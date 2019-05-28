@@ -1,14 +1,15 @@
 import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
-lazy val kamuCoreManifests = RootProject(
-  file("../kamu-core-manifests"))
+lazy val kamuCoreManifests = RootProject(file("../kamu-core-manifests"))
 
 lazy val kamuCoreIngestPolling = RootProject(
   file("../kamu-core-ingest-polling"))
 
+lazy val kamuCliMacros = (project in file("./macros"))
+
 lazy val kamuCli = (project in file("."))
-  .aggregate(kamuCoreManifests, kamuCoreIngestPolling)
-  .dependsOn(kamuCoreManifests, kamuCoreIngestPolling)
+  .aggregate(kamuCliMacros, kamuCoreManifests, kamuCoreIngestPolling)
+  .dependsOn(kamuCliMacros, kamuCoreManifests, kamuCoreIngestPolling)
   .settings(
     scalaVersion := "2.11.12",
     organization := "dev.kamu",

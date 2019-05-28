@@ -1,16 +1,20 @@
 package dev.kamu.cli
 
-import java.net.URI
-
-import dev.kamu.core.manifests.DataSourcePolling
 import scopt.OParser
 
 case class Config(
-  id: String = "",
-  url: URI = null,
-  format: String = "",
-  action: String = ""
+  // args
+  repository: Option[String] = None,
+  // commands
+  ingest: Option[IngestConfig] = None,
+  transform: Option[TransformConfig] = None
 )
+
+case class IngestConfig(
+  manifestPath: Option[String] = None
+)
+
+case class TransformConfig()
 
 object KamuApp extends App {
   val builder = OParser.builder[Config]
@@ -20,30 +24,45 @@ object KamuApp extends App {
       programName("kamu"),
       head("Kamu data processing utility"),
       cmd("ingest")
-        .text("Create a dataset linked to an external source")
-        .action((_, c) => c.copy(action = "ingest"))
+        .text("Create a dataset from an external source")
+        .action((_, c) => c.copy(ingest = Some(IngestConfig())))
+        .children(
+          opt[String]('f', "file")
+            .text("Path to a file containing DataSourcePolling manifest")
+            .action((v, c) =>
+              c.copy(ingest = Some(c.ingest.get.copy(manifestPath = Some(v)))))
+        ),
+      cmd("transform")
+        .text("Run a transformation steps for derivative datasets")
+        .action((_, c) => c.copy(transform = Some(TransformConfig())))
         .children(
           opt[String]("id")
-            .text("ID of the new dataset")
-            .required()
-            .action((id, c) => c.copy(id = id)),
-          opt[URI]("url")
-            .text("Data source URL")
-            .required()
-            .action((url, c) => c.copy(url = url)),
-          opt[String]("format")
-            .text("Format")
-            .required()
-            .action((fmt, c) => c.copy(format = fmt))
+            .text("A specific derivative dataset to update")
+            .action((v, c) => c)
         )
     )
   }
 
   OParser.parse(parser, args, Config()) match {
     case Some(c) =>
-      val src = DataSourcePolling(id = c.id, url = c.url, format = c.format)
-      println(s"success $src")
+      if (c.ingest.isDefined) {
+        c.ingest.get.manifestPath match {
+          case Some(manifestPath) =>
+            ingestWithManifest(manifestPath)
+          case _ =>
+            ingestWithWizard()
+        }
+      } else {
+        println(OParser.usage(parser))
+      }
     case _ =>
-      println("failed")
+  }
+
+  def ingestWithManifest(manifestPath: String): Unit = {
+    println(s"ingest using manifest $manifestPath")
+  }
+
+  def ingestWithWizard(): Unit = {
+    println("ingest wizard")
   }
 }

@@ -1,0 +1,6 @@
+apiVersion: 1
+kind: RepositoryVolumeMap
+content:
+  downloadDir: "./data/poll"
+  checkpointDir: "./data/checkpoint"
+  dataDir: "./data/root"
