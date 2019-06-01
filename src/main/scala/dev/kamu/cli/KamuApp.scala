@@ -1,5 +1,10 @@
 package dev.kamu.cli
 
+import java.io.FileInputStream
+import java.net.URI
+
+import dev.kamu.core.manifests.DataSourcePolling
+import org.apache.hadoop.fs.Path
 import scopt.OParser
 
 case class Config(
@@ -11,7 +16,7 @@ case class Config(
 )
 
 case class IngestConfig(
-  manifestPath: Option[String] = None
+  manifestPath: Option[Path] = None
 )
 
 case class TransformConfig()
@@ -29,8 +34,15 @@ object KamuApp extends App {
         .children(
           opt[String]('f', "file")
             .text("Path to a file containing DataSourcePolling manifest")
-            .action((v, c) =>
-              c.copy(ingest = Some(c.ingest.get.copy(manifestPath = Some(v)))))
+            .action(
+              (v, c) =>
+                c.copy(
+                  ingest = Some(
+                    c.ingest.get
+                      .copy(manifestPath = Some(new Path(URI.create(v))))
+                  )
+                )
+            )
         ),
       cmd("transform")
         .text("Run a transformation steps for derivative datasets")
@@ -58,8 +70,12 @@ object KamuApp extends App {
     case _ =>
   }
 
-  def ingestWithManifest(manifestPath: String): Unit = {
+  def ingestWithManifest(manifestPath: Path): Unit = {
     println(s"ingest using manifest $manifestPath")
+    val inputStream = new FileInputStream(manifestPath.toString)
+    val manifest = DataSourcePolling.loadManifest(inputStream)
+    inputStream.close()
+    println(manifest)
   }
 
   def ingestWithWizard(): Unit = {

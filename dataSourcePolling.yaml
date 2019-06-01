@@ -1,6 +1,7 @@
 apiVersion: 1
 kind: DataSourcePolling
 content:
+  id: xxx
   url: ftp://webftp.vancouver.ca/opendata/csv/property_tax_report_csv2018.zip
   compression: zip
   format: csv
