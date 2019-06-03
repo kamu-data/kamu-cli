@@ -22,7 +22,7 @@ lazy val kamuCli = (project in file("."))
       "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0-SNAPSHOT",
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       ("org.apache.hadoop" % "hadoop-common" % "2.6.5")
-        .exclude("commons-collections", "commons-collections")
+        .exclude("commons-beanutils", "commons-beanutils")
         .exclude("commons-beanutils", "commons-beanutils-core"),
       "org.scalatest" %% "scalatest" % "3.0.5" % Test
     ),
