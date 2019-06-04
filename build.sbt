@@ -20,6 +20,7 @@ lazy val kamuCli = (project in file("."))
     libraryDependencies ++= Seq(
       "dev.kamu" %% "kamu-core-manifests" % "0.1.0-SNAPSHOT",
       "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0-SNAPSHOT",
+      "com.jcabi" % "jcabi-log" % "0.17.3",
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       ("org.apache.hadoop" % "hadoop-common" % "2.6.5")
         .exclude("commons-beanutils", "commons-beanutils")

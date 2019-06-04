@@ -7,6 +7,7 @@ import dev.kamu.core.ingest.polling.FSUtils._
 import dev.kamu.core.manifests.{DataSourcePolling, RepositoryVolumeMap}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.log4j.LogManager
 
 import scala.sys.process.{Process, ProcessIO}
 
@@ -14,6 +15,7 @@ class UsageException(message: String = "", cause: Throwable = None.orNull)
     extends RuntimeException(message, cause)
 
 object KamuApp extends App {
+  val logger = LogManager.getLogger(getClass.getName)
   val fileSystem = FileSystem.get(new Configuration())
 
   val cliParser = new CliParser()
@@ -55,7 +57,11 @@ object KamuApp extends App {
     val configJar =
       prepareIngestConfigsJar(dataSourcePolling, repositoryVolumeMap)
 
-    runIngest(configJar)
+    try {
+      runIngest(configJar)
+    } finally {
+      fileSystem.delete(configJar, false)
+    }
   }
 
   def runIngest(configJar: Path): Unit = {
@@ -66,8 +72,10 @@ object KamuApp extends App {
       "--master=local[4]",
       "--class=dev.kamu.core.ingest.polling.IngestApp",
       s"--jars=${configJar.toString}",
-      getAssemblyPath().toString
+      getAssemblyPath.toString
     )
+
+    logger.debug("Spark cmd: " + submitArgs.mkString(" "))
 
     val sparkProcess = Process(submitArgs)
 
@@ -78,9 +86,7 @@ object KamuApp extends App {
       _ => ()
     )
 
-    println("################################################")
-    println("# Starting Spark Job")
-    println("################################################")
+    logger.info("Starting Spark Job")
     sparkProcess.!
   }
 
@@ -111,6 +117,8 @@ object KamuApp extends App {
     val tmpDir = new Path(sys.props("java.io.tmpdir"))
     val configJarPath = tmpDir.resolve("kamu_configs.jar")
 
+    logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
+
     val fileStream = new BufferedOutputStream(
       new FileOutputStream(configJarPath.toString)
     )
@@ -128,7 +136,7 @@ object KamuApp extends App {
     configJarPath
   }
 
-  def getAssemblyPath(): Path = {
+  def getAssemblyPath: Path = {
     new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
   }
 
