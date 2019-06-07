@@ -2,8 +2,12 @@
 
 # TODO
 - V define dataset manifest formats and schemas
-- setup verbose logging
-- implement root poll command with passing a manifest in
-- ftp support
-- root dataset creation wizzard (generate based on schema)
+- V setup verbose logging
+- V implement root poll command with passing a manifest in
+- V ftp support
+- V integrate transform
+- multi-file support
+- cleanup poll data
+- replace cache json with yaml
+- root dataset creation wizard (generate based on schema)
 - include usage GIF in the readme

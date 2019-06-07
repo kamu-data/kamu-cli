@@ -6,11 +6,21 @@ lazy val kamuCoreIngestPolling = RootProject(
   file("../kamu-core-ingest-polling")
 )
 
-lazy val kamuCliMacros = (project in file("./macros"))
+lazy val kamuCoreTransformStreaming = RootProject(
+  file("../kamu-core-transform-streaming")
+)
 
 lazy val kamuCli = (project in file("."))
-  .aggregate(kamuCliMacros, kamuCoreManifests, kamuCoreIngestPolling)
-  .dependsOn(kamuCliMacros, kamuCoreManifests, kamuCoreIngestPolling)
+  .aggregate(
+    kamuCoreManifests,
+    kamuCoreIngestPolling,
+    kamuCoreTransformStreaming
+  )
+  .dependsOn(
+    kamuCoreManifests,
+    kamuCoreIngestPolling,
+    kamuCoreTransformStreaming
+  )
   .settings(
     scalaVersion := "2.11.12",
     organization := "dev.kamu",
@@ -20,6 +30,7 @@ lazy val kamuCli = (project in file("."))
     libraryDependencies ++= Seq(
       "dev.kamu" %% "kamu-core-manifests" % "0.1.0-SNAPSHOT",
       "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0-SNAPSHOT",
+      "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0-SNAPSHOT",
       "com.jcabi" % "jcabi-log" % "0.17.3",
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       ("org.apache.hadoop" % "hadoop-common" % "2.6.5")

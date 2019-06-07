@@ -17,7 +17,9 @@ case class IngestOptions(
   manifestPath: Option[Path] = None
 )
 
-case class TransformOptions()
+case class TransformOptions(
+  manifestPath: Option[Path] = None
+)
 
 class CliParser {
   private val builder = OParser.builder[CliOptions]
@@ -46,9 +48,17 @@ class CliParser {
         .text("Run a transformation steps for derivative datasets")
         .action((_, c) => c.copy(transform = Some(TransformOptions())))
         .children(
-          opt[String]("id")
-            .text("A specific derivative dataset to update")
-            .action((v, c) => c)
+          opt[String]('f', "file")
+            .text("Path to a file containing TransformStreaming manifest")
+            .action(
+              (v, c) =>
+                c.copy(
+                  transform = Some(
+                    c.transform.get
+                      .copy(manifestPath = Some(new Path(URI.create(v))))
+                  )
+                )
+            )
         )
     )
   }
