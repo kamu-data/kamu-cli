@@ -40,18 +40,10 @@ object KamuApp extends App {
   try {
     cliOptions match {
       case Some(c) =>
-        if (c.ingest.isDefined) {
-          c.ingest.get.manifestPath match {
-            case Some(manifestPath) =>
-              ingestWithManifest(manifestPath, repositoryVolumeMap)
-            case _ =>
-              ingestWithWizard()
-          }
-        } else if (c.transform.isDefined) {
-          transformWithManifest(
-            c.transform.get.manifestPath.get,
-            repositoryVolumeMap
-          )
+        if (c.ingest.isDefined && c.ingest.get.manifests.nonEmpty) {
+          ingestWithManifest(c.ingest.get.manifests, repositoryVolumeMap)
+        } else if (c.transform.isDefined && c.transform.get.manifests.nonEmpty) {
+          transformWithManifest(c.transform.get.manifests, repositoryVolumeMap)
         } else {
           println(cliParser.usage())
         }
@@ -69,16 +61,19 @@ object KamuApp extends App {
   ///////////////////////////////////////////////////////////////////////////////////////
 
   def ingestWithManifest(
-    manifestPath: Path,
+    manifests: Seq[Path],
     repositoryVolumeMap: RepositoryVolumeMap
   ): Unit = {
-    val inputStream = new FileInputStream(manifestPath.toString)
-    val dataSourcePolling =
-      yaml.load[Manifest[DataSourcePolling]](inputStream).content
-    inputStream.close()
+    val sources = manifests.map(manifestPath => {
+      logger.debug(s"Loading manifest from: $manifestPath")
+      val inputStream = new FileInputStream(manifestPath.toString)
+      val ds = yaml.load[Manifest[DataSourcePolling]](inputStream).content
+      inputStream.close()
+      ds
+    })
 
     val configJar =
-      prepareIngestConfigsJar(dataSourcePolling, repositoryVolumeMap)
+      prepareIngestConfigsJar(sources, repositoryVolumeMap)
 
     try {
       runIngest(configJar)
@@ -116,11 +111,11 @@ object KamuApp extends App {
   }
 
   def prepareIngestConfigsJar(
-    dataSourcePolling: DataSourcePolling,
+    sources: Seq[DataSourcePolling],
     repositoryVolumeMap: RepositoryVolumeMap
   ): Path = {
     val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val configJarPath = tmpDir.resolve("kamu_configs.jar")
+    val configJarPath = tmpDir.resolve("kamu-configs.jar")
 
     logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
 
@@ -129,9 +124,11 @@ object KamuApp extends App {
     )
     val zipStream = new ZipOutputStream(fileStream)
 
-    zipStream.putNextEntry(new ZipEntry("dataSourcePolling.yaml"))
-    yaml.save(dataSourcePolling.asManifest, zipStream)
-    zipStream.closeEntry()
+    for ((source, i) <- sources.zipWithIndex) {
+      zipStream.putNextEntry(new ZipEntry(s"dataSourcePolling_$i.yaml"))
+      yaml.save(source.asManifest, zipStream)
+      zipStream.closeEntry()
+    }
 
     zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
     yaml.save(repositoryVolumeMap.asManifest, zipStream)
@@ -146,16 +143,18 @@ object KamuApp extends App {
   ///////////////////////////////////////////////////////////////////////////////////////
 
   def transformWithManifest(
-    manifestPath: Path,
+    manifests: Seq[Path],
     repositoryVolumeMap: RepositoryVolumeMap
   ): Unit = {
-    val inputStream = new FileInputStream(manifestPath.toString)
-    val transformStreaming =
-      yaml.load[Manifest[TransformStreaming]](inputStream).content
-    inputStream.close()
+    val sources = manifests.map(manifestPath => {
+      logger.debug(s"Loading manifest from: $manifestPath")
+      val inputStream = new FileInputStream(manifestPath.toString)
+      val ts = yaml.load[Manifest[TransformStreaming]](inputStream).content
+      inputStream.close()
+      ts
+    })
 
-    val configJar =
-      prepareTransformConfigsJar(transformStreaming, repositoryVolumeMap)
+    val configJar = prepareTransformConfigsJar(sources, repositoryVolumeMap)
 
     try {
       runTransform(configJar)
@@ -168,11 +167,11 @@ object KamuApp extends App {
 
   // TODO: Deduplicate code
   def prepareTransformConfigsJar(
-    transformStreaming: TransformStreaming,
+    sources: Seq[TransformStreaming],
     repositoryVolumeMap: RepositoryVolumeMap
   ): Path = {
     val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val configJarPath = tmpDir.resolve("kamu_configs.jar")
+    val configJarPath = tmpDir.resolve("kamu-configs.jar")
 
     logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
 
@@ -181,9 +180,11 @@ object KamuApp extends App {
     )
     val zipStream = new ZipOutputStream(fileStream)
 
-    zipStream.putNextEntry(new ZipEntry("transformStreaming.yaml"))
-    yaml.save(transformStreaming.asManifest, zipStream)
-    zipStream.closeEntry()
+    for ((source, i) <- sources.zipWithIndex) {
+      zipStream.putNextEntry(new ZipEntry(s"transformStreaming_$i.yaml"))
+      yaml.save(source.asManifest, zipStream)
+      zipStream.closeEntry()
+    }
 
     zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
     yaml.save(repositoryVolumeMap.asManifest, zipStream)
@@ -244,9 +245,5 @@ object KamuApp extends App {
 
   def getAssemblyPath: Path = {
     new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-  }
-
-  def ingestWithWizard(): Unit = {
-    println("ingest wizard")
   }
 }

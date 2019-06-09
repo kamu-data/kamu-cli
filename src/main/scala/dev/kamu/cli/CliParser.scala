@@ -14,11 +14,11 @@ case class CliOptions(
 )
 
 case class IngestOptions(
-  manifestPath: Option[Path] = None
+  manifests: Seq[Path] = Seq.empty
 )
 
 case class TransformOptions(
-  manifestPath: Option[Path] = None
+  manifests: Seq[Path] = Seq.empty
 )
 
 class CliParser {
@@ -28,18 +28,24 @@ class CliParser {
     OParser.sequence(
       programName("kamu"),
       head("Kamu data processing utility"),
+      help('h', "help").text("prints this usage text"),
       cmd("ingest")
         .text("Create a dataset from an external source")
         .action((_, c) => c.copy(ingest = Some(IngestOptions())))
         .children(
-          opt[String]('f', "file")
-            .text("Path to a file containing DataSourcePolling manifest")
+          arg[String]("<manifest>...")
+            .text("Path to a files containing DataSourcePolling manifests")
+            .unbounded()
+            .optional()
             .action(
-              (v, c) =>
+              (x, c) =>
                 c.copy(
                   ingest = Some(
-                    c.ingest.get
-                      .copy(manifestPath = Some(new Path(URI.create(v))))
+                    c.ingest.get.copy(
+                      manifests = c.ingest.get.manifests :+ new Path(
+                        URI.create(x)
+                      )
+                    )
                   )
                 )
             )
@@ -48,14 +54,19 @@ class CliParser {
         .text("Run a transformation steps for derivative datasets")
         .action((_, c) => c.copy(transform = Some(TransformOptions())))
         .children(
-          opt[String]('f', "file")
-            .text("Path to a file containing TransformStreaming manifest")
+          arg[String]("<manifest>...")
+            .text("Path to a files containing TransformStreaming manifests")
+            .unbounded()
+            .optional()
             .action(
-              (v, c) =>
+              (x, c) =>
                 c.copy(
                   transform = Some(
-                    c.transform.get
-                      .copy(manifestPath = Some(new Path(URI.create(v))))
+                    c.transform.get.copy(
+                      manifests = c.transform.get.manifests :+ new Path(
+                        URI.create(x)
+                      )
+                    )
                   )
                 )
             )
