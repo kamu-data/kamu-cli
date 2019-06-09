@@ -7,10 +7,10 @@
 - V ftp support
 - V integrate transform
 - V Multi-file support
-- Get rid of `spark-warehouse` folder
+- V Get rid of `spark-warehouse` folder
+- V Replace cache json with yaml
 - Suppress HDFS warning on startup
 - cleanup poll data
-- replace cache json with yaml
 - root dataset creation wizard (generate based on schema)
 - Control output verbosity
 - include usage GIF in the readme

@@ -90,6 +90,8 @@ object KamuApp extends App {
     val submitArgs = Seq(
       sparkSubmit.toString,
       "--master=local[4]",
+      "--conf",
+      s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
       "--class=dev.kamu.core.ingest.polling.IngestApp",
       s"--jars=${configJar.toString}",
       getAssemblyPath.toString
@@ -201,6 +203,8 @@ object KamuApp extends App {
     val submitArgs = Seq(
       sparkSubmit.toString,
       "--master=local[4]",
+      "--conf",
+      s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
       "--class=dev.kamu.core.transform.streaming.TransformApp",
       s"--jars=${configJar.toString}",
       getAssemblyPath.toString
@@ -245,5 +249,9 @@ object KamuApp extends App {
 
   def getAssemblyPath: Path = {
     new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+  }
+
+  def getSparkWarehouseDir: Path = {
+    new Path(sys.props("java.io.tmpdir")).resolve("spark-warehouse")
   }
 }
