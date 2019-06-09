@@ -5,6 +5,7 @@ import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import dev.kamu.core.ingest.polling.FSUtils._
 import dev.kamu.core.manifests.{
+  Manifest,
   DataSourcePolling,
   RepositoryVolumeMap,
   TransformStreaming
@@ -14,6 +15,10 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
 import scala.sys.process.{Process, ProcessIO}
+
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import yaml.defaults._
+import pureconfig.generic.auto._
 
 class UsageException(message: String = "", cause: Throwable = None.orNull)
     extends RuntimeException(message, cause)
@@ -68,7 +73,8 @@ object KamuApp extends App {
     repositoryVolumeMap: RepositoryVolumeMap
   ): Unit = {
     val inputStream = new FileInputStream(manifestPath.toString)
-    val dataSourcePolling = DataSourcePolling.loadManifest(inputStream).content
+    val dataSourcePolling =
+      yaml.load[Manifest[DataSourcePolling]](inputStream).content
     inputStream.close()
 
     val configJar =
@@ -124,11 +130,11 @@ object KamuApp extends App {
     val zipStream = new ZipOutputStream(fileStream)
 
     zipStream.putNextEntry(new ZipEntry("dataSourcePolling.yaml"))
-    DataSourcePolling.saveManifest(dataSourcePolling.toManifest, zipStream)
+    yaml.save(dataSourcePolling.asManifest, zipStream)
     zipStream.closeEntry()
 
     zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
-    RepositoryVolumeMap.saveManifest(repositoryVolumeMap.toManifest, zipStream)
+    yaml.save(repositoryVolumeMap.asManifest, zipStream)
     zipStream.closeEntry()
 
     zipStream.close()
@@ -145,7 +151,7 @@ object KamuApp extends App {
   ): Unit = {
     val inputStream = new FileInputStream(manifestPath.toString)
     val transformStreaming =
-      TransformStreaming.loadManifest(inputStream).content
+      yaml.load[Manifest[TransformStreaming]](inputStream).content
     inputStream.close()
 
     val configJar =
@@ -176,11 +182,11 @@ object KamuApp extends App {
     val zipStream = new ZipOutputStream(fileStream)
 
     zipStream.putNextEntry(new ZipEntry("transformStreaming.yaml"))
-    TransformStreaming.saveManifest(transformStreaming.toManifest, zipStream)
+    yaml.save(transformStreaming.asManifest, zipStream)
     zipStream.closeEntry()
 
     zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
-    RepositoryVolumeMap.saveManifest(repositoryVolumeMap.toManifest, zipStream)
+    yaml.save(repositoryVolumeMap.asManifest, zipStream)
     zipStream.closeEntry()
 
     zipStream.close()
