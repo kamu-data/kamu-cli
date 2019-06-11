@@ -10,7 +10,7 @@
 - V Get rid of `spark-warehouse` folder
 - V Replace cache json with yaml
 - V Use docker to run spark
-- Put GeoSpark into image, not dependencies
+- V Put GeoSpark into image, not dependencies
 - Suppress HDFS warning on startup
 - cleanup poll data
 - root dataset creation wizard (generate based on schema)
@@ -18,3 +18,4 @@
 - include usage GIF in the readme
 
 # Post-MVP
+- Upgrade to latest Spark
