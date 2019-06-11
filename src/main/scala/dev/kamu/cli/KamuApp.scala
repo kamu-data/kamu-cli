@@ -3,7 +3,7 @@ package dev.kamu.cli
 import java.io.{BufferedOutputStream, FileInputStream, FileOutputStream}
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import dev.kamu.core.ingest.polling.FSUtils._
+import dev.kamu.core.manifests.utils.fs._
 import dev.kamu.core.manifests.{
   Manifest,
   DataSourcePolling,
@@ -13,8 +13,6 @@ import dev.kamu.core.manifests.{
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
-
-import scala.sys.process.{Process, ProcessIO}
 
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
@@ -35,7 +33,7 @@ object KamuApp extends App {
     checkpointDir = new Path("./.checkpoint"),
     dataDirRoot = new Path("./root"),
     dataDirDeriv = new Path("./deriv")
-  )
+  ).toAbsolute(fileSystem)
 
   try {
     cliOptions match {
@@ -76,40 +74,16 @@ object KamuApp extends App {
       prepareIngestConfigsJar(sources, repositoryVolumeMap)
 
     try {
-      runIngest(configJar)
+      getSparkRunner.submit(
+        repo = repositoryVolumeMap,
+        appClass = "dev.kamu.core.ingest.polling.IngestApp",
+        jars = Seq(configJar)
+      )
     } finally {
       fileSystem.delete(configJar, false)
     }
 
     logger.info("Ingestion completed successfully!")
-  }
-
-  def runIngest(configJar: Path): Unit = {
-    val sparkSubmit = findSparkSubmitBin()
-
-    val submitArgs = Seq(
-      sparkSubmit.toString,
-      "--master=local[4]",
-      "--conf",
-      s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
-      "--class=dev.kamu.core.ingest.polling.IngestApp",
-      s"--jars=${configJar.toString}",
-      getAssemblyPath.toString
-    )
-
-    logger.debug("Spark cmd: " + submitArgs.mkString(" "))
-
-    val sparkProcess = Process(submitArgs)
-
-    val processIO = new ProcessIO(
-      _ => (),
-      stdout =>
-        scala.io.Source.fromInputStream(stdout).getLines.foreach(println),
-      _ => ()
-    )
-
-    logger.info("Starting Spark job")
-    sparkProcess.!
   }
 
   def prepareIngestConfigsJar(
@@ -159,7 +133,11 @@ object KamuApp extends App {
     val configJar = prepareTransformConfigsJar(sources, repositoryVolumeMap)
 
     try {
-      runTransform(configJar)
+      getSparkRunner.submit(
+        repo = repositoryVolumeMap,
+        appClass = "dev.kamu.core.transform.streaming.TransformApp",
+        jars = Seq(configJar)
+      )
     } finally {
       fileSystem.delete(configJar, false)
     }
@@ -196,62 +174,12 @@ object KamuApp extends App {
     configJarPath
   }
 
-  // TODO: Deduplicate code
-  def runTransform(configJar: Path): Unit = {
-    val sparkSubmit = findSparkSubmitBin()
-
-    val submitArgs = Seq(
-      sparkSubmit.toString,
-      "--master=local[4]",
-      "--conf",
-      s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
-      "--class=dev.kamu.core.transform.streaming.TransformApp",
-      s"--jars=${configJar.toString}",
-      getAssemblyPath.toString
-    )
-
-    logger.debug("Spark cmd: " + submitArgs.mkString(" "))
-
-    val sparkProcess = Process(submitArgs)
-
-    val processIO = new ProcessIO(
-      _ => (),
-      stdout =>
-        scala.io.Source.fromInputStream(stdout).getLines.foreach(println),
-      _ => ()
-    )
-
-    logger.info("Starting Spark job")
-    sparkProcess.!
-  }
-
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def findSparkSubmitBin(): Path = {
-    val sparkHome = sys.env.get("SPARK_HOME")
-    if (sparkHome.isEmpty)
-      throw new UsageException(
-        "Can't find $SPARK_HOME environment variable. " +
-          "Make sure Spark is installed."
-      )
-
-    val sparkSubmit = new Path(sparkHome.get)
-      .resolve("bin")
-      .resolve("spark-submit")
-
-    if (!fileSystem.isFile(sparkSubmit))
-      throw new UsageException(
-        s"Can't find spark-submit binary in ${sparkSubmit.toString}"
-      )
-
-    sparkSubmit
-  }
-
-  def getAssemblyPath: Path = {
-    new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-  }
-
-  def getSparkWarehouseDir: Path = {
-    new Path(sys.props("java.io.tmpdir")).resolve("spark-warehouse")
+  def getSparkRunner: SparkRunner = {
+    if (cliOptions.get.useLocalSpark)
+      new SparkRunnerLocal(fileSystem)
+    else
+      new SparkRunnerDocker(fileSystem)
   }
 }

@@ -1,0 +1,3 @@
+FROM kamu/spark:2.4.0
+
+# https://github.com/apache/spark/pull/23898

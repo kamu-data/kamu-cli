@@ -7,6 +7,7 @@ import scopt.OParser
 
 case class CliOptions(
   // args
+  useLocalSpark: Boolean = false,
   repository: Option[String] = None,
   // commands
   ingest: Option[IngestOptions] = None,
@@ -29,6 +30,9 @@ class CliParser {
       programName("kamu"),
       head("Kamu data processing utility"),
       help('h', "help").text("prints this usage text"),
+      opt[Unit]("local-spark")
+        .text("Use local spark installation")
+        .action((_, c) => c.copy(useLocalSpark = true)),
       cmd("ingest")
         .text("Create a dataset from an external source")
         .action((_, c) => c.copy(ingest = Some(IngestOptions())))
