@@ -1,10 +1,21 @@
-FROM kamu/spark:2.4.0
+FROM kamu/spark-py:2.4.0
 
 # Spark's Dockerfile should be patched with
 # https://github.com/apache/spark/pull/23898
 
-# GeoSpark
+
+# GeoSparks
 RUN cd /opt/spark/jars && \
     rm -f /opt/spark/jars/geospark-*.jar && \
     wget https://github.com/DataSystemsLab/GeoSpark/releases/download/1.2.0-spark-2.3/geospark-1.2.0.jar && \
     wget https://github.com/DataSystemsLab/GeoSpark/releases/download/1.2.0-spark-2.3/geospark-sql_2.3-1.2.0.jar
+
+
+# Livy
+RUN cd /opt && \
+    wget http://apache.forsale.plus/incubator/livy/0.6.0-incubating/apache-livy-0.6.0-incubating-bin.zip && \
+    unzip apache-livy*.zip && rm apache-livy*.zip && mv apache-livy* livy && \
+    mkdir livy/logs
+
+
+ADD entrypoint.sh /opt/entrypoint.sh

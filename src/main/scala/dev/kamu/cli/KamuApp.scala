@@ -38,7 +38,9 @@ object KamuApp extends App {
   try {
     cliOptions match {
       case Some(c) =>
-        if (c.ingest.isDefined && c.ingest.get.manifests.nonEmpty) {
+        if (c.list.isDefined) {
+          listDatasets(repositoryVolumeMap)
+        } else if (c.ingest.isDefined && c.ingest.get.manifests.nonEmpty) {
           ingestWithManifest(c.ingest.get.manifests, repositoryVolumeMap)
         } else if (c.transform.isDefined && c.transform.get.manifests.nonEmpty) {
           transformWithManifest(c.transform.get.manifests, repositoryVolumeMap)
@@ -52,6 +54,24 @@ object KamuApp extends App {
     case usg: UsageException =>
       Console.err.println(s"[ERROR] ${usg.getMessage}")
       sys.exit(1)
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  // List
+  ///////////////////////////////////////////////////////////////////////////////////////
+
+  def listDatasets(repositoryVolumeMap: RepositoryVolumeMap): Unit = {
+    val rootDatasets = fileSystem
+      .listStatus(repositoryVolumeMap.dataDirRoot)
+      .map(_.getPath.getName)
+
+    val derivDatasets = fileSystem
+      .listStatus(repositoryVolumeMap.dataDirDeriv)
+      .map(_.getPath.getName)
+
+    println("ID, Kind")
+    rootDatasets.foreach(ds => println(s"$ds, root"))
+    derivDatasets.foreach(ds => println(s"$ds, deriv"))
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////

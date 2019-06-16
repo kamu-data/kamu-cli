@@ -10,6 +10,7 @@ case class CliOptions(
   useLocalSpark: Boolean = false,
   repository: Option[String] = None,
   // commands
+  list: Option[Unit] = None,
   ingest: Option[IngestOptions] = None,
   transform: Option[TransformOptions] = None
 )
@@ -33,6 +34,9 @@ class CliParser {
       opt[Unit]("local-spark")
         .text("Use local spark installation")
         .action((_, c) => c.copy(useLocalSpark = true)),
+      cmd("list")
+        .text("List all datasets in the repository")
+        .action((_, c) => c.copy(list = Some(Nil))),
       cmd("ingest")
         .text("Create a dataset from an external source")
         .action((_, c) => c.copy(ingest = Some(IngestOptions())))
