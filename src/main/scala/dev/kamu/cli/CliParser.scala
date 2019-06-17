@@ -12,7 +12,8 @@ case class CliOptions(
   // commands
   list: Option[Unit] = None,
   ingest: Option[IngestOptions] = None,
-  transform: Option[TransformOptions] = None
+  transform: Option[TransformOptions] = None,
+  notebook: Option[Unit] = None
 )
 
 case class IngestOptions(
@@ -78,7 +79,12 @@ class CliParser {
                   )
                 )
             )
+        ),
+      cmd("notebook")
+        .text(
+          "Start the Jupyter notebook server to explore the data in the repository"
         )
+        .action((_, c) => c.copy(notebook = Some(Nil)))
     )
   }
 

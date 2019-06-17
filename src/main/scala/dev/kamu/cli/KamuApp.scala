@@ -44,6 +44,8 @@ object KamuApp extends App {
           ingestWithManifest(c.ingest.get.manifests, repositoryVolumeMap)
         } else if (c.transform.isDefined && c.transform.get.manifests.nonEmpty) {
           transformWithManifest(c.transform.get.manifests, repositoryVolumeMap)
+        } else if (c.notebook.isDefined) {
+          startNotebook(repositoryVolumeMap)
         } else {
           println(cliParser.usage())
         }
@@ -195,11 +197,24 @@ object KamuApp extends App {
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
+  // Notebook
+  ///////////////////////////////////////////////////////////////////////////////////////
+
+  def startNotebook(repositoryVolumeMap: RepositoryVolumeMap): Unit = {
+    val runner = getNotebookRunner
+    runner.start()
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////
 
   def getSparkRunner: SparkRunner = {
     if (cliOptions.get.useLocalSpark)
       new SparkRunnerLocal(fileSystem)
     else
       new SparkRunnerDocker(fileSystem)
+  }
+
+  def getNotebookRunner: NotebookRunnerDocker = {
+    new NotebookRunnerDocker(fileSystem)
   }
 }

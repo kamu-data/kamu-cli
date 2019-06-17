@@ -33,13 +33,6 @@ class SparkRunnerLocal(
 
     val sparkProcess = Process(submitArgs)
 
-    /*val processIO = new ProcessIO(
-      _ => (),
-      stdout =>
-        scala.io.Source.fromInputStream(stdout).getLines.foreach(println),
-      _ => ()
-    )*/
-
     logger.info("Starting Spark job")
 
     val exitCode = sparkProcess.!

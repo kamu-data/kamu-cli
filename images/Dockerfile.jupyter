@@ -1,0 +1,8 @@
+FROM python:3.7.3-slim-stretch
+
+ADD requirements.jupyter.txt /opt/requirements.txt
+RUN pip --no-cache-dir install -r /opt/requirements.txt
+
+WORKDIR /opt/workdir
+EXPOSE 80/tcp
+ENTRYPOINT ["jupyter", "notebook", "--ip", "0.0.0.0", "--port", "80", "--allow-root"]
