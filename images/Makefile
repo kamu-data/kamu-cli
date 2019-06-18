@@ -38,4 +38,4 @@ jupyter:
 
 .PHONY: requirements
 requirements:
-	pip-compile -v requirements.jupyter.in -o requirements.jupyter.txt
+	pip-compile -v -r requirements.jupyter.in -o requirements.jupyter.txt
