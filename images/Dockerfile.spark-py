@@ -15,7 +15,8 @@ RUN cd /opt/spark/jars && \
 RUN cd /opt && \
     wget http://apache.forsale.plus/incubator/livy/0.6.0-incubating/apache-livy-0.6.0-incubating-bin.zip && \
     unzip apache-livy*.zip && rm apache-livy*.zip && mv apache-livy* livy && \
-    mkdir livy/logs
+    mkdir livy/logs && \
+    cp livy/conf/log4j.properties.template livy/conf/log4j.properties
 
 
 ADD entrypoint.sh /opt/entrypoint.sh

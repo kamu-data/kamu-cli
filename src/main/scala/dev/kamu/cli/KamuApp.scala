@@ -215,6 +215,6 @@ object KamuApp extends App {
   }
 
   def getNotebookRunner: NotebookRunnerDocker = {
-    new NotebookRunnerDocker(fileSystem)
+    new NotebookRunnerDocker(fileSystem, repositoryVolumeMap)
   }
 }

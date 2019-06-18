@@ -17,7 +17,7 @@
 #
 
 # echo commands to the terminal output
-set -ex
+set -e
 
 # Check whether there is a passwd entry for the container UID
 myuid=$(id -u)

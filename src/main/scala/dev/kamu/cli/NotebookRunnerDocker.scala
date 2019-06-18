@@ -3,6 +3,7 @@ package dev.kamu.cli
 import java.awt.Desktop
 import java.net.URI
 
+import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import sun.misc.{Signal, SignalHandler}
@@ -11,31 +12,103 @@ import scala.sys.process.{Process, ProcessIO}
 
 class NotebookRunnerDocker(
   fileSystem: FileSystem,
-  sparkImage: String = "kamu/spark-py:2.4.0_0.0.1"
+  repositoryVolumeMap: RepositoryVolumeMap
 ) {
   protected val logger = LogManager.getLogger(getClass.getName)
 
   def start(): Unit = {
-    val jupyterProcess = new JupyterProcess(fileSystem)
+    val network = "kamu"
+    createNetwork(network)
+
+    val livy = new LivyProcess(fileSystem, repositoryVolumeMap, network)
+    val jupyter = new JupyterProcess(fileSystem, network)
 
     Signal.handle(new Signal("INT"), new SignalHandler {
       override def handle(signal: Signal): Unit = {
-        jupyterProcess.stop()
+        jupyter.stop()
+        livy.stop()
       }
     })
 
     try {
-      val jupyterProc = jupyterProcess.run()
-      jupyterProcess.openBrowserWhenReady()
-      jupyterProc.exitValue()
+      val livyProcess = livy.run()
+      val jupyterProcess = jupyter.run()
+      jupyter.openBrowserWhenReady()
+      jupyterProcess.exitValue()
+      livyProcess.exitValue()
     } finally {
-      jupyterProcess.stop()
+      jupyter.stop()
+      livy.stop()
     }
+  }
+
+  def createNetwork(network: String): Unit = {
+    val cmd = Seq("docker", "network", "create", network)
+    logger.debug("Docker cmd: " + cmd.mkString(" "))
+    Process(cmd).!
+  }
+}
+
+class LivyProcess(
+  fileSystem: FileSystem,
+  repositoryVolumeMap: RepositoryVolumeMap,
+  network: String,
+  image: String = "kamu/spark-py:2.4.0_0.0.1"
+) {
+  protected val logger = LogManager.getLogger(getClass.getName)
+
+  val containerName = "kamu-livy"
+
+  def run(): Process = {
+    val cmd = Seq(
+      "docker",
+      "run",
+      "--rm",
+      "-t",
+      "-p",
+      "8998",
+      "--hostname",
+      containerName,
+      "--network",
+      network,
+      "--name",
+      containerName,
+      image,
+      "livy"
+    )
+
+    logger.debug("Docker cmd: " + cmd.mkString(" "))
+
+    val processBuilder = Process(cmd)
+    processBuilder.run(ioHandler)
+  }
+
+  def stop(): Unit = {
+    val killCmd = Seq("docker", "kill", "--signal=TERM", containerName)
+    logger.debug("Docker cmd: " + killCmd.mkString(" "))
+    Process(killCmd).!
+  }
+
+  def ioHandler: ProcessIO = {
+    new ProcessIO(
+      _ => (),
+      stdout =>
+        scala.io.Source
+          .fromInputStream(stdout)
+          .getLines
+          .foreach(l => println("[livy] " + l)),
+      stderr =>
+        scala.io.Source
+          .fromInputStream(stderr)
+          .getLines()
+          .foreach(l => System.err.println("[livy] " + l))
+    )
   }
 }
 
 class JupyterProcess(
   fileSystem: FileSystem,
+  network: String,
   image: String = "kamu/jupyter:0.0.1"
 ) {
   protected val logger = LogManager.getLogger(getClass.getName)
@@ -45,12 +118,13 @@ class JupyterProcess(
   var token: String = ""
 
   def run(): Process = {
-
     val cmd = Seq(
       "docker",
       "run",
       "--rm",
       "-t",
+      "--network",
+      network,
       "-v",
       s"${fileSystem.getWorkingDirectory.toUri.getPath}:/opt/workdir",
       "-P",
@@ -89,7 +163,7 @@ class JupyterProcess(
             }
           }
 
-          println(line)
+          println("[jupyter] " + line)
         }
 
       },
@@ -97,7 +171,7 @@ class JupyterProcess(
         scala.io.Source
           .fromInputStream(stderr)
           .getLines()
-          .foreach(System.err.println)
+          .foreach(l => System.err.println("[jupyter] " + l))
     )
   }
 
