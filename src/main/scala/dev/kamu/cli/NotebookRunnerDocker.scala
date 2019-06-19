@@ -44,9 +44,7 @@ class NotebookRunnerDocker(
   }
 
   def createNetwork(network: String): Unit = {
-    val cmd = Seq("docker", "network", "create", network)
-    logger.debug("Docker cmd: " + cmd.mkString(" "))
-    Process(cmd).!
+    new DockerClient().prepare(Seq("docker", "network", "create", network)).!
   }
 }
 
@@ -59,20 +57,10 @@ class LivyProcess(
   protected val logger = LogManager.getLogger(getClass.getName)
 
   val containerName = "kamu-livy"
+  val dockerClient = new DockerClient()
 
   def run(): Process = {
-    val volumes = Seq(
-      "-v",
-      repositoryVolumeMap.dataDirRoot.toUri.getPath + ":/opt/spark/work-dir/root",
-      "-v",
-      repositoryVolumeMap.dataDirDeriv.toUri.getPath + ":/opt/spark/work-dir/deriv"
-    )
-
-    val cmd = Seq(
-      "docker",
-      "run",
-      "--rm",
-      "-t",
+    val dockerArgs = Seq(
       "-p",
       "8998",
       "--hostname",
@@ -80,22 +68,24 @@ class LivyProcess(
       "--network",
       network,
       "--name",
-      containerName
-    ) ++ volumes ++ Seq(
-      image,
-      "livy"
+      containerName,
+      "-v",
+      repositoryVolumeMap.dataDirRoot.toUri.getPath + ":/opt/spark/work-dir/root",
+      "-v",
+      repositoryVolumeMap.dataDirDeriv.toUri.getPath + ":/opt/spark/work-dir/deriv"
     )
 
-    logger.debug("Docker cmd: " + cmd.mkString(" "))
-
-    val processBuilder = Process(cmd)
+    val cmd = dockerClient.makeRunCmd(
+      image = image,
+      args = Seq("livy"),
+      extraArgs = dockerArgs
+    )
+    val processBuilder = dockerClient.prepare(cmd)
     processBuilder.run(ioHandler)
   }
 
   def stop(): Unit = {
-    val killCmd = Seq("docker", "kill", "--signal=TERM", containerName)
-    logger.debug("Docker cmd: " + killCmd.mkString(" "))
-    Process(killCmd).!
+    dockerClient.kill(containerName)
   }
 
   def ioHandler: ProcessIO = {
@@ -125,17 +115,10 @@ class JupyterProcess(
   val containerName = "kamu-jupyter"
   var port: Long = 0
   var token: String = ""
+  val dockerClient = new DockerClient()
 
   def run(): Process = {
-    val envVars = Seq("MAPBOX_ACCESS_TOKEN")
-      .filter(e => sys.env.contains(e))
-      .flatMap(e => Seq("-e", s"$e=${sys.env(e)}"))
-
-    val cmd = Seq(
-      "docker",
-      "run",
-      "--rm",
-      "-t",
+    val dockerArgs = Seq(
       "--network",
       network,
       "-v",
@@ -143,13 +126,13 @@ class JupyterProcess(
       "-P",
       "--name",
       containerName
-    ) ++ envVars ++ Seq(
-      image
-    )
+    ) ++ Seq(
+      "MAPBOX_ACCESS_TOKEN"
+    ).filter(e => sys.env.contains(e))
+      .flatMap(e => Seq("-e", s"$e=${sys.env(e)}"))
 
-    logger.debug("Docker cmd: " + cmd.mkString(" "))
-
-    val processBuilder = Process(cmd)
+    val cmd = dockerClient.makeRunCmd(image = image, extraArgs = dockerArgs)
+    val processBuilder = dockerClient.prepare(cmd)
     processBuilder.run(ioHandler)
   }
 
@@ -202,7 +185,8 @@ class JupyterProcess(
               pi.wait()
             }
           }
-          val containerPort = dockerGetHostPort(containerName, "80/tcp")
+          val containerPort =
+            dockerClient.inspectHostPort(containerName, "80/tcp")
           val uri = URI.create(s"http://localhost:$containerPort/?token=$token")
 
           logger.info(s"Opening in browser: $uri")
@@ -215,41 +199,31 @@ class JupyterProcess(
     }
   }
 
-  def dockerGetHostPort(container: String, port: String): String = {
-    val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "\") 0).HostPort }}"
-    val cmd = Seq("docker", "inspect", format, container)
-    Process(cmd).!!.stripLineEnd
-  }
-
   def stop(): Unit = {
-    val killCmd = Seq("docker", "kill", "--signal=TERM", containerName)
-    logger.debug("Docker cmd: " + killCmd.mkString(" "))
-    Process(killCmd).!
+    dockerClient.kill(containerName)
   }
 
   // TODO: avoid this by setting up correct user inside the container
   def chown(): Unit = {
     logger.debug("Fixing file ownership")
 
-    val unix = new com.sun.security.auth.module.UnixSystem()
-
-    val cmd = Seq(
-      "docker",
-      "run",
-      "--rm",
-      "-t",
+    val dockerArgs = Seq(
       "-v",
-      s"${fileSystem.getWorkingDirectory.toUri.getPath}:/opt/workdir",
-      "--entrypoint",
+      s"${fileSystem.getWorkingDirectory.toUri.getPath}:/opt/workdir"
+    )
+
+    val unix = new com.sun.security.auth.module.UnixSystem()
+    val shellCommand = Seq(
       "chown",
-      image,
       "-R",
       s"${unix.getUid}:${unix.getGid}",
       "/opt/workdir"
     )
 
-    logger.debug("Docker cmd: " + cmd.mkString(" "))
-    val process = Process(cmd)
-    process.!
+    dockerClient.runShell(
+      image = image,
+      shellCommand = shellCommand,
+      extraArgs = dockerArgs
+    )
   }
 }

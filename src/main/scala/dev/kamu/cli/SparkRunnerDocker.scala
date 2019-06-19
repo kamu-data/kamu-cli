@@ -32,17 +32,9 @@ class SparkRunnerDocker(
       .flatMap(p => Seq("-v", s"$p:$p"))
 
     val dockerArgs = Seq(
-      "docker",
-      "run",
-      "--rm",
-      "-t",
-      "--entrypoint",
-      "bash",
       "-v",
       s"${assemblyPath.toUri.getPath}:$assemblyPathInContainer"
-    ) ++ jarVolumes ++ repoVolumes ++ Seq(
-      image
-    )
+    ) ++ jarVolumes ++ repoVolumes
 
     val submitArgs = List(
       "/opt/spark/bin/spark-submit",
@@ -55,35 +47,30 @@ class SparkRunnerDocker(
     )
 
     logger.info("Starting Spark job")
-    runDocker(dockerArgs, submitArgs)
+
+    val dockerClient = new DockerClient()
+    dockerClient.runShell(
+      image = image,
+      shellCommand = submitArgs,
+      extraArgs = dockerArgs
+    )
 
     // TODO: avoid this by setting up correct user inside the container
     logger.debug("Fixing file ownership")
+
     val unix = new com.sun.security.auth.module.UnixSystem()
-    runDocker(
-      dockerArgs,
-      Seq(
-        "chown",
-        "-R",
-        s"${unix.getUid}:${unix.getGid}"
-      ) ++ repo.allPaths.map(
-        p => p.toUri.getPath
-      )
+    val chownArgs = Seq(
+      "chown",
+      "-R",
+      s"${unix.getUid}:${unix.getGid}"
+    ) ++ repo.allPaths.map(
+      p => p.toUri.getPath
     )
-  }
 
-  def runDocker(dockerArgs: Seq[String], shellCommand: Seq[String]): Unit = {
-    val cmd = dockerArgs ++ Seq("-c", shellCommand.mkString(" "))
-
-    logger.debug("Docker cmd: " + cmd.mkString(" "))
-
-    val process = Process(cmd)
-
-    val exitCode = process.!
-
-    if (exitCode != 0)
-      throw new RuntimeException(
-        s"Command failed with exit code $exitCode: ${cmd.mkString(" ")}"
-      )
+    dockerClient.runShell(
+      image = image,
+      shellCommand = chownArgs,
+      extraArgs = dockerArgs
+    )
   }
 }
