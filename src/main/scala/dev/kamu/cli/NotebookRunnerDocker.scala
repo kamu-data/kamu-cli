@@ -39,6 +39,7 @@ class NotebookRunnerDocker(
     } finally {
       jupyter.stop()
       livy.stop()
+      jupyter.chown()
     }
   }
 
@@ -60,6 +61,13 @@ class LivyProcess(
   val containerName = "kamu-livy"
 
   def run(): Process = {
+    val volumes = Seq(
+      "-v",
+      repositoryVolumeMap.dataDirRoot.toUri.getPath + ":/opt/spark/work-dir/root",
+      "-v",
+      repositoryVolumeMap.dataDirDeriv.toUri.getPath + ":/opt/spark/work-dir/deriv"
+    )
+
     val cmd = Seq(
       "docker",
       "run",
@@ -71,12 +79,9 @@ class LivyProcess(
       containerName,
       "--network",
       network,
-      "-v",
-      repositoryVolumeMap.dataDirRoot.toUri.getPath + ":/opt/spark/work-dir/root",
-      "-v",
-      repositoryVolumeMap.dataDirDeriv.toUri.getPath + ":/opt/spark/work-dir/deriv",
       "--name",
-      containerName,
+      containerName
+    ) ++ volumes ++ Seq(
       image,
       "livy"
     )
@@ -122,6 +127,10 @@ class JupyterProcess(
   var token: String = ""
 
   def run(): Process = {
+    val envVars = Seq("MAPBOX_ACCESS_TOKEN")
+      .filter(e => sys.env.contains(e))
+      .flatMap(e => Seq("-e", s"$e=${sys.env(e)}"))
+
     val cmd = Seq(
       "docker",
       "run",
@@ -133,7 +142,8 @@ class JupyterProcess(
       s"${fileSystem.getWorkingDirectory.toUri.getPath}:/opt/workdir",
       "-P",
       "--name",
-      containerName,
+      containerName
+    ) ++ envVars ++ Seq(
       image
     )
 
@@ -215,5 +225,31 @@ class JupyterProcess(
     val killCmd = Seq("docker", "kill", "--signal=TERM", containerName)
     logger.debug("Docker cmd: " + killCmd.mkString(" "))
     Process(killCmd).!
+  }
+
+  // TODO: avoid this by setting up correct user inside the container
+  def chown(): Unit = {
+    logger.debug("Fixing file ownership")
+
+    val unix = new com.sun.security.auth.module.UnixSystem()
+
+    val cmd = Seq(
+      "docker",
+      "run",
+      "--rm",
+      "-t",
+      "-v",
+      s"${fileSystem.getWorkingDirectory.toUri.getPath}:/opt/workdir",
+      "--entrypoint",
+      "chown",
+      image,
+      "-R",
+      s"${unix.getUid}:${unix.getGid}",
+      "/opt/workdir"
+    )
+
+    logger.debug("Docker cmd: " + cmd.mkString(" "))
+    val process = Process(cmd)
+    process.!
   }
 }
