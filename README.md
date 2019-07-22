@@ -15,20 +15,23 @@
 - V Create Jupyter + SparkMagic + Kamu image
 - V Create `notebook` command to launch Jupyter
 - V Permission fix-up for `notebook` command
-- Rethink repository structure and how datasets are linked
+- V Rethink repository structure and how datasets are linked
+- V Implement `pull` command to refresh dataset
+- V Implement `list` command showing datasets and their metadata
+- Handle dependencies between datasets
+- DOT graph output
+- Implement recursive mode for `pull` command
 - Implement `status` command showing which data is out-of-date
-- Implement `pull` command to refresh dataset
-- Implement `list` command showing datasets and their metadata
 - Cleanup poll data
+- Implement file `import` and `export`
 - Root dataset creation wizard (generate based on schema)
 - Simplify historical vocab
 - Control output verbosity
+- Add `sql` shell
 - Include usage GIF in the readme
-- Handle dependencies between datasets
 
 # Post-MVP
-- Suppress HDFS warning on startup
+- V Suppress HDFS warning on startup
 - Upgrade to latest Spark
 - Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
-- DOT graph output
