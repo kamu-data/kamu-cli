@@ -10,18 +10,19 @@ case class CliOptions(
   useLocalSpark: Boolean = false,
   repository: Option[String] = None,
   // commands
+  init: Option[Unit] = None,
   list: Option[Unit] = None,
-  ingest: Option[IngestOptions] = None,
-  transform: Option[TransformOptions] = None,
+  add: Option[AddOptions] = None,
+  pull: Option[PullOptions] = None,
   notebook: Option[Unit] = None
 )
 
-case class IngestOptions(
+case class AddOptions(
   manifests: Seq[Path] = Seq.empty
 )
 
-case class TransformOptions(
-  manifests: Seq[Path] = Seq.empty
+case class PullOptions(
+  ids: Seq[String] = Seq.empty
 )
 
 class CliParser {
@@ -35,23 +36,26 @@ class CliParser {
       opt[Unit]("local-spark")
         .text("Use local spark installation")
         .action((_, c) => c.copy(useLocalSpark = true)),
+      cmd("init")
+        .text("Initialize the repository in the current directory")
+        .action((_, c) => c.copy(init = Some(Nil))),
       cmd("list")
         .text("List all datasets in the repository")
         .action((_, c) => c.copy(list = Some(Nil))),
-      cmd("ingest")
-        .text("Create a dataset from an external source")
-        .action((_, c) => c.copy(ingest = Some(IngestOptions())))
+      cmd("add")
+        .text("Add a new dataset")
+        .action((_, c) => c.copy(add = Some(AddOptions())))
         .children(
           arg[String]("<manifest>...")
-            .text("Path to a files containing DataSourcePolling manifests")
+            .text("Paths to the manifest files containing dataset definitions")
             .unbounded()
             .optional()
             .action(
               (x, c) =>
                 c.copy(
-                  ingest = Some(
-                    c.ingest.get.copy(
-                      manifests = c.ingest.get.manifests :+ new Path(
+                  add = Some(
+                    c.add.get.copy(
+                      manifests = c.add.get.manifests :+ new Path(
                         URI.create(x)
                       )
                     )
@@ -59,22 +63,20 @@ class CliParser {
                 )
             )
         ),
-      cmd("transform")
-        .text("Run a transformation steps for derivative datasets")
-        .action((_, c) => c.copy(transform = Some(TransformOptions())))
+      cmd("pull")
+        .text("Pull new data for some specific or all datasets")
+        .action((_, c) => c.copy(pull = Some(PullOptions())))
         .children(
           arg[String]("<manifest>...")
             .text("Path to a files containing TransformStreaming manifests")
             .unbounded()
             .optional()
             .action(
-              (x, c) =>
+              (id, c) =>
                 c.copy(
-                  transform = Some(
-                    c.transform.get.copy(
-                      manifests = c.transform.get.manifests :+ new Path(
-                        URI.create(x)
-                      )
+                  pull = Some(
+                    c.pull.get.copy(
+                      ids = c.pull.get.ids :+ id
                     )
                   )
                 )

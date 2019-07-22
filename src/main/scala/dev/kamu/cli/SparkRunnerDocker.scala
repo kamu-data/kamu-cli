@@ -5,8 +5,6 @@ import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
-import scala.sys.process.Process
-
 class SparkRunnerDocker(
   fileSystem: FileSystem,
   image: String = "kamu/spark:2.4.0_0.0.1"

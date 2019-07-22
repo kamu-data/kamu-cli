@@ -118,6 +118,8 @@ class JupyterProcess(
   val dockerClient = new DockerClient()
 
   def run(): Process = {
+    val propagateEnv = Seq("MAPBOX_ACCESS_TOKEN")
+
     val dockerArgs = Seq(
       "--network",
       network,
@@ -126,9 +128,8 @@ class JupyterProcess(
       "-P",
       "--name",
       containerName
-    ) ++ Seq(
-      "MAPBOX_ACCESS_TOKEN"
-    ).filter(e => sys.env.contains(e))
+    ) ++ propagateEnv
+      .filter(e => sys.env.contains(e))
       .flatMap(e => Seq("-e", s"$e=${sys.env(e)}"))
 
     val cmd = dockerClient.makeRunCmd(image = image, extraArgs = dockerArgs)

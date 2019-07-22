@@ -1,53 +1,72 @@
 package dev.kamu.cli
 
-import java.io.{BufferedOutputStream, FileInputStream, FileOutputStream}
-import java.util.zip.{ZipEntry, ZipOutputStream}
-
-import dev.kamu.core.manifests.utils.fs._
-import dev.kamu.core.manifests.{
-  Manifest,
-  DataSourcePolling,
-  RepositoryVolumeMap,
-  TransformStreaming
+import dev.kamu.cli.commands.{
+  AddManifestCommand,
+  InitCommand,
+  ListCommand,
+  NotebookCommand,
+  PullCommand
 }
+import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
-
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import yaml.defaults._
-import pureconfig.generic.auto._
 
 class UsageException(message: String = "", cause: Throwable = None.orNull)
     extends RuntimeException(message, cause)
 
 object KamuApp extends App {
   val logger = LogManager.getLogger(getClass.getName)
+
   val fileSystem = FileSystem.get(new Configuration())
+  fileSystem.setWriteChecksum(false)
+  fileSystem.setVerifyChecksum(false)
 
   val cliParser = new CliParser()
   val cliOptions = cliParser.parse(args)
 
   val repositoryVolumeMap = RepositoryVolumeMap(
-    downloadDir = new Path("./.poll"),
-    checkpointDir = new Path("./.checkpoint"),
-    dataDirRoot = new Path("./root"),
-    dataDirDeriv = new Path("./deriv")
+    sourcesDir = new Path(".kamu/sources"),
+    downloadDir = new Path(".kamu/downloads"),
+    checkpointDir = new Path(".kamu/checkpoints"),
+    dataDirRoot = new Path(".kamu/data"),
+    dataDirDeriv = new Path(".kamu/data")
   ).toAbsolute(fileSystem)
+
+  val metadataRepository =
+    new MetadataRepository(fileSystem, repositoryVolumeMap)
 
   try {
     cliOptions match {
       case Some(c) =>
-        if (c.list.isDefined) {
-          listDatasets(repositoryVolumeMap)
-        } else if (c.ingest.isDefined && c.ingest.get.manifests.nonEmpty) {
-          ingestWithManifest(c.ingest.get.manifests, repositoryVolumeMap)
-        } else if (c.transform.isDefined && c.transform.get.manifests.nonEmpty) {
-          transformWithManifest(c.transform.get.manifests, repositoryVolumeMap)
-        } else if (c.notebook.isDefined) {
-          startNotebook(repositoryVolumeMap)
+        if (c.init.isDefined) {
+          new InitCommand(fileSystem, repositoryVolumeMap).run()
         } else {
-          println(cliParser.usage())
+          // Other commands need to have repository initialized
+          if (repositoryVolumeMap.allPaths.exists(!fileSystem.exists(_)))
+            throw new UsageException("Not a kamu repository")
+
+          if (c.list.isDefined) {
+            new ListCommand(metadataRepository).run()
+          } else if (c.add.isDefined && c.add.get.manifests.nonEmpty) {
+            new AddManifestCommand(
+              fileSystem,
+              metadataRepository,
+              c.add.get.manifests
+            ).run()
+          } else if (c.pull.isDefined) {
+            new PullCommand(
+              fileSystem,
+              repositoryVolumeMap,
+              metadataRepository,
+              getSparkRunner,
+              c.pull.get.ids
+            ).run()
+          } else if (c.notebook.isDefined) {
+            new NotebookCommand(fileSystem, repositoryVolumeMap).run()
+          } else {
+            println(cliParser.usage())
+          }
         }
       case _ =>
     }
@@ -59,162 +78,11 @@ object KamuApp extends App {
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
-  // List
-  ///////////////////////////////////////////////////////////////////////////////////////
-
-  def listDatasets(repositoryVolumeMap: RepositoryVolumeMap): Unit = {
-    val rootDatasets = fileSystem
-      .listStatus(repositoryVolumeMap.dataDirRoot)
-      .map(_.getPath.getName)
-
-    val derivDatasets = fileSystem
-      .listStatus(repositoryVolumeMap.dataDirDeriv)
-      .map(_.getPath.getName)
-
-    println("ID, Kind")
-    rootDatasets.foreach(ds => println(s"$ds, root"))
-    derivDatasets.foreach(ds => println(s"$ds, deriv"))
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////
-  // Ingest
-  ///////////////////////////////////////////////////////////////////////////////////////
-
-  def ingestWithManifest(
-    manifests: Seq[Path],
-    repositoryVolumeMap: RepositoryVolumeMap
-  ): Unit = {
-    val sources = manifests.map(manifestPath => {
-      logger.debug(s"Loading manifest from: $manifestPath")
-      val inputStream = new FileInputStream(manifestPath.toString)
-      val ds = yaml.load[Manifest[DataSourcePolling]](inputStream).content
-      inputStream.close()
-      ds
-    })
-
-    val configJar =
-      prepareIngestConfigsJar(sources, repositoryVolumeMap)
-
-    try {
-      getSparkRunner.submit(
-        repo = repositoryVolumeMap,
-        appClass = "dev.kamu.core.ingest.polling.IngestApp",
-        jars = Seq(configJar)
-      )
-    } finally {
-      fileSystem.delete(configJar, false)
-    }
-
-    logger.info("Ingestion completed successfully!")
-  }
-
-  def prepareIngestConfigsJar(
-    sources: Seq[DataSourcePolling],
-    repositoryVolumeMap: RepositoryVolumeMap
-  ): Path = {
-    val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val configJarPath = tmpDir.resolve("kamu-configs.jar")
-
-    logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
-
-    val fileStream = new BufferedOutputStream(
-      new FileOutputStream(configJarPath.toString)
-    )
-    val zipStream = new ZipOutputStream(fileStream)
-
-    for ((source, i) <- sources.zipWithIndex) {
-      zipStream.putNextEntry(new ZipEntry(s"dataSourcePolling_$i.yaml"))
-      yaml.save(source.asManifest, zipStream)
-      zipStream.closeEntry()
-    }
-
-    zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
-    yaml.save(repositoryVolumeMap.asManifest, zipStream)
-    zipStream.closeEntry()
-
-    zipStream.close()
-    configJarPath
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////
-  // Transform
-  ///////////////////////////////////////////////////////////////////////////////////////
-
-  def transformWithManifest(
-    manifests: Seq[Path],
-    repositoryVolumeMap: RepositoryVolumeMap
-  ): Unit = {
-    val sources = manifests.map(manifestPath => {
-      logger.debug(s"Loading manifest from: $manifestPath")
-      val inputStream = new FileInputStream(manifestPath.toString)
-      val ts = yaml.load[Manifest[TransformStreaming]](inputStream).content
-      inputStream.close()
-      ts
-    })
-
-    val configJar = prepareTransformConfigsJar(sources, repositoryVolumeMap)
-
-    try {
-      getSparkRunner.submit(
-        repo = repositoryVolumeMap,
-        appClass = "dev.kamu.core.transform.streaming.TransformApp",
-        jars = Seq(configJar)
-      )
-    } finally {
-      fileSystem.delete(configJar, false)
-    }
-
-    logger.info("Transformation completed successfully!")
-  }
-
-  // TODO: Deduplicate code
-  def prepareTransformConfigsJar(
-    sources: Seq[TransformStreaming],
-    repositoryVolumeMap: RepositoryVolumeMap
-  ): Path = {
-    val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val configJarPath = tmpDir.resolve("kamu-configs.jar")
-
-    logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
-
-    val fileStream = new BufferedOutputStream(
-      new FileOutputStream(configJarPath.toString)
-    )
-    val zipStream = new ZipOutputStream(fileStream)
-
-    for ((source, i) <- sources.zipWithIndex) {
-      zipStream.putNextEntry(new ZipEntry(s"transformStreaming_$i.yaml"))
-      yaml.save(source.asManifest, zipStream)
-      zipStream.closeEntry()
-    }
-
-    zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
-    yaml.save(repositoryVolumeMap.asManifest, zipStream)
-    zipStream.closeEntry()
-
-    zipStream.close()
-    configJarPath
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////
-  // Notebook
-  ///////////////////////////////////////////////////////////////////////////////////////
-
-  def startNotebook(repositoryVolumeMap: RepositoryVolumeMap): Unit = {
-    val runner = getNotebookRunner
-    runner.start()
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////
 
   def getSparkRunner: SparkRunner = {
     if (cliOptions.get.useLocalSpark)
       new SparkRunnerLocal(fileSystem)
     else
       new SparkRunnerDocker(fileSystem)
-  }
-
-  def getNotebookRunner: NotebookRunnerDocker = {
-    new NotebookRunnerDocker(fileSystem, repositoryVolumeMap)
   }
 }
