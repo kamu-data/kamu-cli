@@ -19,20 +19,22 @@
 - V Implement `pull` command to refresh dataset
 - V Implement `list` command showing datasets and their metadata
 - V DOT graph output
-- Referential integrity
-- Handle dependencies between datasets
-- Implement recursive mode for `pull` command
+- V Referential integrity
+- V `delete` command
+- V `purge` command
 - Implement `status` command showing which data is out-of-date
-- Cleanup poll data
 - Implement file `import` and `export`
+- Implement recursive mode for `pull` command
 - Root dataset creation wizard (generate based on schema)
 - Simplify historical vocab
 - Control output verbosity
 - Add `sql` shell
 - Include usage GIF in the readme
+- Handle dependencies during `purge`
 
 # Post-MVP
 - V Suppress HDFS warning on startup
 - Upgrade to latest Spark
 - Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
+- Cleanup poll data

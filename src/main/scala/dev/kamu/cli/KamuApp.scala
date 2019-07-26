@@ -7,7 +7,8 @@ import dev.kamu.cli.commands.{
   InitCommand,
   ListCommand,
   NotebookCommand,
-  PullCommand
+  PullCommand,
+  PurgeCommand
 }
 import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.conf.Configuration
@@ -56,6 +57,8 @@ object KamuApp extends App {
               metadataRepository,
               c.add.get.manifests
             ).run()
+          } else if (c.purge.isDefined) {
+            new PurgeCommand(metadataRepository, c.purge.get.ids).run()
           } else if (c.delete.isDefined) {
             new DeleteCommand(metadataRepository, c.delete.get.ids).run()
           } else if (c.pull.isDefined) {

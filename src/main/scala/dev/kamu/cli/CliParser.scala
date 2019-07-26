@@ -13,6 +13,7 @@ case class CliOptions(
   init: Option[Unit] = None,
   list: Option[Unit] = None,
   add: Option[AddOptions] = None,
+  purge: Option[PurgeOptions] = None,
   delete: Option[DeleteOptions] = None,
   pull: Option[PullOptions] = None,
   // commands - extra
@@ -22,6 +23,10 @@ case class CliOptions(
 
 case class AddOptions(
   manifests: Seq[Path] = Seq.empty
+)
+
+case class PurgeOptions(
+  ids: Seq[String] = Seq.empty
 )
 
 case class DeleteOptions(
@@ -65,6 +70,25 @@ class CliParser {
                       manifests = c.add.get.manifests :+ new Path(
                         URI.create(x)
                       )
+                    )
+                  )
+                )
+            )
+        ),
+      cmd("purge")
+        .text("Purge all data of the dataset")
+        .action((_, c) => c.copy(purge = Some(PurgeOptions())))
+        .children(
+          arg[String]("<ID>...")
+            .text("IDs of the datasets to purge")
+            .unbounded()
+            .required()
+            .action(
+              (id, c) =>
+                c.copy(
+                  purge = Some(
+                    c.purge.get.copy(
+                      ids = c.purge.get.ids :+ id
                     )
                   )
                 )

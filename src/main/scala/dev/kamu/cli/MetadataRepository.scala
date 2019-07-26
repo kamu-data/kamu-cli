@@ -127,7 +127,25 @@ class MetadataRepository(
       throw new DanglingReferenceException(referencedBy.map(_.id), id)
 
     val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
-    if (!fileSystem.delete(path, false))
+    if (!fileSystem.exists(path))
       throw new DoesNotExistsException(id)
+
+    getAllDataPaths(id).foreach(p => fileSystem.delete(p, true))
+    fileSystem.delete(path, false)
+  }
+
+  def purgeDataSource(id: DatasetID): Unit = {
+    getDataSource(id)
+    getAllDataPaths(id).foreach(p => fileSystem.delete(p, true))
+    // TODO: Purging a dataset that is used by non-empty derivatives should raise an error
+  }
+
+  def getAllDataPaths(id: DatasetID): Seq[Path] = {
+    Seq(
+      repositoryVolumeMap.dataDirRoot.resolve(id.toString),
+      repositoryVolumeMap.dataDirDeriv.resolve(id.toString),
+      repositoryVolumeMap.checkpointDir.resolve(id.toString),
+      repositoryVolumeMap.downloadDir.resolve(id.toString)
+    )
   }
 }
