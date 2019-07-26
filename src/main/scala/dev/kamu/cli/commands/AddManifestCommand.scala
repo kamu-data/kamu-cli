@@ -1,6 +1,10 @@
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.{MetadataRepository, AlreadyExistsException}
+import dev.kamu.cli.{
+  AlreadyExistsException,
+  MetadataRepository,
+  MissingReferenceException
+}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
@@ -27,10 +31,12 @@ class AddManifestCommand(
           metadataRepository.addDataSource(ds)
           true
         } catch {
-          case _: AlreadyExistsException => {
-            logger.warn(s"Dataset ${ds.id} already exists, skipping")
+          case e: AlreadyExistsException =>
+            logger.warn(e.getMessage + " - skipping")
             false
-          }
+          case e: MissingReferenceException =>
+            logger.warn(e.getMessage + " - skipping")
+            false
         }
       })
       .count(added => added)

@@ -17,8 +17,21 @@ import org.apache.log4j.LogManager
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
-class DoesNotExistsException(s: String) extends Exception(s)
-class AlreadyExistsException(s: String) extends Exception(s)
+class DoesNotExistsException(val datasetID: DatasetID)
+    extends Exception(s"Dataset $datasetID does not exist")
+
+class AlreadyExistsException(val datasetID: DatasetID)
+    extends Exception(s"Dataset $datasetID already exists")
+
+class MissingReferenceException(val fromID: DatasetID, val toID: DatasetID)
+    extends Exception(s"Dataset $fromID refers to non existent dataset $toID")
+
+class DanglingReferenceException(
+  val fromIDs: Seq[DatasetID],
+  val toID: DatasetID
+) extends Exception(
+      s"Dataset $toID is referenced by: " + fromIDs.mkString(", ")
+    )
 
 class MetadataRepository(
   fileSystem: FileSystem,
@@ -30,7 +43,7 @@ class MetadataRepository(
     val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
 
     if (!fileSystem.exists(path))
-      throw new DoesNotExistsException(s"Dataset $id does not exist")
+      throw new DoesNotExistsException(id)
 
     loadDataSource(path)
   }
@@ -77,18 +90,44 @@ class MetadataRepository(
       repositoryVolumeMap.sourcesDir.resolve(ds.id + ".yaml")
 
     if (fileSystem.exists(path)) {
-      throw new AlreadyExistsException(s"Dataset ${ds.id} already exists")
+      throw new AlreadyExistsException(ds.id)
     } else {
       val outputStream = fileSystem.create(path)
+      try {
 
-      ds match {
-        case ds: DataSourcePolling =>
-          yaml.save(ds.asManifest, outputStream)
-        case ds: TransformStreaming =>
-          yaml.save(ds.asManifest, outputStream)
+        ds match {
+          case ds: DataSourcePolling =>
+            yaml.save(ds.asManifest, outputStream)
+          case ds: TransformStreaming =>
+            // Validate references
+            try {
+              ds.dependsOn.map(getDataSource)
+            } catch {
+              case e: DoesNotExistsException =>
+                throw new MissingReferenceException(ds.id, e.datasetID)
+            }
+            yaml.save(ds.asManifest, outputStream)
+        }
+
+      } catch {
+        case e: Exception =>
+          outputStream.close()
+          fileSystem.delete(path, false)
+          throw e
+      } finally {
+        outputStream.close()
       }
-
-      outputStream.close()
     }
+  }
+
+  def deleteDataSource(id: DatasetID): Unit = {
+    // Validate references
+    val referencedBy = getDataSources().filter(_.dependsOn.contains(id))
+    if (referencedBy.nonEmpty)
+      throw new DanglingReferenceException(referencedBy.map(_.id), id)
+
+    val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
+    if (!fileSystem.delete(path, false))
+      throw new DoesNotExistsException(id)
   }
 }

@@ -2,6 +2,7 @@ package dev.kamu.cli
 
 import dev.kamu.cli.commands.{
   AddManifestCommand,
+  DeleteCommand,
   DependencyGraphCommand,
   InitCommand,
   ListCommand,
@@ -55,6 +56,8 @@ object KamuApp extends App {
               metadataRepository,
               c.add.get.manifests
             ).run()
+          } else if (c.delete.isDefined) {
+            new DeleteCommand(metadataRepository, c.delete.get.ids).run()
           } else if (c.pull.isDefined) {
             new PullCommand(
               fileSystem,

@@ -13,6 +13,7 @@ case class CliOptions(
   init: Option[Unit] = None,
   list: Option[Unit] = None,
   add: Option[AddOptions] = None,
+  delete: Option[DeleteOptions] = None,
   pull: Option[PullOptions] = None,
   // commands - extra
   depgraph: Option[Unit] = None,
@@ -21,6 +22,10 @@ case class CliOptions(
 
 case class AddOptions(
   manifests: Seq[Path] = Seq.empty
+)
+
+case class DeleteOptions(
+  ids: Seq[String] = Seq.empty
 )
 
 case class PullOptions(
@@ -60,6 +65,25 @@ class CliParser {
                       manifests = c.add.get.manifests :+ new Path(
                         URI.create(x)
                       )
+                    )
+                  )
+                )
+            )
+        ),
+      cmd("delete")
+        .text("Delete a dataset")
+        .action((_, c) => c.copy(delete = Some(DeleteOptions())))
+        .children(
+          arg[String]("<ID>...")
+            .text("IDs of the datasets to delete")
+            .unbounded()
+            .required()
+            .action(
+              (id, c) =>
+                c.copy(
+                  delete = Some(
+                    c.delete.get.copy(
+                      ids = c.delete.get.ids :+ id
                     )
                   )
                 )
