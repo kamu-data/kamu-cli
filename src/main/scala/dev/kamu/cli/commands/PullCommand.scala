@@ -8,6 +8,7 @@ import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.utils.fs._
 import dev.kamu.core.manifests.{
   DataSourcePolling,
+  DatasetID,
   RepositoryVolumeMap,
   TransformStreaming
 }
@@ -26,7 +27,9 @@ class PullCommand(
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val sources = datasetIDs.map(metadataRepository.getDataSource)
+    val sources = datasetIDs
+      .map(DatasetID)
+      .map(metadataRepository.getDataSource)
 
     val numUpdated = sources
       .map {

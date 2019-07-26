@@ -2,6 +2,7 @@ package dev.kamu.cli
 
 import dev.kamu.cli.commands.{
   AddManifestCommand,
+  DependencyGraphCommand,
   InitCommand,
   ListCommand,
   NotebookCommand,
@@ -62,6 +63,8 @@ object KamuApp extends App {
               getSparkRunner,
               c.pull.get.ids
             ).run()
+          } else if (c.depgraph.isDefined) {
+            new DependencyGraphCommand(metadataRepository).run()
           } else if (c.notebook.isDefined) {
             new NotebookCommand(fileSystem, repositoryVolumeMap).run()
           } else {

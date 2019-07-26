@@ -22,7 +22,7 @@ class ListCommand(
         case ds @ (_: TransformStreaming) => (ds.id, "derivative")
       }
       .sortBy {
-        case (id, _) => id
+        case (id, _) => id.toString
       }
       .foreach {
         case (id, kind) => println(s"$id, $kind")

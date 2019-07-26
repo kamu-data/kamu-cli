@@ -3,6 +3,7 @@ package dev.kamu.cli
 import dev.kamu.core.manifests.{
   DataSource,
   DataSourcePolling,
+  DatasetID,
   Manifest,
   RepositoryVolumeMap,
   TransformStreaming
@@ -25,8 +26,8 @@ class MetadataRepository(
 ) {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  def getDataSource(id: String): DataSource = {
-    val path = repositoryVolumeMap.sourcesDir.resolve(id + ".yaml")
+  def getDataSource(id: DatasetID): DataSource = {
+    val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
 
     if (!fileSystem.exists(path))
       throw new DoesNotExistsException(s"Dataset $id does not exist")

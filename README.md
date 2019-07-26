@@ -18,8 +18,9 @@
 - V Rethink repository structure and how datasets are linked
 - V Implement `pull` command to refresh dataset
 - V Implement `list` command showing datasets and their metadata
+- V DOT graph output
+- Referential integrity
 - Handle dependencies between datasets
-- DOT graph output
 - Implement recursive mode for `pull` command
 - Implement `status` command showing which data is out-of-date
 - Cleanup poll data

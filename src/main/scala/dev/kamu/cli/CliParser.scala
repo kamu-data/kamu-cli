@@ -14,6 +14,8 @@ case class CliOptions(
   list: Option[Unit] = None,
   add: Option[AddOptions] = None,
   pull: Option[PullOptions] = None,
+  // commands - extra
+  depgraph: Option[Unit] = None,
   notebook: Option[Unit] = None
 )
 
@@ -82,6 +84,13 @@ class CliParser {
                 )
             )
         ),
+      cmd("depgraph")
+        .text(
+          "Outputs dependency graph of datasets.\n" +
+            "You can visualize it with graphviz by running:\n" +
+            "  kamu depgraph | dot -Tpng > depgraph.png"
+        )
+        .action((_, c) => c.copy(depgraph = Some(Nil))),
       cmd("notebook")
         .text(
           "Start the Jupyter notebook server to explore the data in the repository"
