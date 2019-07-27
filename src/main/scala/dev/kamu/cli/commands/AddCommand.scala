@@ -7,12 +7,8 @@ import dev.kamu.cli.{
 }
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import pureconfig.error.ConfigReaderException
-import yaml.defaults._
-import pureconfig.generic.auto._
 
-class AddManifestCommand(
+class AddCommand(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
   manifests: Seq[Path]
@@ -21,14 +17,14 @@ class AddManifestCommand(
 
   def run(): Unit = {
     val sources = manifests.map(manifestPath => {
-      logger.debug(s"Loading manifest from: $manifestPath")
-      metadataRepository.loadDataSource(manifestPath)
+      logger.debug(s"Loading dataset from: $manifestPath")
+      metadataRepository.loadDatasetFromFile(manifestPath)
     })
 
     val numAdded = sources
       .map(ds => {
         try {
-          metadataRepository.addDataSource(ds)
+          metadataRepository.addDataset(ds)
           true
         } catch {
           case e: AlreadyExistsException =>

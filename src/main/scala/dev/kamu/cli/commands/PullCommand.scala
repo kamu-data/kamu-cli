@@ -6,12 +6,7 @@ import java.util.zip.{ZipEntry, ZipOutputStream}
 import dev.kamu.cli.{MetadataRepository, SparkRunner}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.utils.fs._
-import dev.kamu.core.manifests.{
-  DataSourcePolling,
-  DatasetID,
-  RepositoryVolumeMap,
-  TransformStreaming
-}
+import dev.kamu.core.manifests.{Dataset, DatasetID, RepositoryVolumeMap}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import yaml.defaults._
@@ -27,15 +22,18 @@ class PullCommand(
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val sources = datasetIDs
+    val datasets = datasetIDs
       .map(DatasetID)
-      .map(metadataRepository.getDataSource)
+      .map(metadataRepository.getDataset)
 
-    val numUpdated = sources
-      .map {
-        case ds: DataSourcePolling  => pullRoot(ds)
-        case ds: TransformStreaming => pullDerivative(ds)
-      }
+    val numUpdated = datasets
+      .map(
+        ds =>
+          if (ds.kind == Dataset.Kind.Root)
+            pullRoot(ds)
+          else
+            pullDerivative(ds)
+      )
       .count(updated => updated)
 
     logger.info(s"Done, $numUpdated datasets updated.")
@@ -45,11 +43,11 @@ class PullCommand(
   // Root
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullRoot(ds: DataSourcePolling): Boolean = {
+  def pullRoot(ds: Dataset): Boolean = {
     logger.debug(s"Pulling root dataset ${ds.id}")
 
     val configJar =
-      prepareIngestConfigsJar(Seq(ds), repositoryVolumeMap)
+      prepareConfigsJar(Seq(ds), repositoryVolumeMap)
 
     try {
       sparkRunner.submit(
@@ -66,42 +64,14 @@ class PullCommand(
     true
   }
 
-  def prepareIngestConfigsJar(
-    sources: Seq[DataSourcePolling],
-    repositoryVolumeMap: RepositoryVolumeMap
-  ): Path = {
-    val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val configJarPath = tmpDir.resolve("kamu-configs.jar")
-
-    logger.debug(s"Writing temporary configuration JAR to: $configJarPath")
-
-    val fileStream = new BufferedOutputStream(
-      new FileOutputStream(configJarPath.toString)
-    )
-    val zipStream = new ZipOutputStream(fileStream)
-
-    for ((source, i) <- sources.zipWithIndex) {
-      zipStream.putNextEntry(new ZipEntry(s"dataSourcePolling_$i.yaml"))
-      yaml.save(source.asManifest, zipStream)
-      zipStream.closeEntry()
-    }
-
-    zipStream.putNextEntry(new ZipEntry("repositoryVolumeMap.yaml"))
-    yaml.save(repositoryVolumeMap.asManifest, zipStream)
-    zipStream.closeEntry()
-
-    zipStream.close()
-    configJarPath
-  }
-
   ///////////////////////////////////////////////////////////////////////////////////////
   // Derivative
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullDerivative(ds: TransformStreaming): Boolean = {
+  def pullDerivative(ds: Dataset): Boolean = {
     logger.debug(s"Running transformations for derivative dataset ${ds.id}")
 
-    val configJar = prepareTransformConfigsJar(Seq(ds), repositoryVolumeMap)
+    val configJar = prepareConfigsJar(Seq(ds), repositoryVolumeMap)
 
     try {
       sparkRunner.submit(
@@ -120,9 +90,10 @@ class PullCommand(
     true
   }
 
-  // TODO: Deduplicate code
-  def prepareTransformConfigsJar(
-    sources: Seq[TransformStreaming],
+  ///////////////////////////////////////////////////////////////////////////////////////
+
+  def prepareConfigsJar(
+    datasets: Seq[Dataset],
     repositoryVolumeMap: RepositoryVolumeMap
   ): Path = {
     val tmpDir = new Path(sys.props("java.io.tmpdir"))
@@ -135,9 +106,9 @@ class PullCommand(
     )
     val zipStream = new ZipOutputStream(fileStream)
 
-    for ((source, i) <- sources.zipWithIndex) {
-      zipStream.putNextEntry(new ZipEntry(s"transformStreaming_$i.yaml"))
-      yaml.save(source.asManifest, zipStream)
+    for ((ds, i) <- datasets.zipWithIndex) {
+      zipStream.putNextEntry(new ZipEntry(s"dataset_$i.yaml"))
+      yaml.save(ds.asManifest, zipStream)
       zipStream.closeEntry()
     }
 

@@ -1,11 +1,7 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.MetadataRepository
-import dev.kamu.core.manifests.{
-  DataSourcePolling,
-  DatasetID,
-  TransformStreaming
-}
+import dev.kamu.core.manifests.{Dataset, DatasetID}
 import org.apache.log4j.LogManager
 
 class DependencyGraphCommand(
@@ -18,20 +14,23 @@ class DependencyGraphCommand(
 
     def quote(id: DatasetID) = "\"" + id.toString + "\""
 
-    val sources = metadataRepository
-      .getDataSources()
+    val datasets = metadataRepository
+      .getDatasets()
       .sortBy(_.id.toString)
 
-    sources.foreach(
-      s => s.dependsOn.foreach(d => println(s"${quote(s.id)}  -> ${quote(d)};"))
+    datasets.foreach(
+      ds =>
+        ds.dependsOn
+          .foreach(d => println(s"${quote(ds.id)}  -> ${quote(d)};"))
     )
 
-    sources.foreach {
-      case s: DataSourcePolling =>
-        println(s"${quote(s.id)} [style=filled, fillcolor=darkolivegreen1];")
-      case s: TransformStreaming =>
-        println(s"${quote(s.id)} [style=filled, fillcolor=lightblue];")
-    }
+    datasets.foreach(
+      ds =>
+        if (ds.kind == Dataset.Kind.Root)
+          println(s"${quote(ds.id)} [style=filled, fillcolor=darkolivegreen1];")
+        else if (ds.kind == Dataset.Kind.Derivative)
+          println(s"${quote(ds.id)} [style=filled, fillcolor=lightblue];")
+    )
 
     println("}")
   }

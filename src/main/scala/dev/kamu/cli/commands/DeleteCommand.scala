@@ -19,7 +19,7 @@ class DeleteCommand(
       .map(DatasetID)
       .foreach(id => {
         try {
-          metadataRepository.deleteDataSource(id)
+          metadataRepository.deleteDataset(id)
           logger.info(s"Deleted dataset: ${id.toString}")
         } catch {
           case e: DoesNotExistsException =>

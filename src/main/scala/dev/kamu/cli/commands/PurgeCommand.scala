@@ -16,7 +16,7 @@ class PurgeCommand(
       .map(DatasetID)
       .foreach(id => {
         try {
-          metadataRepository.purgeDataSource(id)
+          metadataRepository.purgeDataset(id)
           logger.info(s"Purged dataset: ${id.toString}")
         } catch {
           case e: DoesNotExistsException =>
