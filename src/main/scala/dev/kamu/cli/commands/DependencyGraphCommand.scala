@@ -15,7 +15,7 @@ class DependencyGraphCommand(
     def quote(id: DatasetID) = "\"" + id.toString + "\""
 
     val datasets = metadataRepository
-      .getDatasets()
+      .getAllDatasets()
       .sortBy(_.id.toString)
 
     datasets.foreach(

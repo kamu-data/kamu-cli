@@ -17,14 +17,19 @@ class PullCommand(
   repositoryVolumeMap: RepositoryVolumeMap,
   metadataRepository: MetadataRepository,
   sparkRunner: SparkRunner,
-  datasetIDs: Seq[String]
+  datasetIDs: Seq[String],
+  all: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val datasets = datasetIDs
-      .map(DatasetID)
-      .map(metadataRepository.getDataset)
+    val datasets =
+      if (all)
+        metadataRepository.getAllDatasets()
+      else
+        datasetIDs
+          .map(DatasetID)
+          .map(metadataRepository.getDataset)
 
     val numUpdated = datasets
       .map(

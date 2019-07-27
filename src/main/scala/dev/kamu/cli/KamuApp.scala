@@ -58,7 +58,11 @@ object KamuApp extends App {
               c.add.get.manifests
             ).run()
           } else if (c.purge.isDefined) {
-            new PurgeCommand(metadataRepository, c.purge.get.ids).run()
+            new PurgeCommand(
+              metadataRepository,
+              c.purge.get.ids,
+              c.purge.get.all
+            ).run()
           } else if (c.delete.isDefined) {
             new DeleteCommand(metadataRepository, c.delete.get.ids).run()
           } else if (c.pull.isDefined) {
@@ -67,7 +71,8 @@ object KamuApp extends App {
               repositoryVolumeMap,
               metadataRepository,
               getSparkRunner,
-              c.pull.get.ids
+              c.pull.get.ids,
+              c.pull.get.all
             ).run()
           } else if (c.depgraph.isDefined) {
             new DependencyGraphCommand(metadataRepository).run()

@@ -12,7 +12,7 @@ class ListCommand(
 
     println("ID, Kind")
     metadataRepository
-      .getDatasets()
+      .getAllDatasets()
       .map(
         ds => (ds.id, ds.kind.toString)
       )

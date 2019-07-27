@@ -26,6 +26,7 @@ case class AddOptions(
 )
 
 case class PurgeOptions(
+  all: Boolean = false,
   ids: Seq[String] = Seq.empty
 )
 
@@ -34,6 +35,7 @@ case class DeleteOptions(
 )
 
 case class PullOptions(
+  all: Boolean = false,
   ids: Seq[String] = Seq.empty
 )
 
@@ -82,7 +84,7 @@ class CliParser {
           arg[String]("<ID>...")
             .text("IDs of the datasets to purge")
             .unbounded()
-            .required()
+            .optional()
             .action(
               (id, c) =>
                 c.copy(
@@ -92,6 +94,11 @@ class CliParser {
                     )
                   )
                 )
+            ),
+          opt[Unit]('a', "all")
+            .text("Purge all datasets")
+            .action(
+              (_, c) => c.copy(purge = Some(c.purge.get.copy(all = true)))
             )
         ),
       cmd("delete")
@@ -130,7 +137,10 @@ class CliParser {
                     )
                   )
                 )
-            )
+            ),
+          opt[Unit]('a', "all")
+            .text("Pull all datasets")
+            .action((_, c) => c.copy(pull = Some(c.pull.get.copy(all = true))))
         ),
       cmd("depgraph")
         .text(

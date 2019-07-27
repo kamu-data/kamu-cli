@@ -28,7 +28,15 @@ class MetadataRepository(
     loadDatasetFromFile(path)
   }
 
-  def getDatasets(): Seq[Dataset] = {
+  def getAllDatasetIDs(): Seq[DatasetID] = {
+    fileSystem
+      .listStatus(repositoryVolumeMap.sourcesDir)
+      .map(_.getPath.getName)
+      .map(filename => filename.substring(0, filename.length - ".yaml".length))
+      .map(DatasetID)
+  }
+
+  def getAllDatasets(): Seq[Dataset] = {
     val manifestFiles = fileSystem
       .listStatus(repositoryVolumeMap.sourcesDir)
       .map(_.getPath)
@@ -79,7 +87,7 @@ class MetadataRepository(
 
   def deleteDataset(id: DatasetID): Unit = {
     // Validate references
-    val referencedBy = getDatasets().filter(_.dependsOn.contains(id))
+    val referencedBy = getAllDatasets().filter(_.dependsOn.contains(id))
     if (referencedBy.nonEmpty)
       throw new DanglingReferenceException(referencedBy.map(_.id), id)
 
