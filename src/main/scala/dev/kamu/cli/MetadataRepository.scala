@@ -71,6 +71,10 @@ class MetadataRepository(
         throw new MissingReferenceException(ds.id, e.datasetID)
     }
 
+    saveDataset(ds, path)
+  }
+
+  def saveDataset(ds: Dataset, path: Path): Unit = {
     val outputStream = fileSystem.create(path)
 
     try {

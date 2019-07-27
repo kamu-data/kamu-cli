@@ -22,7 +22,8 @@ case class CliOptions(
 )
 
 case class AddOptions(
-  manifests: Seq[Path] = Seq.empty
+  manifests: Seq[Path] = Seq.empty,
+  interactive: Boolean = false
 )
 
 case class PurgeOptions(
@@ -75,6 +76,11 @@ class CliParser {
                     )
                   )
                 )
+            ),
+          opt[Unit]('i', "interactive")
+            .text("Start dataset creation wizard")
+            .action(
+              (_, c) => c.copy(add = Some(c.add.get.copy(interactive = true)))
             )
         ),
       cmd("purge")

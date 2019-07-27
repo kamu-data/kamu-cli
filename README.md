@@ -22,10 +22,14 @@
 - V Referential integrity
 - V `delete` command
 - V `purge` command
+- V Root dataset creation wizard (generate based on schema)
+- Distribution `arch`
+- Distribution `ubuntu`
+- Distribution `mac`
+- Implement `describe` command showing dataset metadata
 - Implement `status` command showing which data is out-of-date
 - Implement file `import` and `export`
 - Implement recursive mode for `pull` command
-- Root dataset creation wizard (generate based on schema)
 - Simplify historical vocab
 - Control output verbosity
 - Add `sql` shell

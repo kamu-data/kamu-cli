@@ -2,6 +2,7 @@ package dev.kamu.cli
 
 import dev.kamu.cli.commands.{
   AddCommand,
+  AddInteractiveCommand,
   DeleteCommand,
   DependencyGraphCommand,
   InitCommand,
@@ -51,12 +52,15 @@ object KamuApp extends App {
 
           if (c.list.isDefined) {
             new ListCommand(metadataRepository).run()
-          } else if (c.add.isDefined && c.add.get.manifests.nonEmpty) {
-            new AddCommand(
-              fileSystem,
-              metadataRepository,
-              c.add.get.manifests
-            ).run()
+          } else if (c.add.isDefined) {
+            if (c.add.get.interactive)
+              new AddInteractiveCommand(fileSystem, metadataRepository).run()
+            else
+              new AddCommand(
+                fileSystem,
+                metadataRepository,
+                c.add.get.manifests
+              ).run()
           } else if (c.purge.isDefined) {
             new PurgeCommand(
               metadataRepository,
