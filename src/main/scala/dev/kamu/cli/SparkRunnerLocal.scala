@@ -1,21 +1,21 @@
 package dev.kamu.cli
 
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.utils.fs._
-import dev.kamu.core.manifests.RepositoryVolumeMap
+import org.apache.log4j.Level
 
 import scala.sys.process.Process
 
 class SparkRunnerLocal(
-  fileSystem: FileSystem
-) extends SparkRunner {
-  protected val logger = LogManager.getLogger(getClass.getName)
+  fileSystem: FileSystem,
+  logLevel: Level
+) extends SparkRunner(fileSystem, logLevel) {
 
-  override def submit(
+  protected override def submit(
     repo: RepositoryVolumeMap,
     appClass: String,
-    jars: Seq[Path]
+    jars: Seq[Path],
+    loggingConfig: Path
   ): Unit = {
     val sparkSubmit = findSparkSubmitBin()
 
@@ -24,8 +24,8 @@ class SparkRunnerLocal(
       "--master=local[4]",
       "--conf",
       s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
-      s"--class=$appClass",
-      s"--jars=${jars.mkString(",")}",
+      s"--class=$appClass"
+    ) ++ (if (jars.nonEmpty) Seq(s"--jars=${jars.mkString(",")}") else Seq()) ++ Seq(
       assemblyPath.toString
     )
 

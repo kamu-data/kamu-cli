@@ -33,6 +33,12 @@ lazy val kamuCli = (project in file("."))
       "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0-SNAPSHOT",
       "com.jcabi" % "jcabi-log" % "0.17.3",
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
+      // Spark
+      "org.apache.spark" %% "spark-core" % Versions.spark % "provided",
+      "org.apache.spark" %% "spark-sql" % Versions.spark % "provided",
+      // GeoSpark
+      "org.datasyslab" % "geospark" % Versions.geoSpark % "provided",
+      "org.datasyslab" % "geospark-sql_2.3" % Versions.geoSpark % "provided",
       ("org.apache.hadoop" % "hadoop-common" % "2.6.5")
         .exclude("commons-beanutils", "commons-beanutils")
         .exclude("commons-beanutils", "commons-beanutils-core"),

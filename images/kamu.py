@@ -10,17 +10,12 @@ spark.sparkContext._jvm.org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator.
 SPARK_IMPORT_DATASET_CODE = """
 hadoop = sc._jvm.org.apache.hadoop
 fs = hadoop.fs.FileSystem.get(hadoop.conf.Configuration())
-paths = [
-    hadoop.fs.Path(d + "/" + "{dataset_id}")
-    for d in ["deriv", "root"]
-]
 
-paths = [p for p in paths if fs.exists(p)]
-
-if not paths:
+path = hadoop.fs.Path("data/{dataset_id}")
+if not fs.exists(path):
     raise Exception("Dataset {dataset_id} does not exist")
 
-{alias} = spark.read.parquet(str(paths[0]) + "/*")
+{alias} = spark.read.parquet(str(path) + "/*")
 {alias}.createOrReplaceTempView("`{dataset_id}`")
 {alias}.createOrReplaceTempView("{alias}")
 """

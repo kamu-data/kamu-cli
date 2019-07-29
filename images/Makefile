@@ -6,6 +6,8 @@ IMAGE_JUPYTER_TAG = 0.0.1
 
 .PHONY: base
 base:
+	# NOTE: Spark's Dockerfile should be patched with
+	# https://github.com/apache/spark/pull/23898
 	cd $(SPARK_HOME) && ./bin/docker-image-tool.sh \
 		-r $(IMAGE_REPO) \
 		-t $(IMAGE_SPARK_BASE_TAG) \

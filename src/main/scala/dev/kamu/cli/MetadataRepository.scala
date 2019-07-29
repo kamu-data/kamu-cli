@@ -1,11 +1,6 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.{
-  Dataset,
-  DatasetID,
-  Manifest,
-  RepositoryVolumeMap
-}
+import dev.kamu.core.manifests.{Dataset, DatasetID, Manifest}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
@@ -111,8 +106,7 @@ class MetadataRepository(
 
   def getAllDataPaths(id: DatasetID): Seq[Path] = {
     Seq(
-      repositoryVolumeMap.dataDirRoot.resolve(id.toString),
-      repositoryVolumeMap.dataDirDeriv.resolve(id.toString),
+      repositoryVolumeMap.dataDir.resolve(id.toString),
       repositoryVolumeMap.checkpointDir.resolve(id.toString),
       repositoryVolumeMap.downloadDir.resolve(id.toString)
     )

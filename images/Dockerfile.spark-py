@@ -1,7 +1,8 @@
 FROM kamu/spark-py:2.4.0
 
-# Spark's Dockerfile should be patched with
-# https://github.com/apache/spark/pull/23898
+
+# Logging
+ADD log4j.properties /opt/spark/conf/log4j.properties
 
 
 # GeoSparks

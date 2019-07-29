@@ -3,11 +3,14 @@ package dev.kamu.cli
 import java.net.URI
 
 import org.apache.hadoop.fs.Path
+import org.apache.log4j.Level
 import scopt.OParser
 
 case class CliOptions(
   // args
+  logLevel: Level = Level.INFO,
   useLocalSpark: Boolean = false,
+  sparkLogLevel: Level = Level.WARN,
   repository: Option[String] = None,
   // commands
   init: Option[Unit] = None,
@@ -18,6 +21,7 @@ case class CliOptions(
   pull: Option[PullOptions] = None,
   // commands - extra
   depgraph: Option[Unit] = None,
+  sql: Option[SQLOptions] = None,
   notebook: Option[Unit] = None
 )
 
@@ -40,6 +44,10 @@ case class PullOptions(
   ids: Seq[String] = Seq.empty
 )
 
+case class SQLOptions(
+  command: Option[String] = None
+)
+
 class CliParser {
   private val builder = OParser.builder[CliOptions]
   private val parser = {
@@ -48,9 +56,18 @@ class CliParser {
       programName("kamu"),
       head("Kamu data processing utility"),
       help('h', "help").text("prints this usage text"),
+      opt[Unit]("verbose")
+        .text("Enable full debugging")
+        .action((_, c) => c.copy(logLevel = Level.ALL)),
+      opt[String]("log-level")
+        .text("Sets logging level")
+        .action((lvl, c) => c.copy(logLevel = Level.toLevel(lvl))),
       opt[Unit]("local-spark")
         .text("Use local spark installation")
         .action((_, c) => c.copy(useLocalSpark = true)),
+      opt[String]("spark-log-level")
+        .text("Sets logging level for Spark")
+        .action((lvl, c) => c.copy(sparkLogLevel = Level.toLevel(lvl))),
       cmd("init")
         .text("Initialize the repository in the current directory")
         .action((_, c) => c.copy(init = Some(Nil))),
@@ -155,6 +172,19 @@ class CliParser {
             "  kamu depgraph | dot -Tpng > depgraph.png"
         )
         .action((_, c) => c.copy(depgraph = Some(Nil))),
+      cmd("sql")
+        .text(
+          "Executes an SQL query or drops you into an SQL shell"
+        )
+        .action((_, c) => c.copy(sql = Some(SQLOptions())))
+        .children(
+          opt[String]('c', "command")
+            .text("SQL command to run")
+            .action(
+              (cmd, c) =>
+                c.copy(sql = Some(c.sql.get.copy(command = Some(cmd))))
+            )
+        ),
       cmd("notebook")
         .text(
           "Start the Jupyter notebook server to explore the data in the repository"

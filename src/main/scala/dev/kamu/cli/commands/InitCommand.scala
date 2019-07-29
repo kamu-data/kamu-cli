@@ -3,8 +3,7 @@ package dev.kamu.cli.commands
 import java.io.PrintWriter
 
 import org.apache.log4j.LogManager
-import dev.kamu.cli.UsageException
-import dev.kamu.core.manifests.RepositoryVolumeMap
+import dev.kamu.cli.{RepositoryVolumeMap, UsageException}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
 class InitCommand(
@@ -22,14 +21,13 @@ class InitCommand(
 
     val outputStream = fileSystem.create(new Path(".gitignore"))
     val writer = new PrintWriter(outputStream)
-
-    Seq(
-      "/.kamu/downloads",
-      "/.kamu/checkpoints",
-      "/.kamu/data",
-      ".ipynb_checkpoints"
-    ).distinct.map(_ + "\n").foreach(writer.write)
-
+    writer.write("""
+        |/.kamu/downloads
+        |/.kamu/checkpoints
+        |/.kamu/data
+        |
+        |.ipynb_checkpoints
+      """.stripMargin)
     writer.close()
   }
 }

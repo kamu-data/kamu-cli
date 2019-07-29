@@ -41,8 +41,7 @@ class DockerClient {
     Seq(
       "docker",
       "run",
-      "--rm",
-      "-t"
+      "--rm"
     ) ++ extraArgs ++ Seq(
       image
     ) ++ args

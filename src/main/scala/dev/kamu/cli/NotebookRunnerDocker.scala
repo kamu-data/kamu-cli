@@ -3,7 +3,6 @@ package dev.kamu.cli
 import java.awt.Desktop
 import java.net.URI
 
-import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import sun.misc.{Signal, SignalHandler}
@@ -70,9 +69,7 @@ class LivyProcess(
       "--name",
       containerName,
       "-v",
-      repositoryVolumeMap.dataDirRoot.toUri.getPath + ":/opt/spark/work-dir/root",
-      "-v",
-      repositoryVolumeMap.dataDirDeriv.toUri.getPath + ":/opt/spark/work-dir/deriv"
+      repositoryVolumeMap.dataDir.toUri.getPath + ":/opt/spark/work-dir/data"
     )
 
     val cmd = dockerClient.makeRunCmd(
@@ -142,34 +139,30 @@ class JupyterProcess(
 
     new ProcessIO(
       _ => (),
-      stdout => {
-        val lines = scala.io.Source
+      stdout =>
+        scala.io.Source
           .fromInputStream(stdout)
-          .getLines
-
-        for (line <- lines) {
-          synchronized {
-            if (token.isEmpty) {
-              token = tokenRegex
-                .findFirstMatchIn(line)
-                .map(m => m.group(1))
-                .getOrElse("")
-              if (token.nonEmpty) {
-                logger.debug(s"Got Jupyter token: $token")
-                this.notifyAll()
-              }
-            }
-          }
-
-          println("[jupyter] " + line)
-        }
-
-      },
+          .getLines()
+          .foreach(line => System.out.println("[jupyter] " + line)),
       stderr =>
         scala.io.Source
           .fromInputStream(stderr)
           .getLines()
-          .foreach(l => System.err.println("[jupyter] " + l))
+          .foreach(line => {
+            synchronized {
+              if (token.isEmpty) {
+                token = tokenRegex
+                  .findFirstMatchIn(line)
+                  .map(m => m.group(1))
+                  .getOrElse("")
+                if (token.nonEmpty) {
+                  logger.debug(s"Got Jupyter token: $token")
+                  this.notifyAll()
+                }
+              }
+            }
+            System.err.println("[jupyter] " + line)
+          })
     )
   }
 

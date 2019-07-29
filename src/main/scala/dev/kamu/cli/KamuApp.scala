@@ -1,20 +1,9 @@
 package dev.kamu.cli
 
-import dev.kamu.cli.commands.{
-  AddCommand,
-  AddInteractiveCommand,
-  DeleteCommand,
-  DependencyGraphCommand,
-  InitCommand,
-  ListCommand,
-  NotebookCommand,
-  PullCommand,
-  PurgeCommand
-}
-import dev.kamu.core.manifests.RepositoryVolumeMap
+import dev.kamu.cli.commands._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.log4j.{Level, LogManager}
 
 class UsageException(message: String = "", cause: Throwable = None.orNull)
     extends RuntimeException(message, cause)
@@ -33,8 +22,7 @@ object KamuApp extends App {
     sourcesDir = new Path(".kamu/sources"),
     downloadDir = new Path(".kamu/downloads"),
     checkpointDir = new Path(".kamu/checkpoints"),
-    dataDirRoot = new Path(".kamu/data"),
-    dataDirDeriv = new Path(".kamu/data")
+    dataDir = new Path(".kamu/data")
   ).toAbsolute(fileSystem)
 
   val metadataRepository =
@@ -43,18 +31,30 @@ object KamuApp extends App {
   try {
     cliOptions match {
       case Some(c) =>
+        LogManager
+          .getLogger(getClass.getPackage.getName)
+          .setLevel(c.logLevel)
+
         if (c.init.isDefined) {
-          new InitCommand(fileSystem, repositoryVolumeMap).run()
+          new InitCommand(
+            fileSystem,
+            repositoryVolumeMap
+          ).run()
         } else {
           // Other commands need to have repository initialized
           if (repositoryVolumeMap.allPaths.exists(!fileSystem.exists(_)))
             throw new UsageException("Not a kamu repository")
 
           if (c.list.isDefined) {
-            new ListCommand(metadataRepository).run()
+            new ListCommand(
+              metadataRepository
+            ).run()
           } else if (c.add.isDefined) {
             if (c.add.get.interactive)
-              new AddInteractiveCommand(fileSystem, metadataRepository).run()
+              new AddInteractiveCommand(
+                fileSystem,
+                metadataRepository
+              ).run()
             else
               new AddCommand(
                 fileSystem,
@@ -74,14 +74,25 @@ object KamuApp extends App {
               fileSystem,
               repositoryVolumeMap,
               metadataRepository,
-              getSparkRunner,
+              getSparkRunner(c.sparkLogLevel),
               c.pull.get.ids,
               c.pull.get.all
             ).run()
           } else if (c.depgraph.isDefined) {
-            new DependencyGraphCommand(metadataRepository).run()
+            new DependencyGraphCommand(
+              metadataRepository
+            ).run()
+          } else if (c.sql.isDefined) {
+            new SQLCommand(
+              repositoryVolumeMap,
+              getSparkRunner(c.sparkLogLevel),
+              c.sql.get.command
+            ).run()
           } else if (c.notebook.isDefined) {
-            new NotebookCommand(fileSystem, repositoryVolumeMap).run()
+            new NotebookCommand(
+              fileSystem,
+              repositoryVolumeMap
+            ).run()
           } else {
             println(cliParser.usage())
           }
@@ -90,17 +101,17 @@ object KamuApp extends App {
     }
 
   } catch {
-    case usg: UsageException =>
-      Console.err.println(s"[ERROR] ${usg.getMessage}")
+    case e: UsageException =>
+      logger.error(e.getMessage)
       sys.exit(1)
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def getSparkRunner: SparkRunner = {
+  def getSparkRunner(logLevel: Level): SparkRunner = {
     if (cliOptions.get.useLocalSpark)
-      new SparkRunnerLocal(fileSystem)
+      new SparkRunnerLocal(fileSystem, logLevel)
     else
-      new SparkRunnerDocker(fileSystem)
+      new SparkRunnerDocker(fileSystem, logLevel)
   }
 }

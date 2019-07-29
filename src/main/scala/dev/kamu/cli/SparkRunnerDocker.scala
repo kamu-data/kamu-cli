@@ -1,20 +1,19 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.utils.fs._
-import dev.kamu.core.manifests.RepositoryVolumeMap
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.log4j.Level
 
 class SparkRunnerDocker(
   fileSystem: FileSystem,
+  logLevel: Level,
   image: String = "kamu/spark:2.4.0_0.0.1"
-) extends SparkRunner {
-  protected val logger = LogManager.getLogger(getClass.getName)
+) extends SparkRunner(fileSystem, logLevel) {
 
-  override def submit(
+  protected override def submit(
     repo: RepositoryVolumeMap,
     appClass: String,
-    jars: Seq[Path]
+    jars: Seq[Path],
+    loggingConfig: Path
   ): Unit = {
     val assemblyPathInContainer = "/opt/kamu/kamu"
 
@@ -31,7 +30,9 @@ class SparkRunnerDocker(
 
     val dockerArgs = Seq(
       "-v",
-      s"${assemblyPath.toUri.getPath}:$assemblyPathInContainer"
+      s"${assemblyPath.toUri.getPath}:$assemblyPathInContainer",
+      "-v",
+      s"${loggingConfig.toUri.getPath}:/opt/spark/conf/log4j.properties"
     ) ++ jarVolumes ++ repoVolumes
 
     val submitArgs = List(
@@ -39,8 +40,13 @@ class SparkRunnerDocker(
       "--master=local[4]",
       "--conf",
       "spark.sql.warehouse.dir=/opt/spark-warehouse",
-      s"--class=$appClass",
-      "--jars=" + jarsInContainer.map(_._2).mkString(","),
+      s"--class=$appClass"
+    ) ++ (
+      if (jars.nonEmpty)
+        Seq("--jars=" + jarsInContainer.map(_._2).mkString(","))
+      else
+        Seq()
+    ) ++ Seq(
       assemblyPathInContainer
     )
 

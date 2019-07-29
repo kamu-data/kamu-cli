@@ -23,21 +23,23 @@
 - V `delete` command
 - V `purge` command
 - V Root dataset creation wizard (generate based on schema)
+- Add `sql` shell
+- Control output verbosity
+- Implement `describe` command showing dataset metadata
+- Implement file `import` and `export`
+- Simplify historical vocab
 - Distribution `arch`
 - Distribution `ubuntu`
 - Distribution `mac`
-- Implement `describe` command showing dataset metadata
 - Implement `status` command showing which data is out-of-date
-- Implement file `import` and `export`
 - Implement recursive mode for `pull` command
-- Simplify historical vocab
-- Control output verbosity
-- Add `sql` shell
-- Include usage GIF in the readme
 - Handle dependencies during `purge`
+- Write version metainfo for later upgrades
+- Force `pull` to update uncacheable datasets
 
 # Post-MVP
 - V Suppress HDFS warning on startup
+- Add bash completions
 - Upgrade to latest Spark
 - Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
