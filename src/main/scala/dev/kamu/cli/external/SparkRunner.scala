@@ -1,11 +1,12 @@
-package dev.kamu.cli
+package dev.kamu.cli.external
 
 import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import dev.kamu.cli.RepositoryVolumeMap
 import dev.kamu.core.manifests.utils.fs._
 import org.apache.commons.io.IOUtils
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager, Logger}
 
 abstract class SparkRunner(

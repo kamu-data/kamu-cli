@@ -1,19 +1,20 @@
-package dev.kamu.cli
+package dev.kamu.cli.external
 
 import java.io.InputStream
 
+import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
 import dev.kamu.core.manifests.Resource
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import yaml.defaults._
+import pureconfig.generic.auto._
+import dev.kamu.core.manifests.utils.fs._
+import org.apache.hadoop.fs.FileSystem
 import org.apache.spark.SparkConf
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.SparkSession
 import org.datasyslab.geospark.serde.GeoSparkKryoRegistrator
 import org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator
-import dev.kamu.core.manifests.utils.fs._
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import org.apache.hadoop.fs.FileSystem
-import yaml.defaults._
-import pureconfig.generic.auto._
 
 case class SparkSQLAppConfig(
   repositoryVolumeMap: RepositoryVolumeMap,

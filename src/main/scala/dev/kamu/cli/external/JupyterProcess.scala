@@ -1,106 +1,12 @@
-package dev.kamu.cli
+package dev.kamu.cli.external
 
 import java.awt.Desktop
 import java.net.URI
 
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
-import sun.misc.{Signal, SignalHandler}
 
 import scala.sys.process.{Process, ProcessIO}
-
-class NotebookRunnerDocker(
-  fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap
-) {
-  protected val logger = LogManager.getLogger(getClass.getName)
-
-  def start(): Unit = {
-    val network = "kamu"
-    createNetwork(network)
-
-    val livy = new LivyProcess(fileSystem, repositoryVolumeMap, network)
-    val jupyter = new JupyterProcess(fileSystem, network)
-
-    Signal.handle(new Signal("INT"), new SignalHandler {
-      override def handle(signal: Signal): Unit = {
-        jupyter.stop()
-        livy.stop()
-      }
-    })
-
-    try {
-      val livyProcess = livy.run()
-      val jupyterProcess = jupyter.run()
-      jupyter.openBrowserWhenReady()
-      jupyterProcess.exitValue()
-      livyProcess.exitValue()
-    } finally {
-      jupyter.stop()
-      livy.stop()
-      jupyter.chown()
-    }
-  }
-
-  def createNetwork(network: String): Unit = {
-    new DockerClient().prepare(Seq("docker", "network", "create", network)).!
-  }
-}
-
-class LivyProcess(
-  fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap,
-  network: String,
-  image: String = "kamu/spark-py:2.4.0_0.0.1"
-) {
-  protected val logger = LogManager.getLogger(getClass.getName)
-
-  val containerName = "kamu-livy"
-  val dockerClient = new DockerClient()
-
-  def run(): Process = {
-    val dockerArgs = Seq(
-      "-p",
-      "8998",
-      "--hostname",
-      containerName,
-      "--network",
-      network,
-      "--name",
-      containerName,
-      "-v",
-      repositoryVolumeMap.dataDir.toUri.getPath + ":/opt/spark/work-dir/data"
-    )
-
-    val cmd = dockerClient.makeRunCmd(
-      image = image,
-      args = Seq("livy"),
-      extraArgs = dockerArgs
-    )
-    val processBuilder = dockerClient.prepare(cmd)
-    processBuilder.run(ioHandler)
-  }
-
-  def stop(): Unit = {
-    dockerClient.kill(containerName)
-  }
-
-  def ioHandler: ProcessIO = {
-    new ProcessIO(
-      _ => (),
-      stdout =>
-        scala.io.Source
-          .fromInputStream(stdout)
-          .getLines
-          .foreach(l => println("[livy] " + l)),
-      stderr =>
-        scala.io.Source
-          .fromInputStream(stderr)
-          .getLines()
-          .foreach(l => System.err.println("[livy] " + l))
-    )
-  }
-}
 
 class JupyterProcess(
   fileSystem: FileSystem,

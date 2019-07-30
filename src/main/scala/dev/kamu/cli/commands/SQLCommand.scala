@@ -1,7 +1,8 @@
 package dev.kamu.cli.commands
 
+import dev.kamu.cli.external.{SparkRunner, SparkSQLAppConfig}
 import org.apache.log4j.LogManager
-import dev.kamu.cli.{RepositoryVolumeMap, SparkRunner, SparkSQLAppConfig}
+import dev.kamu.cli.RepositoryVolumeMap
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
 import pureconfig.generic.auto._

@@ -23,8 +23,8 @@
 - V `delete` command
 - V `purge` command
 - V Root dataset creation wizard (generate based on schema)
+- V Control output verbosity
 - Add `sql` shell
-- Control output verbosity
 - Implement `describe` command showing dataset metadata
 - Implement file `import` and `export`
 - Simplify historical vocab

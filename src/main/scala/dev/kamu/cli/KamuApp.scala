@@ -1,6 +1,7 @@
 package dev.kamu.cli
 
 import dev.kamu.cli.commands._
+import dev.kamu.cli.external.{SparkRunner, SparkRunnerDocker, SparkRunnerLocal}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager}

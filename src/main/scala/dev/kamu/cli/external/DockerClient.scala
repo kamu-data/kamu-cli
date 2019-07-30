@@ -1,4 +1,4 @@
-package dev.kamu.cli
+package dev.kamu.cli.external
 
 import org.apache.log4j.LogManager
 

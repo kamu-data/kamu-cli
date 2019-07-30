@@ -1,5 +1,6 @@
-package dev.kamu.cli
+package dev.kamu.cli.external
 
+import dev.kamu.cli.RepositoryVolumeMap
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 

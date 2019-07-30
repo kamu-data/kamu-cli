@@ -1,6 +1,7 @@
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap, SparkRunner}
+import dev.kamu.cli.external.SparkRunner
+import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
 import dev.kamu.core.manifests.{Dataset, DatasetID}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
