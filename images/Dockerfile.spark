@@ -2,7 +2,7 @@ FROM kamu/spark:2.4.0
 
 
 # Logging
-ADD log4j.properties /opt/spark/conf/log4j.properties
+ADD spark/log4j.properties /opt/spark/conf/log4j.properties
 
 
 # GeoSpark

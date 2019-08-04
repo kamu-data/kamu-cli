@@ -16,25 +16,20 @@ class SparkRunnerDocker(
     jars: Seq[Path],
     loggingConfig: Path
   ): Unit = {
-    val assemblyPathInContainer = "/opt/kamu/kamu"
+    val assemblyPathInContainer = new Path("/opt/kamu/kamu")
 
-    val jarsInContainer =
-      jars
-        .map(p => Tuple2(p.toUri.getPath, "/opt/kamu/jars/" + p.getName))
-        .toList
+    val appVolumes = Map(
+      assemblyPath -> assemblyPathInContainer,
+      loggingConfig -> new Path("/opt/spark/conf/log4j.properties")
+    )
 
-    val jarVolumes = jarsInContainer.flatMap(t => Seq("-v", t._1 + ":" + t._2))
+    val jarVolumes = jars
+      .map(p => (p, new Path("/opt/kamu/jars/" + p.getName)))
+      .toMap
 
     val repoVolumes = repo.allPaths
-      .map(p => p.toUri.getPath)
-      .flatMap(p => Seq("-v", s"$p:$p"))
-
-    val dockerArgs = Seq(
-      "-v",
-      s"${assemblyPath.toUri.getPath}:$assemblyPathInContainer",
-      "-v",
-      s"${loggingConfig.toUri.getPath}:/opt/spark/conf/log4j.properties"
-    ) ++ jarVolumes ++ repoVolumes
+      .map(p => (p, p))
+      .toMap
 
     val submitArgs = List(
       "/opt/spark/bin/spark-submit",
@@ -44,20 +39,22 @@ class SparkRunnerDocker(
       s"--class=$appClass"
     ) ++ (
       if (jars.nonEmpty)
-        Seq("--jars=" + jarsInContainer.map(_._2).mkString(","))
+        Seq("--jars=" + jarVolumes.values.map(_.toUri.getPath).mkString(","))
       else
         Seq()
     ) ++ Seq(
-      assemblyPathInContainer
+      assemblyPathInContainer.toUri.getPath
     )
 
     logger.info("Starting Spark job")
 
     val dockerClient = new DockerClient()
     dockerClient.runShell(
-      image = image,
-      shellCommand = submitArgs,
-      extraArgs = dockerArgs
+      DockerRunArgs(
+        image = image,
+        volumeMap = appVolumes ++ repoVolumes ++ jarVolumes
+      ),
+      submitArgs
     )
 
     // TODO: avoid this by setting up correct user inside the container
@@ -68,14 +65,14 @@ class SparkRunnerDocker(
       "chown",
       "-R",
       s"${unix.getUid}:${unix.getGid}"
-    ) ++ repo.allPaths.map(
-      p => p.toUri.getPath
-    )
+    ) ++ repoVolumes.values.map(_.toUri.getPath)
 
     dockerClient.runShell(
-      image = image,
-      shellCommand = chownArgs,
-      extraArgs = dockerArgs
+      DockerRunArgs(
+        image = image,
+        volumeMap = repoVolumes
+      ),
+      chownArgs
     )
   }
 }

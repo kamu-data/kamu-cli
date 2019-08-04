@@ -84,11 +84,19 @@ object KamuApp extends App {
               metadataRepository
             ).run()
           } else if (c.sql.isDefined) {
-            new SQLCommand(
-              repositoryVolumeMap,
-              getSparkRunner(c.sparkLogLevel),
-              c.sql.get.command
-            ).run()
+            if (c.sql.get.server) {
+              new SQLServerCommand(
+                repositoryVolumeMap,
+                c.sql.get.port
+              ).run()
+            } else {
+              new SQLCommand(
+                fileSystem,
+                repositoryVolumeMap,
+                getSparkRunner(c.sparkLogLevel),
+                c.sql.get.command
+              ).run()
+            }
           } else if (c.notebook.isDefined) {
             new NotebookCommand(
               fileSystem,

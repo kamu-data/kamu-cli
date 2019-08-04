@@ -45,6 +45,8 @@ case class PullOptions(
 )
 
 case class SQLOptions(
+  server: Boolean = false,
+  port: Option[Int] = None,
   command: Option[String] = None
 )
 
@@ -178,6 +180,16 @@ class CliParser {
         )
         .action((_, c) => c.copy(sql = Some(SQLOptions())))
         .children(
+          opt[Unit]("server")
+            .text("Run JDBC server only")
+            .action(
+              (_, c) => c.copy(sql = Some(c.sql.get.copy(server = true)))
+            ),
+          opt[Int]("port")
+            .text("Expose JDBC server on specific port")
+            .action(
+              (p, c) => c.copy(sql = Some(c.sql.get.copy(port = Some(p))))
+            ),
           opt[String]('c', "command")
             .text("SQL command to run")
             .action(

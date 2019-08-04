@@ -15,26 +15,36 @@ class NotebookRunnerDocker(
     val network = "kamu"
     createNetwork(network)
 
-    val livy = new LivyProcess(fileSystem, repositoryVolumeMap, network)
-    val jupyter = new JupyterProcess(fileSystem, network)
+    val livyBuilder =
+      new LivyDockerProcessBuilder(repositoryVolumeMap, Some(network))
+
+    val jupyterBuilder = new JupyterDockerProcessBuilder(fileSystem, network)
+
+    var livyProcess: DockerProcess = null
+    var jupyterProcess: JupyterDockerProcess = null
+
+    def stopAll(): Unit = {
+      if (livyProcess != null)
+        livyProcess.kill()
+      if (jupyterProcess != null)
+        jupyterProcess.kill()
+    }
 
     Signal.handle(new Signal("INT"), new SignalHandler {
       override def handle(signal: Signal): Unit = {
-        jupyter.stop()
-        livy.stop()
+        stopAll()
       }
     })
 
     try {
-      val livyProcess = livy.run()
-      val jupyterProcess = jupyter.run()
-      jupyter.openBrowserWhenReady()
-      jupyterProcess.exitValue()
-      livyProcess.exitValue()
+      livyProcess = livyBuilder.run()
+      jupyterProcess = jupyterBuilder.run()
+      jupyterProcess.openBrowserWhenReady()
+      jupyterProcess.join()
+      livyProcess.join()
     } finally {
-      jupyter.stop()
-      livy.stop()
-      jupyter.chown()
+      stopAll()
+      jupyterBuilder.chown()
     }
   }
 

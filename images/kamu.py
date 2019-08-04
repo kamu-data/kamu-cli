@@ -11,7 +11,7 @@ SPARK_IMPORT_DATASET_CODE = """
 hadoop = sc._jvm.org.apache.hadoop
 fs = hadoop.fs.FileSystem.get(hadoop.conf.Configuration())
 
-path = hadoop.fs.Path("data/{dataset_id}")
+path = hadoop.fs.Path("{dataset_id}")
 if not fs.exists(path):
     raise Exception("Dataset {dataset_id} does not exist")
 

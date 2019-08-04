@@ -24,7 +24,10 @@
 - V `purge` command
 - V Root dataset creation wizard (generate based on schema)
 - V Control output verbosity
-- Add `sql` shell
+- V Add `sql --server` command that starts Livy with JDBC endpoint exposed
+- Add `sql` interactive shell
+- Add support for one-off `sql` commands
+- Livy sessions should be pre-configured with GeoSpark types
 - Implement `describe` command showing dataset metadata
 - Implement file `import` and `export`
 - Simplify historical vocab
@@ -36,11 +39,16 @@
 - Handle dependencies during `purge`
 - Write version metainfo for later upgrades
 - Force `pull` to update uncacheable datasets
+- Figure out "unable to infer schema" when loading folder of parquets
 
 # Post-MVP
 - V Suppress HDFS warning on startup
 - Add bash completions
+- Add `spark-shell` command (scala and python)
 - Upgrade to latest Spark
 - Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
 - Cleanup poll data
+- Lock repository where necessary to prevent concurrent alteration
+- Avoid hard-setting the container names
+- Use local timezone in all logs

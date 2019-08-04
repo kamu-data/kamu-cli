@@ -1,18 +1,34 @@
 package dev.kamu.cli.external
 
+import org.apache.hadoop.fs.Path
 import org.apache.log4j.LogManager
 
 import scala.sys.process.{Process, ProcessBuilder}
+
+case class DockerRunArgs(
+  image: String,
+  args: List[String] = List.empty,
+  containerName: Option[String] = None,
+  hostname: Option[String] = None,
+  network: Option[String] = None,
+  exposeAllPorts: Boolean = false,
+  exposePorts: List[Int] = List.empty,
+  exposePortMap: Map[Int, Int] = Map.empty,
+  volumeMap: Map[Path, Path] = Map.empty,
+  environmentVars: Map[String, String] = Map.empty,
+  entryPoint: Option[String] = None,
+  remove: Boolean = true,
+  tty: Boolean = false,
+  interactive: Boolean = false
+)
 
 class DockerClient {
   protected val logger = LogManager.getLogger(getClass.getName)
 
   def run(
-    image: String,
-    args: Seq[String] = Seq.empty,
-    extraArgs: Seq[String] = Seq.empty
+    runArgs: DockerRunArgs
   ): Unit = {
-    val cmd = makeRunCmd(image, args, extraArgs)
+    val cmd = makeRunCmd(runArgs)
     val process = prepare(cmd)
     val exitCode = process.!
     if (exitCode != 0)
@@ -22,29 +38,54 @@ class DockerClient {
   }
 
   def runShell(
-    image: String,
-    shellCommand: Seq[String],
-    extraArgs: Seq[String] = Seq.empty
+    runArgs: DockerRunArgs,
+    shellCommand: Seq[String]
   ): Unit = {
     run(
-      image = image,
-      extraArgs = extraArgs ++ Seq("--entrypoint", "bash"),
-      args = Seq("-c", shellCommand.mkString(" "))
+      runArgs.copy(
+        entryPoint = Some("bash"),
+        args = List("-c", shellCommand.mkString(" "))
+      )
     )
   }
 
-  def makeRunCmd(
-    image: String,
-    args: Seq[String] = Seq.empty,
-    extraArgs: Seq[String] = Seq.empty
-  ): Seq[String] = {
-    Seq(
-      "docker",
-      "run",
-      "--rm"
-    ) ++ extraArgs ++ Seq(
-      image
-    ) ++ args
+  def makeRunCmd(runArgs: DockerRunArgs): Seq[String] = {
+    List(
+      List(
+        "docker",
+        "run"
+      ),
+      if (runArgs.remove) List("--rm") else List.empty,
+      if (runArgs.tty) List("-t") else List.empty,
+      if (runArgs.interactive) List("-i") else List.empty,
+      runArgs.containerName.map(v => List("--name", v)).getOrElse(List.empty),
+      runArgs.hostname.map(v => List("--hostname", v)).getOrElse(List.empty),
+      runArgs.network.map(v => List("--network", v)).getOrElse(List.empty),
+      if (runArgs.exposeAllPorts) List("-P") else List.empty,
+      runArgs.exposePorts
+        .map(p => List("-p", p.toString))
+        .reduceOption(_ ++ _)
+        .getOrElse(List.empty),
+      runArgs.exposePortMap
+        .map { case (h, c) => List("-p", s"$h:$c") }
+        .reduceOption(_ ++ _)
+        .getOrElse(List.empty),
+      runArgs.volumeMap
+        .map {
+          case (h, c) => List("-v", s"${h.toUri.getPath}:${c.toUri.getPath}")
+        }
+        .reduceOption(_ ++ _)
+        .getOrElse(List.empty),
+      runArgs.environmentVars
+        .map { case (n, v) => List("-e", s"$n=$v") }
+        .reduceOption(_ ++ _)
+        .getOrElse(List.empty),
+      runArgs.entryPoint
+        .map(v => List("--entrypoint", v))
+        .getOrElse(List.empty),
+      List(runArgs.image),
+      runArgs.args
+    ).reduce(_ ++ _)
   }
 
   def prepare(cmd: Seq[String]): ProcessBuilder = {
