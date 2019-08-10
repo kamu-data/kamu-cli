@@ -30,13 +30,16 @@ class JupyterDockerProcessBuilder(
       )
     ) {
 
-  override def run(): JupyterDockerProcess = {
+  override def run(
+    processIO: Option[ProcessIO] = None
+  ): JupyterDockerProcess = {
     val processBuilder = dockerClient.prepare(cmd)
     new JupyterDockerProcess(
       id,
       dockerClient,
       runArgs.containerName.get,
-      processBuilder
+      processBuilder,
+      runArgs
     )
   }
 
@@ -67,12 +70,14 @@ class JupyterDockerProcess(
   id: String,
   dockerClient: DockerClient,
   containerName: String,
-  processBuilder: ProcessBuilder
+  processBuilder: ProcessBuilder,
+  runArgs: DockerRunArgs
 ) extends DockerProcess(
       "jupyter",
       dockerClient,
       containerName,
-      processBuilder
+      processBuilder,
+      runArgs
     ) {
   protected val logger = LogManager.getLogger(getClass.getName)
 
@@ -87,7 +92,7 @@ class JupyterDockerProcess(
     }
   }
 
-  override def ioHandler(): ProcessIO = {
+  protected override def getIOHandler(): ProcessIO = {
     val tokenRegex = raw"token=([a-z0-9]+)".r
 
     new ProcessIO(

@@ -89,12 +89,16 @@ object KamuApp extends App {
                 repositoryVolumeMap,
                 c.sql.get.port
               ).run()
-            } else {
+            } else if (c.sql.get.command.isDefined) {
               new SQLCommand(
                 fileSystem,
                 repositoryVolumeMap,
                 getSparkRunner(c.sparkLogLevel),
                 c.sql.get.command
+              ).run()
+            } else {
+              new SQLShellCommand(
+                repositoryVolumeMap
               ).run()
             }
           } else if (c.notebook.isDefined) {

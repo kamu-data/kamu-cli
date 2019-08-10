@@ -58,9 +58,11 @@ class CliParser {
       programName("kamu"),
       head("Kamu data processing utility"),
       help('h', "help").text("prints this usage text"),
-      opt[Unit]("verbose")
+      opt[Unit]("debug")
         .text("Enable full debugging")
-        .action((_, c) => c.copy(logLevel = Level.ALL)),
+        .action(
+          (_, c) => c.copy(logLevel = Level.ALL, sparkLogLevel = Level.INFO)
+        ),
       opt[String]("log-level")
         .text("Sets logging level")
         .action((lvl, c) => c.copy(logLevel = Level.toLevel(lvl))),

@@ -40,6 +40,9 @@
 - Write version metainfo for later upgrades
 - Force `pull` to update uncacheable datasets
 - Figure out "unable to infer schema" when loading folder of parquets
+- Prettify `help`
+- Allow adding manifest from remote URL
+- Create "stable" repository of known good datasources
 
 # Post-MVP
 - V Suppress HDFS warning on startup

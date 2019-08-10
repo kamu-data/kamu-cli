@@ -21,6 +21,7 @@ case class SparkSQLAppConfig(
   command: Option[String]
 ) extends Resource[SparkSQLAppConfig]
 
+// TODO: Remove in favor of JDBC client
 class SparkSQLCommand(
   fileSystem: FileSystem,
   config: SparkSQLAppConfig,
