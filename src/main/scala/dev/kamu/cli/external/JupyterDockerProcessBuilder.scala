@@ -15,7 +15,7 @@ class JupyterDockerProcessBuilder(
       dockerClient = new DockerClient(),
       id = "jupyter",
       runArgs = DockerRunArgs(
-        image = "kamu/jupyter:0.0.1",
+        image = DockerImages.JUPYTER,
         containerName = Some("kamu-jupyter"),
         hostname = Some("kamu-jupyter"),
         network = Some(network),

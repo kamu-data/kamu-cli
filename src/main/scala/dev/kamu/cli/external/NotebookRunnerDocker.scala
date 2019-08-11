@@ -5,8 +5,6 @@ import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import sun.misc.{Signal, SignalHandler}
 
-import scala.sys.process.ProcessLogger
-
 class NotebookRunnerDocker(
   fileSystem: FileSystem,
   repositoryVolumeMap: RepositoryVolumeMap

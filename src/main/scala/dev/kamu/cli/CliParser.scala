@@ -13,7 +13,7 @@ case class CliOptions(
   sparkLogLevel: Level = Level.WARN,
   repository: Option[String] = None,
   // commands
-  init: Option[Unit] = None,
+  init: Option[InitOptions] = None,
   list: Option[Unit] = None,
   add: Option[AddOptions] = None,
   purge: Option[PurgeOptions] = None,
@@ -23,6 +23,10 @@ case class CliOptions(
   depgraph: Option[Unit] = None,
   sql: Option[SQLOptions] = None,
   notebook: Option[Unit] = None
+)
+
+case class InitOptions(
+  pullImages: Boolean = false
 )
 
 case class AddOptions(
@@ -92,7 +96,14 @@ class CliParser {
         .action((lvl, c) => c.copy(sparkLogLevel = Level.toLevel(lvl))),
       cmd("init")
         .text("Initialize the repository in the current directory")
-        .action((_, c) => c.copy(init = Some(Nil))),
+        .action((_, c) => c.copy(init = Some(InitOptions())))
+        .children(
+          opt[Unit]("pull-images")
+            .text("Pull docker images")
+            .action(
+              (_, c) => c.copy(init = Some(c.init.get.copy(pullImages = true)))
+            )
+        ),
       cmd("list")
         .text("List all datasets in the repository")
         .action((_, c) => c.copy(list = Some(Nil))),
@@ -189,8 +200,8 @@ class CliParser {
         ),
       cmd("depgraph")
         .text(
-          "Outputs dependency graph of datasets.\n" +
-            "You can visualize it with graphviz by running:\n" +
+          "Outputs dependency graph of datasets. " +
+            "You can visualize it with graphviz by running: " +
             "  kamu depgraph | dot -Tpng > depgraph.png"
         )
         .action((_, c) => c.copy(depgraph = Some(Nil))),
@@ -206,29 +217,36 @@ class CliParser {
               (_, c) => c.copy(sql = Some(c.sql.get.copy(server = true)))
             ),
           opt[Int]("port")
+            .valueName("<int>")
             .text("Expose JDBC server on specific port")
             .action(
               (p, c) => c.copy(sql = Some(c.sql.get.copy(port = Some(p))))
             ),
           opt[String]('u', "url")
-            .text("URL to connect the SQL shell to")
+            .valueName("<url>")
+            .text(
+              "URL to connect the SQL shell to (e.g jdbc:hive2://example.com:10090)"
+            )
             .action(
               (url, c) =>
                 c.copy(sql = Some(c.sql.get.copy(url = Some(URI.create(url)))))
             ),
           opt[String]('c', "command")
+            .valueName("<script>")
             .text("SQL command to run")
             .action(
               (cmd, c) =>
                 c.copy(sql = Some(c.sql.get.copy(command = Some(cmd))))
             ),
           opt[String]("script")
+            .valueName("<path>")
             .text("SQL script file to execute")
             .action(
               (p, c) =>
                 c.copy(sql = Some(c.sql.get.copy(script = Some(new Path(p)))))
             ),
           opt[Boolean]("color")
+            .valueName("<true/false>")
             .text(
               "Control whether color is used for display"
             )
@@ -243,6 +261,7 @@ class CliParser {
                 )
             ),
           opt[Boolean]("incremental")
+            .valueName("<true/false>")
             .text(
               "Display result rows immediately as they are fetched " +
                 "(lower latency and memory usage at the price of extra display column padding)"
@@ -259,8 +278,9 @@ class CliParser {
                 )
             ),
           opt[String]("output-format")
+            .valueName("<table/vertical/csv/tsv/xmlattrs/xmlelements/json>")
             .text(
-              "Format to display the results in (table/vertical/csv/tsv/xmlattrs/xmlelements/json]"
+              "Format to display the results in"
             )
             .action(
               (fmt, c) =>
@@ -274,6 +294,7 @@ class CliParser {
                 )
             ),
           opt[Boolean]("show-header")
+            .valueName("<true/false>")
             .text(
               "Show column names in query results"
             )
@@ -289,6 +310,7 @@ class CliParser {
                 )
             ),
           opt[Int]("header-interval")
+            .valueName("<int>")
             .text(
               "The number of rows between which headers are displayed"
             )
@@ -304,6 +326,7 @@ class CliParser {
                 )
             ),
           opt[String]("csv-delimiter")
+            .valueName("<char>")
             .text("Delimiter in the csv output format")
             .action(
               (v, c) =>
@@ -317,6 +340,7 @@ class CliParser {
                 )
             ),
           opt[String]("csv-quote-character")
+            .valueName("<char>")
             .text("Quote character in the csv output format")
             .action(
               (v, c) =>
@@ -343,6 +367,7 @@ class CliParser {
                 )
             ),
           opt[String]("number-format")
+            .valueName("<pattern>")
             .text("Format numbers using DecimalFormat pattern")
             .action(
               (v, c) =>
@@ -356,6 +381,7 @@ class CliParser {
                 )
             ),
           opt[String]("date-format")
+            .valueName("<pattern>")
             .text("Format dates using SimpleDateFormat pattern")
             .action(
               (v, c) =>
@@ -369,6 +395,7 @@ class CliParser {
                 )
             ),
           opt[String]("time-format")
+            .valueName("<pattern>")
             .text("Format times using SimpleDateFormat pattern")
             .action(
               (v, c) =>
@@ -382,6 +409,7 @@ class CliParser {
                 )
             ),
           opt[String]("timestamp-format")
+            .valueName("<pattern>")
             .text("Format timestamps using SimpleDateFormat pattern")
             .action(
               (v, c) =>

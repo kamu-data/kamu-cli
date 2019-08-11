@@ -102,6 +102,10 @@ class DockerClient {
       .exitValue()
   }
 
+  def pull(image: String): Unit = {
+    prepare(Seq("docker", "pull", image)).!
+  }
+
   def inspectHostPort(container: String, port: Int): Option[Int] = {
     val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "/tcp\") 0).HostPort }}"
     val processBuilder = prepare(Seq("docker", "inspect", format, container))

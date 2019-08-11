@@ -13,7 +13,7 @@ class LivyDockerProcessBuilder(
       id = "livy",
       dockerClient = new DockerClient(),
       runArgs = DockerRunArgs(
-        image = "kamu/spark-py:2.4.0_0.0.1",
+        image = DockerImages.LIVY,
         args = List("livy"),
         containerName = Some("kamu-livy"),
         hostname = Some("kamu-livy"),

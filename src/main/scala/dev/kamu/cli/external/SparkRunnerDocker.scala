@@ -7,7 +7,7 @@ import org.apache.log4j.Level
 class SparkRunnerDocker(
   fileSystem: FileSystem,
   logLevel: Level,
-  image: String = "kamu/spark:2.4.0_0.0.1"
+  image: String = DockerImages.SPARK
 ) extends SparkRunner(fileSystem, logLevel) {
 
   protected override def submit(

@@ -27,35 +27,40 @@
 - V Add `sql --server` command that starts Livy with JDBC endpoint exposed
 - V Add `sql` interactive shell
 - V Add support for one-off `sql` commands
-- Livy sessions should be pre-configured with GeoSpark types
-- Implement `describe` command showing dataset metadata
-- Implement file `import` and `export`
+- V Add command to pull docker images (`init --pull-images`)
 - Simplify historical vocab
+- Livy sessions should be pre-configured with GeoSpark types
+- Host images on docker hub
+- Distribution `mac`
 - Distribution `arch`
 - Distribution `ubuntu`
-- Distribution `mac`
+- Allow adding manifest from remote URL
+- Handle dependencies during `purge`
+- Cleanup poll data
+- Implement `describe` command showing dataset metadata
 - Implement `status` command showing which data is out-of-date
 - Implement recursive mode for `pull` command
-- Handle dependencies during `purge`
 - Write version metainfo for later upgrades
 - Force `pull` to update uncacheable datasets
-- Figure out "unable to infer schema" when loading folder of parquets
-- Prettify `help`
-- Allow adding manifest from remote URL
 - Create "stable" repository of known good datasources
 
 # Post-MVP
 - V Suppress HDFS warning on startup
 - Add bash completions
+- Figure out "unable to infer schema" when loading folder of parquets
+- Implement file `import` and `export`
 - Add `spark-shell` command (scala and python)
 - Upgrade to latest Spark
 - Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
-- Cleanup poll data
 - Lock repository where necessary to prevent concurrent alteration
 - Avoid hard-setting the container names
 - Use local timezone in all logs
 - Allow using custom-built docker images
+- Prettify `help`
+- Add heuristics to help with configuring dataset sources
+- More flexible source configuration
+- Make list of environment vars propagated to notebooks configurable
 
 # Known issues
 - `Transaction isolation level` warning on sql shell startup

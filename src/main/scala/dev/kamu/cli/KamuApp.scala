@@ -37,10 +37,13 @@ object KamuApp extends App {
           .setLevel(c.logLevel)
 
         val command = if (c.init.isDefined) {
-          new InitCommand(
-            fileSystem,
-            repositoryVolumeMap
-          )
+          if (c.init.get.pullImages)
+            new PullImagesCommand()
+          else
+            new InitCommand(
+              fileSystem,
+              repositoryVolumeMap
+            )
         } else if (c.list.isDefined) {
           new ListCommand(
             metadataRepository
