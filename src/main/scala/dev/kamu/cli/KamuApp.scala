@@ -91,7 +91,9 @@ object KamuApp extends App {
             new SQLShellCommand(
               repositoryVolumeMap,
               c.sql.get.url,
-              c.sql.get.command
+              c.sql.get.command,
+              c.sql.get.script,
+              c.sql.get.sqlLineOptions
             )
           }
         } else if (c.notebook.isDefined) {

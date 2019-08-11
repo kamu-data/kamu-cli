@@ -25,8 +25,8 @@
 - V Root dataset creation wizard (generate based on schema)
 - V Control output verbosity
 - V Add `sql --server` command that starts Livy with JDBC endpoint exposed
-- Add `sql` interactive shell
-- Add support for one-off `sql` commands
+- V Add `sql` interactive shell
+- V Add support for one-off `sql` commands
 - Livy sessions should be pre-configured with GeoSpark types
 - Implement `describe` command showing dataset metadata
 - Implement file `import` and `export`
@@ -55,3 +55,9 @@
 - Lock repository where necessary to prevent concurrent alteration
 - Avoid hard-setting the container names
 - Use local timezone in all logs
+- Allow using custom-built docker images
+
+# Known issues
+- `Transaction isolation level` warning on sql shell startup
+- `NullPointerException` when creating temporary view in sql shell
+- `NoSuchElementException` on every SQL syntax error instead of root cause

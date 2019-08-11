@@ -182,6 +182,27 @@ object IOHandlerPresets {
     )
   }
 
+  def redirectToLogger(
+    logger: Logger,
+    outLevel: Priority = Level.DEBUG,
+    errLevel: Priority = Level.DEBUG,
+    tag: String = ""
+  ): ProcessIO = {
+    new ProcessIO(
+      _ => (),
+      out =>
+        scala.io.Source
+          .fromInputStream(out)
+          .getLines
+          .foreach(l => logger.log(outLevel, tag + l)),
+      stderr =>
+        scala.io.Source
+          .fromInputStream(stderr)
+          .getLines()
+          .foreach(l => logger.log(errLevel, tag + l))
+    )
+  }
+
   private def stream(from: InputStream, to: OutputStream): Unit = {
     val buf = new Array[Byte](1024)
     while (true) {

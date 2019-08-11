@@ -48,7 +48,24 @@ case class SQLOptions(
   server: Boolean = false,
   port: Option[Int] = None,
   url: Option[URI] = None,
-  command: Option[String] = None
+  command: Option[String] = None,
+  script: Option[Path] = None,
+  sqlLineOptions: SqlLineOptions = SqlLineOptions()
+)
+
+case class SqlLineOptions(
+  color: Boolean = true,
+  incremental: Option[Boolean] = None,
+  outputFormat: Option[String] = None,
+  showHeader: Option[Boolean] = None,
+  headerInterval: Option[Int] = None,
+  csvDelimiter: Option[String] = None,
+  csvQuoteCharacter: Option[String] = None,
+  nullValue: Option[String] = None,
+  numberFormat: Option[String] = None,
+  dateFormat: Option[String] = None,
+  timeFormat: Option[String] = None,
+  timestampFormat: Option[String] = None
 )
 
 class CliParser {
@@ -204,6 +221,178 @@ class CliParser {
             .action(
               (cmd, c) =>
                 c.copy(sql = Some(c.sql.get.copy(command = Some(cmd))))
+            ),
+          opt[String]("script")
+            .text("SQL script file to execute")
+            .action(
+              (p, c) =>
+                c.copy(sql = Some(c.sql.get.copy(script = Some(new Path(p)))))
+            ),
+          opt[Boolean]("color")
+            .text(
+              "Control whether color is used for display"
+            )
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions = c.sql.get.sqlLineOptions.copy(color = v)
+                    )
+                  )
+                )
+            ),
+          opt[Boolean]("incremental")
+            .text(
+              "Display result rows immediately as they are fetched " +
+                "(lower latency and memory usage at the price of extra display column padding)"
+            )
+            .action(
+              (i, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(incremental = Some(i))
+                    )
+                  )
+                )
+            ),
+          opt[String]("output-format")
+            .text(
+              "Format to display the results in (table/vertical/csv/tsv/xmlattrs/xmlelements/json]"
+            )
+            .action(
+              (fmt, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(outputFormat = Some(fmt))
+                    )
+                  )
+                )
+            ),
+          opt[Boolean]("show-header")
+            .text(
+              "Show column names in query results"
+            )
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(showHeader = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[Int]("header-interval")
+            .text(
+              "The number of rows between which headers are displayed"
+            )
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(headerInterval = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("csv-delimiter")
+            .text("Delimiter in the csv output format")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(csvDelimiter = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("csv-quote-character")
+            .text("Quote character in the csv output format")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions = c.sql.get.sqlLineOptions
+                        .copy(csvQuoteCharacter = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("null-value")
+            .text("Use specified string in place of NULL values")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(nullValue = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("number-format")
+            .text("Format numbers using DecimalFormat pattern")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(numberFormat = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("date-format")
+            .text("Format dates using SimpleDateFormat pattern")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(dateFormat = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("time-format")
+            .text("Format times using SimpleDateFormat pattern")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(timeFormat = Some(v))
+                    )
+                  )
+                )
+            ),
+          opt[String]("timestamp-format")
+            .text("Format timestamps using SimpleDateFormat pattern")
+            .action(
+              (v, c) =>
+                c.copy(
+                  sql = Some(
+                    c.sql.get.copy(
+                      sqlLineOptions =
+                        c.sql.get.sqlLineOptions.copy(timestampFormat = Some(v))
+                    )
+                  )
+                )
             )
         ),
       cmd("notebook")
