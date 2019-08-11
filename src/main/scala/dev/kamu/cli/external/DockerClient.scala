@@ -3,7 +3,7 @@ package dev.kamu.cli.external
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.LogManager
 
-import scala.sys.process.{Process, ProcessBuilder}
+import scala.sys.process.{Process, ProcessBuilder, ProcessLogger}
 
 case class DockerRunArgs(
   image: String,
@@ -98,7 +98,7 @@ class DockerClient {
       Seq("docker", "kill", s"--signal=$signal", container)
     )
     processBuilder
-      .run(IOHandlerPresets.blackHoled())
+      .run(IOHandlerPresets.logged(logger))
       .exitValue()
   }
 
@@ -106,7 +106,12 @@ class DockerClient {
     val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "/tcp\") 0).HostPort }}"
     val processBuilder = prepare(Seq("docker", "inspect", format, container))
     try {
-      Some(processBuilder.!!.stripLineEnd.toInt)
+      Some(
+        processBuilder
+          .!!(IOHandlerPresets.logged(logger))
+          .stripLineEnd
+          .toInt
+      )
     } catch {
       case _: RuntimeException => None
     }

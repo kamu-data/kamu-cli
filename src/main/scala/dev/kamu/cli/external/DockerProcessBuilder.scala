@@ -10,11 +10,11 @@ import java.net.{
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 
-import org.apache.log4j.LogManager
+import org.apache.log4j.{Level, LogManager, Logger, Priority}
 
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration.Duration
-import scala.sys.process.{Process, ProcessBuilder, ProcessIO}
+import scala.sys.process.{Process, ProcessBuilder, ProcessIO, ProcessLogger}
 
 class DockerProcessBuilder(
   protected val id: String,
@@ -168,6 +168,17 @@ object IOHandlerPresets {
       _ => (),
       _ => (),
       _ => ()
+    )
+  }
+
+  def logged(
+    logger: Logger,
+    outLevel: Priority = Level.DEBUG,
+    errLevel: Priority = Level.DEBUG
+  ): ProcessLogger = {
+    ProcessLogger(
+      out => logger.log(outLevel, out),
+      err => logger.log(errLevel, err)
     )
   }
 
