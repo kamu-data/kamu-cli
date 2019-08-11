@@ -1,10 +1,19 @@
 package dev.kamu.cli.external
 
-import java.io.{InputStream, OutputStream}
+import java.io.{IOException, InputStream, OutputStream}
+import java.net.{
+  ConnectException,
+  InetSocketAddress,
+  Socket,
+  SocketTimeoutException
+}
 import java.nio.charset.StandardCharsets
+import java.time.Instant
 
 import org.apache.log4j.LogManager
 
+import scala.concurrent.TimeoutException
+import scala.concurrent.duration.Duration
 import scala.sys.process.{Process, ProcessBuilder, ProcessIO}
 
 class DockerProcessBuilder(
@@ -59,9 +68,63 @@ class DockerProcess(
   }
 
   def getHostPort(containerPort: Int): Option[Int] = {
-    Some(
-      dockerClient.inspectHostPort(containerName, s"$containerPort/tcp").toInt
-    )
+    dockerClient.inspectHostPort(containerName, containerPort)
+  }
+
+  def waitForHostPort(containerPort: Int, timeout: Duration): Int = {
+    val deadline = Instant.now().plusNanos(timeout.toNanos)
+
+    def waitSome(): Unit = {
+      if (Instant.now().compareTo(deadline) >= 0)
+        throw new TimeoutException(
+          s"Timeout while waiting for container port $containerPort of $id"
+        )
+      else
+        Thread.sleep(500)
+    }
+
+    var hostPort = getHostPort(containerPort)
+
+    while (hostPort.isEmpty) {
+      waitSome()
+      hostPort = getHostPort(containerPort)
+    }
+
+    def tryConnect(): Boolean = {
+      val timeout = (deadline.toEpochMilli - Instant.now().toEpochMilli).toInt
+      if (timeout < 0)
+        return false
+
+      try {
+        val s = new Socket()
+        s.connect(new InetSocketAddress("localhost", hostPort.get), timeout)
+
+        // TODO: Due to how docker works it will accept socket connections to the mapped port even when
+        // the corresponding port in the container didn't open yet. So here we have to wait for a short time and
+        // see if docker's "proxy" will reset the connection when it realizes the container isn't ready yet.
+        try {
+          s.setSoTimeout(500)
+          val read = s.getInputStream.read()
+          read >= 0
+        } catch {
+          case _: SocketTimeoutException =>
+            // This means that the remote side is listening for us
+            true
+        } finally {
+          s.close()
+        }
+      } catch {
+        case _: ConnectException       => false
+        case _: SocketTimeoutException => false
+        case _: IOException            => false
+      }
+    }
+
+    while (!tryConnect()) {
+      waitSome()
+    }
+
+    hostPort.get
   }
 }
 

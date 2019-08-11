@@ -47,6 +47,7 @@ case class PullOptions(
 case class SQLOptions(
   server: Boolean = false,
   port: Option[Int] = None,
+  url: Option[URI] = None,
   command: Option[String] = None
 )
 
@@ -191,6 +192,12 @@ class CliParser {
             .text("Expose JDBC server on specific port")
             .action(
               (p, c) => c.copy(sql = Some(c.sql.get.copy(port = Some(p))))
+            ),
+          opt[String]('u', "url")
+            .text("URL to connect the SQL shell to")
+            .action(
+              (url, c) =>
+                c.copy(sql = Some(c.sql.get.copy(url = Some(URI.create(url)))))
             ),
           opt[String]('c', "command")
             .text("SQL command to run")

@@ -12,6 +12,8 @@ class InitCommand(
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
+  override def requiresRepository: Boolean = false
+
   def run(): Unit = {
     if (repositoryVolumeMap.allPaths.exists(fileSystem.exists))
       throw new UsageException("Already a kamu repository")

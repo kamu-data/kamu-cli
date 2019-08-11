@@ -42,6 +42,14 @@ lazy val kamuCli = (project in file("."))
       ("org.apache.hadoop" % "hadoop-common" % "2.6.5")
         .exclude("commons-beanutils", "commons-beanutils")
         .exclude("commons-beanutils", "commons-beanutils-core"),
+      // SQL Shell
+      "sqlline" % "sqlline" % "1.8.0",
+      ("org.spark-project.hive" % "hive-jdbc" % "1.2.1.spark2")
+        .excludeAll(ExclusionRule(organization = "log4j"))
+        .excludeAll(ExclusionRule(organization = "org.apache.geronimo.specs"))
+        .exclude("org.apache.hadoop", "hadoop-yarn-api")
+        .exclude("org.fusesource.leveldbjni", "leveldbjni-all"),
+      // Test
       "org.scalatest" %% "scalatest" % "3.0.5" % Test
     ),
     mainClass in assembly := Some("dev.kamu.cli.KamuApp"),
@@ -50,6 +58,7 @@ lazy val kamuCli = (project in file("."))
       .copy(prependShellScript = Some(defaultUniversalScript(shebang = true))),
     assemblyMergeStrategy in assembly := {
       case "overview.html" => MergeStrategy.discard
+      case "plugin.xml"    => MergeStrategy.discard
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)

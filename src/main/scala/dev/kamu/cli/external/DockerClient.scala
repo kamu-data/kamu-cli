@@ -97,12 +97,18 @@ class DockerClient {
     val processBuilder = prepare(
       Seq("docker", "kill", s"--signal=$signal", container)
     )
-    processBuilder.!
+    processBuilder
+      .run(IOHandlerPresets.blackHoled())
+      .exitValue()
   }
 
-  def inspectHostPort(container: String, port: String): String = {
-    val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "\") 0).HostPort }}"
+  def inspectHostPort(container: String, port: Int): Option[Int] = {
+    val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "/tcp\") 0).HostPort }}"
     val processBuilder = prepare(Seq("docker", "inspect", format, container))
-    processBuilder.!!.stripLineEnd
+    try {
+      Some(processBuilder.!!.stripLineEnd.toInt)
+    } catch {
+      case _: RuntimeException => None
+    }
   }
 }

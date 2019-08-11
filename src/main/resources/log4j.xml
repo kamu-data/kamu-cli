@@ -26,6 +26,16 @@
         <appender-ref ref="console-cli"/>
     </logger>
 
+    <logger name="org.apache.hive.jdbc.Utils" additivity="false">
+        <level value="warn"/>
+        <appender-ref ref="console-cli"/>
+    </logger>
+
+    <logger name="org.apache.hive.jdbc.HiveConnection" additivity="false">
+        <level value="warn"/>
+        <appender-ref ref="console-cli"/>
+    </logger>
+
     <root>
         <priority value="info"/>
         <appender-ref ref="console-generic"/>
