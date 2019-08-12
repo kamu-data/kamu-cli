@@ -22,7 +22,7 @@ case class CliOptions(
   // commands - extra
   depgraph: Option[Unit] = None,
   sql: Option[SQLOptions] = None,
-  notebook: Option[Unit] = None
+  notebook: Option[NotebookOptions] = None
 )
 
 case class InitOptions(
@@ -55,6 +55,10 @@ case class SQLOptions(
   command: Option[String] = None,
   script: Option[Path] = None,
   sqlLineOptions: SqlLineOptions = SqlLineOptions()
+)
+
+case class NotebookOptions(
+  environmentVars: Map[String, String] = Map.empty
 )
 
 case class SqlLineOptions(
@@ -427,7 +431,35 @@ class CliParser {
         .text(
           "Start the Jupyter notebook server to explore the data in the repository"
         )
-        .action((_, c) => c.copy(notebook = Some(Nil)))
+        .action((_, c) => c.copy(notebook = Some(NotebookOptions())))
+        .children(
+          opt[String]('e', "env")
+            .valueName("<name/name=value>")
+            .text(
+              "Set or propagate specified environment variable into notebook server"
+            )
+            .unbounded()
+            .action(
+              (s, c) => {
+                val (name, value) =
+                  if (s.indexOf("=") < 0) {
+                    (s, sys.env(s))
+                  } else {
+                    val (left, right) = s.splitAt(s.indexOf("="))
+                    (left, right.substring(1))
+                  }
+
+                c.copy(
+                  notebook = Some(
+                    c.notebook.get
+                      .copy(
+                        environmentVars = c.notebook.get.environmentVars + (name -> value)
+                      )
+                  )
+                )
+              }
+            )
+        )
     )
   }
 

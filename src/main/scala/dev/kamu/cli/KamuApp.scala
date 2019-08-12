@@ -102,7 +102,8 @@ object KamuApp extends App {
         } else if (c.notebook.isDefined) {
           new NotebookCommand(
             fileSystem,
-            repositoryVolumeMap
+            repositoryVolumeMap,
+            c.notebook.get.environmentVars
           )
         } else {
           throw new UsageException("Invalid command")

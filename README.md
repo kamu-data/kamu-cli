@@ -46,6 +46,7 @@
 
 # Post-MVP
 - V Suppress HDFS warning on startup
+- V Make list of environment vars propagated to notebooks configurable
 - Add bash completions
 - Figure out "unable to infer schema" when loading folder of parquets
 - Implement file `import` and `export`
@@ -60,7 +61,6 @@
 - Prettify `help`
 - Add heuristics to help with configuring dataset sources
 - More flexible source configuration
-- Make list of environment vars propagated to notebooks configurable
 
 # Known issues
 - `Transaction isolation level` warning on sql shell startup

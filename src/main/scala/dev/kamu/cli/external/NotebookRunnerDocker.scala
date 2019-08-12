@@ -7,7 +7,8 @@ import sun.misc.{Signal, SignalHandler}
 
 class NotebookRunnerDocker(
   fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap
+  repositoryVolumeMap: RepositoryVolumeMap,
+  environmentVars: Map[String, String]
 ) {
   protected val logger = LogManager.getLogger(getClass.getName)
 
@@ -17,7 +18,8 @@ class NotebookRunnerDocker(
       val livyBuilder =
         new LivyDockerProcessBuilder(repositoryVolumeMap, Some(network))
 
-      val jupyterBuilder = new JupyterDockerProcessBuilder(fileSystem, network)
+      val jupyterBuilder =
+        new JupyterDockerProcessBuilder(fileSystem, network, environmentVars)
 
       var livyProcess: DockerProcess = null
       var jupyterProcess: JupyterDockerProcess = null

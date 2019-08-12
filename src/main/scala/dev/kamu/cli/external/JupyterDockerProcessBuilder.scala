@@ -10,7 +10,8 @@ import scala.sys.process.{ProcessBuilder, ProcessIO}
 
 class JupyterDockerProcessBuilder(
   fileSystem: FileSystem,
-  network: String
+  network: String,
+  environmentVars: Map[String, String]
 ) extends DockerProcessBuilder(
       dockerClient = new DockerClient(),
       id = "jupyter",
@@ -23,10 +24,7 @@ class JupyterDockerProcessBuilder(
         volumeMap = Map(
           fileSystem.getWorkingDirectory -> new Path("/opt/workdir")
         ),
-        environmentVars = Seq("MAPBOX_ACCESS_TOKEN")
-          .filter(sys.env.contains)
-          .map(n => (n, sys.env(n)))
-          .toMap
+        environmentVars = environmentVars
       )
     ) {
 
