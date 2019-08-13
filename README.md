@@ -28,9 +28,9 @@
 - V Add `sql` interactive shell
 - V Add support for one-off `sql` commands
 - V Add command to pull docker images (`init --pull-images`)
+- V Host images on docker hub
 - Simplify historical vocab
 - Livy sessions should be pre-configured with GeoSpark types
-- Host images on docker hub
 - Distribution `mac`
 - Distribution `arch`
 - Distribution `ubuntu`
@@ -66,3 +66,4 @@
 - `Transaction isolation level` warning on sql shell startup
 - `NullPointerException` when creating temporary view in sql shell
 - `NoSuchElementException` on every SQL syntax error instead of root cause
+- `No data or no sasl data in the stream` error in Livy logs due to helth check

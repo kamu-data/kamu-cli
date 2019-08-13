@@ -215,16 +215,16 @@ class CliParser {
         )
         .action((_, c) => c.copy(sql = Some(SQLOptions())))
         .children(
-          opt[Unit]("server")
+          cmd("server")
             .text("Run JDBC server only")
-            .action(
-              (_, c) => c.copy(sql = Some(c.sql.get.copy(server = true)))
-            ),
-          opt[Int]("port")
-            .valueName("<int>")
-            .text("Expose JDBC server on specific port")
-            .action(
-              (p, c) => c.copy(sql = Some(c.sql.get.copy(port = Some(p))))
+            .action((_, c) => c.copy(sql = Some(c.sql.get.copy(server = true))))
+            .children(
+              opt[Int]("port")
+                .valueName("<int>")
+                .text("Expose JDBC server on specific port")
+                .action(
+                  (p, c) => c.copy(sql = Some(c.sql.get.copy(port = Some(p))))
+                )
             ),
           opt[String]('u', "url")
             .valueName("<url>")
