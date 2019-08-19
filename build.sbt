@@ -27,6 +27,7 @@ lazy val kamuCli = (project in file("."))
     organizationName := "kamu",
     name := "kamu-cli",
     version := "0.1.0-SNAPSHOT",
+    resolvers += Resolver.mavenLocal,
     libraryDependencies ++= Seq(
       "dev.kamu" %% "kamu-core-manifests" % "0.1.0-SNAPSHOT",
       "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0-SNAPSHOT",
@@ -44,7 +45,7 @@ lazy val kamuCli = (project in file("."))
         .exclude("commons-beanutils", "commons-beanutils-core"),
       // SQL Shell
       "sqlline" % "sqlline" % "1.8.0",
-      ("org.spark-project.hive" % "hive-jdbc" % "1.2.1.spark2")
+      ("org.spark-project.hive" % "hive-jdbc" % "1.2.1.spark2.kamu.1")
         .excludeAll(ExclusionRule(organization = "log4j"))
         .excludeAll(ExclusionRule(organization = "org.apache.geronimo.specs"))
         .exclude("org.apache.hadoop", "hadoop-yarn-api")
