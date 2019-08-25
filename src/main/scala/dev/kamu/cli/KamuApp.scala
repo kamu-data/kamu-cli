@@ -109,10 +109,8 @@ object KamuApp extends App {
           throw new UsageException("Invalid command")
         }
 
-        if (command.requiresRepository && repositoryVolumeMap.allPaths.exists(
-              !fileSystem.exists(_)
-            ))
-          throw new UsageException("Not a kamu repository")
+        if (command.requiresRepository)
+          ensureRepository()
 
         command.run()
       case _ =>
@@ -125,6 +123,15 @@ object KamuApp extends App {
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
+
+  def ensureRepository(): Unit = {
+    if (!fileSystem.exists(new Path("./.kamu")))
+      throw new UsageException("Not a kamu repository")
+
+    repositoryVolumeMap.allPaths
+      .filter(!fileSystem.exists(_))
+      .foreach(fileSystem.mkdirs)
+  }
 
   def getSparkRunner(logLevel: Level): SparkRunner = {
     if (cliOptions.get.useLocalSpark)
