@@ -51,8 +51,7 @@ abstract class SparkRunner(
   }
 
   protected def prepareJar(files: Map[String, OutputStream => Unit]): Path = {
-    val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val jarPath = tmpDir.resolve("kamu-configs.jar")
+    val jarPath = tempDir.resolve("kamu-configs.jar")
 
     logger.debug(s"Writing temporary JAR to: $jarPath")
 
@@ -71,8 +70,7 @@ abstract class SparkRunner(
   }
 
   protected def prepareLog4jConfig(): Path = {
-    val tmpDir = new Path(sys.props("java.io.tmpdir"))
-    val path = tmpDir.resolve("kamu-spark-log4j.properties")
+    val path = tempDir.resolve("kamu-spark-log4j.properties")
 
     val resourceName = logLevel match {
       case Level.ALL | Level.TRACE | Level.DEBUG | Level.INFO =>
@@ -92,5 +90,14 @@ abstract class SparkRunner(
     configStream.close()
 
     path
+  }
+
+  protected def tempDir: Path = {
+    // Note: not using "java.io.tmpdir" because on Mac this resolves to /var/folders for whatever reason
+    // and this directory is not mounted into docker's VM
+    val p = fileSystem.toAbsolute(new Path(".kamu/tmp"))
+    if (!fileSystem.exists(p))
+      fileSystem.mkdirs(p)
+    p
   }
 }

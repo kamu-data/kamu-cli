@@ -28,6 +28,7 @@
 - V Add command to pull docker images (`init --pull-images`)
 - V Host images on docker hub
 - V Livy sessions should be pre-configured with GeoSpark types
+- Add a version information
 - Distribution `mac`
 - Simplify historical vocab
 - Distribution `arch`
@@ -47,6 +48,7 @@
 - V Suppress HDFS warning on startup
 - V Make list of environment vars propagated to notebooks configurable
 - Add bash completions
+- Standardize tabular format and output options
 - Figure out "unable to infer schema" when loading folder of parquets
 - Implement file `import` and `export`
 - Add `spark-shell` command (scala and python)
@@ -64,6 +66,7 @@
 # Known issues
 - V `NullPointerException` when creating temporary view in sql shell
 - V `NoSuchElementException` on every SQL syntax error instead of root cause
+- V `Mounts denied` error on Mac
 - `Kryo serialization failed: Buffer overflow` when manipulating large GIS data
 - `Transaction isolation level` warning on sql shell startup
 - `sparkmagic` garbles some dataset types and often requires casting to string to preserve data
