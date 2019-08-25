@@ -106,7 +106,9 @@ object KamuApp extends App {
             c.notebook.get.environmentVars
           )
         } else {
-          throw new UsageException("Invalid command")
+          new HelpCommand(
+            cliParser
+          )
         }
 
         if (command.requiresRepository)
@@ -114,6 +116,7 @@ object KamuApp extends App {
 
         command.run()
       case _ =>
+        sys.exit(2)
     }
 
   } catch {
