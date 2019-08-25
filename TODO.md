@@ -28,46 +28,51 @@
 - V Add command to pull docker images (`init --pull-images`)
 - V Host images on docker hub
 - V Livy sessions should be pre-configured with GeoSpark types
-- Add a version information
+- V Add a version information
 - Distribution `mac`
+- Prettify `help`
 - Simplify historical vocab
 - Distribution `arch`
 - Distribution `ubuntu`
-- Simplify build
-- Allow adding manifest from remote URL
-- Handle dependencies during `purge`
-- Cleanup poll data
-- Implement `describe` command showing dataset metadata
-- Implement `status` command showing which data is out-of-date
-- Implement recursive mode for `pull` command
+- Rethink repo structure (again!)
 - Write version metainfo for later upgrades
-- Force `pull` to update uncacheable datasets
+- Cleanup poll data
 - Create "stable" repository of known good datasources
+- Allow adding manifest from remote URL
+- Consider `brew create` style of generating new sources (include enough comments to guide the author)
+- Simplify build
 
 # Post-MVP
 - V Suppress HDFS warning on startup
 - V Make list of environment vars propagated to notebooks configurable
+- More flexible source configuration
+- Implement recursive mode for `pull` command
+- Handle dependencies during `purge`
+- Implement `describe` command showing dataset metadata
+- Implement `status` command showing which data is out-of-date
+- Force `pull` to update uncacheable datasets
 - Add bash completions
 - Standardize tabular format and output options
 - Figure out "unable to infer schema" when loading folder of parquets
 - Implement file `import` and `export`
 - Add `spark-shell` command (scala and python)
 - Upgrade to latest Spark
-- Fix notebook warnings
 - Avoid permission issues by propagating UID/GID into containers
 - Lock repository where necessary to prevent concurrent alteration
 - Avoid hard-setting the container names
+- Unify log formats of all tools
 - Use local timezone in all logs
 - Allow using custom-built docker images
-- Prettify `help`
 - Add heuristics to help with configuring dataset sources
-- More flexible source configuration
 
 # Known issues
 - V `NullPointerException` when creating temporary view in sql shell
 - V `NoSuchElementException` on every SQL syntax error instead of root cause
 - V `Mounts denied` error on Mac
+- `dynver` plugin is not tagging snapshot versions as advertised
+- `sparkmagic` spams warnings in notebooks
 - `Kryo serialization failed: Buffer overflow` when manipulating large GIS data
+- `sqlline version ???` uglyness on sql shell startup
 - `Transaction isolation level` warning on sql shell startup
 - `sparkmagic` garbles some dataset types and often requires casting to string to preserve data
 - `No data or no sasl data in the stream` error in Livy logs due to helth check

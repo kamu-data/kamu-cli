@@ -13,6 +13,7 @@ case class CliOptions(
   sparkLogLevel: Level = Level.WARN,
   repository: Option[String] = None,
   // commands
+  version: Option[Unit] = None,
   init: Option[InitOptions] = None,
   list: Option[Unit] = None,
   add: Option[AddOptions] = None,
@@ -98,6 +99,9 @@ class CliParser {
       opt[String]("spark-log-level")
         .text("Sets logging level for Spark")
         .action((lvl, c) => c.copy(sparkLogLevel = Level.toLevel(lvl))),
+      cmd("version")
+        .text("Prints the version of this tool")
+        .action((_, c) => c.copy(version = Some(Nil))),
       cmd("init")
         .text("Initialize the repository in the current directory")
         .action((_, c) => c.copy(init = Some(InitOptions())))

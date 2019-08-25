@@ -36,7 +36,9 @@ object KamuApp extends App {
           .getLogger(getClass.getPackage.getName)
           .setLevel(c.logLevel)
 
-        val command = if (c.init.isDefined) {
+        val command = if (c.version.isDefined) {
+          new VersionCommand()
+        } else if (c.init.isDefined) {
           if (c.init.get.pullImages)
             new PullImagesCommand()
           else
