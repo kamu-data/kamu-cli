@@ -26,12 +26,11 @@ lazy val kamuCli = (project in file("."))
     organization := "dev.kamu",
     organizationName := "kamu",
     name := "kamu-cli",
-    version := "0.1.0-SNAPSHOT",
     resolvers += Resolver.mavenLocal,
     libraryDependencies ++= Seq(
-      "dev.kamu" %% "kamu-core-manifests" % "0.1.0-SNAPSHOT",
-      "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0-SNAPSHOT",
-      "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0-SNAPSHOT",
+      "dev.kamu" %% "kamu-core-manifests" % "0.1.0",
+      "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0",
+      "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0",
       "com.jcabi" % "jcabi-log" % "0.17.3",
       "com.github.scopt" %% "scopt" % "4.0.0-RC2",
       // Spark

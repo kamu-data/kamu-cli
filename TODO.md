@@ -28,10 +28,11 @@
 - V Add command to pull docker images (`init --pull-images`)
 - V Host images on docker hub
 - V Livy sessions should be pre-configured with GeoSpark types
-- Simplify historical vocab
 - Distribution `mac`
+- Simplify historical vocab
 - Distribution `arch`
 - Distribution `ubuntu`
+- Simplify build
 - Allow adding manifest from remote URL
 - Handle dependencies during `purge`
 - Cleanup poll data
