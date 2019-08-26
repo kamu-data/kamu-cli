@@ -95,7 +95,7 @@ abstract class SparkRunner(
   protected def tempDir: Path = {
     // Note: not using "java.io.tmpdir" because on Mac this resolves to /var/folders for whatever reason
     // and this directory is not mounted into docker's VM
-    val p = fileSystem.toAbsolute(new Path(".kamu/tmp"))
+    val p = fileSystem.toAbsolute(new Path(".kamu/run"))
     if (!fileSystem.exists(p))
       fileSystem.mkdirs(p)
     p
