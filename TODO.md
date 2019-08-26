@@ -29,7 +29,7 @@
 - V Host images on docker hub
 - V Livy sessions should be pre-configured with GeoSpark types
 - V Add a version information
-- Distribution `mac`
+- V Distribution `mac`
 - Prettify `help`
 - Simplify historical vocab
 - Distribution `arch`
@@ -41,6 +41,7 @@
 - Allow adding manifest from remote URL
 - Consider `brew create` style of generating new sources (include enough comments to guide the author)
 - Simplify build
+- Homebrew formula should build from source
 
 # Post-MVP
 - V Suppress HDFS warning on startup
@@ -68,7 +69,10 @@
 # Known issues
 - V `NullPointerException` when creating temporary view in sql shell
 - V `NoSuchElementException` on every SQL syntax error instead of root cause
-- V `Mounts denied` error on Mac
+- `Mounts denied` error on Mac when mounting `/usr/local/Cellar/kamu/x.x.x/bin/kamu`
+- `Ctrl+C` kills connection in SQL shell
+- Spamy warning in Spark `Truncated the string representation of a plan since it was too large`.
+- ^ MVP Blockers ^
 - `dynver` plugin is not tagging snapshot versions as advertised
 - `sparkmagic` spams warnings in notebooks
 - `Kryo serialization failed: Buffer overflow` when manipulating large GIS data
