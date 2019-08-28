@@ -32,7 +32,7 @@ lazy val kamuCli = (project in file("."))
       "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0",
       "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0",
       "com.jcabi" % "jcabi-log" % "0.17.3",
-      "com.github.scopt" %% "scopt" % "3.7.1",
+      "org.rogach" %% "scallop" % "3.3.1",
       // Spark
       "org.apache.spark" %% "spark-core" % Versions.spark % "provided",
       "org.apache.spark" %% "spark-sql" % Versions.spark % "provided",

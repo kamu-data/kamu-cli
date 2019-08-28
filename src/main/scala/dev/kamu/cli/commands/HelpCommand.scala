@@ -1,13 +1,13 @@
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.CliParser
+import dev.kamu.cli.CliArgs
 
 class HelpCommand(
-  cliParser: CliParser
+  cliArgs: CliArgs
 ) extends Command {
   override def requiresRepository: Boolean = false
 
   def run(): Unit = {
-    println(cliParser.usage())
+    cliArgs.printHelp()
   }
 }

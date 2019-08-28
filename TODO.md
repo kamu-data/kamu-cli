@@ -30,7 +30,7 @@
 - V Livy sessions should be pre-configured with GeoSpark types
 - V Add a version information
 - V Distribution `mac`
-- Prettify `help`
+- V Prettify `help`
 - Simplify historical vocab
 - Distribution `arch`
 - Distribution `ubuntu`

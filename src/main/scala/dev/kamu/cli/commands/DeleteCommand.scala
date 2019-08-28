@@ -15,18 +15,23 @@ class DeleteCommand(
   private val logger = LogManager.getLogger(getClass.getName)
 
   override def run(): Unit = {
-    ids
+    val numDeleted = ids
       .map(DatasetID)
-      .foreach(id => {
+      .map(id => {
         try {
           metadataRepository.deleteDataset(id)
-          logger.info(s"Deleted dataset: ${id.toString}")
+          1
         } catch {
           case e: DoesNotExistsException =>
             logger.error(e.getMessage)
+            0
           case e: DanglingReferenceException =>
             logger.error(e.getMessage)
+            0
         }
       })
+      .sum
+
+    logger.info(s"Deleted $numDeleted datasets")
   }
 }

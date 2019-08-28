@@ -16,9 +16,6 @@ object KamuApp extends App {
   fileSystem.setWriteChecksum(false)
   fileSystem.setVerifyChecksum(false)
 
-  val cliParser = new CliParser()
-  val cliOptions = cliParser.parse(args)
-
   val repositoryVolumeMap = RepositoryVolumeMap(
     sourcesDir = new Path(".kamu/sources"),
     downloadDir = new Path(".kamu/downloads"),
@@ -30,97 +27,92 @@ object KamuApp extends App {
     new MetadataRepository(fileSystem, repositoryVolumeMap)
 
   try {
-    cliOptions match {
-      case Some(c) =>
-        LogManager
-          .getLogger(getClass.getPackage.getName)
-          .setLevel(c.logLevel)
+    val c = new CliArgs(args)
 
-        val command = if (c.version.isDefined) {
-          new VersionCommand()
-        } else if (c.init.isDefined) {
-          if (c.init.get.pullImages)
-            new PullImagesCommand()
-          else
-            new InitCommand(
-              fileSystem,
-              repositoryVolumeMap
-            )
-        } else if (c.list.isDefined) {
-          new ListCommand(
+    LogManager
+      .getLogger(getClass.getPackage.getName)
+      .setLevel(c.logLevel())
+
+    val command = c.subcommands match {
+      case List(c.version) =>
+        new VersionCommand()
+      case List(c.init) =>
+        if (c.init.pullImages())
+          new PullImagesCommand()
+        else
+          new InitCommand(
+            fileSystem,
+            repositoryVolumeMap
+          )
+      case List(c.list) =>
+        new ListCommand(
+          metadataRepository
+        )
+      case List(c.add) =>
+        if (c.add.interactive())
+          new AddInteractiveCommand(
+            fileSystem,
             metadataRepository
           )
-        } else if (c.add.isDefined) {
-          if (c.add.get.interactive)
-            new AddInteractiveCommand(
-              fileSystem,
-              metadataRepository
-            )
-          else
-            new AddCommand(
-              fileSystem,
-              metadataRepository,
-              c.add.get.manifests
-            )
-        } else if (c.purge.isDefined) {
-          new PurgeCommand(
-            metadataRepository,
-            c.purge.get.ids,
-            c.purge.get.all
-          )
-        } else if (c.delete.isDefined) {
-          new DeleteCommand(
-            metadataRepository,
-            c.delete.get.ids
-          )
-        } else if (c.pull.isDefined) {
-          new PullCommand(
+        else
+          new AddCommand(
             fileSystem,
-            repositoryVolumeMap,
             metadataRepository,
-            getSparkRunner(c.sparkLogLevel),
-            c.pull.get.ids,
-            c.pull.get.all
+            c.add.manifests()
           )
-        } else if (c.depgraph.isDefined) {
-          new DependencyGraphCommand(
-            metadataRepository
-          )
-        } else if (c.sql.isDefined) {
-          if (c.sql.get.server) {
-            new SQLServerCommand(
-              repositoryVolumeMap,
-              c.sql.get.port
-            )
-          } else {
-            new SQLShellCommand(
-              repositoryVolumeMap,
-              c.sql.get.url,
-              c.sql.get.command,
-              c.sql.get.script,
-              c.sql.get.sqlLineOptions
-            )
-          }
-        } else if (c.notebook.isDefined) {
-          new NotebookCommand(
-            fileSystem,
-            repositoryVolumeMap,
-            c.notebook.get.environmentVars
-          )
-        } else {
-          new HelpCommand(
-            cliParser
-          )
-        }
-
-        if (command.requiresRepository)
-          ensureRepository()
-
-        command.run()
+      case List(c.purge) =>
+        new PurgeCommand(
+          metadataRepository,
+          c.purge.ids(),
+          c.purge.all()
+        )
+      case List(c.delete) =>
+        new DeleteCommand(
+          metadataRepository,
+          c.delete.ids()
+        )
+      case List(c.pull) =>
+        new PullCommand(
+          fileSystem,
+          repositoryVolumeMap,
+          metadataRepository,
+          getSparkRunner(c.localSpark(), c.sparkLogLevel()),
+          c.pull.ids(),
+          c.pull.all()
+        )
+      case List(c.depgraph) =>
+        new DependencyGraphCommand(
+          metadataRepository
+        )
+      case List(c.sql) =>
+        new SQLShellCommand(
+          repositoryVolumeMap,
+          c.sql.url.toOption,
+          c.sql.command.toOption,
+          c.sql.script.toOption,
+          c.sql.getSqlLineOptions
+        )
+      case List(c.sql, c.sql.server) =>
+        new SQLServerCommand(
+          repositoryVolumeMap,
+          c.sql.server.port.toOption
+        )
+      case List(c.notebook) =>
+        new NotebookCommand(
+          fileSystem,
+          repositoryVolumeMap,
+          c.notebook.env()
+        )
       case _ =>
-        sys.exit(2)
+        new HelpCommand(
+          c
+        )
     }
 
+    if (command.requiresRepository)
+      ensureRepository()
+
+    command.run()
   } catch {
     case e: UsageException =>
       logger.error(e.getMessage)
@@ -138,8 +130,8 @@ object KamuApp extends App {
       .foreach(fileSystem.mkdirs)
   }
 
-  def getSparkRunner(logLevel: Level): SparkRunner = {
-    if (cliOptions.get.useLocalSpark)
+  def getSparkRunner(useLocalSpark: Boolean, logLevel: Level): SparkRunner = {
+    if (useLocalSpark)
       new SparkRunnerLocal(fileSystem, logLevel)
     else
       new SparkRunnerDocker(fileSystem, logLevel)

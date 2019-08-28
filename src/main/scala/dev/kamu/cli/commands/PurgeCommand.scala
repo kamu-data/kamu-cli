@@ -18,17 +18,20 @@ class PurgeCommand(
       else
         ids.map(DatasetID)
 
-    toPurge
-      .foreach(id => {
+    val numPurged = toPurge
+      .map(id => {
         try {
           logger.info(s"Purging dataset: ${id.toString}")
           metadataRepository.purgeDataset(id)
+          1
         } catch {
           case e: DoesNotExistsException =>
             logger.error(e.getMessage)
+            0
         }
       })
+      .sum
 
-    logger.info(s"Purged ${toPurge.size} datasets")
+    logger.info(s"Purged $numPurged datasets")
   }
 }

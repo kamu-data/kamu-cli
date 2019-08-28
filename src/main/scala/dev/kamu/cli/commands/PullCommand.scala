@@ -38,7 +38,7 @@ class PullCommand(
       )
       .count(updated => updated)
 
-    logger.info(s"Done, $numUpdated datasets updated.")
+    logger.info(s"Updated $numUpdated datasets")
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
