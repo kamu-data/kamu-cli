@@ -46,6 +46,7 @@
 # Post-MVP
 - V Suppress HDFS warning on startup
 - V Make list of environment vars propagated to notebooks configurable
+- Restore tri-state boolead options
 - More flexible source configuration
 - Implement recursive mode for `pull` command
 - Handle dependencies during `purge`
