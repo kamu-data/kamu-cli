@@ -32,9 +32,9 @@
 - V Distribution `mac`
 - V Prettify `help`
 - Simplify historical vocab
+- Rethink repo structure (again!)
 - Distribution `arch`
 - Distribution `ubuntu`
-- Rethink repo structure (again!)
 - Write version metainfo for later upgrades
 - Cleanup poll data
 - Create "stable" repository of known good datasources

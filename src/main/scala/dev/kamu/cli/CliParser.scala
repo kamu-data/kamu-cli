@@ -223,16 +223,14 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       noshort = true
     )
 
-    val color = opt[Boolean](
-      "color",
-      argName = "true|false",
+    val noColor = opt[Boolean](
+      "no-color",
       descr = "Control whether color is used for display",
       noshort = true
     )
 
     val incremental = opt[Boolean](
       "incremental",
-      argName = "true|false",
       descr = "Display result rows immediately as they are fetched " +
         "(lower latency and memory usage at the price of extra display column padding)",
       noshort = true
@@ -246,10 +244,9 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       noshort = true
     )
 
-    val showHeader = opt[Boolean](
-      "show-header",
-      argName = "true|false",
-      descr = "Show column names in query results",
+    val noHeader = opt[Boolean](
+      "no-header",
+      descr = "Whether to show column names in query results",
       noshort = true
     )
 
@@ -310,10 +307,10 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
     def getSqlLineOptions: SqlLineOptions = {
       SqlLineOptions(
-        color = color(),
+        color = !noColor(),
         incremental = incremental.toOption,
         outputFormat = outputFormat.toOption,
-        showHeader = showHeader.toOption,
+        showHeader = noHeader.toOption.map(!_),
         headerInterval = headerInterval.toOption,
         csvDelimiter = csvDelimiter.toOption,
         csvQuoteCharacter = csvQuoteCharacter.toOption,
