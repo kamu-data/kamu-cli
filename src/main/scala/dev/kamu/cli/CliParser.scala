@@ -2,10 +2,124 @@ package dev.kamu.cli
 
 import java.net.URI
 
+import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.Level
-
 import org.rogach.scallop._
+
+///////////////////////////////////////////////////////////////////////////////
+
+class KamuSubcommand(name: String) extends Subcommand(name) {
+  override def descr(d: String): Unit = {
+    super.descr(d)
+    super.banner(d)
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class TabularOutputSubcommand(name: String) extends KamuSubcommand(name) {
+  val outputFormat = opt[String](
+    "output-format",
+    argName = "format",
+    descr = "Format to display the results in. Valid formats are: " +
+      "table, vertical, csv, tsv, xmlattrs, xmlelements, json",
+    short = 'O'
+  )
+
+  val noColor = opt[Boolean](
+    "no-color",
+    descr = "Control whether color is used for display",
+    noshort = true
+  )
+
+  val incremental = opt[Boolean](
+    "incremental",
+    descr = "Display result rows immediately as they are fetched " +
+      "(lower latency and memory usage at the price of extra display column padding)",
+    noshort = true
+  )
+
+  val noHeader = opt[Boolean](
+    "no-header",
+    descr = "Whether to show column names in query results",
+    noshort = true
+  )
+
+  val headerInterval = opt[Int](
+    "header-interval",
+    argName = "int",
+    descr = "The number of rows between which headers are displayed",
+    noshort = true
+  )
+
+  val csvDelimiter = opt[String](
+    "csv-delimiter",
+    argName = "char",
+    descr = "Delimiter in the csv output format",
+    noshort = true
+  )
+
+  val csvQuoteCharacter = opt[String](
+    "csv-quote-character",
+    argName = "char",
+    descr = "Quote character in the csv output format",
+    noshort = true
+  )
+
+  val nullValue = opt[String](
+    "null-value",
+    descr = "Use specified string in place of NULL values",
+    noshort = true
+  )
+
+  val numberFormat = opt[String](
+    "number-format",
+    argName = "pattern",
+    descr = "Format numbers using DecimalFormat pattern",
+    noshort = true
+  )
+
+  val dateFormat = opt[String](
+    "date-format",
+    argName = "pattern",
+    descr = "Format dates using SimpleDateFormat pattern",
+    noshort = true
+  )
+
+  val timeFormat = opt[String](
+    "time-format",
+    argName = "pattern",
+    descr = "Format times using SimpleDateFormat pattern",
+    noshort = true
+  )
+
+  val timestampFormat = opt[String](
+    "timestamp-format",
+    argName = "pattern",
+    descr = "Format timestamps using SimpleDateFormat pattern",
+    noshort = true
+  )
+
+  def getOutputFormat: OutputFormat = {
+    OutputFormat(
+      color = !noColor(),
+      incremental = incremental(),
+      outputFormat = outputFormat.toOption,
+      showHeader = !noHeader(),
+      headerInterval = headerInterval.toOption,
+      csvDelimiter = csvDelimiter.toOption,
+      csvQuoteCharacter = csvQuoteCharacter.toOption,
+      nullValue = nullValue.toOption,
+      numberFormat = numberFormat.toOption,
+      dateFormat = dateFormat.toOption,
+      timeFormat = timeFormat.toOption,
+      timestampFormat = timestampFormat.toOption
+    )
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   banner(
@@ -83,17 +197,15 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val version = new Subcommand("version") {
+  val version = new KamuSubcommand("version") {
     descr("Prints the version information of this tool")
-    banner("Prints the version information of this tool")
   }
   addSubcommand(version)
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val init = new Subcommand("init") {
+  val init = new KamuSubcommand("init") {
     descr("Initialize the repository in the current directory")
-    banner("Initialize the repository in the current directory")
 
     val pullImages = opt[Boolean](
       "pull-images",
@@ -105,17 +217,15 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val list = new Subcommand("list") {
+  val list = new TabularOutputSubcommand("list") {
     descr("List all datasets in the repository")
-    banner("List all datasets in the repository")
   }
   addSubcommand(list)
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val add = new Subcommand("add") {
+  val add = new KamuSubcommand("add") {
     descr("Add a new dataset")
-    banner("Add a new dataset")
 
     val interactive = opt[Boolean](
       "interactive",
@@ -133,9 +243,8 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val purge = new Subcommand("purge") {
+  val purge = new KamuSubcommand("purge") {
     descr("Purge all data of the dataset")
-    banner("Purge all data of the dataset")
 
     val all = opt[Boolean](
       "all",
@@ -153,9 +262,8 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val delete = new Subcommand("delete") {
+  val delete = new KamuSubcommand("delete") {
     descr("Delete a dataset")
-    banner("Delete a dataset")
 
     val ids = trailArg[List[String]](
       "ids",
@@ -168,9 +276,8 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val pull = new Subcommand("pull") {
+  val pull = new KamuSubcommand("pull") {
     descr("Pull new data for some specific or all datasets")
-    banner("Pull new data for some specific or all datasets")
 
     val all = opt[Boolean](
       "all",
@@ -188,9 +295,8 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val sql = new Subcommand("sql") {
+  val sql = new TabularOutputSubcommand("sql") {
     descr("Executes an SQL query or drops you into an SQL shell")
-    banner("Executes an SQL query or drops you into an SQL shell")
 
     val server = new Subcommand("server") {
       banner("Run JDBC server only")
@@ -222,115 +328,13 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "SQL script file to execute",
       noshort = true
     )
-
-    val noColor = opt[Boolean](
-      "no-color",
-      descr = "Control whether color is used for display",
-      noshort = true
-    )
-
-    val incremental = opt[Boolean](
-      "incremental",
-      descr = "Display result rows immediately as they are fetched " +
-        "(lower latency and memory usage at the price of extra display column padding)",
-      noshort = true
-    )
-
-    val outputFormat = opt[String](
-      "output-format",
-      argName = "format",
-      descr = "Format to display the results in. Valid formats are: " +
-        "table, vertical, csv, tsv, xmlattrs, xmlelements, json",
-      noshort = true
-    )
-
-    val noHeader = opt[Boolean](
-      "no-header",
-      descr = "Whether to show column names in query results",
-      noshort = true
-    )
-
-    val headerInterval = opt[Int](
-      "header-interval",
-      argName = "int",
-      descr = "The number of rows between which headers are displayed",
-      noshort = true
-    )
-
-    val csvDelimiter = opt[String](
-      "csv-delimiter",
-      argName = "char",
-      descr = "Delimiter in the csv output format",
-      noshort = true
-    )
-
-    val csvQuoteCharacter = opt[String](
-      "csv-quote-character",
-      argName = "char",
-      descr = "Quote character in the csv output format",
-      noshort = true
-    )
-
-    val nullValue = opt[String](
-      "null-value",
-      descr = "Use specified string in place of NULL values",
-      noshort = true
-    )
-
-    val numberFormat = opt[String](
-      "number-format",
-      argName = "pattern",
-      descr = "Format numbers using DecimalFormat pattern",
-      noshort = true
-    )
-
-    val dateFormat = opt[String](
-      "date-format",
-      argName = "pattern",
-      descr = "Format dates using SimpleDateFormat pattern",
-      noshort = true
-    )
-
-    val timeFormat = opt[String](
-      "time-format",
-      argName = "pattern",
-      descr = "Format times using SimpleDateFormat pattern",
-      noshort = true
-    )
-
-    val timestampFormat = opt[String](
-      "timestamp-format",
-      argName = "pattern",
-      descr = "Format timestamps using SimpleDateFormat pattern",
-      noshort = true
-    )
-
-    def getSqlLineOptions: SqlLineOptions = {
-      SqlLineOptions(
-        color = !noColor(),
-        incremental = incremental.toOption,
-        outputFormat = outputFormat.toOption,
-        showHeader = noHeader.toOption.map(!_),
-        headerInterval = headerInterval.toOption,
-        csvDelimiter = csvDelimiter.toOption,
-        csvQuoteCharacter = csvQuoteCharacter.toOption,
-        nullValue = nullValue.toOption,
-        numberFormat = numberFormat.toOption,
-        dateFormat = dateFormat.toOption,
-        timeFormat = timeFormat.toOption,
-        timestampFormat = timestampFormat.toOption
-      )
-    }
   }
   addSubcommand(sql)
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val notebook = new Subcommand("notebook") {
+  val notebook = new KamuSubcommand("notebook") {
     descr(
-      "Start the Jupyter notebook and Spark to explore the data in the repository"
-    )
-    banner(
       "Start the Jupyter notebook and Spark to explore the data in the repository"
     )
 
@@ -346,9 +350,8 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val depgraph = new Subcommand("depgraph") {
+  val depgraph = new KamuSubcommand("depgraph") {
     descr("Outputs dependency graph of datasets")
-    banner("Outputs dependency graph of datasets")
     footer(
       "\nYou can visualize it with graphviz by running:" +
         "\n    \033[1mkamu depgraph | dot -Tpng > depgraph.png\033[0m"
@@ -363,23 +366,6 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   }
   verify()
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-case class SqlLineOptions(
-  color: Boolean = true,
-  incremental: Option[Boolean] = None,
-  outputFormat: Option[String] = None,
-  showHeader: Option[Boolean] = None,
-  headerInterval: Option[Int] = None,
-  csvDelimiter: Option[String] = None,
-  csvQuoteCharacter: Option[String] = None,
-  nullValue: Option[String] = None,
-  numberFormat: Option[String] = None,
-  dateFormat: Option[String] = None,
-  timeFormat: Option[String] = None,
-  timestampFormat: Option[String] = None
-)
 
 ///////////////////////////////////////////////////////////////////////////////
 

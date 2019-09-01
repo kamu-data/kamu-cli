@@ -1,7 +1,8 @@
 package dev.kamu.cli
 
 import dev.kamu.cli.commands._
-import dev.kamu.cli.external.{SparkRunner, SparkRunnerDocker, SparkRunnerLocal}
+import dev.kamu.cli.external._
+import dev.kamu.cli.output._
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager}
@@ -46,7 +47,8 @@ object KamuApp extends App {
           )
       case List(c.list) =>
         new ListCommand(
-          metadataRepository
+          metadataRepository,
+          getOutputFormatter(c.list.getOutputFormat)
         )
       case List(c.add) =>
         if (c.add.interactive())
@@ -90,7 +92,7 @@ object KamuApp extends App {
           c.sql.url.toOption,
           c.sql.command.toOption,
           c.sql.script.toOption,
-          c.sql.getSqlLineOptions
+          c.sql.getOutputFormat
         )
       case List(c.sql, c.sql.server) =>
         new SQLServerCommand(
@@ -135,5 +137,24 @@ object KamuApp extends App {
       new SparkRunnerLocal(fileSystem, logLevel)
     else
       new SparkRunnerDocker(fileSystem, logLevel)
+  }
+
+  def getOutputFormatter(outputFormat: OutputFormat): OutputFormatter = {
+    outputFormat.outputFormat.map(_.toLowerCase).getOrElse("table") match {
+      case "table" =>
+        new TableOutputFormatter(System.out, outputFormat)
+      case "csv" =>
+        val f = outputFormat.copy(
+          csvDelimiter = outputFormat.csvDelimiter.orElse(Some(","))
+        )
+        new DelimitedFormatter(System.out, f)
+      case "tsv" =>
+        val f = outputFormat.copy(
+          csvDelimiter = outputFormat.csvDelimiter.orElse(Some("\t"))
+        )
+        new DelimitedFormatter(System.out, f)
+      case fmt =>
+        throw new UsageException(s"Unsupported format: $fmt")
+    }
   }
 }

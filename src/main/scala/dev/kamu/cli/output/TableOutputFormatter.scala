@@ -3,9 +3,10 @@ package dev.kamu.cli.output
 import java.io.PrintStream
 import scala.math.max
 
-class TableOutputFormat(rs: SimpleResultSet) {
+class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
+    extends OutputFormatter {
 
-  def format(stream: PrintStream): Unit = {
+  def format(rs: SimpleResultSet): Unit = {
     val maxColDataWidths = rs.columns.indices
       .map(c => rs.rows.map(row => row(c).toString.length).max)
       .toArray
@@ -13,29 +14,29 @@ class TableOutputFormat(rs: SimpleResultSet) {
     val maxColWidths = rs.columns.indices
       .map(c => max(maxColDataWidths(c), rs.columns(c).length))
 
-    writeHeader(rs.columns, maxColWidths, stream)
+    if (outputFormat.showHeader)
+      writeHeader(rs.columns, maxColWidths)
 
     rs.rows.foreach(row => {
-      writeRow(row.map(_.toString), maxColWidths, stream)
+      writeRow(row.map(_.toString), maxColWidths)
     })
 
-    writeSpacer(maxColWidths, stream)
+    if (outputFormat.showHeader)
+      writeSpacer(maxColWidths)
   }
 
   def writeHeader(
     values: Seq[String],
-    widths: Seq[Int],
-    stream: PrintStream
+    widths: Seq[Int]
   ): Unit = {
-    writeSpacer(widths, stream)
-    writeRow(values, widths, stream)
-    writeSpacer(widths, stream)
+    writeSpacer(widths)
+    writeRow(values, widths)
+    writeSpacer(widths)
   }
 
   def writeRow(
     values: Seq[String],
-    widths: Seq[Int],
-    stream: PrintStream
+    widths: Seq[Int]
   ): Unit = {
     stream.print("| ")
     stream.print(
@@ -50,7 +51,7 @@ class TableOutputFormat(rs: SimpleResultSet) {
     stream.println(" |")
   }
 
-  def writeSpacer(widths: Seq[Int], stream: PrintStream): Unit = {
+  def writeSpacer(widths: Seq[Int]): Unit = {
     stream.print("+-")
     stream.print(widths.map("-" * _).mkString("-+-"))
     stream.println("-+")

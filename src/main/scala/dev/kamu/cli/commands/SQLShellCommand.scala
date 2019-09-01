@@ -2,8 +2,9 @@ package dev.kamu.cli.commands
 
 import java.net.URI
 
-import dev.kamu.cli.{RepositoryVolumeMap, SqlLineOptions}
+import dev.kamu.cli.RepositoryVolumeMap
 import dev.kamu.cli.external.{IOHandlerPresets, LivyDockerProcessBuilder}
+import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.LogManager
 import sqlline.SqlLine
@@ -15,7 +16,7 @@ class SQLShellCommand(
   url: Option[URI],
   command: Option[String],
   script: Option[Path],
-  sqlLineOptions: SqlLineOptions
+  outputFormat: OutputFormat
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
@@ -24,7 +25,7 @@ class SQLShellCommand(
   override def run(): Unit = {
     var args = Array(
       "--autoCommit=false",
-      s"--color=${sqlLineOptions.color}",
+      s"--color=${outputFormat.color}",
       "-nn",
       "kamu"
     )
@@ -34,40 +35,40 @@ class SQLShellCommand(
     else if (script.isDefined)
       args ++= Seq("-f", script.get.toUri.getPath)
 
-    if (sqlLineOptions.incremental.isDefined)
-      args ++= Seq(s"--incremental=${sqlLineOptions.incremental.get}")
+    if (outputFormat.incremental)
+      args ++= Seq(s"--incremental=true${outputFormat.incremental}")
 
-    if (sqlLineOptions.showHeader.isDefined)
-      args ++= Seq(s"--showHeader=${sqlLineOptions.showHeader.get}")
+    if (!outputFormat.showHeader)
+      args ++= Seq(s"--showHeader=${outputFormat.showHeader}")
 
-    if (sqlLineOptions.headerInterval.isDefined)
-      args ++= Seq(s"--headerInterval=${sqlLineOptions.headerInterval.get}")
+    if (outputFormat.headerInterval.isDefined)
+      args ++= Seq(s"--headerInterval=${outputFormat.headerInterval.get}")
 
-    if (sqlLineOptions.outputFormat.isDefined)
-      args ++= Seq(s"--outputformat=${sqlLineOptions.outputFormat.get}")
+    if (outputFormat.outputFormat.isDefined)
+      args ++= Seq(s"--outputformat=${outputFormat.outputFormat.get}")
 
-    if (sqlLineOptions.csvDelimiter.isDefined)
-      args ++= Seq(s"--csvDelimiter=${sqlLineOptions.csvDelimiter.get}")
+    if (outputFormat.csvDelimiter.isDefined)
+      args ++= Seq(s"--csvDelimiter=${outputFormat.csvDelimiter.get}")
 
-    if (sqlLineOptions.csvQuoteCharacter.isDefined)
+    if (outputFormat.csvQuoteCharacter.isDefined)
       args ++= Seq(
-        s"--csvQuoteCharacter=${sqlLineOptions.csvQuoteCharacter.get}"
+        s"--csvQuoteCharacter=${outputFormat.csvQuoteCharacter.get}"
       )
 
-    if (sqlLineOptions.nullValue.isDefined)
-      args ++= Seq(s"--nullValue=${sqlLineOptions.nullValue.get}")
+    if (outputFormat.nullValue.isDefined)
+      args ++= Seq(s"--nullValue=${outputFormat.nullValue.get}")
 
-    if (sqlLineOptions.numberFormat.isDefined)
-      args ++= Seq(s"--numberFormat=${sqlLineOptions.numberFormat.get}")
+    if (outputFormat.numberFormat.isDefined)
+      args ++= Seq(s"--numberFormat=${outputFormat.numberFormat.get}")
 
-    if (sqlLineOptions.dateFormat.isDefined)
-      args ++= Seq(s"--dateFormat=${sqlLineOptions.dateFormat.get}")
+    if (outputFormat.dateFormat.isDefined)
+      args ++= Seq(s"--dateFormat=${outputFormat.dateFormat.get}")
 
-    if (sqlLineOptions.timeFormat.isDefined)
-      args ++= Seq(s"--timeFormat=${sqlLineOptions.timeFormat.get}")
+    if (outputFormat.timeFormat.isDefined)
+      args ++= Seq(s"--timeFormat=${outputFormat.timeFormat.get}")
 
-    if (sqlLineOptions.timestampFormat.isDefined)
-      args ++= Seq(s"--timestampFormat=${sqlLineOptions.timestampFormat.get}")
+    if (outputFormat.timestampFormat.isDefined)
+      args ++= Seq(s"--timestampFormat=${outputFormat.timestampFormat.get}")
 
     maybeRunServer { url =>
       args ++= Seq("-u", url.toString)

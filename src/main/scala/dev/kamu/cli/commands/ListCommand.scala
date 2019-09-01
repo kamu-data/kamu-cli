@@ -1,11 +1,12 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.MetadataRepository
-import dev.kamu.cli.output.{SimpleResultSet, TableOutputFormat}
+import dev.kamu.cli.output.{OutputFormatter, SimpleResultSet}
 import org.apache.log4j.LogManager
 
 class ListCommand(
-  metadataRepository: MetadataRepository
+  metadataRepository: MetadataRepository,
+  outputFormatter: OutputFormatter
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
@@ -28,6 +29,6 @@ class ListCommand(
           rs.addRow(Array[Any](id, kind))
       }
 
-    new TableOutputFormat(rs).format(System.out)
+    outputFormatter.format(rs)
   }
 }
