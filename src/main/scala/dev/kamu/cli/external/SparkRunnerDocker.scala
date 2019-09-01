@@ -14,6 +14,7 @@ class SparkRunnerDocker(
     repo: RepositoryVolumeMap,
     appClass: String,
     jars: Seq[Path],
+    extraMounts: Seq[Path],
     loggingConfig: Path
   ): Unit = {
     val assemblyPathInContainer = new Path("/opt/kamu/kamu")
@@ -22,6 +23,8 @@ class SparkRunnerDocker(
       assemblyPath -> assemblyPathInContainer,
       loggingConfig -> new Path("/opt/spark/conf/log4j.properties")
     )
+
+    val extraVolumes = extraMounts.map(p => (p, p)).toMap
 
     val jarVolumes = jars
       .map(p => (p, new Path("/opt/kamu/jars/" + p.getName)))
@@ -52,7 +55,7 @@ class SparkRunnerDocker(
     dockerClient.runShell(
       DockerRunArgs(
         image = image,
-        volumeMap = appVolumes ++ repoVolumes ++ jarVolumes
+        volumeMap = appVolumes ++ repoVolumes ++ jarVolumes ++ extraVolumes
       ),
       submitArgs
     )

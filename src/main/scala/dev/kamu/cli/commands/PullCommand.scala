@@ -3,7 +3,7 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
 import dev.kamu.core.manifests.{Dataset, DatasetID}
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
@@ -31,10 +31,10 @@ class PullCommand(
     val numUpdated = datasets
       .map(
         ds =>
-          if (ds.kind == Dataset.Kind.Root)
-            pullRoot(ds)
-          else
-            pullDerivative(ds)
+          ds.kind match {
+            case Dataset.Kind.Root       => pullRoot(ds)
+            case Dataset.Kind.Derivative => pullDerivative(ds)
+          }
       )
       .count(updated => updated)
 
@@ -48,6 +48,14 @@ class PullCommand(
   def pullRoot(ds: Dataset): Boolean = {
     logger.debug(s"Pulling root dataset ${ds.id}")
 
+    val source = ds.rootPollingSource.get
+
+    val extraMounts =
+      if (source.url.getScheme == null)
+        List(new Path(source.url))
+      else
+        List.empty
+
     sparkRunner.submit(
       repo = repositoryVolumeMap,
       appClass = "dev.kamu.core.ingest.polling.IngestApp",
@@ -56,7 +64,8 @@ class PullCommand(
           os => yaml.save(repositoryVolumeMap.toVolumeMap.asManifest, os)
         ),
         "dataset_0.yaml" -> (os => yaml.save(ds.asManifest, os))
-      )
+      ),
+      extraMounts = extraMounts
     )
 
     logger.debug(s"Successfully pulled root dataset ${ds.id}")

@@ -16,6 +16,7 @@ class SparkRunnerLocal(
     repo: RepositoryVolumeMap,
     appClass: String,
     jars: Seq[Path],
+    extraMounts: Seq[Path],
     loggingConfig: Path
   ): Unit = {
     val sparkSubmit = findSparkSubmitBin()

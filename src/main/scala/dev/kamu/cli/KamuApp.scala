@@ -32,7 +32,7 @@ object KamuApp extends App {
 
     LogManager
       .getLogger(getClass.getPackage.getName)
-      .setLevel(c.logLevel())
+      .setLevel(if (c.debug()) Level.ALL else c.logLevel())
 
     val command = c.subcommands match {
       case List(c.version) =>
@@ -78,7 +78,10 @@ object KamuApp extends App {
           fileSystem,
           repositoryVolumeMap,
           metadataRepository,
-          getSparkRunner(c.localSpark(), c.sparkLogLevel()),
+          getSparkRunner(
+            c.localSpark(),
+            if (c.debug()) Level.INFO else c.sparkLogLevel()
+          ),
           c.pull.ids(),
           c.pull.all()
         )

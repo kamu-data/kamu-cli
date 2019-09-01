@@ -19,6 +19,7 @@ abstract class SparkRunner(
     repo: RepositoryVolumeMap,
     appClass: String,
     extraFiles: Map[String, OutputStream => Unit] = Map.empty,
+    extraMounts: Seq[Path] = Seq.empty,
     jars: Seq[Path] = Seq.empty
   ): Unit = {
     val tmpJar =
@@ -30,7 +31,7 @@ abstract class SparkRunner(
     val loggingConfig = prepareLog4jConfig()
 
     try {
-      submit(repo, appClass, Seq(tmpJar) ++ jars, loggingConfig)
+      submit(repo, appClass, Seq(tmpJar) ++ jars, extraMounts, loggingConfig)
     } finally {
       if (tmpJar != null)
         fileSystem.delete(tmpJar, false)
@@ -43,6 +44,7 @@ abstract class SparkRunner(
     repo: RepositoryVolumeMap,
     appClass: String,
     jars: Seq[Path],
+    extraMounts: Seq[Path],
     loggingConfig: Path
   )
 

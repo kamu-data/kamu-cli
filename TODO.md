@@ -36,6 +36,8 @@
 - Distribution `arch`
 - Distribution `ubuntu`
 - Write version metainfo for later upgrades
+- Need a way for users to debug `Malformed records are detected in record parsing`
+- Cache downloads separately from ingest so you can re-run ingest on failure without re-downloading the data
 - Cleanup poll data
 - Create "stable" repository of known good datasources
 - Allow adding manifest from remote URL
@@ -46,6 +48,7 @@
 # Post-MVP
 - V Suppress HDFS warning on startup
 - V Make list of environment vars propagated to notebooks configurable
+- V Standardize tabular format and output options
 - Restore tri-state boolead options
 - More flexible source configuration
 - Implement recursive mode for `pull` command
@@ -54,7 +57,6 @@
 - Implement `status` command showing which data is out-of-date
 - Force `pull` to update uncacheable datasets
 - Add bash completions
-- Standardize tabular format and output options
 - Figure out "unable to infer schema" when loading folder of parquets
 - Implement file `import` and `export`
 - Add `spark-shell` command (scala and python)
