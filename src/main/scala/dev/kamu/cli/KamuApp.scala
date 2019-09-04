@@ -13,6 +13,8 @@ class UsageException(message: String = "", cause: Throwable = None.orNull)
 object KamuApp extends App {
   val logger = LogManager.getLogger(getClass.getName)
 
+  val config = KamuConfig()
+
   val fileSystem = FileSystem.get(new Configuration())
   fileSystem.setWriteChecksum(false)
   fileSystem.setVerifyChecksum(false)
@@ -139,7 +141,7 @@ object KamuApp extends App {
     if (useLocalSpark)
       new SparkRunnerLocal(fileSystem, logLevel)
     else
-      new SparkRunnerDocker(fileSystem, logLevel)
+      new SparkRunnerDocker(fileSystem, logLevel, config.spark)
   }
 
   def getOutputFormatter(outputFormat: OutputFormat): OutputFormatter = {

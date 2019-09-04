@@ -35,6 +35,7 @@
 - Rethink repo structure (again!)
 - Distribution `arch`
 - Distribution `ubuntu`
+- Add a license
 - Write version metainfo for later upgrades
 - Need a way for users to debug `Malformed records are detected in record parsing`
 - Cache downloads separately from ingest so you can re-run ingest on failure without re-downloading the data
@@ -49,6 +50,8 @@
 - V Suppress HDFS warning on startup
 - V Make list of environment vars propagated to notebooks configurable
 - V Standardize tabular format and output options
+- Avoid creating Parquet files that are too big
+- `shapefile` import should include automatic re-projection
 - Restore tri-state boolead options
 - More flexible source configuration
 - Implement recursive mode for `pull` command

@@ -1,6 +1,6 @@
 package dev.kamu.cli.external
 
-import dev.kamu.cli.{RepositoryVolumeMap, UsageException}
+import dev.kamu.cli.{RepositoryVolumeMap, SparkConfig, UsageException}
 import dev.kamu.core.manifests.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
@@ -9,7 +9,8 @@ import scala.sys.process.Process
 
 class SparkRunnerLocal(
   fileSystem: FileSystem,
-  logLevel: Level
+  logLevel: Level,
+  sparkConfig: SparkConfig
 ) extends SparkRunner(fileSystem, logLevel) {
 
   protected override def submit(
@@ -24,6 +25,7 @@ class SparkRunnerLocal(
     val submitArgs = Seq(
       sparkSubmit.toString,
       "--master=local[4]",
+      s"--driver-memory=${sparkConfig.driverMemory}",
       "--conf",
       s"spark.sql.warehouse.dir=$getSparkWarehouseDir",
       s"--class=$appClass"
