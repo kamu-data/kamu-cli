@@ -8,7 +8,11 @@ class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
 
   def format(rs: SimpleResultSet): Unit = {
     val maxColDataWidths = rs.columns.indices
-      .map(c => rs.rows.map(row => row(c).toString.length).max)
+      .map(
+        c =>
+          if (rs.rows.isEmpty) 0
+          else rs.rows.map(row => row(c).toString.length).max
+      )
       .toArray
 
     val maxColWidths = rs.columns.indices

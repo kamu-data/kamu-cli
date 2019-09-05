@@ -2,13 +2,15 @@ package dev.kamu.cli.commands
 
 import java.io.PrintWriter
 
-import org.apache.log4j.LogManager
 import dev.kamu.cli.{RepositoryVolumeMap, UsageException}
+import dev.kamu.core.manifests.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.log4j.LogManager
 
 class InitCommand(
   fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap
+  repositoryVolumeMap: RepositoryVolumeMap,
+  repositoryRoot: Path
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
@@ -19,9 +21,8 @@ class InitCommand(
       throw new UsageException("Already a kamu repository")
 
     repositoryVolumeMap.allPaths.foreach(fileSystem.mkdirs)
-    logger.info("Initialized an empty repository")
 
-    val outputStream = fileSystem.create(new Path(".gitignore"))
+    val outputStream = fileSystem.create(repositoryRoot.resolve(".gitignore"))
     val writer = new PrintWriter(outputStream)
     writer.write("""
         |/.kamu/downloads
@@ -31,5 +32,7 @@ class InitCommand(
         |.ipynb_checkpoints
       """.stripMargin)
     writer.close()
+
+    logger.info("Initialized an empty repository")
   }
 }

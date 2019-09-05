@@ -50,7 +50,7 @@ lazy val kamuCli = (project in file("."))
         .exclude("org.apache.hadoop", "hadoop-yarn-api")
         .exclude("org.fusesource.leveldbjni", "leveldbjni-all"),
       // Test
-      "org.scalatest" %% "scalatest" % "3.0.5" % Test
+      "org.scalatest" %% "scalatest" % "3.0.8" % Test
     ),
     mainClass in assembly := Some("dev.kamu.cli.KamuApp"),
     assemblyJarName in assembly := "kamu",
