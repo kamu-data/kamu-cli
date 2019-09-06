@@ -1,10 +1,12 @@
 package dev.kamu.cli
 
+import java.io.PrintStream
+
 import dev.kamu.cli.commands._
 import dev.kamu.cli.external._
 import dev.kamu.cli.output._
 import dev.kamu.core.manifests.utils.fs._
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
 class Kamu(
@@ -98,7 +100,8 @@ class Kamu(
           c.sql.url.toOption,
           c.sql.command.toOption,
           c.sql.script.toOption,
-          c.sql.getOutputFormat
+          c.sql.getOutputFormat,
+          getOutputStream()
         )
       case List(c.sql, c.sql.server) =>
         new SQLServerCommand(
@@ -129,9 +132,17 @@ class Kamu(
 
   def getSparkRunner(useLocalSpark: Boolean, logLevel: Level): SparkRunner = {
     if (useLocalSpark)
-      new SparkRunnerLocal(fileSystem, logLevel, config.spark)
+      new SparkRunnerLocal(assemblyPath, fileSystem, logLevel, config.spark)
     else
-      new SparkRunnerDocker(fileSystem, logLevel, config.spark)
+      new SparkRunnerDocker(assemblyPath, fileSystem, logLevel, config.spark)
+  }
+
+  def assemblyPath: Path = {
+    new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+  }
+
+  def getOutputStream(): PrintStream = {
+    System.out
   }
 
   def getOutputFormatter(outputFormat: OutputFormat): OutputFormatter = {
@@ -140,12 +151,12 @@ class Kamu(
         new TableOutputFormatter(System.out, outputFormat)
       case "csv" =>
         val f = outputFormat.copy(
-          csvDelimiter = outputFormat.csvDelimiter.orElse(Some(","))
+          delimiter = outputFormat.delimiter.orElse(Some(","))
         )
         new DelimitedFormatter(System.out, f)
       case "tsv" =>
         val f = outputFormat.copy(
-          csvDelimiter = outputFormat.csvDelimiter.orElse(Some("\t"))
+          delimiter = outputFormat.delimiter.orElse(Some("\t"))
         )
         new DelimitedFormatter(System.out, f)
       case fmt =>

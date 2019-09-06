@@ -1,5 +1,6 @@
 package dev.kamu.cli.commands
 
+import java.io.PrintStream
 import java.net.URI
 
 import dev.kamu.cli.RepositoryVolumeMap
@@ -16,7 +17,8 @@ class SQLShellCommand(
   url: Option[URI],
   command: Option[String],
   script: Option[Path],
-  outputFormat: OutputFormat
+  outputFormat: OutputFormat,
+  outputStream: PrintStream
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
@@ -47,12 +49,12 @@ class SQLShellCommand(
     if (outputFormat.outputFormat.isDefined)
       args ++= Seq(s"--outputformat=${outputFormat.outputFormat.get}")
 
-    if (outputFormat.csvDelimiter.isDefined)
-      args ++= Seq(s"--csvDelimiter=${outputFormat.csvDelimiter.get}")
+    if (outputFormat.delimiter.isDefined)
+      args ++= Seq(s"--csvDelimiter=${outputFormat.delimiter.get}")
 
-    if (outputFormat.csvQuoteCharacter.isDefined)
+    if (outputFormat.quoteCharacter.isDefined)
       args ++= Seq(
-        s"--csvQuoteCharacter=${outputFormat.csvQuoteCharacter.get}"
+        s"--csvQuoteCharacter=${outputFormat.quoteCharacter.get}"
       )
 
     if (outputFormat.nullValue.isDefined)
@@ -74,7 +76,10 @@ class SQLShellCommand(
       args ++= Seq("-u", url.toString)
 
       logger.debug("Starting sqlline: " + args.mkString(" "))
-      new SqlLine().begin(args, null, true)
+
+      val sqlline = new SqlLine()
+      sqlline.setOutputStream(outputStream)
+      sqlline.begin(args, null, true)
     }
   }
 

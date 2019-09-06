@@ -1,6 +1,6 @@
 package dev.kamu.cli.output
 
-class SimpleResultSet() {
+class SimpleResultSet {
   var columns = Vector.empty[String]
   var rows = Vector.empty[Array[Any]]
 
@@ -8,7 +8,11 @@ class SimpleResultSet() {
     columns = columns :+ name
   }
 
-  def addRow(values: Seq[Any]): Unit = {
+  def addColumns(names: String*): Unit = {
+    columns = columns ++ names
+  }
+
+  def addRow(values: Any*): Unit = {
     rows = rows :+ values.toArray
   }
 }

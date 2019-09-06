@@ -48,17 +48,23 @@ object DatasetFactory {
     "tsv"
   )
 
-  def newRootDataset(): Dataset = {
-    val id = newDatasetID()
+  def newRootDataset(
+    id: Option[DatasetID] = None,
+    url: Option[URI] = None,
+    format: Option[String] = None,
+    header: Boolean = false
+  ): Dataset = {
+    val _id = id.getOrElse(newDatasetID())
     Dataset(
-      id = id,
+      id = _id,
       rootPollingSource = Some(
         RootPollingSource(
-          url = newURL(id),
-          format = "csv"
+          url = url.getOrElse(newURL(_id)),
+          format = format.getOrElse("csv"),
+          readerOptions = if (!header) Map.empty else Map("header" -> "true")
         )
       )
-    )
+    ).postLoad()
   }
 
   def newDerivativeDataset(sourceID: DatasetID): Dataset = {
@@ -80,7 +86,7 @@ object DatasetFactory {
           )
         )
       )
-    )
+    ).postLoad()
   }
 
   def newDatasetID(): DatasetID = {

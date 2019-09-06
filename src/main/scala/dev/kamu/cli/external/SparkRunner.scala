@@ -16,8 +16,8 @@ abstract class SparkRunner(
   protected var logger: Logger = LogManager.getLogger(getClass.getName)
 
   def submit(
-    repo: RepositoryVolumeMap,
     appClass: String,
+    repo: RepositoryVolumeMap,
     extraFiles: Map[String, OutputStream => Unit] = Map.empty,
     extraMounts: Seq[Path] = Seq.empty,
     jars: Seq[Path] = Seq.empty
@@ -31,7 +31,13 @@ abstract class SparkRunner(
     val loggingConfig = prepareLog4jConfig()
 
     try {
-      submit(repo, appClass, Seq(tmpJar) ++ jars, extraMounts, loggingConfig)
+      submit(
+        appClass,
+        repo,
+        Seq(tmpJar) ++ jars,
+        extraMounts,
+        loggingConfig
+      )
     } finally {
       if (tmpJar != null)
         fileSystem.delete(tmpJar, false)
@@ -41,16 +47,12 @@ abstract class SparkRunner(
   }
 
   protected def submit(
-    repo: RepositoryVolumeMap,
     appClass: String,
+    repo: RepositoryVolumeMap,
     jars: Seq[Path],
     extraMounts: Seq[Path],
     loggingConfig: Path
   )
-
-  protected def assemblyPath: Path = {
-    new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-  }
 
   protected def prepareJar(files: Map[String, OutputStream => Unit]): Path = {
     val jarPath = tempDir.resolve("kamu-configs.jar")

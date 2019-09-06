@@ -26,7 +26,7 @@ class ListCommand(
       }
       .foreach {
         case (id, kind) =>
-          rs.addRow(Array[Any](id, kind))
+          rs.addRow(id, kind)
       }
 
     outputFormatter.format(rs)

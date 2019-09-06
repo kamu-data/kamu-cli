@@ -5,6 +5,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
 class SparkRunnerDocker(
+  assemblyPath: Path,
   fileSystem: FileSystem,
   logLevel: Level,
   sparkConfig: SparkConfig,
@@ -12,8 +13,8 @@ class SparkRunnerDocker(
 ) extends SparkRunner(fileSystem, logLevel) {
 
   protected override def submit(
-    repo: RepositoryVolumeMap,
     appClass: String,
+    repo: RepositoryVolumeMap,
     jars: Seq[Path],
     extraMounts: Seq[Path],
     loggingConfig: Path

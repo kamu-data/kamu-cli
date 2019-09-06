@@ -14,7 +14,7 @@ class DelimitedFormatter(stream: PrintStream, outputFormat: OutputFormat)
 
   def printLine(row: Seq[String]): Unit = {
     stream.println(
-      row.mkString(outputFormat.csvDelimiter.getOrElse(","))
+      row.mkString(outputFormat.delimiter.getOrElse(","))
     )
   }
 

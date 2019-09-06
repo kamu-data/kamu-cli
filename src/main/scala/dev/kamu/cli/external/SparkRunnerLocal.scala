@@ -8,14 +8,15 @@ import org.apache.log4j.Level
 import scala.sys.process.Process
 
 class SparkRunnerLocal(
+  assemblyPath: Path,
   fileSystem: FileSystem,
   logLevel: Level,
   sparkConfig: SparkConfig
 ) extends SparkRunner(fileSystem, logLevel) {
 
   protected override def submit(
-    repo: RepositoryVolumeMap,
     appClass: String,
+    repo: RepositoryVolumeMap,
     jars: Seq[Path],
     extraMounts: Seq[Path],
     loggingConfig: Path
