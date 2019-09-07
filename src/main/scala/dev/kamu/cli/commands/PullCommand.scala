@@ -50,11 +50,10 @@ class PullCommand(
 
     val source = ds.rootPollingSource.get
 
-    val extraMounts =
-      if (source.url.getScheme == null)
-        List(new Path(source.url))
-      else
-        List.empty
+    val extraMounts = source.url.getScheme match {
+      case "file" | null => List(new Path(source.url))
+      case _             => List.empty
+    }
 
     sparkRunner.submit(
       repo = repositoryVolumeMap,

@@ -5,13 +5,14 @@ import org.apache.hadoop.fs.Path
 
 class LivyDockerProcessBuilder(
   repositoryVolumeMap: RepositoryVolumeMap,
+  dockerClient: DockerClient,
   network: Option[String] = None,
   exposeAllPorts: Boolean = false,
   exposePorts: List[Int] = List.empty,
   exposePortMap: Map[Int, Int] = Map.empty
 ) extends DockerProcessBuilder(
       id = "livy",
-      dockerClient = new DockerClient(),
+      dockerClient = dockerClient,
       runArgs = DockerRunArgs(
         image = DockerImages.LIVY,
         args = List("livy"),

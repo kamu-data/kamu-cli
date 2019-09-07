@@ -9,6 +9,7 @@ class SparkRunnerDocker(
   fileSystem: FileSystem,
   logLevel: Level,
   sparkConfig: SparkConfig,
+  dockerClient: DockerClient,
   image: String = DockerImages.SPARK
 ) extends SparkRunner(fileSystem, logLevel) {
 
@@ -54,7 +55,6 @@ class SparkRunnerDocker(
 
     logger.info("Starting Spark job")
 
-    val dockerClient = new DockerClient()
     try {
       dockerClient.runShell(
         DockerRunArgs(

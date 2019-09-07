@@ -10,10 +10,11 @@ import scala.sys.process.{ProcessBuilder, ProcessIO}
 
 class JupyterDockerProcessBuilder(
   fileSystem: FileSystem,
+  dockerClient: DockerClient,
   network: String,
   environmentVars: Map[String, String]
 ) extends DockerProcessBuilder(
-      dockerClient = new DockerClient(),
+      dockerClient = dockerClient,
       id = "jupyter",
       runArgs = DockerRunArgs(
         image = DockerImages.JUPYTER,

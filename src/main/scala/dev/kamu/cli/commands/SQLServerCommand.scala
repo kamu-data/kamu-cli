@@ -1,12 +1,14 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.RepositoryVolumeMap
-import dev.kamu.cli.external.LivyDockerProcessBuilder
+import dev.kamu.cli.external.{DockerClient, LivyDockerProcessBuilder}
 import org.apache.log4j.LogManager
+
 import scala.concurrent.duration._
 
 class SQLServerCommand(
   repositoryVolumeMap: RepositoryVolumeMap,
+  dockerClient: DockerClient,
   port: Option[Int]
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
@@ -16,6 +18,7 @@ class SQLServerCommand(
 
     val livyProcess = new LivyDockerProcessBuilder(
       repositoryVolumeMap = repositoryVolumeMap,
+      dockerClient = dockerClient,
       exposePorts = if (port.isEmpty) List(containerPort) else List.empty,
       exposePortMap =
         if (port.isDefined) Map(containerPort -> port.get) else Map.empty

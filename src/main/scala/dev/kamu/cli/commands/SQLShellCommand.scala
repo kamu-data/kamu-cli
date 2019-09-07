@@ -4,7 +4,11 @@ import java.io.PrintStream
 import java.net.URI
 
 import dev.kamu.cli.RepositoryVolumeMap
-import dev.kamu.cli.external.{IOHandlerPresets, LivyDockerProcessBuilder}
+import dev.kamu.cli.external.{
+  DockerClient,
+  IOHandlerPresets,
+  LivyDockerProcessBuilder
+}
 import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.LogManager
@@ -14,6 +18,7 @@ import scala.concurrent.duration._
 
 class SQLShellCommand(
   repositoryVolumeMap: RepositoryVolumeMap,
+  dockerClient: DockerClient,
   url: Option[URI],
   command: Option[String],
   script: Option[Path],
@@ -93,6 +98,7 @@ class SQLShellCommand(
 
       val livyProcess = new LivyDockerProcessBuilder(
         repositoryVolumeMap = repositoryVolumeMap,
+        dockerClient = dockerClient,
         exposePorts = List(containerPort)
       ).run(
         Some(

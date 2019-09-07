@@ -13,8 +13,6 @@ import scala.util.Random
 
 trait KamuMixin extends TestSuiteMixin { this: TestSuite =>
   val fileSystem = FileSystem.get(new Configuration())
-  fileSystem.setWriteChecksum(false)
-  fileSystem.setVerifyChecksum(false)
 
   def sysTempDir = new Path(System.getProperty("java.io.tmpdir"))
 

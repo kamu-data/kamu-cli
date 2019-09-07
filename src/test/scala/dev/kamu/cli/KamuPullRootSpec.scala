@@ -30,7 +30,8 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuMixin {
         )
         .output
         .stripLineEnd
-        .stripLineEnd
+
+      println(output)
 
       val expected = """|+-----------+------------+
                         ||   City    | Population |

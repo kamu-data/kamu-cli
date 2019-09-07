@@ -28,9 +28,6 @@ lazy val kamuCli = (project in file("."))
     name := "kamu-cli",
     resolvers += Resolver.mavenLocal,
     libraryDependencies ++= Seq(
-      "dev.kamu" %% "kamu-core-manifests" % "0.1.0",
-      "dev.kamu" %% "kamu-core-ingest-polling" % "0.1.0",
-      "dev.kamu" %% "kamu-core-transform-streaming" % "0.1.0",
       "com.jcabi" % "jcabi-log" % "0.17.3",
       "org.rogach" %% "scallop" % "3.3.1",
       // Spark
@@ -44,13 +41,17 @@ lazy val kamuCli = (project in file("."))
         .exclude("commons-beanutils", "commons-beanutils-core"),
       // SQL Shell
       "sqlline" % "sqlline" % "1.8.0",
+      // NOTE: Using kamu-specific Hive version with some bugfixes
+      // remove `kamu.X` part if you want a simpler build
       ("org.spark-project.hive" % "hive-jdbc" % "1.2.1.spark2.kamu.1")
         .excludeAll(ExclusionRule(organization = "log4j"))
         .excludeAll(ExclusionRule(organization = "org.apache.geronimo.specs"))
         .exclude("org.apache.hadoop", "hadoop-yarn-api")
         .exclude("org.fusesource.leveldbjni", "leveldbjni-all"),
       // Test
-      "org.scalatest" %% "scalatest" % "3.0.8" % Test
+      "org.scalatest" %% "scalatest" % "3.0.8" % Test,
+      "org.apache.spark" %% "spark-hive" % Versions.spark % Test,
+      "com.holdenkarau" %% "spark-testing-base" % s"${Versions.spark}_0.11.0" % Test
     ),
     mainClass in assembly := Some("dev.kamu.cli.KamuApp"),
     assemblyJarName in assembly := "kamu",
@@ -63,5 +64,12 @@ lazy val kamuCli = (project in file("."))
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
     },
-    test in assembly := {}
+    test in assembly := {},
+    fork in Test := true,
+    parallelExecution in Test := false,
+    javaOptions ++= Seq(
+      "-Xms512M",
+      "-Xmx2048M",
+      "-XX:+CMSClassUnloadingEnabled"
+    )
   )

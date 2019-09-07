@@ -43,7 +43,7 @@ class Kamu(
         new VersionCommand()
       case List(c.init) =>
         if (c.init.pullImages())
-          new PullImagesCommand()
+          new PullImagesCommand(getDockerClient())
         else
           new InitCommand(
             fileSystem,
@@ -97,6 +97,7 @@ class Kamu(
       case List(c.sql) =>
         new SQLShellCommand(
           repositoryVolumeMap,
+          getDockerClient(),
           c.sql.url.toOption,
           c.sql.command.toOption,
           c.sql.script.toOption,
@@ -106,12 +107,14 @@ class Kamu(
       case List(c.sql, c.sql.server) =>
         new SQLServerCommand(
           repositoryVolumeMap,
+          getDockerClient(),
           c.sql.server.port.toOption
         )
       case List(c.notebook) =>
         new NotebookCommand(
           fileSystem,
           repositoryVolumeMap,
+          getDockerClient(),
           c.notebook.env()
         )
       case _ =>
@@ -130,11 +133,26 @@ class Kamu(
       .foreach(fileSystem.mkdirs)
   }
 
+  def getDockerClient(): DockerClient = {
+    new DockerClient(fileSystem)
+  }
+
   def getSparkRunner(useLocalSpark: Boolean, logLevel: Level): SparkRunner = {
     if (useLocalSpark)
-      new SparkRunnerLocal(assemblyPath, fileSystem, logLevel, config.spark)
+      new SparkRunnerLocal(
+        assemblyPath,
+        fileSystem,
+        logLevel,
+        config.spark
+      )
     else
-      new SparkRunnerDocker(assemblyPath, fileSystem, logLevel, config.spark)
+      new SparkRunnerDocker(
+        assemblyPath,
+        fileSystem,
+        logLevel,
+        config.spark,
+        getDockerClient()
+      )
   }
 
   def assemblyPath: Path = {

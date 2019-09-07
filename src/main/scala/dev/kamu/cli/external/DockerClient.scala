@@ -1,9 +1,10 @@
 package dev.kamu.cli.external
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
 import scala.sys.process.{Process, ProcessBuilder, ProcessLogger}
+import dev.kamu.core.manifests.utils.fs._
 
 case class DockerRunArgs(
   image: String,
@@ -22,7 +23,7 @@ case class DockerRunArgs(
   interactive: Boolean = false
 )
 
-class DockerClient {
+class DockerClient(fileSystem: FileSystem) {
   protected val logger = LogManager.getLogger(getClass.getName)
 
   def run(
@@ -72,7 +73,11 @@ class DockerClient {
         .getOrElse(List.empty),
       runArgs.volumeMap
         .map {
-          case (h, c) => List("-v", s"${h.toUri.getPath}:${c.toUri.getPath}")
+          case (h, c) =>
+            List(
+              "-v",
+              s"${fileSystem.toAbsolute(h).toUri.getPath}:${c.toUri.getPath}"
+            )
         }
         .reduceOption(_ ++ _)
         .getOrElse(List.empty),

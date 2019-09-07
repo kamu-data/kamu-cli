@@ -31,7 +31,8 @@
 - V Add a version information
 - V Distribution `mac`
 - V Prettify `help`
-- Create functional test framework
+- V Create functional test framework
+- Use Spark and DataFrames in tests
 - Simplify historical vocab
 - Rethink repo structure (again!)
 - Distribution `arch`

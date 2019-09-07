@@ -7,6 +7,7 @@ import sun.misc.{Signal, SignalHandler}
 
 class NotebookRunnerDocker(
   fileSystem: FileSystem,
+  dockerClient: DockerClient,
   repositoryVolumeMap: RepositoryVolumeMap,
   environmentVars: Map[String, String]
 ) {
@@ -16,10 +17,19 @@ class NotebookRunnerDocker(
     val network = "kamu"
     withNetwork(network) {
       val livyBuilder =
-        new LivyDockerProcessBuilder(repositoryVolumeMap, Some(network))
+        new LivyDockerProcessBuilder(
+          repositoryVolumeMap,
+          dockerClient,
+          Some(network)
+        )
 
       val jupyterBuilder =
-        new JupyterDockerProcessBuilder(fileSystem, network, environmentVars)
+        new JupyterDockerProcessBuilder(
+          fileSystem,
+          dockerClient,
+          network,
+          environmentVars
+        )
 
       var livyProcess: DockerProcess = null
       var jupyterProcess: JupyterDockerProcess = null
@@ -51,16 +61,14 @@ class NotebookRunnerDocker(
   }
 
   def withNetwork[T](network: String)(body: => T): T = {
-    val docker = new DockerClient()
-
-    docker
+    dockerClient
       .prepare(Seq("docker", "network", "create", network))
       .!(IOHandlerPresets.logged(logger))
 
     try {
       body
     } finally {
-      docker
+      dockerClient
         .prepare(Seq("docker", "network", "rm", network))
         .!(IOHandlerPresets.logged(logger))
     }
