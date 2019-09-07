@@ -1,0 +1,12 @@
+sudo: false
+language: scala
+cache:
+  directories:
+    - $HOME/.sbt
+script:
+  - cd ..
+  - git clone https://github.com/kamu-data/kamu-core-ingest-polling
+  - git clone https://github.com/kamu-data/kamu-core-manifests
+  - git clone https://github.com/kamu-data/kamu-core-transform-streaming
+  - cd kamu-cli
+  - sbt exit
