@@ -1,5 +1,7 @@
 # Kamu CLI
 
+[![Build Status](https://travis-ci.org/kamu-data/kamu-cli.svg?branch=master)](https://travis-ci.org/kamu-data/kamu-cli)
+
 [Installation](docs/install.md)
 
 [How it Works](docs/architecture.md)
