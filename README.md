@@ -43,6 +43,23 @@ cd ..
 ```shell
 docker ps
 ```
-- Download the repo
-- Pull the data
-- Play with it
+- Download kamu data repo
+```shell
+git clone https://github.com/kamu-data/kamu-example-data
+cd kamu-example-data
+kamu list
+```
+- Pull the data sets of interest
+```shell
+kamu pull example.data.set.raw
+kamu pull example.data.set.derived1
+kamu pull example.data.set.derived2
+```
+- Start the data server
+```shell
+kamu notebook
+```
+- Play with it in you browser at https://localhost:port. Check the port number with:
+```shell
+docker port kamu-jupyter 80/tcp
+```
