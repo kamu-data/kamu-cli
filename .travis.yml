@@ -4,6 +4,7 @@ cache:
   directories:
     - $HOME/.sbt # sbt
     - $HOME/.m2 # Maver repository
+    - $HOME/.sdkman
 script:
   - cd ..
   - git clone https://github.com/kamu-data/kamu-core-ingest-polling
