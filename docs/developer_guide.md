@@ -11,7 +11,7 @@ What you'll need:
 * Maven
 * Spark (optional)
 
-Note: use SdkMan! to install these dependencies.
+Note: Use [SdkMan!](https://sdkman.io/) to install these dependencies:
 
 ```
 java: 8.0.222-zulu
@@ -27,6 +27,8 @@ We use `hive-jdbc` to connect the SQL shell to Spark Thrift Server exposed by Li
 
 This has to be done only once. After you build it and publish the package in your local maven repository you pretty much won't have to touch `hive` ever again.
 
+> Note: You can skip this step entirely if you're in a hurry by changing `hive-jdbc` dependency version from `1.2.1.spark2.kamu.X` to `1.2.1.spark2`.
+
 Instructions:
 
 Clone [kamu-data/hive](https://github.com/kamu-data/hive)
@@ -34,6 +36,7 @@ Clone [kamu-data/hive](https://github.com/kamu-data/hive)
 Build it and install into local maven repo using:
 
 ```sh
+git checkout release-1.2.1-spark2-kamu
 mvn -Phadoop-2 -DskipTests -Psources install
 ```
 
