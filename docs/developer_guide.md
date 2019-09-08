@@ -13,12 +13,14 @@ What you'll need:
 
 Note: Use [SdkMan!](https://sdkman.io/) to install these dependencies:
 
-```
-java: 8.0.222-zulu
-maven: 3.6.1
-sbt: 1.2.8
-scala: 2.11.12
-spark: 2.4.0
+```bash
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdk install java 8.0.222-zulu
+sdk install maven 3.6.1
+sdk install sbt 1.2.8
+sdk install scala 2.11.12
+sdk install spark 2.4.0
 ```
 
 ### Preface: Hive JDBC
