@@ -7,5 +7,5 @@ cache:
     - $HOME/.sbt # sbt
     - $HOME/.m2 # Maven repository
 script:
-  - sbt assembly
-  - sbt test
+  - sbt -Dhive.jdbc.version=upstream assembly
+  - sbt -Dhive.jdbc.version=upstream test
