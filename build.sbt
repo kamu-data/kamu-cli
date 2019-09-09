@@ -1,13 +1,13 @@
 import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
-lazy val kamuCoreManifests = RootProject(file("../kamu-core-manifests"))
+lazy val kamuCoreManifests = RootProject(file("libraries/kamu-core-manifests"))
 
 lazy val kamuCoreIngestPolling = RootProject(
-  file("../kamu-core-ingest-polling")
+  file("libraries/kamu-core-ingest-polling")
 )
 
 lazy val kamuCoreTransformStreaming = RootProject(
-  file("../kamu-core-transform-streaming")
+  file("libraries/kamu-core-transform-streaming")
 )
 
 lazy val kamuCli = (project in file("."))
