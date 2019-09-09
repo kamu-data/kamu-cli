@@ -32,6 +32,8 @@
 - V Distribution `mac`
 - V Prettify `help`
 - V Create functional test framework
+- V Simplify build
+- V Add CI
 - Use Spark and DataFrames in tests
 - Simplify historical vocab
 - Rethink repo structure (again!)
@@ -45,7 +47,6 @@
 - Create "stable" repository of known good datasources
 - Allow adding manifest from remote URL
 - Consider `brew create` style of generating new sources (include enough comments to guide the author)
-- Simplify build
 - Homebrew formula should build from source
 
 # Post-MVP
