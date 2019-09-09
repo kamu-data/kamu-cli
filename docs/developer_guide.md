@@ -46,12 +46,10 @@ Note: You'll need to have a GPG key configured to sign the artifacts.
 
 ### Building
 
-Clone following projects into the same folder:
-
-* [kamu-data/kamu-core-manifests](https://github.com/kamu-data/kamu-core-manifests)
-* [kamu-data/kamu-core-ingest-polling](https://github.com/kamu-data/kamu-core-ingest-polling)
-* [kamu-data/kamu-core-transform-streaming](https://github.com/kamu-data/kamu-core-transform-streaming)
-* [kamu-data/kamu-cli](https://github.com/kamu-data/kamu-cli)
+Clone the repository with submodules:
+```sh
+git clone --recurse-submodules https://github.com/kamu-data/kamu-cli
+```
 
 Then do:
 

@@ -29,10 +29,7 @@ cd ..
 ```
 - Build kamu
 ```shell
-git clone https://github.com/kamu-data/kamu-cli
-git clone https://github.com/kamu-data/kamu-core-ingest-polling
-git clone https://github.com/kamu-data/kamu-core-manifests
-git clone https://github.com/kamu-data/kamu-core-transform-streaming
+git clone --recurse-submodules https://github.com/kamu-data/kamu-cli
 cd kamu-cli
 sbt assembly
 ```

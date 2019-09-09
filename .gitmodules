@@ -1,0 +1,9 @@
+[submodule "kamu-core-ingest-polling"]
+	path = kamu-core-ingest-polling
+	url = https://github.com/kamu-data/kamu-core-ingest-polling
+[submodule "kamu-core-manifests"]
+	path = kamu-core-manifests
+	url = https://github.com/kamu-data/kamu-core-manifests
+[submodule "kamu-core-transform-streaming"]
+	path = kamu-core-transform-streaming
+	url = https://github.com/kamu-data/kamu-core-transform-streaming
