@@ -29,7 +29,7 @@ We use `hive-jdbc` to connect the SQL shell to Spark Thrift Server exposed by Li
 
 This has to be done only once. After you build it and publish the package in your local maven repository you pretty much won't have to touch `hive` ever again.
 
-> Note: You can skip this step entirely if you're in a hurry by changing `hive-jdbc` dependency version from `1.2.1.spark2.kamu.X` to `1.2.1.spark2`.
+> Note: You can skip this step entirely if you're in a hurry by running `sbt` with `-Dhive.jdbc.version=upstream`. You can use this option if your work is not related to SQL shell and JDBC connector.
 
 Instructions:
 
