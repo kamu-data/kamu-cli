@@ -18,14 +18,14 @@ class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
     val maxColWidths = rs.columns.indices
       .map(c => max(maxColDataWidths(c), rs.columns(c).length))
 
-    if (outputFormat.showHeader)
+    if (outputFormat.withHeader)
       writeHeader(rs.columns, maxColWidths)
 
     rs.rows.foreach(row => {
       writeRow(row.map(_.toString), maxColWidths)
     })
 
-    if (outputFormat.showHeader)
+    if (outputFormat.withHeader)
       writeSpacer(maxColWidths)
   }
 

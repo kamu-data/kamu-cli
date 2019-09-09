@@ -4,9 +4,12 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 import java.nio.charset.StandardCharsets
 
 import dev.kamu.cli.output._
-import dev.kamu.core.manifests.{Dataset, DatasetID}
 import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.manifests.{Dataset, DatasetID}
 import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.{DataFrame, SparkSession}
+
+import scala.util.Random
 
 class CaptureOutputFormatter extends OutputFormatter {
   var resultSet: Option[SimpleResultSet] = None
@@ -27,7 +30,8 @@ case class CommandResult(
 
 class KamuTestAdapter(
   config: KamuConfig,
-  fileSystem: FileSystem
+  fileSystem: FileSystem,
+  spark: SparkSession
 ) extends Kamu(config, fileSystem) {
 
   val _captureFormatter = new CaptureOutputFormatter
@@ -65,7 +69,39 @@ class KamuTestAdapter(
     metadataRepository.addDataset(ds)
   }
 
+  def addDataset(ds: Dataset, df: DataFrame): Unit = {
+    metadataRepository.addDataset(ds)
+    df.write.parquet(
+      repositoryVolumeMap.dataDir.resolve(ds.id.toString).toUri.getPath
+    )
+  }
+
   def deleteDataset(id: DatasetID): Unit = {
     metadataRepository.deleteDataset(id)
+  }
+
+  def writeData(df: DataFrame, outputFormat: OutputFormat): Path = {
+    val name = Random.alphanumeric.take(10).mkString + ".csv"
+    val path = config.repositoryRoot.resolve(name)
+
+    df.repartition(1)
+      .write
+      .option("header", "true")
+      .csv(path.toUri.getPath)
+
+    fileSystem
+      .listStatus(path)
+      .filter(_.getPath.getName.startsWith("part"))
+      .head
+      .getPath
+  }
+
+  def readDataset(id: DatasetID): DataFrame = {
+    spark.read.parquet(
+      repositoryVolumeMap.dataDir
+        .resolve(id.toString)
+        .toUri
+        .getPath
+    )
   }
 }

@@ -67,7 +67,10 @@ object DatasetFactory {
     ).postLoad()
   }
 
-  def newDerivativeDataset(sourceID: DatasetID): Dataset = {
+  def newDerivativeDataset(
+    sourceID: DatasetID,
+    sql: Option[String] = None
+  ): Dataset = {
     val id = newDatasetID()
     Dataset(
       id = id,
@@ -81,7 +84,7 @@ object DatasetFactory {
           steps = Vector(
             ProcessingStepSQL(
               view = id.toString,
-              query = s"SELECT * FROM `$sourceID`"
+              query = sql.getOrElse(s"SELECT * FROM `$sourceID`")
             )
           )
         )

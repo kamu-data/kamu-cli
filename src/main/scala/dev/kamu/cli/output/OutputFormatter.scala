@@ -4,7 +4,7 @@ case class OutputFormat(
   color: Boolean = true,
   incremental: Boolean = false,
   outputFormat: Option[String] = None,
-  showHeader: Boolean = true,
+  withHeader: Boolean = true,
   headerInterval: Option[Int] = None,
   delimiter: Option[String] = None,
   quoteCharacter: Option[String] = None,
@@ -19,7 +19,8 @@ object OutputFormat {
   val CSV = OutputFormat(
     outputFormat = Some("csv"),
     delimiter = Some(","),
-    quoteCharacter = Some("\"")
+    quoteCharacter = Some("\""),
+    withHeader = true
   )
 }
 

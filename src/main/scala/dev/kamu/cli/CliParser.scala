@@ -106,7 +106,7 @@ class TabularOutputSubcommand(name: String) extends KamuSubcommand(name) {
       color = !noColor(),
       incremental = incremental(),
       outputFormat = outputFormat.toOption,
-      showHeader = !noHeader(),
+      withHeader = !noHeader(),
       headerInterval = headerInterval.toOption,
       delimiter = csvDelimiter.toOption,
       quoteCharacter = csvQuoteCharacter.toOption,

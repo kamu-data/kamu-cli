@@ -45,8 +45,8 @@ class SQLShellCommand(
     if (outputFormat.incremental)
       args ++= Seq(s"--incremental=true${outputFormat.incremental}")
 
-    if (!outputFormat.showHeader)
-      args ++= Seq(s"--showHeader=${outputFormat.showHeader}")
+    if (!outputFormat.withHeader)
+      args ++= Seq(s"--showHeader=${outputFormat.withHeader}")
 
     if (outputFormat.headerInterval.isDefined)
       args ++= Seq(s"--headerInterval=${outputFormat.headerInterval.get}")

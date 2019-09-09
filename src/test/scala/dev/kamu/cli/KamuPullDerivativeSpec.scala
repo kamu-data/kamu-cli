@@ -1,45 +1,14 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.DatasetID
-import dev.kamu.core.manifests.utils.fs._
-import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.DataFrame
+import dev.kamu.core.manifests.ProcessingStepSQL
 import org.scalatest._
 
-class KamuPullDerivativeSpec
-    extends FlatSpec
-    with Matchers
-    with KamuMixin
-    with DataFrameSuiteBaseEx {
+class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
 
   import spark.implicits._
   protected override val enableHiveSupport = false
 
-  def writeCSV(df: DataFrame, name: String): Path = {
-    val dataDir = testDir.resolve(name)
-
-    df.repartition(1)
-      .write
-      .option("header", "true")
-      .csv(dataDir.toString)
-
-    fileSystem
-      .listStatus(dataDir)
-      .filter(_.getPath.getName.startsWith("part"))
-      .head
-      .getPath
-  }
-
-  def readDataset(kamu: KamuTestAdapter, id: DatasetID): DataFrame = {
-    spark.read.parquet(
-      kamu.repositoryVolumeMap.dataDir
-        .resolve(id.toString)
-        .toUri
-        .getPath
-    )
-  }
-
-  "kamu pull" should "be able to import simple csv" in {
+  "kamu pull" should "produce derivative datasets" in {
     withEmptyRepo { kamu =>
       val input = sc
         .parallelize(
@@ -50,19 +19,31 @@ class KamuPullDerivativeSpec
         )
         .toDF("City", "Population")
 
-      val inputPath = writeCSV(input, "input.csv")
+      val root = DatasetFactory.newRootDataset()
+      kamu.addDataset(root, input)
 
-      val ds = DatasetFactory.newRootDataset(
-        url = Some(inputPath.toUri),
-        format = Some("csv"),
-        header = true
+      val deriv = DatasetFactory.newDerivativeDataset(
+        root.id,
+        Some(
+          s"SELECT City, CAST(Population AS INT) + 1 as Population FROM `${root.id}`"
+        )
       )
 
-      kamu.addDataset(ds)
-      kamu.run("pull", ds.id.toString)
+      kamu.addDataset(deriv)
+      kamu.run("pull", deriv.id.toString)
 
-      val result = readDataset(kamu, ds.id)
-      assertDataFrameEquals(input, result)
+      val result = kamu.readDataset(deriv.id)
+
+      val expected = sc
+        .parallelize(
+          Seq(
+            ("Vancouver", 124),
+            ("Seattle", 322)
+          )
+        )
+        .toDF("City", "Population")
+
+      assertDataFrameEquals(expected, result, true)
     }
   }
 }
