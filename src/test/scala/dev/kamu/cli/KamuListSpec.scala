@@ -2,7 +2,7 @@ package dev.kamu.cli
 
 import org.scalatest._
 
-class KamuListSpec extends FlatSpec with Matchers with KamuMixin {
+class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
   "kamu list" should "return empty result for empty repo" in {
     withEmptyRepo { kamu =>
       val rs = kamu.runEx("list").resultSet.get

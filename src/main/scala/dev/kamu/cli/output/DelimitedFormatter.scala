@@ -6,7 +6,7 @@ class DelimitedFormatter(stream: PrintStream, outputFormat: OutputFormat)
     extends OutputFormatter {
 
   def format(rs: SimpleResultSet): Unit = {
-    if (outputFormat.showHeader)
+    if (outputFormat.withHeader)
       printLine(rs.columns)
 
     rs.rows.foreach(row => printLine(row.map(_.toString)))
