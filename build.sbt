@@ -43,7 +43,7 @@ lazy val kamuCli = (project in file("."))
       "sqlline" % "sqlline" % "1.8.0",
       // NOTE: Using kamu-specific Hive version with some bugfixes
       // remove `kamu.X` part if you want a simpler build
-      ("org.spark-project.hive" % "hive-jdbc" % "1.2.1.spark2.kamu.1")
+      ("org.spark-project.hive" % "hive-jdbc" % Versions.hiveJDBC)
         .excludeAll(ExclusionRule(organization = "log4j"))
         .excludeAll(ExclusionRule(organization = "org.apache.geronimo.specs"))
         .exclude("org.apache.hadoop", "hadoop-yarn-api")
