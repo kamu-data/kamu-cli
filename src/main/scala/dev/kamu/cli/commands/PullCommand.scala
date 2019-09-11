@@ -2,6 +2,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
+import dev.kamu.cli.utility.DependencyGraph
 import dev.kamu.core.manifests.{Dataset, DatasetID}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
@@ -14,21 +15,27 @@ class PullCommand(
   repositoryVolumeMap: RepositoryVolumeMap,
   metadataRepository: MetadataRepository,
   sparkRunner: SparkRunner,
-  datasetIDs: Seq[String],
-  all: Boolean
+  ids: Seq[String],
+  all: Boolean,
+  recursive: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val datasets =
-      if (all)
-        metadataRepository.getAllDatasets()
-      else
-        datasetIDs
-          .map(DatasetID)
-          .map(metadataRepository.getDataset)
+    val datasetIDs = {
+      if (all) metadataRepository.getAllDatasetIDs()
+      else ids.map(DatasetID)
+    }
+    val plan = metadataRepository.getDatasetsInDependencyOrder(
+      datasetIDs,
+      recursive || all // All implies recursive, which is more efficient
+    )
 
-    val numUpdated = datasets
+    logger.debug(s"Pulling datasets in following order:")
+    plan.foreach(d => logger.debug(s"  ${d.id.toString}"))
+
+    // Use Spark to pull each item in the plan
+    val numUpdated = plan
       .map(
         ds =>
           ds.kind match {

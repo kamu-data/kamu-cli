@@ -284,6 +284,11 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Pull all datasets"
     )
 
+    val recursive = opt[Boolean](
+      "recursive",
+      descr = "Pull datasets and their dependencies"
+    )
+
     val ids = trailArg[List[String]](
       "ids",
       required = false,
