@@ -1,6 +1,5 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.ProcessingStepSQL
 import org.scalatest._
 
 class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
@@ -13,19 +12,20 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val input = sc
         .parallelize(
           Seq(
-            ("Vancouver", "123"),
-            ("Seattle", "321")
+            (ts(1), "Vancouver", "123"),
+            (ts(1), "Seattle", "321")
           )
         )
-        .toDF("City", "Population")
+        .toDF("systemTime", "city", "population")
 
       val root = DatasetFactory.newRootDataset()
       kamu.addDataset(root, input)
 
+      // TODO: systemTime should not be propagated but assigned during transform
       val deriv = DatasetFactory.newDerivativeDataset(
         root.id,
         Some(
-          s"SELECT City, CAST(Population AS INT) + 1 as Population FROM `${root.id}`"
+          s"SELECT systemTime, city, CAST(population AS INT) + 1 as population FROM `${root.id}`"
         )
       )
 
@@ -37,11 +37,11 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val expected = sc
         .parallelize(
           Seq(
-            ("Vancouver", 124),
-            ("Seattle", 322)
+            (ts(1), "Vancouver", 124),
+            (ts(1), "Seattle", 322)
           )
         )
-        .toDF("City", "Population")
+        .toDF("systemTime", "city", "population")
 
       assertDataFrameEquals(expected, result, true)
     }

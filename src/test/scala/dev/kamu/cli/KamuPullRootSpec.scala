@@ -1,6 +1,7 @@
 package dev.kamu.cli
 
-import dev.kamu.cli.output.{OutputFormat, SimpleResultSet}
+import dev.kamu.cli.output.OutputFormat
+import dev.kamu.core.ingest.polling.DFUtils._
 import org.scalatest._
 
 class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
@@ -17,7 +18,7 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
             ("Seattle", "321")
           )
         )
-        .toDF("City", "Population")
+        .toDF("city", "population")
 
       val inputPath = kamu.writeData(input, OutputFormat.CSV)
 
@@ -30,8 +31,24 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
       kamu.addDataset(ds)
       kamu.run("pull", ds.id.toString)
 
-      val result = kamu.readDataset(ds.id)
-      assertDataFrameEquals(input, result)
+      val actual = kamu.readDataset(ds.id)
+
+      val expected = sc
+        .parallelize(
+          Seq(
+            (ts(0), "Vancouver", "123"),
+            (ts(0), "Seattle", "321")
+          )
+        )
+        .toDF("systemTime", "city", "population")
+
+      assert(expected.schema, actual.schema)
+
+      // Compare ignoring the systemTime column
+      assertDataFrameEquals(
+        expected.drop("systemTime"),
+        actual.drop("systemTime")
+      )
     }
   }
 }

@@ -3,10 +3,12 @@ package dev.kamu.cli
 import java.net.URI
 
 import dev.kamu.core.manifests.{
+  Append,
   Dataset,
   DatasetID,
   DerivativeInput,
   DerivativeSource,
+  MergeStrategyKind,
   ProcessingStepSQL,
   RootPollingSource
 }
@@ -52,7 +54,8 @@ object DatasetFactory {
     id: Option[DatasetID] = None,
     url: Option[URI] = None,
     format: Option[String] = None,
-    header: Boolean = false
+    header: Boolean = false,
+    mergeStrategy: Option[MergeStrategyKind] = None
   ): Dataset = {
     val _id = id.getOrElse(newDatasetID())
     Dataset(
@@ -61,7 +64,8 @@ object DatasetFactory {
         RootPollingSource(
           url = url.getOrElse(newURL(_id)),
           format = format.getOrElse("csv"),
-          readerOptions = if (!header) Map.empty else Map("header" -> "true")
+          readerOptions = if (!header) Map.empty else Map("header" -> "true"),
+          mergeStrategy = mergeStrategy.getOrElse(Append())
         )
       )
     ).postLoad()
