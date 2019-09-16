@@ -37,6 +37,18 @@ trait DataFrameSuiteBaseEx extends DataFrameSuiteBase { self: Suite =>
     GeoSparkSQLRegistrator.registerAll(spark)
   }
 
+  def assertSchemasEqual(
+    expected: DataFrame,
+    actual: DataFrame,
+    ignoreNullable: Boolean
+  ): Unit = {
+    val exp =
+      if (ignoreNullable) TestUtils.ignoreNullableSchema(expected) else expected
+    val act =
+      if (ignoreNullable) TestUtils.ignoreNullableSchema(actual) else actual
+    assert(exp.schema, act.schema)
+  }
+
   def assertDataFrameEquals(
     expected: DataFrame,
     actual: DataFrame,

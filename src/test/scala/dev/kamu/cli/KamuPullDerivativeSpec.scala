@@ -1,5 +1,6 @@
 package dev.kamu.cli
 
+import dev.kamu.cli.output.OutputFormat
 import org.scalatest._
 
 class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
@@ -12,38 +13,57 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val input = sc
         .parallelize(
           Seq(
-            (ts(1), "Vancouver", "123"),
-            (ts(1), "Seattle", "321")
+            ("Salt Lake City", "312"),
+            ("Seattle", "321"),
+            ("Vancouver", "123")
           )
         )
-        .toDF("systemTime", "city", "population")
+        .toDF("city", "population")
 
-      val root = DatasetFactory.newRootDataset()
-      kamu.addDataset(root, input)
+      val inputPath = kamu.writeData(input, OutputFormat.CSV)
+
+      val root = DatasetFactory.newRootDataset(
+        url = Some(inputPath.toUri),
+        format = Some("csv"),
+        header = true,
+        schema = Seq("city STRING", "population INTEGER")
+      )
+
+      kamu.addDataset(root)
 
       // TODO: systemTime should not be propagated but assigned during transform
       val deriv = DatasetFactory.newDerivativeDataset(
-        root.id,
-        Some(
-          s"SELECT systemTime, city, CAST(population AS INT) + 1 as population FROM `${root.id}`"
+        source = root.id,
+        sql = Some(
+          s"SELECT systemTime, city, (population + 1) as population FROM `${root.id}`"
         )
       )
 
       kamu.addDataset(deriv)
-      kamu.run("pull", deriv.id.toString)
+      kamu.run("pull", "--recursive", deriv.id.toString)
 
-      val result = kamu.readDataset(deriv.id)
+      val actual = kamu
+        .readDataset(deriv.id)
+        .orderBy("systemTime", "city")
 
       val expected = sc
         .parallelize(
           Seq(
-            (ts(1), "Vancouver", 124),
-            (ts(1), "Seattle", 322)
+            (ts(1), "Salt Lake City", 313),
+            (ts(1), "Seattle", 322),
+            (ts(1), "Vancouver", 124)
           )
         )
         .toDF("systemTime", "city", "population")
 
-      assertDataFrameEquals(expected, result, true)
+      assertSchemasEqual(expected, actual, ignoreNullable = true)
+
+      // Compare ignoring the systemTime column
+      assertDataFrameEquals(
+        expected.drop("systemTime"),
+        actual.drop("systemTime"),
+        ignoreNullable = true
+      )
     }
   }
 }

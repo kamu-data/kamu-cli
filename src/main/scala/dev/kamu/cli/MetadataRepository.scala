@@ -1,6 +1,7 @@
 package dev.kamu.cli
 
 import dev.kamu.core.manifests.{Dataset, DatasetID, Manifest}
+import dev.kamu.cli.utility.DependencyGraph
 import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
@@ -21,6 +22,22 @@ class MetadataRepository(
       throw new DoesNotExistsException(id)
 
     loadDatasetFromFile(path)
+  }
+
+  def getDatasetsInDependencyOrder(
+    ids: Seq[DatasetID],
+    recursive: Boolean
+  ): Seq[Dataset] = {
+    if (recursive) {
+      val dependsOn = getDataset(_: DatasetID).dependsOn.toList
+      val depGraph = new DependencyGraph[DatasetID](dependsOn)
+      depGraph.resolve(ids.toList).map(getDataset)
+    } else {
+      val dependsOn = getDataset(_: DatasetID).dependsOn.toList
+        .filter(ids.contains)
+      val depGraph = new DependencyGraph[DatasetID](dependsOn)
+      depGraph.resolve(ids.toList).map(getDataset)
+    }
   }
 
   def getAllDatasetIDs(): Seq[DatasetID] = {

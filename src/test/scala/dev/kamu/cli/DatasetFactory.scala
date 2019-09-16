@@ -55,7 +55,8 @@ object DatasetFactory {
     url: Option[URI] = None,
     format: Option[String] = None,
     header: Boolean = false,
-    mergeStrategy: Option[MergeStrategyKind] = None
+    mergeStrategy: Option[MergeStrategyKind] = None,
+    schema: Seq[String] = Seq.empty
   ): Dataset = {
     val _id = id.getOrElse(newDatasetID())
     Dataset(
@@ -64,6 +65,7 @@ object DatasetFactory {
         RootPollingSource(
           url = url.getOrElse(newURL(_id)),
           format = format.getOrElse("csv"),
+          schema = schema.toVector,
           readerOptions = if (!header) Map.empty else Map("header" -> "true"),
           mergeStrategy = mergeStrategy.getOrElse(Append())
         )
@@ -72,23 +74,24 @@ object DatasetFactory {
   }
 
   def newDerivativeDataset(
-    sourceID: DatasetID,
+    source: DatasetID,
+    id: Option[DatasetID] = None,
     sql: Option[String] = None
   ): Dataset = {
-    val id = newDatasetID()
+    val _id = id.getOrElse(newDatasetID())
     Dataset(
-      id = id,
+      id = _id,
       derivativeSource = Some(
         DerivativeSource(
           inputs = Vector(
             DerivativeInput(
-              id = sourceID
+              id = source
             )
           ),
           steps = Vector(
             ProcessingStepSQL(
-              view = id.toString,
-              query = sql.getOrElse(s"SELECT * FROM `$sourceID`")
+              view = _id.toString,
+              query = sql.getOrElse(s"SELECT * FROM `$source`")
             )
           )
         )

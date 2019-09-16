@@ -88,7 +88,8 @@ class Kamu(
             if (c.debug()) Level.INFO else c.sparkLogLevel()
           ),
           c.pull.ids(),
-          c.pull.all()
+          c.pull.all(),
+          c.pull.recursive()
         )
       case List(c.depgraph) =>
         new DependencyGraphCommand(
