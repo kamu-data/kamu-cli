@@ -30,7 +30,7 @@ class InitCommand(
         |/.kamu/data
         |
         |.ipynb_checkpoints
-      """.stripMargin)
+        |""".stripMargin)
     writer.close()
 
     logger.info("Initialized an empty repository")
