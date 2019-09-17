@@ -5,20 +5,20 @@ import dev.kamu.cli.{
   MetadataRepository,
   MissingReferenceException
 }
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
 class AddCommand(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
-  manifests: Seq[Path]
+  manifests: Seq[String]
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val sources = manifests.map(manifestPath => {
-      logger.debug(s"Loading dataset from: $manifestPath")
-      metadataRepository.loadDatasetFromFile(manifestPath)
+    val sources = manifests.map(manifestURI => {
+      logger.debug(s"Loading dataset from: $manifestURI")
+      metadataRepository.loadDatasetFromURI(manifestURI)
     })
 
     val numAdded = sources

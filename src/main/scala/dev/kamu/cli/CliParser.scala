@@ -232,10 +232,10 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Start dataset creation wizard"
     )
 
-    val manifests = trailArg[List[Path]](
+    val manifests = trailArg[List[String]](
       "manifest",
       required = false,
-      descr = "Paths to the manifest files containing dataset definitions",
+      descr = "Manifest URLs/files containing dataset definitions",
       default = Some(List.empty)
     )
   }
