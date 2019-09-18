@@ -83,9 +83,6 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         )
       ).postLoad()
 
-      println(actual)
-      println(expected)
-
       actual shouldEqual expected
     }
   }
@@ -117,9 +114,6 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
           )
         )
       ).postLoad()
-
-      println(actual)
-      println(expected)
 
       actual shouldEqual expected
     }
