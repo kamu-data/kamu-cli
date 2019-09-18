@@ -1,7 +1,8 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.DatasetID
+import dev.kamu.core.manifests.{Dataset, DatasetID, RootPollingSource}
 import org.scalatest._
+import java.net.{URI, URL}
 
 class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
@@ -51,6 +52,76 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         .map(_.id)
 
       actual3 shouldEqual Seq(dsC.id, dsB.id, dsA.id)
+    }
+  }
+
+  test(raw"'kamu add' from HTTP") {
+    withEmptyRepo { kamu =>
+      val actual =
+        kamu.metadataRepository.loadDatasetFromURI(
+          raw"http://localhost:9000/example-dataset.yaml"
+        )
+
+      val expected = Dataset(
+        DatasetID(raw"dev.kamu.example"),
+        Some(
+          RootPollingSource(
+            new URI("ftp://kamu.dev/opendata/csv/example-data.zip"),
+            Some("zip"),
+            None,
+            None,
+            "csv",
+            Map(
+              "header" -> "true",
+              "sep" -> ",",
+              "quote" -> "\"",
+              "escape" -> "\"",
+              "multiline" -> "true",
+              "nullValue" -> ""
+            )
+          )
+        )
+      ).postLoad()
+
+      println(actual)
+      println(expected)
+
+      actual shouldEqual expected
+    }
+  }
+
+  test(raw"'kamu add' from file") {
+    withEmptyRepo { kamu =>
+      val actual =
+        kamu.metadataRepository.loadDatasetFromURI(
+          raw"./testsuit-extras/test-http-server/example-dataset.yaml"
+        )
+
+      val expected = Dataset(
+        DatasetID(raw"dev.kamu.example"),
+        Some(
+          RootPollingSource(
+            new URI("ftp://kamu.dev/opendata/csv/example-data.zip"),
+            Some("zip"),
+            None,
+            None,
+            "csv",
+            Map(
+              "header" -> "true",
+              "sep" -> ",",
+              "quote" -> "\"",
+              "escape" -> "\"",
+              "multiline" -> "true",
+              "nullValue" -> ""
+            )
+          )
+        )
+      ).postLoad()
+
+      println(actual)
+      println(expected)
+
+      actual shouldEqual expected
     }
   }
 }

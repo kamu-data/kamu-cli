@@ -1,0 +1,15 @@
+apiVersion: 1
+kind: Dataset
+content:
+  id: dev.kamu.example
+  rootPollingSource:
+    url: ftp://kamu.dev/opendata/csv/example-data.zip
+    compression: zip
+    format: csv
+    readerOptions:
+      header: "true"
+      sep: ","
+      quote: '"'
+      escape: '"'
+      nullValue: ""
+      multiline: "true"

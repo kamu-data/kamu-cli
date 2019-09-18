@@ -1,5 +1,8 @@
-sudo: false
 language: scala
+addons:
+  apt:
+    packages:
+      - python3
 services:
   - docker
 cache:
@@ -8,4 +11,7 @@ cache:
     - $HOME/.m2 # Maven repository
 script:
   - sbt -Dhive.jdbc.version=upstream assembly
+  - cd ./testsuit-extras/test-http-server
+  - python3 -m http.server 9000 & # start the server for http related tests
+  - cd ../..
   - sbt -Dhive.jdbc.version=upstream test
