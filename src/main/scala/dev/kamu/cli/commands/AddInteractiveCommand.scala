@@ -192,7 +192,7 @@ class AddInteractiveCommand(
         if (default.isDefined)
           ctor(default.get)
         else
-          throw new UsageException("Aborted")
+          throw new InvalidInputException("Requires a value")
       } else {
         try {
           ctor(s)
@@ -207,11 +207,26 @@ class AddInteractiveCommand(
   private def inputOptional[T](name: String, help: String)(
     ctor: String => T
   ): Option[T] = {
-    try {
-      Some(input(name, help)(ctor))
-    } catch {
-      case _: UsageException =>
+    println()
+
+    if (help.nonEmpty) {
+      println(help)
+      println()
+    }
+
+    retry {
+      val s = StdIn.readLine(getPrompt(name, None))
+
+      if (s.isEmpty) {
         None
+      } else {
+        try {
+          Some(ctor(s))
+        } catch {
+          case e: Exception =>
+            throw new InvalidInputException(e.getMessage)
+        }
+      }
     }
   }
 
@@ -242,7 +257,7 @@ class AddInteractiveCommand(
         if (default.isDefined)
           default.get
         else
-          throw new UsageException("Aborted")
+          throw new InvalidInputException("Requires a value")
       } else if (choices.contains(s)) {
         s
       } else {
