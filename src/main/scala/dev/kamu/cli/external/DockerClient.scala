@@ -46,7 +46,7 @@ class DockerClient(fileSystem: FileSystem) {
     run(
       runArgs.copy(
         entryPoint = Some("bash"),
-        args = List(shellCommand.mkString(" "))
+        args = List("-c", shellCommand.mkString(" "))
       )
     )
   }

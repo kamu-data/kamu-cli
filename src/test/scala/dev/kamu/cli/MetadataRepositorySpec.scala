@@ -1,21 +1,12 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.{Dataset, DatasetID, RootPollingSource}
+import dev.kamu.core.manifests.DatasetID
 import org.scalatest._
-import java.net.{URI, URL}
 
-import dev.kamu.cli.external.{
-  DockerClient,
-  DockerProcess,
-  DockerProcessBuilder,
-  DockerRunArgs
-}
+import dev.kamu.cli.external.{DockerClient, DockerProcessBuilder, DockerRunArgs}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
-
-import scala.concurrent.duration.Duration
-import scala.reflect.io.File
 
 class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
