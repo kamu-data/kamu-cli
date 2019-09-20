@@ -4,6 +4,19 @@ import dev.kamu.core.manifests.{Dataset, DatasetID, RootPollingSource}
 import org.scalatest._
 import java.net.{URI, URL}
 
+import dev.kamu.cli.external.{
+  DockerClient,
+  DockerProcess,
+  DockerProcessBuilder,
+  DockerRunArgs
+}
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
+
+import scala.concurrent.duration.Duration
+import scala.reflect.io.File
+
 class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
 
@@ -57,31 +70,37 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
 
   test(raw"'kamu add' from HTTP") {
     withEmptyRepo { kamu =>
+      val testDir = getRandomDir()
+      val serverPort = 8080
+      val hostPort = 9000
+      val path: Path = new Path(testDir, raw"test-dataset.yaml")
+      fileSystem.mkdirs(testDir)
+      val testServerName = s"kamu_test_http_server"
+      val testHttpServerArgs = DockerRunArgs(
+        image = "python:3.7-slim",
+        args = List("python3", "-m", "http.server", s"${serverPort}"),
+        exposePortMap = Map(hostPort -> serverPort),
+        volumeMap = Map(testDir -> new Path("/mnt/kamu")),
+        containerName = Some(testServerName),
+        detached = true
+      )
+      val testHttpServer = new DockerClient(FileSystem.get(new Configuration()))
+
+      val testHttpServerProc = new DockerProcessBuilder(
+        "http",
+        testHttpServer,
+        testHttpServerArgs
+      ).run()
+      val expected = DatasetFactory.newRootDataset()
+      kamu.metadataRepository.saveDataset(expected, path)
+      testHttpServerProc.join()
+      Thread.sleep(1000) // wait for the port to become ready, 'waitForHostPort' did work :-(
       val actual =
         kamu.metadataRepository.loadDatasetFromURI(
-          raw"http://localhost:9000/example-dataset.yaml"
+          s"http://localhost:${hostPort}/mnt/kamu/test-dataset.yaml"
         )
-
-      val expected = Dataset(
-        DatasetID(raw"dev.kamu.example"),
-        Some(
-          RootPollingSource(
-            new URI("ftp://kamu.dev/opendata/csv/example-data.zip"),
-            Some("zip"),
-            None,
-            None,
-            "csv",
-            Map(
-              "header" -> "true",
-              "sep" -> ",",
-              "quote" -> "\"",
-              "escape" -> "\"",
-              "multiline" -> "true",
-              "nullValue" -> ""
-            )
-          )
-        )
-      ).postLoad()
+      testHttpServer.stop(testServerName, time = 1)
+      fileSystem.delete(testDir, true)
 
       actual shouldEqual expected
     }
@@ -89,31 +108,13 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
 
   test(raw"'kamu add' from file") {
     withEmptyRepo { kamu =>
-      val actual =
-        kamu.metadataRepository.loadDatasetFromURI(
-          raw"./testsuit-extras/test-http-server/example-dataset.yaml"
-        )
-
-      val expected = Dataset(
-        DatasetID(raw"dev.kamu.example"),
-        Some(
-          RootPollingSource(
-            new URI("ftp://kamu.dev/opendata/csv/example-data.zip"),
-            Some("zip"),
-            None,
-            None,
-            "csv",
-            Map(
-              "header" -> "true",
-              "sep" -> ",",
-              "quote" -> "\"",
-              "escape" -> "\"",
-              "multiline" -> "true",
-              "nullValue" -> ""
-            )
-          )
-        )
-      ).postLoad()
+      val expected = DatasetFactory.newRootDataset()
+      val testDir = getRandomDir()
+      val path: Path = new Path(testDir, raw"test-dataset.yaml")
+      fileSystem.mkdirs(testDir)
+      kamu.metadataRepository.saveDataset(expected, path)
+      val actual = kamu.metadataRepository.loadDatasetFromURI(path.toString)
+      fileSystem.delete(testDir, true)
 
       actual shouldEqual expected
     }
