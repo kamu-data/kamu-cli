@@ -82,7 +82,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         containerName = Some(testServerName),
         detached = true
       )
-      val testHttpServer = new DockerClient(FileSystem.get(new Configuration()))
+      val testHttpServer = new DockerClient(fileSystem)
       val testHttpServerProc = new DockerProcessBuilder(
         "http",
         testHttpServer,
