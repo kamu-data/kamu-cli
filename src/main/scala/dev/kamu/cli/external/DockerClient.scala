@@ -16,6 +16,7 @@ case class DockerRunArgs(
   exposePorts: List[Int] = List.empty,
   exposePortMap: Map[Int, Int] = Map.empty,
   volumeMap: Map[Path, Path] = Map.empty,
+  workDir: Option[String] = None,
   environmentVars: Map[String, String] = Map.empty,
   entryPoint: Option[String] = None,
   remove: Boolean = true,
@@ -83,6 +84,7 @@ class DockerClient(fileSystem: FileSystem) {
         }
         .reduceOption(_ ++ _)
         .getOrElse(List.empty),
+      runArgs.workDir.map(v => List("--workdir", v)).getOrElse(List.empty),
       runArgs.environmentVars
         .map { case (n, v) => List("-e", s"$n=$v") }
         .reduceOption(_ ++ _)
@@ -125,7 +127,7 @@ class DockerClient(fileSystem: FileSystem) {
   }
 
   def inspectHostPort(container: String, port: Int): Option[Int] = {
-    val format = "--format=\'{{ (index (index .NetworkSettings.Ports \"" + port + "/tcp\") 0).HostPort }}\'"
+    val format = "--format={{ (index (index .NetworkSettings.Ports \"" + port + "/tcp\") 0).HostPort }}"
     val processBuilder = prepare(Seq("docker", "inspect", format, container))
     try {
       Some(

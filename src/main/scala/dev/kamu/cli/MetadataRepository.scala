@@ -70,13 +70,12 @@ class MetadataRepository(
     }
   }
 
-  def loadDatasetFromURI(uriStr: String): Dataset = {
-    val uri = new URI(uriStr)
+  def loadDatasetFromURI(uri: URI): Dataset = {
     uri.getScheme match {
       case "https" => loadDatasetFromURL(uri.toURL)
       case "http"  => loadDatasetFromURL(uri.toURL)
-      case "ftp"   => loadDatasetFromURL(uri.toURL)
-      case _       => loadDatasetFromFile(new Path(uri.getPath))
+      case "file"  => loadDatasetFromFile(new Path(uri.getPath))
+      case s       => throw new SchemaNotSupportedException(s)
     }
   }
 
@@ -166,6 +165,9 @@ class AlreadyExistsException(val datasetID: DatasetID)
 
 class MissingReferenceException(val fromID: DatasetID, val toID: DatasetID)
     extends Exception(s"Dataset $fromID refers to non existent dataset $toID")
+
+class SchemaNotSupportedException(val schema: String)
+    extends Exception(s"Resource schema not supported: $schema")
 
 class DanglingReferenceException(
   val fromIDs: Seq[DatasetID],
