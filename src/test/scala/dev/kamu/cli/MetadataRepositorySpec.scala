@@ -9,7 +9,7 @@ import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 
 class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
@@ -62,12 +62,16 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
     }
   }
 
-  test(raw"'kamu add' from HTTP") {
+  test(raw"'kamu add' from HTTP URI") {
     withEmptyRepo { kamu =>
       val expected = DatasetFactory.newRootDataset()
-
       // create a temporary directory with the dataset to host
-      val serverDir = getRandomDir()
+      val serverDir =
+        new Path(
+          kamu.config.repositoryRoot,
+          // raw"test dir with: Colon and Space" // bug in scala?
+          raw"server"
+        )
       fileSystem.mkdirs(serverDir)
       val path: Path = new Path(serverDir, raw"test-dataset.yaml")
       kamu.metadataRepository.saveDataset(expected, path)
@@ -83,39 +87,44 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         detached = true
       )
       val testHttpServer = new DockerClient(fileSystem)
-      val testHttpServerProc = new DockerProcessBuilder(
-        "http",
-        testHttpServer,
-        testHttpServerArgs
-      ).run()
-      testHttpServerProc.join()
-      val hostPort =
-        testHttpServerProc.waitForHostPort(serverPort, Duration("500 ms"))
+      try {
+        val testHttpServerProc = new DockerProcessBuilder(
+          "http",
+          testHttpServer,
+          testHttpServerArgs
+        ).run()
+        testHttpServerProc.join()
+        val hostPort =
+          testHttpServerProc.waitForHostPort(serverPort, 500 millis)
 
-      // pull the dataset from the server
-      val actual =
-        kamu.metadataRepository.loadDatasetFromURI(
-          new URI(s"http://localhost:${hostPort}/test-dataset.yaml")
-        )
+        // pull the dataset from the server
+        val actual =
+          kamu.metadataRepository.loadDatasetFromURI(
+            new URI(s"http://localhost:${hostPort}/test-dataset.yaml")
+          )
 
-      // stop the server
-      testHttpServer.kill(testServerName)
-      fileSystem.delete(serverDir, true)
-
-      actual shouldEqual expected
+        actual shouldEqual expected
+      } finally {
+        // stop the server
+        testHttpServer.kill(testServerName)
+      }
     }
   }
 
   test(raw"'kamu add' from file") {
     withEmptyRepo { kamu =>
       val expected = DatasetFactory.newRootDataset()
-      val testDir = getRandomDir()
+      val testDir =
+        new Path(
+          kamu.config.repositoryRoot,
+          // raw"test dir with: Colon and Space" // bug in scala?
+          raw"test"
+        )
       val path: Path = new Path(testDir, raw"test-dataset.yaml")
       fileSystem.mkdirs(testDir)
       kamu.metadataRepository.saveDataset(expected, path)
       val actual =
         kamu.metadataRepository.loadDatasetFromFile(path)
-      fileSystem.delete(testDir, true)
 
       actual shouldEqual expected
     }
