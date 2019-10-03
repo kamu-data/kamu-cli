@@ -167,7 +167,7 @@ class MissingReferenceException(val fromID: DatasetID, val toID: DatasetID)
     extends Exception(s"Dataset $fromID refers to non existent dataset $toID")
 
 class SchemaNotSupportedException(val schema: String)
-    extends Exception(s"Resource schema not supported: $schema")
+    extends Exception(s"$schema")
 
 class DanglingReferenceException(
   val fromIDs: Seq[DatasetID],

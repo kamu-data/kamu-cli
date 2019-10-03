@@ -1,7 +1,5 @@
 package dev.kamu.cli
 
-import java.net.URI
-
 import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.Level
@@ -134,13 +132,23 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   )
   shortSubcommandsHelp()
 
+  // converts a string representing either URI or Path to URI
+  implicit val _addArgumentConverter = listArgConverter[java.net.URI](
+    s =>
+      try {
+        val uri = new java.net.URI(s);
+        if (null == uri.getScheme)
+          new java.io.File(s).toPath.toUri
+        else uri
+      } catch {
+        case _: java.net.URISyntaxException =>
+          new java.io.File(s).toPath.toUri
+      }
+  )
+
   implicit val _logLevelConverter = singleArgConverter[Level](Level.toLevel)
-  implicit val _pathConverter = singleArgConverter[Path](
-    s => new Path(URI.create(s))
-  )
-  implicit val _pathListConverter = listArgConverter[Path](
-    s => new Path(URI.create(s))
-  )
+  implicit val _pathConverter = singleArgConverter[Path](s => new Path(s))
+  implicit val _pathListConverter = listArgConverter[Path](s => new Path(s))
   val _envVarConverter = new ValueConverter[Map[String, String]] {
     def resolveEnvVar(s: String): (String, String) = {
       if (s.indexOf("=") < 0)
@@ -232,7 +240,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Start dataset creation wizard"
     )
 
-    val manifests = trailArg[List[String]](
+    val manifests = trailArg[List[java.net.URI]](
       "manifest",
       required = false,
       descr = "Manifest URLs/files containing dataset definitions",
@@ -313,7 +321,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     }
     addSubcommand(server)
 
-    val url = opt[URI](
+    val url = opt[java.net.URI](
       "url",
       argName = "url",
       descr =

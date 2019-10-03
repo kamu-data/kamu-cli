@@ -95,7 +95,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         ).run()
         testHttpServerProc.join()
         val hostPort =
-          testHttpServerProc.waitForHostPort(serverPort, 500 millis)
+          testHttpServerProc.waitForHostPort(serverPort, 1000 millis) // occasionally fails if set to 500 ms
 
         // pull the dataset from the server
         val actual =
