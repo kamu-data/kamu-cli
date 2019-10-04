@@ -2,12 +2,11 @@ package dev.kamu.cli
 
 import java.net.URI
 
-import dev.kamu.core.manifests.DatasetID
-import org.scalatest._
 import dev.kamu.cli.external.{DockerClient, DockerProcessBuilder, DockerRunArgs}
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
+import dev.kamu.core.manifests.DatasetID
+import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.Path.SEPARATOR
+import org.scalatest._
 
 import scala.concurrent.duration._
 
@@ -67,18 +66,14 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
       val expected = DatasetFactory.newRootDataset()
       // create a temporary directory with the dataset to host
       val serverDir =
-        new Path(
-          kamu.config.repositoryRoot,
-          // raw"test dir with: Colon and Space" // bug in scala?
-          raw"server"
-        )
+        new Path(kamu.config.repositoryRoot, "server")
       fileSystem.mkdirs(serverDir)
-      val path: Path = new Path(serverDir, raw"test-dataset.yaml")
+      val path: Path = new Path(serverDir, "test-dataset.yaml")
       kamu.metadataRepository.saveDataset(expected, path)
 
       // start up the server and host the directory
       val serverPort = 80 // httpd:2.4 default port
-      val testServerName = s"kamu_test_http_server"
+      val testServerName = "kamu_test_http_server"
       val testHttpServerArgs = DockerRunArgs(
         image = "httpd:2.4",
         exposePorts = List(serverPort),
@@ -116,11 +111,11 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
       val expected = DatasetFactory.newRootDataset()
       val testDir =
         new Path(
-          kamu.config.repositoryRoot,
-          // raw"test dir with: Colon and Space" // bug in scala?
-          raw"test"
+          // Path(parent, child) throws an exception, while SEPARATOP
+          // works for names with colons and spaces
+          s"${kamu.config.repositoryRoot.toString}${SEPARATOR}test: add from file"
         )
-      val path: Path = new Path(testDir, raw"test-dataset.yaml")
+      val path: Path = new Path(testDir, "test-dataset.yaml")
       fileSystem.mkdirs(testDir)
       kamu.metadataRepository.saveDataset(expected, path)
       val actual =

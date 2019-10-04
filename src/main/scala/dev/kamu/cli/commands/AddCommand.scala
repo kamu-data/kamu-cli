@@ -17,33 +17,37 @@ class AddCommand(
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    try {
-      val sources =
+    val sources = {
+      try {
         manifests.map(manifestURI => {
           logger.debug(s"Loading dataset from: $manifestURI")
           metadataRepository.loadDatasetFromURI(manifestURI)
         })
-      val numAdded = sources
-        .map(ds => {
-          try {
-            metadataRepository.addDataset(ds)
-            true
-          } catch {
-            case e: AlreadyExistsException =>
-              logger.warn(e.getMessage + " - skipping")
-              false
-            case e: MissingReferenceException =>
-              logger.warn(e.getMessage + " - skipping")
-              false
-          }
-        })
-        .count(added => added)
-      logger.info(s"Added $numAdded datasets")
-    } catch {
-      case e: java.io.FileNotFoundException =>
-        logger.error(s"File not found: ${e.getMessage} - aborted")
-      case e: SchemaNotSupportedException =>
-        logger.error(s"URI schema not supported: ${e.getMessage} - aborted")
+      } catch {
+        case e: java.io.FileNotFoundException =>
+          logger.error(s"File not found: ${e.getMessage} - aborted")
+          Seq.empty
+        case e: SchemaNotSupportedException =>
+          logger.error(s"URI schema not supported: ${e.getMessage} - aborted")
+          Seq.empty
+      }
     }
+
+    val numAdded = sources
+      .map(ds => {
+        try {
+          metadataRepository.addDataset(ds)
+          true
+        } catch {
+          case e: AlreadyExistsException =>
+            logger.warn(e.getMessage + " - skipping")
+            false
+          case e: MissingReferenceException =>
+            logger.warn(e.getMessage + " - skipping")
+            false
+        }
+      })
+      .count(added => added)
+    logger.info(s"Added $numAdded datasets")
   }
 }
