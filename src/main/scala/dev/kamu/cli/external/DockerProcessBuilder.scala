@@ -32,7 +32,7 @@ class DockerProcessBuilder(
     new DockerProcess(
       id,
       dockerClient,
-      runArgs.containerName.get,
+      runArgs.containerName.get, // TODO: containerName is optional... None.get exception possible
       processBuilder,
       runArgs,
       processIO

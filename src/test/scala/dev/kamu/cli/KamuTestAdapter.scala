@@ -29,7 +29,7 @@ case class CommandResult(
 )
 
 class KamuTestAdapter(
-  config: KamuConfig,
+  val config: KamuConfig, // config should be public for tests to access repositoryRoot
   fileSystem: FileSystem,
   spark: SparkSession
 ) extends Kamu(config, fileSystem) {

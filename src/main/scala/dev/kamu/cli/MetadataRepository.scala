@@ -4,6 +4,7 @@ import dev.kamu.core.manifests.{Dataset, DatasetID, Manifest}
 import dev.kamu.cli.utility.DependencyGraph
 import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import java.net.URI
 import yaml.defaults._
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.utils.fs._
@@ -62,10 +63,32 @@ class MetadataRepository(
       yaml.load[Manifest[Dataset]](inputStream).content
     } catch {
       case e: Exception =>
-        logger.error(s"Error while loading data source manifest: $p")
+        logger.error(s"Error while loading data source manifest from file: $p")
         throw e
     } finally {
       inputStream.close()
+    }
+  }
+
+  def loadDatasetFromURI(uri: URI): Dataset = {
+    uri.getScheme match {
+      case "https" => loadDatasetFromURL(uri.toURL)
+      case "http"  => loadDatasetFromURL(uri.toURL)
+      case "file"  => loadDatasetFromFile(new Path(uri.getPath))
+      case s       => throw new SchemaNotSupportedException(s)
+    }
+  }
+
+  def loadDatasetFromURL(url: java.net.URL): Dataset = {
+    val source = scala.io.Source.fromURL(url)
+    try {
+      yaml.load[Manifest[Dataset]](source.mkString).content
+    } catch {
+      case e: Exception =>
+        logger.error(s"Error while loading data source manifest from URL: $url")
+        throw e
+    } finally {
+      source.close()
     }
   }
 
@@ -142,6 +165,9 @@ class AlreadyExistsException(val datasetID: DatasetID)
 
 class MissingReferenceException(val fromID: DatasetID, val toID: DatasetID)
     extends Exception(s"Dataset $fromID refers to non existent dataset $toID")
+
+class SchemaNotSupportedException(val schema: String)
+    extends Exception(s"$schema")
 
 class DanglingReferenceException(
   val fromIDs: Seq[DatasetID],

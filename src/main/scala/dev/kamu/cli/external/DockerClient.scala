@@ -16,11 +16,13 @@ case class DockerRunArgs(
   exposePorts: List[Int] = List.empty,
   exposePortMap: Map[Int, Int] = Map.empty,
   volumeMap: Map[Path, Path] = Map.empty,
+  workDir: Option[String] = None,
   environmentVars: Map[String, String] = Map.empty,
   entryPoint: Option[String] = None,
   remove: Boolean = true,
   tty: Boolean = false,
-  interactive: Boolean = false
+  interactive: Boolean = false,
+  detached: Boolean = false
 )
 
 class DockerClient(fileSystem: FileSystem) {
@@ -59,6 +61,7 @@ class DockerClient(fileSystem: FileSystem) {
       if (runArgs.remove) List("--rm") else List.empty,
       if (runArgs.tty) List("-t") else List.empty,
       if (runArgs.interactive) List("-i") else List.empty,
+      if (runArgs.detached) List("-d") else List.empty,
       runArgs.containerName.map(v => List("--name", v)).getOrElse(List.empty),
       runArgs.hostname.map(v => List("--hostname", v)).getOrElse(List.empty),
       runArgs.network.map(v => List("--network", v)).getOrElse(List.empty),
@@ -81,6 +84,7 @@ class DockerClient(fileSystem: FileSystem) {
         }
         .reduceOption(_ ++ _)
         .getOrElse(List.empty),
+      runArgs.workDir.map(v => List("--workdir", v)).getOrElse(List.empty),
       runArgs.environmentVars
         .map { case (n, v) => List("-e", s"$n=$v") }
         .reduceOption(_ ++ _)
@@ -98,9 +102,20 @@ class DockerClient(fileSystem: FileSystem) {
     Process(cmd)
   }
 
+  // QA: be aware of '--sig-proxy' and '--stop-signal' options. 'docker kill' default signal is 'kill'
   def kill(container: String, signal: String = "TERM"): Unit = {
     val processBuilder = prepare(
       Seq("docker", "kill", s"--signal=$signal", container)
+    )
+    processBuilder
+      .run(IOHandlerPresets.logged(logger))
+      .exitValue()
+  }
+
+  // give a container t seconds to terminate, kill otherwise. 10 seconds is docker's default
+  def stop(container: String, time: Int = 10): Unit = {
+    val processBuilder = prepare(
+      Seq("docker", "stop", s"--time=$time", container)
     )
     processBuilder
       .run(IOHandlerPresets.logged(logger))

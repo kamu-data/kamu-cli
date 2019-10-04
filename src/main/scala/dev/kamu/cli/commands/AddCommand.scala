@@ -3,23 +3,35 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.{
   AlreadyExistsException,
   MetadataRepository,
-  MissingReferenceException
+  MissingReferenceException,
+  SchemaNotSupportedException
 }
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
 class AddCommand(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
-  manifests: Seq[Path]
+  manifests: Seq[java.net.URI]
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val sources = manifests.map(manifestPath => {
-      logger.debug(s"Loading dataset from: $manifestPath")
-      metadataRepository.loadDatasetFromFile(manifestPath)
-    })
+    val sources = {
+      try {
+        manifests.map(manifestURI => {
+          logger.debug(s"Loading dataset from: $manifestURI")
+          metadataRepository.loadDatasetFromURI(manifestURI)
+        })
+      } catch {
+        case e: java.io.FileNotFoundException =>
+          logger.error(s"File not found: ${e.getMessage} - aborted")
+          Seq.empty
+        case e: SchemaNotSupportedException =>
+          logger.error(s"URI schema not supported: ${e.getMessage} - aborted")
+          Seq.empty
+      }
+    }
 
     val numAdded = sources
       .map(ds => {
@@ -36,8 +48,6 @@ class AddCommand(
         }
       })
       .count(added => added)
-
     logger.info(s"Added $numAdded datasets")
   }
-
 }
