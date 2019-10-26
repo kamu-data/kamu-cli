@@ -13,7 +13,7 @@ What you'll need:
 
 Note: Use [SdkMan!](https://sdkman.io/) to install these dependencies:
 
-```bash
+```shell
 curl -s "https://get.sdkman.io" | bash
 source "$HOME/.sdkman/bin/sdkman-init.sh"
 sdk install java 8.0.222-zulu
@@ -33,11 +33,11 @@ This has to be done only once. After you build it and publish the package in you
 
 Instructions:
 
-Clone [kamu-data/hive](https://github.com/kamu-data/hive)
+Clone [kamu-data/hive](https://github.com/kamu-data/hive), build it and install into local maven repo using:
 
-Build it and install into local maven repo using:
-
-```sh
+```shell
+git clone https://github.com/kamu-data/hive
+cd hive
 git checkout release-1.2.1-spark2-kamu
 mvn -Phadoop-2 -DskipTests -Psources install
 ```
@@ -47,23 +47,31 @@ Note: You'll need to have a GPG key configured to sign the artifacts.
 ### Building
 
 Clone the repository with submodules:
-```sh
+```shell
 git clone --recurse-submodules https://github.com/kamu-data/kamu-cli
 ```
 
 Then do:
 
-```sh
+```shell
 cd kamu-cli
 sbt
 >> assembly
 ```
 
-After the assembly is created run tests:
+After the assembly is created tod run tests do:
 
-```sh
+```shell
 sbt
 >> test
+```
+
+> Note: Make sure the docker is running and accessible without `sudo` - it's needed by the system tests.
+
+To use your locally-built `kamu` executable link it as so:
+
+```shell
+sudo ln -s $PWD/target/scala-2.11/kamu /usr/bin/kamu
 ```
 
 ## Release Procedure
