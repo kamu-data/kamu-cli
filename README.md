@@ -1,64 +1,29 @@
 # Kamu CLI
 
+Kamu is a new-generation data management and exploration tool which aims to enable effective collaboration of people around data. To put it simply, it tries to accomplish what `git` and other version control systems did for software - provide a reliable, transparent, and trustworthy way of iteratively improving something as a community - but does it in a way that is most suitable to data.
+
+https://kamu.dev
+
 [![Build Status](https://travis-ci.org/kamu-data/kamu-cli.svg?branch=master)](https://travis-ci.org/kamu-data/kamu-cli)
 
-[Installation](docs/install.md)
+## Features
 
-[How it Works](docs/architecture.md)
+- Easily ingest any data set from the web
+- Keep track of any updates to the data source in the future
+- All data is stored in the efficient structured format (Parquet)
+- Explore data and run adhoc SQL queries (baked by the power of Apache Spark)
 
-[Developer Guide](docs/developer_guide.md)
+![SQL Shell](docs/first_steps_files/sql.svg)
 
-Step by step guide:
-- Install the tools:
-```shell
-curl -s "https://get.sdkman.io" | bash
-source "$HOME/.sdkman/bin/sdkman-init.sh"
-sdk install java 8.0.222-zulu
-sdk install maven 3.6.1
-sdk install sbt 1.2.8
-sdk install scala 2.11.12
-sdk install spark 2.4.0
-```
-- Build local kamu version of Hive(requires GnuPG to sign it):
-```shell
-git clone https://github.com/kamu-data/hive
-cd hive
-git checkout release-1.2.1-spark2-kamu
-mvn -Phadoop-2 -DskipTests -Psources install
-cd ..
-```
-- Build kamu
-```shell
-git clone --recurse-submodules https://github.com/kamu-data/kamu-cli
-cd kamu-cli
-sbt assembly
-```
-- Link the executable, so it can be run from anywhere:
-```shell
-sudo ln -s $PWD/target/scala-2.11/kamu /usr/bin/kamu
-cd ..
-```
-- Make sure the docker is accessible and running before using kamu:
-```shell
-docker ps
-```
-- Download kamu data repo
-```shell
-git clone https://github.com/kamu-data/kamu-example-data
-cd kamu-example-data
-kamu list
-```
-- Pull the data sets of interest
-```shell
-kamu pull example.data.set.raw
-kamu pull example.data.set.derived1
-kamu pull example.data.set.derived2
-```
-- Start the data server
-```shell
-kamu notebook
-```
-- Play with it in you browser at https://localhost:port. Check the port number with:
-```shell
-docker port kamu-jupyter 80/tcp
-```
+- Launch a Jupyter notebook with one command
+- Join, filter, and shape your data using Spark dataframe API or Spark SQL
+- Fetch the result of any query as a Pandas dataframe
+- Visualize it in any way you prefer using any Python library
+
+![Jupyter](docs/first_steps_files/notebook_003.png)
+
+## Documentation
+- [Installation](docs/install.md)
+- [First Steps](docs/first_steps.md)
+- [Architecture](docs/architecture.md)
+- [Developer Guide](docs/developer_guide.md)
