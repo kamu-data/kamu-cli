@@ -3,7 +3,9 @@
 
 ## 3rd Party Components
 
-* [Apache Spark](https://spark.apache.org/) - Data analytics engine
+* [Apache Parquet](https://parquet.apache.org/) - Structured data format optimized for querying
+* [Apache Spark](https://spark.apache.org/) - Data processing and analytics engine
+* [GeoSpark](http://geospark.datasyslab.org/) - GIS extension for Spark
 * [Apache Livy](https://livy.incubator.apache.org) - Multi-user HTTP/JDBC gateway for Spark
 * [Jupyter Hub](https://jupyter.org/) - Interactive computing environment
 * [SparkMagic](https://github.com/juliusvonkohout/sparkmagic) - Jupyter to Livy connector
