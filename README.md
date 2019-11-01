@@ -11,7 +11,7 @@ https://kamu.dev
 - Easily ingest any data set from the web
 - Keep track of any updates to the data source in the future
 - All data is stored in the efficient structured format (Parquet)
-- Explore data and run adhoc SQL queries (baked by the power of Apache Spark)
+- Explore data and run adhoc SQL queries (backed by the power of Apache Spark)
 
 ![SQL Shell](docs/first_steps_files/sql.svg)
 
