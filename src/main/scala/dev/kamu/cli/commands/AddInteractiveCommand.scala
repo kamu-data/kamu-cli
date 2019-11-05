@@ -113,9 +113,9 @@ class AddInteractiveCommand(
           case "snapshot" =>
             // TODO: Column names
             val primaryKey = input(
-              "PK column",
-              "Which column that uniquely identifies the record throughout its lifetime."
-            )(s => s)
+              "PK column(s)",
+              "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
+            )(s => s.split(',').map(_.trim).toVector)
 
             val modificationIndicator = inputOptional(
               "Modification indicator column",
@@ -123,6 +123,7 @@ class AddInteractiveCommand(
                 "For example this can be a modification timestamp, an incremental version, " +
                 "or a data hash. If not specified all data columns will be compared one by one."
             )(s => s)
+
             Snapshot(
               primaryKey = primaryKey,
               modificationIndicator = modificationIndicator
@@ -132,8 +133,9 @@ class AddInteractiveCommand(
             // TODO: Column names
             val primaryKey = input(
               "PK Column",
-              "Which column that uniquely identifies the record throughout its lifetime."
-            )(s => s)
+              "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
+            )(s => s.split(',').map(_.trim).toVector)
+
             Ledger(primaryKey = primaryKey)
           case "append" =>
             Append()
