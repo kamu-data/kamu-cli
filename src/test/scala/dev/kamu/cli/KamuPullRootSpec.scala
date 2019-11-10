@@ -1,7 +1,6 @@
 package dev.kamu.cli
 
 import dev.kamu.cli.output.OutputFormat
-import dev.kamu.core.ingest.polling.DFUtils._
 import org.scalatest._
 
 class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {

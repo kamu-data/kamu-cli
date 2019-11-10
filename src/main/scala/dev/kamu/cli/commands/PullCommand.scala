@@ -3,7 +3,7 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
 import dev.kamu.cli.utility.DependencyGraph
-import dev.kamu.core.manifests.{Dataset, DatasetID}
+import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceFetchUrl}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
@@ -57,9 +57,13 @@ class PullCommand(
 
     val source = ds.rootPollingSource.get
 
-    val extraMounts = source.url.getScheme match {
-      case "file" | null => List(new Path(source.url))
-      case _             => List.empty
+    val extraMounts = source.fetch match {
+      case furl: ExternalSourceFetchUrl =>
+        furl.url.getScheme match {
+          case "file" | null => List(new Path(furl.url))
+          case _             => List.empty
+        }
+      case _ => List.empty
     }
 
     sparkRunner.submit(

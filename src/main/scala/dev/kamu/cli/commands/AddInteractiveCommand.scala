@@ -60,25 +60,29 @@ class AddInteractiveCommand(
         )
 
         // TODO: Add heuristics
-        var compression: Option[String] = None
-        var subPathRegex: Option[String] = None
+        var prepareSteps = Vector.empty[PrepStepKind]
 
         if (inputYesNo("Is the source file compressed", "", false)) {
-          compression = Some(
-            inputChoice(
-              "Compression",
-              "What's the compression format?",
-              Seq("zip", "gzip")
-            )
+          val compression = inputChoice(
+            "Compression",
+            "What's the compression format?",
+            Seq("zip", "gzip")
           )
 
-          if (Seq("zip", "gzip").contains(compression.get)) {
-            subPathRegex = inputOptional(
+          val subPathRegex = if (Seq("zip").contains(compression)) {
+            inputOptional(
               "Sub-path",
               "If this archive can contain multiple files - specify the path regex to " +
                 "help us find the right one."
             )(s => s)
+          } else {
+            None
           }
+
+          prepareSteps = prepareSteps :+ PrepStepDecompress(
+            format = compression,
+            subPathRegex = subPathRegex
+          )
         }
 
         var format = inputChoice(
@@ -124,7 +128,7 @@ class AddInteractiveCommand(
                 "or a data hash. If not specified all data columns will be compared one by one."
             )(s => s)
 
-            Snapshot(
+            MergeStrategySnapshot(
               primaryKey = primaryKey,
               modificationIndicator = modificationIndicator
             )
@@ -136,23 +140,23 @@ class AddInteractiveCommand(
               "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
             )(s => s.split(',').map(_.trim).toVector)
 
-            Ledger(primaryKey = primaryKey)
+            MergeStrategyLedger(primaryKey = primaryKey)
           case "append" =>
-            Append()
+            MergeStrategyAppend()
         }
 
         Dataset(
           id = id,
-          rootPollingSource = Some(
-            RootPollingSource(
-              url = url,
-              format = format,
-              readerOptions = readerOptions.toMap,
-              compression = compression,
-              subPathRegex = subPathRegex,
-              mergeStrategy = mergeStrategy
+          rootPollingSource =
+            Some(
+              RootPollingSource(
+                fetch = ExternalSourceFetchUrl(url = url),
+                prepare = prepareSteps,
+                read =
+                  ReaderGeneric(name = format, options = readerOptions.toMap),
+                merge = mergeStrategy
+              )
             )
-          )
         )
       case "derivative" =>
         Dataset(

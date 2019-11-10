@@ -50,14 +50,16 @@ kind: Dataset
 content:
   id: ca.vancouver.opendata.schools
   rootPollingSource:
-    url: https://opendata.vancouver.ca/explore/dataset/schools/download/?format=csv&timezone=America/Los_Angeles&use_labels_for_header=true
-    format: csv
-    readerOptions:
-      header: "true"
-      sep: ";"
+    fetch:
+      kind: fetchUrl
+      url: https://opendata.vancouver.ca/explore/dataset/schools/download/?format=csv&timezone=America/Los_Angeles&use_labels_for_header=true
+    read:
+      kind: csv
+      header: true
+      delimiter: ';'
       quote: '"'
       escape: '"'
-      nullValue: ""
+      nullValue: ''
     preprocess:
     - view: output
       query: >
@@ -68,12 +70,18 @@ content:
           ST_GeomFromGeoJSON(geom) as geom,
           geo_local_area
         FROM input
+    merge:
+      kind: snapshot
+      primaryKey:
+      - school_name
 ```
 
-Such dataset in kamu is called **root** dataset and is defined by:
-- A `url` that points to some external data source
-- A combination of `format` and `readerOptions` that define how the data looks like and how to load it
-- An optional `preprocess` steps which usually used to convert data into more specific types
+Such dataset in kamu is called **root** dataset and is defined by a sequence of following operations:
+- `fetch` - obtaining the data from some external source (e.g. HTTP/FTP)
+- `prepare` (optional) - steps for preparing data for ingestion (e.g. extracting an archive)
+- `read` - reading the data into a structured form
+- `preprocess` (optional) - shaping the structured data and converting types into best suited form
+- `merge` - merging the new data from the source with the history of previously seen data
 
 Let's add it to our repository:
 

@@ -2,16 +2,7 @@ package dev.kamu.cli
 
 import java.net.URI
 
-import dev.kamu.core.manifests.{
-  Append,
-  Dataset,
-  DatasetID,
-  DerivativeInput,
-  DerivativeSource,
-  MergeStrategyKind,
-  ProcessingStepSQL,
-  RootPollingSource
-}
+import dev.kamu.core.manifests._
 
 import scala.util.Random
 
@@ -63,11 +54,13 @@ object DatasetFactory {
       id = _id,
       rootPollingSource = Some(
         RootPollingSource(
-          url = url.getOrElse(newURL(_id)),
-          format = format.getOrElse("csv"),
-          schema = schema.toVector,
-          readerOptions = if (!header) Map.empty else Map("header" -> "true"),
-          mergeStrategy = mergeStrategy.getOrElse(Append())
+          fetch = ExternalSourceFetchUrl(url.getOrElse(newURL(_id))),
+          read = ReaderGeneric(
+            name = format.getOrElse("csv"),
+            options = if (!header) Map.empty else Map("header" -> "true"),
+            schema = schema.toVector
+          ),
+          merge = mergeStrategy.getOrElse(MergeStrategyAppend())
         )
       )
     ).postLoad()
