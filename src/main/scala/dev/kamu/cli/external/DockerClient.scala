@@ -3,7 +3,7 @@ package dev.kamu.cli.external
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
-import scala.sys.process.{Process, ProcessBuilder, ProcessLogger}
+import scala.sys.process.{Process, ProcessBuilder}
 import dev.kamu.core.manifests.utils.fs._
 
 case class DockerRunArgs(
@@ -36,7 +36,7 @@ class DockerClient(fileSystem: FileSystem) {
     val exitCode = process.!
     if (exitCode != 0)
       throw new RuntimeException(
-        s"Command failed with exit code $exitCode:${cmd.mkString(" ")}"
+        s"Command failed with exit code $exitCode: ${cmd.mkString(" ")}"
       )
   }
 
