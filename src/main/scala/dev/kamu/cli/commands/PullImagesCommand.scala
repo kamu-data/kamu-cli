@@ -8,7 +8,7 @@ class PullImagesCommand(
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  override def requiresRepository: Boolean = false
+  override def requiresWorkspace: Boolean = false
 
   def run(): Unit = {
     DockerImages.ALL.foreach(image => {

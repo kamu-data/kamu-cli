@@ -29,7 +29,7 @@ case class CommandResult(
 )
 
 class KamuTestAdapter(
-  val config: KamuConfig, // config should be public for tests to access repositoryRoot
+  val config: KamuConfig, // config should be public for tests to access workspaceRoot
   fileSystem: FileSystem,
   spark: SparkSession
 ) extends Kamu(config, fileSystem) {
@@ -87,7 +87,7 @@ class KamuTestAdapter(
 
   def writeData(df: DataFrame, outputFormat: OutputFormat): Path = {
     val name = Random.alphanumeric.take(10).mkString + ".csv"
-    val path = config.repositoryRoot.resolve(name)
+    val path = config.workspaceRoot.resolve(name)
 
     df.repartition(1)
       .write

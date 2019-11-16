@@ -1,7 +1,7 @@
 package dev.kamu.cli.commands
 
 trait Command {
-  def requiresRepository = true
+  def requiresWorkspace = true
 
   def run(): Unit
 }

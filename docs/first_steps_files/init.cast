@@ -33,7 +33,7 @@
 [4.568724, "o", "i"]
 [4.604874, "o", "t"]
 [4.69685, "o", "\r\n"]
-[4.977551, "o", "[\u001b[0;37mINFO\u001b[m] Initialized an empty repository\r\n"]
+[4.977551, "o", "[\u001b[0;37mINFO\u001b[m] Initialized an empty workspace\r\n"]
 [4.980413, "o", "\u001b]0;:~/Work/projects/personal/kamu/projects/my_repo\u0007"]
 [4.980688, "o", "\u001b[01;32m[\u001b[01;37mmy_repo\u001b[01;32m]$\u001b[00m "]
 [5.209211, "o", "k"]

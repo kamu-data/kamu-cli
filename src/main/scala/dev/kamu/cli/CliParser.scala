@@ -213,7 +213,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   /////////////////////////////////////////////////////////////////////////////
 
   val init = new KamuSubcommand("init") {
-    descr("Initialize the repository in the current directory")
+    descr("Initialize the workspace in the current directory")
 
     val pullImages = opt[Boolean](
       "pull-images",
@@ -226,7 +226,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   /////////////////////////////////////////////////////////////////////////////
 
   val list = new TabularOutputSubcommand("list") {
-    descr("List all datasets in the repository")
+    descr("List all datasets in the workspace")
   }
   addSubcommand(list)
 
@@ -348,7 +348,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   val notebook = new KamuSubcommand("notebook") {
     descr(
-      "Start the Jupyter notebook and Spark to explore the data in the repository"
+      "Start the Jupyter notebook and Spark to explore the data in the workspace"
     )
 
     val env = opt[Map[String, String]](

@@ -25,7 +25,7 @@ trait KamuTestBase extends DataFrameSuiteBaseEx { self: Suite =>
 
     try {
       val config = KamuConfig(
-        repositoryRoot = testDir
+        workspaceRoot = testDir
       )
 
       val kamu = new KamuTestAdapter(config, fileSystem, spark)
@@ -36,7 +36,7 @@ trait KamuTestBase extends DataFrameSuiteBaseEx { self: Suite =>
     }
   }
 
-  def withEmptyRepo[T](func: KamuTestAdapter => T): T = {
+  def withEmptyWorkspace[T](func: KamuTestAdapter => T): T = {
     withEmptyDir { kamu =>
       kamu.run("init")
       func(kamu)

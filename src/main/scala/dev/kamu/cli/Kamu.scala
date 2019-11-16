@@ -25,8 +25,8 @@ class Kamu(
   def run(cliArgs: CliArgs): Unit = {
     val command = getCommand(cliArgs)
 
-    if (command.requiresRepository)
-      ensureRepository()
+    if (command.requiresWorkspace)
+      ensureWorkspace()
 
     command.run()
   }
@@ -123,9 +123,9 @@ class Kamu(
     }
   }
 
-  def ensureRepository(): Unit = {
+  def ensureWorkspace(): Unit = {
     if (!fileSystem.exists(workspaceLayout.metadataRootDir))
-      throw new UsageException("Not a kamu repository")
+      throw new UsageException("Not a kamu workspace")
   }
 
   def getDockerClient(): DockerClient = {

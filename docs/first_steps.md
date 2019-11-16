@@ -18,18 +18,18 @@ We'll be using a simple Vancouver Schools dataset, which can be found on [Vancou
 ## Getting data in
 ![kamu init](./first_steps_files/init.svg)
 
-### Initializing repository
-To work with `kamu` you first need a **repository** - this is where kamu will store the important information about datasets and the cached data. Let's create one:
+### Initializing the workspace
+To work with `kamu` you first need a **workspace** - this is where kamu will store the important information about datasets and the cached data. Let's create one:
 
 ```bash
 $ mkdir my_repo
 $ cd my_repo
 
 $ kamu init
-[INFO] Initialized an empty repository
+[INFO] Initialized an empty workspace
 ```
 
-As you'd expect the repository is currently empty:
+As you'd expect the workspace is currently empty:
 
 ```bash
 $ kamu list
@@ -83,7 +83,7 @@ Such dataset in kamu is called **root** dataset and is defined by a sequence of 
 - `preprocess` (optional) - shaping the structured data and converting types into best suited form
 - `merge` - merging the new data from the source with the history of previously seen data
 
-Let's add it to our repository:
+Let's add it to our workspace:
 
 ```bash
 $ kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.vancouver.opendata/ca.vancouver.opendata.schools.yaml

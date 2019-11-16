@@ -3,7 +3,7 @@ package dev.kamu.cli
 import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.utils.fs._
 
-/** Describes the layout of the data repository on disk */
+/** Describes the layout of the workspace on disk */
 case class WorkspaceLayout(
   /** Root directory of the workspace metadata */
   metadataRootDir: Path,

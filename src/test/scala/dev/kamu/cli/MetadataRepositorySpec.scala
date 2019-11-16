@@ -14,7 +14,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
 
   test("getDatasetsInDependencyOrder") {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       // A -> B -> C
       val dsC = DatasetFactory.newRootDataset(
         id = Some(DatasetID("C"))
@@ -62,11 +62,11 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   }
 
   test(raw"'kamu add' from HTTP URI") {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       val expected = DatasetFactory.newRootDataset()
       // create a temporary directory with the dataset to host
       val serverDir =
-        new Path(kamu.config.repositoryRoot, "server")
+        new Path(kamu.config.workspaceRoot, "server")
       fileSystem.mkdirs(serverDir)
       val path: Path = new Path(serverDir, "test-dataset.yaml")
       kamu.metadataRepository.saveDataset(expected, path)
@@ -107,13 +107,13 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   }
 
   test(raw"'kamu add' from file") {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       val expected = DatasetFactory.newRootDataset()
       val testDir =
         new Path(
           // Path(parent, child) throws an exception, while SEPARATOP
           // works for names with colons and spaces
-          s"${kamu.config.repositoryRoot.toString}${SEPARATOR}test: add from file"
+          s"${kamu.config.workspaceRoot.toString}${SEPARATOR}test: add from file"
         )
       val path: Path = new Path(testDir, "test-dataset.yaml")
       fileSystem.mkdirs(testDir)

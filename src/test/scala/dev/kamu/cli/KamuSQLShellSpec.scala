@@ -8,7 +8,7 @@ class KamuSQLShellSpec extends FlatSpec with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
 
   "kamu sql" should "be able to read a dataset" in {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       val input = sc
         .parallelize(
           Seq(

@@ -27,7 +27,7 @@ class SQLShellCommand(
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  override def requiresRepository: Boolean = url.isEmpty
+  override def requiresWorkspace: Boolean = url.isEmpty
 
   override def run(): Unit = {
     var args = Array(

@@ -13,11 +13,11 @@ class InitCommand(
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  override def requiresRepository: Boolean = false
+  override def requiresWorkspace: Boolean = false
 
   def run(): Unit = {
     if (fileSystem.exists(workspaceLayout.metadataRootDir))
-      throw new UsageException("Already a kamu repository")
+      throw new UsageException("Already a kamu workspace")
 
     fileSystem.mkdirs(workspaceLayout.datasetsDir)
 
@@ -28,6 +28,6 @@ class InitCommand(
     writer.write(WorkspaceLayout.GITIGNORE_CONTENT)
     writer.close()
 
-    logger.info("Initialized an empty repository")
+    logger.info("Initialized an empty workspace")
   }
 }

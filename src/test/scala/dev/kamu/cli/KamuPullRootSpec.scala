@@ -9,7 +9,7 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
 
   "kamu pull" should "be able to import simple csv" in {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       val input = sc
         .parallelize(
           Seq(

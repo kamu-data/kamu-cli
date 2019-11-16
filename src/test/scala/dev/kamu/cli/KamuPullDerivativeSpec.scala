@@ -9,7 +9,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
   protected override val enableHiveSupport = false
 
   "kamu pull" should "produce derivative datasets" in {
-    withEmptyRepo { kamu =>
+    withEmptyWorkspace { kamu =>
       val input = sc
         .parallelize(
           Seq(

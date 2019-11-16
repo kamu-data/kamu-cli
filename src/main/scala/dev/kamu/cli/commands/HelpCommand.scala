@@ -5,7 +5,7 @@ import dev.kamu.cli.CliArgs
 class HelpCommand(
   cliArgs: CliArgs
 ) extends Command {
-  override def requiresRepository: Boolean = false
+  override def requiresWorkspace: Boolean = false
 
   def run(): Unit = {
     cliArgs.printHelp()

@@ -21,7 +21,7 @@ class AddInteractiveCommand(
 
     if (inputYesNo(
           "Add dataset",
-          "Would you like to add this dataset to the repository? " +
+          "Would you like to add this dataset to the workspace? " +
             "Otherwise it will be saved as a file in current directory.",
           true
         )) {
