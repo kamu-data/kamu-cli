@@ -1,6 +1,6 @@
 package dev.kamu.cli.external
 
-import dev.kamu.cli.{RepositoryVolumeMap, SparkConfig}
+import dev.kamu.cli.{WorkspaceLayout, SparkConfig}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
@@ -15,7 +15,7 @@ class SparkRunnerDocker(
 
   protected override def submit(
     appClass: String,
-    repo: RepositoryVolumeMap,
+    workspaceLayout: WorkspaceLayout,
     jars: Seq[Path],
     extraMounts: Seq[Path],
     loggingConfig: Path
@@ -33,9 +33,11 @@ class SparkRunnerDocker(
       .map(p => (p, new Path("/opt/kamu/jars/" + p.getName)))
       .toMap
 
-    val repoVolumes = repo.allPaths
-      .map(p => (p, p))
-      .toMap
+    val workspaceVolumes =
+      Seq(workspaceLayout.metadataRootDir, workspaceLayout.localVolumeDir)
+        .filter(fileSystem.exists)
+        .map(p => (p, p))
+        .toMap
 
     val submitArgs = List(
       "/opt/spark/bin/spark-submit",
@@ -59,7 +61,7 @@ class SparkRunnerDocker(
       dockerClient.runShell(
         DockerRunArgs(
           image = image,
-          volumeMap = appVolumes ++ repoVolumes ++ jarVolumes ++ extraVolumes
+          volumeMap = appVolumes ++ workspaceVolumes ++ jarVolumes ++ extraVolumes
         ),
         submitArgs
       )
@@ -72,12 +74,12 @@ class SparkRunnerDocker(
         "chown",
         "-R",
         s"${unix.getUid}:${unix.getGid}"
-      ) ++ repoVolumes.values.map(_.toUri.getPath)
+      ) ++ workspaceVolumes.values.map(_.toUri.getPath)
 
       dockerClient.runShell(
         DockerRunArgs(
           image = image,
-          volumeMap = repoVolumes
+          volumeMap = workspaceVolumes
         ),
         chownArgs
       )

@@ -3,7 +3,7 @@ package dev.kamu.cli.external
 import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
-import dev.kamu.cli.RepositoryVolumeMap
+import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.core.manifests.utils.fs._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -17,7 +17,7 @@ abstract class SparkRunner(
 
   def submit(
     appClass: String,
-    repo: RepositoryVolumeMap,
+    workspaceLayout: WorkspaceLayout,
     extraFiles: Map[String, OutputStream => Unit] = Map.empty,
     extraMounts: Seq[Path] = Seq.empty,
     jars: Seq[Path] = Seq.empty
@@ -33,7 +33,7 @@ abstract class SparkRunner(
     try {
       submit(
         appClass,
-        repo,
+        workspaceLayout,
         Seq(tmpJar) ++ jars,
         extraMounts,
         loggingConfig
@@ -48,7 +48,7 @@ abstract class SparkRunner(
 
   protected def submit(
     appClass: String,
-    repo: RepositoryVolumeMap,
+    workspaceLayout: WorkspaceLayout,
     jars: Seq[Path],
     extraMounts: Seq[Path],
     loggingConfig: Path

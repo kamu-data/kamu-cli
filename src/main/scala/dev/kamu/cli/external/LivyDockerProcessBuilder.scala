@@ -1,10 +1,10 @@
 package dev.kamu.cli.external
 
-import dev.kamu.cli.RepositoryVolumeMap
+import dev.kamu.core.manifests.VolumeLayout
 import org.apache.hadoop.fs.Path
 
 class LivyDockerProcessBuilder(
-  repositoryVolumeMap: RepositoryVolumeMap,
+  volumeLayout: VolumeLayout,
   dockerClient: DockerClient,
   network: Option[String] = None,
   exposeAllPorts: Boolean = false,
@@ -22,7 +22,7 @@ class LivyDockerProcessBuilder(
         exposePorts = exposePorts,
         exposePortMap = exposePortMap,
         volumeMap = Map(
-          repositoryVolumeMap.dataDir -> new Path("/opt/spark/work-dir")
+          volumeLayout.dataDir -> new Path("/opt/spark/work-dir")
         ),
         network = network
       )

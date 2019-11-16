@@ -71,8 +71,13 @@ class KamuTestAdapter(
 
   def addDataset(ds: Dataset, df: DataFrame): Unit = {
     metadataRepository.addDataset(ds)
+    val volume = metadataRepository.getLocalVolume()
+
+    if (!fileSystem.exists(volume.dataDir))
+      fileSystem.mkdirs(volume.dataDir)
+
     df.write.parquet(
-      repositoryVolumeMap.dataDir.resolve(ds.id.toString).toUri.getPath
+      volume.dataDir.resolve(ds.id.toString).toUri.getPath
     )
   }
 
@@ -98,7 +103,9 @@ class KamuTestAdapter(
 
   def readDataset(id: DatasetID): DataFrame = {
     spark.read.parquet(
-      repositoryVolumeMap.dataDir
+      metadataRepository
+        .getLocalVolume()
+        .dataDir
         .resolve(id.toString)
         .toUri
         .getPath

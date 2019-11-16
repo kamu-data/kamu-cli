@@ -2,35 +2,30 @@ package dev.kamu.cli.commands
 
 import java.io.PrintWriter
 
-import dev.kamu.cli.{RepositoryVolumeMap, UsageException}
+import dev.kamu.cli.{UsageException, WorkspaceLayout}
 import dev.kamu.core.manifests.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
 class InitCommand(
   fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap,
-  repositoryRoot: Path
+  workspaceLayout: WorkspaceLayout
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   override def requiresRepository: Boolean = false
 
   def run(): Unit = {
-    if (repositoryVolumeMap.allPaths.exists(fileSystem.exists))
+    if (fileSystem.exists(workspaceLayout.metadataRootDir))
       throw new UsageException("Already a kamu repository")
 
-    repositoryVolumeMap.allPaths.foreach(fileSystem.mkdirs)
+    fileSystem.mkdirs(workspaceLayout.datasetsDir)
 
-    val outputStream = fileSystem.create(repositoryRoot.resolve(".gitignore"))
+    val outputStream =
+      fileSystem.create(workspaceLayout.metadataRootDir.resolve(".gitignore"))
+
     val writer = new PrintWriter(outputStream)
-    writer.write("""
-        |/.kamu/downloads
-        |/.kamu/checkpoints
-        |/.kamu/data
-        |
-        |.ipynb_checkpoints
-        |""".stripMargin)
+    writer.write(WorkspaceLayout.GITIGNORE_CONTENT)
     writer.close()
 
     logger.info("Initialized an empty repository")

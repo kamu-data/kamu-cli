@@ -3,7 +3,7 @@ package dev.kamu.cli.commands
 import java.io.PrintStream
 import java.net.URI
 
-import dev.kamu.cli.RepositoryVolumeMap
+import dev.kamu.cli.MetadataRepository
 import dev.kamu.cli.external.{
   DockerClient,
   IOHandlerPresets,
@@ -17,7 +17,7 @@ import sqlline.SqlLine
 import scala.concurrent.duration._
 
 class SQLShellCommand(
-  repositoryVolumeMap: RepositoryVolumeMap,
+  metadataRepository: MetadataRepository,
   dockerClient: DockerClient,
   url: Option[URI],
   command: Option[String],
@@ -97,7 +97,7 @@ class SQLShellCommand(
       val containerPort = 10090
 
       val livyProcess = new LivyDockerProcessBuilder(
-        repositoryVolumeMap = repositoryVolumeMap,
+        volumeLayout = metadataRepository.getLocalVolume(),
         dockerClient = dockerClient,
         exposePorts = List(containerPort)
       ).run(

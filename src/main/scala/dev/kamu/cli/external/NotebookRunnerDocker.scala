@@ -1,6 +1,6 @@
 package dev.kamu.cli.external
 
-import dev.kamu.cli.RepositoryVolumeMap
+import dev.kamu.cli.MetadataRepository
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import sun.misc.{Signal, SignalHandler}
@@ -8,7 +8,7 @@ import sun.misc.{Signal, SignalHandler}
 class NotebookRunnerDocker(
   fileSystem: FileSystem,
   dockerClient: DockerClient,
-  repositoryVolumeMap: RepositoryVolumeMap,
+  metadataRepository: MetadataRepository,
   environmentVars: Map[String, String]
 ) {
   protected val logger = LogManager.getLogger(getClass.getName)
@@ -18,7 +18,7 @@ class NotebookRunnerDocker(
     withNetwork(network) {
       val livyBuilder =
         new LivyDockerProcessBuilder(
-          repositoryVolumeMap,
+          metadataRepository.getLocalVolume(),
           dockerClient,
           Some(network)
         )

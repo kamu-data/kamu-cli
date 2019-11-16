@@ -10,6 +10,10 @@ case class KamuConfig(
   def kamuRoot: Path = {
     repositoryRoot.resolve(".kamu")
   }
+
+  def localVolume: Path = {
+    repositoryRoot.resolve(".kamu.local")
+  }
 }
 
 case class SparkConfig(

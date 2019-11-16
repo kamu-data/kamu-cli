@@ -13,15 +13,14 @@ class Kamu(
   config: KamuConfig,
   fileSystem: FileSystem
 ) {
-  val repositoryVolumeMap = RepositoryVolumeMap(
-    sourcesDir = config.kamuRoot.resolve("sources"),
-    downloadDir = config.kamuRoot.resolve("downloads"),
-    checkpointDir = config.kamuRoot.resolve("checkpoints"),
-    dataDir = config.kamuRoot.resolve("data")
+  val workspaceLayout = WorkspaceLayout(
+    metadataRootDir = config.kamuRoot,
+    datasetsDir = config.kamuRoot.resolve("datasets"),
+    localVolumeDir = config.localVolume
   ).toAbsolute(fileSystem)
 
   val metadataRepository =
-    new MetadataRepository(fileSystem, repositoryVolumeMap)
+    new MetadataRepository(fileSystem, workspaceLayout)
 
   def run(cliArgs: CliArgs): Unit = {
     val command = getCommand(cliArgs)
@@ -47,8 +46,7 @@ class Kamu(
         else
           new InitCommand(
             fileSystem,
-            repositoryVolumeMap,
-            config.repositoryRoot
+            workspaceLayout
           )
       case List(c.list) =>
         new ListCommand(
@@ -81,7 +79,7 @@ class Kamu(
       case List(c.pull) =>
         new PullCommand(
           fileSystem,
-          repositoryVolumeMap,
+          workspaceLayout,
           metadataRepository,
           getSparkRunner(
             c.localSpark(),
@@ -97,7 +95,7 @@ class Kamu(
         )
       case List(c.sql) =>
         new SQLShellCommand(
-          repositoryVolumeMap,
+          metadataRepository,
           getDockerClient(),
           c.sql.url.toOption,
           c.sql.command.toOption,
@@ -107,14 +105,14 @@ class Kamu(
         )
       case List(c.sql, c.sql.server) =>
         new SQLServerCommand(
-          repositoryVolumeMap,
+          metadataRepository,
           getDockerClient(),
           c.sql.server.port.toOption
         )
       case List(c.notebook) =>
         new NotebookCommand(
           fileSystem,
-          repositoryVolumeMap,
+          metadataRepository,
           getDockerClient(),
           c.notebook.env()
         )
@@ -126,12 +124,8 @@ class Kamu(
   }
 
   def ensureRepository(): Unit = {
-    if (!fileSystem.exists(config.kamuRoot))
+    if (!fileSystem.exists(workspaceLayout.metadataRootDir))
       throw new UsageException("Not a kamu repository")
-
-    repositoryVolumeMap.allPaths
-      .filter(!fileSystem.exists(_))
-      .foreach(fileSystem.mkdirs)
   }
 
   def getDockerClient(): DockerClient = {

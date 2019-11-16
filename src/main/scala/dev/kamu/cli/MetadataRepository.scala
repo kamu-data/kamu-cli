@@ -1,10 +1,13 @@
 package dev.kamu.cli
 
-import dev.kamu.core.manifests.{Dataset, DatasetID, Manifest}
+import java.io.PrintWriter
+
+import dev.kamu.core.manifests.{Dataset, DatasetID, Manifest, VolumeLayout}
 import dev.kamu.cli.utility.DependencyGraph
 import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import java.net.URI
+
 import yaml.defaults._
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.utils.fs._
@@ -12,12 +15,16 @@ import org.apache.log4j.LogManager
 
 class MetadataRepository(
   fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap
+  workspaceLayout: WorkspaceLayout
 ) {
   private val logger = LogManager.getLogger(getClass.getName)
 
+  ////////////////////////////////////////////////////////////////////////////
+  // Datasets
+  ////////////////////////////////////////////////////////////////////////////
+
   def getDataset(id: DatasetID): Dataset = {
-    val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
+    val path = getDatasetDefinitionPath(id)
 
     if (!fileSystem.exists(path))
       throw new DoesNotExistsException(id)
@@ -43,7 +50,7 @@ class MetadataRepository(
 
   def getAllDatasetIDs(): Seq[DatasetID] = {
     fileSystem
-      .listStatus(repositoryVolumeMap.sourcesDir)
+      .listStatus(workspaceLayout.datasetsDir)
       .map(_.getPath.getName)
       .map(filename => filename.substring(0, filename.length - ".yaml".length))
       .map(DatasetID)
@@ -51,7 +58,7 @@ class MetadataRepository(
 
   def getAllDatasets(): Seq[Dataset] = {
     val manifestFiles = fileSystem
-      .listStatus(repositoryVolumeMap.sourcesDir)
+      .listStatus(workspaceLayout.datasetsDir)
       .map(_.getPath)
 
     manifestFiles.map(loadDatasetFromFile)
@@ -93,8 +100,7 @@ class MetadataRepository(
   }
 
   def addDataset(ds: Dataset): Unit = {
-    val path =
-      repositoryVolumeMap.sourcesDir.resolve(ds.id + ".yaml")
+    val path = getDatasetDefinitionPath(ds.id)
 
     if (fileSystem.exists(path))
       throw new AlreadyExistsException(ds.id)
@@ -130,7 +136,7 @@ class MetadataRepository(
     if (referencedBy.nonEmpty)
       throw new DanglingReferenceException(referencedBy.map(_.id), id)
 
-    val path = repositoryVolumeMap.sourcesDir.resolve(id.toString + ".yaml")
+    val path = getDatasetDefinitionPath(id)
     if (!fileSystem.exists(path))
       throw new DoesNotExistsException(id)
 
@@ -144,12 +150,44 @@ class MetadataRepository(
     // TODO: Purging a dataset that is used by non-empty derivatives should raise an error
   }
 
-  def getAllDataPaths(id: DatasetID): Seq[Path] = {
+  protected def getAllDataPaths(id: DatasetID): Seq[Path] = {
+    val volume = getVolumeFor(id)
+
     Seq(
-      repositoryVolumeMap.dataDir.resolve(id.toString),
-      repositoryVolumeMap.checkpointDir.resolve(id.toString),
-      repositoryVolumeMap.downloadDir.resolve(id.toString)
+      volume.dataDir.resolve(id.toString),
+      volume.checkpointsDir.resolve(id.toString),
+      getDatasetDefinitionPath(id)
     )
+  }
+
+  protected def getDatasetDefinitionPath(id: DatasetID): Path = {
+    workspaceLayout.datasetsDir.resolve(id.toString + ".yaml")
+  }
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Volumes
+  ////////////////////////////////////////////////////////////////////////////
+
+  def getLocalVolume(): VolumeLayout = {
+    if (!fileSystem.exists(workspaceLayout.localVolumeDir)) {
+      fileSystem.mkdirs(workspaceLayout.localVolumeDir)
+      val outputStream =
+        fileSystem.create(workspaceLayout.localVolumeDir.resolve(".gitignore"))
+      val writer = new PrintWriter(outputStream)
+      writer.write(WorkspaceLayout.LOCAL_VOLUME_GITIGNORE_CONTENT)
+      writer.close()
+    }
+
+    VolumeLayout(
+      datasetsDir = workspaceLayout.localVolumeDir.resolve("datasets"),
+      checkpointsDir = workspaceLayout.localVolumeDir.resolve("checkpoints"),
+      dataDir = workspaceLayout.localVolumeDir.resolve("data")
+    )
+  }
+
+  def getVolumeFor(id: DatasetID): VolumeLayout = {
+    // Only local volumes are supported now
+    getLocalVolume()
   }
 }
 

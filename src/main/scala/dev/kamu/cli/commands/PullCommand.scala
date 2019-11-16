@@ -1,18 +1,25 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.SparkRunner
-import dev.kamu.cli.{MetadataRepository, RepositoryVolumeMap}
-import dev.kamu.cli.utility.DependencyGraph
-import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceFetchUrl}
+import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
+import dev.kamu.core.manifests.{
+  Dataset,
+  DatasetID,
+  ExternalSourceFetchUrl,
+  VolumeLayout
+}
+import dev.kamu.core.ingest.polling
+import dev.kamu.core.transform.streaming
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.utils.fs._
 import yaml.defaults._
 import pureconfig.generic.auto._
 
 class PullCommand(
   fileSystem: FileSystem,
-  repositoryVolumeMap: RepositoryVolumeMap,
+  workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   sparkRunner: SparkRunner,
   ids: Seq[String],
@@ -26,59 +33,86 @@ class PullCommand(
       if (all) metadataRepository.getAllDatasetIDs()
       else ids.map(DatasetID)
     }
-    val plan = metadataRepository.getDatasetsInDependencyOrder(
-      datasetIDs,
-      recursive || all // All implies recursive, which is more efficient
-    )
+
+    val plan = metadataRepository
+      .getDatasetsInDependencyOrder(
+        datasetIDs,
+        recursive || all // All implies recursive, which is more efficient
+      )
 
     logger.debug(s"Pulling datasets in following order:")
     plan.foreach(d => logger.debug(s"  ${d.id.toString}"))
 
-    // Use Spark to pull each item in the plan
-    val numUpdated = plan
-      .map(
-        ds =>
-          ds.kind match {
-            case Dataset.Kind.Root       => pullRoot(ds)
-            case Dataset.Kind.Derivative => pullDerivative(ds)
-          }
-      )
-      .count(updated => updated)
-
+    val numUpdated = pullBatched(plan)
     logger.info(s"Updated $numUpdated datasets")
+  }
+
+  def pullBatched(plan: Seq[Dataset]): Int = {
+    if (plan.nonEmpty) {
+      val kind = plan.head.kind
+      val (batch, rest) = plan.span(_.kind == kind)
+
+      kind match {
+        case Dataset.Kind.Root       => pullRoot(batch)
+        case Dataset.Kind.Derivative => pullDerivative(batch)
+        case Dataset.Kind.Remote =>
+          throw new NotImplementedError("Cannot pull remote datasets")
+      }
+
+      batch.length + pullBatched(rest)
+    } else {
+      0
+    }
   }
 
   ///////////////////////////////////////////////////////////////////////////////////////
   // Root
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullRoot(ds: Dataset): Boolean = {
-    logger.debug(s"Pulling root dataset ${ds.id}")
+  def pullRoot(batch: Seq[Dataset]): Boolean = {
+    val datasets = batch.toVector
 
-    val source = ds.rootPollingSource.get
+    logger.debug(
+      "Pulling root datasets: " + datasets.map(_.id.toString).mkString(", ")
+    )
 
-    val extraMounts = source.fetch match {
-      case furl: ExternalSourceFetchUrl =>
-        furl.url.getScheme match {
-          case "file" | null => List(new Path(furl.url))
-          case _             => List.empty
-        }
-      case _ => List.empty
-    }
+    val extraMounts = datasets
+      .map(_.rootPollingSource.get.fetch)
+      .flatMap({
+        case furl: ExternalSourceFetchUrl =>
+          furl.url.getScheme match {
+            case "file" | null => List(new Path(furl.url))
+            case _             => List.empty
+          } ///
+      })
+
+    val pollConfig = polling.AppConf(
+      tasks = datasets
+        .map(ds => {
+          val volume = metadataRepository.getVolumeFor(ds.id)
+          polling.IngestTask(
+            datasetToIngest = ds,
+            checkpointsPath = volume.checkpointsDir.resolve(ds.id.toString),
+            pollCachePath = volume.checkpointsDir.resolve(ds.id.toString),
+            dataPath = volume.dataDir.resolve(ds.id.toString)
+          )
+        })
+    )
 
     sparkRunner.submit(
-      repo = repositoryVolumeMap,
+      workspaceLayout = workspaceLayout,
       appClass = "dev.kamu.core.ingest.polling.IngestApp",
       extraFiles = Map(
-        "repositoryVolumeMap.yaml" -> (
-          os => yaml.save(repositoryVolumeMap.toVolumeMap.asManifest, os)
-        ),
-        "dataset_0.yaml" -> (os => yaml.save(ds.asManifest, os))
+        "pollConfig.yaml" -> (os => yaml.save(pollConfig.asManifest, os))
       ),
       extraMounts = extraMounts
     )
 
-    logger.debug(s"Successfully pulled root dataset ${ds.id}")
+    logger.debug(
+      s"Successfully pulled root datasets: " + datasets
+        .map(_.id.toString)
+        .mkString(", ")
+    )
 
     true
   }
@@ -87,22 +121,44 @@ class PullCommand(
   // Derivative
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullDerivative(ds: Dataset): Boolean = {
-    logger.debug(s"Running transformations for derivative dataset ${ds.id}")
+  def pullDerivative(batch: Seq[Dataset]): Boolean = {
+    val datasets = batch.toVector
+
+    logger.debug(
+      s"Running transformations for derivative datasets: " + datasets
+        .map(_.id.toString)
+        .mkString(", ")
+    )
+
+    val transformConfig = streaming.AppConfig(
+      tasks = datasets.map(ds => {
+        val volume = metadataRepository.getVolumeFor(ds.id)
+
+        streaming.TransformTaskConfig(
+          datasetToTransform = ds,
+          inputDataPaths = ds.derivativeSource.get.inputs
+            .map(i => i.id.toString -> volume.dataDir.resolve(i.id.toString))
+            .toMap,
+          checkpointsPath = volume.checkpointsDir.resolve(ds.id.toString),
+          outputDataPath = volume.dataDir.resolve(ds.id.toString)
+        )
+      })
+    )
 
     sparkRunner.submit(
-      repo = repositoryVolumeMap,
+      workspaceLayout = workspaceLayout,
       appClass = "dev.kamu.core.transform.streaming.TransformApp",
       extraFiles = Map(
-        "repositoryVolumeMap.yaml" -> (
-          os => yaml.save(repositoryVolumeMap.toVolumeMap.asManifest, os)
-        ),
-        "dataset_0.yaml" -> (os => yaml.save(ds.asManifest, os))
+        "transformConfig.yaml" -> (
+          os => yaml.save(transformConfig.asManifest, os)
+        )
       )
     )
 
     logger.debug(
-      s"Successfully applied transformations for derivative dataset ${ds.id}"
+      s"Successfully applied transformations for derivative datasets: " + datasets
+        .map(_.id.toString)
+        .mkString(", ")
     )
 
     true
