@@ -7,12 +7,12 @@ scala:
 services:
   - docker
 script: make bootstrap && sbt "; assembly ; test"
-#deploy:
-#  edge: true
-#  provider: releases
-#  file: target/scala-2.11/kamu
-#  on:
-#    tags: true
+deploy:
+  edge: true
+  provider: releases
+  file: target/scala-2.11/kamu
+  on:
+    tags: true
 cache:
   directories:
     - $HOME/.sbt
