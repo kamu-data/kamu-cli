@@ -62,12 +62,14 @@ sudo ln -s $PWD/target/scala-2.11/kamu /usr/bin/kamu
 
 ## Release Procedure
 
-TBD
+When ready to make a relase do:
 
-* Tag versions
-* Push tags
-* Build assembly
-* Create release and upload assembly
+```shell
+git tag vX.Y.Z
+git push origin tag vX.Y.Z
+```
+
+Travis CI will pick up the new tag and create a new GitHub release from it.
 
 
 ## Building Hive JDBC
