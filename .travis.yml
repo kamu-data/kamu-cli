@@ -6,10 +6,7 @@ scala:
   - 2.11.12
 services:
   - docker
-script:
-  - make bootstrap
-  - sbt assembly
-  - sbt test
+script: make bootstrap && sbt "; assembly ; test"
 #deploy:
 #  edge: true
 #  provider: releases
