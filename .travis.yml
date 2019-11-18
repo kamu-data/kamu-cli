@@ -7,8 +7,9 @@ scala:
 services:
   - docker
 script:
-  - sbt -Dhive.jdbc.version=upstream assembly
-  - sbt -Dhive.jdbc.version=upstream test
+  - make bootstrap
+  - sbt assembly
+  - sbt test
 #deploy:
 #  edge: true
 #  provider: releases

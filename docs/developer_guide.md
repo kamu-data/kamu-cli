@@ -1,5 +1,11 @@
 # Developer Guide
 
+- [Developer Guide](#developer-guide)
+  - [Building Locally](#building-locally)
+    - [Building](#building)
+  - [Release Procedure](#release-procedure)
+  - [Building Hive JDBC](#building-hive-jdbc)
+
 ## Building Locally
 
 What you'll need:
@@ -23,27 +29,6 @@ sdk install scala 2.11.12
 sdk install spark 2.4.0
 ```
 
-### Preface: Hive JDBC
-
-We use `hive-jdbc` to connect the SQL shell to Spark Thrift Server exposed by Livy. Unfortunately Spark uses a very old version of Hive which has some show-stopper bugs, so we had to fork `hive` project to fix them. In order to build `kamu-cli` you'll first need to build our version of `hive`.
-
-This has to be done only once. After you build it and publish the package in your local maven repository you pretty much won't have to touch `hive` ever again.
-
-> Note: You can skip this step entirely if you're in a hurry by running `sbt` with `-Dhive.jdbc.version=upstream`. You can use this option if your work is not related to SQL shell and JDBC connector.
-
-Instructions:
-
-Clone [kamu-data/hive](https://github.com/kamu-data/hive), build it and install into local maven repo using:
-
-```shell
-git clone https://github.com/kamu-data/hive
-cd hive
-git checkout release-1.2.1-spark2-kamu
-mvn -Phadoop-2 -DskipTests -Psources install
-```
-
-Note: You'll need to have a GPG key configured to sign the artifacts.
-
 ### Building
 
 Clone the repository with submodules:
@@ -55,6 +40,7 @@ Then do:
 
 ```shell
 cd kamu-cli
+make bootstrap
 sbt
 >> assembly
 ```
@@ -82,3 +68,23 @@ TBD
 * Push tags
 * Build assembly
 * Create release and upload assembly
+
+
+## Building Hive JDBC
+
+We use `hive-jdbc` to connect the SQL shell to Spark Thrift Server exposed by Livy. Unfortunately Spark uses a very old version of Hive which has some show-stopper bugs, so we had to fork `hive` project to fix them. In order to build `kamu-cli` you'll first need to build our version of `hive`.
+
+When you run `make bootstrap` you already downloaded a pre-built "fat Jar" of `hive-jdbc`.
+
+Follow these steps in case you need to re-build it:
+
+Clone [kamu-data/hive](https://github.com/kamu-data/hive), build it and install into local maven repo using:
+
+```shell
+git clone https://github.com/kamu-data/hive
+cd hive
+git checkout release-1.2.1-spark2-kamu
+mvn -Phadoop-2 -DskipTests -Psources install
+```
+
+Note: You'll need to have a GPG key configured to sign the artifacts.

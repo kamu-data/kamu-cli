@@ -22,7 +22,6 @@ lazy val kamuCli = project
       deps.scallop,
       deps.hadoopCommon,
       deps.sqlLine,
-      deps.hiveJdbc,
       deps.sparkCore % "provided",
       deps.sparkSql % "provided",
       deps.geoSpark % "provided",
@@ -91,13 +90,6 @@ lazy val versions = new {
   val akkaHttp = "10.1.8"
   val geoSpark = "1.2.0"
   val hadoopCommon = "2.6.5"
-  val hiveJdbc = sys.props
-    .get("hive.jdbc.version")
-    .map {
-      case "upstream" => "1.2.1.spark2"
-      case other      => other
-    }
-    .getOrElse("1.2.1.spark2.kamu.1")
   val pureConfig = "0.11.1"
   val scalajHttp = "2.4.1"
   val spark = "2.4.0"
@@ -126,13 +118,6 @@ lazy val deps =
         .exclude("commons-beanutils", "commons-beanutils-core")
     // SQL Shell
     val sqlLine = "sqlline" % "sqlline" % "1.8.0"
-    // NOTE: Using kamu-specific Hive version with some bugfixes
-    // remove `kamu.X` part if you want a simpler build
-    val hiveJdbc = ("org.spark-project.hive" % "hive-jdbc" % versions.hiveJdbc)
-      .excludeAll(ExclusionRule(organization = "log4j"))
-      .excludeAll(ExclusionRule(organization = "org.apache.geronimo.specs"))
-      .exclude("org.apache.hadoop", "hadoop-yarn-api")
-      .exclude("org.fusesource.leveldbjni", "leveldbjni-all")
     // Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8"
     val sparkHive = "org.apache.spark" %% "spark-hive" % versions.spark
@@ -143,9 +128,7 @@ lazy val deps =
 // Settings
 //////////////////////////////////////////////////////////////////////////////
 
-lazy val commonSettings = Seq(
-  resolvers += Resolver.mavenLocal
-)
+lazy val commonSettings = Seq()
 
 lazy val sparkTestingSettings = Seq(
   libraryDependencies ++= Seq(
@@ -168,6 +151,18 @@ lazy val assemblySettings = Seq(
   assemblyOption in assembly := (assemblyOption in assembly).value
     .copy(prependShellScript = Some(defaultUniversalScript(shebang = true))),
   assemblyMergeStrategy in assembly := {
+    // TODO: begin hive fat jar insanity
+    case PathList("META-INF", "native", xs @ _*)       => MergeStrategy.last
+    case PathList("com", "google", "common", xs @ _*)  => MergeStrategy.last
+    case PathList("javax", xs @ _*)                    => MergeStrategy.last
+    case PathList("jline", xs @ _*)                    => MergeStrategy.last
+    case PathList("org", "apache", "commons", xs @ _*) => MergeStrategy.last
+    case PathList("org", "apache", "http", xs @ _*)    => MergeStrategy.last
+    case PathList("org", "codehaus", xs @ _*)          => MergeStrategy.last
+    case PathList("org", "fusesource", xs @ _*)        => MergeStrategy.last
+    case PathList("org", "slf4j", xs @ _*)             => MergeStrategy.last
+    case PathList("org", "xerial", xs @ _*)            => MergeStrategy.last
+    // end insanity
     case "overview.html" => MergeStrategy.discard
     case "plugin.xml"    => MergeStrategy.discard
     case x =>
