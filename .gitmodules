@@ -1,9 +1,9 @@
 [submodule "kamu-core-ingest-polling"]
 	path = core.ingest.polling
-	url = git@github.com:kamu-data/kamu-core-ingest-polling.git
+	url = https://github.com/kamu-data/kamu-core-ingest-polling
 [submodule "kamu-core-manifests"]
 	path = core.manifests
-	url = git@github.com:kamu-data/kamu-core-manifests.git
+	url = https://github.com/kamu-data/kamu-core-manifests
 [submodule "kamu-core-transform-streaming"]
 	path = core.transform.streaming
-	url = git@github.com:kamu-data/kamu-core-transform-streaming.git
+	url = https://github.com/kamu-data/kamu-core-transform-streaming

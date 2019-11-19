@@ -33,7 +33,7 @@ sdk install spark 2.4.0
 
 Clone the repository with submodules:
 ```shell
-git clone --recurse-submodules https://github.com/kamu-data/kamu-cli
+git clone --recurse-submodules git@github.com:kamu-data/kamu-cli.git
 ```
 
 Then do:
