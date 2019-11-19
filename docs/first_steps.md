@@ -2,7 +2,7 @@
 
 - [First Steps](#first-steps)
   - [Getting data in](#getting-data-in)
-    - [Initializing repository](#initializing-repository)
+    - [Initializing the workspace](#initializing-the-workspace)
     - [Adding a dataset](#adding-a-dataset)
   - [Exploring data](#exploring-data)
     - [SQL shell](#sql-shell)
@@ -42,7 +42,7 @@ $ kamu list
 ### Adding a dataset
 One of the core ideas of `kamu` is to always know exactly where any piece of data came from. So it never simply copies data, but rather links datasets together. But we'll get into the details of that later.
 
-For now let's create such link. We will use a dataset definition from the [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib/blob/master/ca.vancouver.opendata/ca.vancouver.opendata.schools.yaml) which looks like this:
+For now let's create such link. We will use a dataset definition from the [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib/blob/master/ca.vancouver.opendata/schools/ca.vancouver.opendata.schools.yaml) which looks like this:
 
 ```yaml
 apiVersion: 1
@@ -86,7 +86,7 @@ Such dataset in kamu is called **root** dataset and is defined by a sequence of 
 Let's add it to our workspace:
 
 ```bash
-$ kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.vancouver.opendata/ca.vancouver.opendata.schools.yaml
+$ kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.vancouver.opendata/schools/ca.vancouver.opendata.schools.yaml
 
 $ kamu list
 +-------------------------------+------+
