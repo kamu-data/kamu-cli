@@ -1,5 +1,12 @@
 # Installation
 
+- [Installation](#installation)
+  - [General Information](#general-information)
+    - [A Note on Security](#a-note-on-security)
+  - [MacOS X via Homebrew](#macos-x-via-homebrew)
+  - [Installing shell completions](#installing-shell-completions)
+
+
 ## General Information
 
 Dependencies:
@@ -36,4 +43,14 @@ brew tap kamu-data/kamu
 brew install kamu
 # Test
 kamu version
+```
+
+## Installing shell completions
+
+To be able to auto-complete the `kamu` commands please install completion scripts for the shell of your choosing. You can find detailed instructions by running `kamu completion --help`.
+
+For example if you use `bash` you can add following into your `~/.bashrc` file:
+
+```bash
+source <(kamu completion bash)
 ```

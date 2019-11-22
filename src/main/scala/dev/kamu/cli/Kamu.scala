@@ -89,10 +89,6 @@ class Kamu(
           c.pull.all(),
           c.pull.recursive()
         )
-      case List(c.depgraph) =>
-        new DependencyGraphCommand(
-          metadataRepository
-        )
       case List(c.sql) =>
         new SQLShellCommand(
           metadataRepository,
@@ -115,6 +111,15 @@ class Kamu(
           metadataRepository,
           getDockerClient(),
           c.notebook.env()
+        )
+      case List(c.completion) =>
+        new CompletionCommand(
+          c,
+          c.completion.shell.toOption.get
+        )
+      case List(c.depgraph) =>
+        new DependencyGraphCommand(
+          metadataRepository
         )
       case _ =>
         new HelpCommand(

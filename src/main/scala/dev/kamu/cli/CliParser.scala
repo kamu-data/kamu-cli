@@ -241,7 +241,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     )
 
     val manifests = trailArg[List[java.net.URI]](
-      "manifest",
+      "manifests",
       required = false,
       descr = "Manifest URLs/files containing dataset definitions",
       default = Some(List.empty)
@@ -360,6 +360,30 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     )(_envVarConverter)
   }
   addSubcommand(notebook)
+
+  /////////////////////////////////////////////////////////////////////////////
+
+  val completion = new KamuSubcommand("completion") {
+    descr("Outputs auto-completion script")
+    footer(
+      s"""
+      |Installing completions on Linux:
+      |
+      |If bash-completion is not installed on Linux, please install the 'bash-completion' package
+      |via your distribution's package manager. Then load the kamu completion code for bash into
+      |the current shell (you can add following into your ~/.bashrc file):
+      |
+      |    \033[1msource <(kamu completion bash)\033[0m
+      """.stripMargin
+    )
+
+    val shell = trailArg[String](
+      "shell",
+      required = true,
+      descr = "Type of the shell"
+    )
+  }
+  addSubcommand(completion)
 
   /////////////////////////////////////////////////////////////////////////////
 
