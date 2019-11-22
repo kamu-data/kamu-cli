@@ -27,6 +27,7 @@ lazy val kamuCli = project
   )
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
+    aggregate in assembly := false,
     libraryDependencies ++= Seq(
       deps.jcabiLog,
       deps.scallop,
