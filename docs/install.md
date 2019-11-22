@@ -3,7 +3,9 @@
 - [Installation](#installation)
   - [General Information](#general-information)
     - [A Note on Security](#a-note-on-security)
-  - [MacOS X via Homebrew](#macos-x-via-homebrew)
+  - [Supported Platforms](#supported-platforms)
+    - [MacOS X via Homebrew](#macos-x-via-homebrew)
+    - [Other platforms](#other-platforms)
   - [Installing shell completions](#installing-shell-completions)
 
 
@@ -28,7 +30,9 @@ We are taking following measures to gain your trust:
 If there is anything else we can do to make you feel confident in using this tool - let us know!
 
 
-## MacOS X via Homebrew
+## Supported Platforms
+
+### MacOS X via Homebrew
 
 Install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/) and make sure it's running by executing some simple command like `docker ps`.
 
@@ -44,6 +48,11 @@ brew install kamu
 # Test
 kamu version
 ```
+
+### Other platforms
+
+In case you didn't find your OS/distribution in this list you can try to download `kamu` binary from our [releases page](https://github.com/kamu-data/kamu-cli/releases). It should run on most systems capable of running Java and Docker.
+
 
 ## Installing shell completions
 
