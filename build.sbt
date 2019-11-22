@@ -2,7 +2,11 @@ import sbtassembly.AssemblyPlugin.defaultUniversalScript
 
 name := "kamu-cli"
 organization in ThisBuild := "dev.kamu"
-organizationName in ThisBuild := "kamu"
+organizationName in ThisBuild := "kamu.dev"
+startYear in ThisBuild := Some(2018)
+licenses in ThisBuild += ("MPL-2.0", new URL(
+  "https://www.mozilla.org/en-US/MPL/2.0/"
+))
 scalaVersion in ThisBuild := "2.11.12"
 
 //////////////////////////////////////////////////////////////////////////////
@@ -16,6 +20,12 @@ lazy val kamuCli = project
     kamuCoreIngestPolling,
     kamuCoreTransformStreaming
   )
+  .aggregate(
+    kamuCoreManifests,
+    kamuCoreIngestPolling,
+    kamuCoreTransformStreaming
+  )
+  .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
       deps.jcabiLog,
@@ -34,6 +44,7 @@ lazy val kamuCli = project
 
 lazy val kamuCoreManifests = project
   .in(file("core.manifests"))
+  .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
       deps.hadoopCommon,
@@ -46,6 +57,7 @@ lazy val kamuCoreManifests = project
 
 lazy val kamuCoreIngestPolling = project
   .in(file("core.ingest.polling"))
+  .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
     kamuCoreManifests
   )
@@ -65,6 +77,7 @@ lazy val kamuCoreIngestPolling = project
 
 lazy val kamuCoreTransformStreaming = project
   .in(file("core.transform.streaming"))
+  .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
     kamuCoreManifests
   )
