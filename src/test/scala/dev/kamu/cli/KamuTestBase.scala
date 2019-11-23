@@ -11,12 +11,13 @@ package dev.kamu.cli
 import java.sql.Timestamp
 import java.util.UUID
 
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
+import dev.kamu.core.utils.test.KamuDataFrameSuite
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.scalatest._
 
-trait KamuTestBase extends DataFrameSuiteBaseEx { self: Suite =>
+trait KamuTestBase extends KamuDataFrameSuite { self: Suite =>
 
   val fileSystem = FileSystem.get(new Configuration())
 

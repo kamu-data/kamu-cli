@@ -12,7 +12,7 @@ import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager, Logger}

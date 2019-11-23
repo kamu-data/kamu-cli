@@ -11,7 +11,7 @@ package dev.kamu.cli.commands
 import java.io.PrintWriter
 
 import dev.kamu.cli.{UsageException, WorkspaceLayout}
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 

@@ -12,7 +12,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
 import scala.sys.process.{Process, ProcessBuilder}
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 
 case class DockerRunArgs(
   image: String,

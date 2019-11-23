@@ -7,3 +7,6 @@
 [submodule "kamu-core-transform-streaming"]
 	path = core.transform.streaming
 	url = https://github.com/kamu-data/kamu-core-transform-streaming
+[submodule "core.utils"]
+	path = core.utils
+	url = https://github.com/kamu-data/kamu-core-utils.git

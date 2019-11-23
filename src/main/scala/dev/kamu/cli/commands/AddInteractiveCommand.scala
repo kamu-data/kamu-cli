@@ -10,7 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.{MetadataRepository, UsageException}
 import dev.kamu.core.manifests._
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 

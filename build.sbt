@@ -16,11 +16,13 @@ scalaVersion in ThisBuild := "2.11.12"
 lazy val kamuCli = project
   .in(file("."))
   .dependsOn(
+    kamuCoreUtils % "compile->compile;test->test",
     kamuCoreManifests,
     kamuCoreIngestPolling,
     kamuCoreTransformStreaming
   )
   .aggregate(
+    kamuCoreUtils,
     kamuCoreManifests,
     kamuCoreIngestPolling,
     kamuCoreTransformStreaming
@@ -32,26 +34,39 @@ lazy val kamuCli = project
       deps.jcabiLog,
       deps.scallop,
       deps.hadoopCommon,
-      deps.sqlLine,
-      deps.sparkCore % "provided",
-      deps.sparkSql % "provided",
-      deps.geoSpark % "provided",
-      deps.geoSparkSql % "provided"
+      deps.sqlLine
     ),
     commonSettings,
     sparkTestingSettings,
     assemblySettings
   )
 
+lazy val kamuCoreUtils = project
+  .in(file("core.utils"))
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
+    libraryDependencies ++= Seq(
+      deps.hadoopCommon,
+      deps.scalaTest % "test",
+      deps.geoSpark % "test",
+      deps.geoSparkSql % "test",
+      deps.sparkTestingBase % "test",
+      deps.sparkHive % "test"
+    ),
+    commonSettings
+  )
+
 lazy val kamuCoreManifests = project
   .in(file("core.manifests"))
+  .dependsOn(
+    kamuCoreUtils % "compile->compile;test->test"
+  )
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
       deps.hadoopCommon,
       deps.pureConfig,
-      deps.pureConfigYaml,
-      deps.scalaTest % "test"
+      deps.pureConfigYaml
     ),
     commonSettings
   )
@@ -60,12 +75,11 @@ lazy val kamuCoreIngestPolling = project
   .in(file("core.ingest.polling"))
   .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
+    kamuCoreUtils % "compile->compile;test->test",
     kamuCoreManifests
   )
   .settings(
     libraryDependencies ++= Seq(
-      deps.pureConfig,
-      deps.pureConfigYaml,
       deps.scalajHttp,
       deps.sparkCore % "provided",
       deps.sparkSql % "provided",
@@ -80,12 +94,11 @@ lazy val kamuCoreTransformStreaming = project
   .in(file("core.transform.streaming"))
   .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
+    kamuCoreUtils % "compile->compile;test->test",
     kamuCoreManifests
   )
   .settings(
     libraryDependencies ++= Seq(
-      deps.pureConfig,
-      deps.pureConfigYaml,
       deps.sparkCore % "provided",
       deps.sparkSql % "provided",
       deps.geoSpark % "provided",
@@ -145,11 +158,6 @@ lazy val deps =
 lazy val commonSettings = Seq()
 
 lazy val sparkTestingSettings = Seq(
-  libraryDependencies ++= Seq(
-    deps.scalaTest % "test",
-    deps.sparkTestingBase % "test",
-    deps.sparkHive % "test"
-  ),
   fork in Test := true,
   parallelExecution in Test := false,
   javaOptions ++= Seq(

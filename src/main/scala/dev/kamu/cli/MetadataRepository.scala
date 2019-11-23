@@ -18,7 +18,7 @@ import java.net.URI
 
 import yaml.defaults._
 import pureconfig.generic.auto._
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import org.apache.log4j.LogManager
 
 class MetadataRepository(

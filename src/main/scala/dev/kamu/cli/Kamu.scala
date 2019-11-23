@@ -13,7 +13,7 @@ import java.io.PrintStream
 import dev.kamu.cli.commands._
 import dev.kamu.cli.external._
 import dev.kamu.cli.output._
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 

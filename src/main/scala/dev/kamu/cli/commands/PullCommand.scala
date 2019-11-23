@@ -21,7 +21,7 @@ import dev.kamu.core.transform.streaming
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import yaml.defaults._
 import pureconfig.generic.auto._
 

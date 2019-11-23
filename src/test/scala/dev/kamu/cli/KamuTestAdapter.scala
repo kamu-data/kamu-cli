@@ -12,7 +12,7 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 import java.nio.charset.StandardCharsets
 
 import dev.kamu.cli.output._
-import dev.kamu.core.manifests.utils.fs._
+import dev.kamu.core.utils.fs._
 import dev.kamu.core.manifests.{Dataset, DatasetID}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
