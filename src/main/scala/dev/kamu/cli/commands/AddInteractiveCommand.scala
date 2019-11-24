@@ -129,16 +129,16 @@ class AddInteractiveCommand(
               "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
             )(s => s.split(',').map(_.trim).toVector)
 
-            val modificationIndicator = inputOptional(
-              "Modification indicator column",
-              "Name of the column that always has a new value when row data changes. " +
+            val compareColumns = inputOptional(
+              "Columns to compare",
+              "Names of the columns should be compared to determine if a row has changed. " +
                 "For example this can be a modification timestamp, an incremental version, " +
                 "or a data hash. If not specified all data columns will be compared one by one."
-            )(s => s)
+            )(s => s.split(',').map(_.trim).toVector).getOrElse(Vector.empty)
 
             MergeStrategySnapshot(
               primaryKey = primaryKey,
-              modificationIndicator = modificationIndicator
+              compareColumns = compareColumns
             )
 
           case "ledger" =>
