@@ -174,16 +174,17 @@ lazy val assemblySettings = Seq(
     .copy(prependShellScript = Some(defaultUniversalScript(shebang = true))),
   assemblyMergeStrategy in assembly := {
     // TODO: begin hive fat jar insanity
-    case PathList("META-INF", "native", xs @ _*)       => MergeStrategy.last
-    case PathList("com", "google", "common", xs @ _*)  => MergeStrategy.last
-    case PathList("javax", xs @ _*)                    => MergeStrategy.last
-    case PathList("jline", xs @ _*)                    => MergeStrategy.last
-    case PathList("org", "apache", "commons", xs @ _*) => MergeStrategy.last
-    case PathList("org", "apache", "http", xs @ _*)    => MergeStrategy.last
-    case PathList("org", "codehaus", xs @ _*)          => MergeStrategy.last
-    case PathList("org", "fusesource", xs @ _*)        => MergeStrategy.last
-    case PathList("org", "slf4j", xs @ _*)             => MergeStrategy.last
-    case PathList("org", "xerial", xs @ _*)            => MergeStrategy.last
+    case PathList("META-INF", "native", xs @ _*)           => MergeStrategy.last
+    case PathList("com", "google", "common", xs @ _*)      => MergeStrategy.last
+    case PathList("javax", xs @ _*)                        => MergeStrategy.last
+    case PathList("jline", xs @ _*)                        => MergeStrategy.last
+    case PathList("org", "apache", "commons", xs @ _*)     => MergeStrategy.last
+    case PathList("org", "apache", "http", xs @ _*)        => MergeStrategy.last
+    case PathList("org", "codehaus", xs @ _*)              => MergeStrategy.last
+    case PathList("org", "fusesource", "hawtjni", xs @ _*) => MergeStrategy.last
+    case PathList("org", "fusesource", "jansi", xs @ _*)   => MergeStrategy.last
+    case PathList("org", "slf4j", xs @ _*)                 => MergeStrategy.last
+    case PathList("org", "xerial", xs @ _*)                => MergeStrategy.last
     // end insanity
     case "overview.html" => MergeStrategy.discard
     case "plugin.xml"    => MergeStrategy.discard
