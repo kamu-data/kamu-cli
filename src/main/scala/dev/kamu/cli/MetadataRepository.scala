@@ -163,8 +163,7 @@ class MetadataRepository(
 
     Seq(
       volume.dataDir.resolve(id.toString),
-      volume.checkpointsDir.resolve(id.toString),
-      getDatasetDefinitionPath(id)
+      volume.checkpointsDir.resolve(id.toString)
     )
   }
 
