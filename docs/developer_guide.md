@@ -62,10 +62,11 @@ sudo ln -s $PWD/target/scala-2.11/kamu /usr/bin/kamu
 
 ## Release Procedure
 
-1. Tag the latest commit with a version: `git tag vX.Y.Z`
-2. Push the tag and the commit to the origin: `git push origin tag vX.Y.Z`
-3. Travis CI will pick up the new tag and create a new GitHub release from it
-4. Update Homebrew formula in the `homebrew-kamu` repository
+1. Create a CHANGELOG entry for the version you are releasing
+2. Tag the latest commit with a version: `git tag vX.Y.Z`
+3. Push the tag and the commit to the origin: `git push origin tag vX.Y.Z`
+4. Travis CI will pick up the new tag and create a new GitHub release from it
+5. Update Homebrew formula in the `homebrew-kamu` repository
 
 
 ## Building Hive JDBC

@@ -10,12 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{
-  Dataset,
-  DatasetID,
-  ExternalSourceFetchUrl,
-  VolumeLayout
-}
+import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceKind}
 import dev.kamu.core.ingest.polling
 import dev.kamu.core.transform.streaming
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -87,11 +82,13 @@ class PullCommand(
     val extraMounts = datasets
       .map(_.rootPollingSource.get.fetch)
       .flatMap({
-        case furl: ExternalSourceFetchUrl =>
+        case furl: ExternalSourceKind.FetchUrl =>
           furl.url.getScheme match {
             case "file" | null => List(new Path(furl.url))
             case _             => List.empty
-          } ///
+          }
+        case glob: ExternalSourceKind.FetchFilesGlob =>
+          List(glob.path.getParent)
       })
 
     val pollConfig = polling.AppConf(

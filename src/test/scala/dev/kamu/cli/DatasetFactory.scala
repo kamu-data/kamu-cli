@@ -62,13 +62,13 @@ object DatasetFactory {
       id = _id,
       rootPollingSource = Some(
         RootPollingSource(
-          fetch = ExternalSourceFetchUrl(url.getOrElse(newURL(_id))),
-          read = ReaderGeneric(
+          fetch = ExternalSourceKind.FetchUrl(url.getOrElse(newURL(_id))),
+          read = ReaderKind.Generic(
             name = format.getOrElse("csv"),
             options = if (!header) Map.empty else Map("header" -> "true"),
             schema = schema.toVector
           ),
-          merge = mergeStrategy.getOrElse(MergeStrategyAppend())
+          merge = mergeStrategy.getOrElse(MergeStrategyKind.Append())
         )
       )
     ).postLoad()

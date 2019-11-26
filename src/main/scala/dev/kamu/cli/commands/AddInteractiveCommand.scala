@@ -87,7 +87,7 @@ class AddInteractiveCommand(
             None
           }
 
-          prepareSteps = prepareSteps :+ PrepStepDecompress(
+          prepareSteps = prepareSteps :+ PrepStepKind.Decompress(
             format = compression,
             subPathRegex = subPathRegex
           )
@@ -136,7 +136,7 @@ class AddInteractiveCommand(
                 "or a data hash. If not specified all data columns will be compared one by one."
             )(s => s.split(',').map(_.trim).toVector).getOrElse(Vector.empty)
 
-            MergeStrategySnapshot(
+            MergeStrategyKind.Snapshot(
               primaryKey = primaryKey,
               compareColumns = compareColumns
             )
@@ -148,23 +148,22 @@ class AddInteractiveCommand(
               "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
             )(s => s.split(',').map(_.trim).toVector)
 
-            MergeStrategyLedger(primaryKey = primaryKey)
+            MergeStrategyKind.Ledger(primaryKey = primaryKey)
           case "append" =>
-            MergeStrategyAppend()
+            MergeStrategyKind.Append()
         }
 
         Dataset(
           id = id,
-          rootPollingSource =
-            Some(
-              RootPollingSource(
-                fetch = ExternalSourceFetchUrl(url = url),
-                prepare = prepareSteps,
-                read =
-                  ReaderGeneric(name = format, options = readerOptions.toMap),
-                merge = mergeStrategy
-              )
+          rootPollingSource = Some(
+            RootPollingSource(
+              fetch = ExternalSourceKind.FetchUrl(url = url),
+              prepare = prepareSteps,
+              read = ReaderKind
+                .Generic(name = format, options = readerOptions.toMap),
+              merge = mergeStrategy
             )
+          )
         )
       case "derivative" =>
         Dataset(
