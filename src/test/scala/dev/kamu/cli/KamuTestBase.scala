@@ -8,7 +8,6 @@
 
 package dev.kamu.cli
 
-import java.sql.Timestamp
 import java.util.UUID
 
 import dev.kamu.core.utils.fs._
@@ -51,7 +50,5 @@ trait KamuTestBase extends KamuDataFrameSuite { self: Suite =>
       func(kamu)
     }
   }
-
-  def ts(milis: Long) = new Timestamp(milis)
 
 }

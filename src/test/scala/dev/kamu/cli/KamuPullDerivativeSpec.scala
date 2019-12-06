@@ -12,21 +12,19 @@ import dev.kamu.cli.output.OutputFormat
 import org.scalatest._
 
 class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
-
   import spark.implicits._
-  protected override val enableHiveSupport = false
 
   "kamu pull" should "produce derivative datasets" in {
     withEmptyWorkspace { kamu =>
       val input = sc
         .parallelize(
           Seq(
-            ("Salt Lake City", "312"),
-            ("Seattle", "321"),
-            ("Vancouver", "123")
+            (ts(2000, 1, 1), "Salt Lake City", 312),
+            (ts(2000, 1, 1), "Seattle", 321),
+            (ts(2000, 1, 1), "Vancouver", 123)
           )
         )
-        .toDF("city", "population")
+        .toDF("eventTime", "city", "population")
 
       val inputPath = kamu.writeData(input, OutputFormat.CSV)
 
@@ -34,7 +32,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
         url = Some(inputPath.toUri),
         format = Some("csv"),
         header = true,
-        schema = Seq("city STRING", "population INTEGER")
+        schema = Seq("eventTime TIMESTAMP", "city STRING", "population INTEGER")
       )
 
       kamu.addDataset(root)
@@ -43,7 +41,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val deriv = DatasetFactory.newDerivativeDataset(
         source = root.id,
         sql = Some(
-          s"SELECT systemTime, city, (population + 1) as population FROM `${root.id}`"
+          s"SELECT systemTime, eventTime, city, (population + 1) as population FROM `${root.id}`"
         )
       )
 
@@ -57,12 +55,12 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val expected = sc
         .parallelize(
           Seq(
-            (ts(1), "Salt Lake City", 313),
-            (ts(1), "Seattle", 322),
-            (ts(1), "Vancouver", 124)
+            (ts(0), ts(2000, 1, 1), "Salt Lake City", 313),
+            (ts(0), ts(2000, 1, 1), "Seattle", 322),
+            (ts(0), ts(2000, 1, 1), "Vancouver", 124)
           )
         )
-        .toDF("systemTime", "city", "population")
+        .toDF("systemTime", "eventTime", "city", "population")
 
       assertSchemasEqual(expected, actual, ignoreNullable = true)
 

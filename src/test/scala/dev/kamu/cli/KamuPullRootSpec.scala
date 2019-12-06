@@ -12,27 +12,26 @@ import dev.kamu.cli.output.OutputFormat
 import org.scalatest._
 
 class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
-
   import spark.implicits._
-  protected override val enableHiveSupport = false
 
   "kamu pull" should "be able to import simple csv" in {
     withEmptyWorkspace { kamu =>
       val input = sc
         .parallelize(
           Seq(
-            ("Vancouver", "123"),
-            ("Seattle", "321")
+            (ts(2000, 1, 1), "Vancouver", 123),
+            (ts(2000, 1, 1), "Seattle", 321)
           )
         )
-        .toDF("city", "population")
+        .toDF("eventTime", "city", "population")
 
       val inputPath = kamu.writeData(input, OutputFormat.CSV)
 
       val ds = DatasetFactory.newRootDataset(
         url = Some(inputPath.toUri),
         format = Some("csv"),
-        header = true
+        header = true,
+        schema = Array("eventTime TIMESTAMP", "city STRING", "population INT")
       )
 
       kamu.addDataset(ds)
@@ -43,18 +42,19 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
       val expected = sc
         .parallelize(
           Seq(
-            (ts(0), "Vancouver", "123"),
-            (ts(0), "Seattle", "321")
+            (ts(0), ts(2000, 1, 1), "Vancouver", 123),
+            (ts(0), ts(2000, 1, 1), "Seattle", 321)
           )
         )
-        .toDF("systemTime", "city", "population")
+        .toDF("systemTime", "eventTime", "city", "population")
 
-      assert(expected.schema, actual.schema)
+      assertSchemasEqual(expected, actual, true)
 
       // Compare ignoring the systemTime column
       assertDataFrameEquals(
-        expected.drop("systemTime"),
-        actual.drop("systemTime")
+        expected.drop("systemTime", "eventTime"),
+        actual.drop("systemTime", "eventTime"),
+        true
       )
     }
   }
