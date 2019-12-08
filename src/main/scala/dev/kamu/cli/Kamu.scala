@@ -71,7 +71,8 @@ class Kamu(
           new AddCommand(
             fileSystem,
             metadataRepository,
-            c.add.manifests()
+            c.add.manifests(),
+            c.add.replace()
           )
       case List(c.purge) =>
         new PurgeCommand(

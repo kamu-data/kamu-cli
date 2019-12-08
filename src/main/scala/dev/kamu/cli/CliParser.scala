@@ -248,6 +248,12 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Start dataset creation wizard"
     )
 
+    val replace = opt[Boolean](
+      "replace",
+      descr =
+        "Delete and replace the datasets that already exist (data will be lost)"
+    )
+
     val manifests = trailArg[List[java.net.URI]](
       "manifests",
       required = false,

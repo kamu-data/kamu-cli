@@ -14,13 +14,15 @@ import dev.kamu.cli.{
   MissingReferenceException,
   SchemaNotSupportedException
 }
+import dev.kamu.core.manifests.Dataset
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
 class AddCommand(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
-  manifests: Seq[java.net.URI]
+  manifests: Seq[java.net.URI],
+  replace: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
@@ -41,21 +43,31 @@ class AddCommand(
       }
     }
 
+    @scala.annotation.tailrec
+    def addDataset(ds: Dataset): Boolean = {
+      try {
+        metadataRepository.addDataset(ds)
+        true
+      } catch {
+        case e: AlreadyExistsException =>
+          if (replace) {
+            logger.warn(e.getMessage + " - replacing")
+            metadataRepository.deleteDataset(ds.id)
+            addDataset(ds)
+          } else {
+            logger.warn(e.getMessage + " - skipping")
+            false
+          }
+        case e: MissingReferenceException =>
+          logger.warn(e.getMessage + " - skipping")
+          false
+      }
+    }
+
     val numAdded = sources
-      .map(ds => {
-        try {
-          metadataRepository.addDataset(ds)
-          true
-        } catch {
-          case e: AlreadyExistsException =>
-            logger.warn(e.getMessage + " - skipping")
-            false
-          case e: MissingReferenceException =>
-            logger.warn(e.getMessage + " - skipping")
-            false
-        }
-      })
+      .map(addDataset)
       .count(added => added)
+
     logger.info(s"Added $numAdded datasets")
   }
 }
