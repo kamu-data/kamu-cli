@@ -4,10 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.5.0] - 2019-12-09
 ### Added
 - New `fetchFilesGlob` data source that can load multiple data files at once
 - Event time is now a core part of the datasets
+### Fixed
+- Snapshot merge strategy de-duplicates input rows now
 
 ## [0.4.0] - 2019-11-24
 ### Added
