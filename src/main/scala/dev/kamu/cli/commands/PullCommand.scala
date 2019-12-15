@@ -57,7 +57,9 @@ class PullCommand(
 
       kind match {
         case Dataset.Kind.Root       => pullRoot(batch)
-        case Dataset.Kind.Derivative => pullDerivative(batch)
+        case Dataset.Kind.Derivative =>
+          // TODO: Streaming transform currently doesn't handle dependencies
+          batch.foreach(ds => pullDerivative(Seq(ds)))
         case Dataset.Kind.Remote =>
           throw new NotImplementedError("Cannot pull remote datasets")
       }
