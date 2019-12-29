@@ -23,7 +23,7 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
             (ts(2000, 1, 1), "Seattle", 321)
           )
         )
-        .toDF("eventTime", "city", "population")
+        .toDF("event_time", "city", "population")
 
       val inputPath = kamu.writeData(input, OutputFormat.CSV)
 
@@ -31,7 +31,7 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
         url = Some(inputPath.toUri),
         format = Some("csv"),
         header = true,
-        schema = Array("eventTime TIMESTAMP", "city STRING", "population INT")
+        schema = Array("event_time TIMESTAMP", "city STRING", "population INT")
       )
 
       kamu.addDataset(ds)
@@ -46,14 +46,14 @@ class KamuPullRootSpec extends FlatSpec with Matchers with KamuTestBase {
             (ts(0), ts(2000, 1, 1), "Seattle", 321)
           )
         )
-        .toDF("systemTime", "eventTime", "city", "population")
+        .toDF("system_time", "event_time", "city", "population")
 
       assertSchemasEqual(expected, actual, true)
 
-      // Compare ignoring the systemTime column
+      // Compare ignoring the system_time column
       assertDataFrameEquals(
-        expected.drop("systemTime", "eventTime"),
-        actual.drop("systemTime", "eventTime"),
+        expected.drop("system_time", "event_time"),
+        actual.drop("system_time", "event_time"),
         true
       )
     }

@@ -155,7 +155,7 @@ No rows selected (0.092 seconds)
 +-----------------+-----------+---------+
 |    col_name     | data_type | comment |
 +-----------------+-----------+---------+
-| systemTime      | timestamp |         |
+| system_time     | timestamp |         |
 | address         | string    |         |
 | school_category | string    |         |
 | school_name     | string    |         |

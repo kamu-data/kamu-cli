@@ -24,7 +24,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
             (ts(2000, 1, 1), "Vancouver", 123)
           )
         )
-        .toDF("eventTime", "city", "population")
+        .toDF("event_time", "city", "population")
 
       val inputPath = kamu.writeData(input, OutputFormat.CSV)
 
@@ -32,16 +32,17 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
         url = Some(inputPath.toUri),
         format = Some("csv"),
         header = true,
-        schema = Seq("eventTime TIMESTAMP", "city STRING", "population INTEGER")
+        schema =
+          Seq("event_time TIMESTAMP", "city STRING", "population INTEGER")
       )
 
       kamu.addDataset(root)
 
-      // TODO: systemTime should not be propagated but assigned during transform
+      // TODO: system_time should not be propagated but assigned during transform
       val deriv = DatasetFactory.newDerivativeDataset(
         source = root.id,
         sql = Some(
-          s"SELECT systemTime, eventTime, city, (population + 1) as population FROM `${root.id}`"
+          s"SELECT system_time, event_time, city, (population + 1) as population FROM `${root.id}`"
         )
       )
 
@@ -50,7 +51,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
 
       val actual = kamu
         .readDataset(deriv.id)
-        .orderBy("systemTime", "city")
+        .orderBy("system_time", "city")
 
       val expected = sc
         .parallelize(
@@ -60,14 +61,14 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
             (ts(0), ts(2000, 1, 1), "Vancouver", 124)
           )
         )
-        .toDF("systemTime", "eventTime", "city", "population")
+        .toDF("system_time", "event_time", "city", "population")
 
       assertSchemasEqual(expected, actual, ignoreNullable = true)
 
-      // Compare ignoring the systemTime column
+      // Compare ignoring the system_time column
       assertDataFrameEquals(
-        expected.drop("systemTime"),
-        actual.drop("systemTime"),
+        expected.drop("system_time"),
+        actual.drop("system_time"),
         ignoreNullable = true
       )
     }
