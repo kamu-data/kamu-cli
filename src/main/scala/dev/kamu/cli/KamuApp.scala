@@ -21,6 +21,7 @@ object KamuApp extends App {
   val config = KamuConfig()
 
   val fileSystem = FileSystem.get(new Configuration())
+  FileSystem.enableSymlinks()
   fileSystem.setWriteChecksum(false)
   fileSystem.setVerifyChecksum(false)
 

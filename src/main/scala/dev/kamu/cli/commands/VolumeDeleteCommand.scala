@@ -9,28 +9,21 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.{DoesNotExistException, MetadataRepository}
-import dev.kamu.core.manifests.DatasetID
+import dev.kamu.core.manifests.VolumeID
 import org.apache.log4j.LogManager
 
-class PurgeCommand(
+class VolumeDeleteCommand(
   metadataRepository: MetadataRepository,
-  ids: Seq[String],
-  all: Boolean
+  ids: Seq[String]
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  override def run(): Unit = {
-    val toPurge =
-      if (all)
-        metadataRepository.getAllDatasetIDs()
-      else
-        ids.map(DatasetID)
-
-    val numPurged = toPurge
+  def run(): Unit = {
+    val numDeleted = ids
+      .map(VolumeID)
       .map(id => {
         try {
-          logger.info(s"Purging dataset: ${id.toString}")
-          metadataRepository.purgeDataset(id)
+          metadataRepository.deleteVolume(id)
           1
         } catch {
           case e: DoesNotExistException =>
@@ -38,8 +31,7 @@ class PurgeCommand(
             0
         }
       })
-      .sum
 
-    logger.info(s"Purged $numPurged datasets")
+    logger.info(s"Deleted $numDeleted volume(s)")
   }
 }

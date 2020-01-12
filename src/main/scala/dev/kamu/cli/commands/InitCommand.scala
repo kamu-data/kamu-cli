@@ -28,6 +28,7 @@ class InitCommand(
       throw new UsageException("Already a kamu workspace")
 
     fileSystem.mkdirs(workspaceLayout.datasetsDir)
+    fileSystem.mkdirs(workspaceLayout.volumesDir)
 
     val outputStream =
       fileSystem.create(workspaceLayout.metadataRootDir.resolve(".gitignore"))

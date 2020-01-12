@@ -37,7 +37,7 @@ class AddInteractiveCommand(
       logger.info("Added dataset")
     } else {
       val path = new Path("./" + dataset.id + ".yaml")
-      metadataRepository.saveDataset(
+      metadataRepository.exportDataset(
         dataset,
         path
       )

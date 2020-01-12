@@ -8,15 +8,20 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.SparkRunner
-import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceKind}
+import dev.kamu.cli.external.{SparkRunner, VolumeOperatorFactory}
+import dev.kamu.cli.{
+  DoesNotExistException,
+  MetadataRepository,
+  UsageException,
+  WorkspaceLayout
+}
 import dev.kamu.core.ingest.polling
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceKind}
 import dev.kamu.core.transform.streaming
+import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.utils.fs._
 import yaml.defaults._
 import pureconfig.generic.auto._
 
@@ -24,6 +29,7 @@ class PullCommand(
   fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
+  volumeOperatorFactory: VolumeOperatorFactory,
   sparkRunner: SparkRunner,
   ids: Seq[String],
   all: Boolean,
@@ -37,11 +43,16 @@ class PullCommand(
       else ids.map(DatasetID)
     }
 
-    val plan = metadataRepository
-      .getDatasetsInDependencyOrder(
-        datasetIDs,
-        recursive || all // All implies recursive, which is more efficient
-      )
+    val plan = try {
+      metadataRepository
+        .getDatasetsInDependencyOrder(
+          datasetIDs,
+          recursive || all // All implies recursive, which is more efficient
+        )
+    } catch {
+      case e: DoesNotExistException =>
+        throw new UsageException(e.getMessage)
+    }
 
     logger.debug(s"Pulling datasets in following order:")
     plan.foreach(d => logger.debug(s"  ${d.id.toString}"))
@@ -56,12 +67,13 @@ class PullCommand(
       val (batch, rest) = plan.span(_.kind == kind)
 
       kind match {
-        case Dataset.Kind.Root       => pullRoot(batch)
+        case Dataset.Kind.Root =>
+          pullRoot(batch)
         case Dataset.Kind.Derivative =>
           // TODO: Streaming transform currently doesn't handle dependencies
           batch.foreach(ds => pullDerivative(Seq(ds)))
         case Dataset.Kind.Remote =>
-          throw new NotImplementedError("Cannot pull remote datasets")
+          pullRemote(batch)
       }
 
       batch.length + pullBatched(rest)
@@ -96,12 +108,13 @@ class PullCommand(
     val pollConfig = polling.AppConf(
       tasks = datasets
         .map(ds => {
-          val volume = metadataRepository.getVolumeFor(ds.id)
+          val volumeLayout = metadataRepository.getLocalVolume()
           polling.IngestTask(
             datasetToIngest = ds,
-            checkpointsPath = volume.checkpointsDir.resolve(ds.id.toString),
-            pollCachePath = volume.checkpointsDir.resolve(ds.id.toString),
-            dataPath = volume.dataDir.resolve(ds.id.toString)
+            checkpointsPath =
+              volumeLayout.checkpointsDir.resolve(ds.id.toString),
+            pollCachePath = volumeLayout.cacheDir.resolve(ds.id.toString),
+            dataPath = volumeLayout.dataDir.resolve(ds.id.toString)
           )
         })
     )
@@ -139,15 +152,17 @@ class PullCommand(
 
     val transformConfig = streaming.AppConfig(
       tasks = datasets.map(ds => {
-        val volume = metadataRepository.getVolumeFor(ds.id)
+        val volumeLayout = metadataRepository.getLocalVolume()
 
         streaming.TransformTaskConfig(
           datasetToTransform = ds,
           inputDataPaths = ds.derivativeSource.get.inputs
-            .map(i => i.id.toString -> volume.dataDir.resolve(i.id.toString))
+            .map(
+              i => i.id.toString -> volumeLayout.dataDir.resolve(i.id.toString)
+            )
             .toMap,
-          checkpointsPath = volume.checkpointsDir.resolve(ds.id.toString),
-          outputDataPath = volume.dataDir.resolve(ds.id.toString)
+          checkpointsPath = volumeLayout.checkpointsDir.resolve(ds.id.toString),
+          outputDataPath = volumeLayout.dataDir.resolve(ds.id.toString)
         )
       })
     )
@@ -168,6 +183,22 @@ class PullCommand(
         .mkString(", ")
     )
 
+    true
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////
+  // Remote
+  ///////////////////////////////////////////////////////////////////////////////////////
+
+  def pullRemote(batch: Seq[Dataset]): Boolean = {
+    for (ds <- batch) {
+      val sourceVolume = metadataRepository
+        .getVolume(ds.remoteSource.get.volumeID)
+
+      val volumeOperator = volumeOperatorFactory.buildFor(sourceVolume)
+
+      volumeOperator.pull(Seq(ds))
+    }
     true
   }
 }

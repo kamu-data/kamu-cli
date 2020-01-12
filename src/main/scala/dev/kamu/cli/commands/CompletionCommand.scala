@@ -76,12 +76,18 @@ class CompletionCommand(
 
     val flags = builder.opts.filter(!_.isPositional).map("--" + _.name)
 
-    val positional = builder.opts.filter(_.isPositional).map(_.name) match {
-      case Seq("ids") =>
-        Seq("options+=`ls .kamu/datasets | sed -e 's/\\.[^.]*$//'`")
-      case _ =>
-        Seq.empty
-    }
+    val positional = builder.opts
+      .filter(_.isPositional)
+      .flatMap(opt => {
+        opt.name match {
+          case "ids" if opt.descr.contains("dataset") =>
+            Seq("options+=`ls .kamu/datasets | sed -e 's/\\.[^.]*$//'`")
+          case "ids" if opt.descr.contains("volume") =>
+            Seq("options+=`ls .kamu/volumes | sed -e 's/\\.[^.]*$//'`")
+          case _ =>
+            Seq.empty
+        }
+      })
 
     val finale = Seq(
       "if [[ $cur == -* ]]; then",

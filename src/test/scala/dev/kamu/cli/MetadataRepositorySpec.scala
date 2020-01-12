@@ -77,7 +77,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         new Path(kamu.config.workspaceRoot, "server")
       fileSystem.mkdirs(serverDir)
       val path: Path = new Path(serverDir, "test-dataset.yaml")
-      kamu.metadataRepository.saveDataset(expected, path)
+      kamu.metadataRepository.exportDataset(expected, path)
 
       // start up the server and host the directory
       val serverPort = 80 // httpd:2.4 default port
@@ -123,11 +123,12 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
           // works for names with colons and spaces
           s"${kamu.config.workspaceRoot.toString}${SEPARATOR}test: add from file"
         )
-      val path: Path = new Path(testDir, "test-dataset.yaml")
+
       fileSystem.mkdirs(testDir)
-      kamu.metadataRepository.saveDataset(expected, path)
-      val actual =
-        kamu.metadataRepository.loadDatasetFromFile(path)
+      val datasetPath: Path = new Path(testDir, "test-dataset.yaml")
+      kamu.metadataRepository.exportDataset(expected, datasetPath)
+
+      val actual = kamu.metadataRepository.loadDatasetFromURI(datasetPath.toUri)
 
       actual shouldEqual expected
     }

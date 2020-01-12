@@ -8,30 +8,30 @@
 
 package dev.kamu.cli.commands
 
+import dev.kamu.cli.external.VolumeOperatorFactory
 import dev.kamu.cli.{
   AlreadyExistsException,
   MetadataRepository,
   MissingReferenceException,
   SchemaNotSupportedException
 }
-import dev.kamu.core.manifests.Dataset
-import org.apache.hadoop.fs.FileSystem
+import dev.kamu.core.manifests.Volume
 import org.apache.log4j.LogManager
 
-class AddCommand(
-  fileSystem: FileSystem,
+class VolumeAddCommand(
   metadataRepository: MetadataRepository,
+  volumeOperatorFactory: VolumeOperatorFactory,
   manifests: Seq[java.net.URI],
   replace: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val sources = {
+    val volumes = {
       try {
         manifests.map(manifestURI => {
-          logger.debug(s"Loading dataset from: $manifestURI")
-          metadataRepository.loadDatasetFromURI(manifestURI)
+          logger.debug(s"Loading volume from: $manifestURI")
+          metadataRepository.loadVolumeFromURI(manifestURI)
         })
       } catch {
         case e: java.io.FileNotFoundException =>
@@ -44,16 +44,20 @@ class AddCommand(
     }
 
     @scala.annotation.tailrec
-    def addDataset(ds: Dataset): Boolean = {
+    def addVolume(volume: Volume): Boolean = {
       try {
-        metadataRepository.addDataset(ds)
+        volumeOperatorFactory.ensureSupported(volume)
+        metadataRepository.addVolume(volume)
         true
       } catch {
+        case e: NotImplementedError =>
+          logger.warn(e.getMessage + " - skipping")
+          false
         case e: AlreadyExistsException =>
           if (replace) {
             logger.warn(e.getMessage + " - replacing")
-            metadataRepository.deleteDataset(ds.id)
-            addDataset(ds)
+            metadataRepository.deleteVolume(volume.id)
+            addVolume(volume)
           } else {
             logger.warn(e.getMessage + " - skipping")
             false
@@ -64,10 +68,10 @@ class AddCommand(
       }
     }
 
-    val numAdded = sources
-      .map(addDataset)
+    val numAdded = volumes
+      .map(addVolume)
       .count(added => added)
 
-    logger.info(s"Added $numAdded dataset(s)")
+    logger.info(s"Added $numAdded volume(s)")
   }
 }

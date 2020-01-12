@@ -24,11 +24,15 @@ class Kamu(
   val workspaceLayout = WorkspaceLayout(
     metadataRootDir = config.kamuRoot,
     datasetsDir = config.kamuRoot.resolve("datasets"),
+    volumesDir = config.kamuRoot.resolve("volumes"),
     localVolumeDir = config.localVolume
   ).toAbsolute(fileSystem)
 
   val metadataRepository =
     new MetadataRepository(fileSystem, workspaceLayout)
+
+  val volumeOperatorFactory =
+    new VolumeOperatorFactory(fileSystem, workspaceLayout, metadataRepository)
 
   def run(cliArgs: CliArgs): Unit = {
     val command = getCommand(cliArgs)
@@ -90,6 +94,7 @@ class Kamu(
           fileSystem,
           workspaceLayout,
           metadataRepository,
+          volumeOperatorFactory,
           getSparkRunner(
             c.localSpark(),
             if (c.debug()) Level.INFO else c.sparkLogLevel()
@@ -97,6 +102,34 @@ class Kamu(
           c.pull.ids(),
           c.pull.all(),
           c.pull.recursive()
+        )
+      case List(c.push) =>
+        new PushCommand(
+          fileSystem,
+          workspaceLayout,
+          metadataRepository,
+          volumeOperatorFactory,
+          c.push.volume(),
+          c.push.ids(),
+          c.push.all(),
+          c.push.recursive()
+        )
+      case List(c.volume, c.volume.list) =>
+        new VolumeListCommand(
+          metadataRepository,
+          getOutputFormatter(c.volume.list.getOutputFormat)
+        )
+      case List(c.volume, c.volume.add) =>
+        new VolumeAddCommand(
+          metadataRepository,
+          volumeOperatorFactory,
+          c.volume.add.manifests(),
+          c.volume.add.replace()
+        )
+      case List(c.volume, c.volume.delete) =>
+        new VolumeDeleteCommand(
+          metadataRepository,
+          c.volume.delete.ids()
         )
       case List(c.sql) =>
         new SQLShellCommand(

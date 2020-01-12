@@ -16,6 +16,7 @@ What you'll need:
 * Sbt
 * Maven
 * Spark (optional)
+* AWS account and configured AWS CLI (optional, needed for S3 volumes)
 
 Note: Use [SdkMan!](https://sdkman.io/) to install these dependencies:
 

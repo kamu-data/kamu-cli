@@ -10,7 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.{
   DanglingReferenceException,
-  DoesNotExistsException,
+  DoesNotExistException,
   MetadataRepository
 }
 import dev.kamu.core.manifests.DatasetID
@@ -30,7 +30,7 @@ class DeleteCommand(
           metadataRepository.deleteDataset(id)
           1
         } catch {
-          case e: DoesNotExistsException =>
+          case e: DoesNotExistException =>
             logger.error(e.getMessage)
             0
           case e: DanglingReferenceException =>

@@ -322,6 +322,76 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
+  val push = new KamuSubcommand("push") {
+    descr("Push the data to a remote volume")
+
+    val volume = opt[String](
+      "volume",
+      descr = "ID of the volume to push data to",
+      required = true
+    )
+
+    val all = opt[Boolean](
+      "all",
+      descr = "Push all datasets"
+    )
+
+    val recursive = opt[Boolean](
+      "recursive",
+      descr = "Push datasets and their dependencies"
+    )
+
+    val ids = trailArg[List[String]](
+      "ids",
+      required = false,
+      descr = "IDs of the datasets to push",
+      default = Some(List.empty)
+    )
+  }
+  addSubcommand(push)
+
+  /////////////////////////////////////////////////////////////////////////////
+
+  val volume = new KamuSubcommand("volume") {
+    descr("List or manipulate the volumes")
+
+    val list = new TabularOutputSubcommand("list") {
+      banner("List existing volumes")
+    }
+    addSubcommand(list)
+
+    val add = new Subcommand("add") {
+      banner("Add new volumes")
+
+      val manifests = trailArg[List[java.net.URI]](
+        "manifests",
+        required = false,
+        descr = "Manifest URLs/files containing volume definitions",
+        default = Some(List.empty)
+      )
+
+      val replace = opt[Boolean](
+        "replace",
+        descr = "Delete and replace the volumes that already exist"
+      )
+    }
+    addSubcommand(add)
+
+    val delete = new Subcommand("delete") {
+      banner("Delete existing volume")
+
+      val ids = trailArg[List[String]](
+        "ids",
+        "IDs of the volumes to delete",
+        default = Some(List.empty)
+      )
+    }
+    addSubcommand(delete)
+  }
+  addSubcommand(volume)
+
+  /////////////////////////////////////////////////////////////////////////////
+
   val sql = new TabularOutputSubcommand("sql") {
     descr("Executes an SQL query or drops you into an SQL shell")
 

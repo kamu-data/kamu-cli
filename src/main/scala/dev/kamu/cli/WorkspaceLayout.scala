@@ -17,6 +17,8 @@ case class WorkspaceLayout(
   metadataRootDir: Path,
   /** Contains dataset definitions */
   datasetsDir: Path,
+  /** Contains volume definitions */
+  volumesDir: Path,
   /** Root directory of a local storage volume */
   localVolumeDir: Path
 ) {
@@ -25,6 +27,7 @@ case class WorkspaceLayout(
     copy(
       metadataRootDir = fs.toAbsolute(metadataRootDir),
       datasetsDir = fs.toAbsolute(datasetsDir),
+      volumesDir = fs.toAbsolute(volumesDir),
       localVolumeDir = fs.toAbsolute(localVolumeDir)
     )
   }
@@ -34,7 +37,6 @@ case class WorkspaceLayout(
 object WorkspaceLayout {
   val GITIGNORE_CONTENT: String =
     """
-      |/poll
       |""".stripMargin
 
   val LOCAL_VOLUME_GITIGNORE_CONTENT: String =
