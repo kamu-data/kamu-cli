@@ -9,7 +9,7 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.MetadataRepository
-import dev.kamu.core.manifests.{Dataset, DatasetID}
+import dev.kamu.core.manifests.{DatasetID, DatasetKind}
 import org.apache.log4j.LogManager
 
 class DependencyGraphCommand(
@@ -22,21 +22,23 @@ class DependencyGraphCommand(
 
     def quote(id: DatasetID) = "\"" + id.toString + "\""
 
+    // TODO: Not include dependencies of remote datasets?
     val datasets = metadataRepository
       .getAllDatasets()
+      .map(metadataRepository.getDatasetSummary)
       .sortBy(_.id.toString)
 
     datasets.foreach(
       ds =>
-        ds.dependsOn
+        ds.datasetDependencies
           .foreach(d => println(s"${quote(ds.id)}  -> ${quote(d)};"))
     )
 
     datasets.foreach(
       ds =>
-        if (ds.kind == Dataset.Kind.Root)
+        if (ds.kind == DatasetKind.Root)
           println(s"${quote(ds.id)} [style=filled, fillcolor=darkolivegreen1];")
-        else if (ds.kind == Dataset.Kind.Derivative)
+        else if (ds.kind == DatasetKind.Derivative)
           println(s"${quote(ds.id)} [style=filled, fillcolor=lightblue];")
     )
 

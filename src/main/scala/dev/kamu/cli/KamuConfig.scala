@@ -8,19 +8,41 @@
 
 package dev.kamu.cli
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.utils.fs._
 
 case class KamuConfig(
-  workspaceRoot: Path = new Path("."),
+  workspaceRoot: Path,
   spark: SparkConfig = SparkConfig()
 ) {
   def kamuRoot: Path = {
-    workspaceRoot.resolve(".kamu")
+    workspaceRoot.resolve(KamuConfig.ROOT_DIR_NAME)
   }
 
   def localVolume: Path = {
     workspaceRoot.resolve(".kamu.local")
+  }
+}
+
+object KamuConfig {
+  val ROOT_DIR_NAME = ".kamu"
+
+  def findWorkspaceRoot(fileSystem: FileSystem, dir: Path): Option[Path] = {
+    findWorkspaceRootRec(fileSystem, fileSystem.toAbsolute(dir))
+  }
+
+  @scala.annotation.tailrec
+  private def findWorkspaceRootRec(
+    fileSystem: FileSystem,
+    dir: Path
+  ): Option[Path] = {
+    if (fileSystem.exists(dir.resolve(ROOT_DIR_NAME))) {
+      Some(dir)
+    } else if (dir.isRoot) {
+      None
+    } else {
+      findWorkspaceRootRec(fileSystem, dir.getParent)
+    }
   }
 }
 

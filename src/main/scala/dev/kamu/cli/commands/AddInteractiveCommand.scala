@@ -8,7 +8,10 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.{MetadataRepository, UsageException}
+import pureconfig.generic.auto._
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import yaml.defaults._
+import dev.kamu.cli.{MetadataRepository, ResourceLoader}
 import dev.kamu.core.manifests._
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -37,15 +40,12 @@ class AddInteractiveCommand(
       logger.info("Added dataset")
     } else {
       val path = new Path("./" + dataset.id + ".yaml")
-      metadataRepository.exportDataset(
-        dataset,
-        path
-      )
+      new ResourceLoader(fileSystem).saveResourceToFile(dataset, path)
       logger.info(s"Saved dataset to: ${fileSystem.toAbsolute(path)}")
     }
   }
 
-  def runDatasetWizard(): Dataset = {
+  def runDatasetWizard(): DatasetSnapshot = {
     val id = input(
       "Dataset ID",
       "Specify the ID of the new dataset.\nIt is recommended that you use dot-separated " +
@@ -153,7 +153,7 @@ class AddInteractiveCommand(
             MergeStrategyKind.Append()
         }
 
-        Dataset(
+        DatasetSnapshot(
           id = id,
           rootPollingSource = Some(
             RootPollingSource(
@@ -166,7 +166,7 @@ class AddInteractiveCommand(
           )
         )
       case "derivative" =>
-        Dataset(
+        DatasetSnapshot(
           id = id,
           derivativeSource = Some(
             DerivativeSource(

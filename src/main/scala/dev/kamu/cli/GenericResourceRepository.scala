@@ -26,8 +26,8 @@ class GenericResourceRepository[TRes <: Resource[TRes]: ClassTag, TID](
   idFromString: String => TID,
   idFromRes: TRes => TID
 )(
-  implicit rderivation: Derivation[ConfigReader[Manifest[TRes]]],
-  wderivation: Derivation[ConfigWriter[Manifest[TRes]]]
+  implicit readerDerivation: Derivation[ConfigReader[Manifest[TRes]]],
+  writerDerivation: Derivation[ConfigWriter[Manifest[TRes]]]
 ) {
   private val logger = LogManager.getLogger(getClass.getName)
 

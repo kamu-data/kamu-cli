@@ -16,8 +16,8 @@ import dev.kamu.cli.{
   WorkspaceLayout
 }
 import dev.kamu.core.ingest.polling
+import dev.kamu.core.manifests.{DatasetID, DatasetKind, ExternalSourceKind}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.manifests.{Dataset, DatasetID, ExternalSourceKind}
 import dev.kamu.core.transform.streaming
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -39,7 +39,7 @@ class PullCommand(
 
   def run(): Unit = {
     val datasetIDs = {
-      if (all) metadataRepository.getAllDatasetIDs()
+      if (all) metadataRepository.getAllDatasets()
       else ids.map(DatasetID)
     }
 
@@ -54,29 +54,32 @@ class PullCommand(
         throw new UsageException(e.getMessage)
     }
 
-    logger.debug(s"Pulling datasets in following order:")
-    plan.foreach(d => logger.debug(s"  ${d.id.toString}"))
+    logger.debug("Pulling datasets in following order: " + plan.mkString(", "))
 
     val numUpdated = pullBatched(plan)
     logger.info(s"Updated $numUpdated datasets")
   }
 
-  def pullBatched(plan: Seq[Dataset]): Int = {
+  def pullBatched(plan: Seq[DatasetID]): Int = {
     if (plan.nonEmpty) {
-      val kind = plan.head.kind
-      val (batch, rest) = plan.span(_.kind == kind)
+      val withKinds =
+        plan.map(id => (id, metadataRepository.getDatasetKind(id)))
+
+      val kind = withKinds.head._2
+      val (first, rest) = withKinds.span(_._2 == kind)
+      val batch = first.map(_._1)
 
       kind match {
-        case Dataset.Kind.Root =>
+        case DatasetKind.Root =>
           pullRoot(batch)
-        case Dataset.Kind.Derivative =>
+        case DatasetKind.Derivative =>
           // TODO: Streaming transform currently doesn't handle dependencies
           batch.foreach(ds => pullDerivative(Seq(ds)))
-        case Dataset.Kind.Remote =>
+        case DatasetKind.Remote =>
           pullRemote(batch)
       }
 
-      batch.length + pullBatched(rest)
+      batch.length + pullBatched(rest.map(_._1))
     } else {
       0
     }
@@ -86,15 +89,24 @@ class PullCommand(
   // Root
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullRoot(batch: Seq[Dataset]): Boolean = {
+  def pullRoot(batch: Seq[DatasetID]): Boolean = {
     val datasets = batch.toVector
 
     logger.debug(
-      "Pulling root datasets: " + datasets.map(_.id.toString).mkString(", ")
+      "Pulling root datasets: " + datasets.map(_.toString).mkString(", ")
     )
 
+    // TODO: Costly chain traversal
+    // TODO: Account for missing files
     val extraMounts = datasets
-      .map(_.rootPollingSource.get.fetch)
+      .flatMap(id => {
+        val metaChain = metadataRepository.getMetadataChain(id)
+
+        metaChain
+          .getBlocks()
+          .flatMap(_.rootPollingSource)
+          .map(_.fetch)
+      })
       .flatMap({
         case furl: ExternalSourceKind.FetchUrl =>
           furl.url.getScheme match {
@@ -107,14 +119,10 @@ class PullCommand(
 
     val pollConfig = polling.AppConf(
       tasks = datasets
-        .map(ds => {
-          val volumeLayout = metadataRepository.getLocalVolume()
+        .map(id => {
           polling.IngestTask(
-            datasetToIngest = ds,
-            checkpointsPath =
-              volumeLayout.checkpointsDir.resolve(ds.id.toString),
-            pollCachePath = volumeLayout.cacheDir.resolve(ds.id.toString),
-            dataPath = volumeLayout.dataDir.resolve(ds.id.toString)
+            datasetToIngest = id,
+            datasetLayout = metadataRepository.getDatasetLayout(id)
           )
         })
     )
@@ -130,7 +138,7 @@ class PullCommand(
 
     logger.debug(
       s"Successfully pulled root datasets: " + datasets
-        .map(_.id.toString)
+        .map(_.toString)
         .mkString(", ")
     )
 
@@ -141,28 +149,33 @@ class PullCommand(
   // Derivative
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullDerivative(batch: Seq[Dataset]): Boolean = {
+  def pullDerivative(batch: Seq[DatasetID]): Boolean = {
     val datasets = batch.toVector
 
     logger.debug(
       s"Running transformations for derivative datasets: " + datasets
-        .map(_.id.toString)
+        .map(_.toString)
         .mkString(", ")
     )
 
     val transformConfig = streaming.AppConfig(
-      tasks = datasets.map(ds => {
-        val volumeLayout = metadataRepository.getLocalVolume()
+      tasks = datasets.map(id => {
+        val metaChain = metadataRepository.getMetadataChain(id)
+
+        // TODO: Costly chain traversal
+        val allInputs = metaChain
+          .getBlocks()
+          .flatMap(_.derivativeSource)
+          .flatMap(_.inputs)
+          .map(_.id)
+
+        val allDatasets = allInputs :+ id
 
         streaming.TransformTaskConfig(
-          datasetToTransform = ds,
-          inputDataPaths = ds.derivativeSource.get.inputs
-            .map(
-              i => i.id.toString -> volumeLayout.dataDir.resolve(i.id.toString)
-            )
-            .toMap,
-          checkpointsPath = volumeLayout.checkpointsDir.resolve(ds.id.toString),
-          outputDataPath = volumeLayout.dataDir.resolve(ds.id.toString)
+          datasetToTransform = id,
+          datasetLayouts = allDatasets
+            .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
+            .toMap
         )
       })
     )
@@ -179,7 +192,7 @@ class PullCommand(
 
     logger.debug(
       s"Successfully applied transformations for derivative datasets: " + datasets
-        .map(_.id.toString)
+        .map(_.toString)
         .mkString(", ")
     )
 
@@ -190,14 +203,22 @@ class PullCommand(
   // Remote
   ///////////////////////////////////////////////////////////////////////////////////////
 
-  def pullRemote(batch: Seq[Dataset]): Boolean = {
-    for (ds <- batch) {
-      val sourceVolume = metadataRepository
-        .getVolume(ds.remoteSource.get.volumeID)
+  def pullRemote(batch: Seq[DatasetID]): Boolean = {
+    val datasets = batch.toVector
+
+    logger.debug(
+      "Pulling remote datasets: " + datasets.map(_.toString).mkString(", ")
+    )
+
+    for (id <- datasets) {
+      val sourceVolume = metadataRepository.getVolume(
+        metadataRepository
+          .getDatasetVolumeID(id)
+      )
 
       val volumeOperator = volumeOperatorFactory.buildFor(sourceVolume)
 
-      volumeOperator.pull(Seq(ds))
+      volumeOperator.pull(Seq(id))
     }
     true
   }

@@ -15,7 +15,7 @@ import dev.kamu.cli.{
   UsageException,
   WorkspaceLayout
 }
-import dev.kamu.core.manifests.{Dataset, DatasetID, Volume, VolumeID}
+import dev.kamu.core.manifests.{DatasetID, Volume, VolumeID}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
@@ -40,7 +40,7 @@ class PushCommand(
     }
 
     val datasetIDs = {
-      if (all) metadataRepository.getAllDatasetIDs()
+      if (all) metadataRepository.getAllDatasets()
       else ids.map(DatasetID)
     }
 
@@ -61,7 +61,7 @@ class PushCommand(
     logger.info(s"Pushed $numPushed dataset(s)")
   }
 
-  def pushToVolume(datasets: Seq[Dataset], volume: Volume): Int = {
+  def pushToVolume(datasets: Seq[DatasetID], volume: Volume): Int = {
     val volumeOperator = volumeOperatorFactory.buildFor(volume)
     volumeOperator.push(datasets)
     datasets.length

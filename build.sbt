@@ -48,12 +48,15 @@ lazy val kamuCoreUtils = project
     libraryDependencies ++= Seq(
       deps.hadoopCommon,
       deps.scalaTest % "test",
+      deps.sparkCore % "provided",
+      deps.sparkHive % "provided",
       deps.geoSpark % "test",
       deps.geoSparkSql % "test",
       deps.sparkTestingBase % "test",
       deps.sparkHive % "test"
     ),
-    commonSettings
+    commonSettings,
+    sparkTestingSettings
   )
 
 lazy val kamuCoreManifests = project
@@ -66,7 +69,8 @@ lazy val kamuCoreManifests = project
     libraryDependencies ++= Seq(
       deps.hadoopCommon,
       deps.pureConfig,
-      deps.pureConfigYaml
+      deps.pureConfigYaml,
+      deps.spire
     ),
     commonSettings
   )
@@ -121,6 +125,7 @@ lazy val versions = new {
   val scalajHttp = "2.4.1"
   val spark = "2.4.0"
   val sparkTestingBase = s"${spark}_0.11.0"
+  val spire = "0.13.0" // Used by spark too
 }
 
 lazy val deps =
@@ -145,6 +150,10 @@ lazy val deps =
         .exclude("commons-beanutils", "commons-beanutils-core")
     // SQL Shell
     val sqlLine = "sqlline" % "sqlline" % "1.8.0"
+    // Math
+    // TODO: Using older version as it's also used by Spark
+    //val spire = "org.typelevel" %% "spire" % versions.spire
+    val spire = "org.spire-math" %% "spire" % versions.spire
     // Test
     val scalaTest = "org.scalatest" %% "scalatest" % "3.0.8"
     val sparkHive = "org.apache.spark" %% "spark-hive" % versions.spark

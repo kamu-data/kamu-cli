@@ -40,11 +40,19 @@ class CompletionCommand(
     path: Seq[String],
     builder: Scallop
   ): String = {
-    val preable = path match {
+    val preamble = path match {
       case Seq() =>
         Seq(
           "local cur prev words cword",
-          "_init_completion || return"
+          "_init_completion || return",
+          "",
+          "# Find workspace",
+          "WORKSPACE_ROOT=`pwd`",
+          "while : ; do",
+          "  KAMU_ROOT=\"$WORKSPACE_ROOT/.kamu\"",
+          "  [[ \"$WORKSPACE_ROOT\" != \"/\" ]] && [[ ! -d \"$KAMU_ROOT\" ]] || break",
+          "  WORKSPACE_ROOT=`dirname \"$WORKSPACE_ROOT\"`",
+          "done"
         )
       case _ =>
         Seq.empty
@@ -81,9 +89,17 @@ class CompletionCommand(
       .flatMap(opt => {
         opt.name match {
           case "ids" if opt.descr.contains("dataset") =>
-            Seq("options+=`ls .kamu/datasets | sed -e 's/\\.[^.]*$//'`")
+            Seq(
+              "if [[ -d \"$KAMU_ROOT\" ]]; then",
+              "  options+=`ls \"$KAMU_ROOT/datasets\"`",
+              "fi"
+            )
           case "ids" if opt.descr.contains("volume") =>
-            Seq("options+=`ls .kamu/volumes | sed -e 's/\\.[^.]*$//'`")
+            Seq(
+              "if [[ -d \"$KAMU_ROOT\" ]]; then",
+              "  options+=`ls \"$KAMU_ROOT/volumes\" | sed -e 's/\\.[^.]*$//'`",
+              "fi"
+            )
           case _ =>
             Seq.empty
         }
@@ -101,7 +117,7 @@ class CompletionCommand(
     )
 
     val body = (
-      preable.break
+      preamble.break
         ++ dispatch.break
         ++ Seq("options=()")
         ++ subcommands

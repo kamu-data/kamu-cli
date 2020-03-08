@@ -22,7 +22,7 @@ class PurgeCommand(
   override def run(): Unit = {
     val toPurge =
       if (all)
-        metadataRepository.getAllDatasetIDs()
+        metadataRepository.getAllDatasets()
       else
         ids.map(DatasetID)
 

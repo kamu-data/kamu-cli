@@ -13,6 +13,7 @@ import java.io.PrintStream
 import dev.kamu.cli.commands._
 import dev.kamu.cli.external._
 import dev.kamu.cli.output._
+import dev.kamu.core.utils.AutoClock
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
@@ -21,15 +22,17 @@ class Kamu(
   config: KamuConfig,
   fileSystem: FileSystem
 ) {
+  val systemClock = new AutoClock()
+
   val workspaceLayout = WorkspaceLayout(
-    metadataRootDir = config.kamuRoot,
-    datasetsDir = config.kamuRoot.resolve("datasets"),
+    kamuRootDir = config.kamuRoot,
+    metadataDir = config.kamuRoot.resolve("datasets"),
     volumesDir = config.kamuRoot.resolve("volumes"),
     localVolumeDir = config.localVolume
   ).toAbsolute(fileSystem)
 
   val metadataRepository =
-    new MetadataRepository(fileSystem, workspaceLayout)
+    new MetadataRepository(fileSystem, workspaceLayout, systemClock)
 
   val volumeOperatorFactory =
     new VolumeOperatorFactory(fileSystem, workspaceLayout, metadataRepository)
@@ -78,6 +81,13 @@ class Kamu(
             c.add.manifests(),
             c.add.replace()
           )
+      case List(c.add, c.add.remote) =>
+        new AddRemoteCommand(
+          fileSystem,
+          metadataRepository,
+          c.add.remote.volumeID(),
+          c.add.remote.datasetID()
+        )
       case List(c.purge) =>
         new PurgeCommand(
           metadataRepository,
@@ -171,7 +181,7 @@ class Kamu(
   }
 
   def ensureWorkspace(): Unit = {
-    if (!fileSystem.exists(workspaceLayout.metadataRootDir))
+    if (!fileSystem.exists(workspaceLayout.kamuRootDir))
       throw new UsageException("Not a kamu workspace")
   }
 

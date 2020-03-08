@@ -260,6 +260,23 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Manifest URLs/files containing dataset definitions",
       default = Some(List.empty)
     )
+
+    val remote = new Subcommand("remote") {
+      banner("Add a reference to a dataset stored in remote volume")
+
+      val volumeID = trailArg[String](
+        "volumeID",
+        required = true,
+        descr = "IDs of the remote volume"
+      )
+
+      val datasetID = trailArg[String](
+        "datasetID",
+        required = true,
+        descr = "IDs of the dataset"
+      )
+    }
+    addSubcommand(remote)
   }
   addSubcommand(add)
 

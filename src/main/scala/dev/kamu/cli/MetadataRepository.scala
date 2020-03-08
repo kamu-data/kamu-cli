@@ -11,8 +11,12 @@ package dev.kamu.cli
 import java.io.PrintWriter
 
 import dev.kamu.core.manifests.{
-  Dataset,
   DatasetID,
+  DatasetKind,
+  DatasetLayout,
+  DatasetRef,
+  DatasetSnapshot,
+  DatasetSummary,
   Volume,
   VolumeID,
   VolumeLayout
@@ -22,6 +26,8 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import java.net.URI
 
+import dev.kamu.core.manifests.infra.MetadataChainFS
+import dev.kamu.core.utils.Clock
 import yaml.defaults._
 import pureconfig.generic.auto._
 import dev.kamu.core.utils.fs._
@@ -29,18 +35,10 @@ import org.apache.log4j.LogManager
 
 class MetadataRepository(
   fileSystem: FileSystem,
-  workspaceLayout: WorkspaceLayout
+  workspaceLayout: WorkspaceLayout,
+  systemClock: Clock
 ) {
   private val logger = LogManager.getLogger(getClass.getName)
-
-  protected val datasetRepo =
-    new GenericResourceRepository[Dataset, DatasetID](
-      fileSystem,
-      workspaceLayout.datasetsDir,
-      "dataset",
-      DatasetID,
-      (ds: Dataset) => ds.id
-    )
 
   protected val volumeRepo =
     new GenericResourceRepository[Volume, VolumeID](
@@ -55,45 +53,115 @@ class MetadataRepository(
   // Datasets
   ////////////////////////////////////////////////////////////////////////////
 
-  def getDataset(id: DatasetID): Dataset = {
-    datasetRepo.getResource(id)
+  protected def remoteRefFilePath(id: DatasetID): Path = {
+    workspaceLayout.metadataDir.resolve(id.toString).resolve("remote.yaml")
+  }
+
+  protected def datasetMetadataDir(id: DatasetID): Path = {
+    if (isRemote(id))
+      getLocalVolume().metadataDir.resolve(id.toString)
+    else
+      workspaceLayout.metadataDir.resolve(id.toString)
+  }
+
+  protected def ensureDatasetExists(id: DatasetID): Unit = {
+    if (!fileSystem.exists(workspaceLayout.metadataDir.resolve(id.toString)))
+      throw new DoesNotExistException(id.toString, "dataset")
+  }
+
+  protected def ensureDatasetExistsAndPulled(id: DatasetID): Unit = {
+    ensureDatasetExists(id)
+    if (!fileSystem.exists(datasetMetadataDir(id)))
+      throw new DoesNotExistException(id.toString, "dataset")
+  }
+
+  def isRemote(id: DatasetID): Boolean = {
+    val refPath = remoteRefFilePath(id)
+    fileSystem.exists(refPath)
+  }
+
+  def getDatasetLayout(id: DatasetID): DatasetLayout = {
+    ensureDatasetExists(id)
+
+    val localVolume = getLocalVolume()
+
+    DatasetLayout(
+      metadataDir = datasetMetadataDir(id),
+      dataDir = localVolume.dataDir.resolve(id.toString),
+      checkpointsDir = localVolume.checkpointsDir.resolve(id.toString),
+      cacheDir = localVolume.cacheDir.resolve(id.toString)
+    )
+  }
+
+  def getMetadataChain(id: DatasetID): MetadataChainFS = {
+    new MetadataChainFS(fileSystem, getDatasetLayout(id).metadataDir)
+  }
+
+  def getDatasetKind(id: DatasetID): DatasetKind = {
+    ensureDatasetExists(id)
+    if (isRemote(id))
+      DatasetKind.Remote
+    else
+      getDatasetSummary(id).kind
+  }
+
+  def getDatasetSummary(id: DatasetID): DatasetSummary = {
+    ensureDatasetExistsAndPulled(id)
+
+    val chain = new MetadataChainFS(fileSystem, datasetMetadataDir(id))
+    chain.getSummary()
+  }
+
+  def getDatasetVolumeID(id: DatasetID): VolumeID = {
+    if (!isRemote(id))
+      throw new RuntimeException(s"Dataset $id is not remote")
+    val refFile = remoteRefFilePath(id)
+    val ref = new ResourceLoader(fileSystem)
+      .loadResourceFromFile[DatasetRef](refFile)
+    ref.volumeID
+  }
+
+  protected def getDatasetDependencies(id: DatasetID): List[DatasetID] = {
+    if (isRemote(id))
+      List.empty
+    else
+      getDatasetSummary(id).datasetDependencies.toList
   }
 
   def getDatasetsInDependencyOrder(
     ids: Seq[DatasetID],
     recursive: Boolean
-  ): Seq[Dataset] = {
-    if (recursive) {
-      val dependsOn = getDataset(_: DatasetID).dependsOn.toList
-      val depGraph = new DependencyGraph[DatasetID](dependsOn)
-      depGraph.resolve(ids.toList).map(getDataset)
-    } else {
-      val dependsOn = getDataset(_: DatasetID).dependsOn.toList
-        .filter(ids.contains)
-      val depGraph = new DependencyGraph[DatasetID](dependsOn)
-      depGraph.resolve(ids.toList).map(getDataset)
-    }
+  ): Seq[DatasetID] = {
+    // TODO: Check recursive implemented correctly
+    val dependsOn =
+      if (recursive)
+        getDatasetDependencies _
+      else
+        getDatasetDependencies(_: DatasetID).filter(ids.contains)
+
+    val depGraph = new DependencyGraph[DatasetID](dependsOn)
+    depGraph.resolve(ids.toList)
   }
 
-  def getAllDatasetIDs(): Seq[DatasetID] = {
-    datasetRepo.getAllResourceIDs()
+  def getAllDatasets(): Seq[DatasetID] = {
+    fileSystem
+      .listStatus(workspaceLayout.metadataDir)
+      .map(_.getPath.getName)
+      .map(DatasetID)
   }
 
-  def getAllDatasets(): Seq[Dataset] = {
-    datasetRepo.getAllResources()
+  def loadDatasetSnapshotFromURI(uri: URI): DatasetSnapshot = {
+    new ResourceLoader(fileSystem).loadResourceFromURI[DatasetSnapshot](uri)
   }
 
-  def loadDatasetFromURI(uri: URI): Dataset = {
-    datasetRepo.loadResourceFromURI(uri)
-  }
+  def addDataset(ds: DatasetSnapshot): Unit = {
+    val datasetDir = workspaceLayout.metadataDir.resolve(ds.id.toString)
 
-  def addDataset(ds: Dataset): Unit = {
-    if (datasetRepo.getResourceOpt(ds.id).isDefined)
+    if (fileSystem.exists(datasetDir))
       throw new AlreadyExistsException(ds.id.toString, "dataset")
 
     try {
-      ds.dependsOn.map(getDataset)
-      ds.remoteSource.map(rs => getVolume(rs.volumeID))
+      ds.dependsOn.foreach(ensureDatasetExists)
     } catch {
       case e: DoesNotExistException =>
         throw new MissingReferenceException(
@@ -104,38 +172,47 @@ class MetadataRepository(
         )
     }
 
-    datasetRepo.addResource(ds)
+    val chain = new MetadataChainFS(fileSystem, datasetDir)
+    chain.init(ds, systemClock.instant())
+  }
+
+  def addDatasetReference(id: DatasetID, volumeID: VolumeID): Unit = {
+    val datasetDir = workspaceLayout.metadataDir.resolve(id.toString)
+
+    if (fileSystem.exists(datasetDir))
+      throw new AlreadyExistsException(id.toString, "dataset")
+
+    getVolume(volumeID)
+
+    fileSystem.mkdirs(datasetDir)
+    new ResourceLoader(fileSystem)
+      .saveResourceToFile(DatasetRef(volumeID), remoteRefFilePath(id))
   }
 
   def deleteDataset(id: DatasetID): Unit = {
+    ensureDatasetExists(id)
+
     // Validate references
-    val referencedBy = getAllDatasets().filter(_.dependsOn.contains(id))
+    val referencedBy = getAllDatasets()
+      .map(getDatasetSummary)
+      .filter(_.datasetDependencies.contains(id))
+
     if (referencedBy.nonEmpty)
       throw new DanglingReferenceException(referencedBy.map(_.id), id)
 
-    getAllDataPaths(id).foreach(p => fileSystem.delete(p, true))
-
-    datasetRepo.deleteResource(id)
+    val layout = getDatasetLayout(id)
+    fileSystem.delete(layout.cacheDir, true)
+    fileSystem.delete(layout.dataDir, true)
+    fileSystem.delete(layout.checkpointsDir, true)
+    fileSystem.delete(layout.metadataDir, true)
+    fileSystem.delete(workspaceLayout.metadataDir.resolve(id.toString), true)
   }
 
   def purgeDataset(id: DatasetID): Unit = {
-    getDataset(id)
-    getAllDataPaths(id).foreach(p => fileSystem.delete(p, true))
     // TODO: Purging a dataset that is used by non-empty derivatives should raise an error
-  }
-
-  def exportDataset(ds: Dataset, path: Path): Unit = {
-    datasetRepo.saveResourceToFile(ds, path)
-  }
-
-  protected def getAllDataPaths(id: DatasetID): Seq[Path] = {
-    val volumeLayout = getLocalVolume()
-
-    Seq(
-      volumeLayout.dataDir.resolve(id.toString),
-      volumeLayout.cacheDir.resolve(id.toString),
-      volumeLayout.checkpointsDir.resolve(id.toString)
-    )
+    val snapshot = getMetadataChain(id).getSnapshot()
+    deleteDataset(id)
+    addDataset(snapshot)
   }
 
   ////////////////////////////////////////////////////////////////////////////
@@ -153,7 +230,7 @@ class MetadataRepository(
     }
 
     VolumeLayout(
-      datasetsDir = workspaceLayout.localVolumeDir.resolve("datasets"),
+      metadataDir = workspaceLayout.localVolumeDir.resolve("datasets"),
       checkpointsDir = workspaceLayout.localVolumeDir.resolve("checkpoints"),
       dataDir = workspaceLayout.localVolumeDir.resolve("data"),
       cacheDir = workspaceLayout.localVolumeDir.resolve("cache")

@@ -9,7 +9,7 @@
 package dev.kamu.cli.external
 
 import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{Dataset, Volume, VolumeLayout}
+import dev.kamu.core.manifests.{DatasetID, Volume, VolumeLayout}
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
@@ -18,57 +18,53 @@ import scala.sys.process.Process
 
 class VolumeOperatorS3Cli(
   fileSystem: FileSystem,
-  workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   volume: Volume
 ) extends VolumeOperator {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  override def push(datasets: Seq[Dataset]): Unit = {
+  override def push(datasets: Seq[DatasetID]): Unit = {
     withVolumeLayout(datasets) { localDir =>
       s3Sync(localDir, new Path(volume.url))
     }
   }
 
-  override def pull(datasets: Seq[Dataset]): Unit = {
-    val localVolumeLayout = metadataRepository.getLocalVolume()
-
+  override def pull(datasets: Seq[DatasetID]): Unit = {
     val remoteVolumeLayout = VolumeLayout(
-      datasetsDir = new Path("datasets"),
+      metadataDir = new Path("datasets"),
       checkpointsDir = new Path("checkpoints"),
       dataDir = new Path("data"),
       cacheDir = new Path("cache")
     )
 
-    for (ds <- datasets) {
+    for (id <- datasets) {
+      // TODO: Do one sync instead since volume layouts should match
       val sourceLayout = remoteVolumeLayout.relativeTo(new Path(volume.url))
+      val destLayout = metadataRepository.getDatasetLayout(id)
 
-      s3Copy(
-        sourceLayout.datasetsDir.resolve(ds.id.toString + ".yaml"),
-        localVolumeLayout.datasetsDir.resolve(ds.id.toString + ".yaml")
+      s3Sync(
+        sourceLayout.metadataDir.resolve(id.toString),
+        destLayout.metadataDir
       )
 
       s3Sync(
-        sourceLayout.checkpointsDir.resolve(ds.id.toString),
-        localVolumeLayout.checkpointsDir.resolve(ds.id.toString)
+        sourceLayout.checkpointsDir.resolve(id.toString),
+        destLayout.checkpointsDir
       )
 
       s3Sync(
-        sourceLayout.dataDir.resolve(ds.id.toString),
-        localVolumeLayout.dataDir.resolve(ds.id.toString)
+        sourceLayout.dataDir.resolve(id.toString),
+        destLayout.dataDir
       )
     }
   }
 
   protected def withVolumeLayout[T](
-    datasets: Seq[Dataset]
+    datasets: Seq[DatasetID]
   )(func: Path => T): T = {
     Temp.withRandomTempDir(fileSystem, "kamu-volume-") { tempDir =>
-      val localVolumeLayout =
-        metadataRepository.getLocalVolume().toAbsolute(fileSystem)
-
       val targetLayout = VolumeLayout(
-        datasetsDir = new Path("datasets"),
+        metadataDir = new Path("datasets"),
         checkpointsDir = new Path("checkpoints"),
         dataDir = new Path("data"),
         cacheDir = new Path("cache")
@@ -76,30 +72,24 @@ class VolumeOperatorS3Cli(
 
       targetLayout.allDirs.foreach(fileSystem.mkdirs)
 
-      for (ds <- datasets) {
+      for (id <- datasets) {
+        val datasetLayout = metadataRepository.getDatasetLayout(id)
+
         fileSystem.createSymlink(
-          localVolumeLayout.dataDir.resolve(ds.id.toString),
-          targetLayout.dataDir.resolve(ds.id.toString),
+          datasetLayout.dataDir,
+          targetLayout.dataDir.resolve(id.toString),
           false
         )
 
         fileSystem.createSymlink(
-          localVolumeLayout.checkpointsDir.resolve(ds.id.toString),
-          targetLayout.checkpointsDir.resolve(ds.id.toString),
+          datasetLayout.checkpointsDir,
+          targetLayout.checkpointsDir.resolve(id.toString),
           false
         )
 
-        val dsManifestPath =
-          if (fileSystem.exists(
-                localVolumeLayout.datasetsDir.resolve(ds.id.toString + ".yaml")
-              ))
-            localVolumeLayout.datasetsDir.resolve(ds.id.toString + ".yaml")
-          else
-            workspaceLayout.datasetsDir.resolve(ds.id.toString + ".yaml")
-
         fileSystem.createSymlink(
-          dsManifestPath,
-          targetLayout.datasetsDir.resolve(ds.id.toString + ".yaml"),
+          datasetLayout.metadataDir,
+          targetLayout.metadataDir.resolve(id.toString),
           false
         )
       }
@@ -108,7 +98,7 @@ class VolumeOperatorS3Cli(
     }
   }
 
-  def s3Sync(from: Path, to: Path) = {
+  protected def s3Sync(from: Path, to: Path): Unit = {
     command(
       Array(
         "aws",
@@ -120,7 +110,7 @@ class VolumeOperatorS3Cli(
     )
   }
 
-  def s3Copy(from: Path, to: Path) = {
+  protected def s3Copy(from: Path, to: Path): Unit = {
     command(
       Array(
         "aws",
@@ -132,7 +122,7 @@ class VolumeOperatorS3Cli(
     )
   }
 
-  def command(cmd: Seq[String]) = {
+  protected def command(cmd: Seq[String]): Unit = {
     logger.debug(s"Executing command: ${cmd.mkString(" ")}")
     if (Process(cmd).! != 0)
       throw new Exception(s"Command failed: ${cmd.mkString(" ")}")

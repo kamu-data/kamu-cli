@@ -9,7 +9,7 @@
 package dev.kamu.cli
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager}
 
 class UsageException(message: String = "", cause: Throwable = None.orNull)
@@ -18,12 +18,16 @@ class UsageException(message: String = "", cause: Throwable = None.orNull)
 object KamuApp extends App {
   val logger = LogManager.getLogger(getClass.getName)
 
-  val config = KamuConfig()
-
   val fileSystem = FileSystem.get(new Configuration())
   FileSystem.enableSymlinks()
   fileSystem.setWriteChecksum(false)
   fileSystem.setVerifyChecksum(false)
+
+  val config = KamuConfig(
+    workspaceRoot = KamuConfig
+      .findWorkspaceRoot(fileSystem, new Path("."))
+      .getOrElse(new Path("."))
+  )
 
   try {
     val cliArgs = new CliArgs(args)

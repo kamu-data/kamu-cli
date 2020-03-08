@@ -9,13 +9,13 @@
 package dev.kamu.cli.external
 
 import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{Dataset, Volume}
+import dev.kamu.core.manifests.{DatasetID, Volume}
 import org.apache.hadoop.fs.FileSystem
 
 trait VolumeOperator {
-  def push(datasets: Seq[Dataset])
+  def push(datasets: Seq[DatasetID])
 
-  def pull(datasets: Seq[Dataset])
+  def pull(datasets: Seq[DatasetID])
 }
 
 class VolumeOperatorFactory(
@@ -38,7 +38,6 @@ class VolumeOperatorFactory(
       case "s3" =>
         new VolumeOperatorS3Cli(
           fileSystem,
-          workspaceLayout,
           metadataRepository,
           volume
         )

@@ -10,6 +10,8 @@ package dev.kamu.cli
 
 import java.net.URI
 
+import pureconfig.generic.auto._
+import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 import dev.kamu.cli.external.{DockerClient, DockerProcessBuilder, DockerRunArgs}
 import dev.kamu.core.manifests.DatasetID
 import org.apache.hadoop.fs.Path
@@ -45,7 +47,6 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
           Seq(dsA.id, dsB.id, dsC.id),
           recursive = false
         )
-        .map(_.id)
 
       actual1 shouldEqual Seq(dsC.id, dsB.id, dsA.id)
 
@@ -54,7 +55,6 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
           Seq(dsA.id, dsB.id),
           recursive = false
         )
-        .map(_.id)
 
       actual2 shouldEqual Seq(dsB.id, dsA.id)
 
@@ -63,7 +63,6 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
           Seq(dsA.id),
           recursive = true
         )
-        .map(_.id)
 
       actual3 shouldEqual Seq(dsC.id, dsB.id, dsA.id)
     }
@@ -77,7 +76,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         new Path(kamu.config.workspaceRoot, "server")
       fileSystem.mkdirs(serverDir)
       val path: Path = new Path(serverDir, "test-dataset.yaml")
-      kamu.metadataRepository.exportDataset(expected, path)
+      new ResourceLoader(fileSystem).saveResourceToFile(expected, path)
 
       // start up the server and host the directory
       val serverPort = 80 // httpd:2.4 default port
@@ -102,7 +101,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
 
         // pull the dataset from the server
         val actual =
-          kamu.metadataRepository.loadDatasetFromURI(
+          kamu.metadataRepository.loadDatasetSnapshotFromURI(
             new URI(s"http://localhost:${hostPort}/test-dataset.yaml")
           )
 
@@ -126,9 +125,10 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
 
       fileSystem.mkdirs(testDir)
       val datasetPath: Path = new Path(testDir, "test-dataset.yaml")
-      kamu.metadataRepository.exportDataset(expected, datasetPath)
+      new ResourceLoader(fileSystem).saveResourceToFile(expected, datasetPath)
 
-      val actual = kamu.metadataRepository.loadDatasetFromURI(datasetPath.toUri)
+      val actual =
+        kamu.metadataRepository.loadDatasetSnapshotFromURI(datasetPath.toUri)
 
       actual shouldEqual expected
     }

@@ -24,14 +24,14 @@ class InitCommand(
   override def requiresWorkspace: Boolean = false
 
   def run(): Unit = {
-    if (fileSystem.exists(workspaceLayout.metadataRootDir))
+    if (fileSystem.exists(workspaceLayout.kamuRootDir))
       throw new UsageException("Already a kamu workspace")
 
-    fileSystem.mkdirs(workspaceLayout.datasetsDir)
+    fileSystem.mkdirs(workspaceLayout.metadataDir)
     fileSystem.mkdirs(workspaceLayout.volumesDir)
 
     val outputStream =
-      fileSystem.create(workspaceLayout.metadataRootDir.resolve(".gitignore"))
+      fileSystem.create(workspaceLayout.kamuRootDir.resolve(".gitignore"))
 
     val writer = new PrintWriter(outputStream)
     writer.write(WorkspaceLayout.GITIGNORE_CONTENT)

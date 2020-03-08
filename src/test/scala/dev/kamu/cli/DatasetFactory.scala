@@ -56,9 +56,9 @@ object DatasetFactory {
     header: Boolean = false,
     mergeStrategy: Option[MergeStrategyKind] = None,
     schema: Seq[String] = Seq.empty
-  ): Dataset = {
+  ): DatasetSnapshot = {
     val _id = id.getOrElse(newDatasetID())
-    Dataset(
+    DatasetSnapshot(
       id = _id,
       rootPollingSource = Some(
         RootPollingSource(
@@ -78,9 +78,9 @@ object DatasetFactory {
     source: DatasetID,
     id: Option[DatasetID] = None,
     sql: Option[String] = None
-  ): Dataset = {
+  ): DatasetSnapshot = {
     val _id = id.getOrElse(newDatasetID())
-    Dataset(
+    DatasetSnapshot(
       id = _id,
       derivativeSource = Some(
         DerivativeSource(
@@ -90,8 +90,7 @@ object DatasetFactory {
             )
           ),
           steps = Vector(
-            ProcessingStepSQL(
-              view = _id.toString,
+            ProcessingStepKind.SparkSQL(
               query = sql.getOrElse(s"SELECT * FROM `$source`")
             )
           )

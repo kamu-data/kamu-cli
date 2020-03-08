@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets
 
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.fs._
-import dev.kamu.core.manifests.{Dataset, DatasetID}
+import dev.kamu.core.manifests.{DatasetSnapshot, DatasetID}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -73,11 +73,11 @@ class KamuTestAdapter(
     res
   }
 
-  def addDataset(ds: Dataset): Unit = {
+  def addDataset(ds: DatasetSnapshot): Unit = {
     metadataRepository.addDataset(ds)
   }
 
-  def addDataset(ds: Dataset, df: DataFrame): Unit = {
+  def addDataset(ds: DatasetSnapshot, df: DataFrame): Unit = {
     metadataRepository.addDataset(ds)
     val volume = metadataRepository.getLocalVolume()
 

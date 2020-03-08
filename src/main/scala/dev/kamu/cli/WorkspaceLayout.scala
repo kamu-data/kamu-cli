@@ -13,10 +13,10 @@ import dev.kamu.core.utils.fs._
 
 /** Describes the layout of the workspace on disk */
 case class WorkspaceLayout(
-  /** Root directory of the workspace metadata */
-  metadataRootDir: Path,
-  /** Contains dataset definitions */
-  datasetsDir: Path,
+  /** Root directory of the workspace */
+  kamuRootDir: Path,
+  /** Contains dataset metadata */
+  metadataDir: Path,
   /** Contains volume definitions */
   volumesDir: Path,
   /** Root directory of a local storage volume */
@@ -25,8 +25,8 @@ case class WorkspaceLayout(
 
   def toAbsolute(fs: FileSystem): WorkspaceLayout = {
     copy(
-      metadataRootDir = fs.toAbsolute(metadataRootDir),
-      datasetsDir = fs.toAbsolute(datasetsDir),
+      kamuRootDir = fs.toAbsolute(kamuRootDir),
+      metadataDir = fs.toAbsolute(metadataDir),
       volumesDir = fs.toAbsolute(volumesDir),
       localVolumeDir = fs.toAbsolute(localVolumeDir)
     )

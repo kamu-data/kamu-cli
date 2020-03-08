@@ -42,7 +42,7 @@ class SparkRunnerDocker(
       .toMap
 
     val workspaceVolumes =
-      Seq(workspaceLayout.metadataRootDir, workspaceLayout.localVolumeDir)
+      Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
         .filter(fileSystem.exists)
         .map(p => (p, p))
         .toMap

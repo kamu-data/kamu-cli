@@ -27,7 +27,7 @@ class ListCommand(
     metadataRepository
       .getAllDatasets()
       .map(
-        ds => (ds.id, ds.kind.toString)
+        id => (id, metadataRepository.getDatasetKind(id).toString)
       )
       .sortBy {
         case (id, _) => id.toString

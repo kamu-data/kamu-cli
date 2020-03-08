@@ -14,7 +14,7 @@ import dev.kamu.cli.{
   MissingReferenceException,
   SchemaNotSupportedException
 }
-import dev.kamu.core.manifests.Dataset
+import dev.kamu.core.manifests.DatasetSnapshot
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
@@ -31,7 +31,7 @@ class AddCommand(
       try {
         manifests.map(manifestURI => {
           logger.debug(s"Loading dataset from: $manifestURI")
-          metadataRepository.loadDatasetFromURI(manifestURI)
+          metadataRepository.loadDatasetSnapshotFromURI(manifestURI)
         })
       } catch {
         case e: java.io.FileNotFoundException =>
@@ -44,7 +44,7 @@ class AddCommand(
     }
 
     @scala.annotation.tailrec
-    def addDataset(ds: Dataset): Boolean = {
+    def addDataset(ds: DatasetSnapshot): Boolean = {
       try {
         metadataRepository.addDataset(ds)
         true
