@@ -8,13 +8,14 @@
 
 package dev.kamu.cli.commands
 
+import dev.kamu.cli.utility.DependencyGraph
 import dev.kamu.cli.{
   AlreadyExistsException,
   MetadataRepository,
   MissingReferenceException,
   SchemaNotSupportedException
 }
-import dev.kamu.core.manifests.DatasetSnapshot
+import dev.kamu.core.manifests.{DatasetID, DatasetSnapshot}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
@@ -29,17 +30,21 @@ class AddCommand(
   def run(): Unit = {
     val sources = {
       try {
-        manifests.map(manifestURI => {
-          logger.debug(s"Loading dataset from: $manifestURI")
-          metadataRepository.loadDatasetSnapshotFromURI(manifestURI)
-        })
+        manifests
+          .map(manifestURI => {
+            logger.debug(s"Loading dataset from: $manifestURI")
+            val snapshot =
+              metadataRepository.loadDatasetSnapshotFromURI(manifestURI)
+            (snapshot.id, snapshot)
+          })
+          .toMap
       } catch {
         case e: java.io.FileNotFoundException =>
           logger.error(s"File not found: ${e.getMessage} - aborted")
-          Seq.empty
+          Map.empty[DatasetID, DatasetSnapshot]
         case e: SchemaNotSupportedException =>
           logger.error(s"URI schema not supported: ${e.getMessage} - aborted")
-          Seq.empty
+          Map.empty[DatasetID, DatasetSnapshot]
       }
     }
 
@@ -64,7 +69,11 @@ class AddCommand(
       }
     }
 
-    val numAdded = sources
+    val depGraph = new DependencyGraph[DatasetID](sources(_).dependsOn.toList)
+    val ordered = depGraph.resolve(sources.keys.toList)
+
+    val numAdded = ordered
+      .map(sources(_))
       .map(addDataset)
       .count(added => added)
 
