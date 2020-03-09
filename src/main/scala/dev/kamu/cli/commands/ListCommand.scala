@@ -9,7 +9,7 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.MetadataRepository
-import dev.kamu.cli.output.{OutputFormatter, SimpleResultSet}
+import dev.kamu.cli.output.{FormatHint, OutputFormatter, SimpleResultSet}
 import org.apache.log4j.LogManager
 
 class ListCommand(
@@ -37,8 +37,8 @@ class ListCommand(
           id,
           kind,
           summary.numRecords,
-          summary.dataSize,
-          summary.lastPulled
+          FormatHint.MemorySize(summary.dataSize),
+          summary.lastPulled.map(FormatHint.RelativeTime)
         )
       })
 

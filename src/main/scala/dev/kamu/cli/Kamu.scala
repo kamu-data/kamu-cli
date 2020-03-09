@@ -215,19 +215,34 @@ class Kamu(
   }
 
   def getOutputFormatter(outputFormat: OutputFormat): OutputFormatter = {
+    val readableFormatter = new MissingValueFormatter(
+      "",
+      new ReadablePowerOfTwoValueFormatter(
+        new ReadableRelativeTimeValueFormatter(
+          systemClock.instant(),
+          new SimpleValueFormatter()
+        )
+      )
+    )
+
+    val strictFormatter = new MissingValueFormatter(
+      "",
+      new SimpleValueFormatter()
+    )
+
     outputFormat.outputFormat.map(_.toLowerCase).getOrElse("table") match {
       case "table" =>
-        new TableOutputFormatter(System.out, outputFormat)
+        new TableOutputFormatter(System.out, outputFormat, readableFormatter)
       case "csv" =>
         val f = outputFormat.copy(
           delimiter = outputFormat.delimiter.orElse(Some(","))
         )
-        new DelimitedFormatter(System.out, f)
+        new DelimitedFormatter(System.out, f, strictFormatter)
       case "tsv" =>
         val f = outputFormat.copy(
           delimiter = outputFormat.delimiter.orElse(Some("\t"))
         )
-        new DelimitedFormatter(System.out, f)
+        new DelimitedFormatter(System.out, f, strictFormatter)
       case fmt =>
         throw new UsageException(s"Unsupported format: $fmt")
     }

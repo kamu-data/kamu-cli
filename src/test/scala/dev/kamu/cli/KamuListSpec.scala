@@ -8,6 +8,7 @@
 
 package dev.kamu.cli
 
+import dev.kamu.cli.output.FormatHint
 import org.scalatest._
 
 class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
@@ -47,14 +48,14 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
           rootDS.id,
           "Root",
           0,
-          0,
+          FormatHint.MemorySize(0),
           None
         ),
         Array(
           derivDS.id,
           "Derivative",
           0,
-          0,
+          FormatHint.MemorySize(0),
           None
         )
       )

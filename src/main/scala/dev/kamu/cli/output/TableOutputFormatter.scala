@@ -11,24 +11,18 @@ package dev.kamu.cli.output
 import java.io.PrintStream
 import scala.math.max
 
-class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
-    extends OutputFormatter {
-
-  def format(value: Any): String = {
-    value match {
-      case null       => ""
-      case None       => ""
-      case Some(some) => format(some)
-      case other      => other.toString
-    }
-  }
+class TableOutputFormatter(
+  stream: PrintStream,
+  outputFormat: OutputFormat,
+  valueFormatter: ValueFormatter
+) extends OutputFormatter {
 
   def format(rs: SimpleResultSet): Unit = {
     val maxColDataWidths = rs.columns.indices
       .map(
-        c =>
+        i =>
           if (rs.rows.isEmpty) 0
-          else rs.rows.map(row => format(row(c)).length).max
+          else rs.rows.map(row => valueFormatter.format(row(i)).length).max
       )
       .toArray
 
@@ -39,7 +33,7 @@ class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
       writeHeader(rs.columns, maxColWidths)
 
     rs.rows.foreach(row => {
-      writeRow(row.map(format), maxColWidths)
+      writeRow(row.map(valueFormatter.format), maxColWidths)
     })
 
     if (outputFormat.withHeader)
