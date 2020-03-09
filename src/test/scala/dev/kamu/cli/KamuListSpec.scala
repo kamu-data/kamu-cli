@@ -20,7 +20,7 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
         "Kind",
         "Records",
         "Size",
-        "LastModified"
+        "Pulled"
       )
       rs.rows shouldEqual Vector.empty
     }
@@ -40,7 +40,7 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
         "Kind",
         "Records",
         "Size",
-        "LastModified"
+        "Pulled"
       )
       rs.rows should contain theSameElementsAs Seq(
         Array(
@@ -48,14 +48,14 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
           "Root",
           0,
           0,
-          kamu.systemClock.instant()
+          None
         ),
         Array(
           derivDS.id,
           "Derivative",
           0,
           0,
-          kamu.systemClock.instant()
+          None
         )
       )
     }

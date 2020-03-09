@@ -69,8 +69,13 @@ class AddCommand(
       }
     }
 
-    val depGraph = new DependencyGraph[DatasetID](sources(_).dependsOn.toList)
-    val ordered = depGraph.resolve(sources.keys.toList)
+    val depGraph = new DependencyGraph[DatasetID](
+      sources.get(_).map(_.dependsOn.toList).getOrElse(List.empty)
+    )
+
+    val ordered = depGraph
+      .resolve(sources.keys.toList)
+      .filter(sources.contains)
 
     val numAdded = ordered
       .map(sources(_))

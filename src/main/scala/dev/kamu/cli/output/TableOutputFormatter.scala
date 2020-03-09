@@ -14,12 +14,21 @@ import scala.math.max
 class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
     extends OutputFormatter {
 
+  def format(value: Any): String = {
+    value match {
+      case null       => ""
+      case None       => ""
+      case Some(some) => format(some)
+      case other      => other.toString
+    }
+  }
+
   def format(rs: SimpleResultSet): Unit = {
     val maxColDataWidths = rs.columns.indices
       .map(
         c =>
           if (rs.rows.isEmpty) 0
-          else rs.rows.map(row => row(c).toString.length).max
+          else rs.rows.map(row => format(row(c)).length).max
       )
       .toArray
 
@@ -30,7 +39,7 @@ class TableOutputFormatter(stream: PrintStream, outputFormat: OutputFormat)
       writeHeader(rs.columns, maxColWidths)
 
     rs.rows.foreach(row => {
-      writeRow(row.map(_.toString), maxColWidths)
+      writeRow(row.map(format), maxColWidths)
     })
 
     if (outputFormat.withHeader)

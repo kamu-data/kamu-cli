@@ -25,7 +25,7 @@ class ListCommand(
     rs.addColumn("Kind")
     rs.addColumn("Records")
     rs.addColumn("Size")
-    rs.addColumn("LastModified")
+    rs.addColumn("Pulled")
 
     metadataRepository
       .getAllDatasets()
@@ -38,7 +38,7 @@ class ListCommand(
           kind,
           summary.numRecords,
           summary.dataSize,
-          summary.lastModified
+          summary.lastPulled
         )
       })
 
