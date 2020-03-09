@@ -15,7 +15,13 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
     withEmptyWorkspace { kamu =>
       val rs = kamu.runEx("list").resultSet.get
 
-      rs.columns shouldEqual Vector("ID", "Kind")
+      rs.columns shouldEqual Vector(
+        "ID",
+        "Kind",
+        "Records",
+        "Size",
+        "LastModified"
+      )
       rs.rows shouldEqual Vector.empty
     }
   }
@@ -29,11 +35,29 @@ class KamuListSpec extends FlatSpec with Matchers with KamuTestBase {
 
       val rs = kamu.runEx("list").resultSet.get
 
-      rs.columns shouldEqual Vector("ID", "Kind")
-      rs.rows should contain theSameElementsAs (Seq(
-        Array(rootDS.id, "Root"),
-        Array(derivDS.id, "Derivative")
-      ))
+      rs.columns shouldEqual Vector(
+        "ID",
+        "Kind",
+        "Records",
+        "Size",
+        "LastModified"
+      )
+      rs.rows should contain theSameElementsAs Seq(
+        Array(
+          rootDS.id,
+          "Root",
+          0,
+          0,
+          kamu.systemClock.instant()
+        ),
+        Array(
+          derivDS.id,
+          "Derivative",
+          0,
+          0,
+          kamu.systemClock.instant()
+        )
+      )
     }
   }
 }

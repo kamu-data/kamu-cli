@@ -8,6 +8,7 @@
 
 package dev.kamu.cli
 
+import dev.kamu.core.utils.AutoClock
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager}
@@ -17,6 +18,8 @@ class UsageException(message: String = "", cause: Throwable = None.orNull)
 
 object KamuApp extends App {
   val logger = LogManager.getLogger(getClass.getName)
+
+  val systemClock = new AutoClock()
 
   val fileSystem = FileSystem.get(new Configuration())
   FileSystem.enableSymlinks()
@@ -36,7 +39,7 @@ object KamuApp extends App {
       .getLogger(getClass.getPackage.getName)
       .setLevel(if (cliArgs.debug()) Level.ALL else cliArgs.logLevel())
 
-    new Kamu(config, fileSystem)
+    new Kamu(config, fileSystem, systemClock)
       .run(cliArgs)
   } catch {
     case e: UsageException =>

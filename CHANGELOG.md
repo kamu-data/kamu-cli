@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2020-03-08
+### Added
+- `list` command now shows data size, number of records, and last modified time
+- `add` command now accounts for dataset dependency order
+
 ## [0.9.0] - 2020-03-08
 ### Changed
 - Using new metadata chain prototype!

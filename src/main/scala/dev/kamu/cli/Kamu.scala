@@ -13,17 +13,16 @@ import java.io.PrintStream
 import dev.kamu.cli.commands._
 import dev.kamu.cli.external._
 import dev.kamu.cli.output._
-import dev.kamu.core.utils.AutoClock
+import dev.kamu.core.utils.{AutoClock, Clock}
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
 class Kamu(
   config: KamuConfig,
-  fileSystem: FileSystem
+  fileSystem: FileSystem,
+  systemClock: Clock
 ) {
-  val systemClock = new AutoClock()
-
   val workspaceLayout = WorkspaceLayout(
     kamuRootDir = config.kamuRoot,
     metadataDir = config.kamuRoot.resolve("datasets"),

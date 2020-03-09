@@ -13,7 +13,8 @@ import java.nio.charset.StandardCharsets
 
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.fs._
-import dev.kamu.core.manifests.{DatasetSnapshot, DatasetID}
+import dev.kamu.core.manifests.{DatasetID, DatasetSnapshot}
+import dev.kamu.core.utils.{Clock, ManualClock}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -39,8 +40,9 @@ case class CommandResult(
 class KamuTestAdapter(
   val config: KamuConfig, // config should be public for tests to access workspaceRoot
   fileSystem: FileSystem,
-  spark: SparkSession
-) extends Kamu(config, fileSystem) {
+  spark: SparkSession,
+  val systemClock: ManualClock
+) extends Kamu(config, fileSystem, systemClock) {
 
   val _captureFormatter = new CaptureOutputFormatter
   val _captureOutput = new ByteArrayOutputStream()

@@ -23,19 +23,24 @@ class ListCommand(
     val rs = new SimpleResultSet()
     rs.addColumn("ID")
     rs.addColumn("Kind")
+    rs.addColumn("Records")
+    rs.addColumn("Size")
+    rs.addColumn("LastModified")
 
     metadataRepository
       .getAllDatasets()
-      .map(
-        id => (id, metadataRepository.getDatasetKind(id).toString)
-      )
-      .sortBy {
-        case (id, _) => id.toString
-      }
-      .foreach {
-        case (id, kind) =>
-          rs.addRow(id, kind)
-      }
+      .sortBy(_.toString)
+      .foreach(id => {
+        val kind = metadataRepository.getDatasetKind(id).toString
+        val summary = metadataRepository.getDatasetSummary(id)
+        rs.addRow(
+          id,
+          kind,
+          summary.numRecords,
+          summary.dataSize,
+          summary.lastModified
+        )
+      })
 
     outputFormatter.format(rs)
   }
