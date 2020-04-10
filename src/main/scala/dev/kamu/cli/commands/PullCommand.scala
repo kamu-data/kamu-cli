@@ -16,7 +16,12 @@ import dev.kamu.cli.{
   WorkspaceLayout
 }
 import dev.kamu.core.ingest.polling
-import dev.kamu.core.manifests.{DatasetID, DatasetKind, ExternalSourceKind}
+import dev.kamu.core.manifests.{
+  Manifest,
+  DatasetID,
+  DatasetKind,
+  ExternalSourceKind
+}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.transform.streaming
 import dev.kamu.core.utils.fs._
@@ -131,7 +136,7 @@ class PullCommand(
       workspaceLayout = workspaceLayout,
       appClass = "dev.kamu.core.ingest.polling.IngestApp",
       extraFiles = Map(
-        "pollConfig.yaml" -> (os => yaml.save(pollConfig.asManifest, os))
+        "pollConfig.yaml" -> (os => yaml.save(Manifest(pollConfig), os))
       ),
       extraMounts = extraMounts
     )
@@ -185,7 +190,7 @@ class PullCommand(
       appClass = "dev.kamu.core.transform.streaming.TransformApp",
       extraFiles = Map(
         "transformConfig.yaml" -> (
-          os => yaml.save(transformConfig.asManifest, os)
+          os => yaml.save(Manifest(transformConfig), os)
         )
       )
     )

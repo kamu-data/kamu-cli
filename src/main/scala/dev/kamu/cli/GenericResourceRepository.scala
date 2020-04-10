@@ -19,7 +19,7 @@ import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
 import scala.reflect.ClassTag
 
-class GenericResourceRepository[TRes <: Resource[TRes]: ClassTag, TID](
+class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
   fileSystem: FileSystem,
   storagePath: Path,
   resourceKind: String,
@@ -111,7 +111,7 @@ class GenericResourceRepository[TRes <: Resource[TRes]: ClassTag, TID](
     val outputStream = fileSystem.create(path)
 
     try {
-      yaml.save(res.asManifest, outputStream)
+      yaml.save(Manifest(res), outputStream)
     } catch {
       case e: Exception =>
         outputStream.close()

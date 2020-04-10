@@ -34,7 +34,7 @@ class ResourceLoader(
 ) {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  def loadResourceFromFile[T <: Resource[T]: ClassTag](
+  def loadResourceFromFile[T <: Resource: ClassTag](
     p: Path
   )(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
@@ -47,7 +47,7 @@ class ResourceLoader(
     }
   }
 
-  def saveResourceToFile[T <: Resource[T]: ClassTag](
+  def saveResourceToFile[T <: Resource: ClassTag](
     res: T,
     path: Path
   )(
@@ -56,7 +56,7 @@ class ResourceLoader(
     val outputStream = fileSystem.create(path)
 
     try {
-      yaml.save(res.asManifest, outputStream)
+      yaml.save(Manifest(res), outputStream)
     } catch {
       case e: Exception =>
         outputStream.close()
@@ -67,7 +67,7 @@ class ResourceLoader(
     }
   }
 
-  def loadResourceFromURI[T <: Resource[T]: ClassTag](
+  def loadResourceFromURI[T <: Resource: ClassTag](
     uri: URI
   )(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
@@ -80,7 +80,7 @@ class ResourceLoader(
     }
   }
 
-  private def loadResourceFromURL[T <: Resource[T]: ClassTag](
+  private def loadResourceFromURL[T <: Resource: ClassTag](
     url: java.net.URL
   )(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]

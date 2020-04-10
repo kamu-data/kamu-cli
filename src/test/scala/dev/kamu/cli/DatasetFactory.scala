@@ -10,7 +10,10 @@ package dev.kamu.cli
 
 import java.net.URI
 
+import pureconfig.generic.auto._
 import dev.kamu.core.manifests._
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 
 import scala.util.Random
 
@@ -89,9 +92,10 @@ object DatasetFactory {
               id = source
             )
           ),
-          steps = Vector(
-            ProcessingStepKind.SparkSQL(
-              query = sql.getOrElse(s"SELECT * FROM `$source`")
+          transform = yaml.saveObj(
+            TransformKind.SparkSQL(
+              engine = "sparkSQL",
+              query = Some(sql.getOrElse(s"SELECT * FROM `$source`"))
             )
           )
         )

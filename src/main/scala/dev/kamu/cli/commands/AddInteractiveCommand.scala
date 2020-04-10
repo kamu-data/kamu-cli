@@ -171,7 +171,12 @@ class AddInteractiveCommand(
           derivativeSource = Some(
             DerivativeSource(
               inputs = Vector.empty,
-              steps = Vector.empty
+              transform = yaml.saveObj(
+                TransformKind.SparkSQL(
+                  engine = "sparkSQL",
+                  query = Some("SELECT * FROM input")
+                )
+              )
             )
           )
         )
