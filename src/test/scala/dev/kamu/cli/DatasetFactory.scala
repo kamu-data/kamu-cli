@@ -64,7 +64,7 @@ object DatasetFactory {
     DatasetSnapshot(
       id = _id,
       source = SourceKind.Root(
-        fetch = FetchKind.FetchUrl(url.getOrElse(newURL(_id))),
+        fetch = FetchSourceKind.Url(url.getOrElse(newURL(_id))),
         read = ReaderKind.Generic(
           name = format.getOrElse("csv"),
           options = if (!header) Map.empty else Map("header" -> "true"),

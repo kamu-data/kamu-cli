@@ -156,7 +156,7 @@ class AddInteractiveCommand(
         DatasetSnapshot(
           id = id,
           source = SourceKind.Root(
-            fetch = FetchKind.FetchUrl(url = url),
+            fetch = FetchSourceKind.Url(url = url),
             prepare = prepareSteps,
             read = ReaderKind
               .Generic(name = format, options = readerOptions.toMap),

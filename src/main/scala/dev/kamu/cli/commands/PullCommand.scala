@@ -16,11 +16,10 @@ import dev.kamu.cli.{
   WorkspaceLayout
 }
 import dev.kamu.core.ingest.polling
-import dev.kamu.core.manifests
 import dev.kamu.core.manifests.{
   DatasetID,
   DatasetKind,
-  FetchKind,
+  FetchSourceKind,
   Manifest,
   SourceKind
 }
@@ -118,12 +117,12 @@ class PullCommand(
           }
       })
       .flatMap({
-        case furl: FetchKind.FetchUrl =>
+        case furl: FetchSourceKind.Url =>
           furl.url.getScheme match {
             case "file" | null => List(new Path(furl.url))
             case _             => List.empty
           }
-        case glob: FetchKind.FetchFilesGlob =>
+        case glob: FetchSourceKind.FilesGlob =>
           List(glob.path.getParent)
       })
 
