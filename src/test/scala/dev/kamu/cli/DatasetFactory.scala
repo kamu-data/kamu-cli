@@ -63,16 +63,14 @@ object DatasetFactory {
     val _id = id.getOrElse(newDatasetID())
     DatasetSnapshot(
       id = _id,
-      rootPollingSource = Some(
-        RootPollingSource(
-          fetch = ExternalSourceKind.FetchUrl(url.getOrElse(newURL(_id))),
-          read = ReaderKind.Generic(
-            name = format.getOrElse("csv"),
-            options = if (!header) Map.empty else Map("header" -> "true"),
-            schema = schema.toVector
-          ),
-          merge = mergeStrategy.getOrElse(MergeStrategyKind.Append())
-        )
+      source = SourceKind.Root(
+        fetch = FetchKind.FetchUrl(url.getOrElse(newURL(_id))),
+        read = ReaderKind.Generic(
+          name = format.getOrElse("csv"),
+          options = if (!header) Map.empty else Map("header" -> "true"),
+          schema = schema.toVector
+        ),
+        merge = mergeStrategy.getOrElse(MergeStrategyKind.Append())
       )
     ).postLoad()
   }
@@ -85,18 +83,16 @@ object DatasetFactory {
     val _id = id.getOrElse(newDatasetID())
     DatasetSnapshot(
       id = _id,
-      derivativeSource = Some(
-        DerivativeSource(
-          inputs = Vector(
-            DerivativeInput(
-              id = source
-            )
-          ),
-          transform = yaml.saveObj(
-            TransformKind.SparkSQL(
-              engine = "sparkSQL",
-              query = Some(sql.getOrElse(s"SELECT * FROM `$source`"))
-            )
+      source = SourceKind.Derivative(
+        inputs = Vector(
+          SourceKind.Derivative.Input(
+            id = source
+          )
+        ),
+        transform = yaml.saveObj(
+          TransformKind.SparkSQL(
+            engine = "sparkSQL",
+            query = Some(sql.getOrElse(s"SELECT * FROM `$source`"))
           )
         )
       )

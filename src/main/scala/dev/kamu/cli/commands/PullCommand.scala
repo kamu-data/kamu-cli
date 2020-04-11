@@ -16,11 +16,13 @@ import dev.kamu.cli.{
   WorkspaceLayout
 }
 import dev.kamu.core.ingest.polling
+import dev.kamu.core.manifests
 import dev.kamu.core.manifests.{
-  Manifest,
   DatasetID,
   DatasetKind,
-  ExternalSourceKind
+  FetchKind,
+  Manifest,
+  SourceKind
 }
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.transform.streaming
@@ -109,16 +111,19 @@ class PullCommand(
 
         metaChain
           .getBlocks()
-          .flatMap(_.rootPollingSource)
-          .map(_.fetch)
+          .flatMap(_.source)
+          .flatMap {
+            case r: SourceKind.Root => Some(r.fetch)
+            case _                  => None
+          }
       })
       .flatMap({
-        case furl: ExternalSourceKind.FetchUrl =>
+        case furl: FetchKind.FetchUrl =>
           furl.url.getScheme match {
             case "file" | null => List(new Path(furl.url))
             case _             => List.empty
           }
-        case glob: ExternalSourceKind.FetchFilesGlob =>
+        case glob: FetchKind.FetchFilesGlob =>
           List(glob.path.getParent)
       })
 
@@ -170,8 +175,11 @@ class PullCommand(
         // TODO: Costly chain traversal
         val allInputs = metaChain
           .getBlocks()
-          .flatMap(_.derivativeSource)
-          .flatMap(_.inputs)
+          .flatMap(_.source)
+          .flatMap {
+            case d: SourceKind.Derivative => d.inputs
+            case _                        => Seq.empty
+          }
           .map(_.id)
 
         val allDatasets = allInputs :+ id

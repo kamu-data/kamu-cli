@@ -155,27 +155,23 @@ class AddInteractiveCommand(
 
         DatasetSnapshot(
           id = id,
-          rootPollingSource = Some(
-            RootPollingSource(
-              fetch = ExternalSourceKind.FetchUrl(url = url),
-              prepare = prepareSteps,
-              read = ReaderKind
-                .Generic(name = format, options = readerOptions.toMap),
-              merge = mergeStrategy
-            )
+          source = SourceKind.Root(
+            fetch = FetchKind.FetchUrl(url = url),
+            prepare = prepareSteps,
+            read = ReaderKind
+              .Generic(name = format, options = readerOptions.toMap),
+            merge = mergeStrategy
           )
         )
       case "derivative" =>
         DatasetSnapshot(
           id = id,
-          derivativeSource = Some(
-            DerivativeSource(
-              inputs = Vector.empty,
-              transform = yaml.saveObj(
-                TransformKind.SparkSQL(
-                  engine = "sparkSQL",
-                  query = Some("SELECT * FROM input")
-                )
+          source = SourceKind.Derivative(
+            inputs = Vector.empty,
+            transform = yaml.saveObj(
+              TransformKind.SparkSQL(
+                engine = "sparkSQL",
+                query = Some("SELECT * FROM input")
               )
             )
           )
