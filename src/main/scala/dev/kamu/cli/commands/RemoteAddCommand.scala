@@ -8,30 +8,30 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.VolumeOperatorFactory
+import dev.kamu.cli.external.RemoteOperatorFactory
 import dev.kamu.cli.{
   AlreadyExistsException,
   MetadataRepository,
   MissingReferenceException,
   SchemaNotSupportedException
 }
-import dev.kamu.core.manifests.Volume
+import dev.kamu.core.manifests.Remote
 import org.apache.log4j.LogManager
 
-class VolumeAddCommand(
+class RemoteAddCommand(
   metadataRepository: MetadataRepository,
-  volumeOperatorFactory: VolumeOperatorFactory,
+  remoteOperatorFactory: RemoteOperatorFactory,
   manifests: Seq[java.net.URI],
   replace: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val volumes = {
+    val remotes = {
       try {
         manifests.map(manifestURI => {
-          logger.debug(s"Loading volume from: $manifestURI")
-          metadataRepository.loadVolumeFromURI(manifestURI)
+          logger.debug(s"Loading remote from: $manifestURI")
+          metadataRepository.loadRemoteFromURI(manifestURI)
         })
       } catch {
         case e: java.io.FileNotFoundException =>
@@ -44,10 +44,10 @@ class VolumeAddCommand(
     }
 
     @scala.annotation.tailrec
-    def addVolume(volume: Volume): Boolean = {
+    def addRemote(remote: Remote): Boolean = {
       try {
-        volumeOperatorFactory.ensureSupported(volume)
-        metadataRepository.addVolume(volume)
+        remoteOperatorFactory.ensureSupported(remote)
+        metadataRepository.addRemote(remote)
         true
       } catch {
         case e: NotImplementedError =>
@@ -56,8 +56,8 @@ class VolumeAddCommand(
         case e: AlreadyExistsException =>
           if (replace) {
             logger.warn(e.getMessage + " - replacing")
-            metadataRepository.deleteVolume(volume.id)
-            addVolume(volume)
+            metadataRepository.deleteRemote(remote.id)
+            addRemote(remote)
           } else {
             logger.warn(e.getMessage + " - skipping")
             false
@@ -68,8 +68,8 @@ class VolumeAddCommand(
       }
     }
 
-    val numAdded = volumes
-      .map(addVolume)
+    val numAdded = remotes
+      .map(addRemote)
       .count(added => added)
 
     logger.info(s"Added $numAdded volume(s)")

@@ -9,10 +9,10 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.{DoesNotExistException, MetadataRepository}
-import dev.kamu.core.manifests.VolumeID
+import dev.kamu.core.manifests.RemoteID
 import org.apache.log4j.LogManager
 
-class VolumeDeleteCommand(
+class RemoteDeleteCommand(
   metadataRepository: MetadataRepository,
   ids: Seq[String]
 ) extends Command {
@@ -20,10 +20,10 @@ class VolumeDeleteCommand(
 
   def run(): Unit = {
     val numDeleted = ids
-      .map(VolumeID)
+      .map(RemoteID)
       .map(id => {
         try {
-          metadataRepository.deleteVolume(id)
+          metadataRepository.deleteRemote(id)
           1
         } catch {
           case e: DoesNotExistException =>

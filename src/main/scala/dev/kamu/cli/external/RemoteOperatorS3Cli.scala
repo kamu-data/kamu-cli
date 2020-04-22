@@ -8,24 +8,24 @@
 
 package dev.kamu.cli.external
 
-import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{DatasetID, Volume, VolumeLayout}
+import dev.kamu.cli.MetadataRepository
+import dev.kamu.core.manifests.{DatasetID, Remote, VolumeLayout}
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
 import scala.sys.process.Process
 
-class VolumeOperatorS3Cli(
+class RemoteOperatorS3Cli(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
-  volume: Volume
-) extends VolumeOperator {
+  remote: Remote
+) extends RemoteOperator {
   private val logger = LogManager.getLogger(getClass.getName)
 
   override def push(datasets: Seq[DatasetID]): Unit = {
     withVolumeLayout(datasets) { localDir =>
-      s3Sync(localDir, new Path(volume.url))
+      s3Sync(localDir, new Path(remote.url))
     }
   }
 
@@ -39,7 +39,7 @@ class VolumeOperatorS3Cli(
 
     for (id <- datasets) {
       // TODO: Do one sync instead since volume layouts should match
-      val sourceLayout = remoteVolumeLayout.relativeTo(new Path(volume.url))
+      val sourceLayout = remoteVolumeLayout.relativeTo(new Path(remote.url))
       val destLayout = metadataRepository.getDatasetLayout(id)
 
       s3Sync(
@@ -81,11 +81,12 @@ class VolumeOperatorS3Cli(
           false
         )
 
-        fileSystem.createSymlink(
-          datasetLayout.checkpointsDir,
-          targetLayout.checkpointsDir.resolve(id.toString),
-          false
-        )
+        if (fileSystem.exists(datasetLayout.checkpointsDir))
+          fileSystem.createSymlink(
+            datasetLayout.checkpointsDir,
+            targetLayout.checkpointsDir.resolve(id.toString),
+            false
+          )
 
         fileSystem.createSymlink(
           datasetLayout.metadataDir,

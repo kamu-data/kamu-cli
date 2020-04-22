@@ -8,29 +8,66 @@
 
 package dev.kamu.cli.commands
 
+import java.net.URI
+
 import dev.kamu.cli.utility.DependencyGraph
 import dev.kamu.cli.{
   AlreadyExistsException,
+  DoesNotExistException,
   MetadataRepository,
   MissingReferenceException,
   SchemaNotSupportedException
 }
-import dev.kamu.core.manifests.{DatasetID, DatasetSnapshot}
+import dev.kamu.core.manifests.{DatasetID, DatasetRef, DatasetSnapshot}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
 class AddCommand(
   fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
-  manifests: Seq[java.net.URI],
+  urls: Seq[URI],
   replace: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
+    val (remoteRefs, rest) = partitionRemoteRefs(urls)
+    val numAdded = addDatasetsFromRemotes(remoteRefs) + addDatasetsFromManifests(
+      rest
+    )
+    logger.info(s"Added $numAdded dataset(s)")
+  }
+
+  private def partitionRemoteRefs(
+    urls: Seq[URI]
+  ): (Vector[DatasetRef], Vector[URI]) = {
+    val parsed = urls
+      .map(url => {
+        DatasetRef.fromString(url.toString) match {
+          case Some(ref) =>
+            try {
+              metadataRepository.getRemote(ref.remoteID)
+              Left(ref)
+            } catch {
+              case _: DoesNotExistException =>
+                Right(url)
+            }
+          case None =>
+            Right(url)
+        }
+      })
+      .toVector
+
+    (
+      parsed.flatMap(_.left.toOption),
+      parsed.flatMap(_.right.toOption)
+    )
+  }
+
+  private def addDatasetsFromManifests(manifestUrls: Seq[URI]): Int = {
     val sources = {
       try {
-        manifests
+        manifestUrls
           .map(manifestURI => {
             logger.debug(s"Loading dataset from: $manifestURI")
             val snapshot =
@@ -48,27 +85,6 @@ class AddCommand(
       }
     }
 
-    @scala.annotation.tailrec
-    def addDataset(ds: DatasetSnapshot): Boolean = {
-      try {
-        metadataRepository.addDataset(ds)
-        true
-      } catch {
-        case e: AlreadyExistsException =>
-          if (replace) {
-            logger.warn(e.getMessage + " - replacing")
-            metadataRepository.deleteDataset(ds.id)
-            addDataset(ds)
-          } else {
-            logger.warn(e.getMessage + " - skipping")
-            false
-          }
-        case e: MissingReferenceException =>
-          logger.warn(e.getMessage + " - skipping")
-          false
-      }
-    }
-
     val depGraph = new DependencyGraph[DatasetID](
       sources.get(_).map(_.dependsOn.toList).getOrElse(List.empty)
     )
@@ -77,11 +93,54 @@ class AddCommand(
       .resolve(sources.keys.toList)
       .filter(sources.contains)
 
-    val numAdded = ordered
+    ordered
       .map(sources(_))
-      .map(addDataset)
+      .map(addDatasetFromSnapshot)
       .count(added => added)
+  }
 
-    logger.info(s"Added $numAdded dataset(s)")
+  @scala.annotation.tailrec
+  private def addDatasetFromSnapshot(ds: DatasetSnapshot): Boolean = {
+    try {
+      metadataRepository.addDataset(ds)
+      true
+    } catch {
+      case e: AlreadyExistsException =>
+        if (replace) {
+          logger.warn(e.getMessage + " - replacing")
+          metadataRepository.deleteDataset(ds.id)
+          addDatasetFromSnapshot(ds)
+        } else {
+          logger.warn(e.getMessage + " - skipping")
+          false
+        }
+      case e: MissingReferenceException =>
+        logger.warn(e.getMessage + " - skipping")
+        false
+    }
+  }
+
+  private def addDatasetsFromRemotes(refs: Seq[DatasetRef]): Int = {
+    refs
+      .map(addDatasetFromRemote)
+      .count(added => added)
+  }
+
+  @scala.annotation.tailrec
+  private def addDatasetFromRemote(ref: DatasetRef): Boolean = {
+    try {
+      metadataRepository.addDatasetReference(ref)
+      true
+    } catch {
+      case e: AlreadyExistsException =>
+        if (replace) {
+          logger.warn(e.getMessage + " - replacing")
+          metadataRepository.deleteDataset(DatasetID(e.id))
+          addDatasetFromRemote(ref)
+        } else {
+          logger.warn(e.getMessage + " - skipping")
+          false
+        }
+    }
   }
 }

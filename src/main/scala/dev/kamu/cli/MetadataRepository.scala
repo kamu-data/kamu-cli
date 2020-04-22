@@ -17,8 +17,8 @@ import dev.kamu.core.manifests.{
   DatasetRef,
   DatasetSnapshot,
   DatasetSummary,
-  Volume,
-  VolumeID,
+  Remote,
+  RemoteID,
   VolumeLayout
 }
 import dev.kamu.cli.utility.DependencyGraph
@@ -41,12 +41,12 @@ class MetadataRepository(
   private val logger = LogManager.getLogger(getClass.getName)
 
   protected val volumeRepo =
-    new GenericResourceRepository[Volume, VolumeID](
+    new GenericResourceRepository[Remote, RemoteID](
       fileSystem,
-      workspaceLayout.volumesDir,
-      "volume",
-      VolumeID,
-      (vol: Volume) => vol.id
+      workspaceLayout.remotesDir,
+      "remote",
+      RemoteID,
+      (remote: Remote) => remote.id
     )
 
   ////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ class MetadataRepository(
   ////////////////////////////////////////////////////////////////////////////
 
   protected def remoteRefFilePath(id: DatasetID): Path = {
-    workspaceLayout.metadataDir.resolve(id.toString).resolve("remote.yaml")
+    workspaceLayout.metadataDir.resolve(id.toString).resolve("ref.yaml")
   }
 
   protected def datasetMetadataDir(id: DatasetID): Path = {
@@ -112,13 +112,14 @@ class MetadataRepository(
     chain.getSummary()
   }
 
-  def getDatasetVolumeID(id: DatasetID): VolumeID = {
+  def getDatasetRef(id: DatasetID): DatasetRef = {
     if (!isRemote(id))
       throw new RuntimeException(s"Dataset $id is not remote")
+
     val refFile = remoteRefFilePath(id)
-    val ref = new ResourceLoader(fileSystem)
+
+    new ResourceLoader(fileSystem)
       .loadResourceFromFile[DatasetRef](refFile)
-    ref.volumeID
   }
 
   protected def getDatasetDependencies(id: DatasetID): List[DatasetID] = {
@@ -176,17 +177,19 @@ class MetadataRepository(
     chain.init(ds, systemClock.instant())
   }
 
-  def addDatasetReference(id: DatasetID, volumeID: VolumeID): Unit = {
-    val datasetDir = workspaceLayout.metadataDir.resolve(id.toString)
+  def addDatasetReference(datasetRef: DatasetRef): Unit = {
+    val localDatasetID = datasetRef.alias.getOrElse(datasetRef.datasetID)
+    val datasetDir =
+      workspaceLayout.metadataDir.resolve(localDatasetID.toString)
 
     if (fileSystem.exists(datasetDir))
-      throw new AlreadyExistsException(id.toString, "dataset")
+      throw new AlreadyExistsException(localDatasetID.toString, "dataset")
 
-    getVolume(volumeID)
+    getRemote(datasetRef.remoteID)
 
     fileSystem.mkdirs(datasetDir)
     new ResourceLoader(fileSystem)
-      .saveResourceToFile(DatasetRef(volumeID), remoteRefFilePath(id))
+      .saveResourceToFile(datasetRef, remoteRefFilePath(localDatasetID))
   }
 
   def deleteDataset(id: DatasetID): Unit = {
@@ -237,29 +240,29 @@ class MetadataRepository(
     )
   }
 
-  def loadVolumeFromURI(uri: URI): Volume = {
+  def loadRemoteFromURI(uri: URI): Remote = {
     volumeRepo.loadResourceFromURI(uri)
   }
 
-  def getAllVolumeIDs(): Seq[VolumeID] = {
+  def getAllRemoteIDs(): Seq[RemoteID] = {
     volumeRepo.getAllResourceIDs()
   }
 
-  def getAllVolumes(): Seq[Volume] = {
+  def getAllRemotes(): Seq[Remote] = {
     volumeRepo.getAllResources()
   }
 
-  def getVolume(volumeID: VolumeID): Volume = {
-    volumeRepo.getResource(volumeID)
+  def getRemote(remoteID: RemoteID): Remote = {
+    volumeRepo.getResource(remoteID)
   }
 
-  def addVolume(volume: Volume): Unit = {
-    volumeRepo.addResource(volume)
+  def addRemote(remote: Remote): Unit = {
+    volumeRepo.addResource(remote)
   }
 
-  def deleteVolume(volumeID: VolumeID): Unit = {
+  def deleteRemote(remoteID: RemoteID): Unit = {
     // TODO: validate references
-    volumeRepo.deleteResource(volumeID)
+    volumeRepo.deleteResource(remoteID)
   }
 
 }

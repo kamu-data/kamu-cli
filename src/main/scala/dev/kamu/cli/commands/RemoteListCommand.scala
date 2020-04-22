@@ -12,7 +12,7 @@ import dev.kamu.cli.MetadataRepository
 import dev.kamu.cli.output.{OutputFormatter, SimpleResultSet}
 import org.apache.log4j.LogManager
 
-class VolumeListCommand(
+class RemoteListCommand(
   metadataRepository: MetadataRepository,
   outputFormatter: OutputFormatter
 ) extends Command {
@@ -25,7 +25,7 @@ class VolumeListCommand(
     rs.addColumn("URL")
 
     metadataRepository
-      .getAllVolumes()
+      .getAllRemotes()
       .map(
         v => (v.id.toString, v.url.toString)
       )

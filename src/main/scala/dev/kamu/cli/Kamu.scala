@@ -13,7 +13,7 @@ import java.io.PrintStream
 import dev.kamu.cli.commands._
 import dev.kamu.cli.external._
 import dev.kamu.cli.output._
-import dev.kamu.core.utils.{AutoClock, Clock}
+import dev.kamu.core.utils.Clock
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
@@ -26,15 +26,15 @@ class Kamu(
   val workspaceLayout = WorkspaceLayout(
     kamuRootDir = config.kamuRoot,
     metadataDir = config.kamuRoot.resolve("datasets"),
-    volumesDir = config.kamuRoot.resolve("volumes"),
+    remotesDir = config.kamuRoot.resolve("remotes"),
     localVolumeDir = config.localVolume
   ).toAbsolute(fileSystem)
 
   val metadataRepository =
     new MetadataRepository(fileSystem, workspaceLayout, systemClock)
 
-  val volumeOperatorFactory =
-    new VolumeOperatorFactory(fileSystem, workspaceLayout, metadataRepository)
+  val remoteOperatorFactory =
+    new RemoteOperatorFactory(fileSystem, workspaceLayout, metadataRepository)
 
   def run(cliArgs: CliArgs): Unit = {
     val command = getCommand(cliArgs)
@@ -80,13 +80,6 @@ class Kamu(
             c.add.manifests(),
             c.add.replace()
           )
-      case List(c.add, c.add.remote) =>
-        new AddRemoteCommand(
-          fileSystem,
-          metadataRepository,
-          c.add.remote.volumeID(),
-          c.add.remote.datasetID()
-        )
       case List(c.purge) =>
         new PurgeCommand(
           metadataRepository,
@@ -103,7 +96,7 @@ class Kamu(
           fileSystem,
           workspaceLayout,
           metadataRepository,
-          volumeOperatorFactory,
+          remoteOperatorFactory,
           getSparkRunner(
             c.localSpark(),
             if (c.debug()) Level.INFO else c.sparkLogLevel()
@@ -117,28 +110,28 @@ class Kamu(
           fileSystem,
           workspaceLayout,
           metadataRepository,
-          volumeOperatorFactory,
-          c.push.volume(),
+          remoteOperatorFactory,
+          c.push.remote(),
           c.push.ids(),
           c.push.all(),
           c.push.recursive()
         )
-      case List(c.volume, c.volume.list) =>
-        new VolumeListCommand(
+      case List(c.remote, c.remote.list) =>
+        new RemoteListCommand(
           metadataRepository,
-          getOutputFormatter(c.volume.list.getOutputFormat)
+          getOutputFormatter(c.remote.list.getOutputFormat)
         )
-      case List(c.volume, c.volume.add) =>
-        new VolumeAddCommand(
+      case List(c.remote, c.remote.add) =>
+        new RemoteAddCommand(
           metadataRepository,
-          volumeOperatorFactory,
-          c.volume.add.manifests(),
-          c.volume.add.replace()
+          remoteOperatorFactory,
+          c.remote.add.manifests(),
+          c.remote.add.replace()
         )
-      case List(c.volume, c.volume.delete) =>
-        new VolumeDeleteCommand(
+      case List(c.remote, c.remote.delete) =>
+        new RemoteDeleteCommand(
           metadataRepository,
-          c.volume.delete.ids()
+          c.remote.delete.ids()
         )
       case List(c.sql) =>
         new SQLShellCommand(

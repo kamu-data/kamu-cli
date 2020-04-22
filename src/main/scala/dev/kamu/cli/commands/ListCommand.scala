@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.MetadataRepository
+import dev.kamu.cli.{DoesNotExistException, MetadataRepository}
 import dev.kamu.cli.output.{FormatHint, OutputFormatter, SimpleResultSet}
 import org.apache.log4j.LogManager
 
@@ -32,14 +32,25 @@ class ListCommand(
       .sortBy(_.toString)
       .foreach(id => {
         val kind = metadataRepository.getDatasetKind(id).toString
-        val summary = metadataRepository.getDatasetSummary(id)
-        rs.addRow(
-          id,
-          kind,
-          summary.numRecords,
-          FormatHint.MemorySize(summary.dataSize),
-          summary.lastPulled.map(FormatHint.RelativeTime)
-        )
+        try {
+          val summary = metadataRepository.getDatasetSummary(id)
+          rs.addRow(
+            id,
+            kind,
+            summary.numRecords,
+            FormatHint.MemorySize(summary.dataSize),
+            summary.lastPulled.map(FormatHint.RelativeTime)
+          )
+        } catch {
+          case _: DoesNotExistException =>
+            rs.addRow(
+              id,
+              kind,
+              null,
+              null,
+              null
+            )
+        }
       })
 
     outputFormatter.format(rs)

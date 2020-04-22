@@ -8,14 +8,14 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.VolumeOperatorFactory
+import dev.kamu.cli.external.RemoteOperatorFactory
 import dev.kamu.cli.{
   DoesNotExistException,
   MetadataRepository,
   UsageException,
   WorkspaceLayout
 }
-import dev.kamu.core.manifests.{DatasetID, Volume, VolumeID}
+import dev.kamu.core.manifests.{DatasetID, Remote, RemoteID}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 
@@ -23,8 +23,8 @@ class PushCommand(
   fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
-  volumeOperatorFactory: VolumeOperatorFactory,
-  volumeID: String,
+  remoteOperatorFactory: RemoteOperatorFactory,
+  remoteID: String,
   ids: Seq[String],
   all: Boolean,
   recursive: Boolean
@@ -32,8 +32,8 @@ class PushCommand(
   private val logger = LogManager.getLogger(getClass.getName)
 
   def run(): Unit = {
-    val volume = try {
-      metadataRepository.getVolume(VolumeID(volumeID))
+    val remote = try {
+      metadataRepository.getRemote(RemoteID(remoteID))
     } catch {
       case e: DoesNotExistException =>
         throw new UsageException(e.getMessage)
@@ -57,12 +57,12 @@ class PushCommand(
 
     logger.debug(s"Pushing following dataset(s): ${plan.mkString(", ")}")
 
-    val numPushed = pushToVolume(plan, volume)
+    val numPushed = pushToRemote(plan, remote)
     logger.info(s"Pushed $numPushed dataset(s)")
   }
 
-  def pushToVolume(datasets: Seq[DatasetID], volume: Volume): Int = {
-    val volumeOperator = volumeOperatorFactory.buildFor(volume)
+  def pushToRemote(datasets: Seq[DatasetID], remote: Remote): Int = {
+    val volumeOperator = remoteOperatorFactory.buildFor(remote)
     volumeOperator.push(datasets)
     datasets.length
   }

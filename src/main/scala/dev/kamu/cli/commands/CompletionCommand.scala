@@ -94,10 +94,10 @@ class CompletionCommand(
               "  options+=`ls \"$KAMU_ROOT/datasets\"`",
               "fi"
             )
-          case "ids" if opt.descr.contains("volume") =>
+          case "ids" if opt.descr.contains("remote") =>
             Seq(
               "if [[ -d \"$KAMU_ROOT\" ]]; then",
-              "  options+=`ls \"$KAMU_ROOT/volumes\" | sed -e 's/\\.[^.]*$//'`",
+              "  options+=`ls \"$KAMU_ROOT/remotes\" | sed -e 's/\\.[^.]*$//'`",
               "fi"
             )
           case _ =>

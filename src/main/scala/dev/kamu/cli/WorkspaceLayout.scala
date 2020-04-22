@@ -17,8 +17,8 @@ case class WorkspaceLayout(
   kamuRootDir: Path,
   /** Contains dataset metadata */
   metadataDir: Path,
-  /** Contains volume definitions */
-  volumesDir: Path,
+  /** Contains remote definitions */
+  remotesDir: Path,
   /** Root directory of a local storage volume */
   localVolumeDir: Path
 ) {
@@ -27,7 +27,7 @@ case class WorkspaceLayout(
     copy(
       kamuRootDir = fs.toAbsolute(kamuRootDir),
       metadataDir = fs.toAbsolute(metadataDir),
-      volumesDir = fs.toAbsolute(volumesDir),
+      remotesDir = fs.toAbsolute(remotesDir),
       localVolumeDir = fs.toAbsolute(localVolumeDir)
     )
   }

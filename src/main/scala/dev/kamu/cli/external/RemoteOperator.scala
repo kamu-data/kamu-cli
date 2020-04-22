@@ -9,41 +9,41 @@
 package dev.kamu.cli.external
 
 import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
-import dev.kamu.core.manifests.{DatasetID, Volume}
+import dev.kamu.core.manifests.{DatasetID, Remote}
 import org.apache.hadoop.fs.FileSystem
 
-trait VolumeOperator {
+trait RemoteOperator {
   def push(datasets: Seq[DatasetID])
 
   def pull(datasets: Seq[DatasetID])
 }
 
-class VolumeOperatorFactory(
+class RemoteOperatorFactory(
   fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository
 ) {
-  def ensureSupported(volume: Volume): Unit = {
-    volume.url.getScheme match {
+  def ensureSupported(remote: Remote): Unit = {
+    remote.url.getScheme match {
       case "s3" =>
       case _ =>
         throw new NotImplementedError(
-          s"No volume operator found that support scheme: ${volume.url.getScheme}"
+          s"No remote operator found that supports scheme: ${remote.url.getScheme}"
         )
     }
   }
 
-  def buildFor(volume: Volume): VolumeOperator = {
-    volume.url.getScheme match {
+  def buildFor(remote: Remote): RemoteOperator = {
+    remote.url.getScheme match {
       case "s3" =>
-        new VolumeOperatorS3Cli(
+        new RemoteOperatorS3Cli(
           fileSystem,
           metadataRepository,
-          volume
+          remote
         )
       case _ =>
         throw new NotImplementedError(
-          s"No volume operator found that support scheme: ${volume.url.getScheme}"
+          s"No remote operator found that supports scheme: ${remote.url.getScheme}"
         )
     }
   }

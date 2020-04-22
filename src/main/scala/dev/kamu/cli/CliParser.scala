@@ -144,10 +144,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   implicit val _addArgumentConverter = listArgConverter[java.net.URI](
     s =>
       try {
-        val uri = new java.net.URI(s);
-        if (null == uri.getScheme)
-          new java.io.File(s).toPath.toUri
-        else uri
+        new java.net.URI(s)
       } catch {
         case _: java.net.URISyntaxException =>
           new java.io.File(s).toPath.toUri
@@ -257,26 +254,10 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     val manifests = trailArg[List[java.net.URI]](
       "manifests",
       required = false,
-      descr = "Manifest URLs/files containing dataset definitions",
+      descr =
+        "Manifest URLs, files containing dataset definitions, or remote dataset IDs",
       default = Some(List.empty)
     )
-
-    val remote = new Subcommand("remote") {
-      banner("Add a reference to a dataset stored in remote volume")
-
-      val volumeID = trailArg[String](
-        "volumeID",
-        required = true,
-        descr = "IDs of the remote volume"
-      )
-
-      val datasetID = trailArg[String](
-        "datasetID",
-        required = true,
-        descr = "IDs of the dataset"
-      )
-    }
-    addSubcommand(remote)
   }
   addSubcommand(add)
 
@@ -340,11 +321,11 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   /////////////////////////////////////////////////////////////////////////////
 
   val push = new KamuSubcommand("push") {
-    descr("Push the data to a remote volume")
+    descr("Push the specified datasets to a remote")
 
-    val volume = opt[String](
-      "volume",
-      descr = "ID of the volume to push data to",
+    val remote = opt[String](
+      "remote",
+      descr = "ID of the remote to push data to",
       required = true
     )
 
@@ -369,43 +350,43 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
-  val volume = new KamuSubcommand("volume") {
-    descr("List or manipulate the volumes")
+  val remote = new KamuSubcommand("remote") {
+    descr("List or manipulate the remotes")
 
     val list = new TabularOutputSubcommand("list") {
-      banner("List existing volumes")
+      banner("List the existing remotes")
     }
     addSubcommand(list)
 
     val add = new Subcommand("add") {
-      banner("Add new volumes")
+      banner("Add a new remote")
 
       val manifests = trailArg[List[java.net.URI]](
         "manifests",
         required = false,
-        descr = "Manifest URLs/files containing volume definitions",
+        descr = "Manifest URLs/files containing remote definitions",
         default = Some(List.empty)
       )
 
       val replace = opt[Boolean](
         "replace",
-        descr = "Delete and replace the volumes that already exist"
+        descr = "Delete and replace the remotes that already exist"
       )
     }
     addSubcommand(add)
 
     val delete = new Subcommand("delete") {
-      banner("Delete existing volume")
+      banner("Delete the existing remote")
 
       val ids = trailArg[List[String]](
         "ids",
-        "IDs of the volumes to delete",
+        "IDs of the remotes to delete",
         default = Some(List.empty)
       )
     }
     addSubcommand(delete)
   }
-  addSubcommand(volume)
+  addSubcommand(remote)
 
   /////////////////////////////////////////////////////////////////////////////
 

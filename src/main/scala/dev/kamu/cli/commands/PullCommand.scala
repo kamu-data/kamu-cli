@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.{SparkRunner, VolumeOperatorFactory}
+import dev.kamu.cli.external.{SparkRunner, RemoteOperatorFactory}
 import dev.kamu.cli.{
   DoesNotExistException,
   MetadataRepository,
@@ -35,7 +35,7 @@ class PullCommand(
   fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
-  volumeOperatorFactory: VolumeOperatorFactory,
+  remoteOperatorFactory: RemoteOperatorFactory,
   sparkRunner: SparkRunner,
   ids: Seq[String],
   all: Boolean,
@@ -223,13 +223,13 @@ class PullCommand(
     )
 
     for (id <- datasets) {
-      val sourceVolume = metadataRepository.getVolume(
+      val sourceRemote = metadataRepository.getRemote(
         metadataRepository
-          .getDatasetVolumeID(id)
+          .getDatasetRef(id)
+          .remoteID
       )
 
-      val volumeOperator = volumeOperatorFactory.buildFor(sourceVolume)
-
+      val volumeOperator = remoteOperatorFactory.buildFor(sourceRemote)
       volumeOperator.pull(Seq(id))
     }
     true
