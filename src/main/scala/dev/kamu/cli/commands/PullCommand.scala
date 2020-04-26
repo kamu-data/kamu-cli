@@ -8,13 +8,10 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.{SparkRunner, RemoteOperatorFactory}
-import dev.kamu.cli.{
-  DoesNotExistException,
-  MetadataRepository,
-  UsageException,
-  WorkspaceLayout
-}
+import dev.kamu.cli.domain.TransformService
+import dev.kamu.cli.external.{RemoteOperatorFactory, SparkRunner}
+import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
+import dev.kamu.cli.{UsageException, WorkspaceLayout}
 import dev.kamu.core.ingest.polling
 import dev.kamu.core.manifests.{
   DatasetID,
@@ -24,7 +21,6 @@ import dev.kamu.core.manifests.{
   SourceKind
 }
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.transform.streaming
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
@@ -33,6 +29,7 @@ import pureconfig.generic.auto._
 
 class PullCommand(
   fileSystem: FileSystem,
+  transformService: TransformService,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   remoteOperatorFactory: RemoteOperatorFactory,
@@ -167,40 +164,7 @@ class PullCommand(
         .mkString(", ")
     )
 
-    val transformConfig = streaming.AppConfig(
-      tasks = datasets.map(id => {
-        val metaChain = metadataRepository.getMetadataChain(id)
-
-        // TODO: Costly chain traversal
-        val allInputs = metaChain
-          .getBlocks()
-          .flatMap(_.source)
-          .flatMap {
-            case d: SourceKind.Derivative => d.inputs
-            case _                        => Seq.empty
-          }
-          .map(_.id)
-
-        val allDatasets = allInputs :+ id
-
-        streaming.TransformTaskConfig(
-          datasetToTransform = id,
-          datasetLayouts = allDatasets
-            .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
-            .toMap
-        )
-      })
-    )
-
-    sparkRunner.submit(
-      workspaceLayout = workspaceLayout,
-      appClass = "dev.kamu.core.transform.streaming.TransformApp",
-      extraFiles = Map(
-        "transformConfig.yaml" -> (
-          os => yaml.save(Manifest(transformConfig), os)
-        )
-      )
-    )
+    transformService.executeTransform(batch)
 
     logger.debug(
       s"Successfully applied transformations for derivative datasets: " + datasets

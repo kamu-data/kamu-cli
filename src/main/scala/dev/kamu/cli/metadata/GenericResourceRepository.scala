@@ -6,12 +6,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli
+package dev.kamu.cli.metadata
 
 import java.net.URI
 
-import dev.kamu.core.manifests.{DatasetID, Manifest, Resource}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.{DatasetID, Manifest, Resource}
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager

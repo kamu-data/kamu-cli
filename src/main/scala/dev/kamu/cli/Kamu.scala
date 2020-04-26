@@ -11,7 +11,9 @@ package dev.kamu.cli
 import java.io.PrintStream
 
 import dev.kamu.cli.commands._
+import dev.kamu.cli.domain.TransformService
 import dev.kamu.cli.external._
+import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.Clock
 import dev.kamu.core.utils.fs._
@@ -92,15 +94,23 @@ class Kamu(
           c.delete.ids()
         )
       case List(c.pull) =>
+        val sparkRunner = getSparkRunner(
+          c.localSpark(),
+          if (c.debug()) Level.INFO else c.sparkLogLevel()
+        )
         new PullCommand(
           fileSystem,
+          new TransformService(
+            fileSystem,
+            workspaceLayout,
+            metadataRepository,
+            systemClock,
+            sparkRunner
+          ),
           workspaceLayout,
           metadataRepository,
           remoteOperatorFactory,
-          getSparkRunner(
-            c.localSpark(),
-            if (c.debug()) Level.INFO else c.sparkLogLevel()
-          ),
+          sparkRunner,
           c.pull.ids(),
           c.pull.all(),
           c.pull.recursive()

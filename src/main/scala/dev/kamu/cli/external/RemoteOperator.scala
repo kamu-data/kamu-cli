@@ -8,7 +8,8 @@
 
 package dev.kamu.cli.external
 
-import dev.kamu.cli.{MetadataRepository, WorkspaceLayout}
+import dev.kamu.cli.WorkspaceLayout
+import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, Remote}
 import org.apache.hadoop.fs.FileSystem
 

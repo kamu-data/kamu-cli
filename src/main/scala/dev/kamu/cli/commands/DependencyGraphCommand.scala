@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.MetadataRepository
+import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, DatasetKind}
 import org.apache.log4j.LogManager
 

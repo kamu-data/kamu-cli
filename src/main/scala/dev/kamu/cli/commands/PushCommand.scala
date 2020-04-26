@@ -9,12 +9,8 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.RemoteOperatorFactory
-import dev.kamu.cli.{
-  DoesNotExistException,
-  MetadataRepository,
-  UsageException,
-  WorkspaceLayout
-}
+import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
+import dev.kamu.cli.{UsageException, WorkspaceLayout}
 import dev.kamu.core.manifests.{DatasetID, Remote, RemoteID}
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager

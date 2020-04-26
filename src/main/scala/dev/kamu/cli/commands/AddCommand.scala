@@ -11,7 +11,7 @@ package dev.kamu.cli.commands
 import java.net.URI
 
 import dev.kamu.cli.utility.DependencyGraph
-import dev.kamu.cli.{
+import dev.kamu.cli.metadata.{
   AlreadyExistsException,
   DoesNotExistException,
   MetadataRepository,

@@ -6,31 +6,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli
+package dev.kamu.cli.metadata
 
 import java.io.PrintWriter
-
-import dev.kamu.core.manifests.{
-  DatasetID,
-  DatasetKind,
-  DatasetLayout,
-  DatasetRef,
-  DatasetSnapshot,
-  DatasetSummary,
-  Remote,
-  RemoteID,
-  VolumeLayout
-}
-import dev.kamu.cli.utility.DependencyGraph
-import org.apache.hadoop.fs.{FileSystem, Path}
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import java.net.URI
 
+import dev.kamu.cli.utility.DependencyGraph
+import dev.kamu.cli._
 import dev.kamu.core.manifests.infra.MetadataChainFS
+import dev.kamu.core.manifests._
 import dev.kamu.core.utils.Clock
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
 import pureconfig.generic.auto._
 import dev.kamu.core.utils.fs._
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 
 class MetadataRepository(

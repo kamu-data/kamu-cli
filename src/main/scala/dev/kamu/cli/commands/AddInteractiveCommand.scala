@@ -11,7 +11,7 @@ package dev.kamu.cli.commands
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
-import dev.kamu.cli.{MetadataRepository, ResourceLoader}
+import dev.kamu.cli.metadata.{MetadataRepository, ResourceLoader}
 import dev.kamu.core.manifests._
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.{FileSystem, Path}

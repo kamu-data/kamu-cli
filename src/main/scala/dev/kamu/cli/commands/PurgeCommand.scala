@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.{DoesNotExistException, MetadataRepository}
+import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
 import dev.kamu.core.manifests.DatasetID
 import org.apache.log4j.LogManager
 

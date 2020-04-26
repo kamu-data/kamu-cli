@@ -11,12 +11,12 @@ package dev.kamu.cli.commands
 import java.io.PrintStream
 import java.net.URI
 
-import dev.kamu.cli.MetadataRepository
 import dev.kamu.cli.external.{
   DockerClient,
   IOHandlerPresets,
   LivyDockerProcessBuilder
 }
+import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.LogManager

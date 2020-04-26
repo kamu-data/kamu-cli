@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.{
+import dev.kamu.cli.metadata.{
   DanglingReferenceException,
   DoesNotExistException,
   MetadataRepository

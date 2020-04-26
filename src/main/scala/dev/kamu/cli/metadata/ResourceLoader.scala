@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli
+package dev.kamu.cli.metadata
 
 /*
  * Copyright (c) 2018 kamu.dev

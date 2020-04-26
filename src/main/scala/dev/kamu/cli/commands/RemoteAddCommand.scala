@@ -9,7 +9,7 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.RemoteOperatorFactory
-import dev.kamu.cli.{
+import dev.kamu.cli.metadata.{
   AlreadyExistsException,
   MetadataRepository,
   MissingReferenceException,

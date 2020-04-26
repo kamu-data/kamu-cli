@@ -8,8 +8,8 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.MetadataRepository
 import dev.kamu.cli.external.{DockerClient, LivyDockerProcessBuilder}
+import dev.kamu.cli.metadata.MetadataRepository
 import org.apache.log4j.LogManager
 
 import scala.concurrent.duration._
