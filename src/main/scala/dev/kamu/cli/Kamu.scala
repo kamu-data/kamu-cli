@@ -11,8 +11,9 @@ package dev.kamu.cli
 import java.io.PrintStream
 
 import dev.kamu.cli.commands._
-import dev.kamu.cli.domain.TransformService
+import dev.kamu.cli.transform.TransformService
 import dev.kamu.cli.external._
+import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.Clock
@@ -100,6 +101,13 @@ class Kamu(
         )
         new PullCommand(
           fileSystem,
+          new IngestService(
+            fileSystem,
+            workspaceLayout,
+            metadataRepository,
+            sparkRunner,
+            systemClock
+          ),
           new TransformService(
             fileSystem,
             workspaceLayout,

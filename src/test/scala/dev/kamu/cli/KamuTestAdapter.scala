@@ -8,13 +8,13 @@
 
 package dev.kamu.cli
 
-import java.io.{ByteArrayOutputStream, PrintStream}
+import java.io.{ByteArrayOutputStream, PrintStream, PrintWriter}
 import java.nio.charset.StandardCharsets
 
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.fs._
 import dev.kamu.core.manifests.{DatasetID, DatasetSnapshot}
-import dev.kamu.core.utils.{Clock, ManualClock}
+import dev.kamu.core.utils.ManualClock
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
@@ -93,6 +93,16 @@ class KamuTestAdapter(
 
   def deleteDataset(id: DatasetID): Unit = {
     metadataRepository.deleteDataset(id)
+  }
+
+  def writeData(content: String, name: String): Path = {
+    val path = config.workspaceRoot.resolve(name)
+
+    val writer = new PrintWriter(fileSystem.create(path))
+    writer.write(content)
+    writer.close()
+
+    path
   }
 
   def writeData(df: DataFrame, outputFormat: OutputFormat): Path = {

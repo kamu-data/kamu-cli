@@ -34,7 +34,11 @@ lazy val kamuCli = project
       deps.jcabiLog,
       deps.scallop,
       deps.hadoopCommon,
-      deps.sqlLine
+      deps.sqlLine,
+      deps.scalajHttp,
+      deps.json4sJackson,
+      deps.jacksonCore,
+      deps.jacksonDatabind
     ),
     commonSettings,
     sparkTestingSettings,
@@ -84,7 +88,6 @@ lazy val kamuCoreIngestPolling = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      deps.scalajHttp,
       deps.sparkCore % "provided",
       deps.sparkSql % "provided",
       deps.geoSpark % "provided",
@@ -121,6 +124,9 @@ lazy val versions = new {
   val akkaHttp = "10.1.8"
   val geoSpark = "1.2.0"
   val hadoopCommon = "2.6.5"
+  val json4sJackson = "3.5.3"
+  val jacksonCore = "2.6.7"
+  val jacksonDatabind = "2.6.7.1"
   val pureConfig = "0.11.1"
   val scalajHttp = "2.4.1"
   val spark = "2.4.0"
@@ -135,8 +141,14 @@ lazy val deps =
     // Configs
     val pureConfig = "com.github.pureconfig" %% "pureconfig" % versions.pureConfig
     val pureConfigYaml = "com.github.pureconfig" %% "pureconfig-yaml" % versions.pureConfig
-    // HTTP
+    // Ingest
     val scalajHttp = "org.scalaj" %% "scalaj-http" % versions.scalajHttp
+    val json4sJackson =
+      ("org.json4s" %% "json4s-jackson" % versions.json4sJackson)
+        .exclude("com.fasterxml.jackson.core", "jackson-core")
+        .exclude("com.fasterxml.jackson.core", "jackson-databind")
+    val jacksonCore = "com.fasterxml.jackson.core" % "jackson-core" % versions.jacksonCore
+    val jacksonDatabind = "com.fasterxml.jackson.core" % "jackson-databind" % versions.jacksonDatabind
     // Spark
     val sparkCore = "org.apache.spark" %% "spark-core" % versions.spark
     val sparkSql = "org.apache.spark" %% "spark-sql" % versions.spark
@@ -194,6 +206,8 @@ lazy val assemblySettings = Seq(
     case PathList("org", "fusesource", "jansi", xs @ _*)   => MergeStrategy.last
     case PathList("org", "slf4j", xs @ _*)                 => MergeStrategy.last
     case PathList("org", "xerial", xs @ _*)                => MergeStrategy.last
+    case PathList("com", "thoughtworks", "paranamer", xs @ _*) =>
+      MergeStrategy.last
     // end insanity
     case "overview.html" => MergeStrategy.discard
     case "plugin.xml"    => MergeStrategy.discard

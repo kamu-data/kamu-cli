@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli.domain
+package dev.kamu.cli.transform
 
 import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.external.SparkRunner

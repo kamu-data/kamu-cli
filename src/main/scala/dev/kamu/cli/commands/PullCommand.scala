@@ -8,27 +8,22 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.domain.TransformService
+import dev.kamu.cli.transform.TransformService
 import dev.kamu.cli.external.{RemoteOperatorFactory, SparkRunner}
+import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
 import dev.kamu.cli.{UsageException, WorkspaceLayout}
-import dev.kamu.core.ingest.polling
-import dev.kamu.core.manifests.{
-  DatasetID,
-  DatasetKind,
-  FetchSourceKind,
-  Manifest,
-  SourceKind
-}
+import dev.kamu.core.manifests.{DatasetID, DatasetKind}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import yaml.defaults._
 import pureconfig.generic.auto._
 
 class PullCommand(
   fileSystem: FileSystem,
+  ingestService: IngestService,
   transformService: TransformService,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
@@ -99,48 +94,7 @@ class PullCommand(
       "Pulling root datasets: " + datasets.map(_.toString).mkString(", ")
     )
 
-    // TODO: Costly chain traversal
-    // TODO: Account for missing files
-    val extraMounts = datasets
-      .flatMap(id => {
-        val metaChain = metadataRepository.getMetadataChain(id)
-
-        metaChain
-          .getBlocks()
-          .flatMap(_.source)
-          .flatMap {
-            case r: SourceKind.Root => Some(r.fetch)
-            case _                  => None
-          }
-      })
-      .flatMap({
-        case furl: FetchSourceKind.Url =>
-          furl.url.getScheme match {
-            case "file" | null => List(new Path(furl.url))
-            case _             => List.empty
-          }
-        case glob: FetchSourceKind.FilesGlob =>
-          List(glob.path.getParent)
-      })
-
-    val pollConfig = polling.AppConf(
-      tasks = datasets
-        .map(id => {
-          polling.IngestTask(
-            datasetToIngest = id,
-            datasetLayout = metadataRepository.getDatasetLayout(id)
-          )
-        })
-    )
-
-    sparkRunner.submit(
-      workspaceLayout = workspaceLayout,
-      appClass = "dev.kamu.core.ingest.polling.IngestApp",
-      extraFiles = Map(
-        "pollConfig.yaml" -> (os => yaml.save(Manifest(pollConfig), os))
-      ),
-      extraMounts = extraMounts
-    )
+    ingestService.pollAndIngest(batch)
 
     logger.debug(
       s"Successfully pulled root datasets: " + datasets
