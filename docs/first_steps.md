@@ -22,8 +22,8 @@ We'll be using a simple Vancouver Schools dataset, which can be found on [Vancou
 To work with `kamu` you first need a **workspace** - this is where kamu will store the important information about datasets and the cached data. Let's create one:
 
 ```bash
-$ mkdir my_repo
-$ cd my_repo
+$ mkdir my_workspace
+$ cd my_workspace
 
 $ kamu init
 [INFO] Initialized an empty workspace
@@ -33,20 +33,20 @@ As you'd expect the workspace is currently empty:
 
 ```bash
 $ kamu list
-+----+------+
-| ID | Kind |
-+----+------+
-+----+------+
++----+------+---------+------+--------+
+| ID | Kind | Records | Size | Pulled |
++----+------+---------+------+--------+
++----+------+---------+------+--------+
 ```
 
 ### Adding a dataset
-One of the core ideas of `kamu` is to always know exactly where any piece of data came from. So it never simply copies data, but rather links datasets together. But we'll get into the details of that later.
+One of the design principles of `kamu` is to always know exactly where any piece of data came from, so it never simply copies data - instead we create source links to an external data (we'll get into the details of that later).
 
 For now let's create such link. We will use a dataset definition from the [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib/blob/master/ca.vancouver.opendata/schools/ca.vancouver.opendata.schools.yaml) which looks like this:
 
 ```yaml
 apiVersion: 1
-kind: Dataset
+kind: DatasetSnapshot
 content:
   id: ca.vancouver.opendata.schools
   source:
@@ -57,7 +57,7 @@ content:
     read:
       kind: csv
       header: true
-      delimiter: ';'
+      separator: ';'
       quote: '"'
       escape: '"'
       nullValue: ''
@@ -77,7 +77,7 @@ content:
       - school_name
 ```
 
-Such dataset in kamu is called **root** dataset and is defined by a sequence of following operations:
+Such dataset in `kamu` is called a **root** dataset and is defined by a sequence of following operations:
 - `fetch` - obtaining the data from some external source (e.g. HTTP/FTP)
 - `prepare` (optional) - steps for preparing data for ingestion (e.g. extracting an archive)
 - `read` - reading the data into a structured form
@@ -90,11 +90,11 @@ Let's add it to our workspace:
 $ kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.vancouver.opendata/schools/ca.vancouver.opendata.schools.yaml
 
 $ kamu list
-+-------------------------------+------+
-| ID                            | Kind |
-+-------------------------------+------+
-| ca.vancouver.opendata.schools | Root |
-+-------------------------------+------+
++-------------------------------+------+---------+------+--------+
+| ID                            | Kind | Records | Size | Pulled |
++-------------------------------+------+---------+------+--------+
+| ca.vancouver.opendata.schools | Root | 0       | 0    |        |
++-------------------------------+------+---------+------+--------+
 ```
 
 At this point no data was yet loaded from the source, so let's fetch it:
@@ -105,7 +105,9 @@ $ kamu pull --all
 [INFO] Updated 1 datasets
 ```
 
-When you `pull`, the tool will go and check if any new data that we didn't see yet was added to the data source. If there was - it will be downloaded, decompressed, parsed into the structured form, preprocessed and saved locally. The final steps of loading and shaping the data are powered by [Apache Spark](https://spark.apache.org/).
+When you `pull`, `kamu` will go and check the data source for any new data that we didn't see yet. If there was any - it will be downloaded, decompressed, parsed into the structured form, preprocessed and saved locally.
+
+Note how for our final preprocessing step we use [Apache Spark](https://spark.apache.org/) and its SQL language to convert textual data into geometry type.
 
 
 ## Exploring data
@@ -115,7 +117,7 @@ Since you probably never worked with this dataset before you'd want to explore i
 * Jupyter Notebooks integration
 
 ### SQL shell
-SQL is the _lingua franca_ of the data science and `kamu` uses it extensively. So naturally it provides you a simple way to run adhoc queries on data.
+SQL is the _lingua franca_ of the data science and `kamu` uses it extensively. So naturally it provides you a simple way to run ad-hoc queries on data.
 
 ![kamu sql](./first_steps_files/sql.svg)
 

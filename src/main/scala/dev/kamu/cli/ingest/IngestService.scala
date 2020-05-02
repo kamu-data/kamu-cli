@@ -161,6 +161,12 @@ class IngestService(
           logger.debug(
             s"Data was updated: $datasetID:${externalSource.sourceID}"
           )
+
+          // Clean up the source cache dir
+          fileSystem.delete(
+            datasetLayout.cacheDir.resolve(externalSource.sourceID),
+            true
+          )
         }
       }
     }

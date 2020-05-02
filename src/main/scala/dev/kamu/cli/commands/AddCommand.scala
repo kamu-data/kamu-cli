@@ -70,8 +70,13 @@ class AddCommand(
         manifestUrls
           .map(manifestURI => {
             logger.debug(s"Loading dataset from: $manifestURI")
-            val snapshot =
+            val snapshot = try {
               metadataRepository.loadDatasetSnapshotFromURI(manifestURI)
+            } catch {
+              case e: Exception =>
+                logger.error(s"Error while loading dataset from: $manifestURI")
+                throw e
+            }
             (snapshot.id, snapshot)
           })
           .toMap
