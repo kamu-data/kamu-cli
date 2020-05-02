@@ -123,6 +123,11 @@ class Kamu(
           c.pull.all(),
           c.pull.recursive()
         )
+      case List(c.log) =>
+        new LogCommand(
+          metadataRepository,
+          c.log.id()
+        )
       case List(c.push) =>
         new PushCommand(
           fileSystem,

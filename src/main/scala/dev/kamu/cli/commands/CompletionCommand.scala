@@ -88,7 +88,7 @@ class CompletionCommand(
       .filter(_.isPositional)
       .flatMap(opt => {
         opt.name match {
-          case "ids" if opt.descr.contains("dataset") =>
+          case "id" | "ids" if opt.descr.contains("dataset") =>
             Seq(
               "if [[ -d \"$KAMU_ROOT\" ]]; then",
               "  options+=`ls \"$KAMU_ROOT/datasets\"`",

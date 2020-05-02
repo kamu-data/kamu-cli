@@ -320,6 +320,19 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   /////////////////////////////////////////////////////////////////////////////
 
+  val log = new KamuSubcommand("log") {
+    descr("Show dataset's metadata records")
+
+    val id = trailArg[String](
+      "id",
+      required = true,
+      descr = "ID of the dataset"
+    )
+  }
+  addSubcommand(log)
+
+  /////////////////////////////////////////////////////////////////////////////
+
   val push = new KamuSubcommand("push") {
     descr("Push the specified datasets to a remote")
 
