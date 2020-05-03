@@ -13,7 +13,6 @@ import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests._
 import dev.kamu.core.manifests.infra.MetadataChainFS
-import dev.kamu.core.transform.streaming
 import dev.kamu.core.utils.Clock
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
@@ -73,9 +72,9 @@ class TransformService(
     Temp.withRandomTempDir(fileSystem, "kamu-transform-") { tempDir =>
       val allDatasets = batch.source.inputs.map(_.id) :+ datasetID
 
-      val transformConfig = streaming.AppConfig(
+      val transformConfig = dev.kamu.engine.spark.transform.AppConfig(
         tasks = Vector(
-          streaming.TransformTaskConfig(
+          dev.kamu.engine.spark.transform.TransformTaskConfig(
             datasetID = datasetID,
             source = batch.source,
             inputSlices = batch.inputSlices.map {
@@ -91,7 +90,7 @@ class TransformService(
 
       sparkRunner.submit(
         workspaceLayout = workspaceLayout,
-        appClass = "dev.kamu.core.transform.streaming.TransformApp",
+        appClass = "dev.kamu.engine.spark.transform.TransformApp",
         extraFiles = Map(
           "transformConfig.yaml" -> (
             os => yaml.save(Manifest(transformConfig), os)

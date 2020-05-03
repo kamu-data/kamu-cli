@@ -18,13 +18,11 @@ lazy val kamuCli = project
   .dependsOn(
     kamuCoreUtils % "compile->compile;test->test",
     kamuCoreManifests,
-    kamuCoreIngestPolling,
     kamuCoreTransformStreaming
   )
   .aggregate(
     kamuCoreUtils,
     kamuCoreManifests,
-    kamuCoreIngestPolling,
     kamuCoreTransformStreaming
   )
   .enablePlugins(AutomateHeaderPlugin)
@@ -77,24 +75,6 @@ lazy val kamuCoreManifests = project
       deps.spire
     ),
     commonSettings
-  )
-
-lazy val kamuCoreIngestPolling = project
-  .in(file("core.ingest.polling"))
-  .enablePlugins(AutomateHeaderPlugin)
-  .dependsOn(
-    kamuCoreUtils % "compile->compile;test->test",
-    kamuCoreManifests
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      deps.sparkCore % "provided",
-      deps.sparkSql % "provided",
-      deps.geoSpark % "provided",
-      deps.geoSparkSql % "provided"
-    ),
-    commonSettings,
-    sparkTestingSettings
   )
 
 lazy val kamuCoreTransformStreaming = project

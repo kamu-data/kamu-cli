@@ -1,6 +1,3 @@
-[submodule "kamu-core-ingest-polling"]
-	path = core.ingest.polling
-	url = https://github.com/kamu-data/kamu-core-ingest-polling
 [submodule "kamu-core-manifests"]
 	path = core.manifests
 	url = https://github.com/kamu-data/kamu-core-manifests

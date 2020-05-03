@@ -11,7 +11,7 @@ package dev.kamu.cli.ingest.prep
 import java.io.InputStream
 import java.util.regex.Pattern
 
-import dev.kamu.core.ingest.polling.utils.ZipEntryStream
+import dev.kamu.core.utils.ZipEntryStream
 import dev.kamu.core.manifests.PrepStepKind
 
 class DecompressZIPStep(config: PrepStepKind.Decompress) extends PrepStep {

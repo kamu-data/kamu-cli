@@ -37,7 +37,6 @@ import org.apache.commons.compress.compressors.bzip2.{
   BZip2CompressorInputStream,
   BZip2CompressorOutputStream
 }
-import dev.kamu.core.ingest.polling
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
@@ -320,9 +319,9 @@ class IngestService(
           throw new RuntimeException(s"Unsupported fetch kind: ${source.fetch}")
       }
 
-      val pollConfig = polling.AppConf(
+      val pollConfig = dev.kamu.engine.spark.ingest.AppConf(
         tasks = Vector(
-          polling.IngestTask(
+          dev.kamu.engine.spark.ingest.IngestTask(
             datasetID = datasetID,
             source = source,
             datasetLayout = metadataRepository.getDatasetLayout(datasetID),
@@ -336,7 +335,7 @@ class IngestService(
 
       sparkRunner.submit(
         workspaceLayout = workspaceLayout,
-        appClass = "dev.kamu.core.ingest.polling.IngestApp",
+        appClass = "dev.kamu.engine.spark.ingest.IngestApp",
         extraFiles = Map(
           "pollConfig.yaml" -> (os => yaml.save(Manifest(pollConfig), os))
         ),
