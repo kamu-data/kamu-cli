@@ -1,9 +1,9 @@
 [submodule "kamu-core-manifests"]
 	path = core.manifests
 	url = https://github.com/kamu-data/kamu-core-manifests
-[submodule "kamu-core-transform-streaming"]
-	path = core.transform.streaming
-	url = https://github.com/kamu-data/kamu-core-transform-streaming
 [submodule "core.utils"]
 	path = core.utils
 	url = https://github.com/kamu-data/kamu-core-utils.git
+[submodule "engine.spark"]
+	path = engine.spark
+	url = https://github.com/kamu-data/kamu-engine-spark.git

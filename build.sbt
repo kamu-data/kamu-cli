@@ -18,12 +18,12 @@ lazy val kamuCli = project
   .dependsOn(
     kamuCoreUtils % "compile->compile;test->test",
     kamuCoreManifests,
-    kamuCoreTransformStreaming
+    kamuEngineSpark
   )
   .aggregate(
     kamuCoreUtils,
     kamuCoreManifests,
-    kamuCoreTransformStreaming
+    kamuEngineSpark
   )
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
@@ -77,8 +77,8 @@ lazy val kamuCoreManifests = project
     commonSettings
   )
 
-lazy val kamuCoreTransformStreaming = project
-  .in(file("core.transform.streaming"))
+lazy val kamuEngineSpark = project
+  .in(file("engine.spark"))
   .enablePlugins(AutomateHeaderPlugin)
   .dependsOn(
     kamuCoreUtils % "compile->compile;test->test",
@@ -100,8 +100,6 @@ lazy val kamuCoreTransformStreaming = project
 //////////////////////////////////////////////////////////////////////////////
 
 lazy val versions = new {
-  val akka = "2.5.22"
-  val akkaHttp = "10.1.8"
   val geoSpark = "1.2.0"
   val hadoopCommon = "2.6.5"
   val json4sJackson = "3.5.3"
