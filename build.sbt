@@ -13,21 +13,32 @@ scalaVersion in ThisBuild := "2.11.12"
 // Projects
 //////////////////////////////////////////////////////////////////////////////
 
-lazy val kamuCli = project
+lazy val root = project
   .in(file("."))
-  .dependsOn(
-    kamuCoreUtils % "compile->compile;test->test",
-    kamuCoreManifests,
-    kamuEngineSpark
-  )
   .aggregate(
-    kamuCoreUtils,
     kamuCoreManifests,
+    kamuCoreUtils,
+    kamuEngineSpark,
+    kamuCoreCoordinator
+  )
+  .dependsOn(
+    kamuCoreCoordinator,
     kamuEngineSpark
   )
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
     aggregate in assembly := false,
+    assemblySettings
+  )
+
+lazy val kamuCoreCoordinator = project
+  .in(file("core.coordinator"))
+  .dependsOn(
+    kamuCoreUtils % "compile->compile;test->test",
+    kamuCoreManifests
+  )
+  .enablePlugins(AutomateHeaderPlugin)
+  .settings(
     libraryDependencies ++= Seq(
       deps.jcabiLog,
       deps.scallop,
@@ -39,8 +50,7 @@ lazy val kamuCli = project
       deps.jacksonDatabind
     ),
     commonSettings,
-    sparkTestingSettings,
-    assemblySettings
+    sparkTestingSettings
   )
 
 lazy val kamuCoreUtils = project
@@ -96,7 +106,7 @@ lazy val kamuEngineSpark = project
   )
 
 //////////////////////////////////////////////////////////////////////////////
-// Depencencies
+// Dependencies
 //////////////////////////////////////////////////////////////////////////////
 
 lazy val versions = new {

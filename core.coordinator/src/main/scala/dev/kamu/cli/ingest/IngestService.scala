@@ -337,7 +337,9 @@ class IngestService(
         workspaceLayout = workspaceLayout,
         appClass = "dev.kamu.engine.spark.ingest.IngestApp",
         extraFiles = Map(
-          "pollConfig.yaml" -> (os => yaml.save(Manifest(pollConfig), os))
+          IngestConfig.configFileName -> (
+            os => yaml.save(Manifest(pollConfig), os)
+          )
         ),
         extraMounts = tempDir :: extraMounts
       )

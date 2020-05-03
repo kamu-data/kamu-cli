@@ -96,7 +96,7 @@ class TransformService(
         workspaceLayout = workspaceLayout,
         appClass = "dev.kamu.engine.spark.transform.TransformApp",
         extraFiles = Map(
-          "transformConfig.yaml" -> (
+          TransformConfig.configFileName -> (
             os => yaml.save(Manifest(transformConfig), os)
           )
         ),
