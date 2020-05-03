@@ -21,7 +21,7 @@ import dev.kamu.cli.ingest.fetch.{
 }
 import dev.kamu.cli.ingest.prep.{PrepCheckpoint, PrepStepFactory}
 import dev.kamu.cli.metadata.MetadataRepository
-import dev.kamu.core.manifests.infra.MetadataChainFS
+import dev.kamu.core.manifests.infra.{IngestConfig, IngestTask, MetadataChainFS}
 import dev.kamu.core.manifests.{
   DatasetID,
   DatasetVocabulary,
@@ -319,9 +319,9 @@ class IngestService(
           throw new RuntimeException(s"Unsupported fetch kind: ${source.fetch}")
       }
 
-      val pollConfig = dev.kamu.engine.spark.ingest.AppConf(
+      val pollConfig = IngestConfig(
         tasks = Vector(
-          dev.kamu.engine.spark.ingest.IngestTask(
+          IngestTask(
             datasetID = datasetID,
             source = source,
             datasetLayout = metadataRepository.getDatasetLayout(datasetID),
