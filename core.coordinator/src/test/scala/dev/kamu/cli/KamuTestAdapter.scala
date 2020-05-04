@@ -57,11 +57,6 @@ class KamuTestAdapter(
     _captureFormatter
   }
 
-  // TODO: Make sure assembly is compiled and up-to-date, or find some other way to package spark apps for testing
-  override def assemblyPath: Path = {
-    fileSystem.toAbsolute(new Path("./target/scala-2.11/kamu"))
-  }
-
   def runEx(args: String*): CommandResult = {
     super.run(args: _*)
 

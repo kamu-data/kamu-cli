@@ -1,2 +1,2 @@
 target/
-lib/*.jar
+core.coordinator/lib/*.jar

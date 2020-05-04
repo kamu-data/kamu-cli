@@ -9,26 +9,22 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.transform.TransformService
-import dev.kamu.cli.external.{RemoteOperatorFactory, SparkRunner}
+import dev.kamu.cli.external.RemoteOperatorFactory
 import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
-import dev.kamu.cli.{UsageException, WorkspaceLayout}
+import dev.kamu.cli.UsageException
 import dev.kamu.core.manifests.{DatasetID, DatasetKind}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import yaml.defaults._
 import pureconfig.generic.auto._
 
 class PullCommand(
-  fileSystem: FileSystem,
   ingestService: IngestService,
   transformService: TransformService,
-  workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   remoteOperatorFactory: RemoteOperatorFactory,
-  sparkRunner: SparkRunner,
   ids: Seq[String],
   all: Boolean,
   recursive: Boolean

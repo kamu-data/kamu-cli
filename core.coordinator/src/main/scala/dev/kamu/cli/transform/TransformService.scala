@@ -9,7 +9,6 @@
 package dev.kamu.cli.transform
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests._
 import dev.kamu.core.manifests.infra.{
@@ -40,7 +39,7 @@ class TransformService(
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   systemClock: Clock,
-  sparkRunner: SparkRunner
+  engineFactory: EngineFactory
 ) {
   val logger = LogManager.getLogger(getClass.getName)
 
@@ -92,7 +91,9 @@ class TransformService(
         )
       )
 
-      sparkRunner.submit(
+      val engine = engineFactory.getEngine()
+
+      engine.submit(
         workspaceLayout = workspaceLayout,
         appClass = "dev.kamu.engine.spark.transform.TransformApp",
         extraFiles = Map(

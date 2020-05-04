@@ -11,14 +11,14 @@ package dev.kamu.cli
 import java.io.PrintStream
 
 import dev.kamu.cli.commands._
-import dev.kamu.cli.transform.TransformService
+import dev.kamu.cli.transform.{EngineFactory, TransformService}
 import dev.kamu.cli.external._
 import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.Clock
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.Level
 
 class Kamu(
@@ -95,16 +95,15 @@ class Kamu(
           c.delete.ids()
         )
       case List(c.pull) =>
-        val sparkRunner = getSparkRunner(
+        val engineFactory = getEngineFactory(
           if (c.debug()) Level.INFO else c.sparkLogLevel()
         )
         new PullCommand(
-          fileSystem,
           new IngestService(
             fileSystem,
             workspaceLayout,
             metadataRepository,
-            sparkRunner,
+            engineFactory,
             systemClock
           ),
           new TransformService(
@@ -112,12 +111,10 @@ class Kamu(
             workspaceLayout,
             metadataRepository,
             systemClock,
-            sparkRunner
+            engineFactory
           ),
-          workspaceLayout,
           metadataRepository,
           remoteOperatorFactory,
-          sparkRunner,
           c.pull.ids(),
           c.pull.all(),
           c.pull.recursive()
@@ -203,13 +200,8 @@ class Kamu(
     new DockerClient(fileSystem)
   }
 
-  protected def getSparkRunner(logLevel: Level): SparkRunner = {
-    new SparkRunnerDocker(
-      fileSystem,
-      logLevel,
-      config.spark,
-      getDockerClient()
-    )
+  protected def getEngineFactory(logLevel: Level): EngineFactory = {
+    new EngineFactory(fileSystem, logLevel)
   }
 
   protected def getOutputStream(): PrintStream = {

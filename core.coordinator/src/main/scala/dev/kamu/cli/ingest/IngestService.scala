@@ -11,7 +11,6 @@ package dev.kamu.cli.ingest
 import java.time.Instant
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.cli.external.SparkRunner
 import dev.kamu.cli.ingest.convert.{ConversionStepFactory, IngestCheckpoint}
 import dev.kamu.cli.ingest.fetch.{
   CacheableSource,
@@ -21,6 +20,7 @@ import dev.kamu.cli.ingest.fetch.{
 }
 import dev.kamu.cli.ingest.prep.{PrepCheckpoint, PrepStepFactory}
 import dev.kamu.cli.metadata.MetadataRepository
+import dev.kamu.cli.transform.EngineFactory
 import dev.kamu.core.manifests.infra.{IngestConfig, IngestTask, MetadataChainFS}
 import dev.kamu.core.manifests.{
   DatasetID,
@@ -48,7 +48,7 @@ class IngestService(
   fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
-  sparkRunner: SparkRunner,
+  engineFactory: EngineFactory,
   systemClock: Clock
 ) {
   val downloadCheckpointFileName = "download.checkpoint.yaml"
@@ -333,7 +333,9 @@ class IngestService(
         )
       )
 
-      sparkRunner.submit(
+      val engine = engineFactory.getEngine()
+
+      engine.submit(
         workspaceLayout = workspaceLayout,
         appClass = "dev.kamu.engine.spark.ingest.IngestApp",
         extraFiles = Map(

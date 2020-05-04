@@ -6,19 +6,19 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli.external
+package dev.kamu.cli.transform
 
-import dev.kamu.cli.{WorkspaceLayout, SparkConfig}
+import dev.kamu.cli.WorkspaceLayout
+import dev.kamu.cli.external.{DockerClient, DockerImages, DockerRunArgs}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
-class SparkRunnerDocker(
+class EngineDocker(
   fileSystem: FileSystem,
   logLevel: Level,
-  sparkConfig: SparkConfig,
   dockerClient: DockerClient,
   image: String = DockerImages.SPARK
-) extends SparkRunner(fileSystem, logLevel) {
+) extends Engine(fileSystem, logLevel) {
 
   protected override def submit(
     appClass: String,
@@ -46,7 +46,7 @@ class SparkRunnerDocker(
     val submitArgs = List(
       "/opt/spark/bin/spark-submit",
       "--master=local[4]",
-      s"--driver-memory=${sparkConfig.driverMemory}",
+      s"--driver-memory=2g",
       "--conf",
       "spark.sql.warehouse.dir=/opt/spark-warehouse",
       s"--class=$appClass"

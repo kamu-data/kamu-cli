@@ -6,7 +6,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-package dev.kamu.cli.external
+package dev.kamu.cli.transform
 
 import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
@@ -17,7 +17,7 @@ import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager, Logger}
 
-abstract class SparkRunner(
+abstract class Engine(
   fileSystem: FileSystem,
   logLevel: Level
 ) {

@@ -12,8 +12,7 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import dev.kamu.core.utils.fs._
 
 case class KamuConfig(
-  workspaceRoot: Path,
-  spark: SparkConfig = SparkConfig()
+  workspaceRoot: Path
 ) {
   def kamuRoot: Path = {
     workspaceRoot.resolve(KamuConfig.ROOT_DIR_NAME)
@@ -45,7 +44,3 @@ object KamuConfig {
     }
   }
 }
-
-case class SparkConfig(
-  driverMemory: String = "2g"
-)
