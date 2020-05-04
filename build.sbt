@@ -18,12 +18,10 @@ lazy val root = project
   .aggregate(
     kamuCoreManifests,
     kamuCoreUtils,
-    kamuEngineSpark,
     kamuCoreCoordinator
   )
   .dependsOn(
-    kamuCoreCoordinator,
-    kamuEngineSpark
+    kamuCoreCoordinator
   )
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
@@ -85,24 +83,6 @@ lazy val kamuCoreManifests = project
       deps.spire
     ),
     commonSettings
-  )
-
-lazy val kamuEngineSpark = project
-  .in(file("engine.spark"))
-  .enablePlugins(AutomateHeaderPlugin)
-  .dependsOn(
-    kamuCoreUtils % "compile->compile;test->test",
-    kamuCoreManifests
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      deps.sparkCore % "provided",
-      deps.sparkSql % "provided",
-      deps.geoSpark % "provided",
-      deps.geoSparkSql % "provided"
-    ),
-    commonSettings,
-    sparkTestingSettings
   )
 
 //////////////////////////////////////////////////////////////////////////////

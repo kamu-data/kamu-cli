@@ -195,12 +195,6 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     default = Some(Level.INFO)
   )
 
-  val localSpark = opt[Boolean](
-    "local-spark",
-    descr = "Use local spark installation",
-    noshort = true
-  )
-
   val sparkLogLevel = opt[Level](
     "spark-log-level",
     descr = "Sets logging level for Spark",

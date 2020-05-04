@@ -96,7 +96,6 @@ class Kamu(
         )
       case List(c.pull) =>
         val sparkRunner = getSparkRunner(
-          c.localSpark(),
           if (c.debug()) Level.INFO else c.sparkLogLevel()
         )
         new PullCommand(
@@ -195,42 +194,31 @@ class Kamu(
     }
   }
 
-  def ensureWorkspace(): Unit = {
+  protected def ensureWorkspace(): Unit = {
     if (!fileSystem.exists(workspaceLayout.kamuRootDir))
       throw new UsageException("Not a kamu workspace")
   }
 
-  def getDockerClient(): DockerClient = {
+  protected def getDockerClient(): DockerClient = {
     new DockerClient(fileSystem)
   }
 
-  def getSparkRunner(useLocalSpark: Boolean, logLevel: Level): SparkRunner = {
-    if (useLocalSpark)
-      new SparkRunnerLocal(
-        assemblyPath,
-        fileSystem,
-        logLevel,
-        config.spark
-      )
-    else
-      new SparkRunnerDocker(
-        assemblyPath,
-        fileSystem,
-        logLevel,
-        config.spark,
-        getDockerClient()
-      )
+  protected def getSparkRunner(logLevel: Level): SparkRunner = {
+    new SparkRunnerDocker(
+      fileSystem,
+      logLevel,
+      config.spark,
+      getDockerClient()
+    )
   }
 
-  def assemblyPath: Path = {
-    new Path(getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-  }
-
-  def getOutputStream(): PrintStream = {
+  protected def getOutputStream(): PrintStream = {
     System.out
   }
 
-  def getOutputFormatter(outputFormat: OutputFormat): OutputFormatter = {
+  protected def getOutputFormatter(
+    outputFormat: OutputFormat
+  ): OutputFormatter = {
     val readableFormatter = new MissingValueFormatter(
       "",
       new ReadablePowerOfTwoValueFormatter(

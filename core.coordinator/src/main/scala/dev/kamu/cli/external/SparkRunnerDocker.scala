@@ -13,7 +13,6 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 
 class SparkRunnerDocker(
-  assemblyPath: Path,
   fileSystem: FileSystem,
   logLevel: Level,
   sparkConfig: SparkConfig,
@@ -28,10 +27,7 @@ class SparkRunnerDocker(
     extraMounts: Seq[Path],
     loggingConfig: Path
   ): Unit = {
-    val assemblyPathInContainer = new Path("/opt/kamu/kamu")
-
     val appVolumes = Map(
-      assemblyPath -> assemblyPathInContainer,
       loggingConfig -> new Path("/opt/spark/conf/log4j.properties")
     )
 
@@ -60,7 +56,7 @@ class SparkRunnerDocker(
       else
         Seq()
     ) ++ Seq(
-      assemblyPathInContainer.toUri.getPath
+      "/opt/kamu/engine.spark.jar"
     )
 
     logger.info("Starting Spark job")

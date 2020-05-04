@@ -9,7 +9,7 @@
 package dev.kamu.cli.external
 
 object DockerImages {
-  val SPARK = "kamudata/spark-py-uber:2.4.0_0.0.1"
+  val SPARK = "kamudata/engine-spark:0.1.0"
   val LIVY = SPARK
   val JUPYTER = "kamudata/jupyter-uber:0.0.1"
 
