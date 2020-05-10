@@ -9,13 +9,9 @@
 package dev.kamu.cli.transform
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.cli.metadata.MetadataRepository
+import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.core.manifests._
-import dev.kamu.core.manifests.infra.{
-  MetadataChainFS,
-  TransformConfig,
-  TransformTaskConfig
-}
+import dev.kamu.core.manifests.infra.{TransformConfig, TransformTaskConfig}
 import dev.kamu.core.utils.Clock
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
@@ -83,6 +79,11 @@ class TransformService(
             inputSlices = batch.inputSlices.map {
               case (id, slice) => (id.toString, slice)
             },
+            datasetVocabs = allDatasets
+              .map(
+                id => (id.toString, metadataRepository.getDatasetVocabulary(id))
+              )
+              .toMap,
             datasetLayouts = allDatasets
               .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
               .toMap,
@@ -176,8 +177,8 @@ class TransformService(
   private def getInputSlice(
     inputID: DatasetID,
     inputIndex: Int,
-    inputMetaChain: MetadataChainFS,
-    outputMetaChain: MetadataChainFS
+    inputMetaChain: MetadataChain,
+    outputMetaChain: MetadataChain
   ): DataSlice = {
 
     // Determine available data range

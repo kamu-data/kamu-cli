@@ -13,7 +13,6 @@ import java.net.URI
 
 import dev.kamu.cli.utility.DependencyGraph
 import dev.kamu.cli._
-import dev.kamu.core.manifests.infra.MetadataChainFS
 import dev.kamu.core.manifests._
 import dev.kamu.core.utils.Clock
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
@@ -83,8 +82,8 @@ class MetadataRepository(
     )
   }
 
-  def getMetadataChain(id: DatasetID): MetadataChainFS = {
-    new MetadataChainFS(fileSystem, getDatasetLayout(id).metadataDir)
+  def getMetadataChain(id: DatasetID): MetadataChain = {
+    new MetadataChain(fileSystem, getDatasetLayout(id).metadataDir)
   }
 
   def getDatasetKind(id: DatasetID): DatasetKind = {
@@ -98,8 +97,14 @@ class MetadataRepository(
   def getDatasetSummary(id: DatasetID): DatasetSummary = {
     ensureDatasetExistsAndPulled(id)
 
-    val chain = new MetadataChainFS(fileSystem, datasetMetadataDir(id))
+    val chain = new MetadataChain(fileSystem, datasetMetadataDir(id))
     chain.getSummary()
+  }
+
+  def getDatasetVocabulary(id: DatasetID): DatasetVocabulary = {
+    getDatasetSummary(id).vocabulary
+      .getOrElse(DatasetVocabularyOverrides())
+      .asDatasetVocabulary()
   }
 
   def getDatasetRef(id: DatasetID): DatasetRef = {
@@ -134,6 +139,30 @@ class MetadataRepository(
     depGraph.resolve(ids.toList)
   }
 
+  def getDatasetsInReverseDependencyOrder(
+    ids: Seq[DatasetID],
+    recursive: Boolean
+  ): Seq[DatasetID] = {
+    val inverseDependencies =
+      getAllDatasets()
+        .flatMap(id => {
+          getDatasetDependencies(id).map(depID => (depID, id))
+        })
+        .groupBy(_._1)
+        .map { case (id, seq) => (id, seq.map(_._2).toList) }
+
+    def dependencyOf(id: DatasetID): List[DatasetID] = {
+      inverseDependencies.getOrElse(id, List.empty)
+    }
+
+    val depGraph = new DependencyGraph[DatasetID](dependencyOf)
+    val deps = depGraph.resolve(ids.toList)
+    if (recursive)
+      deps
+    else
+      deps.filter(ids.contains)
+  }
+
   def getAllDatasets(): Seq[DatasetID] = {
     fileSystem
       .listStatus(workspaceLayout.metadataDir)
@@ -163,7 +192,7 @@ class MetadataRepository(
         )
     }
 
-    val chain = new MetadataChainFS(fileSystem, datasetDir)
+    val chain = new MetadataChain(fileSystem, datasetDir)
     chain.init(ds, systemClock.instant())
   }
 
@@ -199,13 +228,6 @@ class MetadataRepository(
     fileSystem.delete(layout.checkpointsDir, true)
     fileSystem.delete(layout.metadataDir, true)
     fileSystem.delete(workspaceLayout.metadataDir.resolve(id.toString), true)
-  }
-
-  def purgeDataset(id: DatasetID): Unit = {
-    // TODO: Purging a dataset that is used by non-empty derivatives should raise an error
-    val snapshot = getMetadataChain(id).getSnapshot()
-    deleteDataset(id)
-    addDataset(snapshot)
   }
 
   ////////////////////////////////////////////////////////////////////////////

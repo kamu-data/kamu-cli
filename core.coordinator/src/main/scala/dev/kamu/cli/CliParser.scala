@@ -265,6 +265,11 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       descr = "Purge all datasets"
     )
 
+    val recursive = opt[Boolean](
+      "recursive",
+      descr = "Also purge all known dependent datasets"
+    )
+
     val ids = trailArg[List[String]](
       "ids",
       required = false,

@@ -19,9 +19,9 @@ import dev.kamu.cli.ingest.fetch.{
   SourceFactory
 }
 import dev.kamu.cli.ingest.prep.{PrepCheckpoint, PrepStepFactory}
-import dev.kamu.cli.metadata.MetadataRepository
+import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.cli.transform.EngineFactory
-import dev.kamu.core.manifests.infra.{IngestConfig, IngestTask, MetadataChainFS}
+import dev.kamu.core.manifests.infra.{IngestConfig, IngestTask}
 import dev.kamu.core.manifests.{
   DatasetID,
   DatasetVocabulary,
@@ -355,7 +355,7 @@ class IngestService(
 
   def commitMetadata(
     datasetID: DatasetID,
-    metaChain: MetadataChainFS,
+    metaChain: MetadataChain,
     ingestResult: ExecutionResult[IngestCheckpoint]
   ): Unit = {
     // TODO: Avoid loading blocks again

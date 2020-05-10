@@ -8,38 +8,50 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
+import dev.kamu.cli.UsageException
+import dev.kamu.cli.metadata._
 import dev.kamu.core.manifests.DatasetID
 import org.apache.log4j.LogManager
 
 class PurgeCommand(
   metadataRepository: MetadataRepository,
   ids: Seq[String],
-  all: Boolean
+  all: Boolean,
+  recursive: Boolean
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
 
   override def run(): Unit = {
-    val toPurge =
-      if (all)
-        metadataRepository.getAllDatasets()
-      else
-        ids.map(DatasetID)
+    val datasetIDs = {
+      if (all) metadataRepository.getAllDatasets()
+      else ids.map(DatasetID)
+    }
 
-    val numPurged = toPurge
-      .map(id => {
-        try {
-          logger.info(s"Purging dataset: ${id.toString}")
-          metadataRepository.purgeDataset(id)
-          1
-        } catch {
-          case e: DoesNotExistException =>
-            logger.error(e.getMessage)
-            0
-        }
-      })
-      .sum
+    val plan = try {
+      metadataRepository
+        .getDatasetsInReverseDependencyOrder(
+          datasetIDs,
+          recursive || all // All implies recursive, which is more efficient
+        )
+    } catch {
+      case e: DoesNotExistException =>
+        throw new UsageException(e.getMessage)
+    }
 
-    logger.info(s"Purged $numPurged datasets")
+    val ghostSnapshots = plan.map(id => {
+      logger.info(s"Purging dataset: ${id.toString}")
+      val snapshot = metadataRepository.getMetadataChain(id).getSnapshot()
+      try {
+        metadataRepository.deleteDataset(id)
+      } catch {
+        case e: DanglingReferenceException =>
+          throw new UsageException(e.getMessage)
+      }
+      snapshot
+    })
+
+    ghostSnapshots.reverse.foreach(metadataRepository.addDataset)
+
+    logger.info(s"Purged ${ghostSnapshots.size} datasets")
   }
 }

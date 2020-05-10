@@ -87,7 +87,8 @@ class Kamu(
         new PurgeCommand(
           metadataRepository,
           c.purge.ids(),
-          c.purge.all()
+          c.purge.all(),
+          c.purge.recursive()
         )
       case List(c.delete) =>
         new DeleteCommand(
