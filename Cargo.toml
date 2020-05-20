@@ -1,0 +1,21 @@
+[package]
+name = "kamu-cli"
+version = "0.1.0"
+authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
+edition = "2018"
+default-run = "kamu"
+
+[lib]
+name = "kamu"
+
+[[bin]]
+name = "kamu"
+path = "src/main.rs"
+
+[dependencies]
+hex = "*"
+flatbuffers = "*"
+serde = { version = "*", features = ["derive"] }
+serde_yaml = "*"
+clap = "*"
+indoc = "*"
