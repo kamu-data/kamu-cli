@@ -3,19 +3,26 @@ name = "kamu-cli"
 version = "0.1.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
-default-run = "kamu"
+default-run = "kamu-rs"
+
+[[bin]]
+name = "kamu-rs"
+path = "src/cli/main.rs"
 
 [lib]
 name = "kamu"
 
-[[bin]]
-name = "kamu"
-path = "src/main.rs"
 
 [dependencies]
-hex = "*"
+
+# Serialization
 flatbuffers = "*"
 serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
+
+# UI
 clap = "*"
-indoc = "*"
+indicatif = "*"
+
+# Utils
+indoc = "*"  # Unindenting multi-line strings
