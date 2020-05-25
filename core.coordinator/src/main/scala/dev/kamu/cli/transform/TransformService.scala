@@ -92,11 +92,10 @@ class TransformService(
         )
       )
 
-      val engine = engineFactory.getEngine()
+      val engine = engineFactory.getEngine(batch.source.transformEngine)
 
       engine.submit(
         workspaceLayout = workspaceLayout,
-        appClass = "dev.kamu.engine.spark.transform.TransformApp",
         extraFiles = Map(
           TransformConfig.configFileName -> (
             os => yaml.save(Manifest(transformConfig), os)

@@ -333,11 +333,10 @@ class IngestService(
         )
       )
 
-      val engine = engineFactory.getEngine()
+      val engine = engineFactory.getEngine("sparkIngest")
 
       engine.submit(
         workspaceLayout = workspaceLayout,
-        appClass = "dev.kamu.engine.spark.ingest.IngestApp",
         extraFiles = Map(
           IngestConfig.configFileName -> (
             os => yaml.save(Manifest(pollConfig), os)

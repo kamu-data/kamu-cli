@@ -13,6 +13,8 @@ object DockerImages {
   val LIVY = SPARK
   val JUPYTER = "kamudata/jupyter-uber:0.0.1"
 
+  val FLINK = "kamudata/engine-flink:0.1.0"
+
   val ALL = Array(
     SPARK,
     LIVY,

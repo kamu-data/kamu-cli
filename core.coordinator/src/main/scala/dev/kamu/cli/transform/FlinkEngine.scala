@@ -7,24 +7,23 @@
  */
 
 package dev.kamu.cli.transform
-
 import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import dev.kamu.cli.WorkspaceLayout
+import dev.kamu.cli.external.{DockerClient, DockerImages, DockerRunArgs}
 import dev.kamu.core.utils.fs._
-import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.{Level, LogManager, Logger}
+import org.apache.log4j.{LogManager, Logger}
 
-abstract class Engine(
+class FlinkEngine(
   fileSystem: FileSystem,
-  logLevel: Level
-) {
+  dockerClient: DockerClient,
+  image: String = DockerImages.FLINK
+) extends Engine {
   protected var logger: Logger = LogManager.getLogger(getClass.getName)
 
   def submit(
-    appClass: String,
     workspaceLayout: WorkspaceLayout,
     extraFiles: Map[String, OutputStream => Unit] = Map.empty,
     extraMounts: Seq[Path] = Seq.empty,
@@ -36,31 +35,72 @@ abstract class Engine(
       else
         null
 
-    val loggingConfig = prepareLog4jConfig()
-
     try {
       submit(
-        appClass,
         workspaceLayout,
         Seq(tmpJar) ++ jars,
-        extraMounts,
-        loggingConfig
+        extraMounts
       )
     } finally {
       if (tmpJar != null)
         fileSystem.delete(tmpJar, false)
-
-      fileSystem.delete(loggingConfig, false)
     }
   }
 
   protected def submit(
-    appClass: String,
     workspaceLayout: WorkspaceLayout,
     jars: Seq[Path],
-    extraMounts: Seq[Path],
-    loggingConfig: Path
-  )
+    extraMounts: Seq[Path]
+  ): Unit = {
+    val extraVolumes = extraMounts.map(p => (p, p)).toMap
+
+    val jarVolumes = jars
+      .map(p => (p, new Path("/opt/kamu/jars/" + p.getName)))
+      .toMap
+
+    val workspaceVolumes =
+      Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
+        .filter(fileSystem.exists)
+        .map(p => (p, p))
+        .toMap
+
+    val submitArgs = List(
+      "java",
+      "-cp",
+      "/opt/flink/lib/*:/opt/kamu/jars/*:/opt/kamu/engine.flink.jar",
+      "dev.kamu.engine.flink.EngineApp"
+    )
+
+    logger.info("Starting Flink job")
+
+    try {
+      dockerClient.runShell(
+        DockerRunArgs(
+          image = image,
+          volumeMap = workspaceVolumes ++ jarVolumes ++ extraVolumes
+        ),
+        submitArgs
+      )
+    } finally {
+      // TODO: avoid this by setting up correct user inside the container
+      logger.debug("Fixing file ownership")
+
+      val unix = new com.sun.security.auth.module.UnixSystem()
+      val chownArgs = Seq(
+        "chown",
+        "-R",
+        s"${unix.getUid}:${unix.getGid}"
+      ) ++ workspaceVolumes.values.map(_.toUri.getPath)
+
+      dockerClient.runShell(
+        DockerRunArgs(
+          image = image,
+          volumeMap = workspaceVolumes
+        ),
+        chownArgs
+      )
+    }
+  }
 
   protected def prepareJar(files: Map[String, OutputStream => Unit]): Path = {
     val jarPath = tempDir.resolve("kamu-configs.jar")
@@ -79,29 +119,6 @@ abstract class Engine(
 
     zipStream.close()
     jarPath
-  }
-
-  protected def prepareLog4jConfig(): Path = {
-    val path = tempDir.resolve("kamu-spark-log4j.properties")
-
-    val resourceName = logLevel match {
-      case Level.ALL | Level.TRACE | Level.DEBUG | Level.INFO =>
-        "spark.info.log4j.properties"
-      case Level.WARN | Level.ERROR =>
-        "spark.warn.log4j.properties"
-      case _ =>
-        "spark.info.log4j.properties"
-    }
-
-    val configStream = getClass.getClassLoader.getResourceAsStream(resourceName)
-    val outputStream = fileSystem.create(path, true)
-
-    IOUtils.copy(configStream, outputStream)
-
-    outputStream.close()
-    configStream.close()
-
-    path
   }
 
   protected def tempDir: Path = {
