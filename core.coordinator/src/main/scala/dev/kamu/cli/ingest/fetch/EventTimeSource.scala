@@ -13,6 +13,7 @@ import java.time.Instant
 
 import dev.kamu.core.utils.Clock
 
+// TODO: Refactor this to allow using modification time from source metadata
 trait EventTimeSource {
   def getEventTime(source: FileSystemSource): Option[Instant] =
     getEventTimeDefault()

@@ -8,7 +8,12 @@
 
 package dev.kamu.cli.ingest.fetch
 
-import dev.kamu.core.manifests.{CachingKind, EventTimeKind, FetchSourceKind}
+import dev.kamu.core.manifests.{
+  CachingKind,
+  EventTimeKind,
+  FetchSourceKind,
+  OrderingKind
+}
 import dev.kamu.core.utils.Clock
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
@@ -18,7 +23,7 @@ class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
 
   def getSource(kind: FetchSourceKind): Seq[CacheableSource] = {
     val eventTimeSource = kind.eventTime match {
-      case None | Some(_: EventTimeKind.FromSystemTime) =>
+      case None =>
         new EventTimeSource.FromSystemTime(systemClock)
       case Some(e: EventTimeKind.FromPath) =>
         new EventTimeSource.FromPath(e.pattern, e.timestampFormat)
@@ -91,13 +96,27 @@ class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
             eventTimeSource
           )
       )
-      .sortBy(eventTimeSource.getEventTime)
 
-    logger.debug(
-      s"Glob pattern resolved to: ${globbed.map(_.path.getName).mkString(", ")}"
+    val orderBy = kind.orderBy.getOrElse(
+      if (kind.eventTime.isDefined) OrderingKind.ByMetadataEventTime
+      else OrderingKind.ByName
     )
 
-    globbed
+    val sorted = orderBy match {
+      case OrderingKind.ByName =>
+        globbed.sortWith(
+          (lhs, rhs) =>
+            lhs.path.getName.compareToIgnoreCase(rhs.path.getName) < 0
+        )
+      case OrderingKind.ByMetadataEventTime =>
+        globbed.sortBy(eventTimeSource.getEventTime)
+    }
+
+    logger.debug(
+      s"Glob pattern resolved to: ${sorted.map(_.path.getName).mkString(", ")}"
+    )
+
+    sorted
   }
 
   def getCachingBehavior(kind: FetchSourceKind): CachingBehavior = {
