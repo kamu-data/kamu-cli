@@ -11,6 +11,12 @@ package dev.kamu.cli.external
 import java.awt.Desktop
 import java.net.URI
 
+import dev.kamu.core.utils.{
+  DockerClient,
+  DockerProcess,
+  DockerProcessBuilder,
+  DockerRunArgs
+}
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
 

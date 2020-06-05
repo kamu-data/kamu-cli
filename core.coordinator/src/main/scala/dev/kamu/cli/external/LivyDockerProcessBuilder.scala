@@ -9,6 +9,7 @@
 package dev.kamu.cli.external
 
 import dev.kamu.core.manifests.VolumeLayout
+import dev.kamu.core.utils.{DockerClient, DockerProcessBuilder, DockerRunArgs}
 import org.apache.hadoop.fs.Path
 
 class LivyDockerProcessBuilder(

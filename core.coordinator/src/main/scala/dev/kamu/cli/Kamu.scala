@@ -16,7 +16,7 @@ import dev.kamu.cli.external._
 import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
-import dev.kamu.core.utils.Clock
+import dev.kamu.core.utils.{Clock, DockerClient}
 import dev.kamu.core.utils.fs._
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.Level

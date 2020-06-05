@@ -12,7 +12,8 @@ import java.io.OutputStream
 import java.util.zip.{ZipEntry, ZipOutputStream}
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.cli.external.{DockerClient, DockerImages, DockerRunArgs}
+import dev.kamu.cli.external.DockerImages
+import dev.kamu.core.utils.{DockerClient, DockerRunArgs}
 import dev.kamu.core.utils.fs._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}

@@ -11,7 +11,7 @@ package dev.kamu.cli.transform
 import java.io.OutputStream
 
 import dev.kamu.cli.WorkspaceLayout
-import dev.kamu.cli.external.DockerClient
+import dev.kamu.core.utils.DockerClient
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.Level
 

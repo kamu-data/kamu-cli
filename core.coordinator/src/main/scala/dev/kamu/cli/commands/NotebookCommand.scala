@@ -8,8 +8,9 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.{DockerClient, NotebookRunnerDocker}
+import dev.kamu.cli.external.NotebookRunnerDocker
 import dev.kamu.cli.metadata.MetadataRepository
+import dev.kamu.core.utils.DockerClient
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 

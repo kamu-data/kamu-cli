@@ -8,7 +8,8 @@
 
 package dev.kamu.cli.commands
 
-import dev.kamu.cli.external.{DockerClient, DockerImages}
+import dev.kamu.cli.external.DockerImages
+import dev.kamu.core.utils.DockerClient
 import org.apache.log4j.LogManager
 
 class PullImagesCommand(
