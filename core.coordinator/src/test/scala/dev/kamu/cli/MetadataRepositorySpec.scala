@@ -12,9 +12,9 @@ import java.net.URI
 
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
-import dev.kamu.cli.external.{DockerClient, DockerProcessBuilder, DockerRunArgs}
 import dev.kamu.cli.metadata.ResourceLoader
 import dev.kamu.core.manifests.DatasetID
+import dev.kamu.core.utils.{DockerClient, DockerProcessBuilder, DockerRunArgs}
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.fs.Path.SEPARATOR
 import org.scalatest._
