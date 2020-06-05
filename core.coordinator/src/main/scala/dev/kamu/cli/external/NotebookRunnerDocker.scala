@@ -24,7 +24,7 @@ class NotebookRunnerDocker(
 
   def start(): Unit = {
     val network = "kamu"
-    withNetwork(network) {
+    dockerClient.withNetwork(network, Some(IOHandlerPresets.logged(logger))) {
       val livyBuilder =
         new LivyDockerProcessBuilder(
           metadataRepository.getLocalVolume(),
@@ -66,20 +66,6 @@ class NotebookRunnerDocker(
         stopAll()
         jupyterBuilder.chown()
       }
-    }
-  }
-
-  def withNetwork[T](network: String)(body: => T): T = {
-    dockerClient
-      .prepare(Seq("docker", "network", "create", network))
-      .!(IOHandlerPresets.logged(logger))
-
-    try {
-      body
-    } finally {
-      dockerClient
-        .prepare(Seq("docker", "network", "rm", network))
-        .!(IOHandlerPresets.logged(logger))
     }
   }
 }
