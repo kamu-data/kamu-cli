@@ -8,20 +8,14 @@
 
 package dev.kamu.cli.transform
 
-import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.core.manifests._
-import dev.kamu.core.manifests.infra.{TransformConfig, TransformTaskConfig}
+import dev.kamu.core.manifests.infra.{ExecuteQueryRequest, ExecuteQueryResult}
 import dev.kamu.core.utils.Clock
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import spire.math.Interval
 import spire.math.interval.{Unbound, ValueBound}
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.utils.fs._
-import dev.kamu.core.utils.fs.Temp
-import yaml.defaults._
-import pureconfig.generic.auto._
 
 case class TransformBatch(
   source: SourceKind.Derivative,
@@ -32,7 +26,6 @@ case class TransformBatch(
 
 class TransformService(
   fileSystem: FileSystem,
-  workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   systemClock: Clock,
   engineFactory: EngineFactory
@@ -58,7 +51,7 @@ class TransformService(
         logger.info(s"Dataset is up-to-date: $datasetID")
       } else {
         // TODO: Atomicity
-        val nextBlock = engineExecuteQuery(datasetID, batch)
+        val nextBlock = engineExecuteQuery(datasetID, batch).block
         commitNewBlock(datasetID, nextBlock)
       }
     }
@@ -67,48 +60,27 @@ class TransformService(
   private def engineExecuteQuery(
     datasetID: DatasetID,
     batch: TransformBatch
-  ): MetadataBlock = {
-    Temp.withRandomTempDir(fileSystem, "kamu-transform-") { tempDir =>
-      val allDatasets = batch.source.inputs.map(_.id) :+ datasetID
+  ): ExecuteQueryResult = {
+    val allDatasets = batch.source.inputs.map(_.id) :+ datasetID
 
-      val transformConfig = TransformConfig(
-        tasks = Vector(
-          TransformTaskConfig(
-            datasetID = datasetID,
-            source = batch.source,
-            inputSlices = batch.inputSlices.map {
-              case (id, slice) => (id.toString, slice)
-            },
-            datasetVocabs = allDatasets
-              .map(
-                id => (id.toString, metadataRepository.getDatasetVocabulary(id))
-              )
-              .toMap,
-            datasetLayouts = allDatasets
-              .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
-              .toMap,
-            metadataOutputDir = tempDir
-          )
+    val request = ExecuteQueryRequest(
+      datasetID = datasetID,
+      source = batch.source,
+      inputSlices = batch.inputSlices.map {
+        case (id, slice) => (id.toString, slice)
+      },
+      datasetVocabs = allDatasets
+        .map(
+          id => (id.toString, metadataRepository.getDatasetVocabulary(id))
         )
-      )
+        .toMap,
+      datasetLayouts = allDatasets
+        .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
+        .toMap
+    )
 
-      val engine = engineFactory.getEngine(batch.source.transformEngine)
-
-      engine.submit(
-        workspaceLayout = workspaceLayout,
-        extraFiles = Map(
-          TransformConfig.configFileName -> (
-            os => yaml.save(Manifest(transformConfig), os)
-          )
-        ),
-        extraMounts = Seq(tempDir)
-      )
-
-      val inputStream = fileSystem.open(tempDir.resolve("block.yaml"))
-      val block = yaml.load[Manifest[MetadataBlock]](inputStream).content
-      inputStream.close()
-      block
-    }
+    val engine = engineFactory.getEngine(batch.source.transformEngine)
+    engine.executeQuery(request)
   }
 
   private def commitNewBlock(
@@ -122,16 +94,17 @@ class TransformService(
       )
     )
 
+    val dataSize = Some(metadataRepository.getDatasetLayout(datasetID).dataDir)
+      .filter(fileSystem.exists)
+      .map(p => fileSystem.getContentSummary(p).getSpaceConsumed)
+      .getOrElse(0L)
+
     outputMetaChain.updateSummary(
       s =>
         s.copy(
           lastPulled = Some(systemClock.instant()),
           numRecords = s.numRecords + newBlock.outputSlice.get.numRecords,
-          dataSize = fileSystem
-            .getContentSummary(
-              metadataRepository.getDatasetLayout(datasetID).dataDir
-            )
-            .getSpaceConsumed
+          dataSize = dataSize
         )
     )
 

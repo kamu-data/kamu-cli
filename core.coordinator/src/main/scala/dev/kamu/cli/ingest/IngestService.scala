@@ -21,13 +21,11 @@ import dev.kamu.cli.ingest.fetch.{
 import dev.kamu.cli.ingest.prep.{PrepCheckpoint, PrepStepFactory}
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.cli.transform.EngineFactory
-import dev.kamu.core.manifests.infra.{IngestConfig, IngestTask}
+import dev.kamu.core.manifests.infra.IngestRequest
 import dev.kamu.core.manifests.{
   DatasetID,
   DatasetVocabulary,
   DatasetVocabularyOverrides,
-  FetchSourceKind,
-  Manifest,
   MetadataBlock,
   SourceKind
 }
@@ -40,9 +38,9 @@ import org.apache.commons.compress.compressors.bzip2.{
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.LogManager
-import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import yaml.defaults._
 import pureconfig.generic.auto._
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 
 class IngestService(
   fileSystem: FileSystem,
@@ -305,51 +303,20 @@ class IngestService(
     prepDataPath: Path,
     vocabulary: DatasetVocabulary
   ): MetadataBlock = {
-    Temp.withRandomTempDir(fileSystem, "kamu-ingest-") { tempDir =>
-      // TODO: Account for missing files
-      val extraMounts = source.fetch match {
-        case furl: FetchSourceKind.Url =>
-          furl.url.getScheme match {
-            case "file" | null => List(new Path(furl.url))
-            case _             => List.empty
-          }
-        case glob: FetchSourceKind.FilesGlob =>
-          List(glob.path.getParent)
-        case _ =>
-          throw new RuntimeException(s"Unsupported fetch kind: ${source.fetch}")
-      }
+    val request = IngestRequest(
+      datasetID = datasetID,
+      source = source,
+      datasetLayout = metadataRepository.getDatasetLayout(datasetID),
+      dataToIngest = prepDataPath,
+      eventTime = eventTime,
+      datasetVocab = vocabulary
+    )
 
-      val pollConfig = IngestConfig(
-        tasks = Vector(
-          IngestTask(
-            datasetID = datasetID,
-            source = source,
-            datasetLayout = metadataRepository.getDatasetLayout(datasetID),
-            dataToIngest = prepDataPath,
-            eventTime = eventTime,
-            datasetVocab = vocabulary,
-            metadataOutputDir = tempDir
-          )
-        )
-      )
+    val engine =
+      engineFactory.getEngine(source.preprocessEngine.getOrElse("sparkSQL"))
 
-      val engine = engineFactory.getEngine("sparkIngest")
-
-      engine.submit(
-        workspaceLayout = workspaceLayout,
-        extraFiles = Map(
-          IngestConfig.configFileName -> (
-            os => yaml.save(Manifest(pollConfig), os)
-          )
-        ),
-        extraMounts = tempDir :: extraMounts
-      )
-
-      val inputStream = fileSystem.open(tempDir.resolve("block.yaml"))
-      val block = yaml.load[Manifest[MetadataBlock]](inputStream).content
-      inputStream.close()
-      block
-    }
+    val result = engine.ingest(request)
+    result.block
   }
 
   def commitMetadata(

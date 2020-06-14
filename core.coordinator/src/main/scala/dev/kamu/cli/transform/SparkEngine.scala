@@ -9,80 +9,168 @@
 package dev.kamu.cli.transform
 
 import java.io.OutputStream
-import java.util.zip.{ZipEntry, ZipOutputStream}
 
+import pureconfig.generic.auto._
+import dev.kamu.core.manifests.parsing.pureconfig.yaml
+import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.external.DockerImages
+import dev.kamu.core.manifests.{FetchSourceKind, Manifest}
+import dev.kamu.core.manifests.infra.{
+  ExecuteQueryRequest,
+  ExecuteQueryResult,
+  IngestRequest,
+  IngestResult
+}
 import dev.kamu.core.utils.{DockerClient, DockerRunArgs}
 import dev.kamu.core.utils.fs._
 import org.apache.commons.io.IOUtils
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.log4j.{Level, LogManager, Logger}
 
-abstract class SparkEngineBase(
+class SparkEngine(
   fileSystem: FileSystem,
-  logLevel: Level
+  workspaceLayout: WorkspaceLayout,
+  logLevel: Level,
+  dockerClient: DockerClient,
+  image: String = DockerImages.SPARK
 ) extends Engine {
   protected var logger: Logger = LogManager.getLogger(getClass.getName)
 
-  def submit(
-    workspaceLayout: WorkspaceLayout,
-    extraFiles: Map[String, OutputStream => Unit] = Map.empty,
-    extraMounts: Seq[Path] = Seq.empty,
-    jars: Seq[Path] = Seq.empty
-  ): Unit = {
-    val tmpJar =
-      if (extraFiles.nonEmpty)
-        prepareJar(extraFiles)
-      else
-        null
-
-    val loggingConfig = prepareLog4jConfig()
-
-    try {
-      submit(
-        workspaceLayout,
-        Seq(tmpJar) ++ jars,
-        extraMounts,
-        loggingConfig
+  override def ingest(request: IngestRequest): IngestResult = {
+    Temp.withRandomTempDir(
+      fileSystem,
+      "kamu-inout-"
+    ) { inOutDir =>
+      yaml.save(
+        Manifest(request),
+        fileSystem,
+        inOutDir.resolve("request.yaml")
       )
-    } finally {
-      if (tmpJar != null)
-        fileSystem.delete(tmpJar, false)
 
-      fileSystem.delete(loggingConfig, false)
+      // TODO: Account for missing files
+      val extraMounts = request.source.fetch match {
+        case furl: FetchSourceKind.Url =>
+          furl.url.getScheme match {
+            case "file" | null => List(new Path(furl.url))
+            case _             => List.empty
+          }
+        case glob: FetchSourceKind.FilesGlob =>
+          List(glob.path.getParent)
+        case _ =>
+          throw new RuntimeException(
+            s"Unsupported fetch kind: ${request.source.fetch}"
+          )
+      }
+
+      submit("dev.kamu.engine.spark.ingest.IngestApp", inOutDir, extraMounts)
+
+      yaml
+        .load[Manifest[IngestResult]](
+          fileSystem,
+          inOutDir.resolve("result.yaml")
+        )
+        .content
+    }
+  }
+
+  override def executeQuery(
+    request: ExecuteQueryRequest
+  ): ExecuteQueryResult = {
+    Temp.withRandomTempDir(
+      fileSystem,
+      "kamu-inout-"
+    ) { inOutDir =>
+      yaml.save(
+        Manifest(request),
+        fileSystem,
+        inOutDir.resolve("request.yaml")
+      )
+
+      submit(
+        "dev.kamu.engine.spark.transform.TransformApp",
+        inOutDir,
+        Seq.empty
+      )
+
+      yaml
+        .load[Manifest[ExecuteQueryResult]](
+          fileSystem,
+          inOutDir.resolve("result.yaml")
+        )
+        .content
     }
   }
 
   protected def submit(
-    workspaceLayout: WorkspaceLayout,
-    jars: Seq[Path],
-    extraMounts: Seq[Path],
-    loggingConfig: Path
-  )
+    appClass: String,
+    inOutDir: Path,
+    extraMounts: Seq[Path]
+  ): Unit = {
+    val inOutDirInContainer = new Path("/opt/engine/in-out")
+    val engineJarInContainer = new Path("/opt/engine/bin/engine.spark.jar")
 
-  protected def prepareJar(files: Map[String, OutputStream => Unit]): Path = {
-    val jarPath = tempDir.resolve("kamu-configs.jar")
+    Temp.withTempFile(
+      fileSystem,
+      "kamu-logging-cfg-",
+      writeLog4jConfig
+    ) { loggingConfigPath =>
+      val workspaceVolumes =
+        Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
+          .filter(fileSystem.exists)
+          .map(p => (p, p))
+          .toMap
 
-    logger.debug(s"Writing temporary JAR to: $jarPath")
+      val appVolumes = Map(
+        loggingConfigPath -> new Path("/opt/spark/conf/log4j.properties"),
+        inOutDir -> inOutDirInContainer
+      )
 
-    val fileStream = fileSystem.create(jarPath, true)
-    val zipStream = new ZipOutputStream(fileStream)
+      val extraVolumes = extraMounts.map(p => (p, p)).toMap
 
-    files.foreach {
-      case (name, writeFun) =>
-        zipStream.putNextEntry(new ZipEntry(name))
-        writeFun(zipStream)
-        zipStream.closeEntry()
+      val submitArgs = List(
+        "/opt/spark/bin/spark-submit",
+        "--master=local[4]",
+        s"--driver-memory=2g",
+        "--conf",
+        "spark.sql.warehouse.dir=/opt/spark-warehouse",
+        s"--class=$appClass",
+        engineJarInContainer.toUri.getPath
+      )
+
+      logger.info("Starting Spark job")
+
+      try {
+        dockerClient.runShell(
+          DockerRunArgs(
+            image = image,
+            volumeMap = workspaceVolumes ++ appVolumes ++ extraVolumes
+          ),
+          submitArgs
+        )
+      } finally {
+        // TODO: avoid this by setting up correct user inside the container
+        logger.debug("Fixing file ownership")
+
+        val unix = new com.sun.security.auth.module.UnixSystem()
+        val chownArgs = Seq(
+          "chown",
+          "-R",
+          s"${unix.getUid}:${unix.getGid}"
+        ) ++ workspaceVolumes.values.map(_.toUri.getPath)
+
+        dockerClient.runShell(
+          DockerRunArgs(
+            image = image,
+            volumeMap = workspaceVolumes
+          ),
+          chownArgs
+        )
+      }
     }
-
-    zipStream.close()
-    jarPath
   }
 
-  protected def prepareLog4jConfig(): Path = {
-    val path = tempDir.resolve("kamu-spark-log4j.properties")
-
+  protected def writeLog4jConfig(outputStream: OutputStream): Unit = {
     val resourceName = logLevel match {
       case Level.ALL | Level.TRACE | Level.DEBUG | Level.INFO =>
         "spark.info.log4j.properties"
@@ -93,95 +181,9 @@ abstract class SparkEngineBase(
     }
 
     val configStream = getClass.getClassLoader.getResourceAsStream(resourceName)
-    val outputStream = fileSystem.create(path, true)
-
     IOUtils.copy(configStream, outputStream)
 
     outputStream.close()
     configStream.close()
-
-    path
-  }
-
-  protected def tempDir: Path = {
-    new Path(sys.props("java.io.tmpdir"))
-  }
-}
-
-class SparkEngineDocker(
-  fileSystem: FileSystem,
-  logLevel: Level,
-  dockerClient: DockerClient,
-  appClass: String = "dev.kamu.engine.spark.transform.TransformApp",
-  image: String = DockerImages.SPARK
-) extends SparkEngineBase(fileSystem, logLevel) {
-
-  protected override def submit(
-    workspaceLayout: WorkspaceLayout,
-    jars: Seq[Path],
-    extraMounts: Seq[Path],
-    loggingConfig: Path
-  ): Unit = {
-    val appVolumes = Map(
-      loggingConfig -> new Path("/opt/spark/conf/log4j.properties")
-    )
-
-    val extraVolumes = extraMounts.map(p => (p, p)).toMap
-
-    val jarVolumes = jars
-      .map(p => (p, new Path("/opt/kamu/jars/" + p.getName)))
-      .toMap
-
-    val workspaceVolumes =
-      Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
-        .filter(fileSystem.exists)
-        .map(p => (p, p))
-        .toMap
-
-    val submitArgs = List(
-      "/opt/spark/bin/spark-submit",
-      "--master=local[4]",
-      s"--driver-memory=2g",
-      "--conf",
-      "spark.sql.warehouse.dir=/opt/spark-warehouse",
-      s"--class=$appClass"
-    ) ++ (
-      if (jars.nonEmpty)
-        Seq("--jars=" + jarVolumes.values.map(_.toUri.getPath).mkString(","))
-      else
-        Seq()
-    ) ++ Seq(
-      "/opt/kamu/engine.spark.jar"
-    )
-
-    logger.info("Starting Spark job")
-
-    try {
-      dockerClient.runShell(
-        DockerRunArgs(
-          image = image,
-          volumeMap = appVolumes ++ workspaceVolumes ++ jarVolumes ++ extraVolumes
-        ),
-        submitArgs
-      )
-    } finally {
-      // TODO: avoid this by setting up correct user inside the container
-      logger.debug("Fixing file ownership")
-
-      val unix = new com.sun.security.auth.module.UnixSystem()
-      val chownArgs = Seq(
-        "chown",
-        "-R",
-        s"${unix.getUid}:${unix.getGid}"
-      ) ++ workspaceVolumes.values.map(_.toUri.getPath)
-
-      dockerClient.runShell(
-        DockerRunArgs(
-          image = image,
-          volumeMap = workspaceVolumes
-        ),
-        chownArgs
-      )
-    }
   }
 }

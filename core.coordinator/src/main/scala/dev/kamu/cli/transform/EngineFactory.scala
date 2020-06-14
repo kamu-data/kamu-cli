@@ -8,41 +8,40 @@
 
 package dev.kamu.cli.transform
 
-import java.io.OutputStream
-
 import dev.kamu.cli.WorkspaceLayout
+import dev.kamu.core.manifests.infra.{
+  ExecuteQueryRequest,
+  ExecuteQueryResult,
+  IngestRequest,
+  IngestResult
+}
 import dev.kamu.core.utils.DockerClient
-import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.Level
 
 trait Engine {
-  def submit(
-    workspaceLayout: WorkspaceLayout,
-    extraFiles: Map[String, OutputStream => Unit] = Map.empty,
-    extraMounts: Seq[Path] = Seq.empty,
-    jars: Seq[Path] = Seq.empty
-  ): Unit
+  def ingest(request: IngestRequest): IngestResult
+  def executeQuery(request: ExecuteQueryRequest): ExecuteQueryResult
 }
 
-class EngineFactory(fileSystem: FileSystem, logLevel: Level) {
+class EngineFactory(
+  fileSystem: FileSystem,
+  workspaceLayout: WorkspaceLayout,
+  logLevel: Level
+) {
   def getEngine(engineID: String): Engine = {
     engineID match {
-      case "sparkIngest" =>
-        new SparkEngineDocker(
-          fileSystem,
-          logLevel,
-          new DockerClient(fileSystem),
-          "dev.kamu.engine.spark.ingest.IngestApp"
-        )
       case "sparkSQL" =>
-        new SparkEngineDocker(
+        new SparkEngine(
           fileSystem,
+          workspaceLayout,
           logLevel,
           new DockerClient(fileSystem)
         )
       case "flink" =>
         new FlinkEngine(
           fileSystem,
+          workspaceLayout,
           new DockerClient(fileSystem)
         )
       case _ => throw new NotImplementedError(s"Unsupported engine: $engineID")

@@ -109,7 +109,6 @@ class Kamu(
           ),
           new TransformService(
             fileSystem,
-            workspaceLayout,
             metadataRepository,
             systemClock,
             engineFactory
@@ -202,7 +201,7 @@ class Kamu(
   }
 
   protected def getEngineFactory(logLevel: Level): EngineFactory = {
-    new EngineFactory(fileSystem, logLevel)
+    new EngineFactory(fileSystem, workspaceLayout, logLevel)
   }
 
   protected def getOutputStream(): PrintStream = {
