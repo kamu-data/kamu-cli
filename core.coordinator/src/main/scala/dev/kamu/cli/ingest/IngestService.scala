@@ -25,7 +25,6 @@ import dev.kamu.core.manifests.infra.IngestRequest
 import dev.kamu.core.manifests.{
   DatasetID,
   DatasetVocabulary,
-  DatasetVocabularyOverrides,
   MetadataBlock,
   SourceKind
 }
@@ -137,9 +136,7 @@ class IngestService(
           prepResult.checkpoint,
           prepDataPath,
           ingestCheckpointPath,
-          summary.vocabulary
-            .getOrElse(DatasetVocabularyOverrides())
-            .asDatasetVocabulary()
+          summary.vocabulary.getOrElse(DatasetVocabulary())
         )
 
         if (ingestResult.wasUpToDate) {

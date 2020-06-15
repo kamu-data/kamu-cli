@@ -102,9 +102,7 @@ class MetadataRepository(
   }
 
   def getDatasetVocabulary(id: DatasetID): DatasetVocabulary = {
-    getDatasetSummary(id).vocabulary
-      .getOrElse(DatasetVocabularyOverrides())
-      .asDatasetVocabulary()
+    getDatasetSummary(id).vocabulary.getOrElse(DatasetVocabulary())
   }
 
   def getDatasetRef(id: DatasetID): DatasetRef = {

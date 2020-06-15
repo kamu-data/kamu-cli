@@ -42,7 +42,7 @@ class KamuPullDerivativeSpec extends FlatSpec with Matchers with KamuTestBase {
       val deriv = DatasetFactory.newDerivativeDataset(
         source = root.id,
         sql = Some(
-          s"SELECT system_time, event_time, city, (population + 1) as population FROM `${root.id}`"
+          s"SELECT event_time, city, (population + 1) as population FROM `${root.id}`"
         )
       )
 
