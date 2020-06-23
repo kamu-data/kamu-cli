@@ -167,7 +167,10 @@ class FlinkEngine(
     if (!fileSystem.exists(checkpointsDir))
       return None
 
-    val allSavepoints = fileSystem.listStatus(checkpointsDir).map(_.getPath)
+    val allSavepoints = fileSystem
+      .listStatus(checkpointsDir)
+      .map(_.getPath)
+      .filter(fileSystem.isDirectory)
 
     // TODO: Atomicity
     if (allSavepoints.length > 1)

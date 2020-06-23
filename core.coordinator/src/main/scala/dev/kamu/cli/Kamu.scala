@@ -96,29 +96,38 @@ class Kamu(
           c.delete.ids()
         )
       case List(c.pull) =>
-        val engineFactory = getEngineFactory(
-          if (c.debug()) Level.INFO else c.sparkLogLevel()
-        )
-        new PullCommand(
-          new IngestService(
-            fileSystem,
-            workspaceLayout,
+        if (c.pull.setWatermark.isEmpty) {
+          val engineFactory = getEngineFactory(
+            if (c.debug()) Level.INFO else c.sparkLogLevel()
+          )
+          new PullCommand(
+            new IngestService(
+              fileSystem,
+              workspaceLayout,
+              metadataRepository,
+              engineFactory,
+              systemClock
+            ),
+            new TransformService(
+              fileSystem,
+              metadataRepository,
+              systemClock,
+              engineFactory
+            ),
             metadataRepository,
-            engineFactory,
-            systemClock
-          ),
-          new TransformService(
-            fileSystem,
-            metadataRepository,
+            remoteOperatorFactory,
+            c.pull.ids(),
+            c.pull.all(),
+            c.pull.recursive()
+          )
+        } else {
+          new AssignWatermarkCommand(
             systemClock,
-            engineFactory
-          ),
-          metadataRepository,
-          remoteOperatorFactory,
-          c.pull.ids(),
-          c.pull.all(),
-          c.pull.recursive()
-        )
+            metadataRepository,
+            c.pull.ids(),
+            c.pull.setWatermark()
+          )
+        }
       case List(c.log) =>
         new LogCommand(
           metadataRepository,

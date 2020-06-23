@@ -39,14 +39,20 @@ class LogCommand(
     block.outputSlice.foreach { s =>
       println(renderProperty("Output.Records", s.numRecords))
       println(renderProperty("Output.Interval", s.interval.format()))
-      println(renderProperty("Output.Hash", s.hash))
+      if (s.hash.nonEmpty)
+        println(renderProperty("Output.Hash", s.hash))
+    }
+
+    block.outputWatermark.foreach { w =>
+      println(renderProperty("Output.Watermark", w))
     }
 
     block.inputSlices.zipWithIndex.foreach {
       case (s, i) =>
         println(renderProperty(s"Input[$i].Records", s.numRecords))
         println(renderProperty(s"Input[$i].Interval", s.interval.format()))
-        println(renderProperty(s"Input[$i].Hash", s.hash))
+        if (s.hash.nonEmpty)
+          println(renderProperty(s"Input[$i].Hash", s.hash))
     }
 
     block.source.foreach {

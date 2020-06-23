@@ -8,10 +8,14 @@
 
 package dev.kamu.cli
 
+import java.time.Instant
+
 import dev.kamu.cli.output.OutputFormat
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.Level
 import org.rogach.scallop._
+
+import scala.concurrent.duration.Duration
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -177,6 +181,13 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     }
     val argType = ArgType.LIST
   }
+  implicit val _instantConverter = singleArgConverter[Instant](s => {
+    if (s.endsWith(" ago")) {
+      Instant.now().minusMillis(Duration(s.substring(0, s.length - 4)).toMillis)
+    } else {
+      Instant.parse(s)
+    }
+  })
 
   editBuilder(s => s.copy(helpFormatter = new BetterScallopHelpFormatter()))
 
@@ -306,6 +317,11 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     val recursive = opt[Boolean](
       "recursive",
       descr = "Pull datasets and their dependencies"
+    )
+
+    val setWatermark = opt[Instant](
+      name = "set-watermark",
+      descr = "Manually assigns the watermark to the dataset"
     )
 
     val ids = trailArg[List[String]](

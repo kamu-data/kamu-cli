@@ -10,18 +10,27 @@ package dev.kamu.cli.transform
 
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.core.manifests._
-import dev.kamu.core.manifests.infra.{ExecuteQueryRequest, ExecuteQueryResult}
+import dev.kamu.core.manifests.infra.{
+  ExecuteQueryRequest,
+  ExecuteQueryResult,
+  InputDataSlice,
+  Watermark
+}
 import dev.kamu.core.utils.Clock
 import org.apache.hadoop.fs.FileSystem
 import org.apache.log4j.LogManager
 import spire.math.Interval
-import spire.math.interval.{Unbound, ValueBound}
+import spire.math.interval.{Closed, Unbound, ValueBound}
 
 case class TransformBatch(
   source: SourceKind.Derivative,
-  inputSlices: Map[DatasetID, DataSlice]
+  inputSlices: Map[DatasetID, InputDataSlice]
 ) {
-  def isEmpty: Boolean = inputSlices.values.forall(_.interval.isEmpty)
+  def isEmpty: Boolean = {
+    inputSlices.values.forall(
+      s => s.interval.isEmpty && s.explicitWatermarks.isEmpty
+    )
+  }
 }
 
 class TransformService(
@@ -151,19 +160,7 @@ class TransformService(
     inputIndex: Int,
     inputMetaChain: MetadataChain,
     outputMetaChain: MetadataChain
-  ): DataSlice = {
-
-    // Determine available data range
-    // Result is either: () or (-inf, upper]
-    val ivAvailable = inputMetaChain
-      .getBlocks()
-      .reverse
-      .flatMap(_.outputSlice)
-      .find(_.interval.nonEmpty)
-      .map(_.interval)
-      .map(i => Interval.fromBounds(Unbound(), i.upperBound))
-      .getOrElse(Interval.empty)
-
+  ): InputDataSlice = {
     // Determine processed data range
     // Result is either: () or (inf, upper] or (lower, upper]
     val ivProcessed = outputMetaChain
@@ -184,16 +181,32 @@ class TransformService(
         Interval.all
     }
 
+    // Filter unprocessed input blocks
+    val blocksUnprocessed = inputMetaChain
+      .getBlocks()
+      .reverse
+      .takeWhile(b => ivUnprocessed.contains(b.systemTime))
+
+    // Determine available data/watermark range
+    // Result is either: () or (-inf, upper]
+    val ivAvailable = blocksUnprocessed.headOption
+      .map(b => Interval.fromBounds(Unbound(), Closed(b.systemTime)))
+      .getOrElse(Interval.empty)
+
     // Result is either: () or (lower, upper]
     val ivToProcess = ivAvailable & ivUnprocessed
+
+    val explicitWatermarks = blocksUnprocessed.reverse
+      .filter(_.outputWatermark.isDefined)
+      .map(b => Watermark(b.systemTime, b.outputWatermark.get))
 
     logger.debug(
       s"Input range for $inputID is: $ivToProcess (available: $ivAvailable, processed: $ivProcessed)"
     )
-    DataSlice(
+
+    InputDataSlice(
       interval = ivToProcess,
-      hash = "",
-      numRecords = -1
+      explicitWatermarks = explicitWatermarks
     )
   }
 }
