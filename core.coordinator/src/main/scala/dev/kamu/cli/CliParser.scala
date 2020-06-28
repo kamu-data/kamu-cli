@@ -15,6 +15,7 @@ import dev.kamu.cli.output.OutputFormat
 import org.apache.logging.log4j.Level
 import org.rogach.scallop._
 
+import scala.io.AnsiColor._
 import scala.concurrent.duration.Duration
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -134,12 +135,12 @@ class TabularOutputSubcommand(name: String) extends KamuSubcommand(name) {
 class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   banner(
     "Kamu data management tool" +
-      "\nUsage: \033[1mkamu [OPTION] [COMMAND] [OPTION]\033[0m" +
+      s"\nUsage: ${BOLD}kamu [OPTION] [COMMAND] [OPTION]${RESET}" +
       "\n\nOptions"
   )
   footer(
     "" +
-      "\nTo see help of individual subcommands use: \033[1mkamu [COMMAND] -h\033[0m" +
+      s"\nTo see help of individual subcommands use: ${BOLD}kamu [COMMAND] -h${RESET}" +
       "\n\nDocumentation is available at https://github.com/kamu-data/kamu-cli"
   )
   shortSubcommandsHelp()
@@ -481,7 +482,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
       |via your distribution's package manager. Then load the kamu completion code for bash into
       |the current shell (you can add following into your ~/.bashrc file):
       |
-      |    \033[1msource <(kamu completion bash)\033[0m
+      |    ${BOLD}source <(kamu completion bash)${RESET}
       """.stripMargin
     )
 
@@ -499,7 +500,7 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
     descr("Outputs dependency graph of datasets")
     footer(
       "\nYou can visualize it with graphviz by running:" +
-        "\n    \033[1mkamu depgraph | dot -Tpng > depgraph.png\033[0m"
+        s"\n    ${BOLD}kamu depgraph | dot -Tpng > depgraph.png${RESET}"
     )
   }
   addSubcommand(depgraph)
@@ -522,7 +523,7 @@ class BetterScallopHelpFormatter extends ScallopHelpFormatter {
       s.subbuilders
         .map {
           case (name, option) =>
-            s"  \033[1m${name.padTo(maxCommandLength, ' ')}\033[0m   ${option.descr}"
+            s"  ${BOLD}${name.padTo(maxCommandLength, ' ')}${RESET}   ${option.descr}"
         }
         .mkString("\n")
   }
