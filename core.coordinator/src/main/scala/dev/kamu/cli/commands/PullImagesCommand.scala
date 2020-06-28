@@ -10,7 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.external.DockerImages
 import dev.kamu.core.utils.DockerClient
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class PullImagesCommand(
   dockerClient: DockerClient

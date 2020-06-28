@@ -14,7 +14,7 @@ import dev.kamu.cli.metadata.{
   MetadataRepository
 }
 import dev.kamu.core.manifests.DatasetID
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class DeleteCommand(
   metadataRepository: MetadataRepository,

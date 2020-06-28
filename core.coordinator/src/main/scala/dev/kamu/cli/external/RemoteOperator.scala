@@ -11,7 +11,6 @@ package dev.kamu.cli.external
 import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, Remote}
-import org.apache.hadoop.fs.FileSystem
 
 trait RemoteOperator {
   def push(datasets: Seq[DatasetID])
@@ -20,7 +19,6 @@ trait RemoteOperator {
 }
 
 class RemoteOperatorFactory(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository
 ) {
@@ -38,7 +36,6 @@ class RemoteOperatorFactory(
     remote.url.getScheme match {
       case "s3" =>
         new RemoteOperatorS3Cli(
-          fileSystem,
           metadataRepository,
           remote
         )

@@ -8,10 +8,12 @@
 
 package dev.kamu.cli.ingest
 
+import java.nio.file.Path
+
+import better.files.File
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.{Manifest, Resource}
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
 case class ExecutionResult[TCheckpoint](
@@ -19,9 +21,7 @@ case class ExecutionResult[TCheckpoint](
   checkpoint: TCheckpoint
 )
 
-class CheckpointingExecutor[TCheckpoint <: Resource](
-  fileSystem: FileSystem
-)(
+class CheckpointingExecutor[TCheckpoint <: Resource]()(
   implicit icr: Derivation[ConfigReader[TCheckpoint]],
   icmr: Derivation[ConfigReader[Manifest[TCheckpoint]]],
   icw: Derivation[ConfigWriter[TCheckpoint]],
@@ -56,23 +56,19 @@ class CheckpointingExecutor[TCheckpoint <: Resource](
   def readCheckpoint(
     checkpointPath: Path
   ): Option[TCheckpoint] = {
-    if (!fileSystem.exists(checkpointPath))
+    if (!File(checkpointPath).exists)
       return None
 
-    val inputStream = fileSystem.open(checkpointPath)
-    val cacheInfo = yaml.load[Manifest[TCheckpoint]](inputStream).content
+    val cacheInfo = yaml.load[Manifest[TCheckpoint]](checkpointPath).content
 
     // TODO: detect when cache should be invalidated
     Some(cacheInfo)
   }
 
   def writeCheckpoint(checkpointPath: Path, checkpoint: TCheckpoint): Unit = {
-    if (!fileSystem.exists(checkpointPath.getParent))
-      fileSystem.mkdirs(checkpointPath.getParent)
+    if (!File(checkpointPath.getParent).exists)
+      File(checkpointPath.getParent).createDirectories()
 
-    val outputStream = fileSystem.create(checkpointPath)
-
-    yaml.save(Manifest(checkpoint), outputStream)
-    outputStream.close()
+    yaml.save(Manifest(checkpoint), checkpointPath)
   }
 }

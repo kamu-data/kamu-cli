@@ -10,7 +10,9 @@ package dev.kamu.cli.metadata
 
 import java.io.PrintWriter
 import java.net.URI
+import java.nio.file.Path
 
+import better.files.File
 import dev.kamu.cli.utility.DependencyGraph
 import dev.kamu.cli._
 import dev.kamu.core.manifests._
@@ -19,11 +21,9 @@ import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
 import pureconfig.generic.auto._
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class MetadataRepository(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   systemClock: Clock
 ) {
@@ -31,7 +31,6 @@ class MetadataRepository(
 
   protected val volumeRepo =
     new GenericResourceRepository[Remote, RemoteID](
-      fileSystem,
       workspaceLayout.remotesDir,
       "remote",
       RemoteID,
@@ -54,19 +53,18 @@ class MetadataRepository(
   }
 
   protected def ensureDatasetExists(id: DatasetID): Unit = {
-    if (!fileSystem.exists(workspaceLayout.metadataDir.resolve(id.toString)))
+    if (!File(workspaceLayout.metadataDir.resolve(id.toString)).isDirectory)
       throw new DoesNotExistException(id.toString, "dataset")
   }
 
   protected def ensureDatasetExistsAndPulled(id: DatasetID): Unit = {
     ensureDatasetExists(id)
-    if (!fileSystem.exists(datasetMetadataDir(id)))
+    if (!File(datasetMetadataDir(id)).isDirectory)
       throw new DoesNotExistException(id.toString, "dataset")
   }
 
   def isRemote(id: DatasetID): Boolean = {
-    val refPath = remoteRefFilePath(id)
-    fileSystem.exists(refPath)
+    File(remoteRefFilePath(id)).isRegularFile
   }
 
   def getDatasetLayout(id: DatasetID): DatasetLayout = {
@@ -83,7 +81,7 @@ class MetadataRepository(
   }
 
   def getMetadataChain(id: DatasetID): MetadataChain = {
-    new MetadataChain(fileSystem, getDatasetLayout(id).metadataDir)
+    new MetadataChain(getDatasetLayout(id).metadataDir)
   }
 
   def getDatasetKind(id: DatasetID): DatasetKind = {
@@ -97,7 +95,7 @@ class MetadataRepository(
   def getDatasetSummary(id: DatasetID): DatasetSummary = {
     ensureDatasetExistsAndPulled(id)
 
-    val chain = new MetadataChain(fileSystem, datasetMetadataDir(id))
+    val chain = new MetadataChain(datasetMetadataDir(id))
     chain.getSummary()
   }
 
@@ -111,8 +109,7 @@ class MetadataRepository(
 
     val refFile = remoteRefFilePath(id)
 
-    new ResourceLoader(fileSystem)
-      .loadResourceFromFile[DatasetRef](refFile)
+    new ResourceLoader().loadResourceFromFile[DatasetRef](refFile)
   }
 
   protected def getDatasetDependencies(id: DatasetID): List[DatasetID] = {
@@ -162,20 +159,20 @@ class MetadataRepository(
   }
 
   def getAllDatasets(): Seq[DatasetID] = {
-    fileSystem
-      .listStatus(workspaceLayout.metadataDir)
-      .map(_.getPath.getName)
+    File(workspaceLayout.metadataDir).list
+      .map(_.name)
       .map(DatasetID)
+      .toSeq
   }
 
   def loadDatasetSnapshotFromURI(uri: URI): DatasetSnapshot = {
-    new ResourceLoader(fileSystem).loadResourceFromURI[DatasetSnapshot](uri)
+    new ResourceLoader().loadResourceFromURI[DatasetSnapshot](uri)
   }
 
   def addDataset(ds: DatasetSnapshot): Unit = {
     val datasetDir = workspaceLayout.metadataDir.resolve(ds.id.toString)
 
-    if (fileSystem.exists(datasetDir))
+    if (File(datasetDir).exists)
       throw new AlreadyExistsException(ds.id.toString, "dataset")
 
     try {
@@ -190,7 +187,7 @@ class MetadataRepository(
         )
     }
 
-    val chain = new MetadataChain(fileSystem, datasetDir)
+    val chain = new MetadataChain(datasetDir)
     chain.init(ds, systemClock.instant())
   }
 
@@ -199,13 +196,13 @@ class MetadataRepository(
     val datasetDir =
       workspaceLayout.metadataDir.resolve(localDatasetID.toString)
 
-    if (fileSystem.exists(datasetDir))
+    if (File(datasetDir).exists)
       throw new AlreadyExistsException(localDatasetID.toString, "dataset")
 
     getRemote(datasetRef.remoteID)
 
-    fileSystem.mkdirs(datasetDir)
-    new ResourceLoader(fileSystem)
+    File(datasetDir).createDirectories()
+    new ResourceLoader()
       .saveResourceToFile(datasetRef, remoteRefFilePath(localDatasetID))
   }
 
@@ -221,11 +218,15 @@ class MetadataRepository(
       throw new DanglingReferenceException(referencedBy.map(_.id), id)
 
     val layout = getDatasetLayout(id)
-    fileSystem.delete(layout.cacheDir, true)
-    fileSystem.delete(layout.dataDir, true)
-    fileSystem.delete(layout.checkpointsDir, true)
-    fileSystem.delete(layout.metadataDir, true)
-    fileSystem.delete(workspaceLayout.metadataDir.resolve(id.toString), true)
+
+    Seq(
+      layout.cacheDir,
+      layout.cacheDir,
+      layout.dataDir,
+      layout.checkpointsDir,
+      layout.metadataDir,
+      workspaceLayout.metadataDir.resolve(id.toString)
+    ).foreach(p => File(p).delete())
   }
 
   ////////////////////////////////////////////////////////////////////////////
@@ -233,10 +234,13 @@ class MetadataRepository(
   ////////////////////////////////////////////////////////////////////////////
 
   def getLocalVolume(): VolumeLayout = {
-    if (!fileSystem.exists(workspaceLayout.localVolumeDir)) {
-      fileSystem.mkdirs(workspaceLayout.localVolumeDir)
-      val outputStream =
-        fileSystem.create(workspaceLayout.localVolumeDir.resolve(".gitignore"))
+    if (!File(workspaceLayout.localVolumeDir).isDirectory) {
+      File(workspaceLayout.localVolumeDir).createDirectories()
+
+      val outputStream = File(
+        workspaceLayout.localVolumeDir.resolve(".gitignore")
+      ).newOutputStream
+
       val writer = new PrintWriter(outputStream)
       writer.write(WorkspaceLayout.LOCAL_VOLUME_GITIGNORE_CONTENT)
       writer.close()

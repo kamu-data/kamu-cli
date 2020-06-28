@@ -17,54 +17,30 @@ package dev.kamu.cli.metadata
  */
 
 import java.net.URI
+import java.nio.file.{Path, Paths}
 
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
 import dev.kamu.core.manifests.{Manifest, Resource}
-import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
 import scala.reflect.ClassTag
 
 // TODO: Remove this class?
-class ResourceLoader(
-  fileSystem: FileSystem
-) {
+class ResourceLoader() {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  def loadResourceFromFile[T <: Resource: ClassTag](
-    p: Path
-  )(
+  def loadResourceFromFile[T <: Resource: ClassTag](p: Path)(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
-    val inputStream = fileSystem.open(p)
-    try {
-      yaml.load[Manifest[T]](inputStream).content
-    } finally {
-      inputStream.close()
-    }
+    yaml.load[Manifest[T]](p).content
   }
 
-  def saveResourceToFile[T <: Resource: ClassTag](
-    res: T,
-    path: Path
-  )(
+  def saveResourceToFile[T <: Resource: ClassTag](res: T, path: Path)(
     implicit writer: Derivation[ConfigWriter[Manifest[T]]]
   ): Unit = {
-    val outputStream = fileSystem.create(path)
-
-    try {
-      yaml.save(Manifest(res), outputStream)
-    } catch {
-      case e: Exception =>
-        outputStream.close()
-        fileSystem.delete(path, false)
-        throw e
-    } finally {
-      outputStream.close()
-    }
+    yaml.save(Manifest(res), path)
   }
 
   def loadResourceFromURI[T <: Resource: ClassTag](
@@ -73,10 +49,11 @@ class ResourceLoader(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
     uri.getScheme match {
-      case "https"       => loadResourceFromURL(uri.toURL)
-      case "http"        => loadResourceFromURL(uri.toURL)
-      case null | "file" => loadResourceFromFile(new Path(uri.getPath))
-      case s             => throw new SchemaNotSupportedException(s)
+      case "https" => loadResourceFromURL(uri.toURL)
+      case "http"  => loadResourceFromURL(uri.toURL)
+      case "file"  => loadResourceFromFile(Paths.get(uri))
+      case null    => loadResourceFromFile(Paths.get(uri.toString))
+      case s       => throw new SchemaNotSupportedException(s)
     }
   }
 

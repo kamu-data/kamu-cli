@@ -8,11 +8,11 @@
 
 package dev.kamu.cli
 
+import java.nio.file.Path
 import java.time.Instant
 
 import dev.kamu.cli.output.OutputFormat
-import org.apache.hadoop.fs.Path
-import org.apache.log4j.Level
+import org.apache.logging.log4j.Level
 import org.rogach.scallop._
 
 import scala.concurrent.duration.Duration
@@ -156,8 +156,6 @@ class CliArgs(arguments: Seq[String]) extends ScallopConf(arguments) {
   )
 
   implicit val _logLevelConverter = singleArgConverter[Level](Level.toLevel)
-  implicit val _pathConverter = singleArgConverter[Path](s => new Path(s))
-  implicit val _pathListConverter = listArgConverter[Path](s => new Path(s))
   val _envVarConverter = new ValueConverter[Map[String, String]] {
     def resolveEnvVar(s: String): (String, String) = {
       if (s.indexOf("=") < 0)

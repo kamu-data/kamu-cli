@@ -8,6 +8,7 @@
 
 package dev.kamu.cli.transform
 
+import better.files.File
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.core.manifests._
 import dev.kamu.core.manifests.infra.{
@@ -17,8 +18,8 @@ import dev.kamu.core.manifests.infra.{
   Watermark
 }
 import dev.kamu.core.utils.Clock
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.commons.io.FileUtils
+import org.apache.logging.log4j.LogManager
 import spire.math.Interval
 import spire.math.interval.{Closed, Unbound, ValueBound}
 
@@ -34,7 +35,6 @@ case class TransformBatch(
 }
 
 class TransformService(
-  fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
   systemClock: Clock,
   engineFactory: EngineFactory
@@ -47,8 +47,7 @@ class TransformService(
 
       val missingInputs = batch.inputSlices.keys.filter(
         inputID =>
-          !fileSystem
-            .exists(metadataRepository.getDatasetLayout(inputID).dataDir)
+          !File(metadataRepository.getDatasetLayout(inputID).dataDir).exists
       )
 
       if (missingInputs.nonEmpty) {
@@ -104,8 +103,8 @@ class TransformService(
     )
 
     val dataSize = Some(metadataRepository.getDatasetLayout(datasetID).dataDir)
-      .filter(fileSystem.exists)
-      .map(p => fileSystem.getContentSummary(p).getSpaceConsumed)
+      .filter(p => File(p).exists)
+      .map(p => FileUtils.sizeOfDirectory(p.toFile))
       .getOrElse(0L)
 
     outputMetaChain.updateSummary(

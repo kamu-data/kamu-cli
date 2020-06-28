@@ -9,15 +9,15 @@
 package dev.kamu.cli.ingest.fetch
 
 import java.io.InputStream
+import java.nio.file.Path
 import java.time.Instant
 
+import better.files.File
 import dev.kamu.cli.ingest.ExecutionResult
 import dev.kamu.core.utils.Clock
-import org.apache.hadoop.fs.{FileSystem, Path}
 
 class FileSystemSource(
   val sourceID: String,
-  fileSystem: FileSystem,
   systemClock: Clock,
   val path: Path,
   eventTimeSource: EventTimeSource
@@ -35,10 +35,9 @@ class FileSystemSource(
       )
 
     logger.debug(s"FS stat $path")
-    val fs = path.getFileSystem(fileSystem.getConf)
 
     val lastModified =
-      Instant.ofEpochMilli(fs.getFileStatus(path).getModificationTime)
+      Instant.ofEpochMilli(path.toFile.lastModified())
 
     val needsPull = checkpoint
       .flatMap(_.lastModified)
@@ -46,7 +45,7 @@ class FileSystemSource(
 
     if (needsPull) {
       logger.debug(s"FS reading $path")
-      handler(fs.open(path))
+      handler(File(path).newInputStream)
 
       ExecutionResult(
         wasUpToDate = false,

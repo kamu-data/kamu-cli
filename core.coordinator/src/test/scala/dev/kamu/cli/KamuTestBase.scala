@@ -9,22 +9,18 @@
 package dev.kamu.cli
 
 import dev.kamu.core.utils.ManualClock
-import dev.kamu.core.utils.fs._
+import dev.kamu.core.utils.Temp
 import dev.kamu.core.utils.test.KamuDataFrameSuite
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.FileSystem
 import org.scalatest._
 
 trait KamuTestBase extends KamuDataFrameSuite { self: Suite =>
 
-  val fileSystem = FileSystem.get(new Configuration())
-
   def withEmptyDir[T](func: KamuTestAdapter => T): T = {
-    Temp.withRandomTempDir(fileSystem, "kamu-test-") { tempDir =>
+    Temp.withRandomTempDir("kamu-test-") { tempDir =>
       val config = KamuConfig(workspaceRoot = tempDir)
       val clock = new ManualClock()
       clock.advance()
-      val kamu = new KamuTestAdapter(config, fileSystem, spark, clock)
+      val kamu = new KamuTestAdapter(config, spark, clock)
       func(kamu)
     }
   }

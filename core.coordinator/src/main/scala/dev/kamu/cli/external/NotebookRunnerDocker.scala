@@ -10,12 +10,10 @@ package dev.kamu.cli.external
 
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.utils.{DockerClient, DockerProcess, IOHandlerPresets}
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import sun.misc.{Signal, SignalHandler}
 
 class NotebookRunnerDocker(
-  fileSystem: FileSystem,
   dockerClient: DockerClient,
   metadataRepository: MetadataRepository,
   environmentVars: Map[String, String]
@@ -34,7 +32,6 @@ class NotebookRunnerDocker(
 
       val jupyterBuilder =
         new JupyterDockerProcessBuilder(
-          fileSystem,
           dockerClient,
           network,
           environmentVars

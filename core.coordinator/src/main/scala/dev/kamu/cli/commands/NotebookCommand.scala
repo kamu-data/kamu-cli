@@ -11,11 +11,9 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.external.NotebookRunnerDocker
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.utils.DockerClient
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class NotebookCommand(
-  fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
   dockerClient: DockerClient,
   environmentVars: Map[String, String]
@@ -24,7 +22,6 @@ class NotebookCommand(
 
   def run(): Unit = {
     new NotebookRunnerDocker(
-      fileSystem,
       dockerClient,
       metadataRepository,
       environmentVars

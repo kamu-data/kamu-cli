@@ -10,7 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, DatasetKind}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class DependencyGraphCommand(
   metadataRepository: MetadataRepository
@@ -31,7 +31,7 @@ class DependencyGraphCommand(
     datasets.foreach(
       ds =>
         ds.datasetDependencies
-          .foreach(d => println(s"${quote(ds.id)}  -> ${quote(d)};"))
+          .foreach(d => println(s"${quote(d)} -> ${quote(ds.id)};"))
     )
 
     datasets.foreach(

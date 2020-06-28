@@ -9,18 +9,18 @@
 package dev.kamu.cli.metadata
 
 import java.net.URI
+import java.nio.file.{Path, Paths}
 
+import better.files.File
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.{DatasetID, Manifest, Resource}
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
 import scala.reflect.ClassTag
 
 class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
-  fileSystem: FileSystem,
   storagePath: Path,
   resourceKind: String,
   idFromString: String => TID,
@@ -36,11 +36,11 @@ class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
   }
 
   def getAllResourceIDs(): Seq[TID] = {
-    fileSystem
-      .listStatus(storagePath)
-      .map(_.getPath.getName)
+    File(storagePath).list
+      .map(_.name)
       .map(filename => filename.substring(0, filename.length - ".yaml".length))
       .map(idFromString)
+      .toSeq
   }
 
   def getResource(id: TID): TRes = {
@@ -53,25 +53,23 @@ class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
   def getResourceOpt(id: TID): Option[TRes] = {
     val path = getResourcePath(id)
 
-    if (!fileSystem.exists(path))
+    if (!File(path).exists)
       None
     else
       Some(loadResourceFromFile(path))
   }
 
   def getAllResources(): Seq[TRes] = {
-    val resourceFiles = fileSystem
-      .listStatus(storagePath)
-      .map(_.getPath)
-
-    resourceFiles.map(loadResourceFromFile)
+    File(storagePath).list
+      .map(f => loadResourceFromFile(f.path))
+      .toSeq
   }
 
   def addResource(res: TRes): Unit = {
     val id = idFromRes(res)
     val path = getResourcePath(id)
 
-    if (fileSystem.exists(path))
+    if (File(path).exists)
       throw new AlreadyExistsException(
         id.toString,
         resourceKind
@@ -81,24 +79,21 @@ class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
   }
 
   def deleteResource(id: TID): Unit = {
-    val path = getResourcePath(id)
+    val file = File(getResourcePath(id))
 
-    if (!fileSystem.exists(path))
+    if (!file.isRegularFile)
       throw new DoesNotExistException(id.toString, resourceKind)
 
-    fileSystem.delete(path, false)
+    file.delete()
   }
 
   def loadResourceFromFile(p: Path): TRes = {
-    val inputStream = fileSystem.open(p)
     try {
-      yaml.load[Manifest[TRes]](inputStream).content
+      yaml.load[Manifest[TRes]](p).content
     } catch {
       case e: Exception =>
         logger.error(s"Error while loading $resourceKind from file: $p")
         throw e
-    } finally {
-      inputStream.close()
     }
   }
 
@@ -108,25 +103,14 @@ class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
   }
 
   def saveResourceToFile(res: TRes, path: Path): Unit = {
-    val outputStream = fileSystem.create(path)
-
-    try {
-      yaml.save(Manifest(res), outputStream)
-    } catch {
-      case e: Exception =>
-        outputStream.close()
-        fileSystem.delete(path, false)
-        throw e
-    } finally {
-      outputStream.close()
-    }
+    yaml.save(Manifest(res), path)
   }
 
   def loadResourceFromURI(uri: URI): TRes = {
     uri.getScheme match {
       case "https"       => loadResourceFromURL(uri.toURL)
       case "http"        => loadResourceFromURL(uri.toURL)
-      case null | "file" => loadResourceFromFile(new Path(uri.getPath))
+      case null | "file" => loadResourceFromFile(Paths.get(uri.getPath))
       case s             => throw new SchemaNotSupportedException(s)
     }
   }

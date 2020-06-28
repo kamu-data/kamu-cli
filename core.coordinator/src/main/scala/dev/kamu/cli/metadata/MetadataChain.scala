@@ -9,20 +9,20 @@
 package dev.kamu.cli.metadata
 
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Instant
 
+import better.files.File
 import dev.kamu.core.manifests._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
-import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 import pureconfig.generic.auto._
 
 import scala.reflect.ClassTag
 
-class MetadataChain(fileSystem: FileSystem, datasetDir: Path) {
+class MetadataChain(datasetDir: Path) {
 
   def init(ds: DatasetSnapshot, systemTime: Instant): Unit = {
     val initialBlock = MetadataBlock(
@@ -42,12 +42,12 @@ class MetadataChain(fileSystem: FileSystem, datasetDir: Path) {
     )
 
     try {
-      fileSystem.mkdirs(blocksDir)
+      File(blocksDir).createDirectories()
       saveResource(initialSummary, summaryPath)
       saveResource(initialBlock, blocksDir.resolve(initialBlock.blockHash))
     } catch {
       case e: Exception =>
-        fileSystem.delete(datasetDir, true)
+        File(datasetDir).delete()
         throw e
     }
   }
@@ -87,10 +87,8 @@ class MetadataChain(fileSystem: FileSystem, datasetDir: Path) {
 
   /** Returns metadata blocks in historical order */
   def getBlocks(): Vector[MetadataBlock] = {
-    val blocks = fileSystem
-      .listStatus(blocksDir)
-      .map(_.getPath)
-      .map(loadResource[MetadataBlock])
+    val blocks = File(blocksDir).list
+      .map(f => loadResource[MetadataBlock](f.path))
       .map(b => (b.blockHash, b))
       .toMap
 
@@ -121,23 +119,13 @@ class MetadataChain(fileSystem: FileSystem, datasetDir: Path) {
   protected def saveResource[T <: Resource: ClassTag](obj: T, path: Path)(
     implicit derivation: Derivation[ConfigWriter[Manifest[T]]]
   ): Unit = {
-    val outputStream = fileSystem.create(path)
-    try {
-      yaml.save(Manifest(obj), outputStream)
-    } finally {
-      outputStream.close()
-    }
+    yaml.save(Manifest(obj), path)
   }
 
   protected def loadResource[T <: Resource: ClassTag](path: Path)(
     implicit derivation: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
-    val inputStream = fileSystem.open(path)
-    try {
-      yaml.load[Manifest[T]](inputStream).content
-    } finally {
-      inputStream.close()
-    }
+    yaml.load[Manifest[T]](path).content
   }
 
   protected implicit class MetadataBlockEx(b: MetadataBlock) {

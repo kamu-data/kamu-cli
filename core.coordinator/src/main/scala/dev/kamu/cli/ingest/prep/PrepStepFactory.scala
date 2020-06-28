@@ -9,10 +9,9 @@
 package dev.kamu.cli.ingest.prep
 
 import dev.kamu.core.manifests.PrepStepKind
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
-class PrepStepFactory(fileSystem: FileSystem) {
+class PrepStepFactory() {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def getStep(

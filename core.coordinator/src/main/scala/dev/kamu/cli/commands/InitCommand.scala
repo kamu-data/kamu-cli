@@ -10,13 +10,11 @@ package dev.kamu.cli.commands
 
 import java.io.PrintWriter
 
+import better.files.File
 import dev.kamu.cli.{UsageException, WorkspaceLayout}
-import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class InitCommand(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
@@ -24,14 +22,14 @@ class InitCommand(
   override def requiresWorkspace: Boolean = false
 
   def run(): Unit = {
-    if (fileSystem.exists(workspaceLayout.kamuRootDir))
+    if (File(workspaceLayout.kamuRootDir).isDirectory)
       throw new UsageException("Already a kamu workspace")
 
-    fileSystem.mkdirs(workspaceLayout.metadataDir)
-    fileSystem.mkdirs(workspaceLayout.remotesDir)
+    File(workspaceLayout.metadataDir).createDirectories()
+    File(workspaceLayout.remotesDir).createDirectories()
 
-    val outputStream =
-      fileSystem.create(workspaceLayout.kamuRootDir.resolve(".gitignore"))
+    val outputStream = File(workspaceLayout.kamuRootDir.resolve(".gitignore"))
+      .newOutputStream()
 
     val writer = new PrintWriter(outputStream)
     writer.write(WorkspaceLayout.GITIGNORE_CONTENT)

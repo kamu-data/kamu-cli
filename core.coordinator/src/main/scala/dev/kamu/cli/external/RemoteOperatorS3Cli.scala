@@ -8,16 +8,17 @@
 
 package dev.kamu.cli.external
 
+import java.nio.file.{Files, Path, Paths}
+
+import better.files.File
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, Remote, VolumeLayout}
-import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import dev.kamu.core.utils.Temp
+import org.apache.logging.log4j.LogManager
 
 import scala.sys.process.Process
 
 class RemoteOperatorS3Cli(
-  fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
   remote: Remote
 ) extends RemoteOperator {
@@ -25,21 +26,21 @@ class RemoteOperatorS3Cli(
 
   override def push(datasets: Seq[DatasetID]): Unit = {
     withVolumeLayout(datasets) { localDir =>
-      s3Sync(localDir, new Path(remote.url))
+      s3Sync(localDir, Paths.get(remote.url))
     }
   }
 
   override def pull(datasets: Seq[DatasetID]): Unit = {
     val remoteVolumeLayout = VolumeLayout(
-      metadataDir = new Path("datasets"),
-      checkpointsDir = new Path("checkpoints"),
-      dataDir = new Path("data"),
-      cacheDir = new Path("cache")
+      metadataDir = Paths.get("datasets"),
+      checkpointsDir = Paths.get("checkpoints"),
+      dataDir = Paths.get("data"),
+      cacheDir = Paths.get("cache")
     )
 
     for (id <- datasets) {
       // TODO: Do one sync instead since volume layouts should match
-      val sourceLayout = remoteVolumeLayout.relativeTo(new Path(remote.url))
+      val sourceLayout = remoteVolumeLayout.relativeTo(Paths.get(remote.url))
       val destLayout = metadataRepository.getDatasetLayout(id)
 
       s3Sync(
@@ -62,36 +63,33 @@ class RemoteOperatorS3Cli(
   protected def withVolumeLayout[T](
     datasets: Seq[DatasetID]
   )(func: Path => T): T = {
-    Temp.withRandomTempDir(fileSystem, "kamu-volume-") { tempDir =>
+    Temp.withRandomTempDir("kamu-volume-") { tempDir =>
       val targetLayout = VolumeLayout(
-        metadataDir = new Path("datasets"),
-        checkpointsDir = new Path("checkpoints"),
-        dataDir = new Path("data"),
-        cacheDir = new Path("cache")
+        metadataDir = Paths.get("datasets"),
+        checkpointsDir = Paths.get("checkpoints"),
+        dataDir = Paths.get("data"),
+        cacheDir = Paths.get("cache")
       ).relativeTo(tempDir)
 
-      targetLayout.allDirs.foreach(fileSystem.mkdirs)
+      targetLayout.allDirs.foreach(File(_).createDirectories())
 
       for (id <- datasets) {
         val datasetLayout = metadataRepository.getDatasetLayout(id)
 
-        fileSystem.createSymlink(
-          datasetLayout.dataDir,
+        Files.createSymbolicLink(
           targetLayout.dataDir.resolve(id.toString),
-          false
+          datasetLayout.dataDir
         )
 
-        if (fileSystem.exists(datasetLayout.checkpointsDir))
-          fileSystem.createSymlink(
-            datasetLayout.checkpointsDir,
+        if (File(datasetLayout.checkpointsDir).exists)
+          Files.createSymbolicLink(
             targetLayout.checkpointsDir.resolve(id.toString),
-            false
+            datasetLayout.checkpointsDir
           )
 
-        fileSystem.createSymlink(
-          datasetLayout.metadataDir,
+        Files.createSymbolicLink(
           targetLayout.metadataDir.resolve(id.toString),
-          false
+          datasetLayout.metadataDir
         )
       }
 

@@ -10,12 +10,13 @@ package dev.kamu.cli
 
 import java.io.{ByteArrayOutputStream, PrintStream, PrintWriter}
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 
+import better.files.File
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.fs._
 import dev.kamu.core.manifests.{DatasetID, DatasetSnapshot}
 import dev.kamu.core.utils.ManualClock
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.util.Random
@@ -39,10 +40,9 @@ case class CommandResult(
 
 class KamuTestAdapter(
   val config: KamuConfig, // config should be public for tests to access workspaceRoot
-  fileSystem: FileSystem,
   spark: SparkSession,
   val systemClock: ManualClock
-) extends Kamu(config, fileSystem, systemClock) {
+) extends Kamu(config, systemClock) {
 
   val _captureFormatter = new CaptureOutputFormatter
   val _captureOutput = new ByteArrayOutputStream()
@@ -78,8 +78,8 @@ class KamuTestAdapter(
     metadataRepository.addDataset(ds)
     val volume = metadataRepository.getLocalVolume()
 
-    if (!fileSystem.exists(volume.dataDir))
-      fileSystem.mkdirs(volume.dataDir)
+    if (!File(volume.dataDir).exists)
+      File(volume.dataDir).createDirectories()
 
     df.write.parquet(
       volume.dataDir.resolve(ds.id.toString).toUri.getPath
@@ -93,7 +93,7 @@ class KamuTestAdapter(
   def writeData(content: String, name: String): Path = {
     val path = config.workspaceRoot.resolve(name)
 
-    val writer = new PrintWriter(fileSystem.create(path))
+    val writer = new PrintWriter(File(path).newOutputStream)
     writer.write(content)
     writer.close()
 
@@ -109,11 +109,11 @@ class KamuTestAdapter(
       .option("header", "true")
       .csv(path.toUri.getPath)
 
-    fileSystem
-      .listStatus(path)
-      .filter(_.getPath.getName.startsWith("part"))
+    File(path).list
+      .filter(_.name.startsWith("part"))
+      .toSeq
+      .map(_.path)
       .head
-      .getPath
   }
 
   def readDataset(id: DatasetID): DataFrame = {

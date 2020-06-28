@@ -9,7 +9,7 @@
 package dev.kamu.cli.commands
 
 import dev.kamu.cli.{CliArgs, UsageException}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import org.rogach.scallop.Scallop
 
 class CompletionCommand(

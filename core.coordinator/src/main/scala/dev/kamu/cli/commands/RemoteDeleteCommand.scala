@@ -10,7 +10,7 @@ package dev.kamu.cli.commands
 
 import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
 import dev.kamu.core.manifests.RemoteID
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class RemoteDeleteCommand(
   metadataRepository: MetadataRepository,

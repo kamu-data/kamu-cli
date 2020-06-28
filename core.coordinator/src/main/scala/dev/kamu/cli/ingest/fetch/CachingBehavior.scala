@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.ingest.fetch
 
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 trait CachingBehavior {
   protected val logger = LogManager.getLogger(getClass.getName)

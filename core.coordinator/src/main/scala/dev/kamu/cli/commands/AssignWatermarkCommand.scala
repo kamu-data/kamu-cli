@@ -13,7 +13,7 @@ import java.time.Instant
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.manifests.{DatasetID, MetadataBlock}
 import dev.kamu.core.utils.Clock
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class AssignWatermarkCommand(
   systemClock: Clock,

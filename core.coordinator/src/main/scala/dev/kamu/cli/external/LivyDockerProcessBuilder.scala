@@ -8,9 +8,10 @@
 
 package dev.kamu.cli.external
 
+import java.nio.file.Paths
+
 import dev.kamu.core.manifests.VolumeLayout
 import dev.kamu.core.utils.{DockerClient, DockerProcessBuilder, DockerRunArgs}
-import org.apache.hadoop.fs.Path
 
 class LivyDockerProcessBuilder(
   volumeLayout: VolumeLayout,
@@ -31,7 +32,7 @@ class LivyDockerProcessBuilder(
         exposePorts = exposePorts,
         exposePortMap = exposePortMap,
         volumeMap = Map(
-          volumeLayout.dataDir -> new Path("/opt/spark/work-dir")
+          volumeLayout.dataDir -> Paths.get("/opt/spark/work-dir")
         ),
         network = network
       )

@@ -10,20 +10,20 @@ package dev.kamu.cli.external
 
 import java.awt.Desktop
 import java.net.URI
+import java.nio.file.Paths
 
+import dev.kamu.core.utils.fs._
 import dev.kamu.core.utils.{
   DockerClient,
   DockerProcess,
   DockerProcessBuilder,
   DockerRunArgs
 }
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 import scala.sys.process.{ProcessBuilder, ProcessIO}
 
 class JupyterDockerProcessBuilder(
-  fileSystem: FileSystem,
   dockerClient: DockerClient,
   network: String,
   environmentVars: Map[String, String]
@@ -36,9 +36,8 @@ class JupyterDockerProcessBuilder(
         hostname = Some("kamu-jupyter"),
         network = Some(network),
         exposePorts = List(80),
-        volumeMap = Map(
-          fileSystem.getWorkingDirectory -> new Path("/opt/workdir")
-        ),
+        volumeMap =
+          Map(Paths.get("").toAbsolutePath -> Paths.get("/opt/workdir")),
         environmentVars = environmentVars
       )
     ) {
@@ -72,7 +71,7 @@ class JupyterDockerProcessBuilder(
       DockerRunArgs(
         image = runArgs.image,
         volumeMap =
-          Map(fileSystem.getWorkingDirectory -> new Path("/opt/workdir"))
+          Map(Paths.get("").toAbsolutePath -> Paths.get("/opt/workdir"))
       ),
       shellCommand
     )

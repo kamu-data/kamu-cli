@@ -12,11 +12,9 @@ import dev.kamu.cli.external.RemoteOperatorFactory
 import dev.kamu.cli.metadata.{DoesNotExistException, MetadataRepository}
 import dev.kamu.cli.{UsageException, WorkspaceLayout}
 import dev.kamu.core.manifests.{DatasetID, Remote, RemoteID}
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class PushCommand(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   remoteOperatorFactory: RemoteOperatorFactory,

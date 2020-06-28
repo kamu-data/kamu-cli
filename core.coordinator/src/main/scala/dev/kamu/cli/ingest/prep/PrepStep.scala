@@ -10,7 +10,7 @@ package dev.kamu.cli.ingest.prep
 
 import java.io.InputStream
 
-import org.apache.log4j.{LogManager, Logger}
+import org.apache.logging.log4j.{LogManager, Logger}
 
 trait PrepStep {
   protected val logger: Logger = LogManager.getLogger(getClass.getName)

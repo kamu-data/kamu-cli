@@ -16,8 +16,7 @@ import dev.kamu.core.manifests.infra.{
   IngestResult
 }
 import dev.kamu.core.utils.DockerClient
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.Level
+import org.apache.logging.log4j.Level
 
 trait Engine {
   def ingest(request: IngestRequest): IngestResult
@@ -25,7 +24,6 @@ trait Engine {
 }
 
 class EngineFactory(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   logLevel: Level
 ) {
@@ -33,16 +31,14 @@ class EngineFactory(
     engineID match {
       case "sparkSQL" =>
         new SparkEngine(
-          fileSystem,
           workspaceLayout,
           logLevel,
-          new DockerClient(fileSystem)
+          new DockerClient()
         )
       case "flink" =>
         new FlinkEngine(
-          fileSystem,
           workspaceLayout,
-          new DockerClient(fileSystem)
+          new DockerClient()
         )
       case _ => throw new NotImplementedError(s"Unsupported engine: $engineID")
     }

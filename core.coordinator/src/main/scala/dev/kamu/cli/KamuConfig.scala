@@ -8,8 +8,9 @@
 
 package dev.kamu.cli
 
-import org.apache.hadoop.fs.{FileSystem, Path}
-import dev.kamu.core.utils.fs._
+import java.nio.file.Path
+
+import better.files.File
 
 case class KamuConfig(
   workspaceRoot: Path
@@ -26,21 +27,18 @@ case class KamuConfig(
 object KamuConfig {
   val ROOT_DIR_NAME = ".kamu"
 
-  def findWorkspaceRoot(fileSystem: FileSystem, dir: Path): Option[Path] = {
-    findWorkspaceRootRec(fileSystem, fileSystem.toAbsolute(dir))
+  def findWorkspaceRoot(dir: Path): Option[Path] = {
+    findWorkspaceRootRec(dir.toAbsolutePath)
   }
 
   @scala.annotation.tailrec
-  private def findWorkspaceRootRec(
-    fileSystem: FileSystem,
-    dir: Path
-  ): Option[Path] = {
-    if (fileSystem.exists(dir.resolve(ROOT_DIR_NAME))) {
-      Some(dir)
-    } else if (dir.isRoot) {
+  private def findWorkspaceRootRec(dir: Path): Option[Path] = {
+    if (dir == null) {
       None
+    } else if (File(dir.resolve(ROOT_DIR_NAME)).exists) {
+      Some(dir)
     } else {
-      findWorkspaceRootRec(fileSystem, dir.getParent)
+      findWorkspaceRootRec(dir.getParent)
     }
   }
 }

@@ -8,10 +8,11 @@
 
 package dev.kamu.cli
 
+import java.nio.file.Paths
+
 import dev.kamu.core.utils.AutoClock
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.{Level, LogManager}
+import org.apache.logging.log4j.core.config.Configurator
+import org.apache.logging.log4j.{Level, LogManager}
 
 class UsageException(message: String = "", cause: Throwable = None.orNull)
     extends RuntimeException(message, cause)
@@ -21,25 +22,21 @@ object KamuApp extends App {
 
   val systemClock = new AutoClock()
 
-  val fileSystem = FileSystem.get(new Configuration())
-  FileSystem.enableSymlinks()
-  fileSystem.setWriteChecksum(false)
-  fileSystem.setVerifyChecksum(false)
-
   val config = KamuConfig(
     workspaceRoot = KamuConfig
-      .findWorkspaceRoot(fileSystem, new Path("."))
-      .getOrElse(new Path("."))
+      .findWorkspaceRoot(Paths.get(""))
+      .getOrElse(Paths.get(""))
   )
 
   try {
     val cliArgs = new CliArgs(args)
 
-    LogManager
-      .getLogger(getClass.getPackage.getName)
-      .setLevel(if (cliArgs.debug()) Level.ALL else cliArgs.logLevel())
+    Configurator.setLevel(
+      getClass.getPackage.getName,
+      if (cliArgs.debug()) Level.ALL else cliArgs.logLevel()
+    )
 
-    new Kamu(config, fileSystem, systemClock)
+    new Kamu(config, systemClock)
       .run(cliArgs)
   } catch {
     case e: UsageException =>

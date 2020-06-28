@@ -9,7 +9,7 @@
 package dev.kamu.cli.ingest.convert
 
 import dev.kamu.core.manifests.ReaderKind
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class ConversionStepFactory {
   val logger = LogManager.getLogger(getClass.getName)

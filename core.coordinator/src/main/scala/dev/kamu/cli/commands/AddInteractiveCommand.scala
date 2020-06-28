@@ -8,21 +8,21 @@
 
 package dev.kamu.cli.commands
 
+import java.nio.file.Paths
+
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
 import dev.kamu.cli.metadata.{MetadataRepository, ResourceLoader}
 import dev.kamu.core.manifests._
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 import scala.io.StdIn
 
 class InvalidInputException(msg: String) extends Exception(msg)
 
 class AddInteractiveCommand(
-  fileSystem: FileSystem,
   metadataRepository: MetadataRepository
 ) extends Command {
   private val logger = LogManager.getLogger(getClass.getName)
@@ -39,9 +39,9 @@ class AddInteractiveCommand(
       metadataRepository.addDataset(dataset)
       logger.info("Added dataset")
     } else {
-      val path = new Path("./" + dataset.id + ".yaml")
-      new ResourceLoader(fileSystem).saveResourceToFile(dataset, path)
-      logger.info(s"Saved dataset to: ${fileSystem.toAbsolute(path)}")
+      val path = Paths.get("./" + dataset.id + ".yaml")
+      new ResourceLoader().saveResourceToFile(dataset, path)
+      logger.info(s"Saved dataset to: ${path.toAbsolutePath}")
     }
   }
 

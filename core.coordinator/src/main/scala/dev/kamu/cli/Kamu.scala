@@ -10,34 +10,33 @@ package dev.kamu.cli
 
 import java.io.PrintStream
 
+import better.files.File
 import dev.kamu.cli.commands._
 import dev.kamu.cli.transform.{EngineFactory, TransformService}
 import dev.kamu.cli.external._
 import dev.kamu.cli.ingest.IngestService
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
-import dev.kamu.core.utils.{Clock, DockerClient}
 import dev.kamu.core.utils.fs._
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.Level
+import dev.kamu.core.utils.{Clock, DockerClient}
+import org.apache.logging.log4j.Level
 
 class Kamu(
   config: KamuConfig,
-  fileSystem: FileSystem,
   systemClock: Clock
 ) {
   val workspaceLayout = WorkspaceLayout(
     kamuRootDir = config.kamuRoot,
-    metadataDir = config.kamuRoot.resolve("datasets"),
-    remotesDir = config.kamuRoot.resolve("remotes"),
+    metadataDir = config.kamuRoot / "datasets",
+    remotesDir = config.kamuRoot / "remotes",
     localVolumeDir = config.localVolume
-  ).toAbsolute(fileSystem)
+  ).toAbsolute
 
   val metadataRepository =
-    new MetadataRepository(fileSystem, workspaceLayout, systemClock)
+    new MetadataRepository(workspaceLayout, systemClock)
 
   val remoteOperatorFactory =
-    new RemoteOperatorFactory(fileSystem, workspaceLayout, metadataRepository)
+    new RemoteOperatorFactory(workspaceLayout, metadataRepository)
 
   def run(cliArgs: CliArgs): Unit = {
     val command = getCommand(cliArgs)
@@ -61,10 +60,7 @@ class Kamu(
         if (c.init.pullImages())
           new PullImagesCommand(getDockerClient())
         else
-          new InitCommand(
-            fileSystem,
-            workspaceLayout
-          )
+          new InitCommand(workspaceLayout)
       case List(c.list) =>
         new ListCommand(
           metadataRepository,
@@ -73,12 +69,10 @@ class Kamu(
       case List(c.add) =>
         if (c.add.interactive())
           new AddInteractiveCommand(
-            fileSystem,
             metadataRepository
           )
         else
           new AddCommand(
-            fileSystem,
             metadataRepository,
             c.add.manifests(),
             c.add.replace()
@@ -102,14 +96,12 @@ class Kamu(
           )
           new PullCommand(
             new IngestService(
-              fileSystem,
               workspaceLayout,
               metadataRepository,
               engineFactory,
               systemClock
             ),
             new TransformService(
-              fileSystem,
               metadataRepository,
               systemClock,
               engineFactory
@@ -135,7 +127,6 @@ class Kamu(
         )
       case List(c.push) =>
         new PushCommand(
-          fileSystem,
           workspaceLayout,
           metadataRepository,
           remoteOperatorFactory,
@@ -179,7 +170,6 @@ class Kamu(
         )
       case List(c.notebook) =>
         new NotebookCommand(
-          fileSystem,
           metadataRepository,
           getDockerClient(),
           c.notebook.env()
@@ -201,16 +191,16 @@ class Kamu(
   }
 
   protected def ensureWorkspace(): Unit = {
-    if (!fileSystem.exists(workspaceLayout.kamuRootDir))
+    if (!File(workspaceLayout.kamuRootDir).isDirectory)
       throw new UsageException("Not a kamu workspace")
   }
 
   protected def getDockerClient(): DockerClient = {
-    new DockerClient(fileSystem)
+    new DockerClient()
   }
 
   protected def getEngineFactory(logLevel: Level): EngineFactory = {
-    new EngineFactory(fileSystem, workspaceLayout, logLevel)
+    new EngineFactory(workspaceLayout, logLevel)
   }
 
   protected def getOutputStream(): PrintStream = {

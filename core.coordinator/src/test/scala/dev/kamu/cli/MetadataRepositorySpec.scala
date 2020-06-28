@@ -9,14 +9,15 @@
 package dev.kamu.cli
 
 import java.net.URI
+import java.nio.file.Paths
 
+import better.files.File
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 import dev.kamu.cli.metadata.ResourceLoader
 import dev.kamu.core.manifests.DatasetID
+import dev.kamu.core.utils.fs._
 import dev.kamu.core.utils.{DockerClient, DockerProcessBuilder, DockerRunArgs}
-import org.apache.hadoop.fs.Path
-import org.apache.hadoop.fs.Path.SEPARATOR
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -73,11 +74,11 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
     withEmptyWorkspace { kamu =>
       val expected = DatasetFactory.newRootDataset()
       // create a temporary directory with the dataset to host
-      val serverDir =
-        new Path(kamu.config.workspaceRoot, "server")
-      fileSystem.mkdirs(serverDir)
-      val path: Path = new Path(serverDir, "test-dataset.yaml")
-      new ResourceLoader(fileSystem).saveResourceToFile(expected, path)
+      val serverDir = kamu.config.workspaceRoot / "server"
+      File(serverDir).createDirectories()
+
+      val path = serverDir / "test-dataset.yaml"
+      new ResourceLoader().saveResourceToFile(expected, path)
 
       // start up the server and host the directory
       val serverPort = 80 // httpd:2.4 default port
@@ -85,11 +86,11 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
       val testHttpServerArgs = DockerRunArgs(
         image = "httpd:2.4",
         exposePorts = List(serverPort),
-        volumeMap = Map(serverDir -> new Path("/usr/local/apache2/htdocs")), // httpd:2.4 default location
+        volumeMap = Map(serverDir -> Paths.get("/usr/local/apache2/htdocs")), // httpd:2.4 default location
         containerName = Some(testServerName),
         detached = true
       )
-      val testHttpServer = new DockerClient(fileSystem)
+      val testHttpServer = new DockerClient()
       try {
         val testHttpServerProc = new DockerProcessBuilder(
           "http",
@@ -117,16 +118,11 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
   test(raw"'kamu add' from file") {
     withEmptyWorkspace { kamu =>
       val expected = DatasetFactory.newRootDataset()
-      val testDir =
-        new Path(
-          // Path(parent, child) throws an exception, while SEPARATOP
-          // works for names with colons and spaces
-          s"${kamu.config.workspaceRoot.toString}${SEPARATOR}test: add from file"
-        )
+      val testDir = kamu.config.workspaceRoot / "my folder"
 
-      fileSystem.mkdirs(testDir)
-      val datasetPath: Path = new Path(testDir, "test-dataset.yaml")
-      new ResourceLoader(fileSystem).saveResourceToFile(expected, datasetPath)
+      File(testDir).createDirectories()
+      val datasetPath = testDir / "test-dataset.yaml"
+      new ResourceLoader().saveResourceToFile(expected, datasetPath)
 
       val actual =
         kamu.metadataRepository.loadDatasetSnapshotFromURI(datasetPath.toUri)

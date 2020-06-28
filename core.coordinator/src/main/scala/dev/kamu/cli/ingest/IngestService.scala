@@ -8,8 +8,10 @@
 
 package dev.kamu.cli.ingest
 
+import java.nio.file.Path
 import java.time.Instant
 
+import better.files.File
 import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.ingest.convert.{ConversionStepFactory, IngestCheckpoint}
 import dev.kamu.cli.ingest.fetch.{
@@ -34,15 +36,13 @@ import org.apache.commons.compress.compressors.bzip2.{
   BZip2CompressorInputStream,
   BZip2CompressorOutputStream
 }
-import org.apache.commons.io.IOUtils
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.commons.io.{FileUtils, IOUtils}
+import org.apache.logging.log4j.LogManager
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 
 class IngestService(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   metadataRepository: MetadataRepository,
   engineFactory: EngineFactory,
@@ -56,15 +56,12 @@ class IngestService(
 
   private val logger = LogManager.getLogger(getClass.getName)
 
-  private val sourceFactory = new SourceFactory(fileSystem, systemClock)
+  private val sourceFactory = new SourceFactory(systemClock)
   private val conversionStepFactory = new ConversionStepFactory()
-  private val prepStepFactory = new PrepStepFactory(fileSystem)
-  private val downloadExecutor =
-    new CheckpointingExecutor[DownloadCheckpoint](fileSystem)
-  private val prepExecutor =
-    new CheckpointingExecutor[PrepCheckpoint](fileSystem)
-  private val ingestExecutor =
-    new CheckpointingExecutor[IngestCheckpoint](fileSystem)
+  private val prepStepFactory = new PrepStepFactory()
+  private val downloadExecutor = new CheckpointingExecutor[DownloadCheckpoint]()
+  private val prepExecutor = new CheckpointingExecutor[PrepCheckpoint]()
+  private val ingestExecutor = new CheckpointingExecutor[IngestCheckpoint]()
 
   def pollAndIngest(datasetIDs: Seq[DatasetID]): Unit = {
     for (datasetID <- datasetIDs) {
@@ -86,30 +83,20 @@ class IngestService(
           s"Processing data source: $datasetID:${externalSource.sourceID}"
         )
 
-        val downloadCheckpointPath = datasetLayout.checkpointsDir
-          .resolve(externalSource.sourceID)
-          .resolve(downloadCheckpointFileName)
-        val downloadDataPath = datasetLayout.cacheDir
-          .resolve(externalSource.sourceID)
-          .resolve(downloadDataFileName)
-        val prepCheckpointPath = datasetLayout.checkpointsDir
-          .resolve(externalSource.sourceID)
-          .resolve(prepCheckpointFileName)
-        val prepDataPath = datasetLayout.cacheDir
-          .resolve(externalSource.sourceID)
-          .resolve(prepDataFileName)
-        val ingestCheckpointPath = datasetLayout.checkpointsDir
-          .resolve(externalSource.sourceID)
-          .resolve(ingestCheckpointFileName)
+        val downloadCheckpointPath = datasetLayout.checkpointsDir / externalSource.sourceID / downloadCheckpointFileName
+        val downloadDataPath = datasetLayout.cacheDir / externalSource.sourceID / downloadDataFileName
+        val prepCheckpointPath = datasetLayout.checkpointsDir / externalSource.sourceID / prepCheckpointFileName
+        val prepDataPath = datasetLayout.cacheDir / externalSource.sourceID / prepDataFileName
+        val ingestCheckpointPath = datasetLayout.checkpointsDir / externalSource.sourceID / ingestCheckpointFileName
 
         Seq(
           downloadCheckpointPath,
           downloadDataPath,
           prepCheckpointPath,
           prepDataPath
-        ).map(_.getParent)
-          .filter(!fileSystem.exists(_))
-          .foreach(fileSystem.mkdirs)
+        ).map(p => File(p.getParent))
+          .filter(!_.exists)
+          .foreach(_.createDirectories())
 
         logger.debug(s"Stage: polling")
         val downloadResult = maybeDownload(
@@ -157,10 +144,7 @@ class IngestService(
           )
 
           // Clean up the source cache dir
-          fileSystem.delete(
-            datasetLayout.cacheDir.resolve(externalSource.sourceID),
-            true
-          )
+          File(datasetLayout.cacheDir.resolve(externalSource.sourceID)).delete()
         }
       }
     }
@@ -180,9 +164,8 @@ class IngestService(
           storedCheckpoint,
           cachingBehavior,
           body => {
-            val outputStream = fileSystem.create(downloadDataPath, true)
-            val compressedStream =
-              new BZip2CompressorOutputStream(outputStream)
+            val outputStream = File(downloadDataPath).newOutputStream()
+            val compressedStream = new BZip2CompressorOutputStream(outputStream)
             try {
               IOUtils.copy(body, compressedStream)
             } finally {
@@ -222,10 +205,10 @@ class IngestService(
           val prepStep = prepStepFactory.getComposedSteps(source.prepare)
           val convertStep = conversionStepFactory.getComposedSteps(source.read)
 
-          val inputStream = fileSystem.open(downloadDataPath)
+          val inputStream = File(downloadDataPath).newInputStream
           val decompressedInStream = new BZip2CompressorInputStream(inputStream)
 
-          val outputStream = fileSystem.create(prepDataPath, true)
+          val outputStream = File(prepDataPath).newOutputStream
           val compressedOutStream =
             new BZip2CompressorOutputStream(outputStream)
 
@@ -328,9 +311,9 @@ class IngestService(
       )
     )
 
-    val dataSize = fileSystem
-      .getContentSummary(metadataRepository.getDatasetLayout(datasetID).dataDir)
-      .getSpaceConsumed
+    val dataSize = FileUtils.sizeOfDirectory(
+      metadataRepository.getDatasetLayout(datasetID).dataDir.toFile
+    )
 
     // TODO: Atomicity
     metaChain.updateSummary(

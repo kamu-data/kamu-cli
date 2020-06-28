@@ -16,7 +16,7 @@ import dev.kamu.cli.metadata.{
   SchemaNotSupportedException
 }
 import dev.kamu.core.manifests.Remote
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class RemoteAddCommand(
   metadataRepository: MetadataRepository,

@@ -8,7 +8,8 @@
 
 package dev.kamu.cli
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import java.nio.file.Path
+
 import dev.kamu.core.utils.fs._
 
 /** Describes the layout of the workspace on disk */
@@ -23,12 +24,12 @@ case class WorkspaceLayout(
   localVolumeDir: Path
 ) {
 
-  def toAbsolute(fs: FileSystem): WorkspaceLayout = {
+  def toAbsolute: WorkspaceLayout = {
     copy(
-      kamuRootDir = fs.toAbsolute(kamuRootDir),
-      metadataDir = fs.toAbsolute(metadataDir),
-      remotesDir = fs.toAbsolute(remotesDir),
-      localVolumeDir = fs.toAbsolute(localVolumeDir)
+      kamuRootDir = kamuRootDir.toAbsolutePath,
+      metadataDir = metadataDir.toAbsolutePath,
+      remotesDir = remotesDir.toAbsolutePath,
+      localVolumeDir = localVolumeDir.toAbsolutePath
     )
   }
 

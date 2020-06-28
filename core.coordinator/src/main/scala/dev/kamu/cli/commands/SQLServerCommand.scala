@@ -11,7 +11,7 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.external.LivyDockerProcessBuilder
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.core.utils.DockerClient
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 import scala.concurrent.duration._
 

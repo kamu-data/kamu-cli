@@ -9,7 +9,9 @@
 package dev.kamu.cli.transform
 
 import java.io.OutputStream
+import java.nio.file.{Path, Paths}
 
+import better.files.File
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
@@ -24,12 +26,11 @@ import dev.kamu.core.manifests.infra.{
 }
 import dev.kamu.core.utils.{DockerClient, DockerRunArgs}
 import dev.kamu.core.utils.fs._
+import dev.kamu.core.utils.Temp
 import org.apache.commons.io.IOUtils
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.{Level, LogManager, Logger}
+import org.apache.logging.log4j.{Level, LogManager, Logger}
 
 class SparkEngine(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   logLevel: Level,
   dockerClient: DockerClient,
@@ -39,20 +40,15 @@ class SparkEngine(
 
   override def ingest(request: IngestRequest): IngestResult = {
     Temp.withRandomTempDir(
-      fileSystem,
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(
-        Manifest(request),
-        fileSystem,
-        inOutDir.resolve("request.yaml")
-      )
+      yaml.save(Manifest(request), inOutDir / "request.yaml")
 
       // TODO: Account for missing files
       val extraMounts = request.source.fetch match {
         case furl: FetchSourceKind.Url =>
           furl.url.getScheme match {
-            case "file" | null => List(new Path(furl.url))
+            case "file" | null => List(Paths.get(furl.url))
             case _             => List.empty
           }
         case glob: FetchSourceKind.FilesGlob =>
@@ -65,12 +61,7 @@ class SparkEngine(
 
       submit("dev.kamu.engine.spark.ingest.IngestApp", inOutDir, extraMounts)
 
-      yaml
-        .load[Manifest[IngestResult]](
-          fileSystem,
-          inOutDir.resolve("result.yaml")
-        )
-        .content
+      yaml.load[Manifest[IngestResult]](inOutDir / "result.yaml").content
     }
   }
 
@@ -78,14 +69,9 @@ class SparkEngine(
     request: ExecuteQueryRequest
   ): ExecuteQueryResult = {
     Temp.withRandomTempDir(
-      fileSystem,
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(
-        Manifest(request),
-        fileSystem,
-        inOutDir.resolve("request.yaml")
-      )
+      yaml.save(Manifest(request), inOutDir / "request.yaml")
 
       submit(
         "dev.kamu.engine.spark.transform.TransformApp",
@@ -93,12 +79,7 @@ class SparkEngine(
         Seq.empty
       )
 
-      yaml
-        .load[Manifest[ExecuteQueryResult]](
-          fileSystem,
-          inOutDir.resolve("result.yaml")
-        )
-        .content
+      yaml.load[Manifest[ExecuteQueryResult]](inOutDir / "result.yaml").content
     }
   }
 
@@ -107,22 +88,21 @@ class SparkEngine(
     inOutDir: Path,
     extraMounts: Seq[Path]
   ): Unit = {
-    val inOutDirInContainer = new Path("/opt/engine/in-out")
-    val engineJarInContainer = new Path("/opt/engine/bin/engine.spark.jar")
+    val inOutDirInContainer = Paths.get("/opt/engine/in-out")
+    val engineJarInContainer = Paths.get("/opt/engine/bin/engine.spark.jar")
 
     Temp.withTempFile(
-      fileSystem,
       "kamu-logging-cfg-",
       writeLog4jConfig
     ) { loggingConfigPath =>
       val workspaceVolumes =
         Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
-          .filter(fileSystem.exists)
+          .filter(p => File(p).exists)
           .map(p => (p, p))
           .toMap
 
       val appVolumes = Map(
-        loggingConfigPath -> new Path("/opt/spark/conf/log4j.properties"),
+        loggingConfigPath -> Paths.get("/opt/spark/conf/log4j.properties"),
         inOutDir -> inOutDirInContainer
       )
 

@@ -8,8 +8,9 @@
 
 package dev.kamu.cli.transform
 
-import java.io.OutputStream
+import java.nio.file.{Path, Paths}
 
+import better.files.File
 import dev.kamu.cli.WorkspaceLayout
 
 import scala.concurrent.duration._
@@ -25,6 +26,7 @@ import dev.kamu.core.manifests.infra.{
   IngestResult
 }
 import dev.kamu.core.utils.fs._
+import dev.kamu.core.utils.Temp
 import dev.kamu.core.utils.{
   DockerClient,
   DockerProcessBuilder,
@@ -32,11 +34,9 @@ import dev.kamu.core.utils.{
   ExecArgs,
   IOHandlerPresets
 }
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.slf4j.LoggerFactory
 
 class FlinkEngine(
-  fileSystem: FileSystem,
   workspaceLayout: WorkspaceLayout,
   dockerClient: DockerClient,
   image: String = DockerImages.FLINK,
@@ -51,20 +51,19 @@ class FlinkEngine(
   override def executeQuery(
     request: ExecuteQueryRequest
   ): ExecuteQueryResult = {
-    val inOutDirInContainer = new Path("/opt/engine/in-out")
-    val engineJarInContainer = new Path("/opt/engine/bin/engine.flink.jar")
+    val inOutDirInContainer = Paths.get("/opt/engine/in-out")
+    val engineJarInContainer = Paths.get("/opt/engine/bin/engine.flink.jar")
 
     val workspaceVolumes =
       Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
-        .filter(fileSystem.exists)
+        .filter(p => File(p).exists)
         .map(p => (p, p))
         .toMap
 
     Temp.withRandomTempDir(
-      fileSystem,
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(Manifest(request), fileSystem, inOutDir.resolve("request.yaml"))
+      yaml.save(Manifest(request), inOutDir / "request.yaml")
 
       dockerClient.withNetwork(networkName) {
 
@@ -151,12 +150,7 @@ class FlinkEngine(
         }
       }
 
-      yaml
-        .load[Manifest[ExecuteQueryResult]](
-          fileSystem,
-          inOutDir.resolve("result.yaml")
-        )
-        .content
+      yaml.load[Manifest[ExecuteQueryResult]](inOutDir / "result.yaml").content
     }
   }
 
@@ -164,13 +158,12 @@ class FlinkEngine(
     val checkpointsDir =
       request.datasetLayouts(request.datasetID.toString).checkpointsDir
 
-    if (!fileSystem.exists(checkpointsDir))
+    if (!File(checkpointsDir).exists)
       return None
 
-    val allSavepoints = fileSystem
-      .listStatus(checkpointsDir)
-      .map(_.getPath)
-      .filter(fileSystem.isDirectory)
+    val allSavepoints = File(checkpointsDir).list
+      .filter(_.isDirectory)
+      .toList
 
     // TODO: Atomicity
     if (allSavepoints.length > 1)
@@ -180,7 +173,7 @@ class FlinkEngine(
 
     logger.debug("Using savepoint: {}", allSavepoints.headOption)
 
-    allSavepoints.headOption
+    allSavepoints.map(_.path).headOption
   }
 
   // TODO: Atomicity
@@ -190,6 +183,6 @@ class FlinkEngine(
 
     logger.debug("Deleting savepoint: {}", oldSavepoint)
 
-    oldSavepoint.foreach(fileSystem.delete(_, true))
+    oldSavepoint.foreach(p => File(p).delete())
   }
 }

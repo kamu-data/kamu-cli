@@ -11,7 +11,7 @@ package dev.kamu.cli.ingest.fetch
 import java.io.InputStream
 
 import dev.kamu.cli.ingest.ExecutionResult
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 trait CacheableSource {
   protected val logger = LogManager.getLogger(getClass.getName)

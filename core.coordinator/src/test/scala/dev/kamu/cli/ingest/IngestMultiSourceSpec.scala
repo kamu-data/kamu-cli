@@ -10,7 +10,6 @@ package dev.kamu.cli.ingest
 
 import dev.kamu.cli.{DatasetFactory, KamuTestBase}
 import dev.kamu.core.manifests._
-import dev.kamu.core.utils.fs._
 import org.scalatest._
 
 class IngestMultiSourceSpec extends FlatSpec with Matchers with KamuTestBase {

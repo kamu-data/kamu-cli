@@ -38,7 +38,11 @@ lazy val kamuCoreCoordinator = project
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      deps.jcabiLog,
+      //deps.apacheCommonsCompress,
+      deps.betterFiles,
+      deps.log4jApi,
+      deps.log4jCore,
+      deps.log4jBridge,
       deps.scallop,
       deps.hadoopCommon,
       deps.sqlLine,
@@ -56,7 +60,8 @@ lazy val kamuCoreUtils = project
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      deps.hadoopCommon,
+      deps.betterFiles,
+      deps.log4jApi,
       deps.scalaTest % "test",
       deps.sparkCore % "provided",
       deps.sparkHive % "provided",
@@ -77,7 +82,7 @@ lazy val kamuCoreManifests = project
   .enablePlugins(AutomateHeaderPlugin)
   .settings(
     libraryDependencies ++= Seq(
-      deps.hadoopCommon,
+      deps.betterFiles,
       deps.pureConfig,
       deps.pureConfigYaml,
       deps.spire
@@ -90,11 +95,14 @@ lazy val kamuCoreManifests = project
 //////////////////////////////////////////////////////////////////////////////
 
 lazy val versions = new {
+  val apacheCommonsCompress = "1.20"
+  val betterFiles = "3.9.1"
   val geoSpark = "1.2.0"
   val hadoopCommon = "2.6.5"
   val json4sJackson = "3.5.3"
   val jacksonCore = "2.6.7"
   val jacksonDatabind = "2.6.7.1"
+  val log4j = "2.13.3"
   val pureConfig = "0.11.1"
   val scalajHttp = "2.4.1"
   val spark = "2.4.0"
@@ -104,8 +112,14 @@ lazy val versions = new {
 
 lazy val deps =
   new {
-    val jcabiLog = "com.jcabi" % "jcabi-log" % "0.17.3"
+    val log4jApi = "org.apache.logging.log4j" % "log4j-api" % versions.log4j
+    val log4jCore = "org.apache.logging.log4j" % "log4j-core" % versions.log4j
+    val log4jBridge = "org.apache.logging.log4j" % "log4j-1.2-api" % versions.log4j
+    //val jcabiLog = "com.jcabi" % "jcabi-log" % "0.17.3"
     val scallop = "org.rogach" %% "scallop" % "3.3.1"
+    // File system
+    val betterFiles = "com.github.pathikrit" %% "better-files" % versions.betterFiles
+    val apacheCommonsCompress = "org.apache.commons" % "commons-compress" % versions.apacheCommonsCompress
     // Configs
     val pureConfig = "com.github.pureconfig" %% "pureconfig" % versions.pureConfig
     val pureConfigYaml = "com.github.pureconfig" %% "pureconfig-yaml" % versions.pureConfig
@@ -126,6 +140,7 @@ lazy val deps =
     // Hadoop File System
     val hadoopCommon =
       ("org.apache.hadoop" % "hadoop-common" % versions.hadoopCommon)
+        .exclude("log4j", "log4j")
         .exclude("commons-beanutils", "commons-beanutils")
         .exclude("commons-beanutils", "commons-beanutils-core")
     // SQL Shell
@@ -176,6 +191,8 @@ lazy val assemblySettings = Seq(
     case PathList("org", "xerial", xs @ _*)                => MergeStrategy.last
     case PathList("com", "thoughtworks", "paranamer", xs @ _*) =>
       MergeStrategy.last
+    case PathList(ps @ _*) if ps.last == "Log4j2Plugins.dat" =>
+      MergeStrategy.discard
     // end insanity
     case "overview.html" => MergeStrategy.discard
     case "plugin.xml"    => MergeStrategy.discard

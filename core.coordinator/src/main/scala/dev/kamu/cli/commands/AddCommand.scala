@@ -19,11 +19,9 @@ import dev.kamu.cli.metadata.{
   SchemaNotSupportedException
 }
 import dev.kamu.core.manifests.{DatasetID, DatasetRef, DatasetSnapshot}
-import org.apache.hadoop.fs.FileSystem
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class AddCommand(
-  fileSystem: FileSystem,
   metadataRepository: MetadataRepository,
   urls: Seq[URI],
   replace: Boolean

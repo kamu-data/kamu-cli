@@ -10,13 +10,13 @@ package dev.kamu.cli.commands
 
 import java.io.PrintStream
 import java.net.URI
+import java.nio.file.Path
 
 import dev.kamu.cli.external.LivyDockerProcessBuilder
 import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output.OutputFormat
 import dev.kamu.core.utils.{DockerClient, IOHandlerPresets}
-import org.apache.hadoop.fs.Path
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import sqlline.SqlLine
 
 import scala.concurrent.duration._

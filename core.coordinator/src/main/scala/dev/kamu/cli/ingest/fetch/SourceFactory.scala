@@ -8,6 +8,9 @@
 
 package dev.kamu.cli.ingest.fetch
 
+import java.nio.file.Paths
+
+import better.files.File
 import dev.kamu.core.manifests.{
   CachingKind,
   EventTimeKind,
@@ -15,10 +18,9 @@ import dev.kamu.core.manifests.{
   OrderingKind
 }
 import dev.kamu.core.utils.Clock
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
-class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
+class SourceFactory(systemClock: Clock) {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def getSource(kind: FetchSourceKind): Seq[CacheableSource] = {
@@ -69,9 +71,8 @@ class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
         Seq(
           new FileSystemSource(
             "primary",
-            fileSystem,
             systemClock,
-            new Path(kind.url),
+            Paths.get(kind.url),
             eventTimeSource
           )
         )
@@ -84,18 +85,18 @@ class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
     kind: FetchSourceKind.FilesGlob,
     eventTimeSource: EventTimeSource
   ): Seq[CacheableSource] = {
-    val globbed = fileSystem
-      .globStatus(kind.path)
+    val globbed = File(kind.path.getParent)
+      .glob(kind.path.getFileName.toString)
       .map(
         f =>
           new FileSystemSource(
-            f.getPath.getName,
-            fileSystem,
+            f.name,
             systemClock,
-            f.getPath,
+            f.path,
             eventTimeSource
           )
       )
+      .toVector
 
     val orderBy = kind.orderBy.getOrElse(
       if (kind.eventTime.isDefined) OrderingKind.ByMetadataEventTime
@@ -104,16 +105,13 @@ class SourceFactory(fileSystem: FileSystem, systemClock: Clock) {
 
     val sorted = orderBy match {
       case OrderingKind.ByName =>
-        globbed.sortWith(
-          (lhs, rhs) =>
-            lhs.path.getName.compareToIgnoreCase(rhs.path.getName) < 0
-        )
+        globbed.sortBy(_.path.getFileName.toString.toLowerCase())
       case OrderingKind.ByMetadataEventTime =>
         globbed.sortBy(eventTimeSource.getEventTime)
     }
 
     logger.debug(
-      s"Glob pattern resolved to: ${sorted.map(_.path.getName).mkString(", ")}"
+      s"Glob pattern resolved to: ${sorted.map(_.path.getFileName).mkString(", ")}"
     )
 
     sorted

@@ -16,7 +16,7 @@ import dev.kamu.cli.UsageException
 import dev.kamu.core.manifests.{DatasetID, DatasetKind}
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.utils.fs._
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 import yaml.defaults._
 import pureconfig.generic.auto._
 

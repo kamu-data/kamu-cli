@@ -11,7 +11,7 @@ package dev.kamu.cli.commands
 import dev.kamu.cli.UsageException
 import dev.kamu.cli.metadata._
 import dev.kamu.core.manifests.DatasetID
-import org.apache.log4j.LogManager
+import org.apache.logging.log4j.LogManager
 
 class PurgeCommand(
   metadataRepository: MetadataRepository,
