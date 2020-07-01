@@ -226,7 +226,7 @@ class MetadataRepository(
       layout.checkpointsDir,
       layout.metadataDir,
       workspaceLayout.metadataDir.resolve(id.toString)
-    ).foreach(p => File(p).delete())
+    ).foreach(p => File(p).delete(true))
   }
 
   ////////////////////////////////////////////////////////////////////////////

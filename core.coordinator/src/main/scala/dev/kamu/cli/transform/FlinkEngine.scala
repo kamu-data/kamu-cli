@@ -26,13 +26,14 @@ import dev.kamu.core.manifests.infra.{
   IngestResult
 }
 import dev.kamu.core.utils.fs._
-import dev.kamu.core.utils.Temp
 import dev.kamu.core.utils.{
   DockerClient,
   DockerProcessBuilder,
   DockerRunArgs,
   ExecArgs,
-  IOHandlerPresets
+  IOHandlerPresets,
+  OS,
+  Temp
 }
 import org.slf4j.LoggerFactory
 
@@ -41,8 +42,12 @@ class FlinkEngine(
   dockerClient: DockerClient,
   image: String = DockerImages.FLINK,
   networkName: String = "kamu-flink"
-) extends Engine {
+) extends Engine
+    with EngineUtils {
   private val logger = LoggerFactory.getLogger(getClass)
+
+  private val engineJarInContainer =
+    Paths.get("/opt/engine/bin/engine.flink.jar")
 
   override def ingest(request: IngestRequest): IngestResult = {
     throw new NotImplementedError()
@@ -51,19 +56,26 @@ class FlinkEngine(
   override def executeQuery(
     request: ExecuteQueryRequest
   ): ExecuteQueryResult = {
-    val inOutDirInContainer = Paths.get("/opt/engine/in-out")
-    val engineJarInContainer = Paths.get("/opt/engine/bin/engine.flink.jar")
-
-    val workspaceVolumes =
-      Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
-        .filter(p => File(p).exists)
-        .map(p => (p, p))
-        .toMap
+    val workspaceVolumes = Map(
+      workspaceLayout.localVolumeDir -> Paths.get(volumeDirInContainer)
+    )
 
     Temp.withRandomTempDir(
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(Manifest(request), inOutDir / "request.yaml")
+      val newRequest =
+        request.copy(
+          checkpointsDir = toContainerPath(
+            request.checkpointsDir,
+            workspaceLayout.localVolumeDir
+          ),
+          dataDirs = request.dataDirs.map {
+            case (k, v) =>
+              (k, toContainerPath(v, workspaceLayout.localVolumeDir))
+          }
+        )
+
+      yaml.save(Manifest(newRequest), inOutDir / "request.yaml")
 
       dockerClient.withNetwork(networkName) {
 
@@ -81,7 +93,7 @@ class FlinkEngine(
             exposePorts = List(6123, 8081),
             network = Some(networkName),
             volumeMap = Map(
-              inOutDir -> inOutDirInContainer
+              inOutDir -> Paths.get(inOutDirInContainer)
             ) ++ workspaceVolumes
           )
         ).run(Some(IOHandlerPresets.redirectOutputTagged("jobmanager: ")))
@@ -104,7 +116,10 @@ class FlinkEngine(
         jobManager.waitForHostPort(8081, 15 seconds)
 
         val prevSavepoint = getPrevSavepoint(request)
-        val savepointArgs = prevSavepoint.map(p => s"-s $p").getOrElse("")
+        val savepointArgs = prevSavepoint
+          .map(p => toContainerPath(p.toString, workspaceLayout.localVolumeDir))
+          .map(p => s"-s $p")
+          .getOrElse("")
 
         try {
           val exitCode = dockerClient
@@ -127,23 +142,24 @@ class FlinkEngine(
           commitSavepoint(prevSavepoint)
 
         } finally {
-          logger.debug("Fixing file ownership")
+          if (!OS.isWindows) {
+            logger.debug("Fixing file ownership")
 
-          val unix = new com.sun.security.auth.module.UnixSystem()
-          val chownCmd = s"chown -R ${unix.getUid}:${unix.getGid} " + workspaceVolumes.values
-            .map(_.toUri.getPath)
-            .mkString(" ")
+            dockerClient
+              .exec(
+                ExecArgs(),
+                jobManager.containerName,
+                Seq(
+                  "bash",
+                  "-c",
+                  s"chown -R ${OS.uid}:${OS.gid} $volumeDirInContainer"
+                )
+              )
+              .!
+          }
 
-          dockerClient
-            .exec(
-              ExecArgs(),
-              jobManager.containerName,
-              Seq("bash", "-c", chownCmd)
-            )
-            .!
-
-          taskManager.kill()
-          jobManager.kill()
+          taskManager.stop()
+          jobManager.stop()
 
           taskManager.join()
           jobManager.join()
@@ -155,13 +171,12 @@ class FlinkEngine(
   }
 
   protected def getPrevSavepoint(request: ExecuteQueryRequest): Option[Path] = {
-    val checkpointsDir =
-      request.datasetLayouts(request.datasetID.toString).checkpointsDir
+    val checkpointsDir = File(request.checkpointsDir)
 
-    if (!File(checkpointsDir).exists)
+    if (!checkpointsDir.exists)
       return None
 
-    val allSavepoints = File(checkpointsDir).list
+    val allSavepoints = checkpointsDir.list
       .filter(_.isDirectory)
       .toList
 

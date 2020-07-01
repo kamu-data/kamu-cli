@@ -4,7 +4,10 @@
   - [General Information](#general-information)
     - [A Note on Security](#a-note-on-security)
   - [Supported Platforms](#supported-platforms)
+    - [Linux](#linux)
     - [MacOS X via Homebrew](#macos-x-via-homebrew)
+    - [Windows](#windows)
+      - [Known issues](#known-issues)
     - [Other platforms](#other-platforms)
   - [Installing shell completions](#installing-shell-completions)
 
@@ -32,6 +35,10 @@ If there is anything else we can do to make you feel confident in using this too
 
 ## Supported Platforms
 
+### Linux
+
+We don't have packages for various Linux flavors yet, but the project is being developed on Linux and supports it well. Simply install `docker` and `jre`, download the binary, `chown +x` it, and link it into your preferred location on your `PATH`.
+
 ### MacOS X via Homebrew
 
 Install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/) and make sure it's running by executing some simple command like `docker ps`.
@@ -48,6 +55,31 @@ brew install kamu
 # Test
 kamu version
 ```
+
+### Windows
+
+Windows is supported partially, see [known issues](#known-issues).
+
+You should already have Java, but check `java -version` just in case.
+
+Install Docker for Windows. If you are using Docker toolbox backed by VirtualBox it's a good idea to give the Docker's VM more CPU and RAM. Make sure that you can run `docker ps` successfully.
+
+Download `kamu` binary and save it as `kamu.jar`. You should already be able to run it as `java -jar kamu.jar`.
+
+If you decide to use `cygwin` as your shell you can create the following laucher script and add it to `PATH`:
+
+```sh
+#!/bin/bash
+
+java -jar `cygpath -w /home/me/kamu/bin/kamu.jar` $@
+```
+
+#### Known issues
+- Docker is quite slow under VirtualBox
+- Default `cmd` shell doesn't understand ANSI colors
+- SQL shell history doesn't work
+- SQL shell arrow keys don't work
+- SQL shell Input/output formatting is sometimes off
 
 ### Other platforms
 

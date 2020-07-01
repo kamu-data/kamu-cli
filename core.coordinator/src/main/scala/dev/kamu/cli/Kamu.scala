@@ -19,18 +19,22 @@ import dev.kamu.cli.metadata.MetadataRepository
 import dev.kamu.cli.output._
 import dev.kamu.core.utils.fs._
 import dev.kamu.core.utils.{Clock, DockerClient}
-import org.apache.logging.log4j.Level
+import org.apache.logging.log4j.{Level, LogManager}
 
 class Kamu(
   config: KamuConfig,
   systemClock: Clock
 ) {
+  val logger = LogManager.getLogger(getClass.getName)
+
   val workspaceLayout = WorkspaceLayout(
     kamuRootDir = config.kamuRoot,
     metadataDir = config.kamuRoot / "datasets",
     remotesDir = config.kamuRoot / "remotes",
     localVolumeDir = config.localVolume
   ).toAbsolute
+
+  logger.debug("Workspace root: {}", workspaceLayout.kamuRootDir)
 
   val metadataRepository =
     new MetadataRepository(workspaceLayout, systemClock)

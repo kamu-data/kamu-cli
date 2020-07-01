@@ -11,22 +11,20 @@ package dev.kamu.cli.transform
 import java.io.OutputStream
 import java.nio.file.{Path, Paths}
 
-import better.files.File
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 import dev.kamu.cli.WorkspaceLayout
 import dev.kamu.cli.external.DockerImages
-import dev.kamu.core.manifests.{FetchSourceKind, Manifest}
+import dev.kamu.core.manifests.Manifest
 import dev.kamu.core.manifests.infra.{
   ExecuteQueryRequest,
   ExecuteQueryResult,
   IngestRequest,
   IngestResult
 }
-import dev.kamu.core.utils.{DockerClient, DockerRunArgs}
+import dev.kamu.core.utils.{DockerClient, DockerRunArgs, OS, Temp}
 import dev.kamu.core.utils.fs._
-import dev.kamu.core.utils.Temp
 import org.apache.commons.io.IOUtils
 import org.apache.logging.log4j.{Level, LogManager, Logger}
 
@@ -35,31 +33,28 @@ class SparkEngine(
   logLevel: Level,
   dockerClient: DockerClient,
   image: String = DockerImages.SPARK
-) extends Engine {
-  protected var logger: Logger = LogManager.getLogger(getClass.getName)
+) extends Engine
+    with EngineUtils {
+  protected val logger: Logger = LogManager.getLogger(getClass.getName)
 
   override def ingest(request: IngestRequest): IngestResult = {
     Temp.withRandomTempDir(
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(Manifest(request), inOutDir / "request.yaml")
+      val newRequest = request.copy(
+        ingestPath = toContainerPath(
+          request.ingestPath,
+          workspaceLayout.localVolumeDir
+        ),
+        dataDir = toContainerPath(
+          request.dataDir,
+          workspaceLayout.localVolumeDir
+        )
+      )
 
-      // TODO: Account for missing files
-      val extraMounts = request.source.fetch match {
-        case furl: FetchSourceKind.Url =>
-          furl.url.getScheme match {
-            case "file" | null => List(Paths.get(furl.url))
-            case _             => List.empty
-          }
-        case glob: FetchSourceKind.FilesGlob =>
-          List(glob.path.getParent)
-        case _ =>
-          throw new RuntimeException(
-            s"Unsupported fetch kind: ${request.source.fetch}"
-          )
-      }
+      yaml.save(Manifest(newRequest), inOutDir / "request.yaml")
 
-      submit("dev.kamu.engine.spark.ingest.IngestApp", inOutDir, extraMounts)
+      submit("dev.kamu.engine.spark.ingest.IngestApp", inOutDir)
 
       yaml.load[Manifest[IngestResult]](inOutDir / "result.yaml").content
     }
@@ -71,42 +66,38 @@ class SparkEngine(
     Temp.withRandomTempDir(
       "kamu-inout-"
     ) { inOutDir =>
-      yaml.save(Manifest(request), inOutDir / "request.yaml")
+      val newRequest =
+        request.copy(
+          checkpointsDir = toContainerPath(
+            request.checkpointsDir,
+            workspaceLayout.localVolumeDir
+          ),
+          dataDirs = request.dataDirs.map {
+            case (k, v) =>
+              (k, toContainerPath(v, workspaceLayout.localVolumeDir))
+          }
+        )
 
-      submit(
-        "dev.kamu.engine.spark.transform.TransformApp",
-        inOutDir,
-        Seq.empty
-      )
+      yaml.save(Manifest(newRequest), inOutDir / "request.yaml")
+
+      submit("dev.kamu.engine.spark.transform.TransformApp", inOutDir)
 
       yaml.load[Manifest[ExecuteQueryResult]](inOutDir / "result.yaml").content
     }
   }
 
-  protected def submit(
-    appClass: String,
-    inOutDir: Path,
-    extraMounts: Seq[Path]
-  ): Unit = {
-    val inOutDirInContainer = Paths.get("/opt/engine/in-out")
-    val engineJarInContainer = Paths.get("/opt/engine/bin/engine.spark.jar")
-
+  protected def submit(appClass: String, inOutDir: Path): Unit = {
     Temp.withTempFile(
       "kamu-logging-cfg-",
       writeLog4jConfig
     ) { loggingConfigPath =>
       val workspaceVolumes =
-        Seq(workspaceLayout.kamuRootDir, workspaceLayout.localVolumeDir)
-          .filter(p => File(p).exists)
-          .map(p => (p, p))
-          .toMap
+        Map(workspaceLayout.localVolumeDir -> Paths.get(volumeDirInContainer))
 
       val appVolumes = Map(
         loggingConfigPath -> Paths.get("/opt/spark/conf/log4j.properties"),
-        inOutDir -> inOutDirInContainer
+        inOutDir -> Paths.get(inOutDirInContainer)
       )
-
-      val extraVolumes = extraMounts.map(p => (p, p)).toMap
 
       val submitArgs = List(
         "/opt/spark/bin/spark-submit",
@@ -115,7 +106,7 @@ class SparkEngine(
         "--conf",
         "spark.sql.warehouse.dir=/opt/spark-warehouse",
         s"--class=$appClass",
-        engineJarInContainer.toUri.getPath
+        "/opt/engine/bin/engine.spark.jar"
       )
 
       logger.info("Starting Spark job")
@@ -124,28 +115,30 @@ class SparkEngine(
         dockerClient.runShell(
           DockerRunArgs(
             image = image,
-            volumeMap = workspaceVolumes ++ appVolumes ++ extraVolumes
+            volumeMap = workspaceVolumes ++ appVolumes
           ),
           submitArgs
         )
       } finally {
-        // TODO: avoid this by setting up correct user inside the container
-        logger.debug("Fixing file ownership")
+        if (!OS.isWindows) {
+          // TODO: avoid this by setting up correct user inside the container
+          logger.debug("Fixing file ownership")
 
-        val unix = new com.sun.security.auth.module.UnixSystem()
-        val chownArgs = Seq(
-          "chown",
-          "-R",
-          s"${unix.getUid}:${unix.getGid}"
-        ) ++ workspaceVolumes.values.map(_.toUri.getPath)
+          val chownArgs = Seq(
+            "chown",
+            "-R",
+            s"${OS.uid}:${OS.gid}",
+            volumeDirInContainer
+          )
 
-        dockerClient.runShell(
-          DockerRunArgs(
-            image = image,
-            volumeMap = workspaceVolumes
-          ),
-          chownArgs
-        )
+          dockerClient.runShell(
+            DockerRunArgs(
+              image = image,
+              volumeMap = workspaceVolumes
+            ),
+            chownArgs
+          )
+        }
       }
     }
   }
@@ -166,4 +159,5 @@ class SparkEngine(
     outputStream.close()
     configStream.close()
   }
+
 }

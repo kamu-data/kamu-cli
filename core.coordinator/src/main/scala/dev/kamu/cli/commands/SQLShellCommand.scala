@@ -112,13 +112,15 @@ class SQLShellCommand(
       )
 
       try {
-        val hostPort = livyProcess.waitForHostPort(containerPort, 15 seconds)
-        val livyUrl = URI.create(s"jdbc:hive2://localhost:$hostPort")
+        val hostPort = livyProcess.waitForHostPort(containerPort, 60 seconds)
+        val livyUrl =
+          URI.create(s"jdbc:hive2://${dockerClient.getDockerHost}:${hostPort}")
         logger.debug(s"Resolved Livy URL: $livyUrl")
 
         body(livyUrl)
       } finally {
-        livyProcess.kill()
+        livyProcess.stop()
+        livyProcess.join()
       }
     }
   }

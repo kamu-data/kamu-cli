@@ -11,7 +11,7 @@
 
     <Loggers>
         <Logger name="org.apache.hive.jdbc" level="warn"/>
-        <Logger name="dev.kamu.cli" level="info" additivity="false">
+        <Logger name="dev.kamu" level="info" additivity="false">
             <AppenderRef ref="console-cli"/>
         </Logger>
         <Root level="info">

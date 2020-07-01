@@ -9,8 +9,8 @@
 package dev.kamu.cli.external
 
 object DockerImages {
-  val SPARK = "kamudata/engine-spark:0.6.0"
-  val FLINK = "kamudata/engine-flink:0.4.0"
+  val SPARK = "kamudata/engine-spark:0.7.0"
+  val FLINK = "kamudata/engine-flink:0.5.0"
 
   val LIVY = SPARK
   val JUPYTER = "kamudata/jupyter-uber:0.0.1"

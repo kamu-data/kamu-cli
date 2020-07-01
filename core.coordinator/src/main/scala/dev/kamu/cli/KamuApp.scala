@@ -32,7 +32,7 @@ object KamuApp extends App {
     val cliArgs = new CliArgs(args)
 
     Configurator.setLevel(
-      getClass.getPackage.getName,
+      "dev.kamu",
       if (cliArgs.debug()) Level.ALL else cliArgs.logLevel()
     )
 

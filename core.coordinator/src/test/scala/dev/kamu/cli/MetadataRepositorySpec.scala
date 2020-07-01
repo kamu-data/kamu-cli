@@ -110,7 +110,7 @@ class MetadataRepositorySpec extends FunSuite with Matchers with KamuTestBase {
         actual shouldEqual expected
       } finally {
         // stop the server
-        testHttpServer.kill(testServerName)
+        testHttpServer.stop(testServerName)
       }
     }
   }

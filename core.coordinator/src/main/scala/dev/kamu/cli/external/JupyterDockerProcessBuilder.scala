@@ -17,7 +17,8 @@ import dev.kamu.core.utils.{
   DockerClient,
   DockerProcess,
   DockerProcessBuilder,
-  DockerRunArgs
+  DockerRunArgs,
+  OS
 }
 import org.apache.logging.log4j.LogManager
 
@@ -57,24 +58,25 @@ class JupyterDockerProcessBuilder(
 
   // TODO: avoid this by setting up correct user inside the container
   def chown(): Unit = {
-    logger.debug("Fixing file ownership")
+    if (!OS.isWindows) {
+      logger.debug("Fixing file ownership")
 
-    val unix = new com.sun.security.auth.module.UnixSystem()
-    val shellCommand = Seq(
-      "chown",
-      "-R",
-      s"${unix.getUid}:${unix.getGid}",
-      "/opt/workdir"
-    )
+      val shellCommand = Seq(
+        "chown",
+        "-R",
+        s"${OS.uid}:${OS.gid}",
+        "/opt/workdir"
+      )
 
-    dockerClient.runShell(
-      DockerRunArgs(
-        image = runArgs.image,
-        volumeMap =
-          Map(Paths.get("").toAbsolutePath -> Paths.get("/opt/workdir"))
-      ),
-      shellCommand
-    )
+      dockerClient.runShell(
+        DockerRunArgs(
+          image = runArgs.image,
+          volumeMap =
+            Map(Paths.get("").toAbsolutePath -> Paths.get("/opt/workdir"))
+        ),
+        shellCommand
+      )
+    }
   }
 }
 
@@ -139,23 +141,26 @@ class JupyterDockerProcess(
   }
 
   def openBrowserWhenReady(): Unit = {
-    if (Desktop.isDesktopSupported && Desktop.getDesktop.isSupported(
-          Desktop.Action.BROWSE
-        )) {
-      val browserOpenerThread = new Thread {
-        override def run(): Unit = {
-          val token = waitForToken()
+    if (!Desktop.isDesktopSupported ||
+        !Desktop.getDesktop.isSupported(Desktop.Action.BROWSE))
+      return
 
-          val hostPort = getHostPort(80).get
-          val uri = URI.create(s"http://localhost:$hostPort/?token=$token")
+    val browserOpenerThread = new Thread {
+      override def run(): Unit = {
+        val token = waitForToken()
 
-          logger.info(s"Opening in browser: $uri")
-          Desktop.getDesktop.browse(uri)
-        }
+        val hostPort = getHostPort(80).get
+        val uri = URI.create(
+          s"http://${dockerClient.getDockerHost}:$hostPort/?token=$token"
+        )
+
+        logger.info(s"Opening in browser: $uri")
+        Desktop.getDesktop.browse(uri)
       }
-
-      browserOpenerThread.setDaemon(true)
-      browserOpenerThread.start()
     }
+
+    browserOpenerThread.setDaemon(true)
+    browserOpenerThread.start()
+
   }
 }

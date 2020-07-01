@@ -82,9 +82,17 @@ class TransformService(
           id => (id.toString, metadataRepository.getDatasetVocabulary(id))
         )
         .toMap,
-      datasetLayouts = allDatasets
-        .map(i => (i.toString, metadataRepository.getDatasetLayout(i)))
-        .toMap
+      dataDirs = allDatasets
+        .map(
+          i =>
+            (
+              i.toString,
+              metadataRepository.getDatasetLayout(i).dataDir.toString
+            )
+        )
+        .toMap,
+      checkpointsDir =
+        metadataRepository.getDatasetLayout(datasetID).checkpointsDir.toString
     )
 
     val engine = engineFactory.getEngine(batch.source.transformEngine)

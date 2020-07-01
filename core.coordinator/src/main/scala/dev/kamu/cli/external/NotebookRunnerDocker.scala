@@ -41,10 +41,14 @@ class NotebookRunnerDocker(
       var jupyterProcess: JupyterDockerProcess = null
 
       def stopAll(): Unit = {
-        if (livyProcess != null)
-          livyProcess.kill()
-        if (jupyterProcess != null)
-          jupyterProcess.kill()
+        if (livyProcess != null) {
+          livyProcess.stop()
+          livyProcess.join()
+        }
+        if (jupyterProcess != null) {
+          jupyterProcess.stop()
+          jupyterProcess.join()
+        }
       }
 
       Signal.handle(new Signal("INT"), new SignalHandler {

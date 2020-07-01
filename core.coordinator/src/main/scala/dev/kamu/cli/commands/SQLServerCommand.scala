@@ -36,12 +36,15 @@ class SQLServerCommand(
     // TODO: Avoid thrift ecxeption during testing of the port
     val hostPort = livyProcess.waitForHostPort(containerPort, 15 seconds)
 
-    logger.info(s"Server is running at: jdbc:hive2://localhost:$hostPort")
+    logger.info(
+      s"Server is running at: jdbc:hive2://${dockerClient.getDockerHost}:${hostPort}"
+    )
 
     try {
       livyProcess.join()
     } finally {
-      livyProcess.kill()
+      livyProcess.stop()
+      livyProcess.join()
     }
   }
 }

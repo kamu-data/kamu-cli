@@ -283,13 +283,16 @@ class IngestService(
     prepDataPath: Path,
     vocabulary: DatasetVocabulary
   ): MetadataBlock = {
+    val layout = metadataRepository.getDatasetLayout(datasetID)
+
     val request = IngestRequest(
       datasetID = datasetID,
-      source = source,
-      datasetLayout = metadataRepository.getDatasetLayout(datasetID),
-      dataToIngest = prepDataPath,
+      ingestPath = prepDataPath.toString,
       eventTime = eventTime,
-      datasetVocab = vocabulary
+      source = source,
+      datasetVocab = vocabulary,
+      dataDir = layout.dataDir.toString,
+      checkpointsDir = layout.checkpointsDir.toString
     )
 
     val engine =
