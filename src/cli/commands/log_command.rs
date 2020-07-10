@@ -1,6 +1,6 @@
 extern crate kamu;
 
-use super::*;
+use super::Command;
 use kamu::domain::MetadataChain;
 use kamu::infra::MetadataChainFsYaml;
 use std::path::Path;

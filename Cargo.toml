@@ -14,15 +14,18 @@ name = "kamu"
 
 
 [dependencies]
-
 # Serialization
 flatbuffers = "*"
 serde = { version = "*", features = ["derive"] }
 serde_yaml = "*"
+
+# Data
+parquet = { git = "https://github.com/apache/arrow" }
 
 # UI
 clap = "*"
 indicatif = "*"
 
 # Utils
+regex = "*"
 indoc = "*"  # Unindenting multi-line strings

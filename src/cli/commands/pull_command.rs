@@ -1,6 +1,6 @@
 extern crate indicatif;
 
-use super::*;
+use super::Command;
 use indicatif::*;
 
 pub struct PullCommand;
