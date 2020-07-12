@@ -74,6 +74,12 @@ If you decide to use `cygwin` as your shell you can create the following laucher
 java -jar `cygpath -w /home/me/kamu/bin/kamu.jar` $@
 ```
 
+Docker Toolbox runs Docker in a Virtual Machine. This means to mount a file from your host file system into a Docker container the file first needs to be mounted into VM, so make sure all paths that `kamu` will need are mapped in VirtualBox VM settings.
+
+> **Example:** If you run the tool under `cygwin` your home directory might be in `C:\cygwin64`. When `kamu` runs it will resolve the system temporary folder as `C:\cygwin64\tmp` and when it detects that Docker runs in a VM it will map it to `/c/cygwin64/tmp`. So in your VM settings you will need to add a mapping from `C:\cygwin64` to `/c/cygwin64`.
+
+Windows is fun...
+
 #### Known issues
 - Docker is quite slow under VirtualBox
 - Default `cmd` shell doesn't understand ANSI colors
