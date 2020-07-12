@@ -35,6 +35,7 @@ class Kamu(
   ).toAbsolute
 
   logger.debug("Workspace root: {}", workspaceLayout.kamuRootDir)
+  logger.debug("System temp dir: {}", System.getProperty("java.io.tmpdir"))
 
   val metadataRepository =
     new MetadataRepository(workspaceLayout, systemClock)
