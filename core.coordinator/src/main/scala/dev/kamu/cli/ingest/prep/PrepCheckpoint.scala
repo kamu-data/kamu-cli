@@ -10,10 +10,8 @@ package dev.kamu.cli.ingest.prep
 
 import java.time.Instant
 
-import dev.kamu.core.manifests.Resource
-
 case class PrepCheckpoint(
   downloadTimestamp: Instant,
   eventTime: Option[Instant],
   lastPrepared: Instant
-) extends Resource
+)

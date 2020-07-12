@@ -71,12 +71,12 @@ class IngestGeoJsonSpec extends FlatSpec with Matchers with KamuTestBase {
 
       val ds = DatasetSnapshot(
         id = DatasetFactory.newDatasetID(),
-        source = SourceKind.Root(
-          fetch = FetchSourceKind.Url(inputPath.toUri),
-          read = ReaderKind.Geojson(),
-          merge = MergeStrategyKind.Snapshot(primaryKey = Vector("id"))
+        source = DatasetSource.Root(
+          fetch = FetchStep.Url(inputPath.toUri),
+          read = ReadStep.GeoJson(),
+          merge = MergeStrategy.Snapshot(primaryKey = Vector("id"))
         )
-      ).postLoad()
+      )
 
       kamu.addDataset(ds)
       kamu.run("pull", ds.id.toString)

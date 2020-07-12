@@ -12,12 +12,12 @@ import java.io.InputStream
 import java.util.regex.Pattern
 
 import dev.kamu.core.utils.ZipEntryStream
-import dev.kamu.core.manifests.PrepStepKind
+import dev.kamu.core.manifests.{PrepStep => PrepStepCfg}
 
-class DecompressZIPStep(config: PrepStepKind.Decompress) extends PrepStep {
+class DecompressZIPStep(config: PrepStepCfg.Decompress) extends PrepStep {
   override def prepare(inputStream: InputStream): InputStream = {
-    val subPathRegex = config.subPathRegex.orElse(
-      config.subPath.map(p => Pattern.quote(p.toString))
+    val subPathRegex = config.subPath.orElse(
+      config.subPath.map(p => Pattern.quote(p))
     )
 
     val stream = subPathRegex

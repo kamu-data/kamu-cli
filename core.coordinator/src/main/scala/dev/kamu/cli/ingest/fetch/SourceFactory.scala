@@ -11,40 +11,43 @@ package dev.kamu.cli.ingest.fetch
 import java.nio.file.Paths
 
 import better.files.File
-import dev.kamu.core.manifests.{
-  CachingKind,
-  EventTimeKind,
-  FetchSourceKind,
-  OrderingKind
-}
+import dev.kamu.core.manifests
+import dev.kamu.core.manifests._
 import dev.kamu.core.utils.Clock
 import org.apache.logging.log4j.LogManager
 
 class SourceFactory(systemClock: Clock) {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  def getSource(kind: FetchSourceKind): Seq[CacheableSource] = {
-    val eventTimeSource = kind.eventTime match {
+  def getSource(fetch: FetchStep): Seq[CacheableSource] = {
+    fetch match {
+      case url: FetchStep.Url =>
+        getFetchUrlSource(url, getEventTimeSource(url.eventTime))
+      case glob: FetchStep.FilesGlob =>
+        getFetchFilesGlobSource(glob, getEventTimeSource(glob.eventTime))
+    }
+  }
+
+  def getEventTimeSource(
+    eventTimeSource: Option[manifests.EventTimeSource]
+  ): EventTimeSource = {
+    eventTimeSource match {
       case None =>
         new EventTimeSource.FromSystemTime(systemClock)
-      case Some(e: EventTimeKind.FromPath) =>
-        new EventTimeSource.FromPath(e.pattern, e.timestampFormat)
+      case Some(e: manifests.EventTimeSource.FromPath) =>
+        new EventTimeSource.FromPath(
+          e.pattern,
+          e.timestampFormat.getOrElse("yyyy-MM-dd")
+        )
       case _ =>
         throw new NotImplementedError(
-          s"Unsupported event time source: ${kind.eventTime}"
+          s"Unsupported event time source: ${eventTimeSource}"
         )
-    }
-
-    kind match {
-      case fetch: FetchSourceKind.Url =>
-        getFetchUrlSource(fetch, eventTimeSource)
-      case glob: FetchSourceKind.FilesGlob =>
-        getFetchFilesGlobSource(glob, eventTimeSource)
     }
   }
 
   def getFetchUrlSource(
-    kind: FetchSourceKind.Url,
+    kind: FetchStep.Url,
     eventTimeSource: EventTimeSource
   ): Seq[CacheableSource] = {
     kind.url.getScheme match {
@@ -82,11 +85,12 @@ class SourceFactory(systemClock: Clock) {
   }
 
   def getFetchFilesGlobSource(
-    kind: FetchSourceKind.FilesGlob,
+    kind: FetchStep.FilesGlob,
     eventTimeSource: EventTimeSource
   ): Seq[CacheableSource] = {
-    val globbed = File(kind.path.getParent)
-      .glob(kind.path.getFileName.toString)
+    val path = Paths.get(kind.path)
+    val globbed = File(path.getParent)
+      .glob(path.getFileName.toString)
       .map(
         f =>
           new FileSystemSource(
@@ -98,15 +102,15 @@ class SourceFactory(systemClock: Clock) {
       )
       .toVector
 
-    val orderBy = kind.orderBy.getOrElse(
-      if (kind.eventTime.isDefined) OrderingKind.ByMetadataEventTime
-      else OrderingKind.ByName
+    val orderBy = kind.order.getOrElse(
+      if (kind.eventTime.isDefined) SourceOrdering.ByEventTime()
+      else SourceOrdering.ByName()
     )
 
     val sorted = orderBy match {
-      case OrderingKind.ByName =>
+      case SourceOrdering.ByName() =>
         globbed.sortBy(_.path.getFileName.toString.toLowerCase())
-      case OrderingKind.ByMetadataEventTime =>
+      case SourceOrdering.ByEventTime() =>
         globbed.sortBy(eventTimeSource.getEventTime)
     }
 
@@ -117,14 +121,14 @@ class SourceFactory(systemClock: Clock) {
     sorted
   }
 
-  def getCachingBehavior(kind: FetchSourceKind): CachingBehavior = {
+  def getCachingBehavior(kind: FetchStep): CachingBehavior = {
     val cacheSettings = kind match {
-      case url: FetchSourceKind.Url        => url.cache
-      case glob: FetchSourceKind.FilesGlob => glob.cache
+      case url: FetchStep.Url        => url.cache
+      case glob: FetchStep.FilesGlob => glob.cache
     }
     cacheSettings match {
-      case None                         => new CachingBehaviorDefault()
-      case Some(_: CachingKind.Forever) => new CachingBehaviorForever()
+      case None                           => new CachingBehaviorDefault()
+      case Some(_: SourceCaching.Forever) => new CachingBehaviorForever()
     }
   }
 }

@@ -8,17 +8,17 @@
 
 package dev.kamu.cli.ingest.prep
 
-import dev.kamu.core.manifests.PrepStepKind
+import dev.kamu.core.manifests.{PrepStep => PrepStepCfg}
 import org.apache.logging.log4j.LogManager
 
 class PrepStepFactory() {
   private val logger = LogManager.getLogger(getClass.getName)
 
   def getStep(
-    config: PrepStepKind
+    config: PrepStepCfg
   ): PrepStep = {
     config match {
-      case dc: PrepStepKind.Decompress =>
+      case dc: PrepStepCfg.Decompress =>
         dc.format.toLowerCase match {
           case "gzip" =>
             logger.debug("Extracting gzip")
@@ -31,7 +31,7 @@ class PrepStepFactory() {
               s"Unknown compression format: ${dc.format}"
             )
         }
-      case pipe: PrepStepKind.Pipe =>
+      case pipe: PrepStepCfg.Pipe =>
         new ProcessPipeStep(pipe.command)
       case _ =>
         throw new NotImplementedError(s"Unknown prep step: $config")
@@ -39,7 +39,7 @@ class PrepStepFactory() {
   }
 
   def getComposedSteps(
-    configs: Seq[PrepStepKind]
+    configs: Seq[PrepStepCfg]
   ): PrepStep = {
     new CompositePrepStep(configs.map(getStep).toVector)
   }

@@ -10,6 +10,7 @@ package dev.kamu.cli
 
 import java.net.URI
 
+import com.typesafe.config.ConfigObject
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
@@ -18,13 +19,13 @@ import dev.kamu.core.manifests.parsing.pureconfig.yaml.defaults._
 import scala.util.Random
 
 object DatasetFactory {
-  val _schemes = Array(
+  private val _schemes = Array(
     "http",
     "https",
     "ftp"
   )
 
-  val _topLevelDomains = Array(
+  private val _topLevelDomains = Array(
     "com",
     "org",
     "net",
@@ -32,19 +33,19 @@ object DatasetFactory {
     "gov"
   )
 
-  val _organizations = (0 to 100)
+  private val _organizations = (0 to 100)
     .map(_ => Random.nextInt(10) + 3)
     .map(len => Random.alphanumeric.take(len).mkString.toLowerCase)
     .toArray
 
-  val _subdomains = Array(
+  private val _subdomains = Array(
     "api",
     "catalog",
     "data",
     "portal"
   )
 
-  val _extensions = Array(
+  private val _extensions = Array(
     "zip",
     "tar.gz",
     "gz",
@@ -57,22 +58,21 @@ object DatasetFactory {
     url: Option[URI] = None,
     format: Option[String] = None,
     header: Boolean = false,
-    mergeStrategy: Option[MergeStrategyKind] = None,
+    mergeStrategy: Option[MergeStrategy] = None,
     schema: Seq[String] = Seq.empty
   ): DatasetSnapshot = {
     val _id = id.getOrElse(newDatasetID())
     DatasetSnapshot(
       id = _id,
-      source = SourceKind.Root(
-        fetch = FetchSourceKind.Url(url.getOrElse(newURL(_id))),
-        read = ReaderKind.Generic(
-          name = format.getOrElse("csv"),
-          options = if (!header) Map.empty else Map("header" -> "true"),
-          schema = schema.toVector
+      source = DatasetSource.Root(
+        fetch = FetchStep.Url(url.getOrElse(newURL(_id))),
+        read = ReadStep.Csv(
+          header = Some(header),
+          schema = Some(schema.toVector)
         ),
-        merge = mergeStrategy.getOrElse(MergeStrategyKind.Append())
+        merge = mergeStrategy.getOrElse(MergeStrategy.Append())
       )
-    ).postLoad()
+    )
   }
 
   def newDerivativeDataset(
@@ -81,22 +81,19 @@ object DatasetFactory {
     sql: Option[String] = None
   ): DatasetSnapshot = {
     val _id = id.getOrElse(newDatasetID())
+    val _sql = sql.getOrElse(s"SELECT * FROM `$source`")
     DatasetSnapshot(
       id = _id,
-      source = SourceKind.Derivative(
-        inputs = Vector(
-          SourceKind.Derivative.Input(
-            id = source
-          )
-        ),
-        transform = yaml.saveObj(
-          TransformKind.SparkSQL(
-            engine = "sparkSQL",
-            query = Some(sql.getOrElse(s"SELECT * FROM `$source`"))
-          )
+      source = DatasetSource.Derivative(
+        inputs = Vector(source),
+        transform = yaml.load[ConfigObject](
+          s"""
+            |engine: sparkSQL
+            |query: '${_sql}'
+          """.stripMargin
         )
       )
-    ).postLoad()
+    )
   }
 
   def newDatasetID(): DatasetID = {

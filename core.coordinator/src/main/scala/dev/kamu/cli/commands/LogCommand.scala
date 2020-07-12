@@ -47,7 +47,7 @@ class LogCommand(
       println(renderProperty("Output.Watermark", w))
     }
 
-    block.inputSlices.zipWithIndex.foreach {
+    block.inputSlices.getOrElse(Vector.empty).zipWithIndex.foreach {
       case (s, i) =>
         println(renderProperty(s"Input[$i].Records", s.numRecords))
         println(renderProperty(s"Input[$i].Interval", s.interval.format()))
@@ -56,9 +56,9 @@ class LogCommand(
     }
 
     block.source.foreach {
-      case _: SourceKind.Root =>
+      case _: DatasetSource.Root =>
         println(renderProperty("Source", "<Root source updated>"))
-      case _: SourceKind.Derivative =>
+      case _: DatasetSource.Derivative =>
         println(renderProperty("Source", "<Derivative source updated>"))
     }
 

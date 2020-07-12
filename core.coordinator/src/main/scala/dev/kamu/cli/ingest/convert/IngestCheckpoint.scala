@@ -10,10 +10,10 @@ package dev.kamu.cli.ingest.convert
 
 import java.time.Instant
 
-import dev.kamu.core.manifests.{MetadataBlock, Resource}
+import dev.kamu.core.manifests.MetadataBlock
 
 case class IngestCheckpoint(
   prepTimestamp: Instant,
   lastIngested: Instant,
   resultingBlock: MetadataBlock
-) extends Resource
+)

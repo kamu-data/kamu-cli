@@ -36,22 +36,22 @@ class IngestMultiSourceSpec extends FlatSpec with Matchers with KamuTestBase {
 
       val ds = DatasetSnapshot(
         id = DatasetFactory.newDatasetID(),
-        source = SourceKind.Root(
-          fetch = FetchSourceKind.FilesGlob(
-            path = globPath,
+        source = DatasetSource.Root(
+          fetch = FetchStep.FilesGlob(
+            path = globPath.toString,
             eventTime = Some(
-              EventTimeKind.FromPath(
+              EventTimeSource.FromPath(
                 pattern = """balances-(\d+-\d+-\d+)\.csv""",
-                timestampFormat = "yyyy-MM-dd"
+                timestampFormat = Some("yyyy-MM-dd")
               )
             )
           ),
-          read = ReaderKind.Csv(
-            schema = Vector("id INT", "name STRING", "balance INT")
+          read = ReadStep.Csv(
+            schema = Some(Vector("id INT", "name STRING", "balance INT"))
           ),
-          merge = MergeStrategyKind.Snapshot(primaryKey = Vector("id"))
+          merge = MergeStrategy.Snapshot(primaryKey = Vector("id"))
         )
-      ).postLoad()
+      )
 
       kamu.addDataset(ds)
       kamu.run("pull", ds.id.toString)

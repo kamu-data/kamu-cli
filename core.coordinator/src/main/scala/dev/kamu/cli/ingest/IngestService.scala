@@ -24,12 +24,7 @@ import dev.kamu.cli.ingest.prep.{PrepCheckpoint, PrepStepFactory}
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.cli.transform.EngineFactory
 import dev.kamu.core.manifests.infra.IngestRequest
-import dev.kamu.core.manifests.{
-  DatasetID,
-  DatasetVocabulary,
-  MetadataBlock,
-  SourceKind
-}
+import dev.kamu.core.manifests._
 import dev.kamu.core.utils.fs._
 import dev.kamu.core.utils.Clock
 import org.apache.commons.compress.compressors.bzip2.{
@@ -74,7 +69,7 @@ class IngestService(
         .reverse
         .flatMap(_.source)
         .head
-        .asInstanceOf[SourceKind.Root]
+        .asInstanceOf[DatasetSource.Root]
 
       val cachingBehavior = sourceFactory.getCachingBehavior(source.fetch)
 
@@ -123,7 +118,7 @@ class IngestService(
           prepResult.checkpoint,
           prepDataPath,
           ingestCheckpointPath,
-          summary.vocabulary.getOrElse(DatasetVocabulary())
+          summary.vocab.getOrElse(DatasetVocabulary())
         )
 
         if (ingestResult.wasUpToDate) {
@@ -151,7 +146,7 @@ class IngestService(
   }
 
   def maybeDownload(
-    source: SourceKind.Root,
+    source: DatasetSource.Root,
     externalSource: CacheableSource,
     cachingBehavior: CachingBehavior,
     downloadCheckpointPath: Path,
@@ -186,7 +181,7 @@ class IngestService(
 
   // TODO: Avoid copying data if prepare step is a no-op
   def maybePrepare(
-    source: SourceKind.Root,
+    source: DatasetSource.Root,
     downloadDataPath: Path,
     downloadCheckpoint: DownloadCheckpoint,
     prepCheckpointPath: Path,
@@ -202,7 +197,9 @@ class IngestService(
             checkpoint = storedCheckpoint.get
           )
         } else {
-          val prepStep = prepStepFactory.getComposedSteps(source.prepare)
+          val prepStep = prepStepFactory.getComposedSteps(
+            source.prepare.getOrElse(Vector.empty)
+          )
           val convertStep = conversionStepFactory.getComposedSteps(source.read)
 
           val inputStream = File(downloadDataPath).newInputStream
@@ -239,7 +236,7 @@ class IngestService(
 
   def maybeIngest(
     datasetID: DatasetID,
-    source: SourceKind.Root,
+    source: DatasetSource.Root,
     prepCheckpoint: PrepCheckpoint,
     prepDataPath: Path,
     ingestCheckpointPath: Path,
@@ -278,7 +275,7 @@ class IngestService(
 
   def ingest(
     datasetID: DatasetID,
-    source: SourceKind.Root,
+    source: DatasetSource.Root,
     eventTime: Option[Instant],
     prepDataPath: Path,
     vocabulary: DatasetVocabulary
@@ -296,7 +293,9 @@ class IngestService(
     )
 
     val engine =
-      engineFactory.getEngine(source.preprocessEngine.getOrElse("sparkSQL"))
+      engineFactory.getEngine(
+        source.preprocessPartial.map(_.engine).getOrElse("sparkSQL")
+      )
 
     val result = engine.ingest(request)
     result.block

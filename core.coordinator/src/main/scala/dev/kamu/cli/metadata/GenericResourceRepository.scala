@@ -13,14 +13,14 @@ import java.nio.file.{Path, Paths}
 
 import better.files.File
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.manifests.{DatasetID, Manifest, Resource}
+import dev.kamu.core.manifests.{DatasetID, Manifest}
 import dev.kamu.core.utils.fs._
 import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
 import scala.reflect.ClassTag
 
-class GenericResourceRepository[TRes <: Resource: ClassTag, TID](
+class GenericResourceRepository[TRes: ClassTag, TID](
   storagePath: Path,
   resourceKind: String,
   idFromString: String => TID,

@@ -10,6 +10,7 @@ package dev.kamu.cli.commands
 
 import java.nio.file.Paths
 
+import com.typesafe.config.ConfigObject
 import pureconfig.generic.auto._
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
@@ -68,7 +69,7 @@ class AddInteractiveCommand(
         )
 
         // TODO: Add heuristics
-        var prepareSteps = Vector.empty[PrepStepKind]
+        var prepareSteps = Vector.empty[PrepStep]
 
         if (inputYesNo("Is the source file compressed", "", false)) {
           val compression = inputChoice(
@@ -77,7 +78,7 @@ class AddInteractiveCommand(
             Seq("zip", "gzip")
           )
 
-          val subPathRegex = if (Seq("zip").contains(compression)) {
+          val subPath = if (Seq("zip").contains(compression)) {
             inputOptional(
               "Sub-path",
               "If this archive can contain multiple files - specify the path regex to " +
@@ -87,29 +88,27 @@ class AddInteractiveCommand(
             None
           }
 
-          prepareSteps = prepareSteps :+ PrepStepKind.Decompress(
+          prepareSteps = prepareSteps :+ PrepStep.Decompress(
             format = compression,
-            subPathRegex = subPathRegex
+            subPath = subPath
           )
         }
 
         var format = inputChoice(
           "Format",
           "Specify which format is the source data in.",
-          Seq("csv", "tsv", "json", "geojson", "shapefile")
+          Seq("csv", "json", "geojson", "shapefile")
         )
 
-        val readerOptions = scala.collection.mutable.Map.empty[String, String]
-
-        // TODO: Add heuristics
-        if (format == "tsv") {
-          format = "csv"
-          readerOptions.put("delimiter", "\\t")
-        }
-
-        if (format == "csv") {
-          if (inputYesNo("Is the first line a header", "", true))
-            readerOptions.put("header", "true")
+        val readStep = format match {
+          case "csv" =>
+            if (inputYesNo("Is the first line a header", "", true))
+              ReadStep.Csv(header = Some(true))
+            else
+              ReadStep.Csv()
+          case "json"      => ReadStep.JsonLines()
+          case "geojson"   => ReadStep.GeoJson()
+          case "shapefile" => ReadStep.EsriShapefile()
         }
 
         val mergeStrategy = inputChoice(
@@ -134,9 +133,9 @@ class AddInteractiveCommand(
               "Names of the columns should be compared to determine if a row has changed. " +
                 "For example this can be a modification timestamp, an incremental version, " +
                 "or a data hash. If not specified all data columns will be compared one by one."
-            )(s => s.split(',').map(_.trim).toVector).getOrElse(Vector.empty)
+            )(s => s.split(',').map(_.trim).toVector)
 
-            MergeStrategyKind.Snapshot(
+            MergeStrategy.Snapshot(
               primaryKey = primaryKey,
               compareColumns = compareColumns
             )
@@ -148,31 +147,30 @@ class AddInteractiveCommand(
               "Which columns uniquely identify the record throughout its lifetime (comma-separated)."
             )(s => s.split(',').map(_.trim).toVector)
 
-            MergeStrategyKind.Ledger(primaryKey = primaryKey)
+            MergeStrategy.Ledger(primaryKey = primaryKey)
           case "append" =>
-            MergeStrategyKind.Append()
+            MergeStrategy.Append()
         }
 
         DatasetSnapshot(
           id = id,
-          source = SourceKind.Root(
-            fetch = FetchSourceKind.Url(url = url),
-            prepare = prepareSteps,
-            read = ReaderKind
-              .Generic(name = format, options = readerOptions.toMap),
+          source = DatasetSource.Root(
+            fetch = FetchStep.Url(url = url),
+            prepare = if (prepareSteps.isEmpty) None else Some(prepareSteps),
+            read = readStep,
             merge = mergeStrategy
           )
         )
       case "derivative" =>
         DatasetSnapshot(
           id = id,
-          source = SourceKind.Derivative(
+          source = DatasetSource.Derivative(
             inputs = Vector.empty,
-            transform = yaml.saveObj(
-              TransformKind.SparkSQL(
-                engine = "sparkSQL",
-                query = Some("SELECT * FROM input")
-              )
+            transform = yaml.load[ConfigObject](
+              """
+                |engine: sparkSQL
+                |query: 'SELECT * FROM input'
+                |""".stripMargin
             )
           )
         )

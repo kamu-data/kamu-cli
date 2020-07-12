@@ -11,12 +11,7 @@ package dev.kamu.cli.transform
 import better.files.File
 import dev.kamu.cli.metadata.{MetadataChain, MetadataRepository}
 import dev.kamu.core.manifests._
-import dev.kamu.core.manifests.infra.{
-  ExecuteQueryRequest,
-  ExecuteQueryResult,
-  InputDataSlice,
-  Watermark
-}
+import dev.kamu.core.manifests.infra._
 import dev.kamu.core.utils.Clock
 import org.apache.commons.io.FileUtils
 import org.apache.logging.log4j.LogManager
@@ -24,7 +19,7 @@ import spire.math.Interval
 import spire.math.interval.{Closed, Unbound, ValueBound}
 
 case class TransformBatch(
-  source: SourceKind.Derivative,
+  source: DatasetSource.Derivative,
   inputSlices: Map[DatasetID, InputDataSlice]
 ) {
   def isEmpty: Boolean = {
@@ -69,7 +64,7 @@ class TransformService(
     datasetID: DatasetID,
     batch: TransformBatch
   ): ExecuteQueryResult = {
-    val allDatasets = batch.source.inputs.map(_.id) :+ datasetID
+    val allDatasets = batch.source.inputs :+ datasetID
 
     val request = ExecuteQueryRequest(
       datasetID = datasetID,
@@ -95,7 +90,7 @@ class TransformService(
         metadataRepository.getDatasetLayout(datasetID).checkpointsDir.toString
     )
 
-    val engine = engineFactory.getEngine(batch.source.transformEngine)
+    val engine = engineFactory.getEngine(batch.source.transformPartial.engine)
     engine.executeQuery(request)
   }
 
@@ -143,15 +138,15 @@ class TransformService(
     if (sources.length > 1)
       throw new RuntimeException("Transform evolution is not yet supported")
 
-    val source = sources.head.asInstanceOf[SourceKind.Derivative]
+    val source = sources.head.asInstanceOf[DatasetSource.Derivative]
 
     val inputSlices = source.inputs.zipWithIndex.map {
-      case (input, index) =>
-        val inputMetaChain = metadataRepository.getMetadataChain(input.id)
+      case (inputID, index) =>
+        val inputMetaChain = metadataRepository.getMetadataChain(inputID)
         (
-          input.id,
+          inputID,
           getInputSlice(
-            input.id,
+            inputID,
             index,
             inputMetaChain,
             outputMetaChain
@@ -174,7 +169,7 @@ class TransformService(
       .getBlocks()
       .reverse
       .filter(_.inputSlices.nonEmpty)
-      .map(_.inputSlices(inputIndex))
+      .map(_.inputSlices.get(inputIndex))
       .find(_.interval.nonEmpty)
       .map(_.interval)
       .getOrElse(Interval.empty)

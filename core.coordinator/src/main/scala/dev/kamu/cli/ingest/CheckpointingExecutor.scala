@@ -12,7 +12,7 @@ import java.nio.file.Path
 
 import better.files.File
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
-import dev.kamu.core.manifests.{Manifest, Resource}
+import dev.kamu.core.manifests.Manifest
 import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
@@ -21,7 +21,7 @@ case class ExecutionResult[TCheckpoint](
   checkpoint: TCheckpoint
 )
 
-class CheckpointingExecutor[TCheckpoint <: Resource]()(
+class CheckpointingExecutor[TCheckpoint]()(
   implicit icr: Derivation[ConfigReader[TCheckpoint]],
   icmr: Derivation[ConfigReader[Manifest[TCheckpoint]]],
   icw: Derivation[ConfigWriter[TCheckpoint]],

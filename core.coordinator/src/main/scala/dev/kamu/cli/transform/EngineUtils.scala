@@ -33,12 +33,10 @@ trait EngineUtils {
   protected def toContainerPath(ps: String, volumePath: Path): String = {
     val p = Paths.get(ps).normalize().toAbsolutePath
     val rel = volumePath.relativize(p)
-    val x = if (!OS.isWindows) {
+    if (!OS.isWindows) {
       Paths.get(volumeDirInContainer).resolve(rel).toString
     } else {
       volumeDirInContainer + "/" + rel.toString.replace("\\", "/")
     }
-    println(s"Mapped path $ps to $x")
-    x
   }
 }

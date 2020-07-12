@@ -21,7 +21,7 @@ import java.nio.file.{Path, Paths}
 
 import dev.kamu.core.manifests.parsing.pureconfig.yaml
 import yaml.defaults._
-import dev.kamu.core.manifests.{Manifest, Resource}
+import dev.kamu.core.manifests.Manifest
 import org.apache.logging.log4j.LogManager
 import pureconfig.{ConfigReader, ConfigWriter, Derivation}
 
@@ -31,19 +31,19 @@ import scala.reflect.ClassTag
 class ResourceLoader() {
   private val logger = LogManager.getLogger(getClass.getName)
 
-  def loadResourceFromFile[T <: Resource: ClassTag](p: Path)(
+  def loadResourceFromFile[T: ClassTag](p: Path)(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
     yaml.load[Manifest[T]](p).content
   }
 
-  def saveResourceToFile[T <: Resource: ClassTag](res: T, path: Path)(
+  def saveResourceToFile[T: ClassTag](res: T, path: Path)(
     implicit writer: Derivation[ConfigWriter[Manifest[T]]]
   ): Unit = {
     yaml.save(Manifest(res), path)
   }
 
-  def loadResourceFromURI[T <: Resource: ClassTag](
+  def loadResourceFromURI[T: ClassTag](
     uri: URI
   )(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]
@@ -57,7 +57,7 @@ class ResourceLoader() {
     }
   }
 
-  private def loadResourceFromURL[T <: Resource: ClassTag](
+  private def loadResourceFromURL[T: ClassTag](
     url: java.net.URL
   )(
     implicit reader: Derivation[ConfigReader[Manifest[T]]]

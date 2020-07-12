@@ -26,6 +26,7 @@ class MetadataChain(datasetDir: Path) {
 
   def init(ds: DatasetSnapshot, systemTime: Instant): Unit = {
     val initialBlock = MetadataBlock(
+      blockHash = "",
       prevBlockHash = "",
       systemTime = systemTime,
       source = Some(ds.source)
@@ -35,7 +36,7 @@ class MetadataChain(datasetDir: Path) {
       id = ds.id,
       kind = ds.kind,
       datasetDependencies = ds.dependsOn.toSet,
-      vocabulary = ds.vocabulary,
+      vocab = ds.vocab,
       lastPulled = None,
       numRecords = 0,
       dataSize = 0
@@ -81,7 +82,7 @@ class MetadataChain(datasetDir: Path) {
     DatasetSnapshot(
       id = summary.id,
       source = source,
-      vocabulary = summary.vocabulary
+      vocab = summary.vocab
     )
   }
 
@@ -116,13 +117,13 @@ class MetadataChain(datasetDir: Path) {
   // Helpers
   /////////////////////////////////////////////////////////////////////////////
 
-  protected def saveResource[T <: Resource: ClassTag](obj: T, path: Path)(
+  protected def saveResource[T: ClassTag](obj: T, path: Path)(
     implicit derivation: Derivation[ConfigWriter[Manifest[T]]]
   ): Unit = {
     yaml.save(Manifest(obj), path)
   }
 
-  protected def loadResource[T <: Resource: ClassTag](path: Path)(
+  protected def loadResource[T: ClassTag](path: Path)(
     implicit derivation: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
     yaml.load[Manifest[T]](path).content
