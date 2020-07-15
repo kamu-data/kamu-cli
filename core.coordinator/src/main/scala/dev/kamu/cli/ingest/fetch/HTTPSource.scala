@@ -16,7 +16,7 @@ import java.time.format.DateTimeFormatter
 
 import dev.kamu.cli.ingest.ExecutionResult
 import dev.kamu.core.utils.Clock
-import scalaj.http.Http
+import scalaj.http.{Http, HttpOptions}
 
 class HTTPSource(
   val sourceID: String,
@@ -41,6 +41,7 @@ class HTTPSource(
       )
 
     var request = Http(url.toString)
+      .option(HttpOptions.followRedirects(true))
       .timeout(connTimeoutMs = 30 * 1000, readTimeoutMs = 30 * 1000)
       .method("GET")
 
