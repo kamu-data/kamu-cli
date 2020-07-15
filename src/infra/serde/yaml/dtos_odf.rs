@@ -9,6 +9,8 @@ use crate::domain::TimeInterval;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use serde_yaml::Value;
+use std::collections::BTreeMap;
 
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetSource
@@ -40,9 +42,8 @@ pub enum DatasetSource {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DatasetVocabulary {
   pub system_time_column: Option<String>,
   pub event_time_column: Option<String>,
@@ -67,9 +68,8 @@ pub enum SourceCaching {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DatasetSnapshot {
   pub id: DatasetIDBuf,
   pub source: DatasetSource,
@@ -82,9 +82,8 @@ pub struct DatasetSnapshot {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct DataSlice {
   pub hash: String,
   pub interval: TimeInterval,
@@ -121,9 +120,8 @@ pub enum MergeStrategy {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MetadataBlock {
   pub block_hash: String,
   pub prev_block_hash: String,
@@ -195,6 +193,8 @@ pub enum ReadStep {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transform {
   pub engine: String,
+  #[serde(flatten)]
+  pub additional_properties: BTreeMap<String, Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
