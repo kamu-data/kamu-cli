@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2020-07-15
+### Added
+- `#26`: Follow redirects when fetching data from URL
+### Changed
+- Follow ODF spec on metadata `refs`
+
 ## [0.21.0] - 2020-07-12
 ### Fixed
 - Encoding issue in `DatasetSummary` manifest

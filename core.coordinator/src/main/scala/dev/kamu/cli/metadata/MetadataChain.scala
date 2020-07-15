@@ -8,10 +8,12 @@
 
 package dev.kamu.cli.metadata
 
+import java.io.PrintWriter
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.time.Instant
+import java.util.Scanner
 
 import better.files.File
 import dev.kamu.core.manifests._
@@ -44,8 +46,10 @@ class MetadataChain(datasetDir: Path) {
 
     try {
       File(blocksDir).createDirectories()
+      File(refsDir).createDirectories()
       saveResource(initialSummary, summaryPath)
       saveResource(initialBlock, blocksDir.resolve(initialBlock.blockHash))
+      saveRef("head", initialBlock.blockHash)
     } catch {
       case e: Exception =>
         File(datasetDir).delete()
@@ -57,6 +61,7 @@ class MetadataChain(datasetDir: Path) {
   def append(_block: MetadataBlock): MetadataBlock = {
     val block = _block.hashed()
     saveResource(block, blocksDir.resolve(block.blockHash))
+    saveRef("head", block.blockHash)
     block
   }
 
@@ -75,7 +80,7 @@ class MetadataChain(datasetDir: Path) {
   def getSnapshot(): DatasetSnapshot = {
     val summary = getSummary()
 
-    val source = getBlocks().reverse
+    val source = getBlocks()
       .flatMap(_.source)
       .head
 
@@ -86,32 +91,33 @@ class MetadataChain(datasetDir: Path) {
     )
   }
 
-  /** Returns metadata blocks in historical order */
-  def getBlocks(): Vector[MetadataBlock] = {
-    val blocks = File(blocksDir).list
-      .map(f => loadResource[MetadataBlock](f.path))
-      .map(b => (b.blockHash, b))
-      .toMap
-
-    val nextBlocks = blocks.values
-      .map(b => (b.prevBlockHash, b.blockHash))
-      .toMap
-
-    val blocksOrdered =
-      new scala.collection.immutable.VectorBuilder[MetadataBlock]()
-
-    var parentBlockHash = ""
-    while (nextBlocks.contains(parentBlockHash)) {
-      parentBlockHash = nextBlocks(parentBlockHash)
-      blocksOrdered += blocks(parentBlockHash)
+  /** Returns metadata blocks starting from head and down until the origin */
+  def getBlocks(): Stream[MetadataBlock] = {
+    loadRef("head") match {
+      case None => Stream.empty
+      case Some(hash) => {
+        val block = loadResource[MetadataBlock](blocksDir.resolve(hash))
+        block #:: nextBlock(block)
+      }
     }
+  }
 
-    blocksOrdered.result()
+  protected def nextBlock(block: MetadataBlock): Stream[MetadataBlock] = {
+    if (block.prevBlockHash.isEmpty) {
+      Stream.empty
+    } else {
+      val newBlock = loadResource[MetadataBlock](
+        blocksDir.resolve(block.prevBlockHash)
+      )
+      newBlock #:: nextBlock(newBlock)
+    }
   }
 
   protected def summaryPath: Path = datasetDir.resolve("summary")
 
   protected def blocksDir: Path = datasetDir.resolve("blocks")
+
+  protected def refsDir: Path = datasetDir.resolve("refs")
 
   /////////////////////////////////////////////////////////////////////////////
   // Helpers
@@ -127,6 +133,35 @@ class MetadataChain(datasetDir: Path) {
     implicit derivation: Derivation[ConfigReader[Manifest[T]]]
   ): T = {
     yaml.load[Manifest[T]](path).content
+  }
+
+  protected def saveRef(name: String, value: String): Unit = {
+    val path = refsDir.resolve(name)
+    val outputStream = File(path).newOutputStream()
+    try {
+      val writer = new PrintWriter(outputStream)
+      try {
+        writer.write(value)
+      } finally {
+        writer.close()
+      }
+    } finally {
+      outputStream.close()
+    }
+  }
+
+  protected def loadRef(name: String): Option[String] = {
+    val file = File(refsDir.resolve(name))
+    if (!file.exists) {
+      None
+    } else {
+      val scanner = new Scanner(file.toJava)
+      try {
+        Some(scanner.next)
+      } finally {
+        scanner.close()
+      }
+    }
   }
 
   protected implicit class MetadataBlockEx(b: MetadataBlock) {
