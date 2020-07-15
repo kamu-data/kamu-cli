@@ -1,5 +1,3 @@
-extern crate kamu;
-
 use kamu::domain::{DatasetID, DatasetIDBuf};
 use std::convert::TryFrom;
 

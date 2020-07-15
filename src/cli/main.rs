@@ -1,5 +1,4 @@
-#[macro_use]
-extern crate clap;
+use clap::value_t_or_exit;
 
 mod cli_parser;
 mod commands;

@@ -282,6 +282,7 @@ checksum = "80094f509cf8b5ae86a4966a39b3ff66cd7e2a3e594accec3743ff3fabeab5b2"
 dependencies = [
  "num-integer",
  "num-traits",
+ "serde",
  "time",
 ]
 
@@ -732,6 +733,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "intervals-general"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6261104c6643ef332fd8a7c1a1e630da692335c701bb5048c32c36826b5bd24e"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "iovec"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -777,13 +787,16 @@ dependencies = [
 name = "kamu-cli"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "clap",
  "flatbuffers",
  "indicatif",
  "indoc",
+ "intervals-general",
  "parquet",
  "regex",
  "serde",
+ "serde_with",
  "serde_yaml",
 ]
 
@@ -1446,6 +1459,27 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89d3d595d64120bbbc70b7f6d5ae63298b62a3d9f373ec2f56acf5365ca8a444"
+dependencies = [
+ "serde",
+ "serde_with_macros",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4070d2c9b9d258465ad1d82aabb985b84cd9a3afa94da25ece5a9938ba5f1606"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

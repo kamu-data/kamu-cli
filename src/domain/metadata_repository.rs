@@ -1,6 +1,3 @@
-use super::MetadataChain;
-
-use crate::infra::MetadataChainFsYaml;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,8 +19,8 @@ impl MetadataRepository {
         //DatasetIter { read_dir: iter }
     }
 
-    pub fn get_metadata_chain(&self) -> Box<dyn MetadataChain> {
+    /*pub fn get_metadata_chain(&self) -> Box<dyn MetadataChain> {
         let chain = MetadataChainFsYaml::new(Path::new("."));
         Box::new(chain)
-    }
+    }*/
 }

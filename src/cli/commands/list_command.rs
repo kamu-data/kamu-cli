@@ -1,5 +1,3 @@
-extern crate kamu;
-
 use super::Command;
 use kamu::domain::*;
 
@@ -17,11 +15,11 @@ impl ListCommand<'_> {
 
 impl Command for ListCommand<'_> {
     fn run(&mut self) {
-        self.metadata_repo.get_all_datasets();
+        /*self.metadata_repo.get_all_datasets();
         let chain = self.metadata_repo.get_metadata_chain();
 
         for block in chain.iter_blocks() {
             println!("{:?}", block);
-        }
+        }*/
     }
 }

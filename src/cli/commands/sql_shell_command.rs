@@ -1,5 +1,3 @@
-extern crate parquet;
-
 use super::Command;
 
 pub struct SqlShellCommand {}

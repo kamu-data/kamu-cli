@@ -3,13 +3,11 @@ pub use super::Result;
 pub use super::SerdeError;
 pub use super::Serializer;
 
-extern crate flatbuffers;
-use crate::domain::metadata::MetadataBlock;
-
 #[allow(dead_code, unused_imports)]
 mod metadata_block_generated;
 use metadata_block_generated as gen;
 
+/*
 pub struct FlatbuffersSerializer;
 pub struct FlatbuffersDeserializer;
 
@@ -44,3 +42,4 @@ impl Deserializer<MetadataBlock> for FlatbuffersDeserializer {
         Ok(obj)
     }
 }
+*/

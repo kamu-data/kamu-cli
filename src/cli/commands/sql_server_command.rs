@@ -1,5 +1,3 @@
-extern crate parquet;
-
 use super::Command;
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs::File;

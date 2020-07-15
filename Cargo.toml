@@ -14,9 +14,14 @@ name = "kamu"
 
 
 [dependencies]
+# Domain
+chrono = { version = "*", features = ["serde"] }
+intervals-general = "*"
+
 # Serialization
 flatbuffers = "*"
 serde = { version = "*", features = ["derive"] }
+serde_with = "*"
 serde_yaml = "*"
 
 # Data

@@ -77,6 +77,12 @@ impl DatasetIDBuf {
     }
 }
 
+impl Default for DatasetIDBuf {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl From<&DatasetID> for DatasetIDBuf {
     fn from(id: &DatasetID) -> Self {
         Self(String::from(id as &str))
@@ -131,11 +137,37 @@ impl fmt::Display for DatasetIDBuf {
     }
 }
 
+impl serde::Serialize for DatasetIDBuf {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for DatasetIDBuf {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_string(DatasetIDBufSerdeVisitor)
+    }
+}
+
+struct DatasetIDBufSerdeVisitor;
+
+impl<'de> serde::de::Visitor<'de> for DatasetIDBufSerdeVisitor {
+    type Value = DatasetIDBuf;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a DatasetID string")
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        DatasetIDBuf::try_from(v).map_err(serde::de::Error::custom)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InvalidDatasetID {
     invalid_id: String,
 }

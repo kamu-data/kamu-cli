@@ -1,13 +1,10 @@
-pub mod metadata;
-
-mod dataset_id;
-pub use self::dataset_id::{DatasetID, DatasetIDBuf, InvalidDatasetID};
-
 mod grammar;
 
-mod metadata_chain;
-pub use self::metadata_chain::BlockIterator;
-pub use self::metadata_chain::MetadataChain;
+mod dataset_id;
+pub use dataset_id::{DatasetID, DatasetIDBuf, InvalidDatasetID};
+
+mod time_interval;
+pub use time_interval::TimeInterval;
 
 mod metadata_repository;
 pub use self::metadata_repository::MetadataRepository;

@@ -1,5 +1,3 @@
-extern crate indicatif;
-
 use super::Command;
 use indicatif::*;
 
