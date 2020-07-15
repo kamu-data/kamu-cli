@@ -37,7 +37,7 @@ class AssignWatermarkCommand(
     val newBlock = metaChain.append(
       MetadataBlock(
         blockHash = "",
-        prevBlockHash = metaChain.getBlocks().last.blockHash,
+        prevBlockHash = metaChain.getBlocks().head.blockHash,
         systemTime = systemClock.instant(),
         outputWatermark = Some(watermark)
       )

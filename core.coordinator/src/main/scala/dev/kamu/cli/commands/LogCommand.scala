@@ -29,7 +29,7 @@ class LogCommand(
         return
     }
 
-    metadataChain.getBlocks().reverse.foreach(renderBlock)
+    metadataChain.getBlocks().foreach(renderBlock)
   }
 
   private def renderBlock(block: MetadataBlock): Unit = {

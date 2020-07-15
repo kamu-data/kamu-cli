@@ -101,7 +101,7 @@ class TransformService(
     val outputMetaChain = metadataRepository.getMetadataChain(datasetID)
     val newBlock = outputMetaChain.append(
       block.copy(
-        prevBlockHash = outputMetaChain.getBlocks().last.blockHash
+        prevBlockHash = outputMetaChain.getBlocks().head.blockHash
       )
     )
 
@@ -131,7 +131,6 @@ class TransformService(
 
     val sources = outputMetaChain
       .getBlocks()
-      .reverse
       .flatMap(_.source)
 
     // TODO: source could've changed several times
@@ -167,7 +166,6 @@ class TransformService(
     // Result is either: () or (inf, upper] or (lower, upper]
     val ivProcessed = outputMetaChain
       .getBlocks()
-      .reverse
       .filter(_.inputSlices.nonEmpty)
       .map(_.inputSlices.get(inputIndex))
       .find(_.interval.nonEmpty)
@@ -186,8 +184,8 @@ class TransformService(
     // Filter unprocessed input blocks
     val blocksUnprocessed = inputMetaChain
       .getBlocks()
-      .reverse
       .takeWhile(b => ivUnprocessed.contains(b.systemTime))
+      .toVector
 
     // Determine available data/watermark range
     // Result is either: () or (-inf, upper]

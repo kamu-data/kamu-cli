@@ -66,7 +66,6 @@ class IngestService(
       val summary = metaChain.getSummary()
       val source = metaChain
         .getBlocks()
-        .reverse
         .flatMap(_.source)
         .head
         .asInstanceOf[DatasetSource.Root]
@@ -309,7 +308,7 @@ class IngestService(
     // TODO: Avoid loading blocks again
     val block = metaChain.append(
       ingestResult.checkpoint.resultingBlock.copy(
-        prevBlockHash = metaChain.getBlocks().last.blockHash
+        prevBlockHash = metaChain.getBlocks().head.blockHash
       )
     )
 
