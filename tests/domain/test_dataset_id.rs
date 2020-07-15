@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 #[test]
 fn datasetid_newtype() {
     let s = "valid.dataset.id";
-    let id = DatasetID::new(s).unwrap();
+    let id = DatasetID::try_from(s).unwrap();
 
     fn needs_str(_: &str) {}
     fn needs_id(_: &DatasetID) {}
@@ -16,7 +16,7 @@ fn datasetid_newtype() {
 
 #[test]
 fn datasetid_fmt() {
-    let id = DatasetID::new("valid.dataset.id").unwrap();
+    let id = DatasetID::try_from("valid.dataset.id").unwrap();
 
     assert_eq!(format!("{}", id), "valid.dataset.id");
     assert_eq!(format!("{:?}", id), "DatasetID(\"valid.dataset.id\")");
@@ -30,16 +30,16 @@ fn datasetid_equality() {
 
 #[test]
 fn datasetid_validation() {
-    match DatasetID::new("valid.dataset-id") {
+    match DatasetID::try_from("valid.dataset-id") {
         Ok(act) => assert_eq!(act, "valid.dataset-id"),
         Err(e) => assert!(false, e),
     }
 
-    assert!(DatasetID::new(".invalid").is_err());
-    assert!(DatasetID::new("invalid-").is_err());
-    assert!(DatasetID::new("invalid--id").is_err());
-    assert!(DatasetID::new("invalid..id").is_err());
-    assert!(DatasetID::new("in^valid").is_err());
+    assert!(DatasetID::try_from(".invalid").is_err());
+    assert!(DatasetID::try_from("invalid-").is_err());
+    assert!(DatasetID::try_from("invalid--id").is_err());
+    assert!(DatasetID::try_from("invalid..id").is_err());
+    assert!(DatasetID::try_from("in^valid").is_err());
 }
 
 #[test]

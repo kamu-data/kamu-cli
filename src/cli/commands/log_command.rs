@@ -1,20 +1,26 @@
 use super::Command;
-use std::path::Path;
+use kamu::domain::*;
 
-pub struct LogCommand;
+pub struct LogCommand<'a> {
+    metadata_repo: &'a dyn MetadataRepository,
+}
 
-impl LogCommand {
-    pub fn new() -> LogCommand {
-        LogCommand
+impl LogCommand<'_> {
+    pub fn new(metadata_repo: &dyn MetadataRepository) -> LogCommand {
+        LogCommand {
+            metadata_repo: metadata_repo,
+        }
     }
 }
 
-impl Command for LogCommand {
+impl Command for LogCommand<'_> {
     fn run(&mut self) {
-        /*let chain = MetadataChainFsYaml::new(Path::new("."));
+        let chain = self
+            .metadata_repo
+            .get_metadata_chain(&DatasetID::try_from("aaa").unwrap());
 
-        for block in chain.iter_blocks() {
+        for block in chain.list_blocks() {
             println!("{:?}", block);
-        }*/
+        }
     }
 }

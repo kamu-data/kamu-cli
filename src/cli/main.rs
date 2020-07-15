@@ -1,19 +1,22 @@
-use clap::value_t_or_exit;
-
 mod cli_parser;
 mod commands;
 
 use commands::*;
 use kamu::domain::*;
+use kamu::infra::*;
+
+use clap::value_t_or_exit;
+
+use std::path::Path;
 
 fn main() {
-    let metadata_repo = MetadataRepository::new();
+    let metadata_repo = MetadataRepositoryFs::new(Path::new("./.kamu"));
 
     let matches = cli_parser::cli().get_matches();
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
-        ("log", Some(_)) => Box::new(LogCommand::new()),
+        ("log", Some(_)) => Box::new(LogCommand::new(&metadata_repo)),
         ("pull", Some(_)) => Box::new(PullCommand::new()),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new()),

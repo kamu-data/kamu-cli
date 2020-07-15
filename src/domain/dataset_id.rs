@@ -18,7 +18,7 @@ impl DatasetID {
         unsafe { &*(s.as_ref() as *const str as *const DatasetID) }
     }
 
-    pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> Result<&DatasetID, InvalidDatasetID> {
+    pub fn try_from<S: AsRef<str> + ?Sized>(s: &S) -> Result<&DatasetID, InvalidDatasetID> {
         match DatasetIDGrammar::match_dataset_id(s.as_ref()) {
             Some((_, "")) => Ok(DatasetID::new_unchecked(s)),
             _ => Err(InvalidDatasetID {
@@ -92,7 +92,7 @@ impl From<&DatasetID> for DatasetIDBuf {
 impl TryFrom<&str> for DatasetIDBuf {
     type Error = InvalidDatasetID;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let id = DatasetID::new(s)?;
+        let id = DatasetID::try_from(s)?;
         Ok(Self::from(id))
     }
 }
