@@ -1,26 +1,25 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
 
 pub fn cli() -> App<'static, 'static> {
-    App::new("My Super Program")
+    App::new("kamu")
         .global_settings(&[AppSettings::ColoredHelp])
         .settings(&[AppSettings::SubcommandRequiredElseHelp])
-        .version("1.0")
-        .about("Does awesome things")
+        .version("1.0") // TODO: get true version
         .arg(
             Arg::with_name("v")
                 .short("v")
                 .multiple(true)
-                .help("Sets the level of verbosity"),
+                .help("Sets the level of verbosity (repeat for more)"),
         )
-        .subcommand(SubCommand::with_name("list").about("controls testing features"))
+        .subcommand(SubCommand::with_name("list").about("List all datasets in the workspace"))
         .subcommand(
             SubCommand::with_name("log")
-                .about("controls testing features")
+                .about("Show dataset's metadata history")
                 .arg(
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
-                        .help("asdasd"),
+                        .help("ID of the dataset"),
                 ),
         )
         .subcommand(

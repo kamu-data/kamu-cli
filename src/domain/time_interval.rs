@@ -27,28 +27,28 @@ impl TimeInterval {
     }
 
     pub fn closed(left: Element, right: Element) -> Result<Self, InvalidTimeInterval> {
-        match BoundPair::new(right, left) {
+        match BoundPair::new(left, right) {
             None => Err(InvalidTimeInterval),
             Some(p) => Ok(Self(Interval::Closed { bound_pair: p })),
         }
     }
 
     pub fn open(left: Element, right: Element) -> Result<Self, InvalidTimeInterval> {
-        match BoundPair::new(right, left) {
+        match BoundPair::new(left, right) {
             None => Err(InvalidTimeInterval),
             Some(p) => Ok(Self(Interval::Open { bound_pair: p })),
         }
     }
 
     pub fn left_half_open(left: Element, right: Element) -> Result<Self, InvalidTimeInterval> {
-        match BoundPair::new(right, left) {
+        match BoundPair::new(left, right) {
             None => Err(InvalidTimeInterval),
             Some(p) => Ok(Self(Interval::LeftHalfOpen { bound_pair: p })),
         }
     }
 
     pub fn right_half_open(left: Element, right: Element) -> Result<Self, InvalidTimeInterval> {
-        match BoundPair::new(right, left) {
+        match BoundPair::new(left, right) {
             None => Err(InvalidTimeInterval),
             Some(p) => Ok(Self(Interval::RightHalfOpen { bound_pair: p })),
         }

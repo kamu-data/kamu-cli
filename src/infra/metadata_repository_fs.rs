@@ -27,8 +27,7 @@ impl MetadataRepository for MetadataRepositoryFs {
         if !path.exists() {
             Err(Error::DoesNotExist {
                 kind: ResourceKind::Dataset,
-                // TODO: fix string conversion
-                id: String::from(dataset_id.as_str()),
+                id: (dataset_id as &str).to_owned(),
                 backtrace: Backtrace::capture(),
             })
         } else {

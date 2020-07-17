@@ -8,6 +8,7 @@ use kamu::domain::*;
 use kamu::infra::*;
 
 use clap::value_t_or_exit;
+use console::style;
 use std::backtrace::BacktraceStatus;
 use std::error::Error;
 use std::path::PathBuf;
@@ -24,6 +25,12 @@ fn main() {
     let metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
 
     let matches = cli_parser::cli().get_matches();
+
+    // Verboseness
+    match matches.occurrences_of("v") {
+        0 => (),
+        _ => std::env::set_var("RUST_BACKTRACE", "1"),
+    };
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
@@ -57,10 +64,10 @@ fn main() {
             Ok(_) => true,
             Err(err) => {
                 // TODO: Missing colors
-                eprintln!("Error: {}", err);
+                eprintln!("[{}] {}", style("ERROR").red(), err);
                 if let Some(bt) = err.backtrace() {
                     if bt.status() == BacktraceStatus::Captured {
-                        eprintln!("\nBacktrace:\n{}", bt);
+                        eprintln!("\nBacktrace:\n{}", style(bt).dim());
                     }
                 }
                 false

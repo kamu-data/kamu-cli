@@ -29,7 +29,8 @@ parquet = { git = "https://github.com/apache/arrow" }
 
 # UI
 clap = "*"
-indicatif = "*"
+console = "*"  # Terminal colors
+indicatif = "*"  # Progress bars and spinners
 
 # Utils
 regex = "*"
