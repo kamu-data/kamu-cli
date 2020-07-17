@@ -1,3 +1,5 @@
+pub use kamu::domain::Error;
+
 mod list_command;
 mod log_command;
 mod pull_command;
@@ -11,11 +13,17 @@ pub use sql_server_command::SqlServerCommand;
 pub use sql_shell_command::SqlShellCommand;
 
 pub trait Command {
-    fn run(&mut self);
+    fn needs_workspace(&self) -> bool {
+        true
+    }
+
+    fn run(&mut self) -> Result<(), Error>;
 }
 
 pub struct NoOpCommand;
 
 impl Command for NoOpCommand {
-    fn run(&mut self) {}
+    fn run(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
 }

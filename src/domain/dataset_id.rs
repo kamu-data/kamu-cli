@@ -26,6 +26,10 @@ impl DatasetID {
             }),
         }
     }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl ops::Deref for DatasetID {
@@ -58,6 +62,18 @@ impl cmp::PartialEq<str> for DatasetID {
 
 impl cmp::Eq for DatasetID {}
 
+impl cmp::Ord for DatasetID {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl cmp::PartialOrd for DatasetID {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl fmt::Display for DatasetID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
@@ -89,11 +105,27 @@ impl From<&DatasetID> for DatasetIDBuf {
     }
 }
 
+// TODO: Why TryFrom not enough?
+impl std::str::FromStr for DatasetIDBuf {
+    type Err = InvalidDatasetID;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from(s)
+    }
+}
+
+// TODO: Replace with AsRef matcher
+// See: https://github.com/rust-lang/rust/issues/50133
 impl TryFrom<&str> for DatasetIDBuf {
     type Error = InvalidDatasetID;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         let id = DatasetID::try_from(s)?;
         Ok(Self::from(id))
+    }
+}
+impl TryFrom<&std::ffi::OsString> for DatasetIDBuf {
+    type Error = InvalidDatasetID;
+    fn try_from(s: &std::ffi::OsString) -> Result<Self, Self::Error> {
+        Self::try_from(s.to_str().unwrap())
     }
 }
 
@@ -130,6 +162,18 @@ impl cmp::PartialEq<str> for DatasetIDBuf {
 }
 
 impl cmp::Eq for DatasetIDBuf {}
+
+impl cmp::Ord for DatasetIDBuf {
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl cmp::PartialOrd for DatasetIDBuf {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 impl fmt::Display for DatasetIDBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

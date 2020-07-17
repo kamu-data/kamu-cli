@@ -1,4 +1,4 @@
-use super::Command;
+use super::{Command, Error};
 
 pub struct SqlShellCommand {}
 
@@ -9,7 +9,8 @@ impl SqlShellCommand {
 }
 
 impl Command for SqlShellCommand {
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<(), Error> {
         println!("Vroooom Vroom!");
+        Ok(())
     }
 }

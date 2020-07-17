@@ -1,30 +1,51 @@
-use super::MetadataChainFsYaml;
+use super::*;
 use crate::domain::*;
 
+use std::backtrace::Backtrace;
 use std::convert::TryFrom;
-use std::path::{Path, PathBuf};
 
 pub struct MetadataRepositoryFs {
-    meta_path: PathBuf,
+    workspace_layout: WorkspaceLayout,
 }
 
 impl MetadataRepositoryFs {
-    pub fn new(meta_path: &Path) -> MetadataRepositoryFs {
+    pub fn new(workspace_layout: WorkspaceLayout) -> MetadataRepositoryFs {
         MetadataRepositoryFs {
-            meta_path: meta_path.to_owned(),
+            workspace_layout: workspace_layout,
         }
     }
 }
 
 impl MetadataRepository for MetadataRepositoryFs {
-    fn list_datasets(&self) -> Vec<DatasetIDBuf> {
-        vec![
-            DatasetIDBuf::try_from("AAAA").unwrap(),
-            DatasetIDBuf::try_from("BBBB").unwrap(),
-        ]
+    fn list_datasets(&self) -> Box<dyn Iterator<Item = DatasetIDBuf>> {
+        let read_dir = std::fs::read_dir(&self.workspace_layout.metadata_dir).unwrap();
+        Box::new(ListDatasetsIter { rd: read_dir })
     }
 
-    fn get_metadata_chain(&self, dataset_id: &DatasetID) -> Box<dyn MetadataChain> {
-        Box::new(MetadataChainFsYaml::new(&self.meta_path))
+    fn get_metadata_chain(&self, dataset_id: &DatasetID) -> Result<Box<dyn MetadataChain>, Error> {
+        let path = self.workspace_layout.metadata_dir.join(dataset_id.as_str());
+        if !path.exists() {
+            Err(Error::DoesNotExist {
+                kind: ResourceKind::Dataset,
+                // TODO: fix string conversion
+                id: String::from(dataset_id.as_str()),
+                backtrace: Backtrace::capture(),
+            })
+        } else {
+            Ok(Box::new(MetadataChainFsYaml::new(path)))
+        }
+    }
+}
+
+struct ListDatasetsIter {
+    rd: std::fs::ReadDir,
+}
+impl Iterator for ListDatasetsIter {
+    type Item = DatasetIDBuf;
+    fn next(&mut self) -> Option<Self::Item> {
+        let res = self.rd.next()?;
+        let path = res.unwrap();
+        let name = path.file_name();
+        Some(DatasetIDBuf::try_from(&name).unwrap())
     }
 }

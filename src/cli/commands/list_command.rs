@@ -1,4 +1,4 @@
-use super::Command;
+use super::{Command, Error};
 use kamu::domain::*;
 
 pub struct ListCommand<'a> {
@@ -14,9 +14,15 @@ impl ListCommand<'_> {
 }
 
 impl Command for ListCommand<'_> {
-    fn run(&mut self) {
-        for id in self.metadata_repo.list_datasets() {
-            println!("{:?}", id);
+    fn run(&mut self) -> Result<(), Error> {
+        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.list_datasets().collect();
+
+        datasets.sort();
+
+        for id in datasets {
+            println!("{}", id);
         }
+
+        Ok(())
     }
 }

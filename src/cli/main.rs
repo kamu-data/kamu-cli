@@ -1,3 +1,5 @@
+#![feature(backtrace)]
+
 mod cli_parser;
 mod commands;
 
@@ -6,17 +8,29 @@ use kamu::domain::*;
 use kamu::infra::*;
 
 use clap::value_t_or_exit;
-
-use std::path::Path;
+use std::backtrace::BacktraceStatus;
+use std::error::Error;
+use std::path::PathBuf;
 
 fn main() {
-    let metadata_repo = MetadataRepositoryFs::new(Path::new("./.kamu"));
+    let kamu_root = PathBuf::from(".kamu");
+
+    let workspace_layout = WorkspaceLayout {
+        metadata_dir: kamu_root.join("datasets"),
+        remotes_dir: kamu_root.join("remotes"),
+        local_volume_dir: PathBuf::from(".kamu.local"),
+    };
+
+    let metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
 
     let matches = cli_parser::cli().get_matches();
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
-        ("log", Some(_)) => Box::new(LogCommand::new(&metadata_repo)),
+        ("log", Some(submatches)) => Box::new(LogCommand::new(
+            &metadata_repo,
+            value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+        )),
         ("pull", Some(_)) => Box::new(PullCommand::new()),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new()),
@@ -34,5 +48,27 @@ fn main() {
         _ => panic!("Unrecognized command"),
     };
 
-    command.run();
+    let ok = if command.needs_workspace() && !workspace_layout.metadata_dir.exists() {
+        // TODO: Make into error
+        eprintln!("Error: Not a kamu workspace");
+        false
+    } else {
+        match command.run() {
+            Ok(_) => true,
+            Err(err) => {
+                // TODO: Missing colors
+                eprintln!("Error: {}", err);
+                if let Some(bt) = err.backtrace() {
+                    if bt.status() == BacktraceStatus::Captured {
+                        eprintln!("\nBacktrace:\n{}", bt);
+                    }
+                }
+                false
+            }
+        }
+    };
+
+    if !ok {
+        std::process::exit(1);
+    }
 }

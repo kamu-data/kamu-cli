@@ -1,4 +1,4 @@
-use super::Command;
+use super::{Command, Error};
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs::File;
 use std::path::Path;
@@ -18,12 +18,13 @@ impl SqlServerCommand {
 }
 
 impl Command for SqlServerCommand {
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<(), Error> {
         let file = File::open(&Path::new("data/decimal/1.snappy.parquet")).unwrap();
         let reader = SerializedFileReader::new(file).unwrap();
         let mut iter = reader.get_row_iter(None).unwrap();
         while let Some(record) = iter.next() {
             println!("{}", record);
         }
+        Ok(())
     }
 }

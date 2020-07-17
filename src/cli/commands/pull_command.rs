@@ -1,4 +1,4 @@
-use super::Command;
+use super::{Command, Error};
 use indicatif::*;
 
 pub struct PullCommand;
@@ -10,7 +10,7 @@ impl PullCommand {
 }
 
 impl Command for PullCommand {
-    fn run(&mut self) {
+    fn run(&mut self) -> Result<(), Error> {
         let bar = ProgressBar::new(100);
         bar.set_style(
             ProgressStyle::default_bar()
@@ -21,5 +21,6 @@ impl Command for PullCommand {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         bar.finish_with_message("OK");
+        Ok(())
     }
 }

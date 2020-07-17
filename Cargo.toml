@@ -33,4 +33,5 @@ indicatif = "*"
 
 # Utils
 regex = "*"
-indoc = "*"  # Unindenting multi-line strings
+indoc = "*"  # Compile-time unindent
+thiserror = "*"  # Structured error derivations
