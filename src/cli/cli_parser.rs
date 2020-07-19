@@ -11,7 +11,14 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .multiple(true)
                 .help("Sets the level of verbosity (repeat for more)"),
         )
-        .subcommand(
+        .subcommands(vec![
+            SubCommand::with_name("init")
+                .about("Initialize the workspace in the current directory")
+                .arg(
+                    Arg::with_name("pull_images")
+                        .long("pull-images")
+                        .help("Only pull docker images and exit"),
+                ),
             SubCommand::with_name("add")
                 .about("Add a new dataset or modify existing one")
                 .arg(
@@ -20,9 +27,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .index(1)
                         .help("Path or URL of a file containing the dataset snapshot"),
                 ),
-        )
-        .subcommand(SubCommand::with_name("list").about("List all datasets in the workspace"))
-        .subcommand(
+            SubCommand::with_name("list").about("List all datasets in the workspace"),
             SubCommand::with_name("log")
                 .about("Show dataset's metadata history")
                 .arg(
@@ -31,8 +36,6 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .index(1)
                         .help("ID of the dataset"),
                 ),
-        )
-        .subcommand(
             SubCommand::with_name("pull")
                 .about("Pull new data into the datasets")
                 .arg(
@@ -53,8 +56,6 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .index(1)
                         .help("IDs of the dataset"),
                 ),
-        )
-        .subcommand(
             SubCommand::with_name("sql")
                 .about("controls testing features")
                 .subcommand(
@@ -73,8 +74,6 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                                 .help("asdasd"),
                         ),
                 ),
-        )
-        .subcommand(
             SubCommand::with_name("completions")
                 .about("Generate tab-completion scripts for your shell")
                 .after_help("HOWTOOOOOOOOOOOOOOOO")
@@ -83,11 +82,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .required(true)
                         .possible_values(&Shell::variants()),
                 ),
-        )
-        .subcommand(
             SubCommand::with_name("complete")
                 .about("Completes a command in the shell")
                 .arg(Arg::with_name("input").required(true).index(1))
                 .arg(Arg::with_name("current").required(true).index(2)),
-        )
+        ])
 }

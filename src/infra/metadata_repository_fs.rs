@@ -18,12 +18,12 @@ impl MetadataRepositoryFs {
 
 impl MetadataRepository for MetadataRepositoryFs {
     fn list_datasets(&self) -> Box<dyn Iterator<Item = DatasetIDBuf>> {
-        let read_dir = std::fs::read_dir(&self.workspace_layout.metadata_dir).unwrap();
+        let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).unwrap();
         Box::new(ListDatasetsIter { rd: read_dir })
     }
 
     fn get_metadata_chain(&self, dataset_id: &DatasetID) -> Result<Box<dyn MetadataChain>, Error> {
-        let path = self.workspace_layout.metadata_dir.join(dataset_id.as_str());
+        let path = self.workspace_layout.datasets_dir.join(dataset_id.as_str());
         if !path.exists() {
             Err(Error::DoesNotExist {
                 kind: ResourceKind::Dataset,

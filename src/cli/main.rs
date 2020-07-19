@@ -2,29 +2,24 @@
 
 mod cli_parser;
 mod commands;
+mod error;
 
 use commands::*;
+use error::Error;
 use kamu::domain::*;
 use kamu::infra::*;
 
 use clap::value_t_or_exit;
 use console::style;
 use std::backtrace::BacktraceStatus;
-use std::error::Error;
+use std::error::Error as StdError;
 use std::path::PathBuf;
 
 const BINARY_NAME: &str = "kamu-rs";
 const VERSION: &str = "0.0.1";
 
 fn main() {
-    let kamu_root = PathBuf::from(".kamu");
-
-    let workspace_layout = WorkspaceLayout {
-        metadata_dir: kamu_root.join("datasets"),
-        remotes_dir: kamu_root.join("remotes"),
-        local_volume_dir: PathBuf::from(".kamu.local"),
-    };
-
+    let workspace_layout = find_workspace();
     let metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
 
     let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
@@ -36,6 +31,7 @@ fn main() {
     };
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
+        ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
         ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             &metadata_repo,
@@ -63,26 +59,36 @@ fn main() {
         _ => panic!("Unrecognized command"),
     };
 
-    let ok = if command.needs_workspace() && !workspace_layout.metadata_dir.exists() {
-        // TODO: Make into error
-        eprintln!("Error: Not a kamu workspace");
-        false
+    let result = if command.needs_workspace() && !workspace_layout.kamu_root_dir.is_dir() {
+        Err(Error::NotInWorkspace)
     } else {
-        match command.run() {
-            Ok(_) => true,
-            Err(err) => {
-                eprintln!("[{}] {}", style("ERROR").red(), err);
-                if let Some(bt) = err.backtrace() {
-                    if bt.status() == BacktraceStatus::Captured {
-                        eprintln!("\nBacktrace:\n{}", style(bt).dim());
-                    }
-                }
-                false
-            }
-        }
+        command.run()
     };
 
-    if !ok {
-        std::process::exit(1);
+    match result {
+        Ok(_) => (),
+        Err(err) => {
+            display_error(err);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn find_workspace() -> WorkspaceLayout {
+    let kamu_root_dir = PathBuf::from(".kamu");
+    WorkspaceLayout {
+        kamu_root_dir: kamu_root_dir.clone(),
+        datasets_dir: kamu_root_dir.join("datasets"),
+        remotes_dir: kamu_root_dir.join("remotes"),
+        local_volume_dir: PathBuf::from(".kamu.local"),
+    }
+}
+
+fn display_error(err: Error) {
+    eprintln!("{}: {}", style("Error").red(), err);
+    if let Some(bt) = err.backtrace() {
+        if bt.status() == BacktraceStatus::Captured {
+            eprintln!("\nBacktrace:\n{}", style(bt).dim());
+        }
     }
 }

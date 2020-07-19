@@ -3,8 +3,10 @@ use std::path::PathBuf;
 /// Describes the layout of the workspace on disk
 #[derive(Debug, Clone)]
 pub struct WorkspaceLayout {
+    /// Root directory of all metadata and configuration
+    pub kamu_root_dir: PathBuf,
     /// Contains dataset metadata
-    pub metadata_dir: PathBuf,
+    pub datasets_dir: PathBuf,
     /// Contains remote definitions
     pub remotes_dir: PathBuf,
     /// Root directory of a local storage volume
