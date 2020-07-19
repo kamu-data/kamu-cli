@@ -1,15 +1,25 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
 
-pub fn cli() -> App<'static, 'static> {
-    App::new("kamu")
+pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'static> {
+    App::new(binary_name)
         .global_settings(&[AppSettings::ColoredHelp])
         .settings(&[AppSettings::SubcommandRequiredElseHelp])
-        .version("1.0") // TODO: get true version
+        .version(version) // TODO: get true version
         .arg(
             Arg::with_name("v")
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity (repeat for more)"),
+        )
+        .subcommand(
+            SubCommand::with_name("add")
+                .about("Add a new dataset or modify existing one")
+                .arg(
+                    Arg::with_name("snapshot")
+                        .multiple(true)
+                        .index(1)
+                        .help("Path or URL of a file containing the dataset snapshot"),
+                ),
         )
         .subcommand(SubCommand::with_name("list").about("List all datasets in the workspace"))
         .subcommand(
@@ -24,12 +34,24 @@ pub fn cli() -> App<'static, 'static> {
         )
         .subcommand(
             SubCommand::with_name("pull")
-                .about("controls testing features")
+                .about("Pull new data into the datasets")
+                .arg(
+                    Arg::with_name("all")
+                        .short("a")
+                        .long("all")
+                        .help("Pull all datasets in the workspace"),
+                )
+                .arg(
+                    Arg::with_name("recursive")
+                        .short("r")
+                        .long("recursive")
+                        .help("Also pull all transitive dependencies of specified datasets"),
+                )
                 .arg(
                     Arg::with_name("dataset")
-                        .required(true)
+                        .multiple(true)
                         .index(1)
-                        .help("asdasd"),
+                        .help("IDs of the dataset"),
                 ),
         )
         .subcommand(
@@ -61,5 +83,11 @@ pub fn cli() -> App<'static, 'static> {
                         .required(true)
                         .possible_values(&Shell::variants()),
                 ),
+        )
+        .subcommand(
+            SubCommand::with_name("complete")
+                .about("Completes a command in the shell")
+                .arg(Arg::with_name("input").required(true).index(1))
+                .arg(Arg::with_name("current").required(true).index(2)),
         )
 }

@@ -29,6 +29,8 @@ parquet = { git = "https://github.com/apache/arrow" }
 
 # UI
 clap = "*"
+shlex = "*"  # Parsing partial input for custom completions
+glob = "*"  # Used for path completions
 console = "*"  # Terminal colors
 indicatif = "*"  # Progress bars and spinners
 

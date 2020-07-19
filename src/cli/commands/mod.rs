@@ -1,11 +1,15 @@
 pub use kamu::domain::Error;
 
+mod complete_command;
+mod completions_command;
 mod list_command;
 mod log_command;
 mod pull_command;
 mod sql_server_command;
 mod sql_shell_command;
 
+pub use complete_command::CompleteCommand;
+pub use completions_command::CompletionsCommand;
 pub use list_command::ListCommand;
 pub use log_command::LogCommand;
 pub use pull_command::PullCommand;

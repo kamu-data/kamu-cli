@@ -13,6 +13,9 @@ use std::backtrace::BacktraceStatus;
 use std::error::Error;
 use std::path::PathBuf;
 
+const BINARY_NAME: &str = "kamu-rs";
+const VERSION: &str = "0.0.1";
+
 fn main() {
     let kamu_root = PathBuf::from(".kamu");
 
@@ -24,7 +27,7 @@ fn main() {
 
     let metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
 
-    let matches = cli_parser::cli().get_matches();
+    let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
 
     // Verboseness
     match matches.occurrences_of("v") {
@@ -47,11 +50,16 @@ fn main() {
             )),
             _ => panic!("Unrecognized command"),
         },
-        ("completions", Some(submatches)) => {
-            let shell = value_t_or_exit!(submatches.value_of("shell"), clap::Shell);
-            cli_parser::cli().gen_completions_to("kamu-rs", shell, &mut std::io::stdout());
-            Box::new(NoOpCommand)
-        }
+        ("completions", Some(submatches)) => Box::new(CompletionsCommand::new(
+            cli_parser::cli(BINARY_NAME, VERSION),
+            value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
+        )),
+        ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
+            &metadata_repo,
+            cli_parser::cli(BINARY_NAME, VERSION),
+            submatches.value_of("input").unwrap().into(),
+            submatches.value_of("current").unwrap().parse().unwrap(),
+        )),
         _ => panic!("Unrecognized command"),
     };
 
@@ -63,7 +71,6 @@ fn main() {
         match command.run() {
             Ok(_) => true,
             Err(err) => {
-                // TODO: Missing colors
                 eprintln!("[{}] {}", style("ERROR").red(), err);
                 if let Some(bt) = err.backtrace() {
                     if bt.status() == BacktraceStatus::Captured {
