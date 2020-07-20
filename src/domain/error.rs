@@ -7,7 +7,7 @@ pub enum ResourceKind {
 }
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum DomainError {
     #[error("{kind:?} {id} does not exist")]
     DoesNotExist {
         kind: ResourceKind,
@@ -35,4 +35,39 @@ pub enum Error {
         to_id: String,
         backtrace: Backtrace,
     },
+    #[error("{0}")]
+    InfraError(Box<dyn std::error::Error>),
+}
+
+impl DomainError {
+    pub fn already_exists(kind: ResourceKind, id: String) -> DomainError {
+        DomainError::AlreadyExists {
+            kind: kind,
+            id: id,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn does_not_exist(kind: ResourceKind, id: String) -> DomainError {
+        DomainError::DoesNotExist {
+            kind: kind,
+            id: id,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn missing_reference(
+        from_kind: ResourceKind,
+        from_id: String,
+        to_kind: ResourceKind,
+        to_id: String,
+    ) -> DomainError {
+        DomainError::MissingReference {
+            from_kind: from_kind,
+            from_id: from_id,
+            to_kind: to_kind,
+            to_id: to_id,
+            backtrace: Backtrace::capture(),
+        }
+    }
 }

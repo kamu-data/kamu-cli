@@ -17,6 +17,7 @@ name = "kamu"
 # Domain
 chrono = { version = "*", features = ["serde"] }
 intervals-general = "*"
+rust-crypto = "*"  # Data and metadata hashing
 
 # Serialization
 flatbuffers = "*"
@@ -26,6 +27,9 @@ serde_yaml = "*"
 
 # Data
 parquet = { git = "https://github.com/apache/arrow" }
+
+# Ingest
+url = "*"
 
 # UI
 clap = "*"
@@ -38,3 +42,4 @@ indicatif = "*"  # Progress bars and spinners
 regex = "*"
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
+

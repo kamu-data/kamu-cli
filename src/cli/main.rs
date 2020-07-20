@@ -20,7 +20,8 @@ const VERSION: &str = "0.0.1";
 
 fn main() {
     let workspace_layout = find_workspace();
-    let metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
+    let mut metadata_repo = MetadataRepositoryFs::new(workspace_layout.clone());
+    let mut dataset_svc = DatasetServiceImpl::new(&mut metadata_repo);
 
     let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
 
@@ -31,6 +32,20 @@ fn main() {
     };
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
+        ("add", Some(submatches)) => Box::new(AddCommand::new(
+            &mut dataset_svc,
+            submatches.values_of("snapshot").unwrap(),
+        )),
+        ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
+            &metadata_repo,
+            cli_parser::cli(BINARY_NAME, VERSION),
+            submatches.value_of("input").unwrap().into(),
+            submatches.value_of("current").unwrap().parse().unwrap(),
+        )),
+        ("completions", Some(submatches)) => Box::new(CompletionsCommand::new(
+            cli_parser::cli(BINARY_NAME, VERSION),
+            value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
+        )),
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
         ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
@@ -46,16 +61,6 @@ fn main() {
             )),
             _ => panic!("Unrecognized command"),
         },
-        ("completions", Some(submatches)) => Box::new(CompletionsCommand::new(
-            cli_parser::cli(BINARY_NAME, VERSION),
-            value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
-        )),
-        ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
-            &metadata_repo,
-            cli_parser::cli(BINARY_NAME, VERSION),
-            submatches.value_of("input").unwrap().into(),
-            submatches.value_of("current").unwrap().parse().unwrap(),
-        )),
         _ => panic!("Unrecognized command"),
     };
 

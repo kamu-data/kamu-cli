@@ -12,20 +12,32 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .help("Sets the level of verbosity (repeat for more)"),
         )
         .subcommands(vec![
-            SubCommand::with_name("init")
-                .about("Initialize the workspace in the current directory")
-                .arg(
-                    Arg::with_name("pull_images")
-                        .long("pull-images")
-                        .help("Only pull docker images and exit"),
-                ),
             SubCommand::with_name("add")
                 .about("Add a new dataset or modify existing one")
                 .arg(
                     Arg::with_name("snapshot")
                         .multiple(true)
                         .index(1)
-                        .help("Path or URL of a file containing the dataset snapshot"),
+                        .help("References to files containing the dataset snapshot (path / URL / remote dataset)"),
+                ),
+            SubCommand::with_name("complete")
+                .about("Completes a command in the shell")
+                .arg(Arg::with_name("input").required(true).index(1))
+                .arg(Arg::with_name("current").required(true).index(2)),
+            SubCommand::with_name("completions")
+                .about("Generate tab-completion scripts for your shell")
+                .after_help("HOWTOOOOOOOOOOOOOOOO")
+                .arg(
+                    Arg::with_name("shell")
+                        .required(true)
+                        .possible_values(&Shell::variants()),
+                ),
+            SubCommand::with_name("init")
+                .about("Initialize the workspace in the current directory")
+                .arg(
+                    Arg::with_name("pull_images")
+                        .long("pull-images")
+                        .help("Only pull docker images and exit"),
                 ),
             SubCommand::with_name("list").about("List all datasets in the workspace"),
             SubCommand::with_name("log")
@@ -74,17 +86,5 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                                 .help("asdasd"),
                         ),
                 ),
-            SubCommand::with_name("completions")
-                .about("Generate tab-completion scripts for your shell")
-                .after_help("HOWTOOOOOOOOOOOOOOOO")
-                .arg(
-                    Arg::with_name("shell")
-                        .required(true)
-                        .possible_values(&Shell::variants()),
-                ),
-            SubCommand::with_name("complete")
-                .about("Completes a command in the shell")
-                .arg(Arg::with_name("input").required(true).index(1))
-                .arg(Arg::with_name("current").required(true).index(2)),
         ])
 }

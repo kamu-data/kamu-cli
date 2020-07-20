@@ -1,5 +1,11 @@
 pub mod serde;
 
+mod error;
+pub use error::InfraError;
+
+mod dataset_service_impl;
+pub use dataset_service_impl::DatasetServiceImpl;
+
 mod metadata_repository_fs;
 pub use metadata_repository_fs::MetadataRepositoryFs;
 

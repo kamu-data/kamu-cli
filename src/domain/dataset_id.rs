@@ -1,6 +1,6 @@
 use std::borrow;
 use std::cmp;
-use std::convert::TryFrom;
+use std::convert::{AsRef, TryFrom};
 use std::fmt;
 use std::ops;
 
@@ -37,6 +37,18 @@ impl ops::Deref for DatasetID {
 
     fn deref(&self) -> &str {
         &self.0
+    }
+}
+
+impl AsRef<str> for DatasetID {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for DatasetID {
+    fn as_ref(&self) -> &std::path::Path {
+        self.0.as_ref()
     }
 }
 
@@ -84,7 +96,7 @@ impl fmt::Display for DatasetID {
 // DatasetIDBuf (buffer type)
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DatasetIDBuf(String);
 
 impl DatasetIDBuf {
@@ -134,6 +146,18 @@ impl ops::Deref for DatasetIDBuf {
 
     fn deref(&self) -> &DatasetID {
         DatasetID::new_unchecked(&self.0)
+    }
+}
+
+impl AsRef<str> for DatasetIDBuf {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl AsRef<std::path::Path> for DatasetIDBuf {
+    fn as_ref(&self) -> &std::path::Path {
+        self.0.as_ref()
     }
 }
 

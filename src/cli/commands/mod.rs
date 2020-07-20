@@ -1,5 +1,8 @@
 pub use super::error::Error;
 
+mod add_command;
+pub use add_command::AddCommand;
+
 mod complete_command;
 pub use complete_command::CompleteCommand;
 

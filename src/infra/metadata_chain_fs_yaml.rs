@@ -1,6 +1,10 @@
 use crate::domain::*;
 use crate::infra::serde::yaml::*;
+use crate::infra::*;
 
+use crypto::digest::Digest;
+use crypto::sha3::Sha3;
+use std::io::prelude::*;
 use std::path::PathBuf;
 
 pub struct MetadataChainFsYaml {
@@ -12,6 +16,35 @@ impl MetadataChainFsYaml {
     MetadataChainFsYaml {
       meta_path: meta_path,
     }
+  }
+
+  pub fn init(
+    meta_path: PathBuf,
+    first_block: MetadataBlock,
+  ) -> Result<MetadataChainFsYaml, InfraError> {
+    std::fs::create_dir(&meta_path)?;
+    std::fs::create_dir(meta_path.join("blocks"))?;
+    std::fs::create_dir(meta_path.join("refs"))?;
+
+    assert!(first_block.block_hash.is_empty());
+
+    let mut chain = Self::new(meta_path);
+    let first_block_hashed = chain.hash_block(first_block);
+
+    let hash = first_block_hashed.block_hash.clone();
+    chain.write_block(first_block_hashed)?;
+    chain.write_ref(&BlockRef::Head, &hash)?;
+
+    Ok(chain)
+  }
+
+  fn hash_block(&self, block: MetadataBlock) -> MetadataBlock {
+    let mut b = block;
+    let mut digest = Sha3::sha3_256();
+    // TODO: use generated hashers
+    digest.input_str(&b.prev_block_hash);
+    b.block_hash = digest.result_str();
+    b
   }
 
   fn read_block(&self, hash: &str) -> MetadataBlock {
@@ -26,6 +59,35 @@ impl MetadataChainFsYaml {
     ));
     assert_eq!(manifest.kind, "MetadataBlock");
     manifest.content
+  }
+
+  fn write_block(&mut self, block: MetadataBlock) -> Result<(), InfraError> {
+    assert!(
+      !block.block_hash.is_empty(),
+      "Attempt to write non-hashed block"
+    );
+
+    let file = std::fs::File::with_options()
+      .write(true)
+      .create_new(true)
+      .open(self.block_path(&block.block_hash))?;
+
+    let manifest = Manifest {
+      api_version: 1,
+      kind: "MetadataBlock".to_owned(),
+      content: block,
+    };
+
+    serde_yaml::to_writer(file, &manifest)?;
+    Ok(())
+  }
+
+  // TODO: atomicity
+  fn write_ref(&mut self, r: &BlockRef, hash: &str) -> Result<(), InfraError> {
+    let mut file = std::fs::File::create(self.ref_path(r))?;
+    file.write_all(hash.as_bytes())?;
+    file.sync_all()?;
+    Ok(())
   }
 
   fn block_path(&self, hash: &str) -> PathBuf {
