@@ -73,7 +73,7 @@ impl Command for LogCommand<'_> {
     fn run(&mut self) -> Result<(), Error> {
         let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
 
-        for block in chain.list_blocks() {
+        for block in chain.iter_blocks() {
             self.render_block(&block);
             println!();
         }

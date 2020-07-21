@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetSource {
   #[serde(rename_all = "camelCase")]
   Root {
@@ -43,7 +43,7 @@ pub enum DatasetSource {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetVocabulary {
   pub system_time_column: Option<String>,
   pub event_time_column: Option<String>,
@@ -56,7 +56,7 @@ pub struct DatasetVocabulary {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SourceCaching {
   #[serde(rename_all = "camelCase")]
   Forever,
@@ -69,7 +69,7 @@ pub enum SourceCaching {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetSnapshot {
   pub id: DatasetIDBuf,
   pub source: DatasetSource,
@@ -83,7 +83,7 @@ pub struct DatasetSnapshot {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataSlice {
   pub hash: String,
   pub interval: TimeInterval,
@@ -97,7 +97,7 @@ pub struct DataSlice {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MergeStrategy {
   #[serde(rename_all = "camelCase")]
   Append,
@@ -121,7 +121,7 @@ pub enum MergeStrategy {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MetadataBlock {
   pub block_hash: String,
   pub prev_block_hash: String,
@@ -141,7 +141,7 @@ pub struct MetadataBlock {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReadStep {
   #[serde(rename_all = "camelCase")]
   Csv {
@@ -190,7 +190,7 @@ pub enum ReadStep {
 
 #[skip_serializing_none]
 #[serde(rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Transform {
   pub engine: String,
   #[serde(flatten)]
@@ -204,7 +204,7 @@ pub struct Transform {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FetchStep {
   #[serde(rename_all = "camelCase")]
   Url {
@@ -223,7 +223,7 @@ pub enum FetchStep {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SourceOrdering {
   ByEventTime,
   ByName,
@@ -236,7 +236,7 @@ pub enum SourceOrdering {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrepStep {
   #[serde(rename_all = "camelCase")]
   Decompress {
@@ -249,7 +249,7 @@ pub enum PrepStep {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CompressionFormat {
   Gzip,
   Zip,
@@ -262,7 +262,7 @@ pub enum CompressionFormat {
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventTimeSource {
   #[serde(rename_all = "camelCase")]
   FromPath {

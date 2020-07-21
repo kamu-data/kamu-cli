@@ -7,61 +7,67 @@ use crypto::sha3::Sha3;
 use std::io::prelude::*;
 use std::path::PathBuf;
 
-pub struct MetadataChainFsYaml {
+pub struct MetadataChainImpl {
   meta_path: PathBuf,
 }
 
-impl MetadataChainFsYaml {
-  pub fn new(meta_path: PathBuf) -> MetadataChainFsYaml {
-    MetadataChainFsYaml {
+impl MetadataChainImpl {
+  pub fn new(meta_path: PathBuf) -> Self {
+    Self {
       meta_path: meta_path,
     }
   }
 
-  pub fn init(
+  pub fn create(
     meta_path: PathBuf,
     first_block: MetadataBlock,
-  ) -> Result<MetadataChainFsYaml, InfraError> {
+  ) -> Result<(Self, String), InfraError> {
     std::fs::create_dir(&meta_path)?;
     std::fs::create_dir(meta_path.join("blocks"))?;
     std::fs::create_dir(meta_path.join("refs"))?;
 
-    assert!(first_block.block_hash.is_empty());
-
     let mut chain = Self::new(meta_path);
-    let first_block_hashed = chain.hash_block(first_block);
+    let first_block_hashed = chain.hashed(first_block);
 
-    let hash = first_block_hashed.block_hash.clone();
-    chain.write_block(first_block_hashed)?;
-    chain.write_ref(&BlockRef::Head, &hash)?;
+    chain.write_block(&first_block_hashed)?;
+    chain.write_ref(&BlockRef::Head, &first_block_hashed.block_hash)?;
 
-    Ok(chain)
+    Ok((chain, first_block_hashed.block_hash))
   }
 
-  fn hash_block(&self, block: MetadataBlock) -> MetadataBlock {
-    let mut b = block;
+  pub fn block_hash(block: &MetadataBlock) -> String {
     let mut digest = Sha3::sha3_256();
     // TODO: use generated hashers
-    digest.input_str(&b.prev_block_hash);
-    b.block_hash = digest.result_str();
+    digest.input_str(&block.prev_block_hash);
+    digest.result_str()
+  }
+
+  fn hashed(&self, block: MetadataBlock) -> MetadataBlock {
+    assert!(block.block_hash.is_empty(), "Got an already hashed block");
+    let mut b = block;
+    b.block_hash = Self::block_hash(&b);
     b
   }
 
   fn read_block(&self, hash: &str) -> MetadataBlock {
     let path = self.block_path(hash);
-    let file = std::fs::File::open(path.clone()).expect(&format!(
-      "Failed to open the block file at: {}",
-      path.display()
-    ));
-    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).expect(&format!(
-      "Failed to deserialize the MetadataBlock at: {}",
-      path.display()
-    ));
+
+    let file = std::fs::File::open(path.clone())
+      .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
+
+    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+      panic!(
+        "Failed to deserialize the MetadataBlock at {}: {}",
+        path.display(),
+        e
+      )
+    });
+
     assert_eq!(manifest.kind, "MetadataBlock");
     manifest.content
   }
 
-  fn write_block(&mut self, block: MetadataBlock) -> Result<(), InfraError> {
+  fn write_block(&mut self, block: &MetadataBlock) -> Result<(), InfraError> {
     assert!(
       !block.block_hash.is_empty(),
       "Attempt to write non-hashed block"
@@ -107,23 +113,51 @@ impl MetadataChainFsYaml {
   }
 }
 
-impl MetadataChain for MetadataChainFsYaml {
-  fn read_ref(&self, r: &BlockRef) -> String {
+impl MetadataChain for MetadataChainImpl {
+  fn read_ref(&self, r: &BlockRef) -> Option<String> {
     let path = self.ref_path(r);
-    std::fs::read_to_string(&path).expect(&format!("Failed to read ref at: {}", path.display()))
+    if !path.exists() {
+      None
+    } else {
+      Some(
+        std::fs::read_to_string(&path)
+          .unwrap_or_else(|e| panic!("Failed to read ref at {}: {}", path.display(), e)),
+      )
+    }
   }
 
-  fn list_blocks_ref<'c>(&'c self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock> + 'c> {
-    let hash = self.read_ref(r);
+  fn iter_blocks_ref<'c>(&'c self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock> + 'c> {
+    let hash = self
+      .read_ref(r)
+      .unwrap_or_else(|| panic!("Ref {:?} does not exist", r));
+
     Box::new(MetadataBlockIter {
       chain: &self,
       next_hash: Some(hash),
     })
   }
+
+  fn append_ref(&mut self, r: &BlockRef, block: MetadataBlock) -> String {
+    let last_hash = self
+      .read_ref(r)
+      .unwrap_or_else(|| panic!("Ref {:?} does not exist", r));
+
+    assert_eq!(
+      block.prev_block_hash, last_hash,
+      "New block doesn't specify correct prev block hash"
+    );
+
+    let block_hashed = self.hashed(block);
+
+    self.write_block(&block_hashed).unwrap();
+    self.write_ref(r, &block_hashed.block_hash).unwrap();
+
+    block_hashed.block_hash
+  }
 }
 
 struct MetadataBlockIter<'c> {
-  chain: &'c MetadataChainFsYaml,
+  chain: &'c MetadataChainImpl,
   next_hash: Option<String>,
 }
 

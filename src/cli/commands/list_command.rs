@@ -15,7 +15,7 @@ impl ListCommand<'_> {
 
 impl Command for ListCommand<'_> {
     fn run(&mut self) -> Result<(), Error> {
-        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.list_datasets().collect();
+        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.iter_datasets().collect();
 
         datasets.sort();
 

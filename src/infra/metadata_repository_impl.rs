@@ -6,13 +6,13 @@ use chrono::Utc;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
-pub struct MetadataRepositoryFs {
+pub struct MetadataRepositoryImpl {
     workspace_layout: WorkspaceLayout,
 }
 
-impl MetadataRepositoryFs {
-    pub fn new(workspace_layout: WorkspaceLayout) -> MetadataRepositoryFs {
-        MetadataRepositoryFs {
+impl MetadataRepositoryImpl {
+    pub fn new(workspace_layout: WorkspaceLayout) -> Self {
+        Self {
             workspace_layout: workspace_layout,
         }
     }
@@ -27,8 +27,8 @@ impl MetadataRepositoryFs {
     }
 }
 
-impl MetadataRepository for MetadataRepositoryFs {
-    fn list_datasets(&self) -> Box<dyn Iterator<Item = DatasetIDBuf>> {
+impl MetadataRepository for MetadataRepositoryImpl {
+    fn iter_datasets(&self) -> Box<dyn Iterator<Item = DatasetIDBuf>> {
         let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).unwrap();
         Box::new(ListDatasetsIter { rd: read_dir })
     }
@@ -69,7 +69,7 @@ impl MetadataRepository for MetadataRepositoryFs {
             input_slices: None,
         };
 
-        MetadataChainFsYaml::init(dataset_metadata_dir, first_block).map_err(|e| e.into())?;
+        MetadataChainImpl::create(dataset_metadata_dir, first_block).map_err(|e| e.into())?;
         Ok(())
     }
 
@@ -84,7 +84,7 @@ impl MetadataRepository for MetadataRepositoryFs {
                 (dataset_id as &str).to_owned(),
             ))
         } else {
-            Ok(Box::new(MetadataChainFsYaml::new(path)))
+            Ok(Box::new(MetadataChainImpl::new(path)))
         }
     }
 }

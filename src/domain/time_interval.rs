@@ -9,7 +9,7 @@ use std::fmt;
 
 type Element = DateTime<Utc>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TimeInterval(Interval<Element>);
 
 #[derive(Debug, Clone)]

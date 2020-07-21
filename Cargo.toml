@@ -42,4 +42,4 @@ indicatif = "*"  # Progress bars and spinners
 regex = "*"
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
-
+tempfile = "*"

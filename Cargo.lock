@@ -719,6 +719,7 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "shlex",
+ "tempfile",
  "thiserror",
  "url",
 ]
