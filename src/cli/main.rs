@@ -57,9 +57,9 @@ fn main() {
         ("pull", Some(submatches)) => Box::new(PullCommand::new(
             &metadata_repo,
             &mut ingest_svc,
-            submatches.values_of("dataset").unwrap(),
-            value_t_or_exit!(submatches.value_of("all"), bool),
-            value_t_or_exit!(submatches.value_of("recursive"), bool),
+            submatches.values_of("dataset").unwrap_or_default(),
+            submatches.is_present("all"),
+            submatches.is_present("recursive"),
         )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new()),
@@ -98,10 +98,10 @@ fn find_workspace() -> WorkspaceLayout {
 }
 
 fn display_error(err: Error) {
-    eprintln!("{}: {}", style("Error").red(), err);
+    eprintln!("{}: {}", style("Error").red().bold(), err);
     if let Some(bt) = err.backtrace() {
         if bt.status() == BacktraceStatus::Captured {
-            eprintln!("\nBacktrace:\n{}", style(bt).dim());
+            eprintln!("\nBacktrace:\n{}", style(bt).dim().bold());
         }
     }
 }

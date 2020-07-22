@@ -12,6 +12,8 @@ pub trait MetadataRepository {
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)>;
 
+    // TODO: Separate mutable and immutable paths
+    // See: https://github.com/rust-lang/rfcs/issues/2035
     fn get_metadata_chain(
         &self,
         dataset_id: &DatasetID,

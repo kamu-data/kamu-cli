@@ -6,6 +6,8 @@ pub enum BlockRef {
     Head,
 }
 
+// TODO: Separate mutable and immutable traits
+// See: https://github.com/rust-lang/rfcs/issues/2035
 pub trait MetadataChain {
     fn read_ref(&self, r: &BlockRef) -> Option<String>;
 
