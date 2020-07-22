@@ -25,6 +25,12 @@ impl MetadataRepositoryImpl {
     fn get_dataset_metadata_dir(&self, id: &DatasetID) -> PathBuf {
         self.workspace_layout.datasets_dir.join(id)
     }
+
+    fn sort_snapshots_in_dependency_order(&self, snapshots: &mut Vec<DatasetSnapshot>) {
+        if snapshots.len() > 1 {
+            unimplemented!();
+        }
+    }
 }
 
 impl MetadataRepository for MetadataRepositoryImpl {
@@ -71,6 +77,23 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
         MetadataChainImpl::create(dataset_metadata_dir, first_block).map_err(|e| e.into())?;
         Ok(())
+    }
+
+    fn add_datasets(
+        &mut self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)> {
+        let mut snapshots_ordered = snapshots;
+        self.sort_snapshots_in_dependency_order(&mut snapshots_ordered);
+
+        snapshots_ordered
+            .into_iter()
+            .map(|s| {
+                let id = s.id.clone();
+                let res = self.add_dataset(s);
+                (id, res)
+            })
+            .collect()
     }
 
     fn get_metadata_chain(

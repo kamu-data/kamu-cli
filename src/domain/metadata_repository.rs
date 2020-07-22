@@ -7,6 +7,11 @@ pub trait MetadataRepository {
 
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError>;
 
+    fn add_datasets(
+        &mut self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)>;
+
     fn get_metadata_chain(
         &self,
         dataset_id: &DatasetID,

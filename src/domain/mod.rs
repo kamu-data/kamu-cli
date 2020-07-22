@@ -1,23 +1,26 @@
 // Data structures
 
 mod error;
-pub use error::{DomainError, ResourceKind};
+pub use error::*;
 
 mod grammar;
 
 mod dataset_id;
-pub use dataset_id::{DatasetID, DatasetIDBuf, InvalidDatasetID};
+pub use dataset_id::*;
 
 mod time_interval;
-pub use time_interval::TimeInterval;
+pub use time_interval::*;
 
 // Services
 
-mod dataset_service;
-pub use dataset_service::DatasetService;
+mod ingest_service;
+pub use ingest_service::*;
 
 mod metadata_chain;
-pub use metadata_chain::{BlockRef, MetadataChain};
+pub use metadata_chain::*;
 
 mod metadata_repository;
-pub use metadata_repository::MetadataRepository;
+pub use metadata_repository::*;
+
+mod resource_loader;
+pub use resource_loader::*;

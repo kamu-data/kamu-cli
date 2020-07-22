@@ -5,7 +5,7 @@ mod commands;
 mod error;
 
 use commands::*;
-use error::Error;
+use error::*;
 use kamu::domain::*;
 use kamu::infra::*;
 
@@ -21,7 +21,8 @@ const VERSION: &str = "0.0.1";
 fn main() {
     let workspace_layout = find_workspace();
     let mut metadata_repo = MetadataRepositoryImpl::new(workspace_layout.clone());
-    let mut dataset_svc = DatasetServiceImpl::new(&mut metadata_repo);
+    let mut resource_loader = ResourceLoaderImpl::new();
+    let mut ingest_svc = IngestServiceImpl::new();
 
     let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
 
@@ -33,7 +34,8 @@ fn main() {
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
-            &mut dataset_svc,
+            &mut resource_loader,
+            &mut metadata_repo,
             submatches.values_of("snapshot").unwrap(),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
@@ -52,7 +54,13 @@ fn main() {
             &metadata_repo,
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
         )),
-        ("pull", Some(_)) => Box::new(PullCommand::new()),
+        ("pull", Some(submatches)) => Box::new(PullCommand::new(
+            &metadata_repo,
+            &mut ingest_svc,
+            submatches.values_of("dataset").unwrap(),
+            value_t_or_exit!(submatches.value_of("all"), bool),
+            value_t_or_exit!(submatches.value_of("recursive"), bool),
+        )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new()),
             ("server", Some(server_matches)) => Box::new(SqlServerCommand::new(

@@ -2,17 +2,23 @@ use super::{Command, Error};
 use kamu::domain::*;
 
 pub struct AddCommand<'a> {
-    dataset_service: &'a mut dyn DatasetService,
+    resource_loader: &'a mut dyn ResourceLoader,
+    metadata_repo: &'a mut dyn MetadataRepository,
     snapshot_refs: Vec<String>,
 }
 
 impl AddCommand<'_> {
-    pub fn new<'a, I>(dataset_service: &mut dyn DatasetService, snapshot_refs_iter: I) -> AddCommand
+    pub fn new<'a, I>(
+        resource_loader: &'a mut dyn ResourceLoader,
+        metadata_repo: &'a mut dyn MetadataRepository,
+        snapshot_refs_iter: I,
+    ) -> AddCommand<'a>
     where
         I: Iterator<Item = &'a str>,
     {
         AddCommand {
-            dataset_service: dataset_service,
+            resource_loader: resource_loader,
+            metadata_repo: metadata_repo,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
         }
     }
@@ -23,7 +29,7 @@ impl Command for AddCommand<'_> {
         let results: Vec<_> = self
             .snapshot_refs
             .iter()
-            .map(|r| self.dataset_service.load_snapshot_from_ref(r))
+            .map(|r| self.resource_loader.load_dataset_snapshot_from_ref(r))
             .collect();
 
         let snapshots: Vec<_> = results
@@ -47,10 +53,7 @@ impl Command for AddCommand<'_> {
             return Err(Error::Aborted);
         }
 
-        for (id, res) in self
-            .dataset_service
-            .create_datasets_from_snapshots(snapshots)
-        {
+        for (id, res) in self.metadata_repo.add_datasets(snapshots) {
             match res {
                 Ok(_) => eprintln!("Added: {}", id),
                 Err(err) => eprintln!("Failed: {} - {}", id, err),
