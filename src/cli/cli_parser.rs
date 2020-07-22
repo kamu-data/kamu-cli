@@ -18,7 +18,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("snapshot")
                         .multiple(true)
                         .index(1)
-                        .help("References to files containing the dataset snapshot (path / URL / remote dataset)"),
+                        .help("Dataset snapshot reference(s) (path, URL, or remote)"),
                 ),
             SubCommand::with_name("complete")
                 .about("Completes a command in the shell")
@@ -66,7 +66,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .help("IDs of the dataset"),
+                        .help("Dataset ID(s)"),
                 ),
             SubCommand::with_name("sql")
                 .about("controls testing features")
