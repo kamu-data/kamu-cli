@@ -1,6 +1,5 @@
 use super::{Command, Error};
 use kamu::domain::*;
-use kamu::infra::*;
 
 use glob;
 use std::cell::RefCell;
@@ -90,7 +89,7 @@ impl Command for CompleteCommand {
         let mut last_cmd = &self.app.p;
 
         // Establish command context
-        for (i, arg) in args[1..].iter().enumerate() {
+        for arg in args[1..].iter() {
             for s in last_cmd.subcommands.iter() {
                 if s.p.meta.name == *arg {
                     last_cmd = &s.p;

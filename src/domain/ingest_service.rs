@@ -1,6 +1,5 @@
 use crate::domain::{DatasetID, DatasetIDBuf};
 
-use std::backtrace::Backtrace;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////

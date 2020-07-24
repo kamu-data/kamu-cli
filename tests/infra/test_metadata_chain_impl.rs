@@ -1,6 +1,5 @@
 use crate::utils::MetadataFactory;
 use kamu::domain::*;
-use kamu::infra::serde::yaml::*;
 use kamu::infra::*;
 
 macro_rules! assert_err {

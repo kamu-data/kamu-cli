@@ -1,6 +1,5 @@
 use chrono::prelude::*;
 use indoc::indoc;
-use serde_yaml::{Mapping, Value};
 use std::convert::TryFrom;
 
 use kamu::domain::*;
@@ -39,7 +38,7 @@ macro_rules! yaml_seq(
     );
 );
 
-fn yaml_str(s: &str) -> Value {
+fn yaml_str(s: &str) -> serde_yaml::Value {
     serde_yaml::to_value(s).unwrap()
 }
 

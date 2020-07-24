@@ -1,5 +1,4 @@
 use super::DomainError;
-use crate::domain::DatasetIDBuf;
 use crate::infra::serde::yaml::DatasetSnapshot;
 
 pub trait ResourceLoader {

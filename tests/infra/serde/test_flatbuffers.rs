@@ -1,8 +1,9 @@
+/*
 use kamu::domain::*;
 use kamu::infra::serde::flatbuffers::*;
 use std::io;
 
-/*
+
 #[test]
 fn to_and_from() -> Result<()> {
     let block = MetadataBlock {
