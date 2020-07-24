@@ -39,6 +39,7 @@ console = "*"  # Terminal colors
 indicatif = "*"  # Progress bars and spinners
 
 # Utils
+rand = "*"
 regex = "*"
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations

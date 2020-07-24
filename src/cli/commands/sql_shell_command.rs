@@ -3,8 +3,8 @@ use super::{Command, Error};
 pub struct SqlShellCommand {}
 
 impl SqlShellCommand {
-    pub fn new() -> SqlShellCommand {
-        SqlShellCommand {}
+    pub fn new() -> Self {
+        Self {}
     }
 }
 

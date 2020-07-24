@@ -713,6 +713,7 @@ dependencies = [
  "indoc",
  "intervals-general",
  "parquet",
+ "rand 0.3.23",
  "regex",
  "rust-crypto",
  "serde",

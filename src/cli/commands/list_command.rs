@@ -1,21 +1,24 @@
 use super::{Command, Error};
 use kamu::domain::*;
 
-pub struct ListCommand<'a> {
-    metadata_repo: &'a dyn MetadataRepository,
+use std::cell::RefCell;
+use std::rc::Rc;
+
+pub struct ListCommand {
+    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
 }
 
-impl ListCommand<'_> {
-    pub fn new(metadata_repo: &dyn MetadataRepository) -> ListCommand {
-        ListCommand {
+impl ListCommand {
+    pub fn new(metadata_repo: Rc<RefCell<dyn MetadataRepository>>) -> Self {
+        Self {
             metadata_repo: metadata_repo,
         }
     }
 }
 
-impl Command for ListCommand<'_> {
+impl Command for ListCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.iter_datasets().collect();
+        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.borrow().iter_datasets().collect();
 
         datasets.sort();
 

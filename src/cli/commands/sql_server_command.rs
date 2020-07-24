@@ -1,4 +1,5 @@
 use super::{Command, Error};
+
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use std::fs::File;
 use std::path::Path;
@@ -9,8 +10,8 @@ pub struct SqlServerCommand {
 }
 
 impl SqlServerCommand {
-    pub fn new(address: &str, port: u16) -> SqlServerCommand {
-        SqlServerCommand {
+    pub fn new(address: &str, port: u16) -> Self {
+        Self {
             address: address.to_owned(),
             port: port,
         }

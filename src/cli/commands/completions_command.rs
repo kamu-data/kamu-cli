@@ -20,7 +20,7 @@ pub struct CompletionsCommand {
 
 impl CompletionsCommand {
     pub fn new(app: clap::App<'static, 'static>, shell: clap::Shell) -> Self {
-        CompletionsCommand {
+        Self {
             app: app,
             shell: shell,
         }

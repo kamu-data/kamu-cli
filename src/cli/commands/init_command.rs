@@ -4,19 +4,19 @@ use kamu::infra::*;
 use std::fs;
 use std::io::prelude::*;
 
-pub struct InitCommand<'a> {
-    workspace_layout: &'a WorkspaceLayout,
+pub struct InitCommand {
+    workspace_layout: WorkspaceLayout,
 }
 
-impl InitCommand<'_> {
-    pub fn new<'a>(workspace_layout: &'a WorkspaceLayout) -> InitCommand<'a> {
-        InitCommand {
-            workspace_layout: workspace_layout,
+impl InitCommand {
+    pub fn new<'a>(workspace_layout: &WorkspaceLayout) -> Self {
+        Self {
+            workspace_layout: workspace_layout.clone(),
         }
     }
 }
 
-impl Command for InitCommand<'_> {
+impl Command for InitCommand {
     fn needs_workspace(&self) -> bool {
         false
     }

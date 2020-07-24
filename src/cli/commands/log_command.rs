@@ -3,16 +3,21 @@ use kamu::domain::*;
 use kamu::infra::serde::yaml::*;
 
 use console::style;
+use std::cell::RefCell;
 use std::fmt::Display;
+use std::rc::Rc;
 
-pub struct LogCommand<'a> {
-    metadata_repo: &'a dyn MetadataRepository,
+pub struct LogCommand {
+    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     dataset_id: DatasetIDBuf,
 }
 
-impl LogCommand<'_> {
-    pub fn new(metadata_repo: &dyn MetadataRepository, dataset_id: DatasetIDBuf) -> LogCommand {
-        LogCommand {
+impl LogCommand {
+    pub fn new(
+        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        dataset_id: DatasetIDBuf,
+    ) -> Self {
+        Self {
             metadata_repo: metadata_repo,
             dataset_id: dataset_id,
         }
@@ -69,9 +74,12 @@ impl LogCommand<'_> {
     }
 }
 
-impl Command for LogCommand<'_> {
+impl Command for LogCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
+        let chain = self
+            .metadata_repo
+            .borrow()
+            .get_metadata_chain(&self.dataset_id)?;
 
         for block in chain.iter_blocks() {
             self.render_block(&block);

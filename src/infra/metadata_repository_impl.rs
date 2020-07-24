@@ -11,9 +11,9 @@ pub struct MetadataRepositoryImpl {
 }
 
 impl MetadataRepositoryImpl {
-    pub fn new(workspace_layout: WorkspaceLayout) -> Self {
+    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
-            workspace_layout: workspace_layout,
+            workspace_layout: workspace_layout.clone(),
         }
     }
 

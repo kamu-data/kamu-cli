@@ -161,6 +161,12 @@ impl AsRef<std::path::Path> for DatasetIDBuf {
     }
 }
 
+impl AsRef<DatasetID> for DatasetIDBuf {
+    fn as_ref(&self) -> &DatasetID {
+        DatasetID::new_unchecked(&self.0)
+    }
+}
+
 impl borrow::Borrow<DatasetID> for DatasetIDBuf {
     fn borrow(&self) -> &DatasetID {
         self

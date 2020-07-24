@@ -3,11 +3,13 @@ use kamu::domain::*;
 use kamu::infra::*;
 
 use glob;
+use std::cell::RefCell;
 use std::fs;
 use std::path;
+use std::rc::Rc;
 
-pub struct CompleteCommand<'a> {
-    metadata_repo: &'a dyn MetadataRepository,
+pub struct CompleteCommand {
+    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     app: clap::App<'static, 'static>,
     input: String,
     current: usize,
@@ -15,14 +17,14 @@ pub struct CompleteCommand<'a> {
 
 // TODO: This is an extremely hacky way to implement the completion
 // but we have to do this until clap supports custom completer functions
-impl CompleteCommand<'_> {
-    pub fn new<'a>(
-        metadata_repo: &'a dyn MetadataRepository,
+impl CompleteCommand {
+    pub fn new(
+        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         app: clap::App<'static, 'static>,
         input: String,
         current: usize,
-    ) -> CompleteCommand<'a> {
-        CompleteCommand {
+    ) -> Self {
+        Self {
             metadata_repo: metadata_repo,
             app: app,
             input: input,
@@ -31,7 +33,7 @@ impl CompleteCommand<'_> {
     }
 
     fn complete_dataset(&self, prefix: &str) {
-        for dataset_id in self.metadata_repo.iter_datasets() {
+        for dataset_id in self.metadata_repo.borrow().iter_datasets() {
             if dataset_id.starts_with(prefix) {
                 println!("{}", dataset_id);
             }
@@ -76,7 +78,7 @@ impl CompleteCommand<'_> {
     }
 }
 
-impl Command for CompleteCommand<'_> {
+impl Command for CompleteCommand {
     fn run(&mut self) -> Result<(), Error> {
         let mut args = match shlex::split(&self.input) {
             Some(v) => v,

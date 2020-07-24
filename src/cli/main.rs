@@ -12,17 +12,27 @@ use kamu::infra::*;
 use clap::value_t_or_exit;
 use console::style;
 use std::backtrace::BacktraceStatus;
+use std::cell::RefCell;
 use std::error::Error as StdError;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 const BINARY_NAME: &str = "kamu-rs";
 const VERSION: &str = "0.0.1";
 
 fn main() {
     let workspace_layout = find_workspace();
-    let mut metadata_repo = MetadataRepositoryImpl::new(workspace_layout.clone());
-    let mut resource_loader = ResourceLoaderImpl::new();
-    let mut ingest_svc = IngestServiceImpl::new();
+    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
+    let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
+    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(metadata_repo.clone())));
+    let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
+        metadata_repo.clone(),
+    )));
+    let pull_svc = Rc::new(RefCell::new(PullServiceImpl::new(
+        metadata_repo.clone(),
+        ingest_svc.clone(),
+        transform_svc.clone(),
+    )));
 
     let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
 
@@ -34,12 +44,12 @@ fn main() {
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
-            &mut resource_loader,
-            &mut metadata_repo,
+            resource_loader.clone(),
+            metadata_repo.clone(),
             submatches.values_of("snapshot").unwrap(),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
-            &metadata_repo,
+            metadata_repo.clone(),
             cli_parser::cli(BINARY_NAME, VERSION),
             submatches.value_of("input").unwrap().into(),
             submatches.value_of("current").unwrap().parse().unwrap(),
@@ -49,14 +59,13 @@ fn main() {
             value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
         )),
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
-        ("list", Some(_)) => Box::new(ListCommand::new(&metadata_repo)),
+        ("list", Some(_)) => Box::new(ListCommand::new(metadata_repo.clone())),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
-            &metadata_repo,
+            metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
         )),
         ("pull", Some(submatches)) => Box::new(PullCommand::new(
-            &metadata_repo,
-            &mut ingest_svc,
+            pull_svc.clone(),
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
