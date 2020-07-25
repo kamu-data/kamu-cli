@@ -17,3 +17,6 @@ tempfile = "*"
 
 # TODO: Move to core
 parquet = { git = "https://github.com/apache/arrow" }
+
+[dev-dependencies]
+rand = "*"

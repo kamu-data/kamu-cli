@@ -1,6 +1,5 @@
-use kamu::infra::serde::yaml::*;
-
 use chrono::{SubsecRound, Utc};
+use kamu::infra::serde::yaml::*;
 
 pub struct MetadataFactory;
 

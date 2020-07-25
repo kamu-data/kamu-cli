@@ -635,6 +635,7 @@ dependencies = [
  "flatbuffers 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "indoc 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "intervals-general 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kamu-test 0.1.0",
  "rand 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -656,9 +657,18 @@ dependencies = [
  "indicatif 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "kamu 0.1.0",
  "parquet 1.1.0-SNAPSHOT (git+https://github.com/apache/arrow)",
+ "rand 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "shlex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "thiserror 1.0.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "kamu-test"
+version = "0.1.0"
+dependencies = [
+ "chrono 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "kamu 0.1.0",
 ]
 
 [[package]]

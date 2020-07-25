@@ -20,18 +20,19 @@ pub struct PullCommand {
 }
 
 impl PullCommand {
-    pub fn new<'s, I>(
+    pub fn new<'s, I, S>(
         pull_svc: Rc<RefCell<dyn PullService>>,
         ids: I,
         all: bool,
         recursive: bool,
     ) -> Self
     where
-        I: Iterator<Item = &'s str>,
+        I: Iterator<Item = S>,
+        S: AsRef<str>,
     {
         Self {
             pull_svc: pull_svc,
-            ids: ids.map(|s| s.into()).collect(),
+            ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
             recursive: recursive,
         }
@@ -58,7 +59,7 @@ impl Command for PullCommand {
         let pull_progress = Box::new(PrettyPullProgress::new());
         let pull_progress_in_thread = pull_progress.clone();
 
-        std::thread::spawn(move || {
+        let draw_thread = std::thread::spawn(move || {
             pull_progress_in_thread.draw();
         });
 
@@ -71,6 +72,7 @@ impl Command for PullCommand {
         );
 
         pull_progress.finish();
+        draw_thread.join().unwrap();
 
         let mut updated = 0;
         let mut up_to_date = 0;
@@ -214,7 +216,7 @@ impl PrettyIngestProgress {
         let pb = indicatif::ProgressBar::hidden();
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
-            .template("{spinner:.cyan} {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+            .template("{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
             .progress_chars("#>-"));
         pb.set_prefix(prefix);
         pb.set_length(len);

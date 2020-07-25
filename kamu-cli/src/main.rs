@@ -1,13 +1,10 @@
 #![feature(backtrace)]
 
-mod cli_parser;
-mod commands;
-mod error;
-
-use commands::*;
-use error::*;
 use kamu::domain::*;
 use kamu::infra::*;
+use kamu_cli::cli_parser;
+use kamu_cli::commands::*;
+use kamu_cli::error::*;
 
 use clap::value_t_or_exit;
 use console::style;

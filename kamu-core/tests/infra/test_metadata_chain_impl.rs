@@ -1,6 +1,6 @@
-use crate::utils::MetadataFactory;
 use kamu::domain::*;
 use kamu::infra::*;
+use kamu_test::MetadataFactory;
 
 macro_rules! assert_err {
     ($actual:expr, $expected:pat) => {

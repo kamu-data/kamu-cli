@@ -25,3 +25,6 @@ regex = "*"
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
+
+[dev-dependencies]
+kamu-test = { path = "../kamu-core-test" }
