@@ -1,46 +1,5 @@
-[package]
-name = "kamu-cli"
-version = "0.1.0"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2018"
-default-run = "kamu-rs"
-
-[[bin]]
-name = "kamu-rs"
-path = "src/cli/main.rs"
-
-[lib]
-name = "kamu"
-
-
-[dependencies]
-# Domain
-chrono = { version = "*", features = ["serde"] }
-intervals-general = "*"
-rust-crypto = "*"  # Data and metadata hashing
-
-# Serialization
-flatbuffers = "*"
-serde = { version = "*", features = ["derive"] }
-serde_with = "*"
-serde_yaml = "*"
-
-# Data
-parquet = { git = "https://github.com/apache/arrow" }
-
-# Ingest
-url = "*"
-
-# UI
-clap = "*"
-shlex = "*"  # Parsing partial input for custom completions
-glob = "*"  # Used for path completions
-console = "*"  # Terminal colors
-indicatif = "*"  # Progress bars and spinners
-
-# Utils
-rand = "*"
-regex = "*"
-indoc = "*"  # Compile-time unindent
-thiserror = "*"  # Structured error derivations
-tempfile = "*"
+[workspace]
+members = [
+    "kamu-core",
+    "kamu-cli",
+]

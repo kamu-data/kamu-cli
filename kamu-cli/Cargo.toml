@@ -1,0 +1,19 @@
+[package]
+name = "kamu-cli"
+version = "0.1.0"
+authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+kamu = { path = "../kamu-core" }
+
+clap = "*"
+shlex = "*"  # Parsing partial input for custom completions
+glob = "*"  # Used for path completions
+console = "*"  # Terminal colors
+indicatif = "*"  # Progress bars and spinners
+thiserror = "*"  # Structured error derivations
+tempfile = "*"
+
+# TODO: Move to core
+parquet = { git = "https://github.com/apache/arrow" }
