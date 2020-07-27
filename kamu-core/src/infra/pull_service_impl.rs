@@ -61,16 +61,16 @@ impl PullService for PullServiceImpl {
         transform_listener: Option<Box<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let dataset_ids: Vec<DatasetIDBuf> = if all {
-            self.metadata_repo.borrow().iter_datasets().collect()
+            self.metadata_repo.borrow().get_all_datasets().collect()
         } else if recursive {
-            unimplemented!();
+            unimplemented!()
         } else {
             dataset_ids_iter.map(|id| id.to_owned()).collect()
         };
 
         let mut results: Vec<_> = Vec::new();
 
-        results.extend(
+        /*results.extend(
             self.ingest_svc
                 .borrow_mut()
                 .ingest_multi(
@@ -90,7 +90,7 @@ impl PullService for PullServiceImpl {
                 )
                 .into_iter()
                 .map(|(id, res)| (id, Self::convert_transform_result(res))),
-        );
+        );*/
 
         results
     }

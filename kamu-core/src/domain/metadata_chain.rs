@@ -11,11 +11,11 @@ pub enum BlockRef {
 pub trait MetadataChain {
     fn read_ref(&self, r: &BlockRef) -> Option<String>;
 
-    fn iter_blocks<'c>(&'c self) -> Box<dyn Iterator<Item = MetadataBlock> + 'c> {
+    fn iter_blocks(&self) -> Box<dyn Iterator<Item = MetadataBlock>> {
         self.iter_blocks_ref(&BlockRef::Head)
     }
 
-    fn iter_blocks_ref<'c>(&'c self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock> + 'c>;
+    fn iter_blocks_ref(&self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock>>;
 
     fn append_ref(&mut self, r: &BlockRef, block: MetadataBlock) -> String;
 

@@ -26,6 +26,36 @@ impl MetadataRepositoryImpl {
         self.workspace_layout.datasets_dir.join(id)
     }
 
+    fn get_metadata_chain_impl(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<MetadataChainImpl, DomainError> {
+        let path = self.workspace_layout.datasets_dir.join(dataset_id.as_str());
+        if !path.exists() {
+            Err(DomainError::does_not_exist(
+                ResourceKind::Dataset,
+                (dataset_id as &str).to_owned(),
+            ))
+        } else {
+            Ok(MetadataChainImpl::new(path))
+        }
+    }
+
+    // TODO: Avoid iterating blocks
+    fn get_dependencies(
+        &self,
+        metadata_chain: &MetadataChainImpl,
+    ) -> impl Iterator<Item = DatasetIDBuf> {
+        metadata_chain
+            .iter_blocks()
+            .filter_map(|b| b.source)
+            .filter_map(|s| match s {
+                DatasetSource::Root { .. } => None,
+                DatasetSource::Derivative { inputs, .. } => Some(inputs),
+            })
+            .flatten()
+    }
+
     fn sort_snapshots_in_dependency_order(&self, snapshots: &mut Vec<DatasetSnapshot>) {
         if snapshots.len() > 1 {
             unimplemented!();
@@ -34,9 +64,24 @@ impl MetadataRepositoryImpl {
 }
 
 impl MetadataRepository for MetadataRepositoryImpl {
-    fn iter_datasets(&self) -> Box<dyn Iterator<Item = DatasetIDBuf>> {
+    fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's> {
         let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).unwrap();
         Box::new(ListDatasetsIter { rd: read_dir })
+    }
+
+    fn visit_dataset_dependencies(
+        &self,
+        dataset_id: &DatasetID,
+        visitor: &mut dyn DatasetDependencyVisitor,
+    ) -> Result<(), DomainError> {
+        let meta_chain = self.get_metadata_chain_impl(dataset_id)?;
+        if visitor.enter(dataset_id, &meta_chain) {
+            for input in self.get_dependencies(&meta_chain) {
+                self.visit_dataset_dependencies(&input, visitor)?;
+            }
+            visitor.exit(dataset_id, &meta_chain);
+        }
+        Ok(())
     }
 
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError> {
@@ -100,15 +145,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Box<dyn MetadataChain>, DomainError> {
-        let path = self.workspace_layout.datasets_dir.join(dataset_id.as_str());
-        if !path.exists() {
-            Err(DomainError::does_not_exist(
-                ResourceKind::Dataset,
-                (dataset_id as &str).to_owned(),
-            ))
-        } else {
-            Ok(Box::new(MetadataChainImpl::new(path)))
-        }
+        self.get_metadata_chain_impl(dataset_id)
+            .map(|c| Box::new(c) as Box<dyn MetadataChain>)
     }
 }
 

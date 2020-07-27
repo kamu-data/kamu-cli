@@ -19,60 +19,7 @@ impl IngestServiceImpl {
         dataset_id: &DatasetID,
         listener: &mut dyn IngestListener,
     ) -> Result<IngestResult, IngestError> {
-        let scale: f32 = rand::random();
-
-        listener.begin();
-
-        std::thread::sleep_ms((2000 as f32 * scale) as u32);
-        listener.on_stage_progress(IngestStage::CheckCache, 0, 0);
-        std::thread::sleep_ms((2000 as f32 * scale) as u32);
-
-        let chance: f32 = rand::random();
-        if rand::random::<f32>() < 0.3 {
-            let error = IngestError::FetchError;
-            listener.error(IngestStage::CheckCache, &error);
-            Err(error)
-        } else if rand::random::<f32>() < 0.3 {
-            let result = IngestResult::UpToDate;
-            listener.success(&result);
-            Ok(result)
-        } else {
-            for i in 0..100 {
-                listener.on_stage_progress(IngestStage::Fetch, i, 100);
-                std::thread::sleep_ms((100 as f32 * scale) as u32);
-            }
-
-            if rand::random::<f32>() < 0.3 {
-                let error = IngestError::FetchError;
-                listener.error(IngestStage::Fetch, &error);
-                return Err(error);
-            }
-
-            listener.on_stage_progress(IngestStage::Fetch, 100, 100);
-
-            std::thread::sleep_ms((1000 as f32 * scale) as u32);
-            listener.on_stage_progress(IngestStage::Prepare, 0, 0);
-
-            std::thread::sleep_ms((1000 as f32 * scale) as u32);
-            listener.on_stage_progress(IngestStage::Read, 0, 0);
-
-            std::thread::sleep_ms((1000 as f32 * scale) as u32);
-            listener.on_stage_progress(IngestStage::Preprocess, 0, 0);
-
-            std::thread::sleep_ms((1000 as f32 * scale) as u32);
-            listener.on_stage_progress(IngestStage::Merge, 0, 0);
-
-            std::thread::sleep_ms((1000 as f32 * scale) as u32);
-            listener.on_stage_progress(IngestStage::Commit, 0, 0);
-
-            std::thread::sleep_ms(100);
-
-            let result = IngestResult::Updated {
-                block_hash: "13127948719dsdka1203ahsjkdh12983213".to_owned(),
-            };
-            listener.success(&result);
-            Ok(result)
-        }
+        unimplemented!();
     }
 }
 

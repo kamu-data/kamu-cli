@@ -18,7 +18,8 @@ impl ListCommand {
 
 impl Command for ListCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.borrow().iter_datasets().collect();
+        let mut datasets: Vec<DatasetIDBuf> =
+            self.metadata_repo.borrow().get_all_datasets().collect();
 
         datasets.sort();
 

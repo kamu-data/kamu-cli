@@ -32,7 +32,7 @@ impl CompleteCommand {
     }
 
     fn complete_dataset(&self, prefix: &str) {
-        for dataset_id in self.metadata_repo.borrow().iter_datasets() {
+        for dataset_id in self.metadata_repo.borrow().get_all_datasets() {
             if dataset_id.starts_with(prefix) {
                 println!("{}", dataset_id);
             }

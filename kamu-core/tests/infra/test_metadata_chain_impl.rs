@@ -1,19 +1,6 @@
 use kamu::domain::*;
 use kamu::infra::*;
-use kamu_test::MetadataFactory;
-
-macro_rules! assert_err {
-    ($actual:expr, $expected:pat) => {
-        match $actual {
-            Err($expected) => (),
-            Err(e) => assert!(
-                false,
-                format!("expected {} but got {:?} instead", stringify!($expected), e)
-            ),
-            _ => assert!(false, "Expected an error but got Ok"),
-        }
-    };
-}
+use kamu_test::*;
 
 #[test]
 fn test_block_hashing() {

@@ -49,24 +49,6 @@ impl MetadataChainImpl {
     b
   }
 
-  fn read_block(&self, hash: &str) -> MetadataBlock {
-    let path = self.block_path(hash);
-
-    let file = std::fs::File::open(path.clone())
-      .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
-
-    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
-      panic!(
-        "Failed to deserialize the MetadataBlock at {}: {}",
-        path.display(),
-        e
-      )
-    });
-
-    assert_eq!(manifest.kind, "MetadataBlock");
-    manifest.content
-  }
-
   fn write_block(&mut self, block: &MetadataBlock) -> Result<(), InfraError> {
     assert!(
       !block.block_hash.is_empty(),
@@ -126,13 +108,15 @@ impl MetadataChain for MetadataChainImpl {
     }
   }
 
-  fn iter_blocks_ref<'c>(&'c self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock> + 'c> {
+  fn iter_blocks_ref(&self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock>> {
     let hash = self
       .read_ref(r)
       .unwrap_or_else(|| panic!("Ref {:?} does not exist", r));
 
     Box::new(MetadataBlockIter {
-      chain: &self,
+      reader: BlockReader {
+        blocks_dir: self.meta_path.join("blocks"),
+      },
       next_hash: Some(hash),
     })
   }
@@ -156,19 +140,43 @@ impl MetadataChain for MetadataChainImpl {
   }
 }
 
-struct MetadataBlockIter<'c> {
-  chain: &'c MetadataChainImpl,
+struct BlockReader {
+  blocks_dir: PathBuf,
+}
+
+impl BlockReader {
+  fn read_block(&self, hash: &str) -> MetadataBlock {
+    let path = self.blocks_dir.join(hash);
+
+    let file = std::fs::File::open(path.clone())
+      .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
+
+    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+      panic!(
+        "Failed to deserialize the MetadataBlock at {}: {}",
+        path.display(),
+        e
+      )
+    });
+
+    assert_eq!(manifest.kind, "MetadataBlock");
+    manifest.content
+  }
+}
+
+struct MetadataBlockIter {
+  reader: BlockReader,
   next_hash: Option<String>,
 }
 
-impl Iterator for MetadataBlockIter<'_> {
+impl Iterator for MetadataBlockIter {
   type Item = MetadataBlock;
 
   fn next(&mut self) -> Option<Self::Item> {
     match self.next_hash {
       None => None,
       Some(ref hash) => {
-        let block = self.chain.read_block(hash);
+        let block = self.reader.read_block(hash);
         self.next_hash = Some(block.prev_block_hash.clone()).filter(|h| !h.is_empty());
         Some(block)
       }
