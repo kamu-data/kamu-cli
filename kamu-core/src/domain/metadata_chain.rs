@@ -8,7 +8,7 @@ pub enum BlockRef {
 
 // TODO: Separate mutable and immutable traits
 // See: https://github.com/rust-lang/rfcs/issues/2035
-pub trait MetadataChain {
+pub trait MetadataChain: Send {
     fn read_ref(&self, r: &BlockRef) -> Option<String>;
 
     fn iter_blocks(&self) -> Box<dyn Iterator<Item = MetadataBlock>> {

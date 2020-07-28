@@ -22,18 +22,28 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatasetSource {
   #[serde(rename_all = "camelCase")]
-  Root {
-    fetch: FetchStep,
-    prepare: Option<Vec<PrepStep>>,
-    read: ReadStep,
-    preprocess: Option<Transform>,
-    merge: MergeStrategy,
-  },
+  Root(DatasetSourceRoot),
   #[serde(rename_all = "camelCase")]
-  Derivative {
-    inputs: Vec<DatasetIDBuf>,
-    transform: Transform,
-  },
+  Derivative(DatasetSourceDerivative),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetSourceRoot {
+  pub fetch: FetchStep,
+  pub prepare: Option<Vec<PrepStep>>,
+  pub read: ReadStep,
+  pub preprocess: Option<Transform>,
+  pub merge: MergeStrategy,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatasetSourceDerivative {
+  pub inputs: Vec<DatasetIDBuf>,
+  pub transform: Transform,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,16 +112,28 @@ pub enum MergeStrategy {
   #[serde(rename_all = "camelCase")]
   Append,
   #[serde(rename_all = "camelCase")]
-  Ledger { primary_key: Vec<String> },
+  Ledger(MergeStrategyLedger),
   #[serde(rename_all = "camelCase")]
-  Snapshot {
-    primary_key: Vec<String>,
-    compare_columns: Option<Vec<String>>,
-    observation_column: Option<String>,
-    obsv_added: Option<String>,
-    obsv_changed: Option<String>,
-    obsv_removed: Option<String>,
-  },
+  Snapshot(MergeStrategySnapshot),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MergeStrategyLedger {
+  pub primary_key: Vec<String>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MergeStrategySnapshot {
+  pub primary_key: Vec<String>,
+  pub compare_columns: Option<Vec<String>>,
+  pub observation_column: Option<String>,
+  pub obsv_added: Option<String>,
+  pub obsv_changed: Option<String>,
+  pub obsv_removed: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -144,43 +166,65 @@ pub struct MetadataBlock {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReadStep {
   #[serde(rename_all = "camelCase")]
-  Csv {
-    schema: Option<Vec<String>>,
-    separator: Option<String>,
-    encoding: Option<String>,
-    quote: Option<String>,
-    escape: Option<String>,
-    comment: Option<String>,
-    header: Option<bool>,
-    enforce_schema: Option<bool>,
-    infer_schema: Option<bool>,
-    ignore_leading_white_space: Option<bool>,
-    ignore_trailing_white_space: Option<bool>,
-    null_value: Option<String>,
-    empty_value: Option<String>,
-    nan_value: Option<String>,
-    positive_inf: Option<String>,
-    negative_inf: Option<String>,
-    date_format: Option<String>,
-    timestamp_format: Option<String>,
-    multi_line: Option<bool>,
-  },
+  Csv(ReadStepCsv),
   #[serde(rename_all = "camelCase")]
-  JsonLines {
-    schema: Option<Vec<String>>,
-    date_format: Option<String>,
-    encoding: Option<String>,
-    multi_line: Option<bool>,
-    primitives_as_string: Option<bool>,
-    timestamp_format: Option<String>,
-  },
+  JsonLines(ReadStepJsonLines),
   #[serde(rename_all = "camelCase")]
-  GeoJson { schema: Option<Vec<String>> },
+  GeoJson(ReadStepGeoJson),
   #[serde(rename_all = "camelCase")]
-  EsriShapefile {
-    schema: Option<Vec<String>>,
-    sub_path: Option<String>,
-  },
+  EsriShapefile(ReadStepEsriShapefile),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadStepCsv {
+  pub schema: Option<Vec<String>>,
+  pub separator: Option<String>,
+  pub encoding: Option<String>,
+  pub quote: Option<String>,
+  pub escape: Option<String>,
+  pub comment: Option<String>,
+  pub header: Option<bool>,
+  pub enforce_schema: Option<bool>,
+  pub infer_schema: Option<bool>,
+  pub ignore_leading_white_space: Option<bool>,
+  pub ignore_trailing_white_space: Option<bool>,
+  pub null_value: Option<String>,
+  pub empty_value: Option<String>,
+  pub nan_value: Option<String>,
+  pub positive_inf: Option<String>,
+  pub negative_inf: Option<String>,
+  pub date_format: Option<String>,
+  pub timestamp_format: Option<String>,
+  pub multi_line: Option<bool>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadStepJsonLines {
+  pub schema: Option<Vec<String>>,
+  pub date_format: Option<String>,
+  pub encoding: Option<String>,
+  pub multi_line: Option<bool>,
+  pub primitives_as_string: Option<bool>,
+  pub timestamp_format: Option<String>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadStepGeoJson {
+  pub schema: Option<Vec<String>>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadStepEsriShapefile {
+  pub schema: Option<Vec<String>>,
+  pub sub_path: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -207,18 +251,28 @@ pub struct Transform {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FetchStep {
   #[serde(rename_all = "camelCase")]
-  Url {
-    url: String,
-    event_time: Option<EventTimeSource>,
-    cache: Option<SourceCaching>,
-  },
+  Url(FetchStepUrl),
   #[serde(rename_all = "camelCase")]
-  FilesGlob {
-    path: String,
-    event_time: Option<EventTimeSource>,
-    cache: Option<SourceCaching>,
-    order: Option<SourceOrdering>,
-  },
+  FilesGlob(FetchStepFilesGlob),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FetchStepUrl {
+  pub url: String,
+  pub event_time: Option<EventTimeSource>,
+  pub cache: Option<SourceCaching>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FetchStepFilesGlob {
+  pub path: String,
+  pub event_time: Option<EventTimeSource>,
+  pub cache: Option<SourceCaching>,
+  pub order: Option<SourceOrdering>,
 }
 
 #[skip_serializing_none]
@@ -239,12 +293,24 @@ pub enum SourceOrdering {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrepStep {
   #[serde(rename_all = "camelCase")]
-  Decompress {
-    format: CompressionFormat,
-    sub_path: Option<String>,
-  },
+  Decompress(PrepStepDecompress),
   #[serde(rename_all = "camelCase")]
-  Pipe { command: Vec<String> },
+  Pipe(PrepStepPipe),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrepStepDecompress {
+  pub format: CompressionFormat,
+  pub sub_path: Option<String>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrepStepPipe {
+  pub command: Vec<String>,
 }
 
 #[skip_serializing_none]
@@ -265,8 +331,13 @@ pub enum CompressionFormat {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventTimeSource {
   #[serde(rename_all = "camelCase")]
-  FromPath {
-    pattern: String,
-    timestamp_format: Option<String>,
-  },
+  FromPath(EventTimeSourceFromPath),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EventTimeSourceFromPath {
+  pub pattern: String,
+  pub timestamp_format: Option<String>,
 }

@@ -103,7 +103,7 @@ impl Command for AddCommand {
             self.load_recursive()?
         };
 
-        let (mut added, mut skipped, mut errors) = (0, 0, 0);
+        let (mut added, mut errors) = (0, 0);
 
         for (id, res) in self
             .metadata_repo
@@ -116,7 +116,6 @@ impl Command for AddCommand {
                     eprintln!("{}: {}", console::style("Added").green(), id);
                 }
                 Err(err @ DomainError::AlreadyExists { .. }) => {
-                    skipped += 1;
                     eprintln!("{}: {}", console::style("Warning").yellow(), err);
                 }
                 Err(err) => {

@@ -4,7 +4,6 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
-use kamu_cli::error::*;
 
 use clap::value_t_or_exit;
 use console::style;
@@ -21,7 +20,10 @@ fn main() {
     let workspace_layout = find_workspace();
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
-    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(metadata_repo.clone())));
+    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
+        &workspace_layout,
+        metadata_repo.clone(),
+    )));
     let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
         metadata_repo.clone(),
     )));

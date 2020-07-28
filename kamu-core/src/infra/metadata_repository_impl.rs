@@ -55,8 +55,8 @@ impl MetadataRepositoryImpl {
         while !snapshots.is_empty() {
             let head = snapshots.pop_front().unwrap();
             let has_deps = match head.source {
-                DatasetSource::Derivative { ref inputs, .. } => {
-                    inputs.iter().any(|id| pending.contains(id))
+                DatasetSource::Derivative(ref src) => {
+                    src.inputs.iter().any(|id| pending.contains(id))
                 }
                 _ => false,
             };
@@ -89,8 +89,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
         }
 
         let (kind, dependencies) = match snapshot.source {
-            DatasetSource::Derivative { ref inputs, .. } => {
-                for input_id in inputs {
+            DatasetSource::Derivative(ref src) => {
+                for input_id in src.inputs.iter() {
                     if !self.dataset_exists(input_id) {
                         return Err(DomainError::missing_reference(
                             ResourceKind::Dataset,
@@ -100,7 +100,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
                         ));
                     }
                 }
-                (DatasetKind::Derivative, inputs.clone())
+                (DatasetKind::Derivative, src.inputs.clone())
             }
             DatasetSource::Root { .. } => (DatasetKind::Root, Vec::new()),
         };

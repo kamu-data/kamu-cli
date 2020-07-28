@@ -60,20 +60,20 @@ impl TransformBuilder {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSourceBuilderRoot {
-    v: DatasetSource,
+    v: DatasetSourceRoot,
 }
 
 impl DatasetSourceBuilderRoot {
     fn new() -> Self {
         Self {
-            v: DatasetSource::Root {
-                fetch: FetchStep::Url {
+            v: DatasetSourceRoot {
+                fetch: FetchStep::Url(FetchStepUrl {
                     url: "http://nowhere.org".to_owned(),
                     event_time: None,
                     cache: None,
-                },
+                }),
                 prepare: None,
-                read: ReadStep::GeoJson { schema: None },
+                read: ReadStep::GeoJson(ReadStepGeoJson { schema: None }),
                 preprocess: None,
                 merge: MergeStrategy::Append,
             },
@@ -81,12 +81,12 @@ impl DatasetSourceBuilderRoot {
     }
 
     pub fn build(self) -> DatasetSource {
-        self.v
+        DatasetSource::Root(self.v)
     }
 }
 
 pub struct DatasetSourceBuilderDeriv {
-    v: DatasetSource,
+    v: DatasetSourceDerivative,
 }
 
 impl DatasetSourceBuilderDeriv {
@@ -96,7 +96,7 @@ impl DatasetSourceBuilderDeriv {
         S: AsRef<str>,
     {
         Self {
-            v: DatasetSource::Derivative {
+            v: DatasetSourceDerivative {
                 inputs: inputs
                     .map(|s| DatasetIDBuf::try_from(s.as_ref()).unwrap())
                     .collect(),
@@ -106,7 +106,7 @@ impl DatasetSourceBuilderDeriv {
     }
 
     pub fn build(self) -> DatasetSource {
-        self.v
+        DatasetSource::Derivative(self.v)
     }
 }
 

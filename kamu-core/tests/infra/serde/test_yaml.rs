@@ -84,17 +84,17 @@ fn de_dataset_snapshot_root() {
         kind: "DatasetSnapshot".to_owned(),
         content: DatasetSnapshot {
             id: DatasetIDBuf::try_from("kamu.test").unwrap(),
-            source: DatasetSource::Root {
-                fetch: FetchStep::Url {
+            source: DatasetSource::Root(DatasetSourceRoot {
+                fetch: FetchStep::Url(FetchStepUrl {
                     url: "ftp://kamu.dev/test.zip".to_owned(),
                     event_time: None,
                     cache: Some(SourceCaching::Forever),
-                },
-                prepare: Some(vec![PrepStep::Decompress {
+                }),
+                prepare: Some(vec![PrepStep::Decompress(PrepStepDecompress {
                     format: CompressionFormat::Zip,
                     sub_path: Some("data_*.csv".to_owned()),
-                }]),
-                read: ReadStep::Csv {
+                })]),
+                read: ReadStep::Csv(ReadStepCsv {
                     schema: None,
                     separator: None,
                     encoding: None,
@@ -114,22 +114,22 @@ fn de_dataset_snapshot_root() {
                     date_format: None,
                     timestamp_format: None,
                     multi_line: None,
-                },
+                }),
                 preprocess: Some(Transform {
                     engine: "sparkSQL".to_owned(),
                     additional_properties: map! {
                         "query".to_owned() => yaml_str("SELECT * FROM input\n")
                     },
                 }),
-                merge: MergeStrategy::Snapshot {
+                merge: MergeStrategy::Snapshot(MergeStrategySnapshot {
                     primary_key: vec!["id".to_owned()],
                     compare_columns: None,
                     observation_column: None,
                     obsv_added: None,
                     obsv_changed: None,
                     obsv_removed: None,
-                },
-            },
+                }),
+            }),
             vocab: Some(DatasetVocabulary {
                 system_time_column: None,
                 event_time_column: Some("date".to_owned()),
@@ -166,7 +166,7 @@ fn de_dataset_snapshot_derivative() {
         kind: "DatasetSnapshot".to_owned(),
         content: DatasetSnapshot {
             id: DatasetIDBuf::try_from("com.naturalearthdata.admin0").unwrap(),
-            source: DatasetSource::Derivative {
+            source: DatasetSource::Derivative(DatasetSourceDerivative {
                 inputs: vec![
                     DatasetIDBuf::try_from("com.naturalearthdata.10m.admin0").unwrap(),
                     DatasetIDBuf::try_from("com.naturalearthdata.50m.admin0").unwrap(),
@@ -177,7 +177,7 @@ fn de_dataset_snapshot_derivative() {
                         "query".to_owned() => yaml_str("SOME_SQL")
                     },
                 },
-            },
+            }),
             vocab: None,
         },
     };
@@ -228,7 +228,7 @@ fn de_metadata_block() {
             block_hash: "ddeeaaddbbeeff".to_owned(),
             prev_block_hash: "ffeebbddaaeedd".to_owned(),
             system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-            source: Some(DatasetSource::Derivative {
+            source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
                 inputs: vec![
                     DatasetIDBuf::try_from("input1").unwrap(),
                     DatasetIDBuf::try_from("input2").unwrap(),
@@ -239,7 +239,7 @@ fn de_metadata_block() {
                         "query".to_owned() => yaml_str("SELECT * FROM input1 UNION ALL SELECT * FROM input2\n")
                     },
                 },
-            }),
+            })),
             output_slice: Some(DataSlice {
                 hash: "ffaabb".to_owned(),
                 interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -335,12 +335,12 @@ fn serde_fetch_step_files_glob() {
 
     let actual: FetchStep = serde_yaml::from_str(data).unwrap();
 
-    let expected = FetchStep::FilesGlob {
+    let expected = FetchStep::FilesGlob(FetchStepFilesGlob {
         path: "/opt/x/*.txt".to_owned(),
         event_time: None,
         cache: Some(SourceCaching::Forever),
         order: Some(SourceOrdering::ByName),
-    };
+    });
 
     assert_eq!(expected, actual);
 
