@@ -84,6 +84,20 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Ok(())
     }
 
+    fn get_datasets_in_dependency_order(
+        &self,
+        starting_dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+    ) -> Vec<DatasetIDBuf> {
+        let mut ordering_visitor = DependencyOrderingVisitor::new();
+
+        for dataset_id in starting_dataset_ids {
+            self.visit_dataset_dependencies(&dataset_id, &mut ordering_visitor)
+                .unwrap();
+        }
+
+        ordering_visitor.result()
+    }
+
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError> {
         let dataset_metadata_dir = self.get_dataset_metadata_dir(&snapshot.id);
 
@@ -150,9 +164,14 @@ impl MetadataRepository for MetadataRepositoryImpl {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Used by get_all_datasets
+///////////////////////////////////////////////////////////////////////////////
+
 struct ListDatasetsIter {
     rd: std::fs::ReadDir,
 }
+
 impl Iterator for ListDatasetsIter {
     type Item = DatasetIDBuf;
     fn next(&mut self) -> Option<Self::Item> {
@@ -160,5 +179,38 @@ impl Iterator for ListDatasetsIter {
         let path = res.unwrap();
         let name = path.file_name();
         Some(DatasetIDBuf::try_from(&name).unwrap())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Used by get_datasets_in_dependency_order
+///////////////////////////////////////////////////////////////////////////////
+
+struct DependencyOrderingVisitor {
+    queue: Vec<DatasetIDBuf>,
+    queued: std::collections::HashSet<DatasetIDBuf>,
+}
+
+impl DependencyOrderingVisitor {
+    fn new() -> Self {
+        Self {
+            queue: Vec::new(),
+            queued: std::collections::HashSet::new(),
+        }
+    }
+
+    fn result(self) -> Vec<DatasetIDBuf> {
+        self.queue
+    }
+}
+
+impl DatasetDependencyVisitor for DependencyOrderingVisitor {
+    fn enter(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain) -> bool {
+        !self.queued.contains(dataset_id)
+    }
+
+    fn exit(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain) {
+        self.queue.push(dataset_id.to_owned());
+        self.queued.insert(dataset_id.to_owned());
     }
 }

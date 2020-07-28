@@ -92,6 +92,12 @@ impl fmt::Display for DatasetID {
     }
 }
 
+impl std::hash::Hash for DatasetID {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetIDBuf (buffer type)
 ////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +214,12 @@ impl cmp::PartialOrd for DatasetIDBuf {
 impl fmt::Display for DatasetIDBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", &self.0)
+    }
+}
+
+impl std::hash::Hash for DatasetIDBuf {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
     }
 }
 

@@ -62,8 +62,8 @@ impl Command for AddCommand {
 
         for (id, res) in self.metadata_repo.borrow_mut().add_datasets(snapshots) {
             match res {
-                Ok(_) => eprintln!("Added: {}", id),
-                Err(err) => eprintln!("Failed: {} - {}", id, err),
+                Ok(_) => eprintln!("{}: {}", console::style("Added").green().bold(), id),
+                Err(err) => eprintln!("{}: {}", console::style("Error").red().bold(), err),
             }
         }
 

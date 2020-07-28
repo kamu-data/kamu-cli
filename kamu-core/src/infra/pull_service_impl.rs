@@ -54,21 +54,36 @@ impl PullServiceImpl {
 impl PullService for PullServiceImpl {
     fn pull_multi(
         &mut self,
-        dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         recursive: bool,
         all: bool,
         ingest_listener: Option<Box<dyn IngestMultiListener>>,
         transform_listener: Option<Box<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
-        let dataset_ids: Vec<DatasetIDBuf> = if all {
-            self.metadata_repo.borrow().get_all_datasets().collect()
-        } else if recursive {
-            unimplemented!()
+        let metadata_repo = self.metadata_repo.borrow();
+
+        let starting_dataset_ids: std::collections::HashSet<DatasetIDBuf> = if !all {
+            dataset_ids.map(|id| id.to_owned()).collect()
         } else {
-            dataset_ids_iter.map(|id| id.to_owned()).collect()
+            metadata_repo.get_all_datasets().collect()
         };
 
-        let mut results: Vec<_> = Vec::new();
+        let datasets_in_order = metadata_repo.get_datasets_in_dependency_order(
+            &mut starting_dataset_ids.iter().map(|id| id.as_ref()),
+        );
+
+        let datasets_to_pull = if recursive || all {
+            datasets_in_order
+        } else {
+            datasets_in_order
+                .into_iter()
+                .filter(|id| starting_dataset_ids.contains(id))
+                .collect()
+        };
+
+        unimplemented!();
+
+        //let (root_datasets, deriv_datasets) = datasets_to_pull.into_iter().partition(|id| metadata_repo.)
 
         /*results.extend(
             self.ingest_svc
@@ -91,7 +106,5 @@ impl PullService for PullServiceImpl {
                 .into_iter()
                 .map(|(id, res)| (id, Self::convert_transform_result(res))),
         );*/
-
-        results
     }
 }

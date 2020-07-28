@@ -16,30 +16,10 @@ impl TransformServiceImpl {
 
     // Note: Can be called from multiple threads
     fn do_transform(
-        dataset_id: &DatasetID,
-        listener: &mut dyn TransformListener,
+        _dataset_id: &DatasetID,
+        _listener: &mut dyn TransformListener,
     ) -> Result<TransformResult, TransformError> {
-        let scale: f32 = rand::random();
-
-        listener.begin();
-        std::thread::sleep_ms(3000);
-
-        let chance: f32 = rand::random();
-        if rand::random::<f32>() < 0.3 {
-            let error = TransformError::EngineError;
-            listener.error(&error);
-            Err(error)
-        } else if rand::random::<f32>() < 0.3 {
-            let result = TransformResult::UpToDate;
-            listener.success(&result);
-            Ok(result)
-        } else {
-            let result = TransformResult::Updated {
-                block_hash: "13127948719dsdka1203ahsjkdh12983213".to_owned(),
-            };
-            listener.success(&result);
-            Ok(result)
-        }
+        unimplemented!();
     }
 }
 
