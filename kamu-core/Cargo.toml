@@ -23,6 +23,7 @@ url = "*"
 rand = "*"
 regex = "*"
 indoc = "*"  # Compile-time unindent
+itertools = "*"
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
 

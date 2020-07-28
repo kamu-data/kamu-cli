@@ -5,17 +5,6 @@ use crate::infra::serde::yaml::*;
 pub trait MetadataRepository {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
 
-    fn visit_dataset_dependencies(
-        &self,
-        dataset_id: &DatasetID,
-        visitor: &mut dyn DatasetDependencyVisitor,
-    ) -> Result<(), DomainError>;
-
-    fn get_datasets_in_dependency_order(
-        &self,
-        starting_dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-    ) -> Vec<DatasetIDBuf>;
-
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError>;
 
     fn add_datasets(

@@ -19,8 +19,8 @@ impl PullService for TestPullService {
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
         _recursive: bool,
         _all: bool,
-        ingest_listener: Option<Box<dyn IngestMultiListener>>,
-        _transform_listener: Option<Box<dyn TransformMultiListener>>,
+        ingest_listener: Option<&mut dyn IngestMultiListener>,
+        _transform_listener: Option<&mut dyn TransformMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let id = DatasetIDBuf::try_from("org.geonames.cities").unwrap();
         let mut listener = ingest_listener.unwrap().begin_ingest(&id).unwrap();

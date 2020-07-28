@@ -16,7 +16,7 @@ pub trait IngestService {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        listener: Option<Box<dyn IngestMultiListener>>,
+        listener: Option<&mut dyn IngestMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
 }
 

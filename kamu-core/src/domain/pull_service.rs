@@ -14,8 +14,8 @@ pub trait PullService {
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         recursive: bool,
         all: bool,
-        ingest_listener: Option<Box<dyn IngestMultiListener>>,
-        transform_listener: Option<Box<dyn TransformMultiListener>>,
+        ingest_listener: Option<&mut dyn IngestMultiListener>,
+        transform_listener: Option<&mut dyn TransformMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
 }
 

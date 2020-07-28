@@ -38,20 +38,23 @@ impl IngestService for IngestServiceImpl {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        maybe_multi_listener: Option<Box<dyn IngestMultiListener>>,
+        maybe_multi_listener: Option<&mut dyn IngestMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
-        let null_multi_listener = Box::new(NullIngestMultiListener {});
-        let mut multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
+        let mut null_multi_listener = NullIngestMultiListener {};
+        let multi_listener = maybe_multi_listener.unwrap_or(&mut null_multi_listener);
 
         let thread_handles: Vec<_> = dataset_ids
             .map(|id_ref| {
                 let id = id_ref.to_owned();
                 let null_listener = Box::new(NullIngestListener {});
                 let mut listener = multi_listener.begin_ingest(&id).unwrap_or(null_listener);
-                std::thread::spawn(move || {
-                    let res = Self::do_ingest(&id, listener.as_mut());
-                    (id, res)
-                })
+                std::thread::Builder::new()
+                    .name("ingest_multi".to_owned())
+                    .spawn(move || {
+                        let res = Self::do_ingest(&id, listener.as_mut());
+                        (id, res)
+                    })
+                    .unwrap()
             })
             .collect();
 

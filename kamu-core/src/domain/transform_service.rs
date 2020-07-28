@@ -16,7 +16,7 @@ pub trait TransformService {
     fn transform_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        listener: Option<Box<dyn TransformMultiListener>>,
+        listener: Option<&mut dyn TransformMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)>;
 }
 

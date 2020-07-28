@@ -78,37 +78,6 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Box::new(ListDatasetsIter { rd: read_dir })
     }
 
-    // TODO: Remove?
-    fn visit_dataset_dependencies(
-        &self,
-        dataset_id: &DatasetID,
-        visitor: &mut dyn DatasetDependencyVisitor,
-    ) -> Result<(), DomainError> {
-        let meta_chain = self.get_metadata_chain_impl(dataset_id)?;
-        if visitor.enter(dataset_id, &meta_chain) {
-            let summary = self.get_summary(dataset_id)?;
-            for input in summary.dependencies {
-                self.visit_dataset_dependencies(&input, visitor)?;
-            }
-            visitor.exit(dataset_id, &meta_chain);
-        }
-        Ok(())
-    }
-
-    fn get_datasets_in_dependency_order(
-        &self,
-        starting_dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-    ) -> Vec<DatasetIDBuf> {
-        let mut ordering_visitor = DependencyOrderingVisitor::new();
-
-        for dataset_id in starting_dataset_ids {
-            self.visit_dataset_dependencies(&dataset_id, &mut ordering_visitor)
-                .unwrap();
-        }
-
-        ordering_visitor.result()
-    }
-
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError> {
         let dataset_metadata_dir = self.get_dataset_metadata_dir(&snapshot.id);
 
@@ -257,38 +226,5 @@ impl Iterator for ListDatasetsIter {
         let path = res.unwrap();
         let name = path.file_name();
         Some(DatasetIDBuf::try_from(&name).unwrap())
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// Used by get_datasets_in_dependency_order
-///////////////////////////////////////////////////////////////////////////////
-
-struct DependencyOrderingVisitor {
-    queue: Vec<DatasetIDBuf>,
-    queued: std::collections::HashSet<DatasetIDBuf>,
-}
-
-impl DependencyOrderingVisitor {
-    fn new() -> Self {
-        Self {
-            queue: Vec::new(),
-            queued: std::collections::HashSet::new(),
-        }
-    }
-
-    fn result(self) -> Vec<DatasetIDBuf> {
-        self.queue
-    }
-}
-
-impl DatasetDependencyVisitor for DependencyOrderingVisitor {
-    fn enter(&mut self, dataset_id: &DatasetID, _meta_chain: &dyn MetadataChain) -> bool {
-        !self.queued.contains(dataset_id)
-    }
-
-    fn exit(&mut self, dataset_id: &DatasetID, _meta_chain: &dyn MetadataChain) {
-        self.queue.push(dataset_id.to_owned());
-        self.queued.insert(dataset_id.to_owned());
     }
 }

@@ -38,20 +38,23 @@ impl TransformService for TransformServiceImpl {
     fn transform_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        maybe_multi_listener: Option<Box<dyn TransformMultiListener>>,
+        maybe_multi_listener: Option<&mut dyn TransformMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
-        let null_multi_listener = Box::new(NullTransformMultiListener {});
-        let mut multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
+        let mut null_multi_listener = NullTransformMultiListener {};
+        let multi_listener = maybe_multi_listener.unwrap_or(&mut null_multi_listener);
 
         let thread_handles: Vec<_> = dataset_ids
             .map(|id_ref| {
                 let id = id_ref.to_owned();
                 let null_listener = Box::new(NullTransformListener {});
                 let mut listener = multi_listener.begin_transform(&id).unwrap_or(null_listener);
-                std::thread::spawn(move || {
-                    let res = Self::do_transform(&id, listener.as_mut());
-                    (id, res)
-                })
+                std::thread::Builder::new()
+                    .name("transform_multi".to_owned())
+                    .spawn(move || {
+                        let res = Self::do_transform(&id, listener.as_mut());
+                        (id, res)
+                    })
+                    .unwrap()
             })
             .collect();
 

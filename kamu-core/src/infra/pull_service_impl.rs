@@ -1,7 +1,7 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct PullServiceImpl {
@@ -21,6 +21,49 @@ impl PullServiceImpl {
             ingest_svc: ingest_svc,
             transform_svc: transform_svc,
         }
+    }
+
+    fn get_datasets_ordered_by_depth<'i>(
+        &self,
+        starting_dataset_ids: impl Iterator<Item = &'i DatasetID>,
+    ) -> Vec<(DatasetIDBuf, i32)> {
+        let mut labeled = HashMap::new();
+        for id in starting_dataset_ids {
+            self.depth_first_label(id, &mut labeled);
+        }
+        let mut ordered = Vec::with_capacity(labeled.len());
+        ordered.extend(labeled.into_iter());
+        ordered.sort_by(|(a_id, a_depth), (b_id, b_depth)| {
+            if a_depth == b_depth {
+                a_id.cmp(&b_id)
+            } else {
+                a_depth.cmp(&b_depth)
+            }
+        });
+        ordered
+    }
+
+    fn depth_first_label(
+        &self,
+        dataset_id: &DatasetID,
+        labeled: &mut HashMap<DatasetIDBuf, i32>,
+    ) -> i32 {
+        if let Some(v) = labeled.get(dataset_id) {
+            return *v;
+        }
+
+        let summary = self.metadata_repo.borrow().get_summary(dataset_id).unwrap();
+
+        let depth = summary
+            .dependencies
+            .iter()
+            .map(|id| self.depth_first_label(id, labeled))
+            .max()
+            .map(|max| max + 1)
+            .unwrap_or(0);
+
+        labeled.insert(dataset_id.to_owned(), depth);
+        depth
     }
 
     fn convert_ingest_result(
@@ -50,6 +93,15 @@ impl PullServiceImpl {
             Err(err) => Err(err.into()),
         }
     }
+
+    fn slice<'a>(
+        &self,
+        to_slice: &'a [(DatasetIDBuf, i32)],
+    ) -> (i32, &'a [(DatasetIDBuf, i32)], &'a [(DatasetIDBuf, i32)]) {
+        let d = to_slice.get(0).unwrap().1;
+        let count = to_slice.iter().take_while(|(_, depth)| *depth == d).count();
+        (d, &to_slice[..count], &to_slice[count..])
+    }
 }
 
 impl PullService for PullServiceImpl {
@@ -58,8 +110,8 @@ impl PullService for PullServiceImpl {
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         recursive: bool,
         all: bool,
-        ingest_listener: Option<Box<dyn IngestMultiListener>>,
-        transform_listener: Option<Box<dyn TransformMultiListener>>,
+        mut ingest_listener: Option<&mut dyn IngestMultiListener>,
+        mut transform_listener: Option<&mut dyn TransformMultiListener>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let metadata_repo = self.metadata_repo.borrow();
 
@@ -69,46 +121,56 @@ impl PullService for PullServiceImpl {
             metadata_repo.get_all_datasets().collect()
         };
 
-        let datasets_in_order = metadata_repo.get_datasets_in_dependency_order(
-            &mut starting_dataset_ids.iter().map(|id| id.as_ref()),
-        );
+        let datasets_labeled = self
+            .get_datasets_ordered_by_depth(&mut starting_dataset_ids.iter().map(|id| id.as_ref()));
 
         let datasets_to_pull = if recursive || all {
-            datasets_in_order
+            datasets_labeled
         } else {
-            datasets_in_order
+            datasets_labeled
                 .into_iter()
-                .filter(|id| starting_dataset_ids.contains(id))
+                .filter(|(id, _)| starting_dataset_ids.contains(id))
                 .collect()
         };
 
-        let (root_datasets, deriv_datasets): (Vec<_>, Vec<_>) = datasets_to_pull
-            .into_iter()
-            .partition(|id| metadata_repo.get_summary(id).unwrap().kind == DatasetKind::Root);
+        let mut results = Vec::with_capacity(datasets_to_pull.len());
 
-        println!("Root: {:?}\nDeriv: {:?}", root_datasets, deriv_datasets);
-        unimplemented!();
+        let mut rest = &datasets_to_pull[..];
+        while !rest.is_empty() {
+            let (depth, level, tail) = self.slice(rest);
+            rest = tail;
 
-        /*results.extend(
-            self.ingest_svc
-                .borrow_mut()
-                .ingest_multi(
-                    &mut dataset_ids.iter().map(|id| id.as_ref()),
-                    ingest_listener,
-                )
-                .into_iter()
-                .map(|(id, res)| (id, Self::convert_ingest_result(res))),
-        );
+            // See: https://internals.rust-lang.org/t/should-option-mut-t-implement-copy/3715/6
+            // For listener option magic explanation
+            let results_level: Vec<_> = if depth == 0 {
+                self.ingest_svc
+                    .borrow_mut()
+                    .ingest_multi(
+                        &mut level.iter().map(|(id, _)| id.as_ref()),
+                        ingest_listener.as_mut().map_or(None, |l| Some(*l)),
+                    )
+                    .into_iter()
+                    .map(|(id, res)| (id, Self::convert_ingest_result(res)))
+                    .collect()
+            } else {
+                self.transform_svc
+                    .borrow_mut()
+                    .transform_multi(
+                        &mut level.iter().map(|(id, _)| id.as_ref()),
+                        transform_listener.as_mut().map_or(None, |l| Some(*l)),
+                    )
+                    .into_iter()
+                    .map(|(id, res)| (id, Self::convert_transform_result(res)))
+                    .collect()
+            };
 
-        results.extend(
-            self.transform_svc
-                .borrow_mut()
-                .transform_multi(
-                    &mut dataset_ids.iter().map(|id| id.as_ref()),
-                    transform_listener,
-                )
-                .into_iter()
-                .map(|(id, res)| (id, Self::convert_transform_result(res))),
-        );*/
+            let errors = results_level.iter().any(|(_, r)| r.is_err());
+            results.extend(results_level);
+            if errors {
+                break;
+            }
+        }
+
+        results
     }
 }

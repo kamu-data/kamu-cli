@@ -56,7 +56,8 @@ impl Command for PullCommand {
             }
         };
 
-        let pull_progress = Box::new(PrettyPullProgress::new());
+        let mut pull_progress = PrettyPullProgress::new();
+        let mut transform_progress = pull_progress.clone();
         let pull_progress_in_thread = pull_progress.clone();
 
         let draw_thread = std::thread::spawn(move || {
@@ -67,8 +68,8 @@ impl Command for PullCommand {
             &mut dataset_ids.iter().map(|id| id.as_ref()),
             self.recursive,
             self.all,
-            Some(pull_progress.clone()),
-            Some(pull_progress.clone()),
+            Some(&mut pull_progress),
+            Some(&mut transform_progress),
         );
 
         pull_progress.finish();
