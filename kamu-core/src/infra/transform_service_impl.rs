@@ -4,13 +4,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 pub struct TransformServiceImpl {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    //metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
 }
 
 impl TransformServiceImpl {
-    pub fn new(metadata_repo: Rc<RefCell<dyn MetadataRepository>>) -> Self {
+    pub fn new(_metadata_repo: Rc<RefCell<dyn MetadataRepository>>) -> Self {
         Self {
-            metadata_repo: metadata_repo,
+            //metadata_repo: metadata_repo,
         }
     }
 

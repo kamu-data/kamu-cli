@@ -1,7 +1,7 @@
 use crate::domain::DomainError;
 
 use std::backtrace::Backtrace;
-use std::convert::{From, Into};
+use std::convert::From;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

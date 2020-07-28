@@ -1,5 +1,4 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
 use std::cell::RefCell;
@@ -26,28 +25,6 @@ impl IngestServiceImpl {
         let vol = VolumeLayout::create(&self.workspace_layout.local_volume_dir).unwrap();
         DatasetLayout::create(&vol, dataset_id).unwrap()
     }
-
-    // Note: Can be called from multiple threads
-    fn do_ingest(
-        dataset_id: &DatasetID,
-        layout: DatasetLayout,
-        meta_chain: &mut dyn MetadataChain,
-        listener: &mut dyn IngestListener,
-    ) -> Result<IngestResult, IngestError> {
-        listener.begin();
-        let source = Self::get_source(meta_chain);
-        println!("{} {:?}", dataset_id, layout);
-        println!("{:?}", source);
-        unimplemented!();
-    }
-
-    // TODO: this is expensive
-    fn get_source(meta_chain: &dyn MetadataChain) -> DatasetSourceRoot {
-        match meta_chain.iter_blocks().filter_map(|b| b.source).next() {
-            Some(DatasetSource::Root(src)) => src,
-            _ => panic!("Failed to find source definition"),
-        }
-    }
 }
 
 impl IngestService for IngestServiceImpl {
@@ -67,7 +44,10 @@ impl IngestService for IngestServiceImpl {
 
         let layout = self.get_dataset_layout(dataset_id);
 
-        Self::do_ingest(dataset_id, layout, meta_chain.as_mut(), listener.as_mut())
+        let mut ingest_task =
+            IngestTask::new(dataset_id, layout, meta_chain.as_mut(), listener.as_mut());
+
+        ingest_task.ingest()
     }
 
     fn ingest_multi(
@@ -90,8 +70,10 @@ impl IngestService for IngestServiceImpl {
                 std::thread::Builder::new()
                     .name("ingest_multi".to_owned())
                     .spawn(move || {
-                        let res =
-                            Self::do_ingest(&id, layout, meta_chain.as_mut(), listener.as_mut());
+                        let mut ingest_task =
+                            IngestTask::new(&id, layout, meta_chain.as_mut(), listener.as_mut());
+
+                        let res = ingest_task.ingest();
                         (id, res)
                     })
                     .unwrap()

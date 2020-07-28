@@ -9,6 +9,9 @@ pub use dataset_layout::*;
 mod ingest_service_impl;
 pub use ingest_service_impl::*;
 
+mod ingest_task;
+pub use ingest_task::*;
+
 mod metadata_repository_impl;
 pub use metadata_repository_impl::*;
 

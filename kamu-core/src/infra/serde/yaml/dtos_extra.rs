@@ -1,5 +1,4 @@
 use super::formats::datetime_rfc3339_opt;
-use super::DatasetVocabulary;
 use crate::domain::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
