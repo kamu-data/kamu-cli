@@ -44,6 +44,7 @@ fn main() {
             resource_loader.clone(),
             metadata_repo.clone(),
             submatches.values_of("snapshot").unwrap(),
+            submatches.is_present("recursive"),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
             metadata_repo.clone(),

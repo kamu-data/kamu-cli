@@ -15,8 +15,15 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
             SubCommand::with_name("add")
                 .about("Add a new dataset or modify existing one")
                 .arg(
+                    Arg::with_name("recursive")
+                        .short("r")
+                        .long("recursive")
+                        .help("Recursively searches for all snapshots in the specified directory"),
+                )
+                .arg(
                     Arg::with_name("snapshot")
                         .multiple(true)
+                        .required(true)
                         .index(1)
                         .help("Dataset snapshot reference(s) (path, URL, or remote)"),
                 ),

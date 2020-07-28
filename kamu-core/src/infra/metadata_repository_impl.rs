@@ -3,6 +3,8 @@ use crate::domain::*;
 use crate::infra::serde::yaml::*;
 
 use chrono::Utc;
+use std::collections::HashSet;
+use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
@@ -41,10 +43,32 @@ impl MetadataRepositoryImpl {
         }
     }
 
-    fn sort_snapshots_in_dependency_order(&self, snapshots: &mut Vec<DatasetSnapshot>) {
-        if snapshots.len() > 1 {
-            unimplemented!();
+    fn sort_snapshots_in_dependency_order(
+        &self,
+        mut snapshots: LinkedList<DatasetSnapshot>,
+    ) -> Vec<DatasetSnapshot> {
+        let mut ordered = Vec::with_capacity(snapshots.len());
+        let mut pending: HashSet<DatasetIDBuf> = snapshots.iter().map(|s| s.id.clone()).collect();
+        let mut added: HashSet<DatasetIDBuf> = HashSet::new();
+
+        // TODO: cycle detection
+        while !snapshots.is_empty() {
+            let head = snapshots.pop_front().unwrap();
+            let has_deps = match head.source {
+                DatasetSource::Derivative { ref inputs, .. } => {
+                    inputs.iter().any(|id| pending.contains(id))
+                }
+                _ => false,
+            };
+            if !has_deps {
+                pending.remove(&head.id);
+                added.insert(head.id.clone());
+                ordered.push(head);
+            } else {
+                snapshots.push_back(head);
+            }
         }
+        ordered
     }
 }
 
@@ -54,6 +78,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Box::new(ListDatasetsIter { rd: read_dir })
     }
 
+    // TODO: Remove?
     fn visit_dataset_dependencies(
         &self,
         dataset_id: &DatasetID,
@@ -137,10 +162,9 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
     fn add_datasets(
         &mut self,
-        snapshots: Vec<DatasetSnapshot>,
+        snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)> {
-        let mut snapshots_ordered = snapshots;
-        self.sort_snapshots_in_dependency_order(&mut snapshots_ordered);
+        let snapshots_ordered = self.sort_snapshots_in_dependency_order(snapshots.collect());
 
         snapshots_ordered
             .into_iter()
@@ -259,11 +283,11 @@ impl DependencyOrderingVisitor {
 }
 
 impl DatasetDependencyVisitor for DependencyOrderingVisitor {
-    fn enter(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain) -> bool {
+    fn enter(&mut self, dataset_id: &DatasetID, _meta_chain: &dyn MetadataChain) -> bool {
         !self.queued.contains(dataset_id)
     }
 
-    fn exit(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain) {
+    fn exit(&mut self, dataset_id: &DatasetID, _meta_chain: &dyn MetadataChain) {
         self.queue.push(dataset_id.to_owned());
         self.queued.insert(dataset_id.to_owned());
     }

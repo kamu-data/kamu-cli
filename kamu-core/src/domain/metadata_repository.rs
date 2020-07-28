@@ -20,7 +20,7 @@ pub trait MetadataRepository {
 
     fn add_datasets(
         &mut self,
-        snapshots: Vec<DatasetSnapshot>,
+        snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)>;
 
     // TODO: Separate mutable and immutable paths

@@ -13,6 +13,8 @@ pub enum Error {
     NotInWorkspace,
     #[error("Operation aborted")]
     Aborted,
+    #[error("Partial failure")]
+    PartialFailure,
     #[error("IO error: {source}")]
     IOError {
         #[from]

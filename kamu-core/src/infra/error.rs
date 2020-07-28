@@ -28,7 +28,7 @@ pub enum SerdeError {
 
 impl From<serde_yaml::Error> for InfraError {
     fn from(v: serde_yaml::Error) -> Self {
-        Self::SerdeError(v.into())
+        Self::from(SerdeError::from(v))
     }
 }
 
