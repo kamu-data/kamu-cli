@@ -78,6 +78,10 @@ impl CompleteCommand {
 }
 
 impl Command for CompleteCommand {
+    fn needs_workspace(&self) -> bool {
+        false
+    }
+
     fn run(&mut self) -> Result<(), Error> {
         let mut args = match shlex::split(&self.input) {
             Some(v) => v,

@@ -1,4 +1,5 @@
 use crate::domain::*;
+use crate::infra::serde::yaml::*;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -81,9 +82,12 @@ impl PullService for PullServiceImpl {
                 .collect()
         };
 
-        unimplemented!();
+        let (root_datasets, deriv_datasets): (Vec<_>, Vec<_>) = datasets_to_pull
+            .into_iter()
+            .partition(|id| metadata_repo.get_summary(id).unwrap().kind == DatasetKind::Root);
 
-        //let (root_datasets, deriv_datasets) = datasets_to_pull.into_iter().partition(|id| metadata_repo.)
+        println!("Root: {:?}\nDeriv: {:?}", root_datasets, deriv_datasets);
+        unimplemented!();
 
         /*results.extend(
             self.ingest_svc

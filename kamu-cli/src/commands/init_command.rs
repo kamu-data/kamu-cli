@@ -34,7 +34,12 @@ impl Command for InitCommand {
         writeln!(gitignore, "/config")?;
         gitignore.sync_all()?;
 
-        eprintln!("Initialized an empty workspace");
+        eprintln!(
+            "{}",
+            console::style("Initialized an empty workspace")
+                .green()
+                .bold()
+        );
         Ok(())
     }
 }

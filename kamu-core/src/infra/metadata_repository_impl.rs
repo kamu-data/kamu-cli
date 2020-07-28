@@ -41,21 +41,6 @@ impl MetadataRepositoryImpl {
         }
     }
 
-    // TODO: Avoid iterating blocks
-    fn get_dependencies(
-        &self,
-        metadata_chain: &MetadataChainImpl,
-    ) -> impl Iterator<Item = DatasetIDBuf> {
-        metadata_chain
-            .iter_blocks()
-            .filter_map(|b| b.source)
-            .filter_map(|s| match s {
-                DatasetSource::Root { .. } => None,
-                DatasetSource::Derivative { inputs, .. } => Some(inputs),
-            })
-            .flatten()
-    }
-
     fn sort_snapshots_in_dependency_order(&self, snapshots: &mut Vec<DatasetSnapshot>) {
         if snapshots.len() > 1 {
             unimplemented!();
@@ -76,7 +61,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
     ) -> Result<(), DomainError> {
         let meta_chain = self.get_metadata_chain_impl(dataset_id)?;
         if visitor.enter(dataset_id, &meta_chain) {
-            for input in self.get_dependencies(&meta_chain) {
+            let summary = self.get_summary(dataset_id)?;
+            for input in summary.dependencies {
                 self.visit_dataset_dependencies(&input, visitor)?;
             }
             visitor.exit(dataset_id, &meta_chain);
@@ -108,7 +94,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
             ));
         }
 
-        match snapshot.source {
+        let (kind, dependencies) = match snapshot.source {
             DatasetSource::Derivative { ref inputs, .. } => {
                 for input_id in inputs {
                     if !self.dataset_exists(input_id) {
@@ -120,9 +106,10 @@ impl MetadataRepository for MetadataRepositoryImpl {
                         ));
                     }
                 }
+                (DatasetKind::Derivative, inputs.clone())
             }
-            _ => (),
-        }
+            DatasetSource::Root { .. } => (DatasetKind::Root, Vec::new()),
+        };
 
         let first_block = MetadataBlock {
             block_hash: "".to_owned(),
@@ -135,6 +122,16 @@ impl MetadataRepository for MetadataRepositoryImpl {
         };
 
         MetadataChainImpl::create(dataset_metadata_dir, first_block).map_err(|e| e.into())?;
+
+        let summary = DatasetSummary {
+            kind: kind,
+            dependencies: dependencies,
+            last_pulled: None,
+            num_records: 0,
+            data_size: 0,
+        };
+
+        self.update_summary(&snapshot.id, summary)?;
         Ok(())
     }
 
@@ -161,6 +158,63 @@ impl MetadataRepository for MetadataRepositoryImpl {
     ) -> Result<Box<dyn MetadataChain>, DomainError> {
         self.get_metadata_chain_impl(dataset_id)
             .map(|c| Box::new(c) as Box<dyn MetadataChain>)
+    }
+
+    fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError> {
+        let path = self
+            .workspace_layout
+            .datasets_dir
+            .join(dataset_id)
+            .join("summary");
+        if !path.exists() {
+            Err(DomainError::does_not_exist(
+                ResourceKind::Dataset,
+                dataset_id.as_str().to_owned(),
+            ))
+        } else {
+            let file = std::fs::File::open(path.clone()).unwrap_or_else(|e| {
+                panic!(
+                    "Failed to open the summary file at {}: {}",
+                    path.display(),
+                    e
+                )
+            });
+
+            let manifest: Manifest<DatasetSummary> =
+                serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+                    panic!(
+                        "Failed to deserialize the DatasetSummary at {}: {}",
+                        path.display(),
+                        e
+                    )
+                });
+
+            assert_eq!(manifest.kind, "DatasetSummary");
+            Ok(manifest.content)
+        }
+    }
+
+    fn update_summary(
+        &self,
+        dataset_id: &DatasetID,
+        summary: DatasetSummary,
+    ) -> Result<(), DomainError> {
+        let path = self
+            .workspace_layout
+            .datasets_dir
+            .join(dataset_id)
+            .join("summary");
+
+        let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
+
+        let manifest = Manifest {
+            api_version: 1,
+            kind: "DatasetSummary".to_owned(),
+            content: summary,
+        };
+
+        serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
+        Ok(())
     }
 }
 

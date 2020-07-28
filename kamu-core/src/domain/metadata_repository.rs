@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::infra::serde::yaml::DatasetSnapshot;
+use crate::infra::serde::yaml::*;
 
 pub trait MetadataRepository {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
@@ -29,6 +29,14 @@ pub trait MetadataRepository {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Box<dyn MetadataChain>, DomainError>;
+
+    fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError>;
+
+    fn update_summary(
+        &self,
+        dataset_id: &DatasetID,
+        summary: DatasetSummary,
+    ) -> Result<(), DomainError>;
 }
 
 pub trait DatasetDependencyVisitor {
