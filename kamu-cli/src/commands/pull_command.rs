@@ -216,7 +216,7 @@ impl PrettyIngestProgress {
         }
     }
 
-    fn new_progress_bar(prefix: &str, len: u64) -> indicatif::ProgressBar {
+    fn new_progress_bar(prefix: &str, pos: u64, len: u64) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
@@ -224,6 +224,7 @@ impl PrettyIngestProgress {
             .progress_chars("#>-"));
         pb.set_prefix(prefix);
         pb.set_length(len);
+        pb.set_position(pos);
         pb
     }
 
@@ -278,15 +279,16 @@ impl IngestListener for PrettyIngestProgress {
                 ProgressStyle::Spinner => self
                     .multi_progress
                     .add(Self::new_spinner(&self.message_for_stage(stage))),
-                ProgressStyle::Bar => self
-                    .multi_progress
-                    .add(Self::new_progress_bar(&self.dataset_id, out_of as u64)),
+                ProgressStyle::Bar => {
+                    self.multi_progress
+                        .add(Self::new_progress_bar(&self.dataset_id, n, out_of))
+                }
             }
         } else {
             self.curr_progress
                 .set_message(&self.message_for_stage(stage));
             if self.curr_progress_style == ProgressStyle::Bar {
-                self.curr_progress.set_position(n as u64)
+                self.curr_progress.set_position(n)
             }
         }
     }

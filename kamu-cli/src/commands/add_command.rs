@@ -105,11 +105,14 @@ impl Command for AddCommand {
 
         let (mut added, mut errors) = (0, 0);
 
-        for (id, res) in self
+        let mut results = self
             .metadata_repo
             .borrow_mut()
-            .add_datasets(&mut snapshots.into_iter())
-        {
+            .add_datasets(&mut snapshots.into_iter());
+
+        results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
+
+        for (id, res) in results {
             match res {
                 Ok(_) => {
                     added += 1;
