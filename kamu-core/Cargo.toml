@@ -18,6 +18,7 @@ serde_yaml = "*"
 
 # Ingest
 url = "*"
+fs_extra = "*"  # Copy files with progress
 
 # Utils
 rand = "*"
@@ -29,3 +30,4 @@ tempfile = "*"
 
 [dev-dependencies]
 kamu-test = { path = "../kamu-core-test" }
+filetime = "*"

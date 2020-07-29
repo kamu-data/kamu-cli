@@ -155,9 +155,12 @@ impl PrettyPullProgress {
     }
 
     fn draw(&self) {
-        while !self.finished.load(Ordering::SeqCst) {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+        loop {
             self.multi_progress.join().unwrap();
+            if self.finished.load(Ordering::SeqCst) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 
@@ -265,7 +268,7 @@ impl PrettyIngestProgress {
 }
 
 impl IngestListener for PrettyIngestProgress {
-    fn on_stage_progress(&mut self, stage: IngestStage, n: usize, out_of: usize) {
+    fn on_stage_progress(&mut self, stage: IngestStage, n: u64, out_of: u64) {
         if self.curr_progress.is_finished()
             || self.curr_progress_style != self.style_for_stage(stage)
         {

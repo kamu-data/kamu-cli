@@ -1,3 +1,4 @@
+use super::fetch::*;
 use crate::domain::*;
 use crate::infra::serde::yaml::*;
 use crate::infra::*;
@@ -35,10 +36,40 @@ impl IngestTask<'_> {
     // Note: Can be called from multiple threads
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         self.listener.begin();
-        println!("{} {:?}", self.dataset_id, self.layout);
-        println!("{:?}", self.source);
-        unimplemented!();
+
+        self.listener
+            .on_stage_progress(IngestStage::CheckCache, 0, 1);
+
+        self.maybe_fetch()?;
+        Ok(IngestResult::UpToDate)
     }
 
-    fn maybe_download() {}
+    fn maybe_fetch(&mut self) -> Result<FetchResult, FetchError> {
+        let fetch_svc = FetchService::new();
+        let checkpoint_path = self.layout.cache_dir.join("fetch.yaml");
+        let target_path = self.layout.cache_dir.join("fetched.bin");
+        let mut listener = FetchProgressListenerBridge {
+            listener: self.listener,
+        };
+        fetch_svc.fetch(
+            &self.source.fetch,
+            &checkpoint_path,
+            &target_path,
+            Some(&mut listener),
+        )
+    }
+}
+
+struct FetchProgressListenerBridge<'a> {
+    listener: &'a mut dyn IngestListener,
+}
+
+impl FetchProgressListener for FetchProgressListenerBridge<'_> {
+    fn on_progress(&mut self, progress: &FetchProgress) {
+        self.listener.on_stage_progress(
+            IngestStage::Fetch,
+            progress.fetched_bytes,
+            progress.total_bytes,
+        );
+    }
 }

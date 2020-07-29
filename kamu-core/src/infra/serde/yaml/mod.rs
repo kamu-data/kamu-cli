@@ -1,4 +1,4 @@
-mod formats;
+pub mod formats;
 
 mod dtos_odf;
 pub use dtos_odf::*;

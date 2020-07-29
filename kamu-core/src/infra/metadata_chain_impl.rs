@@ -148,7 +148,7 @@ impl BlockReader {
   fn read_block(&self, hash: &str) -> MetadataBlock {
     let path = self.blocks_dir.join(hash);
 
-    let file = std::fs::File::open(path.clone())
+    let file = std::fs::File::open(&path)
       .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
 
     let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {

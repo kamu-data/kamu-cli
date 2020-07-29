@@ -1,3 +1,4 @@
+use super::ingest::*;
 use crate::domain::*;
 use crate::infra::*;
 

@@ -1,5 +1,7 @@
 use crate::domain::{DatasetID, DatasetIDBuf};
 
+use std::backtrace::Backtrace;
+use std::path::Path;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -43,7 +45,7 @@ pub enum IngestStage {
 
 pub trait IngestListener: Send {
     fn begin(&mut self) {}
-    fn on_stage_progress(&mut self, _stage: IngestStage, _n: usize, _out_of: usize) {}
+    fn on_stage_progress(&mut self, _stage: IngestStage, _n: u64, _out_of: u64) {}
     fn warn_uncacheable(&mut self) {}
     fn success(&mut self, _result: &IngestResult) {}
     fn error(&mut self, _stage: IngestStage, _error: &IngestError) {}
@@ -68,7 +70,7 @@ impl IngestMultiListener for NullIngestMultiListener {}
 #[derive(Debug, Error)]
 pub enum IngestError {
     #[error("Fetch stage error")]
-    FetchError,
+    FetchError(#[from] FetchError),
     //#[error("Preparation stage error")]
     //PrepareError,
     //#[error("Read error")]
@@ -77,4 +79,25 @@ pub enum IngestError {
     //SchemaError,
     //#[error("Engine error")]
     //EngineError,
+}
+
+#[derive(Error, Debug)]
+pub enum FetchError {
+    #[error("Source not found at {path}")]
+    NotFound { path: String, backtrace: Backtrace },
+    #[error("{0}")]
+    InternalError(#[from] Box<dyn std::error::Error + Send>),
+}
+
+impl FetchError {
+    pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
+        FetchError::InternalError(Box::new(e))
+    }
+
+    pub fn not_found<S: AsRef<Path>>(path: S) -> Self {
+        FetchError::NotFound {
+            path: path.as_ref().to_str().unwrap().to_owned(),
+            backtrace: Backtrace::capture(),
+        }
+    }
 }
