@@ -4,6 +4,7 @@ use kamu_cli::commands::*;
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 fn main() {
     let pull_svc = Rc::new(RefCell::new(TestPullService {}));
@@ -19,11 +20,14 @@ impl PullService for TestPullService {
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
         _recursive: bool,
         _all: bool,
-        ingest_listener: Option<&mut dyn IngestMultiListener>,
-        _transform_listener: Option<&mut dyn TransformMultiListener>,
+        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        _transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let id = DatasetIDBuf::try_from("org.geonames.cities").unwrap();
-        let mut listener = ingest_listener.unwrap().begin_ingest(&id).unwrap();
+
+        let multi_listener = ingest_listener.unwrap();
+        let single_listener = multi_listener.lock().unwrap().begin_ingest(&id).unwrap();
+        let mut listener = single_listener.lock().unwrap();
 
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
 

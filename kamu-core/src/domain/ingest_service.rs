@@ -2,6 +2,7 @@ use crate::domain::{DatasetID, DatasetIDBuf};
 
 use std::backtrace::Backtrace;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -12,13 +13,13 @@ pub trait IngestService {
     fn ingest(
         &mut self,
         dataset_id: &DatasetID,
-        listener: Option<Box<dyn IngestListener>>,
+        listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        listener: Option<&mut dyn IngestMultiListener>,
+        listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
 }
 
@@ -55,7 +56,7 @@ pub struct NullIngestListener;
 impl IngestListener for NullIngestListener {}
 
 pub trait IngestMultiListener {
-    fn begin_ingest(&mut self, _dataset_id: &DatasetID) -> Option<Box<dyn IngestListener>> {
+    fn begin_ingest(&mut self, _dataset_id: &DatasetID) -> Option<Arc<Mutex<dyn IngestListener>>> {
         None
     }
 }
@@ -71,8 +72,8 @@ impl IngestMultiListener for NullIngestMultiListener {}
 pub enum IngestError {
     #[error("Fetch stage error")]
     FetchError(#[from] FetchError),
-    //#[error("Preparation stage error")]
-    //PrepareError,
+    #[error("Preparation stage error")]
+    PrepError(#[from] PrepError),
     //#[error("Read error")]
     //ReadError
     //#[error("Schema error")]
@@ -99,5 +100,17 @@ impl FetchError {
             path: path.as_ref().to_str().unwrap().to_owned(),
             backtrace: Backtrace::capture(),
         }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum PrepError {
+    #[error("{0}")]
+    InternalError(#[from] Box<dyn std::error::Error + Send>),
+}
+
+impl PrepError {
+    pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
+        PrepError::InternalError(Box::new(e))
     }
 }

@@ -1,5 +1,6 @@
 use crate::domain::{DatasetID, DatasetIDBuf};
 
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -10,13 +11,13 @@ pub trait TransformService {
     fn transform(
         &mut self,
         dataset_id: &DatasetID,
-        listener: Option<Box<dyn TransformListener>>,
+        listener: Option<Arc<Mutex<dyn TransformListener>>>,
     ) -> Result<TransformResult, TransformError>;
 
     fn transform_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        listener: Option<&mut dyn TransformMultiListener>,
+        listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)>;
 }
 
@@ -40,7 +41,10 @@ pub struct NullTransformListener;
 impl TransformListener for NullTransformListener {}
 
 pub trait TransformMultiListener {
-    fn begin_transform(&mut self, _dataset_id: &DatasetID) -> Option<Box<dyn TransformListener>> {
+    fn begin_transform(
+        &mut self,
+        _dataset_id: &DatasetID,
+    ) -> Option<Arc<Mutex<dyn TransformListener>>> {
         None
     }
 }

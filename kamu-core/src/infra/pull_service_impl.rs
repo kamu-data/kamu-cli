@@ -3,6 +3,7 @@ use crate::domain::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub struct PullServiceImpl {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
@@ -110,8 +111,8 @@ impl PullService for PullServiceImpl {
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         recursive: bool,
         all: bool,
-        mut ingest_listener: Option<&mut dyn IngestMultiListener>,
-        mut transform_listener: Option<&mut dyn TransformMultiListener>,
+        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let metadata_repo = self.metadata_repo.borrow();
 
@@ -147,7 +148,7 @@ impl PullService for PullServiceImpl {
                     .borrow_mut()
                     .ingest_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
-                        ingest_listener.as_mut().map_or(None, |l| Some(*l)),
+                        ingest_listener.clone(),
                     )
                     .into_iter()
                     .map(|(id, res)| (id, Self::convert_ingest_result(res)))
@@ -157,7 +158,7 @@ impl PullService for PullServiceImpl {
                     .borrow_mut()
                     .transform_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
-                        transform_listener.as_mut().map_or(None, |l| Some(*l)),
+                        transform_listener.clone(),
                     )
                     .into_iter()
                     .map(|(id, res)| (id, Self::convert_transform_result(res)))

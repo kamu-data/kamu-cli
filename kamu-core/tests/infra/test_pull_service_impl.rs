@@ -6,6 +6,7 @@ use itertools::Itertools;
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 fn id(s: &str) -> DatasetIDBuf {
     DatasetIDBuf::try_from(s).unwrap()
@@ -108,7 +109,7 @@ impl IngestService for TestIngestService {
     fn ingest(
         &mut self,
         _dataset_id: &DatasetID,
-        _maybe_listener: Option<Box<dyn IngestListener>>,
+        _maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!();
     }
@@ -116,7 +117,7 @@ impl IngestService for TestIngestService {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        _maybe_multi_listener: Option<&mut dyn IngestMultiListener>,
+        _maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
         let results = ids
@@ -142,7 +143,7 @@ impl TransformService for TestTransformService {
     fn transform(
         &mut self,
         _dataset_id: &DatasetID,
-        _maybe_listener: Option<Box<dyn TransformListener>>,
+        _maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
     ) -> Result<TransformResult, TransformError> {
         unimplemented!();
     }
@@ -150,7 +151,7 @@ impl TransformService for TestTransformService {
     fn transform_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        _maybe_multi_listener: Option<&mut dyn TransformMultiListener>,
+        _maybe_multi_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
         let results = ids

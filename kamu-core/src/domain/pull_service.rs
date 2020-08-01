@@ -2,6 +2,7 @@ use super::ingest_service::*;
 use super::transform_service::*;
 use crate::domain::{DatasetID, DatasetIDBuf};
 
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,8 +15,8 @@ pub trait PullService {
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         recursive: bool,
         all: bool,
-        ingest_listener: Option<&mut dyn IngestMultiListener>,
-        transform_listener: Option<&mut dyn TransformMultiListener>,
+        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
 }
 

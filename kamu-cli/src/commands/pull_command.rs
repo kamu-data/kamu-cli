@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::error::Error as StdError;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -56,23 +56,22 @@ impl Command for PullCommand {
             }
         };
 
-        let mut pull_progress = PrettyPullProgress::new();
-        let mut transform_progress = pull_progress.clone();
-        let pull_progress_in_thread = pull_progress.clone();
+        let pull_progress = PrettyPullProgress::new();
+        let listener = Arc::new(Mutex::new(pull_progress.clone()));
 
         let draw_thread = std::thread::spawn(move || {
-            pull_progress_in_thread.draw();
+            pull_progress.draw();
         });
 
         let results = self.pull_svc.borrow_mut().pull_multi(
             &mut dataset_ids.iter().map(|id| id.as_ref()),
             self.recursive,
             self.all,
-            Some(&mut pull_progress),
-            Some(&mut transform_progress),
+            Some(listener.clone()),
+            Some(listener.clone()),
         );
 
-        pull_progress.finish();
+        listener.lock().unwrap().finish();
         draw_thread.join().unwrap();
 
         let mut updated = 0;
@@ -170,20 +169,23 @@ impl PrettyPullProgress {
 }
 
 impl IngestMultiListener for PrettyPullProgress {
-    fn begin_ingest(&mut self, dataset_id: &DatasetID) -> Option<Box<dyn IngestListener>> {
-        Some(Box::new(PrettyIngestProgress::new(
+    fn begin_ingest(&mut self, dataset_id: &DatasetID) -> Option<Arc<Mutex<dyn IngestListener>>> {
+        Some(Arc::new(Mutex::new(PrettyIngestProgress::new(
             dataset_id,
             self.multi_progress.clone(),
-        )))
+        ))))
     }
 }
 
 impl TransformMultiListener for PrettyPullProgress {
-    fn begin_transform(&mut self, dataset_id: &DatasetID) -> Option<Box<dyn TransformListener>> {
-        Some(Box::new(PrettyTransformProgress::new(
+    fn begin_transform(
+        &mut self,
+        dataset_id: &DatasetID,
+    ) -> Option<Arc<Mutex<dyn TransformListener>>> {
+        Some(Arc::new(Mutex::new(PrettyTransformProgress::new(
             dataset_id,
             self.multi_progress.clone(),
-        )))
+        ))))
     }
 }
 

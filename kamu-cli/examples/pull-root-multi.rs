@@ -4,6 +4,7 @@ use kamu_cli::commands::*;
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 fn main() {
     let pull_svc = Rc::new(RefCell::new(TestPullService {}));
@@ -16,7 +17,7 @@ pub struct TestPullService;
 impl TestPullService {
     fn ingest(
         id: DatasetIDBuf,
-        l: Box<dyn IngestListener>,
+        l: Arc<Mutex<dyn IngestListener>>,
     ) -> (DatasetIDBuf, Result<PullResult, PullError>) {
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
         let sleep_rand = |min: u64, max: u64| {
@@ -25,7 +26,7 @@ impl TestPullService {
             std::thread::sleep(std::time::Duration::from_millis(t));
         };
 
-        let mut listener = l;
+        let mut listener = l.lock().unwrap();
 
         listener.begin();
 
@@ -75,8 +76,8 @@ impl PullService for TestPullService {
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
         _recursive: bool,
         _all: bool,
-        ingest_listener: Option<&mut dyn IngestMultiListener>,
-        _transform_listener: Option<&mut dyn TransformMultiListener>,
+        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        _transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         let in_l = ingest_listener.unwrap();
         let handles: Vec<_> = [
@@ -87,7 +88,7 @@ impl PullService for TestPullService {
         .iter()
         .map(|s| DatasetIDBuf::try_from(*s).unwrap())
         .map(|id| {
-            let listener = in_l.begin_ingest(&id).unwrap();
+            let listener = in_l.lock().unwrap().begin_ingest(&id).unwrap();
             std::thread::spawn(move || Self::ingest(id, listener))
         })
         .collect();
