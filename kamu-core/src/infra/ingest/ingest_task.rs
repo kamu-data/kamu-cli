@@ -3,8 +3,6 @@ use crate::domain::*;
 use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
-use chrono::Utc;
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 
 pub struct IngestTask {
@@ -43,15 +41,49 @@ impl IngestTask {
 
     // Note: Can be called from multiple threads
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
-        {
-            let mut listener = self.listener.lock().unwrap();
-            listener.begin();
-            listener.on_stage_progress(IngestStage::CheckCache, 0, 1);
-        }
+        self.listener.lock().unwrap().begin();
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::CheckCache, 0, 1);
 
         let fetch_result = self.maybe_fetch()?;
+
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::Prepare, 0, 1);
+
         let prepare_result = self.maybe_prepare(&fetch_result)?;
-        Ok(IngestResult::UpToDate)
+
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::Read, 0, 1);
+
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::Preprocess, 0, 1);
+
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::Merge, 0, 1);
+
+        self.listener
+            .lock()
+            .unwrap()
+            .on_stage_progress(IngestStage::Commit, 0, 1);
+
+        let res = match prepare_result.was_up_to_date {
+            true => IngestResult::UpToDate,
+            false => IngestResult::Updated {
+                block_hash: "woooo?".to_owned(),
+            },
+        };
+
+        Ok(res)
     }
 
     fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, FetchError> {
@@ -94,7 +126,9 @@ impl IngestTask {
                     let prep_steps = self.source.prepare.as_ref().unwrap_or(&null_steps);
                     self.prep_service.prepare(
                         prep_steps,
+                        fetch_result.checkpoint.last_fetched,
                         old_checkpoint,
+                        &self.layout.cache_dir.join("fetched.bin"),
                         &self.layout.cache_dir.join("prepared.bin"),
                     )
                 },
