@@ -9,16 +9,19 @@ use std::sync::{Arc, Mutex};
 pub struct IngestServiceImpl {
     workspace_layout: WorkspaceLayout,
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    engine_factory: Arc<Mutex<EngineFactory>>,
 }
 
 impl IngestServiceImpl {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        engine_factory: Arc<Mutex<EngineFactory>>,
     ) -> Self {
         Self {
             workspace_layout: workspace_layout.clone(),
             metadata_repo: metadata_repo,
+            engine_factory: engine_factory,
         }
     }
 
@@ -39,7 +42,7 @@ impl IngestService for IngestServiceImpl {
             Arc::new(Mutex::new(NullIngestListener {}));
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        let mut meta_chain = self
+        let meta_chain = self
             .metadata_repo
             .borrow()
             .get_metadata_chain(dataset_id)
@@ -47,7 +50,13 @@ impl IngestService for IngestServiceImpl {
 
         let layout = self.get_dataset_layout(dataset_id);
 
-        let mut ingest_task = IngestTask::new(dataset_id, layout, meta_chain.as_mut(), listener);
+        let mut ingest_task = IngestTask::new(
+            dataset_id,
+            layout,
+            meta_chain,
+            listener,
+            self.engine_factory.clone(),
+        );
 
         ingest_task.ingest()
     }
@@ -65,7 +74,8 @@ impl IngestService for IngestServiceImpl {
             .map(|id_ref| {
                 let id = id_ref.to_owned();
                 let layout = self.get_dataset_layout(&id);
-                let mut meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
+                let meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
+                let engine_factory = self.engine_factory.clone();
 
                 let null_listener = Arc::new(Mutex::new(NullIngestListener {}));
                 let listener = multi_listener
@@ -78,7 +88,7 @@ impl IngestService for IngestServiceImpl {
                     .name("ingest_multi".to_owned())
                     .spawn(move || {
                         let mut ingest_task =
-                            IngestTask::new(&id, layout, meta_chain.as_mut(), listener);
+                            IngestTask::new(&id, layout, meta_chain, listener, engine_factory);
 
                         let res = ingest_task.ingest();
                         (id, res)

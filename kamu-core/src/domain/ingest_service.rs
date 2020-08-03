@@ -1,3 +1,4 @@
+use super::EngineError;
 use crate::domain::{DatasetID, DatasetIDBuf};
 
 use std::backtrace::Backtrace;
@@ -70,47 +71,23 @@ impl IngestMultiListener for NullIngestMultiListener {}
 
 #[derive(Debug, Error)]
 pub enum IngestError {
-    #[error("Fetch stage error")]
-    FetchError(#[from] FetchError),
-    #[error("Preparation stage error")]
-    PrepError(#[from] PrepError),
-    //#[error("Read error")]
-    //ReadError
-    //#[error("Schema error")]
-    //SchemaError,
-    //#[error("Engine error")]
-    //EngineError,
-}
-
-#[derive(Error, Debug)]
-pub enum FetchError {
     #[error("Source not found at {path}")]
     NotFound { path: String, backtrace: Backtrace },
+    #[error("{0}")]
+    EngineError(#[from] EngineError),
     #[error("{0}")]
     InternalError(#[from] Box<dyn std::error::Error + Send>),
 }
 
-impl FetchError {
-    pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
-        FetchError::InternalError(Box::new(e))
-    }
-
+impl IngestError {
     pub fn not_found<S: AsRef<Path>>(path: S) -> Self {
-        FetchError::NotFound {
+        IngestError::NotFound {
             path: path.as_ref().to_str().unwrap().to_owned(),
             backtrace: Backtrace::capture(),
         }
     }
-}
 
-#[derive(Error, Debug)]
-pub enum PrepError {
-    #[error("{0}")]
-    InternalError(#[from] Box<dyn std::error::Error + Send>),
-}
-
-impl PrepError {
     pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
-        PrepError::InternalError(Box::new(e))
+        IngestError::InternalError(Box::new(e))
     }
 }

@@ -22,10 +22,10 @@ impl FetchService {
         old_checkpoint: Option<FetchCheckpoint>,
         target: &Path,
         listener: Option<&mut dyn FetchProgressListener>,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, FetchError> {
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         match fetch_step {
             FetchStep::Url(ref furl) => {
-                let url = Url::parse(&furl.url).map_err(|e| FetchError::internal(e))?;
+                let url = Url::parse(&furl.url).map_err(|e| IngestError::internal(e))?;
                 match url.scheme() {
                     "file" => self.fetch_file(
                         &url.to_file_path().unwrap(),
@@ -46,15 +46,15 @@ impl FetchService {
         old_checkpoint: Option<FetchCheckpoint>,
         target: &Path,
         maybe_listener: Option<&mut dyn FetchProgressListener>,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, FetchError> {
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         use fs_extra::file::*;
 
         let mut null_listener = NullFetchProgressListener {};
         let listener = maybe_listener.unwrap_or(&mut null_listener);
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => FetchError::not_found(path),
-            _ => FetchError::internal(e),
+            std::io::ErrorKind::NotFound => IngestError::not_found(path),
+            _ => IngestError::internal(e),
         })?;
 
         let mod_time: DateTime<Utc> = meta
@@ -93,7 +93,7 @@ impl FetchService {
         // TODO: Use symlinks
         // TODO: Support compression
         fs_extra::file::copy_with_progress(path, target, &options, handle)
-            .map_err(|e| FetchError::InternalError(Box::new(e)))?;
+            .map_err(|e| IngestError::internal(e))?;
 
         Ok(ExecutionResult {
             was_up_to_date: false,

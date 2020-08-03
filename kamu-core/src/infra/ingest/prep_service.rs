@@ -28,18 +28,21 @@ impl PrepService {
         _old_checkpoint: Option<PrepCheckpoint>,
         src_path: &Path,
         target_path: &Path,
-    ) -> Result<ExecutionResult<PrepCheckpoint>, PrepError> {
-        let step = prep_steps.get(0).unwrap();
+    ) -> Result<ExecutionResult<PrepCheckpoint>, IngestError> {
+        let mut stream: Box<dyn Stream> =
+            Box::new(File::open(src_path).map_err(|e| IngestError::internal(e))?);
 
-        let src_file = File::open(src_path).map_err(|e| PrepError::internal(e))?;
+        for step in prep_steps.iter() {
+            stream = match step {
+                PrepStep::Pipe(ref p) => Box::new(
+                    PipeStream::new(&p.command, stream).map_err(|e| IngestError::internal(e))?,
+                ),
+                _ => unimplemented!(),
+            };
+        }
 
-        let stream = match step {
-            PrepStep::Pipe(ref p) => self.pipe(p, src_file).map_err(|e| PrepError::internal(e))?,
-            _ => unimplemented!(),
-        };
-
-        let target_file = File::create(target_path).map_err(|e| PrepError::internal(e))?;
-        let sink = FileSink::new(target_file, stream);
+        let target_file = File::create(target_path).map_err(|e| IngestError::internal(e))?;
+        let sink = Box::new(FileSink::new(target_file, stream));
 
         sink.join();
 
@@ -51,20 +54,6 @@ impl PrepService {
             },
         })
     }
-
-    fn pipe(
-        &self,
-        step: &PrepStepPipe,
-        src: impl Stream + 'static,
-    ) -> Result<PipeStream, std::io::Error> {
-        PipeStream::new(&step.command, src)
-    }
-}
-
-#[derive(Debug)]
-pub struct PrepResult {
-    was_updated: bool,
-    checkpoint: PrepCheckpoint,
 }
 
 #[skip_serializing_none]
@@ -85,7 +74,7 @@ pub struct PrepCheckpoint {
 
 trait Stream: Send {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError>;
-    fn join(self);
+    fn join(self: Box<Self>);
 }
 
 impl Stream for std::fs::File {
@@ -93,7 +82,7 @@ impl Stream for std::fs::File {
         <std::fs::File as std::io::Read>::read(self, buf)
     }
 
-    fn join(self) {}
+    fn join(self: Box<Self>) {}
 }
 
 struct PipeStream {
@@ -102,7 +91,7 @@ struct PipeStream {
 }
 
 impl PipeStream {
-    fn new(cmd: &Vec<String>, mut input: impl Stream + 'static) -> Result<Self, IOError> {
+    fn new(cmd: &Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
         let process = Command::new(cmd.get(0).unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
@@ -139,7 +128,7 @@ impl Stream for PipeStream {
         self.stdout.read(buf)
     }
 
-    fn join(self) {
+    fn join(self: Box<Self>) {
         self.ingress.join().unwrap()
     }
 }
@@ -149,7 +138,7 @@ struct FileSink {
 }
 
 impl FileSink {
-    fn new(mut file: std::fs::File, mut input: impl Stream + 'static) -> Self {
+    fn new(mut file: std::fs::File, mut input: Box<dyn Stream>) -> Self {
         let ingress = std::thread::Builder::new()
             .name("file_sink".to_owned())
             .spawn(move || {
@@ -170,7 +159,7 @@ impl FileSink {
         Self { ingress: ingress }
     }
 
-    fn join(self) {
+    fn join(self: Box<Self>) {
         self.ingress.join().unwrap();
     }
 }

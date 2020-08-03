@@ -10,8 +10,9 @@ use console::style;
 use std::backtrace::BacktraceStatus;
 use std::cell::RefCell;
 use std::error::Error as StdError;
-use std::path::PathBuf;
+use std::path::Path;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 const BINARY_NAME: &str = "kamu-rs";
 const VERSION: &str = "0.0.1";
@@ -20,9 +21,11 @@ fn main() {
     let workspace_layout = find_workspace();
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
         &workspace_layout,
         metadata_repo.clone(),
+        engine_factory,
     )));
     let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
         metadata_repo.clone(),
@@ -97,12 +100,13 @@ fn main() {
 }
 
 fn find_workspace() -> WorkspaceLayout {
-    let kamu_root_dir = PathBuf::from(".kamu");
+    let cwd = Path::new(".").canonicalize().unwrap();
+    let kamu_root_dir = cwd.join(".kamu");
     WorkspaceLayout {
         kamu_root_dir: kamu_root_dir.clone(),
         datasets_dir: kamu_root_dir.join("datasets"),
         remotes_dir: kamu_root_dir.join("remotes"),
-        local_volume_dir: PathBuf::from(".kamu.local"),
+        local_volume_dir: cwd.join(".kamu.local"),
     }
 }
 

@@ -13,6 +13,9 @@ pub use time_interval::*;
 
 // Services
 
+mod engine;
+pub use engine::*;
+
 mod ingest_service;
 pub use ingest_service::*;
 

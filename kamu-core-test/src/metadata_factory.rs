@@ -3,6 +3,7 @@ use kamu::domain::*;
 use kamu::infra::serde::yaml::*;
 
 use std::convert::TryFrom;
+use std::path::Path;
 
 pub struct MetadataFactory;
 
@@ -56,7 +57,7 @@ impl TransformBuilder {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DatasetSource Builder
+// DatasetSource Builder Root
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSourceBuilderRoot {
@@ -80,10 +81,42 @@ impl DatasetSourceBuilderRoot {
         }
     }
 
+    pub fn fetch(mut self, fetch_step: FetchStep) -> Self {
+        self.v = DatasetSourceRoot {
+            fetch: fetch_step,
+            ..self.v
+        };
+        self
+    }
+
+    pub fn fetch_file(self, path: &Path) -> Self {
+        self.fetch(FetchStep::Url(FetchStepUrl {
+            url: url::Url::from_file_path(path).unwrap().as_str().to_owned(),
+            event_time: None,
+            cache: None,
+        }))
+    }
+
+    pub fn read(mut self, read_step: ReadStep) -> Self {
+        self.v = DatasetSourceRoot {
+            read: read_step,
+            ..self.v
+        };
+        self
+    }
+
     pub fn build(self) -> DatasetSource {
         DatasetSource::Root(self.v)
     }
+
+    pub fn build_inner(self) -> DatasetSourceRoot {
+        self.v
+    }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// DatasetSource Builder Deriv
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSourceBuilderDeriv {
     v: DatasetSourceDerivative,
@@ -107,6 +140,10 @@ impl DatasetSourceBuilderDeriv {
 
     pub fn build(self) -> DatasetSource {
         DatasetSource::Derivative(self.v)
+    }
+
+    pub fn build_inner(self) -> DatasetSourceDerivative {
+        self.v
     }
 }
 

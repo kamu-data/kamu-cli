@@ -22,7 +22,7 @@ fn test_fetch_file_via_url() {
     let fetch_svc = FetchService::new();
 
     // No file to fetch
-    assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), FetchError::NotFound {..});
+    assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), IngestError::NotFound {..});
     assert!(!target_path.exists());
 
     std::fs::write(

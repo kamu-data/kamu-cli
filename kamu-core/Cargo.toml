@@ -27,7 +27,9 @@ indoc = "*"  # Compile-time unindent
 itertools = "*"
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
+users = "*"  # For getting uid:gid on Unix
 
 [dev-dependencies]
 kamu-test = { path = "../kamu-core-test" }
 filetime = "*"
+parquet = { git = "https://github.com/apache/arrow" }

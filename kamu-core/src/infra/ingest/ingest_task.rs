@@ -8,19 +8,22 @@ use std::sync::{Arc, Mutex};
 pub struct IngestTask {
     dataset_id: DatasetIDBuf,
     layout: DatasetLayout,
+    meta_chain: Box<dyn MetadataChain>,
     source: DatasetSourceRoot,
     listener: Arc<Mutex<dyn IngestListener>>,
     checkpointing_executor: CheckpointingExecutor,
     fetch_service: FetchService,
     prep_service: PrepService,
+    read_service: ReadService,
 }
 
 impl IngestTask {
     pub fn new<'a>(
         dataset_id: &DatasetID,
         layout: DatasetLayout,
-        meta_chain: &'a dyn MetadataChain,
+        meta_chain: Box<dyn MetadataChain>,
         listener: Arc<Mutex<dyn IngestListener>>,
+        engine_factory: Arc<Mutex<EngineFactory>>,
     ) -> Self {
         // TODO: this is expensive
         let source = match meta_chain.iter_blocks().filter_map(|b| b.source).next() {
@@ -31,21 +34,26 @@ impl IngestTask {
         Self {
             dataset_id: dataset_id.to_owned(),
             layout: layout,
+            meta_chain: meta_chain,
             source: source,
             listener: listener,
             checkpointing_executor: CheckpointingExecutor::new(),
             fetch_service: FetchService::new(),
             prep_service: PrepService::new(),
+            read_service: ReadService::new(engine_factory),
         }
     }
 
     // Note: Can be called from multiple threads
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         self.listener.lock().unwrap().begin();
+
         self.listener
             .lock()
             .unwrap()
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
+
+        let prev_hash = self.meta_chain.read_ref(&BlockRef::Head).unwrap();
 
         let fetch_result = self.maybe_fetch()?;
 
@@ -54,12 +62,14 @@ impl IngestTask {
             .unwrap()
             .on_stage_progress(IngestStage::Prepare, 0, 1);
 
-        let prepare_result = self.maybe_prepare(&fetch_result)?;
+        let prepare_result = self.maybe_prepare(fetch_result)?;
 
         self.listener
             .lock()
             .unwrap()
             .on_stage_progress(IngestStage::Read, 0, 1);
+
+        let read_result = self.maybe_read(prepare_result)?;
 
         self.listener
             .lock()
@@ -76,17 +86,17 @@ impl IngestTask {
             .unwrap()
             .on_stage_progress(IngestStage::Commit, 0, 1);
 
-        let res = match prepare_result.was_up_to_date {
-            true => IngestResult::UpToDate,
-            false => IngestResult::Updated {
-                block_hash: "woooo?".to_owned(),
-            },
+        let commit = self.maybe_commit(read_result, prev_hash)?;
+
+        let res = match commit {
+            None => IngestResult::UpToDate,
+            Some(hash) => IngestResult::Updated { block_hash: hash },
         };
 
         Ok(res)
     }
 
-    fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, FetchError> {
+    fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("fetch.yaml");
 
         self.checkpointing_executor
@@ -100,13 +110,13 @@ impl IngestTask {
                     }),
                 )
             })
-            .map_err(|e| FetchError::internal(e))?
+            .map_err(|e| IngestError::internal(e))?
     }
 
     fn maybe_prepare(
         &mut self,
-        fetch_result: &ExecutionResult<FetchCheckpoint>,
-    ) -> Result<ExecutionResult<PrepCheckpoint>, PrepError> {
+        fetch_result: ExecutionResult<FetchCheckpoint>,
+    ) -> Result<ExecutionResult<PrepCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("prep.yaml");
 
         self.checkpointing_executor
@@ -133,7 +143,57 @@ impl IngestTask {
                     )
                 },
             )
-            .map_err(|e| PrepError::internal(e))?
+            .map_err(|e| IngestError::internal(e))?
+    }
+
+    fn maybe_read(
+        &mut self,
+        prep_result: ExecutionResult<PrepCheckpoint>,
+    ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
+        let checkpoint_path = self.layout.cache_dir.join("read.yaml");
+
+        self.checkpointing_executor
+            .execute(
+                &checkpoint_path,
+                |old_checkpoint: Option<ReadCheckpoint>| {
+                    if let Some(ref cp) = old_checkpoint {
+                        if cp.for_prepared_at == prep_result.checkpoint.last_prepared {
+                            return Ok(ExecutionResult {
+                                was_up_to_date: true,
+                                checkpoint: old_checkpoint.unwrap(),
+                            });
+                        }
+                    }
+
+                    self.read_service.read(
+                        &self.dataset_id,
+                        &self.layout,
+                        &self.source,
+                        prep_result.checkpoint.last_prepared,
+                        old_checkpoint,
+                        &self.layout.cache_dir.join("prepared.bin"),
+                    )
+                },
+            )
+            .map_err(|e| IngestError::internal(e))?
+    }
+
+    fn maybe_commit(
+        &mut self,
+        read_result: ExecutionResult<ReadCheckpoint>,
+        prev_hash: String,
+    ) -> Result<Option<String>, IngestError> {
+        // TODO: Atomicity
+        if !read_result.was_up_to_date {
+            let new_block = MetadataBlock {
+                prev_block_hash: prev_hash,
+                ..read_result.checkpoint.last_block
+            };
+            let hash = self.meta_chain.append(new_block);
+            Ok(Some(hash))
+        } else {
+            Ok(None)
+        }
     }
 }
 
