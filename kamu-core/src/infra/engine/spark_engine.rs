@@ -1,6 +1,6 @@
-use super::docker_client::*;
 use crate::domain::*;
 use crate::infra::serde::yaml::*;
+use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
 use std::fs::File;
@@ -49,7 +49,6 @@ impl SparkEngine {
             .run_shell_cmd(
                 DockerRunArgs {
                     image: self.image.clone(),
-                    interactive: true,
                     volume_map: volume_map,
                     ..DockerRunArgs::default()
                 },
@@ -111,7 +110,7 @@ impl SparkEngine {
 
 impl Engine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        let in_out_dir = tempfile::tempdir()?;
+        let in_out_dir = tempfile::Builder::new().prefix("kamu-ingest").tempdir()?;
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);

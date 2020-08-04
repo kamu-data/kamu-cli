@@ -19,6 +19,8 @@ serde_yaml = "*"
 # Ingest
 url = "*"
 fs_extra = "*"  # Copy files with progress
+curl = { version = "*", features = ["http2", "protocol-ftp"] }
+curl-sys = "*"
 
 # Utils
 rand = "*"

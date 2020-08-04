@@ -47,12 +47,22 @@ pub struct IngestResponse {
 pub enum EngineError {
     #[error("Engine {id} was not found")]
     NotFound { id: String },
-    #[error("{0}")]
-    IOError(#[from] std::io::Error),
+    #[error("{source}")]
+    IOError {
+        #[from]
+        source: std::io::Error,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
     #[error("{0}")]
     ProcessError(#[from] ProcessError),
-    #[error("{0}")]
-    InternalError(#[from] Box<dyn std::error::Error + Send>),
+    #[error("Internal error: {source}")]
+    InternalError {
+        #[from]
+        source: Box<dyn std::error::Error + Send + Sync>,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -66,8 +76,11 @@ impl EngineError {
         EngineError::NotFound { id: id.to_owned() }
     }
 
-    pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
-        EngineError::InternalError(Box::new(e))
+    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        EngineError::InternalError {
+            source: e.into(),
+            backtrace: Backtrace::capture(),
+        }
     }
 }
 

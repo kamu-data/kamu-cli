@@ -69,25 +69,51 @@ impl IngestMultiListener for NullIngestMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
+type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
 #[derive(Debug, Error)]
 pub enum IngestError {
+    #[error("Source is unreachable {path}")]
+    Unreachable {
+        path: String,
+        #[source]
+        source: Option<BoxedError>,
+    },
     #[error("Source not found at {path}")]
-    NotFound { path: String, backtrace: Backtrace },
-    #[error("{0}")]
+    NotFound {
+        path: String,
+        #[source]
+        source: Option<BoxedError>,
+    },
+    #[error("Engine error: {0}")]
     EngineError(#[from] EngineError),
-    #[error("{0}")]
-    InternalError(#[from] Box<dyn std::error::Error + Send>),
+    #[error("Internal error: {source}")]
+    InternalError {
+        #[from]
+        source: BoxedError,
+        backtrace: Backtrace,
+    },
 }
 
 impl IngestError {
-    pub fn not_found<S: AsRef<Path>>(path: S) -> Self {
-        IngestError::NotFound {
+    pub fn unreachable<S: AsRef<Path>>(path: S, source: Option<BoxedError>) -> Self {
+        IngestError::Unreachable {
             path: path.as_ref().to_str().unwrap().to_owned(),
-            backtrace: Backtrace::capture(),
+            source: source,
         }
     }
 
-    pub fn internal(e: impl std::error::Error + 'static + Send) -> Self {
-        IngestError::InternalError(Box::new(e))
+    pub fn not_found<S: AsRef<Path>>(path: S, source: Option<BoxedError>) -> Self {
+        IngestError::NotFound {
+            path: path.as_ref().to_str().unwrap().to_owned(),
+            source: source,
+        }
+    }
+
+    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        IngestError::InternalError {
+            source: e.into(),
+            backtrace: Backtrace::capture(),
+        }
     }
 }

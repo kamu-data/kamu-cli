@@ -1,8 +1,9 @@
-pub mod engine;
+mod engine;
 pub use engine::*;
 
 pub mod ingest;
 pub mod serde;
+pub mod utils;
 
 mod error;
 pub use error::*;
