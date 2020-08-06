@@ -3,6 +3,7 @@ use crate::domain::*;
 use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
+use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
 
 pub struct IngestTask {
@@ -10,6 +11,7 @@ pub struct IngestTask {
     layout: DatasetLayout,
     meta_chain: Box<dyn MetadataChain>,
     source: DatasetSourceRoot,
+    vocab: DatasetVocabulary,
     listener: Arc<Mutex<dyn IngestListener>>,
     checkpointing_executor: CheckpointingExecutor,
     fetch_service: FetchService,
@@ -22,6 +24,7 @@ impl IngestTask {
         dataset_id: &DatasetID,
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
+        vocab: DatasetVocabulary,
         listener: Arc<Mutex<dyn IngestListener>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
     ) -> Self {
@@ -36,6 +39,7 @@ impl IngestTask {
             layout: layout,
             meta_chain: meta_chain,
             source: source,
+            vocab: vocab,
             listener: listener,
             checkpointing_executor: CheckpointingExecutor::new(),
             fetch_service: FetchService::new(),
@@ -56,6 +60,7 @@ impl IngestTask {
         let prev_hash = self.meta_chain.read_ref(&BlockRef::Head).unwrap();
 
         let fetch_result = self.maybe_fetch()?;
+        let source_event_time = fetch_result.checkpoint.source_event_time.clone();
 
         self.listener
             .lock()
@@ -69,7 +74,7 @@ impl IngestTask {
             .unwrap()
             .on_stage_progress(IngestStage::Read, 0, 1);
 
-        let read_result = self.maybe_read(prepare_result)?;
+        let read_result = self.maybe_read(prepare_result, source_event_time)?;
 
         self.listener
             .lock()
@@ -149,6 +154,7 @@ impl IngestTask {
     fn maybe_read(
         &mut self,
         prep_result: ExecutionResult<PrepCheckpoint>,
+        source_event_time: Option<DateTime<Utc>>,
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("read.yaml");
 
@@ -169,6 +175,8 @@ impl IngestTask {
                         &self.dataset_id,
                         &self.layout,
                         &self.source,
+                        source_event_time,
+                        &self.vocab,
                         prep_result.checkpoint.last_prepared,
                         old_checkpoint,
                         &self.layout.cache_dir.join("prepared.bin"),

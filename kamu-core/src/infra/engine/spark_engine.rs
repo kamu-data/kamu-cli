@@ -98,6 +98,10 @@ impl SparkEngine {
     }
 
     fn read_ingest_response(&self, path: &Path) -> Result<IngestResponse, EngineError> {
+        if !path.exists() {
+            return Err(ContractError::new("Engine did not write a response file").into());
+        }
+
         let file = File::open(path)?;
 
         let manifest: Manifest<IngestResponse> =

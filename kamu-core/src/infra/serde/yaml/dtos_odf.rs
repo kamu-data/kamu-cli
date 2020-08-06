@@ -331,6 +331,8 @@ pub enum CompressionFormat {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EventTimeSource {
   #[serde(rename_all = "camelCase")]
+  FromMetadata,
+  #[serde(rename_all = "camelCase")]
   FromPath(EventTimeSourceFromPath),
 }
 

@@ -123,6 +123,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
             last_pulled: None,
             num_records: 0,
             data_size: 0,
+            vocab: snapshot.vocab.unwrap_or_default(),
         };
 
         self.update_summary(&snapshot.id, summary)?;

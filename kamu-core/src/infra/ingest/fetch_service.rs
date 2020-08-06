@@ -35,13 +35,18 @@ impl FetchService {
                     "file" => self.fetch_file(
                         &url.to_file_path()
                             .map_err(|_| BadUrlError::new(&furl.url))?,
+                        furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
                         listener,
                     ),
-                    "http" | "https" => {
-                        self.fetch_http(&furl.url, old_checkpoint, target, listener)
-                    }
+                    "http" | "https" => self.fetch_http(
+                        &furl.url,
+                        furl.event_time.as_ref(),
+                        old_checkpoint,
+                        target,
+                        listener,
+                    ),
                     _ => unimplemented!(),
                 }
             }
@@ -49,9 +54,12 @@ impl FetchService {
         }
     }
 
+    // TODO: Validate event_time_source
+    // TODO: Support event time from ctime/modtime
     fn fetch_file(
         &self,
         path: &Path,
+        _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
         listener: &mut dyn FetchProgressListener,
@@ -82,6 +90,7 @@ impl FetchService {
             last_fetched: Utc::now(),
             last_modified: Some(mod_time),
             etag: None,
+            source_event_time: Some(mod_time),
         };
 
         let mut options = CopyOptions::new();
@@ -110,6 +119,7 @@ impl FetchService {
     fn fetch_http(
         &self,
         url: &str,
+        _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
         listener: &mut dyn FetchProgressListener,
@@ -196,6 +206,7 @@ impl FetchService {
                         last_fetched: Utc::now(),
                         last_modified: last_modified,
                         etag: etag,
+                        source_event_time: last_modified,
                     },
                 })
             }
@@ -246,6 +257,8 @@ pub struct FetchCheckpoint {
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub last_modified: Option<DateTime<Utc>>,
     pub etag: Option<String>,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub source_event_time: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

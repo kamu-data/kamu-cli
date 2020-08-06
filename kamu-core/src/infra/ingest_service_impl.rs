@@ -48,12 +48,20 @@ impl IngestService for IngestServiceImpl {
             .get_metadata_chain(dataset_id)
             .unwrap();
 
+        let vocab = self
+            .metadata_repo
+            .borrow()
+            .get_summary(dataset_id)
+            .unwrap()
+            .vocab;
+
         let layout = self.get_dataset_layout(dataset_id);
 
         let mut ingest_task = IngestTask::new(
             dataset_id,
             layout,
             meta_chain,
+            vocab,
             listener,
             self.engine_factory.clone(),
         );
@@ -75,6 +83,7 @@ impl IngestService for IngestServiceImpl {
                 let id = id_ref.to_owned();
                 let layout = self.get_dataset_layout(&id);
                 let meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
+                let vocab = self.metadata_repo.borrow().get_summary(&id).unwrap().vocab;
                 let engine_factory = self.engine_factory.clone();
 
                 let null_listener = Arc::new(Mutex::new(NullIngestListener {}));
@@ -87,8 +96,14 @@ impl IngestService for IngestServiceImpl {
                 std::thread::Builder::new()
                     .name("ingest_multi".to_owned())
                     .spawn(move || {
-                        let mut ingest_task =
-                            IngestTask::new(&id, layout, meta_chain, listener, engine_factory);
+                        let mut ingest_task = IngestTask::new(
+                            &id,
+                            layout,
+                            meta_chain,
+                            vocab,
+                            listener,
+                            engine_factory,
+                        );
 
                         let res = ingest_task.ingest();
                         (id, res)

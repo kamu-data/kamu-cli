@@ -27,6 +27,8 @@ impl ReadService {
         dataset_id: &DatasetID,
         dataset_layout: &DatasetLayout,
         source: &DatasetSourceRoot,
+        source_event_time: Option<DateTime<Utc>>,
+        vocab: &DatasetVocabulary,
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
@@ -36,12 +38,9 @@ impl ReadService {
         let request = IngestRequest {
             dataset_id: dataset_id.to_owned(),
             ingest_path: src_path.to_owned(),
-            event_time: None, // TODO
+            event_time: source_event_time,
             source: source.clone(),
-            dataset_vocab: DatasetVocabulary {
-                system_time_column: None,
-                event_time_column: None,
-            }, // TODO
+            dataset_vocab: vocab.clone(),
             checkpoints_dir: dataset_layout.checkpoints_dir.clone(),
             data_dir: dataset_layout.data_dir.clone(),
         };

@@ -280,7 +280,8 @@ fn serde_dataset_summary() {
             - bar
           lastPulled: '2020-01-01T12:00:00.000Z'
           dataSize: 1024
-          numRecords: 100"
+          numRecords: 100
+          vocab: {}"
     );
 
     let actual: Manifest<DatasetSummary> = serde_yaml::from_str(data).unwrap();
@@ -297,6 +298,7 @@ fn serde_dataset_summary() {
             last_pulled: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             data_size: 1024,
             num_records: 100,
+            vocab: DatasetVocabulary::default(),
         },
     };
 
@@ -316,7 +318,8 @@ fn serde_dataset_summary() {
                 - bar
               lastPulled: \"2020-01-01T12:00:00.000Z\"
               numRecords: 100
-              dataSize: 1024"
+              dataSize: 1024
+              vocab: {}"
         )
     );
 }

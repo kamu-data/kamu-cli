@@ -54,8 +54,10 @@ pub enum EngineError {
         #[backtrace]
         backtrace: Backtrace,
     },
-    #[error("{0}")]
+    #[error("Process error: {0}")]
     ProcessError(#[from] ProcessError),
+    #[error("Contract error: {0}")]
+    ContractError(#[from] ContractError),
     #[error("Internal error: {source}")]
     InternalError {
         #[from]
@@ -68,6 +70,12 @@ pub enum EngineError {
 #[derive(Debug, Error)]
 pub struct ProcessError {
     exit_code: Option<i32>,
+    backtrace: Backtrace,
+}
+
+#[derive(Debug, Error)]
+pub struct ContractError {
+    reason: String,
     backtrace: Backtrace,
 }
 
@@ -86,7 +94,7 @@ impl EngineError {
 
 impl ProcessError {
     pub fn new(exit_code: Option<i32>) -> Self {
-        ProcessError {
+        Self {
             exit_code: exit_code,
             backtrace: Backtrace::capture(),
         }
@@ -99,5 +107,20 @@ impl std::fmt::Display for ProcessError {
             Some(c) => write!(f, "Process exited with code {}", c),
             None => write!(f, "Process terminated by a signal"),
         }
+    }
+}
+
+impl ContractError {
+    pub fn new(reason: &str) -> Self {
+        Self {
+            reason: reason.to_owned(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl std::fmt::Display for ContractError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.reason)
     }
 }
