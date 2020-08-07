@@ -14,6 +14,7 @@ pub struct DockerRunArgs {
     pub expose_all_ports: bool,
     pub expose_ports: Vec<u16>,
     pub expose_port_map: Vec<(u16, u16)>,
+    pub expose_port_map_range: Vec<((u16, u16), (u16, u16))>,
     pub volume_map: Vec<(PathBuf, PathBuf)>,
     pub work_dir: Option<PathBuf>,
     pub environment_vars: Vec<(String, String)>,
@@ -40,6 +41,7 @@ impl Default for DockerRunArgs {
             expose_all_ports: false,
             expose_ports: Vec::new(),
             expose_port_map: Vec::new(),
+            expose_port_map_range: Vec::new(),
             volume_map: Vec::new(),
             work_dir: None,
             environment_vars: Vec::new(),
@@ -89,6 +91,12 @@ impl DockerClient {
             cmd.arg("-p");
             cmd.arg(format!("{}:{}", h, c));
         });
+        args.expose_port_map_range
+            .iter()
+            .for_each(|((hl, hr), (cl, cr))| {
+                cmd.arg("-p");
+                cmd.arg(format!("{}-{}:{}-{}", hl, hr, cl, cr));
+            });
         args.volume_map.iter().for_each(|(h, c)| {
             cmd.arg("-v");
             cmd.arg(format!("{}:{}", h.display(), c.display()));
@@ -97,7 +105,7 @@ impl DockerClient {
             .map(|v| cmd.arg(format!("--workdir={}", v.display())));
         args.environment_vars.iter().for_each(|(n, v)| {
             cmd.arg("-e");
-            cmd.arg(format!("{}:{}", n, v));
+            cmd.arg(format!("{}={}", n, v));
         });
         args.entry_point
             .map(|v| cmd.arg(format!("--entrypoint={}", v)));

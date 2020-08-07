@@ -47,6 +47,13 @@ impl FetchService {
                         target,
                         listener,
                     ),
+                    "ftp" => self.fetch_ftp(
+                        &furl.url,
+                        furl.event_time.as_ref(),
+                        old_checkpoint,
+                        target,
+                        listener,
+                    ),
                     _ => unimplemented!(),
                 }
             }
@@ -229,6 +236,69 @@ impl FetchService {
                 ))
             }
         }
+    }
+
+    // TODO: not implementing caching as some FTP servers throw errors at us
+    // when we request filetime :(
+    fn fetch_ftp(
+        &self,
+        url: &str,
+        _event_time_source: Option<&EventTimeSource>,
+        _old_checkpoint: Option<FetchCheckpoint>,
+        target_path: &Path,
+        listener: &mut dyn FetchProgressListener,
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+        let target_path_tmp = target_path.with_extension("tmp");
+
+        let mut h = curl::easy::Easy::new();
+        h.connect_timeout(Duration::from_secs(30))?;
+        h.url(url)?;
+        h.progress(true)?;
+
+        {
+            let mut target_file =
+                std::fs::File::create(&target_path_tmp).map_err(|e| IngestError::internal(e))?;
+
+            let mut transfer = h.transfer();
+
+            transfer.write_function(|data| {
+                let written = target_file.write(data).unwrap();
+                Ok(written)
+            })?;
+
+            transfer.progress_function(|f_total, f_downloaded, _, _| {
+                let total = f_total as u64;
+                let downloaded = f_downloaded as u64;
+                if downloaded > 0 {
+                    listener.on_progress(&FetchProgress {
+                        total_bytes: std::cmp::max(total, downloaded),
+                        fetched_bytes: downloaded,
+                    });
+                }
+                true
+            })?;
+
+            transfer.perform().map_err(|e| {
+                std::fs::remove_file(&target_path_tmp).unwrap();
+                match e.code() {
+                    curl_sys::CURLE_COULDNT_CONNECT => {
+                        IngestError::unreachable(url, Some(e.into()))
+                    }
+                    _ => IngestError::internal(e),
+                }
+            })?;
+        }
+
+        std::fs::rename(target_path_tmp, target_path).unwrap();
+        Ok(ExecutionResult {
+            was_up_to_date: false,
+            checkpoint: FetchCheckpoint {
+                last_fetched: Utc::now(),
+                last_modified: None,
+                etag: None,
+                source_event_time: None,
+            },
+        })
     }
 
     fn split_header<'a>(&self, h: &'a str) -> Option<(&'a str, &'a str)> {

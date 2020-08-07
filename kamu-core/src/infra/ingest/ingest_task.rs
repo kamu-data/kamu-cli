@@ -48,10 +48,23 @@ impl IngestTask {
         }
     }
 
-    // Note: Can be called from multiple threads
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         self.listener.lock().unwrap().begin();
 
+        match self.ingest_inner() {
+            Ok(res) => {
+                self.listener.lock().unwrap().success(&res);
+                Ok(res)
+            }
+            Err(err) => {
+                self.listener.lock().unwrap().error(&err);
+                Err(err)
+            }
+        }
+    }
+
+    // Note: Can be called from multiple threads
+    pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
         self.listener
             .lock()
             .unwrap()

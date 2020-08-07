@@ -199,6 +199,7 @@ enum ProgressStyle {
 
 struct PrettyIngestProgress {
     dataset_id: DatasetIDBuf,
+    stage: IngestStage,
     multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
     curr_progress_style: ProgressStyle,
@@ -208,6 +209,7 @@ impl PrettyIngestProgress {
     fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
             dataset_id: dataset_id.to_owned(),
+            stage: IngestStage::CheckCache,
             curr_progress_style: ProgressStyle::Spinner,
             curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
                 dataset_id,
@@ -280,6 +282,8 @@ impl PrettyIngestProgress {
 
 impl IngestListener for PrettyIngestProgress {
     fn on_stage_progress(&mut self, stage: IngestStage, n: u64, out_of: u64) {
+        self.stage = stage;
+
         if self.curr_progress.is_finished()
             || self.curr_progress_style != self.style_for_stage(stage)
         {
@@ -331,11 +335,11 @@ impl IngestListener for PrettyIngestProgress {
             ));
     }
 
-    fn error(&mut self, stage: IngestStage, _error: &IngestError) {
+    fn error(&mut self, _error: &IngestError) {
         self.curr_progress
             .finish_with_message(&Self::spinner_message(
                 &self.dataset_id,
-                stage as u32,
+                self.stage as u32,
                 console::style("Failed to update root dataset").red(),
             ));
     }

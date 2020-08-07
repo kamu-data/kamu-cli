@@ -1,7 +1,9 @@
 # TODO
 
-- Url pull
+- FTP support
+- Decompression
+- Uncachable handling
 - Engine output or logging?
-- Vocab in summary or in metadata?
+- SIGINT handling during pull
 - Table output
 - Indicatif bugs...
