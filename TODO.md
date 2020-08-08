@@ -1,6 +1,6 @@
 # TODO
 
-- thiserror bug
+- Pull derivs
 - Real metadata hashing
 - Logging
 - SIGINT handling during pull

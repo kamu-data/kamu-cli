@@ -33,38 +33,21 @@ impl AddCommand {
 }
 
 impl AddCommand {
-    fn load_specific(&self) -> Result<Vec<DatasetSnapshot>, Error> {
-        let snapshots: Vec<_> = self
-            .snapshot_refs
+    fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, DomainError>)> {
+        self.snapshot_refs
             .iter()
-            .filter_map(|r| {
-                match self
-                    .resource_loader
-                    .borrow()
-                    .load_dataset_snapshot_from_ref(r)
-                {
-                    Ok(s) => Some(s),
-                    Err(e) => {
-                        eprintln!(
-                            "{}: {}\n  {}",
-                            console::style("Failed to load data from").red(),
-                            r,
-                            console::style(e).dim()
-                        );
-                        None
-                    }
-                }
+            .map(|r| {
+                (
+                    r.clone(),
+                    self.resource_loader
+                        .borrow()
+                        .load_dataset_snapshot_from_ref(r),
+                )
             })
-            .collect();
-
-        if snapshots.len() == self.snapshot_refs.len() {
-            Ok(snapshots)
-        } else {
-            Err(Error::Aborted)
-        }
+            .collect()
     }
 
-    fn load_recursive(&self) -> Result<Vec<DatasetSnapshot>, Error> {
+    fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, DomainError>)> {
         self.snapshot_refs
             .iter()
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
@@ -75,10 +58,13 @@ impl AddCommand {
             .map(|e| e.unwrap())
             .filter(|p| self.is_snapshot_file(p))
             .map(|p| {
-                self.resource_loader
-                    .borrow()
-                    .load_dataset_snapshot_from_path(&p)
-                    .map_err(|e| e.into())
+                (
+                    p.to_str().unwrap().to_owned(),
+                    self.resource_loader
+                        .borrow()
+                        .load_dataset_snapshot_from_path(&p)
+                        .map_err(|e| e.into()),
+                )
             })
             .collect()
     }
@@ -97,45 +83,66 @@ impl AddCommand {
 
 impl Command for AddCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let snapshots = if !self.recursive {
-            self.load_specific()?
+        let mut load_results = if !self.recursive {
+            self.load_specific()
         } else {
-            self.load_recursive()?
+            self.load_recursive()
         };
+
+        load_results.sort_by(|(ref_a, _), (ref_b, _)| ref_a.cmp(&ref_b));
 
         let (mut added, mut errors) = (0, 0);
 
-        let mut results = self
-            .metadata_repo
-            .borrow_mut()
-            .add_datasets(&mut snapshots.into_iter());
+        load_results.iter().for_each(|(r, res)| match res {
+            Err(error) => {
+                eprintln!("{}: {}", console::style(r).red(), error);
+                errors += 1;
+            }
+            _ => (),
+        });
 
-        results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
+        if errors != 0 {
+            return Err(Error::Aborted);
+        }
 
-        for (id, res) in results {
+        let mut add_results =
+            self.metadata_repo
+                .borrow_mut()
+                .add_datasets(
+                    &mut load_results.into_iter().filter_map(|(_, res)| match res {
+                        Ok(snapshot) => Some(snapshot),
+                        _ => None,
+                    }),
+                );
+
+        add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
+
+        for (id, res) in add_results {
             match res {
                 Ok(_) => {
                     added += 1;
                     eprintln!("{}: {}", console::style("Added").green(), id);
                 }
-                Err(err @ DomainError::AlreadyExists { .. }) => {
-                    eprintln!("{}: {}", console::style("Warning").yellow(), err);
+                Err(DomainError::AlreadyExists { .. }) => {
+                    eprintln!(
+                        "{}: {}: Already exists",
+                        console::style("Skipped").yellow(),
+                        id
+                    );
                 }
                 Err(err) => {
                     errors += 1;
-                    eprintln!("{}: {}", console::style("Error").red(), err);
+                    eprintln!("{}: {}: {}", console::style("Error").red(), id, err);
                 }
             }
         }
 
-        if added != 0 {
-            eprintln!(
-                "{}",
-                console::style(format!("Added {} dataset(s)", added))
-                    .green()
-                    .bold()
-            );
-        }
+        eprintln!(
+            "{}",
+            console::style(format!("Added {} dataset(s)", added))
+                .green()
+                .bold()
+        );
 
         if errors == 0 {
             Ok(())
