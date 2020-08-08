@@ -47,7 +47,7 @@ impl AddCommand {
                     Err(e) => {
                         eprintln!(
                             "{}: {}\n  {}",
-                            console::style("Failed to load data from").yellow(),
+                            console::style("Failed to load data from").red(),
                             r,
                             console::style(e).dim()
                         );

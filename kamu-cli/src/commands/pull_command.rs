@@ -110,23 +110,32 @@ impl Command for PullCommand {
                 console::style(format!("{} dataset(s) had errors", errors))
                     .red()
                     .bold(),
-                console::style("Error summary").red().bold()
+                console::style("Summary of errors")
             );
             results
                 .into_iter()
                 .filter_map(|(id, res)| res.err().map(|e| (id, e)))
-                .enumerate()
-                .for_each(|(i, (id, err))| {
+                .for_each(|(id, err)| {
                     eprintln!(
-                        "\n{} {} {}",
-                        console::style(format!("<{}>", i + 1)).dim(),
-                        console::style(format!("While pulling {}:", id)).dim(),
+                        "\n{}: {}",
+                        console::style(format!("{}", id)).red().bold(),
                         err
                     );
                     if let Some(bt) = err.backtrace() {
                         if bt.status() == BacktraceStatus::Captured {
-                            eprintln!("\nBacktrace:\n{}", console::style(bt).dim().bold());
+                            eprintln!("{}", console::style(bt).dim());
                         }
+                    }
+
+                    let mut source = err.source();
+                    while source.is_some() {
+                        if let Some(bt) = source.unwrap().backtrace() {
+                            if bt.status() == BacktraceStatus::Captured {
+                                eprintln!("\nCaused by: {}", source.unwrap());
+                                eprintln!("{}", console::style(bt).dim());
+                            }
+                        }
+                        source = source.unwrap().source();
                     }
                 });
         }
