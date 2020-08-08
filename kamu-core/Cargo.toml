@@ -21,6 +21,8 @@ url = "*"
 fs_extra = "*"  # Copy files with progress
 curl = { version = "*", features = ["http2", "protocol-ftp"] }
 curl-sys = "*"
+zip = "*"
+ringbuf = "*"
 
 # Utils
 rand = "*"

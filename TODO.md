@@ -1,6 +1,5 @@
 # TODO
 
-- FTP support
 - Decompression
 - Uncachable handling
 - Engine output or logging?
