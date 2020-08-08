@@ -309,17 +309,6 @@ impl IngestListener for PrettyIngestProgress {
         }
     }
 
-    fn warn_uncacheable(&mut self) {
-        self.curr_progress
-            .finish_with_message(&Self::spinner_message(
-                &self.dataset_id,
-                IngestStage::Fetch as u32,
-                console::style("Data source does not support caching and will never be updated")
-                    .yellow()
-                    .bold(),
-            ));
-    }
-
     fn success(&mut self, result: &IngestResult) {
         let msg = match result {
             IngestResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
@@ -332,6 +321,15 @@ impl IngestListener for PrettyIngestProgress {
                 &self.dataset_id,
                 IngestStage::Commit as u32,
                 msg,
+            ));
+    }
+
+    fn uncacheable(&mut self) {
+        self.curr_progress
+            .finish_with_message(&Self::spinner_message(
+                &self.dataset_id,
+                IngestStage::Commit as u32,
+                console::style("Data source is uncacheable and will not be updated").yellow(),
             ));
     }
 

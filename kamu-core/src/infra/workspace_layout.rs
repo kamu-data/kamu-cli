@@ -9,6 +9,8 @@ pub struct WorkspaceLayout {
     pub datasets_dir: PathBuf,
     /// Contains remote definitions
     pub remotes_dir: PathBuf,
+    /// Directory for storing per-run diagnostics information and logs
+    pub run_info_dir: PathBuf,
     /// Root directory of a local storage volume
     pub local_volume_dir: PathBuf,
 }
@@ -19,6 +21,7 @@ impl WorkspaceLayout {
         Self {
             datasets_dir: kamu_root_dir.join("datasets"),
             remotes_dir: kamu_root_dir.join("remotes"),
+            run_info_dir: kamu_root_dir.join("run"),
             kamu_root_dir: kamu_root_dir,
             local_volume_dir: workspace_root.join(".kamu.local"),
         }
@@ -29,6 +32,7 @@ impl WorkspaceLayout {
         std::fs::create_dir_all(&ws.kamu_root_dir)?;
         std::fs::create_dir_all(&ws.datasets_dir)?;
         std::fs::create_dir_all(&ws.remotes_dir)?;
+        std::fs::create_dir_all(&ws.run_info_dir)?;
         std::fs::create_dir_all(&ws.local_volume_dir)?;
         Ok(ws)
     }

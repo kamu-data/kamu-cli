@@ -70,12 +70,16 @@ pub enum EngineError {
 #[derive(Debug, Error)]
 pub struct ProcessError {
     exit_code: Option<i32>,
+    stdout_path: Option<PathBuf>,
+    stderr_path: Option<PathBuf>,
     backtrace: Backtrace,
 }
 
 #[derive(Debug, Error)]
 pub struct ContractError {
     reason: String,
+    stdout_path: Option<PathBuf>,
+    stderr_path: Option<PathBuf>,
     backtrace: Backtrace,
 }
 
@@ -93,9 +97,15 @@ impl EngineError {
 }
 
 impl ProcessError {
-    pub fn new(exit_code: Option<i32>) -> Self {
+    pub fn new(
+        exit_code: Option<i32>,
+        stdout_path: Option<PathBuf>,
+        stderr_path: Option<PathBuf>,
+    ) -> Self {
         Self {
             exit_code: exit_code,
+            stdout_path: stdout_path,
+            stderr_path: stderr_path,
             backtrace: Backtrace::capture(),
         }
     }
@@ -104,16 +114,27 @@ impl ProcessError {
 impl std::fmt::Display for ProcessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.exit_code {
-            Some(c) => write!(f, "Process exited with code {}", c),
-            None => write!(f, "Process terminated by a signal"),
+            Some(c) => write!(f, "Process exited with code {}", c)?,
+            None => write!(f, "Process terminated by a signal")?,
         }
+
+        if let Some(ref out) = self.stdout_path {
+            write!(f, ", process stdout: {}", out.display())?;
+        }
+        if let Some(ref err) = self.stderr_path {
+            write!(f, ", process stderr: {}", err.display())?;
+        }
+
+        Ok(())
     }
 }
 
 impl ContractError {
-    pub fn new(reason: &str) -> Self {
+    pub fn new(reason: &str, stdout_path: Option<PathBuf>, stderr_path: Option<PathBuf>) -> Self {
         Self {
             reason: reason.to_owned(),
+            stdout_path: stdout_path,
+            stderr_path: stderr_path,
             backtrace: Backtrace::capture(),
         }
     }
@@ -121,6 +142,15 @@ impl ContractError {
 
 impl std::fmt::Display for ContractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.reason)
+        write!(f, "{}", self.reason)?;
+
+        if let Some(ref out) = self.stdout_path {
+            write!(f, ", process stdout: {}", out.display())?;
+        }
+        if let Some(ref err) = self.stderr_path {
+            write!(f, ", process stderr: {}", err.display())?;
+        }
+
+        Ok(())
     }
 }

@@ -28,6 +28,7 @@ impl Command for InitCommand {
 
         fs::create_dir_all(&self.workspace_layout.datasets_dir)?;
         fs::create_dir_all(&self.workspace_layout.remotes_dir)?;
+        fs::create_dir_all(&self.workspace_layout.run_info_dir)?;
 
         let gitignore_path = self.workspace_layout.kamu_root_dir.join(".gitignore");
         let mut gitignore = fs::File::create(gitignore_path)?;

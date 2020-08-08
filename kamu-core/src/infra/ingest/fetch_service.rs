@@ -331,6 +331,12 @@ pub struct FetchCheckpoint {
     pub source_event_time: Option<DateTime<Utc>>,
 }
 
+impl FetchCheckpoint {
+    pub fn is_cacheable(&self) -> bool {
+        self.last_modified.is_some() || self.etag.is_some()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FetchProgress {
     pub total_bytes: u64,

@@ -48,8 +48,9 @@ pub enum IngestStage {
 pub trait IngestListener: Send {
     fn begin(&mut self) {}
     fn on_stage_progress(&mut self, _stage: IngestStage, _n: u64, _out_of: u64) {}
-    fn warn_uncacheable(&mut self) {}
+
     fn success(&mut self, _result: &IngestResult) {}
+    fn uncacheable(&mut self) {}
     fn error(&mut self, _error: &IngestError) {}
 }
 

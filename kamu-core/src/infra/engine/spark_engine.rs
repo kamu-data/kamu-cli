@@ -3,12 +3,40 @@ use crate::infra::serde::yaml::*;
 use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
+use rand::Rng;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
     image: String,
     workspace_layout: WorkspaceLayout,
+}
+
+struct RunInfo {
+    in_out_dir: PathBuf,
+    stdout_path: PathBuf,
+    stderr_path: PathBuf,
+}
+
+impl RunInfo {
+    fn new(in_out_dir: &Path, workspace_layout: &WorkspaceLayout) -> Self {
+        let mut run_id = String::with_capacity(10);
+        run_id.extend(
+            rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(10),
+        );
+
+        Self {
+            in_out_dir: in_out_dir.to_owned(),
+            stdout_path: workspace_layout
+                .run_info_dir
+                .join(format!("ingest-spark-{}.out.txt", run_id)),
+            stderr_path: workspace_layout
+                .run_info_dir
+                .join(format!("ingest-spark-{}.err.txt", run_id)),
+        }
+    }
 }
 
 impl SparkEngine {
@@ -34,16 +62,19 @@ impl SparkEngine {
         self.volume_dir_in_container().join(rel)
     }
 
-    fn submit(&self, app_class: &str, in_out_dir: &Path) -> Result<(), EngineError> {
+    fn submit(&self, app_class: &str, run_info: &RunInfo) -> Result<(), EngineError> {
         let docker = DockerClient::new();
 
         let volume_map = vec![
-            (in_out_dir.to_owned(), self.in_out_dir_in_container()),
+            (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
             (
                 self.workspace_layout.local_volume_dir.clone(),
                 self.volume_dir_in_container(),
             ),
         ];
+
+        let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
+        let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
 
         let status = docker
             .run_shell_cmd(
@@ -70,18 +101,29 @@ impl SparkEngine {
                     ),
                 ],
             )
-            .stdout(std::process::Stdio::null()) // TODO: logging
-            .stderr(std::process::Stdio::null())
+            .stdout(std::process::Stdio::from(stdout_file))
+            .stderr(std::process::Stdio::from(stderr_file))
             .status()
             .map_err(|e| EngineError::internal(e))?;
 
         match status.code() {
             Some(code) if code == 0 => Ok(()),
-            _ => Err(ProcessError::new(status.code()).into()),
+            _ => Err(ProcessError::new(
+                status.code(),
+                Some(run_info.stdout_path.clone()),
+                Some(run_info.stderr_path.clone()),
+            )
+            .into()),
         }
     }
 
-    fn write_ingest_request(&self, path: &Path, request: IngestRequest) -> Result<(), EngineError> {
+    fn write_ingest_request(
+        &self,
+        run_info: &RunInfo,
+        request: IngestRequest,
+    ) -> Result<(), EngineError> {
+        let path = run_info.in_out_dir.join("request.yaml");
+
         let file = File::create(path)?;
 
         serde_yaml::to_writer(
@@ -97,9 +139,16 @@ impl SparkEngine {
         Ok(())
     }
 
-    fn read_ingest_response(&self, path: &Path) -> Result<IngestResponse, EngineError> {
+    fn read_ingest_response(&self, run_info: &RunInfo) -> Result<IngestResponse, EngineError> {
+        let path = run_info.in_out_dir.join("result.yaml");
+
         if !path.exists() {
-            return Err(ContractError::new("Engine did not write a response file").into());
+            return Err(ContractError::new(
+                "Engine did not write a response file",
+                Some(run_info.stdout_path.clone()),
+                Some(run_info.stderr_path.clone()),
+            )
+            .into());
         }
 
         let file = File::open(path)?;
@@ -115,6 +164,7 @@ impl SparkEngine {
 impl Engine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
         let in_out_dir = tempfile::Builder::new().prefix("kamu-ingest").tempdir()?;
+        let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
@@ -129,10 +179,10 @@ impl Engine for SparkEngine {
             ..request
         };
 
-        self.write_ingest_request(&in_out_dir.path().join("request.yaml"), request_adj)?;
+        self.write_ingest_request(&run_info, request_adj)?;
 
-        self.submit("dev.kamu.engine.spark.ingest.IngestApp", in_out_dir.path())?;
+        self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
 
-        self.read_ingest_response(&in_out_dir.path().join("result.yaml"))
+        self.read_ingest_response(&run_info)
     }
 }

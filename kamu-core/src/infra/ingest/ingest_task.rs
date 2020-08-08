@@ -52,8 +52,12 @@ impl IngestTask {
         self.listener.lock().unwrap().begin();
 
         match self.ingest_inner() {
-            Ok(res) => {
-                self.listener.lock().unwrap().success(&res);
+            Ok((res, cacheable)) => {
+                if cacheable {
+                    self.listener.lock().unwrap().success(&res);
+                } else {
+                    self.listener.lock().unwrap().uncacheable();
+                }
                 Ok(res)
             }
             Err(err) => {
@@ -64,7 +68,7 @@ impl IngestTask {
     }
 
     // Note: Can be called from multiple threads
-    pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
+    pub fn ingest_inner(&mut self) -> Result<(IngestResult, bool), IngestError> {
         self.listener
             .lock()
             .unwrap()
@@ -73,6 +77,7 @@ impl IngestTask {
         let prev_hash = self.meta_chain.read_ref(&BlockRef::Head).unwrap();
 
         let fetch_result = self.maybe_fetch()?;
+        let cacheable = fetch_result.checkpoint.is_cacheable();
         let source_event_time = fetch_result.checkpoint.source_event_time.clone();
 
         self.listener
@@ -111,23 +116,35 @@ impl IngestTask {
             Some(hash) => IngestResult::Updated { block_hash: hash },
         };
 
-        Ok(res)
+        Ok((res, cacheable))
     }
 
     fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("fetch.yaml");
 
         self.checkpointing_executor
-            .execute(&checkpoint_path, |old_checkpoint| {
-                self.fetch_service.fetch(
-                    &self.source.fetch,
-                    old_checkpoint,
-                    &self.layout.cache_dir.join("fetched.bin"),
-                    Some(&mut FetchProgressListenerBridge {
-                        listener: self.listener.clone(),
-                    }),
-                )
-            })
+            .execute(
+                &checkpoint_path,
+                |old_checkpoint: Option<FetchCheckpoint>| {
+                    if let Some(ref cp) = old_checkpoint {
+                        if !cp.is_cacheable() {
+                            return Ok(ExecutionResult {
+                                was_up_to_date: true,
+                                checkpoint: old_checkpoint.unwrap(),
+                            });
+                        }
+                    }
+
+                    self.fetch_service.fetch(
+                        &self.source.fetch,
+                        old_checkpoint,
+                        &self.layout.cache_dir.join("fetched.bin"),
+                        Some(&mut FetchProgressListenerBridge {
+                            listener: self.listener.clone(),
+                        }),
+                    )
+                },
+            )
             .map_err(|e| IngestError::internal(e))?
     }
 

@@ -19,6 +19,13 @@ const VERSION: &str = "0.0.1";
 
 fn main() {
     let workspace_layout = find_workspace();
+
+    // Cleanup run info dir
+    if workspace_layout.run_info_dir.exists() {
+        std::fs::remove_dir_all(&workspace_layout.run_info_dir).unwrap();
+        std::fs::create_dir(&workspace_layout.run_info_dir).unwrap();
+    }
+
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
     let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
@@ -101,13 +108,7 @@ fn main() {
 
 fn find_workspace() -> WorkspaceLayout {
     let cwd = Path::new(".").canonicalize().unwrap();
-    let kamu_root_dir = cwd.join(".kamu");
-    WorkspaceLayout {
-        kamu_root_dir: kamu_root_dir.clone(),
-        datasets_dir: kamu_root_dir.join("datasets"),
-        remotes_dir: kamu_root_dir.join("remotes"),
-        local_volume_dir: cwd.join(".kamu.local"),
-    }
+    WorkspaceLayout::new(&cwd)
 }
 
 fn display_error(err: Error) {
