@@ -274,6 +274,7 @@ fn serde_dataset_summary() {
         apiVersion: 1
         kind: DatasetSummary
         content:
+          id: foo.bar
           kind: root
           dependencies:
             - foo
@@ -290,6 +291,7 @@ fn serde_dataset_summary() {
         api_version: 1,
         kind: "DatasetSummary".to_owned(),
         content: DatasetSummary {
+            id: DatasetIDBuf::try_from("foo.bar").unwrap(),
             kind: DatasetKind::Root,
             dependencies: vec![
                 DatasetIDBuf::try_from("foo").unwrap(),
@@ -312,6 +314,7 @@ fn serde_dataset_summary() {
             apiVersion: 1
             kind: DatasetSummary
             content:
+              id: foo.bar
               kind: root
               dependencies:
                 - foo

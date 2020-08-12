@@ -22,12 +22,9 @@ fn test_ingest_with_engine() {
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
-        &workspace_layout,
         metadata_repo.clone(),
-        Arc::new(Mutex::new(EngineFactory::new(
-            &workspace_layout,
-            &volume_layout,
-        ))),
+        Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
+        &volume_layout,
     )));
 
     let src_path = tempdir.path().join("data.csv");

@@ -22,7 +22,7 @@ pub trait MetadataRepository {
     fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError>;
 
     fn update_summary(
-        &self,
+        &mut self,
         dataset_id: &DatasetID,
         summary: DatasetSummary,
     ) -> Result<(), DomainError>;

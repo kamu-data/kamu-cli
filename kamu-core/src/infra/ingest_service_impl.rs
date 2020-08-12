@@ -7,19 +7,19 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct IngestServiceImpl {
-    workspace_layout: WorkspaceLayout,
+    volume_layout: VolumeLayout,
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     engine_factory: Arc<Mutex<EngineFactory>>,
 }
 
 impl IngestServiceImpl {
     pub fn new(
-        workspace_layout: &WorkspaceLayout,
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
+        volume_layout: &VolumeLayout,
     ) -> Self {
         Self {
-            workspace_layout: workspace_layout.clone(),
+            volume_layout: volume_layout.clone(),
             metadata_repo: metadata_repo,
             engine_factory: engine_factory,
         }
@@ -27,8 +27,45 @@ impl IngestServiceImpl {
 
     // TODO: error handling
     fn get_dataset_layout(&self, dataset_id: &DatasetID) -> DatasetLayout {
-        let vol = VolumeLayout::create(&self.workspace_layout.local_volume_dir).unwrap();
-        DatasetLayout::create(&vol, dataset_id).unwrap()
+        DatasetLayout::create(&self.volume_layout, dataset_id).unwrap()
+    }
+
+    fn update_summary(
+        &self,
+        dataset_id: &DatasetID,
+        result: &IngestResult,
+    ) -> Result<(), IngestError> {
+        match result {
+            IngestResult::UpToDate => Ok(()),
+            IngestResult::Updated { block_hash } => {
+                let mut metadata_repo = self.metadata_repo.borrow_mut();
+
+                let mut summary = metadata_repo
+                    .get_summary(dataset_id)
+                    .map_err(|e| IngestError::internal(e))?;
+
+                let block = metadata_repo
+                    .get_metadata_chain(dataset_id)
+                    .unwrap()
+                    .get_block(block_hash)
+                    .unwrap();
+
+                summary.num_records = match block.output_slice {
+                    Some(slice) => summary.num_records + slice.num_records as u64,
+                    _ => 0,
+                };
+
+                summary.last_pulled = Some(block.system_time);
+
+                let layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+                summary.data_size = fs_extra::dir::get_size(layout.data_dir).unwrap_or(0);
+                summary.data_size += fs_extra::dir::get_size(layout.checkpoints_dir).unwrap_or(0);
+
+                metadata_repo
+                    .update_summary(dataset_id, summary)
+                    .map_err(|e| IngestError::internal(e))
+            }
+        }
     }
 }
 
@@ -66,7 +103,9 @@ impl IngestService for IngestServiceImpl {
             self.engine_factory.clone(),
         );
 
-        ingest_task.ingest()
+        let result = ingest_task.ingest()?;
+        self.update_summary(dataset_id, &result)?;
+        Ok(result)
     }
 
     fn ingest_multi(
@@ -112,9 +151,19 @@ impl IngestService for IngestServiceImpl {
             })
             .collect();
 
-        thread_handles
+        let results: Vec<_> = thread_handles
             .into_iter()
             .map(|h| h.join().unwrap())
-            .collect()
+            .collect();
+
+        results
+            .iter()
+            .filter(|(_, res)| res.is_ok())
+            .for_each(|(dataset_id, res)| {
+                self.update_summary(dataset_id, res.as_ref().unwrap())
+                    .unwrap()
+            });
+
+        results
     }
 }

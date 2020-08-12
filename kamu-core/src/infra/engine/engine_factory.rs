@@ -12,13 +12,9 @@ pub struct EngineFactory {
 }
 
 impl EngineFactory {
-    pub fn new(workspace_layout: &WorkspaceLayout, volume_layout: &VolumeLayout) -> Self {
+    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
-            spark_engine: Arc::new(Mutex::new(SparkEngine::new(
-                IMAGE_SPARK,
-                workspace_layout,
-                volume_layout,
-            ))),
+            spark_engine: Arc::new(Mutex::new(SparkEngine::new(IMAGE_SPARK, workspace_layout))),
         }
     }
 

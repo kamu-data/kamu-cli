@@ -18,7 +18,7 @@ serde_yaml = "*"
 
 # Ingest
 url = "*"
-fs_extra = "*"  # Copy files with progress
+fs_extra = "*"  # Copy files with progress, get directory sizes
 curl = { version = "*", features = ["http2", "protocol-ftp"] }
 curl-sys = "*"
 zip = "*"

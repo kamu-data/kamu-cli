@@ -10,16 +10,19 @@ use std::sync::{Arc, Mutex};
 pub struct TransformServiceImpl {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     engine_factory: Arc<Mutex<EngineFactory>>,
+    volume_layout: VolumeLayout,
 }
 
 impl TransformServiceImpl {
     pub fn new(
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
+        volume_layout: &VolumeLayout,
     ) -> Self {
         Self {
             metadata_repo: metadata_repo,
             engine_factory: engine_factory,
+            volume_layout: volume_layout.clone(),
         }
     }
 
@@ -44,6 +47,7 @@ impl TransformServiceImpl {
         }
     }
 
+    // Note: Can be called from multiple threads
     fn do_transform_inner(
         request: ExecuteQueryRequest,
         mut meta_chain: Box<dyn MetadataChain>,
@@ -133,14 +137,29 @@ impl TransformServiceImpl {
                 .vocab,
         );
 
+        let output_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+
+        let mut data_dirs: BTreeMap<_, _> = source
+            .inputs
+            .iter()
+            .map(|input_id| {
+                (
+                    input_id.clone(),
+                    DatasetLayout::new(&self.volume_layout, &input_id).data_dir,
+                )
+            })
+            .collect();
+
+        data_dirs.insert(dataset_id.to_owned(), output_layout.data_dir);
+
         if non_empty > 0 {
             Ok(Some(ExecuteQueryRequest {
                 dataset_id: dataset_id.to_owned(),
-                checkpoints_dir: std::path::PathBuf::new(), // TODO: move down a layer
+                checkpoints_dir: output_layout.checkpoints_dir, // TODO: move down a layer
                 source: source,
                 dataset_vocabs: vocabs,
                 input_slices: input_slices,
-                data_dirs: std::collections::BTreeMap::new(), // TODO: move down a layer
+                data_dirs: data_dirs, // TODO: move down a layer
             }))
         } else {
             Ok(None)
@@ -206,6 +225,44 @@ impl TransformServiceImpl {
             empty,
         ))
     }
+
+    fn update_summary(
+        &self,
+        dataset_id: &DatasetID,
+        result: &TransformResult,
+    ) -> Result<(), TransformError> {
+        match result {
+            TransformResult::UpToDate => Ok(()),
+            TransformResult::Updated { block_hash } => {
+                let mut metadata_repo = self.metadata_repo.borrow_mut();
+
+                let mut summary = metadata_repo
+                    .get_summary(dataset_id)
+                    .map_err(|e| TransformError::internal(e))?;
+
+                let block = metadata_repo
+                    .get_metadata_chain(dataset_id)
+                    .unwrap()
+                    .get_block(block_hash)
+                    .unwrap();
+
+                summary.num_records = match block.output_slice {
+                    Some(slice) => summary.num_records + slice.num_records as u64,
+                    _ => 0,
+                };
+
+                summary.last_pulled = Some(block.system_time);
+
+                let layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+                summary.data_size = fs_extra::dir::get_size(layout.data_dir).unwrap_or(0);
+                summary.data_size += fs_extra::dir::get_size(layout.checkpoints_dir).unwrap_or(0);
+
+                metadata_repo
+                    .update_summary(dataset_id, summary)
+                    .map_err(|e| TransformError::internal(e))
+            }
+        }
+    }
 }
 
 impl TransformService for TransformServiceImpl {
@@ -228,7 +285,10 @@ impl TransformService for TransformServiceImpl {
                 .get_metadata_chain(&dataset_id)
                 .unwrap();
 
-            Self::do_transform(request, meta_chain, listener, self.engine_factory.clone())
+            let res =
+                Self::do_transform(request, meta_chain, listener, self.engine_factory.clone())?;
+            self.update_summary(dataset_id, &res)?;
+            Ok(res)
         } else {
             Ok(TransformResult::UpToDate)
         }
@@ -292,6 +352,14 @@ impl TransformService for TransformServiceImpl {
             .collect();
 
         results.extend(thread_handles.into_iter().map(|h| h.join().unwrap()));
+
+        results
+            .iter()
+            .filter(|(_, res)| res.is_ok())
+            .for_each(|(dataset_id, res)| {
+                self.update_summary(dataset_id, res.as_ref().unwrap())
+                    .unwrap()
+            });
 
         results
     }

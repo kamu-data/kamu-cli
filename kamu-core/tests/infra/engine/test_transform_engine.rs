@@ -21,19 +21,19 @@ fn test_transform_with_engine() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
-        &workspace_layout,
-        &volume_layout,
-    )));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
 
     let mut ingest_svc = IngestServiceImpl::new(
-        &workspace_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
+        &volume_layout,
     );
 
-    let mut transform_svc =
-        TransformServiceImpl::new(metadata_repo.clone(), engine_factory.clone());
+    let mut transform_svc = TransformServiceImpl::new(
+        metadata_repo.clone(),
+        engine_factory.clone(),
+        &volume_layout,
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup
@@ -125,6 +125,7 @@ fn test_transform_with_engine() {
         .unwrap();
 
     let res = transform_svc.transform(&deriv_id, None).unwrap();
+    assert!(matches!(res, TransformResult::Updated {.. }));
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
     assert!(dataset_layout.data_dir.exists());

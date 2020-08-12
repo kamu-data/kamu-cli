@@ -28,6 +28,10 @@ impl CompletionsCommand {
 }
 
 impl Command for CompletionsCommand {
+    fn needs_workspace(&self) -> bool {
+        false
+    }
+
     fn run(&mut self) -> Result<(), Error> {
         // TODO: Remove once clap allows to programmatically complete values
         // See: https://github.com/clap-rs/clap/issues/568

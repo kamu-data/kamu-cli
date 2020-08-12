@@ -27,6 +27,7 @@ pub enum DatasetKind {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DatasetSummary {
+    pub id: DatasetIDBuf,
     pub kind: DatasetKind,
     pub dependencies: Vec<DatasetIDBuf>,
     #[serde(default, with = "datetime_rfc3339_opt")]

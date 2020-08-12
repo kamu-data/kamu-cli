@@ -118,6 +118,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         MetadataChainImpl::create(&dataset_metadata_dir, first_block).map_err(|e| e.into())?;
 
         let summary = DatasetSummary {
+            id: snapshot.id.clone(),
             kind: kind,
             dependencies: dependencies,
             last_pulled: None,
@@ -166,7 +167,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
                 dataset_id.as_str().to_owned(),
             ))
         } else {
-            let file = std::fs::File::open(path.clone()).unwrap_or_else(|e| {
+            let file = std::fs::File::open(&path).unwrap_or_else(|e| {
                 panic!(
                     "Failed to open the summary file at {}: {}",
                     path.display(),
@@ -188,8 +189,11 @@ impl MetadataRepository for MetadataRepositoryImpl {
         }
     }
 
+    // TODO: summaries should be per branch
+    // TODO: vocab should be stored in the chain
+    // TODO: update summary lazily when new blocks appear
     fn update_summary(
-        &self,
+        &mut self,
         dataset_id: &DatasetID,
         summary: DatasetSummary,
     ) -> Result<(), DomainError> {

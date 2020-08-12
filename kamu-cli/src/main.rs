@@ -15,7 +15,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 const BINARY_NAME: &str = "kamu-rs";
-const VERSION: &str = "0.0.1";
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
     let workspace_layout = find_workspace();
@@ -29,18 +29,16 @@ fn main() {
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
-        &workspace_layout,
-        &local_volume_layout,
-    )));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
-        &workspace_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
+        &local_volume_layout,
     )));
     let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
+        &local_volume_layout,
     )));
     let pull_svc = Rc::new(RefCell::new(PullServiceImpl::new(
         metadata_repo.clone(),

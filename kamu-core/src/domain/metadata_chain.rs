@@ -11,6 +11,8 @@ pub enum BlockRef {
 pub trait MetadataChain: Send {
     fn read_ref(&self, r: &BlockRef) -> Option<String>;
 
+    fn get_block(&self, block_hash: &str) -> Option<MetadataBlock>;
+
     fn iter_blocks(&self) -> Box<dyn Iterator<Item = MetadataBlock>> {
         self.iter_blocks_ref(&BlockRef::Head)
     }

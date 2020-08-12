@@ -114,12 +114,10 @@ impl PullService for PullServiceImpl {
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
-        let metadata_repo = self.metadata_repo.borrow();
-
         let starting_dataset_ids: std::collections::HashSet<DatasetIDBuf> = if !all {
             dataset_ids.map(|id| id.to_owned()).collect()
         } else {
-            metadata_repo.get_all_datasets().collect()
+            self.metadata_repo.borrow().get_all_datasets().collect()
         };
 
         let datasets_labeled = self

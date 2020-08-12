@@ -4,14 +4,12 @@ use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
 use rand::Rng;
-use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
     image: String,
     workspace_layout: WorkspaceLayout,
-    volume_layout: VolumeLayout,
 }
 
 struct RunInfo {
@@ -42,15 +40,10 @@ impl RunInfo {
 }
 
 impl SparkEngine {
-    pub fn new(
-        image: &str,
-        workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
-    ) -> Self {
+    pub fn new(image: &str, workspace_layout: &WorkspaceLayout) -> Self {
         Self {
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
-            volume_layout: volume_layout.clone(),
         }
     }
 
@@ -206,33 +199,16 @@ impl Engine for SparkEngine {
         let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
 
         // Remove data_dir if it exists but empty as it will confuse Spark
-        let output_dir = DatasetLayout::new(&self.volume_layout, &request.dataset_id).data_dir;
+        let output_dir = request.data_dirs.get(&request.dataset_id).unwrap();
         let _ = std::fs::remove_dir(&output_dir);
 
-        let mut data_dirs: BTreeMap<_, _> = request
-            .source
-            .inputs
-            .iter()
-            .map(|input_id| {
-                (
-                    input_id.clone(),
-                    self.to_container_path(
-                        &DatasetLayout::new(&self.volume_layout, &input_id).data_dir,
-                    ),
-                )
-            })
-            .collect();
-
-        data_dirs.insert(
-            request.dataset_id.clone(),
-            self.to_container_path(&output_dir),
-        );
-
         let request_adj = ExecuteQueryRequest {
-            data_dirs: data_dirs,
-            checkpoints_dir: self.to_container_path(
-                &DatasetLayout::new(&self.volume_layout, &request.dataset_id).checkpoints_dir,
-            ),
+            data_dirs: request
+                .data_dirs
+                .into_iter()
+                .map(|(id, path)| (id, self.to_container_path(&path)))
+                .collect(),
+            checkpoints_dir: self.to_container_path(&request.checkpoints_dir),
             ..request
         };
 

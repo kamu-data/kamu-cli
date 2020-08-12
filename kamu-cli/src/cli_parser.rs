@@ -29,6 +29,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ),
             SubCommand::with_name("complete")
                 .about("Completes a command in the shell")
+                .setting(AppSettings::Hidden)
                 .arg(Arg::with_name("input").required(true).index(1))
                 .arg(Arg::with_name("current").required(true).index(2)),
             SubCommand::with_name("completions")

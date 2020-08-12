@@ -124,6 +124,15 @@ impl MetadataChain for MetadataChainImpl {
     }
   }
 
+  fn get_block(&self, block_hash: &str) -> Option<MetadataBlock> {
+    let path = self.block_path(block_hash);
+    if !path.exists() {
+      None
+    } else {
+      Some(Self::read_block(&path))
+    }
+  }
+
   fn iter_blocks_ref(&self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock>> {
     let hash = self
       .read_ref(r)
