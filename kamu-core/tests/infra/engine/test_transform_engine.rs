@@ -14,35 +14,47 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
-fn test_ingest_with_engine() {
+fn test_transform_with_engine() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        &volume_layout,
+    )));
+
+    let mut ingest_svc = IngestServiceImpl::new(
         &workspace_layout,
         metadata_repo.clone(),
-        Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
-    )));
+        engine_factory.clone(),
+    );
+
+    let mut transform_svc =
+        TransformServiceImpl::new(metadata_repo.clone(), engine_factory.clone());
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Root setup
+    ///////////////////////////////////////////////////////////////////////////
 
     let src_path = tempdir.path().join("data.csv");
     std::fs::write(
         &src_path,
         indoc!(
             "
-                city,population
-                A,1000
-                B,2000
-                C,3000
-                "
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "
         ),
     )
     .unwrap();
 
-    let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .id("foo.bar")
+    let root_snapshot = MetadataFactory::dataset_snapshot()
+        .id("root")
         .source(
             MetadataFactory::dataset_source_root()
                 .fetch_file(&src_path)
@@ -76,18 +88,55 @@ fn test_ingest_with_engine() {
         )
         .build();
 
-    let dataset_id = dataset_snapshot.id.clone();
+    let root_id = root_snapshot.id.clone();
 
     metadata_repo
         .borrow_mut()
-        .add_dataset(dataset_snapshot)
+        .add_dataset(root_snapshot)
         .unwrap();
 
-    let res = ingest_svc.borrow_mut().ingest(&dataset_id, None);
-    assert_ok!(res, IngestResult::Updated {..});
+    ingest_svc.ingest(&root_id, None).unwrap();
 
-    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);
+    ///////////////////////////////////////////////////////////////////////////
+    // Derivative setup
+    ///////////////////////////////////////////////////////////////////////////
+
+    let deriv_snapshot = MetadataFactory::dataset_snapshot()
+        .id("deriv")
+        .source(
+            MetadataFactory::dataset_source_deriv([&root_id].iter())
+                .transform(
+                    MetadataFactory::transform()
+                        .engine("sparkSQL")
+                        .query(
+                            "SELECT event_time, city, population * 10 as population_x10 FROM root",
+                        )
+                        .build(),
+                )
+                .build(),
+        )
+        .build();
+
+    let deriv_id = deriv_snapshot.id.clone();
+
+    metadata_repo
+        .borrow_mut()
+        .add_dataset(deriv_snapshot)
+        .unwrap();
+
+    let res = transform_svc.transform(&deriv_id, None).unwrap();
+
+    let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
     assert!(dataset_layout.data_dir.exists());
+    assert_eq!(
+        metadata_repo
+            .borrow_mut()
+            .get_metadata_chain(&deriv_id)
+            .unwrap()
+            .iter_blocks()
+            .count(),
+        2
+    );
 
     let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {
         Some(Ok(entry)) => entry.path(),
@@ -107,7 +156,10 @@ fn test_ingest_with_engine() {
         .map(|cd| cd.path().string())
         .collect();
 
-    assert_eq!(columns, ["system_time", "event_time", "city", "population"]);
+    assert_eq!(
+        columns,
+        ["system_time", "event_time", "city", "population_x10"]
+    );
 
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
@@ -118,9 +170,9 @@ fn test_ingest_with_engine() {
     assert_eq!(
         records,
         [
-            ("A".to_owned(), 1000),
-            ("B".to_owned(), 2000),
-            ("C".to_owned(), 3000)
+            ("A".to_owned(), 10000),
+            ("B".to_owned(), 20000),
+            ("C".to_owned(), 30000)
         ]
     );
 }

@@ -5,21 +5,21 @@ use crate::infra::*;
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 use std::io::prelude::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub struct MetadataChainImpl {
   meta_path: PathBuf,
 }
 
 impl MetadataChainImpl {
-  pub fn new(meta_path: PathBuf) -> Self {
+  pub fn new(meta_path: &Path) -> Self {
     Self {
-      meta_path: meta_path,
+      meta_path: meta_path.to_owned(),
     }
   }
 
   pub fn create(
-    meta_path: PathBuf,
+    meta_path: &Path,
     first_block: MetadataBlock,
   ) -> Result<(Self, String), InfraError> {
     std::fs::create_dir(&meta_path)?;
@@ -47,6 +47,22 @@ impl MetadataChainImpl {
     let mut b = block;
     b.block_hash = Self::block_hash(&b);
     b
+  }
+
+  fn read_block(path: &Path) -> MetadataBlock {
+    let file = std::fs::File::open(&path)
+      .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
+
+    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+      panic!(
+        "Failed to deserialize the MetadataBlock at {}: {}",
+        path.display(),
+        e
+      )
+    });
+
+    assert_eq!(manifest.kind, "MetadataBlock");
+    manifest.content
   }
 
   fn write_block(&mut self, block: &MetadataBlock) -> Result<(), InfraError> {
@@ -131,6 +147,15 @@ impl MetadataChain for MetadataChainImpl {
       "New block doesn't specify correct prev block hash"
     );
 
+    let last_block = Self::read_block(&self.block_path(&last_hash));
+
+    assert!(
+      last_block.system_time < block.system_time,
+      "New block's system_time is less than the previous block's: {} < {}",
+      block.system_time,
+      last_block.system_time,
+    );
+
     let block_hashed = self.hashed(block);
 
     self.write_block(&block_hashed).unwrap();
@@ -147,20 +172,7 @@ struct BlockReader {
 impl BlockReader {
   fn read_block(&self, hash: &str) -> MetadataBlock {
     let path = self.blocks_dir.join(hash);
-
-    let file = std::fs::File::open(&path)
-      .unwrap_or_else(|e| panic!("Failed to open the block file at {}: {}", path.display(), e));
-
-    let manifest: Manifest<MetadataBlock> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
-      panic!(
-        "Failed to deserialize the MetadataBlock at {}: {}",
-        path.display(),
-        e
-      )
-    });
-
-    assert_eq!(manifest.kind, "MetadataBlock");
-    manifest.content
+    MetadataChainImpl::read_block(&path)
   }
 }
 

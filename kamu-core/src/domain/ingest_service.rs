@@ -74,7 +74,7 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
 pub enum IngestError {
-    #[error("Source is unreachable {path}")]
+    #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,
         #[source]

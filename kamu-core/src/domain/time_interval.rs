@@ -77,6 +77,74 @@ impl TimeInterval {
     pub fn unbounded() -> Self {
         Self(Interval::Unbounded)
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self.0 {
+            Interval::Empty => true,
+            _ => false,
+        }
+    }
+
+    // TODO: upstream
+    pub fn left_complement(&self) -> TimeInterval {
+        match self.0 {
+            Interval::Empty => Self(Interval::Unbounded),
+            Interval::Unbounded => Self(Interval::Empty),
+            Interval::Singleton { at } => Self::unbounded_open_right(at),
+            Interval::Open { bound_pair } => {
+                Self::unbounded_closed_right(bound_pair.left().clone())
+            }
+            Interval::Closed { bound_pair } => {
+                Self::unbounded_open_right(bound_pair.left().clone())
+            }
+            Interval::LeftHalfOpen { bound_pair } => {
+                Self::unbounded_closed_right(bound_pair.left().clone())
+            }
+            Interval::RightHalfOpen { bound_pair } => {
+                Self::unbounded_open_right(bound_pair.left().clone())
+            }
+            Interval::UnboundedOpenRight { .. } => Self(Interval::Empty),
+            Interval::UnboundedClosedRight { .. } => Self(Interval::Empty),
+            Interval::UnboundedOpenLeft { left } => Self::unbounded_closed_right(left.clone()),
+            Interval::UnboundedClosedLeft { left } => Self::unbounded_open_right(left.clone()),
+        }
+    }
+
+    pub fn right_complement(&self) -> TimeInterval {
+        match self.0 {
+            Interval::Empty => Self(Interval::Unbounded),
+            Interval::Unbounded => Self(Interval::Empty),
+            Interval::Singleton { at } => Self::unbounded_open_left(at),
+            Interval::Open { bound_pair } => {
+                Self::unbounded_closed_left(bound_pair.right().clone())
+            }
+            Interval::Closed { bound_pair } => {
+                Self::unbounded_open_left(bound_pair.right().clone())
+            }
+            Interval::LeftHalfOpen { bound_pair } => {
+                Self::unbounded_open_left(bound_pair.right().clone())
+            }
+            Interval::RightHalfOpen { bound_pair } => {
+                Self::unbounded_closed_left(bound_pair.right().clone())
+            }
+            Interval::UnboundedOpenRight { right } => Self::unbounded_closed_left(right.clone()),
+            Interval::UnboundedClosedRight { right } => Self::unbounded_open_left(right.clone()),
+            Interval::UnboundedOpenLeft { .. } => Self(Interval::Empty),
+            Interval::UnboundedClosedLeft { .. } => Self(Interval::Empty),
+        }
+    }
+
+    pub fn contains(&self, other: &TimeInterval) -> bool {
+        self.0.contains(&other.0)
+    }
+
+    pub fn contains_point(&self, point: &Element) -> bool {
+        self.contains(&TimeInterval::singleton(point.clone()))
+    }
+
+    pub fn intersect(&self, other: &TimeInterval) -> TimeInterval {
+        Self(self.0.intersect(&other.0))
+    }
 }
 
 impl Eq for TimeInterval {}

@@ -6,11 +6,13 @@ use ::serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use serde_with::skip_serializing_none;
 use std::backtrace::Backtrace;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use thiserror::Error;
 
 pub trait Engine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
+    fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,6 +41,43 @@ pub struct IngestResponse {
     pub block: MetadataBlock,
 }
 
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecuteQueryRequest {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetIDBuf,
+    pub source: DatasetSourceDerivative,
+    pub dataset_vocabs: BTreeMap<DatasetIDBuf, DatasetVocabulary>,
+    pub input_slices: BTreeMap<DatasetIDBuf, InputDataSlice>,
+    pub data_dirs: BTreeMap<DatasetIDBuf, PathBuf>,
+    pub checkpoints_dir: PathBuf,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecuteQueryResponse {
+    pub block: MetadataBlock,
+    pub data_file_name: Option<String>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InputDataSlice {
+    pub interval: TimeInterval,
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Watermark {
+    pub system_time: DateTime<Utc>,
+    pub event_time: DateTime<Utc>,
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
@@ -46,7 +85,7 @@ pub struct IngestResponse {
 #[derive(Debug, Error)]
 pub enum EngineError {
     #[error("Engine {id} was not found")]
-    NotFound { id: String },
+    NotFound { id: String, backtrace: Backtrace },
     #[error("{source}")]
     IOError {
         #[from]
@@ -85,7 +124,10 @@ pub struct ContractError {
 
 impl EngineError {
     pub fn not_found(id: &str) -> Self {
-        EngineError::NotFound { id: id.to_owned() }
+        EngineError::NotFound {
+            id: id.to_owned(),
+            backtrace: Backtrace::capture(),
+        }
     }
 
     pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {

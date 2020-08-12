@@ -1,6 +1,8 @@
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
+type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
 #[derive(Debug)]
 pub enum ResourceKind {
     Dataset,
@@ -36,7 +38,7 @@ pub enum DomainError {
         backtrace: Backtrace,
     },
     #[error("{0}")]
-    InfraError(Box<dyn std::error::Error>),
+    InfraError(BoxedError),
 }
 
 impl DomainError {

@@ -1,7 +1,7 @@
-use chrono::{SubsecRound, Utc};
 use kamu::domain::*;
 use kamu::infra::serde::yaml::*;
 
+use chrono::{DateTime, SubsecRound, Utc};
 use std::convert::TryFrom;
 use std::path::Path;
 
@@ -51,6 +51,20 @@ impl TransformBuilder {
         }
     }
 
+    pub fn engine(mut self, engine: &str) -> Self {
+        self.v.engine = engine.to_owned();
+        self
+    }
+
+    pub fn property(mut self, key: &str, value: serde_yaml::Value) -> Self {
+        self.v.additional_properties.insert(key.to_owned(), value);
+        self
+    }
+
+    pub fn query(self, query: &str) -> Self {
+        self.property("query", serde_yaml::to_value(query).unwrap())
+    }
+
     pub fn build(self) -> Transform {
         self.v
     }
@@ -92,7 +106,7 @@ impl DatasetSourceBuilderRoot {
     pub fn fetch_file(self, path: &Path) -> Self {
         self.fetch(FetchStep::Url(FetchStepUrl {
             url: url::Url::from_file_path(path).unwrap().as_str().to_owned(),
-            event_time: None,
+            event_time: None, // TODO: Some(EventTimeSource::FromMetadata),
             cache: None,
         }))
     }
@@ -138,6 +152,11 @@ impl DatasetSourceBuilderDeriv {
         }
     }
 
+    pub fn transform(mut self, transform: Transform) -> Self {
+        self.v.transform = transform;
+        self
+    }
+
     pub fn build(self) -> DatasetSource {
         DatasetSource::Derivative(self.v)
     }
@@ -173,6 +192,26 @@ impl MetadataBlockBuilder {
     pub fn prev(mut self, prev_block_hash: &str) -> Self {
         self.v.prev_block_hash.clear();
         self.v.prev_block_hash.push_str(prev_block_hash);
+        self
+    }
+
+    pub fn system_time(mut self, system_time: DateTime<Utc>) -> Self {
+        self.v.system_time = system_time;
+        self
+    }
+
+    pub fn output_slice(mut self, slice: DataSlice) -> Self {
+        self.v.output_slice = Some(slice);
+        self
+    }
+
+    pub fn output_watermark(mut self, wm: DateTime<Utc>) -> Self {
+        self.v.output_watermark = Some(wm);
+        self
+    }
+
+    pub fn source(mut self, source: DatasetSource) -> Self {
+        self.v.source = Some(source);
         self
     }
 

@@ -39,7 +39,7 @@ impl MetadataRepositoryImpl {
                 (dataset_id as &str).to_owned(),
             ))
         } else {
-            Ok(MetadataChainImpl::new(path))
+            Ok(MetadataChainImpl::new(&path))
         }
     }
 
@@ -115,7 +115,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
             input_slices: None,
         };
 
-        MetadataChainImpl::create(dataset_metadata_dir, first_block).map_err(|e| e.into())?;
+        MetadataChainImpl::create(&dataset_metadata_dir, first_block).map_err(|e| e.into())?;
 
         let summary = DatasetSummary {
             kind: kind,

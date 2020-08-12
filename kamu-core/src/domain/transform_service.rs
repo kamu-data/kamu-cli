@@ -1,5 +1,7 @@
+use super::EngineError;
 use crate::domain::{DatasetID, DatasetIDBuf};
 
+use std::backtrace::Backtrace;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -56,8 +58,25 @@ impl TransformMultiListener for NullTransformMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
+type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
 #[derive(Debug, Error)]
 pub enum TransformError {
-    #[error("Engine error")]
-    EngineError,
+    #[error("Engine error: {0}")]
+    EngineError(#[from] EngineError),
+    #[error("Internal error: {source}")]
+    InternalError {
+        #[from]
+        source: BoxedError,
+        backtrace: Backtrace,
+    },
+}
+
+impl TransformError {
+    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        TransformError::InternalError {
+            source: e.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
 }

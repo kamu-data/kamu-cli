@@ -9,3 +9,4 @@ kamu = { path = "../kamu-core" }
 
 chrono = { version = "*", features = ["serde"] }
 url = "*"
+serde_yaml = "*"

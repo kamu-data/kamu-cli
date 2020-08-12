@@ -2,6 +2,8 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu_test::*;
 
+use chrono::{TimeZone, Utc};
+
 #[test]
 fn test_block_hashing() {
     assert_eq!(
@@ -26,7 +28,7 @@ fn test_create_new_chain() {
 
     let block = MetadataFactory::metadata_block().build();
 
-    let (chain, _) = MetadataChainImpl::create(chain_dir, block.clone()).unwrap();
+    let (chain, _) = MetadataChainImpl::create(&chain_dir, block.clone()).unwrap();
 
     assert_eq!(chain.iter_blocks().count(), 1);
 }
@@ -37,7 +39,7 @@ fn test_create_new_chain_err() {
 
     let block = MetadataFactory::metadata_block().build();
 
-    let res = MetadataChainImpl::create(tmp_dir.path().to_owned(), block);
+    let res = MetadataChainImpl::create(tmp_dir.path(), block);
     assert_err!(res, InfraError::IOError { .. });
 }
 
@@ -46,11 +48,17 @@ fn test_append_and_iter_blocks() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain_dir = tmp_dir.path().join("foo.test");
 
-    let mut block1 = MetadataFactory::metadata_block().build();
-    let mut block2 = MetadataFactory::metadata_block().build();
-    let mut block3 = MetadataFactory::metadata_block().build();
+    let mut block1 = MetadataFactory::metadata_block()
+        .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
+        .build();
+    let mut block2 = MetadataFactory::metadata_block()
+        .system_time(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
+        .build();
+    let mut block3 = MetadataFactory::metadata_block()
+        .system_time(Utc.ymd(2000, 1, 3).and_hms(12, 0, 0))
+        .build();
 
-    let (mut chain, hash) = MetadataChainImpl::create(chain_dir, block1.clone()).unwrap();
+    let (mut chain, hash) = MetadataChainImpl::create(&chain_dir, block1.clone()).unwrap();
     block1.block_hash = hash;
     block2.prev_block_hash = block1.block_hash.clone();
     block2.block_hash = chain.append(block2.clone());

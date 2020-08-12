@@ -19,6 +19,7 @@ const VERSION: &str = "0.0.1";
 
 fn main() {
     let workspace_layout = find_workspace();
+    let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     // Cleanup run info dir
     if workspace_layout.run_info_dir.exists() {
@@ -28,14 +29,18 @@ fn main() {
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        &local_volume_layout,
+    )));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
         &workspace_layout,
         metadata_repo.clone(),
-        engine_factory,
+        engine_factory.clone(),
     )));
     let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
         metadata_repo.clone(),
+        engine_factory.clone(),
     )));
     let pull_svc = Rc::new(RefCell::new(PullServiceImpl::new(
         metadata_repo.clone(),

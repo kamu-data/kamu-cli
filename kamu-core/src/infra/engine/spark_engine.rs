@@ -4,12 +4,14 @@ use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
 use rand::Rng;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
     image: String,
     workspace_layout: WorkspaceLayout,
+    volume_layout: VolumeLayout,
 }
 
 struct RunInfo {
@@ -40,10 +42,15 @@ impl RunInfo {
 }
 
 impl SparkEngine {
-    pub fn new(image: &str, workspace_layout: &WorkspaceLayout) -> Self {
+    pub fn new(
+        image: &str,
+        workspace_layout: &WorkspaceLayout,
+        volume_layout: &VolumeLayout,
+    ) -> Self {
         Self {
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
+            volume_layout: volume_layout.clone(),
         }
     }
 
@@ -55,10 +62,12 @@ impl SparkEngine {
         PathBuf::from("/opt/engine/in-out")
     }
 
-    fn to_container_path(&self, path: &Path, volume_dir: &Path) -> PathBuf {
+    fn to_container_path(&self, path: &Path) -> PathBuf {
         assert!(path.is_absolute());
-        assert!(volume_dir.is_absolute());
-        let rel = path.strip_prefix(volume_dir).unwrap();
+        assert!(self.workspace_layout.local_volume_dir.is_absolute());
+        let rel = path
+            .strip_prefix(&self.workspace_layout.local_volume_dir)
+            .unwrap();
         self.volume_dir_in_container().join(rel)
     }
 
@@ -117,20 +126,24 @@ impl SparkEngine {
         }
     }
 
-    fn write_ingest_request(
+    fn write_request<T>(
         &self,
         run_info: &RunInfo,
-        request: IngestRequest,
-    ) -> Result<(), EngineError> {
+        request: T,
+        resource_name: &str,
+    ) -> Result<(), EngineError>
+    where
+        T: ::serde::ser::Serialize,
+    {
         let path = run_info.in_out_dir.join("request.yaml");
 
-        let file = File::create(path)?;
+        let file = File::create(&path)?;
 
         serde_yaml::to_writer(
             file,
             &Manifest {
                 api_version: 1,
-                kind: "IngestRequest".to_owned(),
+                kind: resource_name.to_owned(),
                 content: request,
             },
         )
@@ -139,7 +152,10 @@ impl SparkEngine {
         Ok(())
     }
 
-    fn read_ingest_response(&self, run_info: &RunInfo) -> Result<IngestResponse, EngineError> {
+    fn read_response<T>(&self, run_info: &RunInfo, resource_name: &str) -> Result<T, EngineError>
+    where
+        T: ::serde::de::DeserializeOwned,
+    {
         let path = run_info.in_out_dir.join("result.yaml");
 
         if !path.exists() {
@@ -153,9 +169,9 @@ impl SparkEngine {
 
         let file = File::open(path)?;
 
-        let manifest: Manifest<IngestResponse> =
+        let manifest: Manifest<T> =
             serde_yaml::from_reader(file).map_err(|e| EngineError::internal(e))?;
-        assert_eq!(manifest.kind, "IngestResult"); // Note naming difference
+        assert_eq!(manifest.kind, resource_name);
 
         Ok(manifest.content)
     }
@@ -163,26 +179,67 @@ impl SparkEngine {
 
 impl Engine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        let in_out_dir = tempfile::Builder::new().prefix("kamu-ingest").tempdir()?;
+        let in_out_dir = tempfile::Builder::new().prefix("kamu-ingest-").tempdir()?;
         let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
 
         let request_adj = IngestRequest {
-            ingest_path: self.to_container_path(
-                &request.ingest_path,
-                &self.workspace_layout.local_volume_dir,
-            ),
-            data_dir: self
-                .to_container_path(&request.data_dir, &self.workspace_layout.local_volume_dir),
+            ingest_path: self.to_container_path(&request.ingest_path),
+            data_dir: self.to_container_path(&request.data_dir),
             ..request
         };
 
-        self.write_ingest_request(&run_info, request_adj)?;
+        self.write_request(&run_info, request_adj, "IngestRequest")?;
 
         self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
 
-        self.read_ingest_response(&run_info)
+        self.read_response(&run_info, "IngestResult")
+    }
+
+    fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
+        let in_out_dir = tempfile::Builder::new()
+            .prefix("kamu-transform-")
+            .tempdir()?;
+
+        let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
+
+        // Remove data_dir if it exists but empty as it will confuse Spark
+        let output_dir = DatasetLayout::new(&self.volume_layout, &request.dataset_id).data_dir;
+        let _ = std::fs::remove_dir(&output_dir);
+
+        let mut data_dirs: BTreeMap<_, _> = request
+            .source
+            .inputs
+            .iter()
+            .map(|input_id| {
+                (
+                    input_id.clone(),
+                    self.to_container_path(
+                        &DatasetLayout::new(&self.volume_layout, &input_id).data_dir,
+                    ),
+                )
+            })
+            .collect();
+
+        data_dirs.insert(
+            request.dataset_id.clone(),
+            self.to_container_path(&output_dir),
+        );
+
+        let request_adj = ExecuteQueryRequest {
+            data_dirs: data_dirs,
+            checkpoints_dir: self.to_container_path(
+                &DatasetLayout::new(&self.volume_layout, &request.dataset_id).checkpoints_dir,
+            ),
+            ..request
+        };
+
+        self.write_request(&run_info, request_adj, "ExecuteQueryRequest")?;
+
+        self.submit("dev.kamu.engine.spark.transform.TransformApp", &run_info)?;
+
+        self.read_response(&run_info, "ExecuteQueryResult")
     }
 }
