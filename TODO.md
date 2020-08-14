@@ -12,3 +12,5 @@
 - summaries should be per branch
 - vocab should be stored in the chain
 - update summary lazily when new blocks appear
+- rethink "uncacheable" warning
+- "Invalid parquet file. Corrupt footer" returned for files written by Flink (https://issues.apache.org/jira/browse/ARROW-9735)

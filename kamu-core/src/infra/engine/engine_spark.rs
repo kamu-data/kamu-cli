@@ -31,10 +31,10 @@ impl RunInfo {
             in_out_dir: in_out_dir.to_owned(),
             stdout_path: workspace_layout
                 .run_info_dir
-                .join(format!("ingest-spark-{}.out.txt", run_id)),
+                .join(format!("spark-{}.out.txt", run_id)),
             stderr_path: workspace_layout
                 .run_info_dir
-                .join(format!("ingest-spark-{}.err.txt", run_id)),
+                .join(format!("spark-{}.err.txt", run_id)),
         }
     }
 }

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use std::backtrace::Backtrace;
@@ -50,6 +50,15 @@ impl Default for DockerRunArgs {
             tty: false,
             interactive: false,
             detached: false,
+        }
+    }
+}
+
+impl Default for ExecArgs {
+    fn default() -> Self {
+        Self {
+            tty: false,
+            interactive: false,
         }
     }
 }
@@ -131,10 +140,80 @@ impl DockerClient {
         })
     }
 
+    pub fn exec_cmd<I, S>(&self, exec_args: ExecArgs, container_name: &str, cmd_args: I) -> Command
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<std::ffi::OsStr>,
+    {
+        let mut cmd = Command::new("docker");
+        cmd.arg("exec");
+        if exec_args.tty {
+            cmd.arg("-t");
+        }
+        if exec_args.interactive {
+            cmd.arg("-i");
+        }
+        cmd.arg(container_name);
+        cmd.args(cmd_args);
+        cmd
+    }
+
+    pub fn exec_shell_cmd<I, S>(
+        &self,
+        exec_args: ExecArgs,
+        container_name: &str,
+        shell_cmd: I,
+    ) -> Command
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let shell_cmd_vec: Vec<String> = shell_cmd
+            .into_iter()
+            .map(|s| s.as_ref().to_string())
+            .collect();
+
+        let args = vec!["bash".to_owned(), "-c".to_owned(), shell_cmd_vec.join(" ")];
+        self.exec_cmd(exec_args, container_name, args)
+    }
+
     pub fn kill_cmd(&self, container_name: &str) -> Command {
         let mut cmd = Command::new("docker");
         cmd.arg("kill").arg(container_name);
         cmd
+    }
+
+    pub fn create_network_cmd(&self, network_name: &str) -> Command {
+        let mut cmd = Command::new("docker");
+        cmd.arg("network").arg("create").arg(network_name);
+        cmd
+    }
+
+    pub fn remove_network_cmd(&self, network_name: &str) -> Command {
+        let mut cmd = Command::new("docker");
+        cmd.arg("network").arg("rm").arg(network_name);
+        cmd
+    }
+
+    pub fn create_network(&self, network_name: &str) -> NetworkHandle {
+        let output = self
+            .create_network_cmd(network_name)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .unwrap();
+
+        if !output.status.success() {
+            panic!(
+                "Failed to create docker network: exit code: {} stdout: {} stderr: {}",
+                output.status,
+                std::str::from_utf8(&output.stdout).unwrap(),
+                std::str::from_utf8(&output.stderr).unwrap(),
+            )
+        }
+
+        let remove = self.remove_network_cmd(network_name);
+        NetworkHandle::new(remove)
     }
 
     pub fn get_host_port(&self, container_name: &str, container_port: u16) -> Option<u16> {
@@ -214,5 +293,26 @@ impl TimeoutError {
             duration: d,
             backtrace: Backtrace::capture(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct NetworkHandle {
+    remove: Command,
+}
+
+impl NetworkHandle {
+    fn new(remove: Command) -> Self {
+        Self { remove: remove }
+    }
+}
+
+impl Drop for NetworkHandle {
+    fn drop(&mut self) {
+        self.remove
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
     }
 }
