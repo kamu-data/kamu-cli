@@ -179,7 +179,6 @@ fn test_transform_with_engine_spark() {
 }
 
 #[test]
-#[ignore]
 fn test_transform_with_engine_flink() {
     let tempdir = tempfile::tempdir().unwrap();
 
@@ -305,13 +304,21 @@ fn test_transform_with_engine_flink() {
         2
     );
 
-    let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {
-        Some(Ok(entry)) => entry.path(),
-        _ => panic!(
-            "Data file not found in {}",
-            dataset_layout.data_dir.display()
-        ),
-    };
+    let part_file = dataset_layout
+        .data_dir
+        .read_dir()
+        .unwrap()
+        .map(|r| r.unwrap())
+        .filter_map(|e| {
+            let p = e.path();
+            if p.file_name().unwrap().to_str().unwrap().starts_with(".") {
+                None
+            } else {
+                Some(p)
+            }
+        })
+        .next()
+        .expect("Data file not found");
 
     let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
     let columns: Vec<_> = parquet_reader
