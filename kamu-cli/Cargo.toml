@@ -7,11 +7,18 @@ edition = "2018"
 [dependencies]
 kamu = { path = "../kamu-core" }
 
-chrono = "*"
+# UI
+chrono-humanize = "*"  # Human readable durations
 clap = "*"
 console = "*"  # Terminal colors
-glob = "*"  # Used for path completions
+humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
+num-format = "*"  # Human-readable number formatting
+prettytable-rs = "*"  # ASCII table formatting
+
+# Utils
+chrono = "*"
+glob = "*"  # Used for path completions
 itertools = "*"
 shlex = "*"  # Parsing partial input for custom completions
 slog = "*"  # Logging

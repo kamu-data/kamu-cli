@@ -1,5 +1,5 @@
 use super::{Command, Error};
-use crate::OutputFormat;
+use crate::output::OutputFormat;
 use kamu::domain::*;
 
 use std::backtrace::BacktraceStatus;

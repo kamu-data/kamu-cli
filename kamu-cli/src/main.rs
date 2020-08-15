@@ -4,7 +4,7 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
-use kamu_cli::OutputFormat;
+use kamu_cli::output::*;
 
 use clap::value_t_or_exit;
 use console::style;
@@ -74,7 +74,7 @@ fn main() {
             value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
         )),
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
-        ("list", Some(_)) => Box::new(ListCommand::new(metadata_repo.clone())),
+        ("list", Some(_)) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
@@ -165,6 +165,7 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputFormat {
 
     OutputFormat {
         verbosity_level: verbosity_level,
+        is_tty: console::Term::stdout().is_term(),
     }
 }
 

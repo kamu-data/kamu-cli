@@ -1,6 +1,6 @@
 use kamu::domain::*;
 use kamu_cli::commands::*;
-use kamu_cli::OutputFormat;
+use kamu_cli::output::OutputFormat;
 
 use std::cell::RefCell;
 use std::convert::TryFrom;
