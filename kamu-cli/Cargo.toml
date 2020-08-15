@@ -7,13 +7,18 @@ edition = "2018"
 [dependencies]
 kamu = { path = "../kamu-core" }
 
+chrono = "*"
 clap = "*"
-shlex = "*"  # Parsing partial input for custom completions
-glob = "*"  # Used for path completions
 console = "*"  # Terminal colors
+glob = "*"  # Used for path completions
 indicatif = "*"  # Progress bars and spinners
-thiserror = "*"  # Structured error derivations
+itertools = "*"
+shlex = "*"  # Parsing partial input for custom completions
+slog = "*"  # Logging
+slog-async = "*"
+slog-term = "*"
 tempfile = "*"
+thiserror = "*"  # Structured error derivations
 
 # TODO: Move to core
 parquet = { git = "https://github.com/apache/arrow" }

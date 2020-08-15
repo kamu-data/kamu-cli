@@ -4,6 +4,7 @@ use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
 use chrono::{DateTime, Utc};
+use slog::{info, Logger};
 use std::sync::{Arc, Mutex};
 
 pub struct IngestTask {
@@ -17,6 +18,7 @@ pub struct IngestTask {
     fetch_service: FetchService,
     prep_service: PrepService,
     read_service: ReadService,
+    logger: Logger,
 }
 
 impl IngestTask {
@@ -27,6 +29,7 @@ impl IngestTask {
         vocab: DatasetVocabulary,
         listener: Arc<Mutex<dyn IngestListener>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
+        logger: Logger,
     ) -> Self {
         // TODO: this is expensive
         let source = match meta_chain.iter_blocks().filter_map(|b| b.source).next() {
@@ -45,6 +48,7 @@ impl IngestTask {
             fetch_service: FetchService::new(),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_factory),
+            logger: logger,
         }
     }
 
@@ -228,6 +232,9 @@ impl IngestTask {
                 ..read_result.checkpoint.last_block
             };
             let hash = self.meta_chain.append(new_block);
+
+            info!(self.logger, "Committed new block"; "hash" => &hash);
+
             Ok(Some(hash))
         } else {
             Ok(None)

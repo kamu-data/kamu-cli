@@ -25,6 +25,7 @@ zip = "*"
 ringbuf = "*"
 
 # Utils
+slog = "*"
 rand = "*"
 regex = "*"
 indoc = "*"  # Compile-time unindent

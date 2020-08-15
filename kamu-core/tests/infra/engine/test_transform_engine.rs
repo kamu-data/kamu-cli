@@ -27,12 +27,14 @@ fn test_transform_with_engine_spark() {
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let mut transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -192,12 +194,14 @@ fn test_transform_with_engine_flink() {
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let mut transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     ///////////////////////////////////////////////////////////////////////////

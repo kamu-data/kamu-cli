@@ -1,5 +1,6 @@
 use kamu::domain::*;
 use kamu_cli::commands::*;
+use kamu_cli::OutputFormat;
 
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -8,7 +9,13 @@ use std::sync::{Arc, Mutex};
 
 fn main() {
     let pull_svc = Rc::new(RefCell::new(TestPullService {}));
-    let mut cmd = PullCommand::new(pull_svc, ["a"].iter(), false, false);
+    let mut cmd = PullCommand::new(
+        pull_svc,
+        ["a"].iter(),
+        false,
+        false,
+        &OutputFormat::default(),
+    );
     cmd.run().unwrap();
 }
 

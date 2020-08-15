@@ -1,5 +1,6 @@
 use crate::domain::*;
 
+use slog::{info, Logger};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -9,6 +10,7 @@ pub struct PullServiceImpl {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     ingest_svc: Rc<RefCell<dyn IngestService>>,
     transform_svc: Rc<RefCell<dyn TransformService>>,
+    logger: Logger,
 }
 
 impl PullServiceImpl {
@@ -16,11 +18,13 @@ impl PullServiceImpl {
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         ingest_svc: Rc<RefCell<dyn IngestService>>,
         transform_svc: Rc<RefCell<dyn TransformService>>,
+        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo: metadata_repo,
             ingest_svc: ingest_svc,
             transform_svc: transform_svc,
+            logger: logger,
         }
     }
 
@@ -119,6 +123,8 @@ impl PullService for PullServiceImpl {
         } else {
             self.metadata_repo.borrow().get_all_datasets().collect()
         };
+
+        info!(self.logger, "Performing pull_multi"; "datasets" => ?starting_dataset_ids);
 
         let datasets_labeled = self
             .get_datasets_ordered_by_depth(&mut starting_dataset_ids.iter().map(|id| id.as_ref()));

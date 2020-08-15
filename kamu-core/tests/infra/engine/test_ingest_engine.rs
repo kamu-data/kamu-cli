@@ -25,6 +25,7 @@ fn test_ingest_with_engine() {
         metadata_repo.clone(),
         Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     )));
 
     let src_path = tempdir.path().join("data.csv");

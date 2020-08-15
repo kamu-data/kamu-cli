@@ -1,10 +1,8 @@
 # TODO
 
-- Flink engine
-- Real metadata hashing
-- Logging
-- SIGINT handling during pull
 - Table output
+- Real metadata hashing
+- SIGINT handling during pull
 - Indicatif throttling
 - Indicatif verify chunked download progress
 - Indicatif bugs...
@@ -14,3 +12,5 @@
 - update summary lazily when new blocks appear
 - rethink "uncacheable" warning
 - "Invalid parquet file. Corrupt footer" returned for files written by Flink (https://issues.apache.org/jira/browse/ARROW-9735)
+- use cargo-crev?
+- Add self-help info to error output

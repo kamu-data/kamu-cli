@@ -2,6 +2,7 @@ use crate::domain::*;
 use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
+use slog::{info, Logger};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -11,6 +12,7 @@ pub struct TransformServiceImpl {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     engine_factory: Arc<Mutex<EngineFactory>>,
     volume_layout: VolumeLayout,
+    logger: Logger,
 }
 
 impl TransformServiceImpl {
@@ -18,11 +20,13 @@ impl TransformServiceImpl {
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
         volume_layout: &VolumeLayout,
+        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo: metadata_repo,
             engine_factory: engine_factory,
             volume_layout: volume_layout.clone(),
+            logger: logger,
         }
     }
 
@@ -274,6 +278,8 @@ impl TransformService for TransformServiceImpl {
         let null_listener = Arc::new(Mutex::new(NullTransformListener {}));
         let listener = maybe_listener.unwrap_or(null_listener);
 
+        info!(self.logger, "Transforming single dataset"; "dataset" => dataset_id.as_str());
+
         // TODO: There might be more operations to do
         if let Some(request) = self
             .get_next_operation(dataset_id)
@@ -302,19 +308,23 @@ impl TransformService for TransformServiceImpl {
         let null_multi_listener = Arc::new(Mutex::new(NullTransformMultiListener {}));
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
+        let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
+        info!(self.logger, "Transforming multiple datasets"; "datasets" => ?dataset_ids_owned);
+
         // TODO: handle errors without crashing
-        let requests: Vec<_> = dataset_ids
+        let requests: Vec<_> = dataset_ids_owned
+            .into_iter()
             .map(|dataset_id| {
-                (
-                    dataset_id.to_owned(),
-                    self.get_next_operation(dataset_id)
-                        .map_err(|e| TransformError::internal(e))
-                        .unwrap(),
-                )
+                let next_op = self
+                    .get_next_operation(&dataset_id)
+                    .map_err(|e| TransformError::internal(e))
+                    .unwrap();
+                (dataset_id, next_op)
             })
             .collect();
 
-        let mut results: Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> = Vec::new();
+        let mut results: Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> =
+            Vec::with_capacity(requests.len());
 
         let thread_handles: Vec<_> = requests
             .into_iter()

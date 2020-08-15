@@ -4,9 +4,11 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
+use kamu_cli::OutputFormat;
 
 use clap::value_t_or_exit;
 use console::style;
+use slog::{info, o, Drain, FnValue, Logger};
 use std::backtrace::BacktraceStatus;
 use std::cell::RefCell;
 use std::error::Error as StdError;
@@ -18,6 +20,9 @@ const BINARY_NAME: &str = "kamu-rs";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
+    let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
+    let output_format = configure_output_format(&matches);
+
     let workspace_layout = find_workspace();
     let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
@@ -27,6 +32,8 @@ fn main() {
         std::fs::create_dir(&workspace_layout.run_info_dir).unwrap();
     }
 
+    let logger = configure_logging(&output_format, &workspace_layout);
+
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
     let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
@@ -34,25 +41,20 @@ fn main() {
         metadata_repo.clone(),
         engine_factory.clone(),
         &local_volume_layout,
+        logger.new(o!()),
     )));
     let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &local_volume_layout,
+        logger.new(o!()),
     )));
     let pull_svc = Rc::new(RefCell::new(PullServiceImpl::new(
         metadata_repo.clone(),
         ingest_svc.clone(),
         transform_svc.clone(),
+        logger.new(o!()),
     )));
-
-    let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
-
-    // Verboseness
-    match matches.occurrences_of("v") {
-        0 => (),
-        _ => std::env::set_var("RUST_BACKTRACE", "1"),
-    };
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
@@ -82,6 +84,7 @@ fn main() {
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
+            &output_format,
         )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new()),
@@ -112,6 +115,57 @@ fn main() {
 fn find_workspace() -> WorkspaceLayout {
     let cwd = Path::new(".").canonicalize().unwrap();
     WorkspaceLayout::new(&cwd)
+}
+
+fn configure_logging(output_format: &OutputFormat, workspace_layout: &WorkspaceLayout) -> Logger {
+    let raw_logger = if output_format.verbosity_level > 0 {
+        // Log into stderr for verbose output
+        let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
+        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+        let drain = slog_async::Async::new(drain).build().fuse();
+        Logger::root(drain, o!())
+    } else if workspace_layout.run_info_dir.exists() {
+        // Log to file if workspace exists
+        let log_path = workspace_layout.run_info_dir.join("kamu.log");
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&log_path)
+            .unwrap_or_else(|e| {
+                panic!("Failed to create log file at {}: {}", log_path.display(), e)
+            });
+
+        let decorator = slog_term::PlainSyncDecorator::new(file);
+        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
+        let drain = slog_async::Async::new(drain).build().fuse();
+        Logger::root(drain, o!())
+    } else {
+        // Discard otherwise
+        let drain = slog::Discard.fuse();
+        Logger::root(drain, o!())
+    };
+
+    let logger = raw_logger.new(o!("version" => VERSION));
+
+    info!(logger, "Running with arguments"; "args" => FnValue(|_| {
+         let v: Vec<_> = std::env::args().collect();
+         format!("{:?}", v)
+    }));
+
+    logger
+}
+
+fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputFormat {
+    let verbosity_level = matches.occurrences_of("v") as u8;
+
+    if verbosity_level > 0 {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
+    OutputFormat {
+        verbosity_level: verbosity_level,
+    }
 }
 
 fn display_error(err: Error) {

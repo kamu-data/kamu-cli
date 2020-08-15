@@ -45,6 +45,7 @@ fn test_pull_batching() {
         repo.clone(),
         test_ingest_svc.clone(),
         test_transform_svc.clone(),
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     //    / C \

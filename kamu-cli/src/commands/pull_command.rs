@@ -1,4 +1,5 @@
 use super::{Command, Error};
+use crate::OutputFormat;
 use kamu::domain::*;
 
 use std::backtrace::BacktraceStatus;
@@ -17,6 +18,7 @@ pub struct PullCommand {
     ids: Vec<String>,
     all: bool,
     recursive: bool,
+    output_format: OutputFormat,
 }
 
 impl PullCommand {
@@ -25,6 +27,7 @@ impl PullCommand {
         ids: I,
         all: bool,
         recursive: bool,
+        output_format: &OutputFormat,
     ) -> Self
     where
         I: Iterator<Item = S>,
@@ -35,7 +38,46 @@ impl PullCommand {
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
             recursive: recursive,
+            output_format: output_format.clone(),
         }
+    }
+
+    fn pull_quiet(
+        &self,
+        dataset_ids: Vec<DatasetIDBuf>,
+    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
+        self.pull_svc.borrow_mut().pull_multi(
+            &mut dataset_ids.iter().map(|id| id.as_ref()),
+            self.recursive,
+            self.all,
+            None,
+            None,
+        )
+    }
+
+    fn pull_with_progress(
+        &self,
+        dataset_ids: Vec<DatasetIDBuf>,
+    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
+        let pull_progress = PrettyPullProgress::new();
+        let listener = Arc::new(Mutex::new(pull_progress.clone()));
+
+        let draw_thread = std::thread::spawn(move || {
+            pull_progress.draw();
+        });
+
+        let results = self.pull_svc.borrow_mut().pull_multi(
+            &mut dataset_ids.iter().map(|id| id.as_ref()),
+            self.recursive,
+            self.all,
+            Some(listener.clone()),
+            Some(listener.clone()),
+        );
+
+        listener.lock().unwrap().finish();
+        draw_thread.join().unwrap();
+
+        results
     }
 }
 
@@ -56,23 +98,11 @@ impl Command for PullCommand {
             }
         };
 
-        let pull_progress = PrettyPullProgress::new();
-        let listener = Arc::new(Mutex::new(pull_progress.clone()));
-
-        let draw_thread = std::thread::spawn(move || {
-            pull_progress.draw();
-        });
-
-        let results = self.pull_svc.borrow_mut().pull_multi(
-            &mut dataset_ids.iter().map(|id| id.as_ref()),
-            self.recursive,
-            self.all,
-            Some(listener.clone()),
-            Some(listener.clone()),
-        );
-
-        listener.lock().unwrap().finish();
-        draw_thread.join().unwrap();
+        let results = if self.output_format.verbosity_level == 0 {
+            self.pull_with_progress(dataset_ids)
+        } else {
+            self.pull_quiet(dataset_ids)
+        };
 
         let mut updated = 0;
         let mut up_to_date = 0;

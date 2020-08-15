@@ -83,6 +83,7 @@ fn test_get_next_operation() {
         // TODO: Use a mock
         Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
         &volume_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let foo = new_root(&metadata_repo, "foo");
