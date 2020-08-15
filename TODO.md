@@ -6,6 +6,7 @@
 - Support SQL shell
 - Remotes & Push support
 - depgraph support
+- workspace search
 
 ## Post catch-up
 - pretty hashes

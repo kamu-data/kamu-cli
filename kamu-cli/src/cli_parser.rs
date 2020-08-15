@@ -4,7 +4,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
     App::new(binary_name)
         .global_settings(&[AppSettings::ColoredHelp])
         .settings(&[AppSettings::SubcommandRequiredElseHelp])
-        .version(version) // TODO: get true version
+        .version(version)
         .arg(
             Arg::with_name("v")
                 .short("v")
@@ -13,12 +13,12 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
         )
         .subcommands(vec![
             SubCommand::with_name("add")
-                .about("Add a new dataset or modify existing one")
+                .about("Add a new dataset or modify an existing one")
                 .arg(
                     Arg::with_name("recursive")
                         .short("r")
                         .long("recursive")
-                        .help("Recursively searches for all snapshots in the specified directory"),
+                        .help("Recursively search for all snapshots in the specified directory"),
                 )
                 .arg(
                     Arg::with_name("snapshot")
@@ -34,20 +34,55 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .arg(Arg::with_name("current").required(true).index(2)),
             SubCommand::with_name("completions")
                 .about("Generate tab-completion scripts for your shell")
-                .after_help("HOWTOOOOOOOOOOOOOOOO")
+                .after_help(indoc::indoc!(
+                    r"
+                    The script outputs on `stdout`, allowing you to re-direct the output to the file
+                    of your choosing. Where you place the file will depend on which shell and which
+                    operating system you are using. Your particular configuration may also determine
+                    where these scripts need to be placed.
+
+                    Here are some common set ups:
+
+                    #### BASH ####
+
+                    Simplest way to enable completions in bash is to append the following line
+                    to your `~/.bashrc`:
+
+                        source <(kamu completions bash)
+
+                    You will need to reload your shell session (or execute the same command in your
+                    current one) for changes to take effect.
+
+                    Please contribute a guide for your favorite shell!
+                    "
+                ))
                 .arg(
                     Arg::with_name("shell")
                         .required(true)
                         .possible_values(&Shell::variants()),
                 ),
             SubCommand::with_name("init")
-                .about("Initialize the workspace in the current directory")
+                .about("Initialize an empty workspace in the current directory")
                 .arg(
                     Arg::with_name("pull_images")
                         .long("pull-images")
                         .help("Only pull docker images and exit"),
                 ),
-            SubCommand::with_name("list").about("List all datasets in the workspace"),
+            SubCommand::with_name("list")
+                .about("List all datasets in the workspace")
+                .subcommand(
+                    SubCommand::with_name("depgraph")
+                    .about("Outputs the dependency graph of datasets")
+                    .after_help(indoc::indoc!(
+                        r"
+                        The output is in graphviz (dot) format.
+
+                        If you have graphviz installed you can visualize the graph by running:
+
+                            kamu list depgraph | dot -Tpng > depgraph.png
+                        "
+                    )),
+                ),
             SubCommand::with_name("log")
                 .about("Show dataset's metadata history")
                 .arg(
@@ -55,6 +90,23 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .required(true)
                         .index(1)
                         .help("ID of the dataset"),
+                ),
+            SubCommand::with_name("notebook")
+                .about("Starts the notebook server for exploring the data in the workspace")
+                .after_help(indoc::indoc!(
+                    r"
+                    This command will run the Jupyter server and the Spark engine connected together,
+                    letting you query data with SQL before pulling it into the notebook for final
+                    processing and visualization.
+
+                    For more information check out notebook examples at https://github.com/kamu-data/kamu-cli
+                    "
+                ))
+                .arg(
+                    Arg::with_name("env")
+                    .short("e")
+                        .long("env")
+                        .help("Pass specified environment variable into the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                 ),
             SubCommand::with_name("pull")
                 .about("Pull new data into the datasets")
@@ -77,22 +129,40 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .help("Dataset ID(s)"),
                 ),
             SubCommand::with_name("sql")
-                .about("controls testing features")
+                .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
                     SubCommand::with_name("server")
-                        .about("controls testing features")
+                        .about("Run JDBC server only")
                         .arg(
                             Arg::with_name("address")
                                 .long("address")
                                 .default_value("127.0.0.1")
-                                .help("asdasd"),
+                                .help("Expose JDBC server on specific network interface"),
                         )
                         .arg(
                             Arg::with_name("port")
                                 .long("port")
                                 .default_value("8080")
-                                .help("asdasd"),
+                                .help("Expose JDBC server on specific port"),
                         ),
+                )
+                .arg(
+                    Arg::with_name("url")
+                        .long("url")
+                        .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10090)"),
+                )
+                .arg(
+                    Arg::with_name("command")
+                        .short("c")
+                        .long("command")
+                        .help("SQL command to run"),
+                )
+                .arg(
+                    Arg::with_name("script")
+                        .long("script")
+                        .help("SQL script file to execute"),
                 ),
         ])
+}
+    }
 }

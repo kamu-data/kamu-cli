@@ -107,7 +107,7 @@ impl Command for CompleteCommand {
 
         // Complete commands
         for s in last_cmd.subcommands.iter() {
-            if s.p.meta.name.starts_with(to_complete) {
+            if !s.p.is_set(clap::AppSettings::Hidden) && s.p.meta.name.starts_with(to_complete) {
                 println!("{}", s.p.meta.name);
             }
         }

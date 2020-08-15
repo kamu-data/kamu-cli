@@ -19,6 +19,7 @@ prettytable-rs = "*"  # ASCII table formatting
 # Utils
 chrono = "*"
 glob = "*"  # Used for path completions
+indoc = "*"
 itertools = "*"
 shlex = "*"  # Parsing partial input for custom completions
 slog = "*"  # Logging
