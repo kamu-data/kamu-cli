@@ -16,7 +16,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-const BINARY_NAME: &str = "kamu-rs";
+const BINARY_NAME: &str = "kamu";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() {
