@@ -73,6 +73,13 @@ fn main() {
             cli_parser::cli(BINARY_NAME, VERSION),
             value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
         )),
+        ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
+            metadata_repo.clone(),
+            submatches.values_of("dataset").unwrap_or_default(),
+            submatches.is_present("all"),
+            submatches.is_present("recursive"),
+            submatches.is_present("yes"),
+        )),
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
         ("list", Some(_)) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
         ("log", Some(submatches)) => Box::new(LogCommand::new(

@@ -61,6 +61,32 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .required(true)
                         .possible_values(&Shell::variants()),
                 ),
+            SubCommand::with_name("delete")
+                .about("Delete a dataset")
+                .arg(
+                    Arg::with_name("all")
+                        .short("a")
+                        .long("all")
+                        .help("Delete all datasets in the workspace"),
+                )
+                .arg(
+                    Arg::with_name("recursive")
+                        .short("r")
+                        .long("recursive")
+                        .help("Also delete all transitive dependencies of specified datasets"),
+                )
+                .arg(
+                    Arg::with_name("dataset")
+                        .multiple(true)
+                        .index(1)
+                        .help("Dataset ID(s)"),
+                )
+                .arg(
+                    Arg::with_name("yes")
+                        .short("y")
+                        .long("yes")
+                        .help("Don't ask for confirmation"),
+                ),
             SubCommand::with_name("init")
                 .about("Initialize an empty workspace in the current directory")
                 .arg(
@@ -128,6 +154,26 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .index(1)
                         .help("Dataset ID(s)"),
                 ),
+            SubCommand::with_name("reset")
+                .about("Revert the dataset back to the specified state")
+                .arg(
+                    Arg::with_name("dataset")
+                        .required(true)
+                        .index(1)
+                        .help("ID of the dataset")
+                )
+                .arg(
+                    Arg::with_name("hash")
+                        .required(true)
+                        .index(2)
+                        .help("Hash of the block to reset to")
+                )
+                .arg(
+                    Arg::with_name("yes")
+                        .short("y")
+                        .long("yes")
+                        .help("Don't ask for confirmation")
+                ),
             SubCommand::with_name("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
@@ -163,6 +209,4 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .help("SQL script file to execute"),
                 ),
         ])
-}
-    }
 }

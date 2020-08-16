@@ -22,7 +22,7 @@ pub struct PullCommand {
 }
 
 impl PullCommand {
-    pub fn new<'s, I, S>(
+    pub fn new<I, S>(
         pull_svc: Rc<RefCell<dyn PullService>>,
         ids: I,
         all: bool,

@@ -19,6 +19,11 @@ impl MetadataRepositoryImpl {
         }
     }
 
+    fn get_all_datasets_impl(&self) -> Result<ListDatasetsIter, std::io::Error> {
+        let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir)?;
+        Ok(ListDatasetsIter { rd: read_dir })
+    }
+
     fn dataset_exists(&self, id: &DatasetID) -> bool {
         let path = self.get_dataset_metadata_dir(id);
         path.exists()
@@ -74,8 +79,7 @@ impl MetadataRepositoryImpl {
 
 impl MetadataRepository for MetadataRepositoryImpl {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's> {
-        let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).unwrap();
-        Box::new(ListDatasetsIter { rd: read_dir })
+        Box::new(self.get_all_datasets_impl().unwrap())
     }
 
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError> {
@@ -145,6 +149,60 @@ impl MetadataRepository for MetadataRepositoryImpl {
                 (id, res)
             })
             .collect()
+    }
+
+    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError> {
+        if !self.dataset_exists(dataset_id) {
+            return Err(DomainError::does_not_exist(
+                ResourceKind::Dataset,
+                dataset_id.as_str().to_owned(),
+            ));
+        }
+
+        // TODO: avoid copying
+        let owned_id = dataset_id.to_owned();
+
+        let dependents: Vec<_> = self
+            .get_all_datasets_impl()
+            .unwrap()
+            .filter(|id| id != dataset_id)
+            .map(|id| self.get_summary(&id).unwrap())
+            .filter(|s| s.dependencies.contains(&owned_id))
+            .map(|s| s.id)
+            .collect();
+
+        if dependents.len() > 0 {
+            return Err(DomainError::dangling_reference(
+                dependents
+                    .into_iter()
+                    .map(|id| (ResourceKind::Dataset, id.as_str().to_owned()))
+                    .collect(),
+                ResourceKind::Dataset,
+                dataset_id.as_str().to_owned(),
+            ));
+        }
+
+        // TODO: should be handled differently
+        let metadata_dir = self.get_dataset_metadata_dir(dataset_id);
+        let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
+        let layout = DatasetLayout::new(&volume_layout, dataset_id);
+
+        let paths = [
+            layout.cache_dir,
+            layout.checkpoints_dir,
+            layout.data_dir,
+            metadata_dir,
+        ];
+
+        for p in paths.iter() {
+            if p.exists() {
+                std::fs::remove_dir_all(p).unwrap_or_else(|e| {
+                    panic!("Failed to remove directory {}: {}", p.display(), e)
+                });
+            }
+        }
+
+        Ok(())
     }
 
     fn get_metadata_chain(

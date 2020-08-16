@@ -72,4 +72,17 @@ impl DomainError {
             backtrace: Backtrace::capture(),
         }
     }
+
+    pub fn dangling_reference(
+        from_kinds_ids: Vec<(ResourceKind, String)>,
+        to_kind: ResourceKind,
+        to_id: String,
+    ) -> Self {
+        Self::DanglingReference {
+            from_kinds_ids: from_kinds_ids,
+            to_kind: to_kind,
+            to_id: to_id,
+            backtrace: Backtrace::capture(),
+        }
+    }
 }

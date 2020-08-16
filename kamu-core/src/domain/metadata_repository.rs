@@ -12,6 +12,8 @@ pub trait MetadataRepository {
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)>;
 
+    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError>;
+
     // TODO: Separate mutable and immutable paths
     // See: https://github.com/rust-lang/rfcs/issues/2035
     fn get_metadata_chain(

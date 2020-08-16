@@ -8,6 +8,7 @@ edition = "2018"
 kamu = { path = "../kamu-core" }
 
 # UI
+read_input = "*"  # Basic user input
 chrono-humanize = "*"  # Human readable durations
 clap = "*"
 console = "*"  # Terminal colors

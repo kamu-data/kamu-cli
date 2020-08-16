@@ -9,6 +9,9 @@ pub use complete_command::CompleteCommand;
 mod completions_command;
 pub use completions_command::CompletionsCommand;
 
+mod delete_command;
+pub use delete_command::*;
+
 mod list_command;
 pub use list_command::ListCommand;
 
