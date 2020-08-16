@@ -121,7 +121,22 @@ fn main() {
 
 fn find_workspace() -> WorkspaceLayout {
     let cwd = Path::new(".").canonicalize().unwrap();
-    WorkspaceLayout::new(&cwd)
+    if let Some(ws) = find_workspace_rec(&cwd) {
+        ws
+    } else {
+        WorkspaceLayout::new(&cwd)
+    }
+}
+
+fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
+    let root_dir = p.join(".kamu");
+    if root_dir.exists() {
+        Some(WorkspaceLayout::new(p))
+    } else if let Some(parent) = p.parent() {
+        find_workspace_rec(parent)
+    } else {
+        None
+    }
 }
 
 fn configure_logging(output_format: &OutputFormat, workspace_layout: &WorkspaceLayout) -> Logger {

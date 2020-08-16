@@ -1,16 +1,15 @@
 # TODO
 
 ## Catch-up
-- reset support
-- SIGINT handling during pull
 - Support SQL shell
-- Remotes & Push support
 - depgraph support
-- workspace search
+- Remotes & Push support
+- reset support
 - recursive/all delete
 
 ## Post catch-up
 - interactive add replacement
+- SIGINT handling during pull
 - pretty hashes
 - Support fast cat/head/tail (SQL-like?)
 - Real metadata hashing

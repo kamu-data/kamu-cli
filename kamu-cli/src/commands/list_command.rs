@@ -4,7 +4,6 @@ use kamu::domain::*;
 
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
-use prettytable::{cell, row, Cell, Row, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -55,6 +54,8 @@ impl ListCommand {
     }
 
     fn print_pretty(&self) -> Result<(), Error> {
+        use prettytable::*;
+
         let mut datasets: Vec<DatasetIDBuf> =
             self.metadata_repo.borrow().get_all_datasets().collect();
 
