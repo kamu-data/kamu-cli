@@ -30,6 +30,7 @@ rand = "*"
 regex = "*"
 indoc = "*"  # Compile-time unindent
 itertools = "*"
+signal-hook = "*"
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
 users = "*"  # For getting uid:gid on Unix

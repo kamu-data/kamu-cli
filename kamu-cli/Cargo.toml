@@ -16,6 +16,7 @@ humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
+webbrowser = "*"  # For opening URLs in default system browser
 
 # Utils
 chrono = "*"

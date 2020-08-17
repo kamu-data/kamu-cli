@@ -196,6 +196,9 @@ impl FetchService {
             transfer.perform().map_err(|e| {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 match e.code() {
+                    curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
+                        IngestError::unreachable(url, Some(e.into()))
+                    }
                     curl_sys::CURLE_COULDNT_CONNECT => {
                         IngestError::unreachable(url, Some(e.into()))
                     }
@@ -281,6 +284,9 @@ impl FetchService {
             transfer.perform().map_err(|e| {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 match e.code() {
+                    curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
+                        IngestError::unreachable(url, Some(e.into()))
+                    }
                     curl_sys::CURLE_COULDNT_CONNECT => {
                         IngestError::unreachable(url, Some(e.into()))
                     }

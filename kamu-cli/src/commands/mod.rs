@@ -1,34 +1,37 @@
 pub use super::error::Error;
 
 mod add_command;
-pub use add_command::AddCommand;
+pub use add_command::*;
 
 mod complete_command;
-pub use complete_command::CompleteCommand;
+pub use complete_command::*;
 
 mod completions_command;
-pub use completions_command::CompletionsCommand;
+pub use completions_command::*;
 
 mod delete_command;
 pub use delete_command::*;
 
 mod list_command;
-pub use list_command::ListCommand;
+pub use list_command::*;
 
 mod log_command;
-pub use log_command::LogCommand;
+pub use log_command::*;
 
 mod init_command;
-pub use init_command::InitCommand;
+pub use init_command::*;
+
+mod notebook_command;
+pub use notebook_command::*;
 
 mod pull_command;
-pub use pull_command::PullCommand;
+pub use pull_command::*;
 
 mod sql_server_command;
-pub use sql_server_command::SqlServerCommand;
+pub use sql_server_command::*;
 
 mod sql_shell_command;
-pub use sql_shell_command::SqlShellCommand;
+pub use sql_shell_command::*;
 
 pub trait Command {
     fn needs_workspace(&self) -> bool {

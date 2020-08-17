@@ -86,6 +86,12 @@ fn main() {
             metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
         )),
+        ("notebook", Some(submatches)) => Box::new(NotebookCommand::new(
+            &workspace_layout,
+            &local_volume_layout,
+            &output_format,
+            submatches.values_of("env").unwrap_or_default(),
+        )),
         ("pull", Some(submatches)) => Box::new(PullCommand::new(
             pull_svc.clone(),
             submatches.values_of("dataset").unwrap_or_default(),

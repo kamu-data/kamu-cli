@@ -130,8 +130,11 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ))
                 .arg(
                     Arg::with_name("env")
-                    .short("e")
+                        .short("e")
                         .long("env")
+                        .value_name("VAR")
+                        .takes_value(true)
+                        .multiple(true)
                         .help("Pass specified environment variable into the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                 ),
             SubCommand::with_name("pull")

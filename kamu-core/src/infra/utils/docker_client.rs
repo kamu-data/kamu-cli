@@ -63,6 +63,7 @@ impl Default for ExecArgs {
     }
 }
 
+#[derive(Clone)]
 pub struct DockerClient;
 
 impl DockerClient {
@@ -314,5 +315,34 @@ impl Drop for NetworkHandle {
             .stderr(Stdio::null())
             .status()
             .unwrap();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DropContainer
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct DropContainer {
+    docker: DockerClient,
+    name: String,
+}
+
+impl DropContainer {
+    pub fn new(docker: DockerClient, name: &str) -> Self {
+        Self {
+            docker: docker,
+            name: name.to_owned(),
+        }
+    }
+}
+
+impl Drop for DropContainer {
+    fn drop(&mut self) {
+        let _ = self
+            .docker
+            .kill_cmd(&self.name)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
     }
 }

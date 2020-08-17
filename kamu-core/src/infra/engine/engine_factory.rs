@@ -6,7 +6,7 @@ use super::engine_spark::*;
 
 use std::sync::{Arc, Mutex};
 
-pub const IMAGE_SPARK: &str = "kamudata/engine-spark:0.8.0";
+pub const IMAGE_SPARK: &str = "kamudata/engine-spark:0.8.1";
 pub const IMAGE_FLINK: &str = "kamudata/engine-flink:0.6.0";
 
 pub struct EngineFactory {

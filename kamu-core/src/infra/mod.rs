@@ -1,6 +1,7 @@
 mod engine;
 pub use engine::*;
 
+pub mod explore;
 pub mod ingest;
 pub mod serde;
 pub mod utils;
