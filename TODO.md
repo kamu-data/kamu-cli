@@ -6,6 +6,7 @@
 - Remotes & Push support
 - reset support
 - recursive/all delete
+- Windows support
 
 ## Post catch-up
 - interactive add replacement

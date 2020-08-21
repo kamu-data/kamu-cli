@@ -75,7 +75,7 @@ impl NotebookServerImpl {
                 container_name: Some("kamu-jupyter".to_owned()),
                 network: Some(network_name.to_owned()),
                 expose_ports: vec![80],
-                volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
+                volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
                 interactive: true,
                 environment_vars: environment_vars,
                 ..DockerRunArgs::default()
@@ -126,9 +126,35 @@ impl NotebookServerImpl {
         livy.wait()?;
         token_extractor.handle.join().unwrap();
 
+        // Fix permissions
+        if cfg!(unix) {
+            docker_client
+                .run_shell_cmd(
+                    DockerRunArgs {
+                        image: JUPYTER_IMAGE.to_owned(),
+                        container_name: Some("kamu-jupyter".to_owned()),
+                        volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
+                        ..DockerRunArgs::default()
+                    },
+                    &[format!(
+                        "chown -R {}:{} {}",
+                        users::get_current_uid(),
+                        users::get_current_gid(),
+                        "/opt/workdir"
+                    )],
+                )
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+        }
+
         Ok(())
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// TokenExtractor
+///////////////////////////////////////////////////////////////////////////////
 
 struct TokenExtractor {
     handle: std::thread::JoinHandle<()>,
