@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2020-08-23
+### Changed
+- This version is a complete re-write of the application from **Scala** into
+  **Rust**. It is mostly on par with the functionality of the previous version
+  but has many improvements. Most notably, all interactions not involving
+  engines (which are still heavy and run in `docker`) are blazing fast.
+
 ## [0.23.0] - 2020-08-22
 ### Changed
 - Updated to latest ODF schema

@@ -1,25 +1,7 @@
-dist: xenial
-language: scala
-jdk:
-  - openjdk8
-scala:
-  - 2.11.12
+os: linux
 services:
-  - docker
-script: make bootstrap && sbt "; assembly ; test"
-deploy:
-  edge: true
-  provider: releases
-  file: target/scala-2.11/kamu
-  on:
-    tags: true
-cache:
-  directories:
-    - $HOME/.sbt
-    - $HOME/.m2
-    - $HOME/.ivy2/cache
-    - $HOME/.cache/coursier
-before_cache:
-  - rm -fv $HOME/.ivy2/.sbt.ivy.lock
-  - find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
-  - find $HOME/.sbt        -name "*.lock"               -print -delete
+- docker
+language: rust
+rust:
+- nightly
+cache: cargo
