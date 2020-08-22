@@ -14,6 +14,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_transform_with_engine_spark() {
     let tempdir = tempfile::tempdir().unwrap();
 
@@ -181,6 +182,7 @@ fn test_transform_with_engine_spark() {
 }
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_transform_with_engine_flink() {
     let tempdir = tempfile::tempdir().unwrap();
 

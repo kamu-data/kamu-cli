@@ -14,6 +14,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_ingest_with_engine() {
     let tempdir = tempfile::tempdir().unwrap();
 

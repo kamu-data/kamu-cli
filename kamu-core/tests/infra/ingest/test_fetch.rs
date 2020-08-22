@@ -3,9 +3,11 @@ use kamu::domain::*;
 use kamu::infra::ingest::*;
 use kamu::infra::serde::yaml::*;
 use kamu::infra::utils::docker_client::*;
+use kamu::infra::utils::docker_images;
 use kamu_test::*;
 
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::time::Duration;
 use url::Url;
 
@@ -91,6 +93,7 @@ fn test_fetch_url_http_unreachable() {
 }
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_fetch_url_http_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
     let target_path = tempdir.path().join("fetched.bin");
@@ -113,6 +116,7 @@ fn test_fetch_url_http_not_found() {
 }
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_fetch_url_http_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let server_dir = tempdir.path().join("srv");
@@ -201,6 +205,7 @@ fn test_fetch_url_http_ok() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let server_dir = tempdir.path().join("srv");
@@ -297,9 +302,19 @@ impl HttpServer {
             std::fs::create_dir(&server_dir).unwrap();
         }
 
+        let image = docker_images::HTTPD;
+
+        docker
+            .pull_cmd(image)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
+
         let process = docker
             .run_cmd(DockerRunArgs {
-                image: "httpd:2.4".to_owned(),
+                image: image.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![server_port],
                 volume_map: vec![(
@@ -369,11 +384,21 @@ impl FtpServer {
             std::fs::create_dir(&server_dir).unwrap();
         }
 
+        let image = docker_images::FTP;
+
+        docker
+            .pull_cmd(image)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
+
         // TODO: this is likely very brittle because of all the port mapping
         // FTP is a crazy protocol :(
         let process = docker
             .run_cmd(DockerRunArgs {
-                image: "bogem/ftp".to_owned(),
+                image: image.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![21],
                 expose_port_map_range: vec![((47400, 47470), (47400, 47470))],

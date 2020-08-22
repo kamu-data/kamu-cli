@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 
+[features]
+skip_docker_tests = []
+
 [dependencies]
 # Domain
 chrono = { version = "*", features = ["serde"] }
