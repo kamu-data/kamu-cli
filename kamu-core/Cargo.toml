@@ -1,0 +1,41 @@
+[package]
+name = "kamu"
+version = "0.1.0"
+authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+# Domain
+chrono = { version = "*", features = ["serde"] }
+intervals-general = "*"
+rust-crypto = "*"  # Data and metadata hashing
+
+# Serialization
+flatbuffers = "*"
+serde = { version = "*", features = ["derive"] }
+serde_with = "*"
+serde_yaml = "*"
+
+# Ingest
+url = "*"
+fs_extra = "*"  # Copy files with progress, get directory sizes
+curl = { version = "*", features = ["http2", "protocol-ftp"] }
+curl-sys = "*"
+zip = "*"
+ringbuf = "*"
+
+# Utils
+slog = "*"
+rand = "*"
+regex = "*"
+indoc = "*"  # Compile-time unindent
+itertools = "*"
+signal-hook = "*"
+thiserror = "*"  # Structured error derivations
+tempfile = "*"
+users = "*"  # For getting uid:gid on Unix
+
+[dev-dependencies]
+kamu-test = { path = "../kamu-core-test" }
+filetime = "*"
+parquet = { git = "https://github.com/apache/arrow" }

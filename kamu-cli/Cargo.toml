@@ -1,0 +1,37 @@
+[package]
+name = "kamu-cli"
+version = "0.1.0"
+authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+kamu = { path = "../kamu-core" }
+
+# UI
+read_input = "*"  # Basic user input
+chrono-humanize = "*"  # Human readable durations
+clap = "*"
+console = "*"  # Terminal colors
+humansize = "*"  # Human readable data sizes
+indicatif = "*"  # Progress bars and spinners
+num-format = "*"  # Human-readable number formatting
+prettytable-rs = "*"  # ASCII table formatting
+webbrowser = "*"  # For opening URLs in default system browser
+
+# Utils
+chrono = "*"
+glob = "*"  # Used for path completions
+indoc = "*"
+itertools = "*"
+shlex = "*"  # Parsing partial input for custom completions
+slog = "*"  # Logging
+slog-async = "*"
+slog-term = "*"
+tempfile = "*"
+thiserror = "*"  # Structured error derivations
+
+# TODO: Move to core
+parquet = { git = "https://github.com/apache/arrow" }
+
+[dev-dependencies]
+rand = "*"

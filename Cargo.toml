@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "kamu-core",
+    "kamu-core-test",
+    "kamu-cli",
+]
