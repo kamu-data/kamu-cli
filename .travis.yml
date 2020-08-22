@@ -5,3 +5,4 @@ language: rust
 rust:
 - nightly
 cache: cargo
+env: RUST_BACKTRACE=1

@@ -33,6 +33,9 @@ pub use notebook_command::*;
 mod pull_command;
 pub use pull_command::*;
 
+mod pull_images_command;
+pub use pull_images_command::*;
+
 mod sql_server_command;
 pub use sql_server_command::*;
 

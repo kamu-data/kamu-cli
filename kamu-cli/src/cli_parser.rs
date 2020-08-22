@@ -90,7 +90,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
             SubCommand::with_name("init")
                 .about("Initialize an empty workspace in the current directory")
                 .arg(
-                    Arg::with_name("pull_images")
+                    Arg::with_name("pull-images")
                         .long("pull-images")
                         .help("Only pull docker images and exit"),
                 ),

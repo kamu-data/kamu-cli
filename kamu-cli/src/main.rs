@@ -80,7 +80,13 @@ fn main() {
             submatches.is_present("recursive"),
             submatches.is_present("yes"),
         )),
-        ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
+        ("init", Some(submatches)) => {
+            if !submatches.is_present("pull-images") {
+                Box::new(InitCommand::new(&workspace_layout))
+            } else {
+                Box::new(PullImagesCommand::new())
+            }
+        }
         ("list", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
             ("depgraph", _) => Box::new(DepgraphCommand::new(metadata_repo.clone())),

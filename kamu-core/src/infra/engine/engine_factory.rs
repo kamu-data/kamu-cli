@@ -1,13 +1,11 @@
 use crate::domain::*;
+use crate::infra::utils::docker_images;
 use crate::infra::*;
 
 use super::engine_flink::*;
 use super::engine_spark::*;
 
 use std::sync::{Arc, Mutex};
-
-pub const IMAGE_SPARK: &str = "kamudata/engine-spark:0.8.1";
-pub const IMAGE_FLINK: &str = "kamudata/engine-flink:0.6.0";
 
 pub struct EngineFactory {
     spark_engine: Arc<Mutex<SparkEngine>>,
@@ -17,8 +15,14 @@ pub struct EngineFactory {
 impl EngineFactory {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
-            spark_engine: Arc::new(Mutex::new(SparkEngine::new(IMAGE_SPARK, workspace_layout))),
-            flink_engine: Arc::new(Mutex::new(FlinkEngine::new(IMAGE_FLINK, workspace_layout))),
+            spark_engine: Arc::new(Mutex::new(SparkEngine::new(
+                docker_images::SPARK,
+                workspace_layout,
+            ))),
+            flink_engine: Arc::new(Mutex::new(FlinkEngine::new(
+                docker_images::FLINK,
+                workspace_layout,
+            ))),
         }
     }
 

@@ -1,4 +1,5 @@
 use crate::infra::utils::docker_client::*;
+use crate::infra::utils::docker_images;
 use crate::infra::*;
 
 use slog::{info, Logger};
@@ -7,9 +8,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-
-// TODO: Replace with kamu image
-const SPARK_IMAGE: &str = "bitnami/spark:3.0.0";
 
 pub struct SqlShellImpl;
 
@@ -40,7 +38,7 @@ impl SqlShellImpl {
         signal_hook::flag::register(signal_hook::SIGTERM, exit.clone())?;
 
         let mut cmd = docker_client.run_cmd(DockerRunArgs {
-            image: SPARK_IMAGE.to_owned(),
+            image: docker_images::SPARK_V3.to_owned(),
             container_name: Some("kamu-spark".to_owned()),
             user: Some("root".to_owned()),
             expose_ports: vec![8080, 10000],

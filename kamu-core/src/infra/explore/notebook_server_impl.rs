@@ -1,4 +1,5 @@
 use crate::infra::utils::docker_client::*;
+use crate::infra::utils::docker_images;
 use crate::infra::*;
 
 use std::fs::File;
@@ -6,9 +7,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-
-const LIVY_IMAGE: &str = "kamudata/engine-spark:0.8.0";
-const JUPYTER_IMAGE: &str = "kamudata/jupyter-uber:0.0.1";
 
 pub struct NotebookServerImpl;
 
@@ -39,7 +37,7 @@ impl NotebookServerImpl {
 
         let mut livy = docker_client
             .run_cmd(DockerRunArgs {
-                image: LIVY_IMAGE.to_owned(),
+                image: docker_images::LIVY.to_owned(),
                 container_name: Some("kamu-livy".to_owned()),
                 hostname: Some("kamu-livy".to_owned()),
                 network: Some(network_name.to_owned()),
@@ -70,7 +68,7 @@ impl NotebookServerImpl {
         // TODO: env vars propagation
         let mut jupyter = docker_client
             .run_cmd(DockerRunArgs {
-                image: JUPYTER_IMAGE.to_owned(),
+                image: docker_images::JUPYTER.to_owned(),
                 container_name: Some("kamu-jupyter".to_owned()),
                 network: Some(network_name.to_owned()),
                 expose_ports: vec![80],
@@ -129,7 +127,7 @@ impl NotebookServerImpl {
             docker_client
                 .run_shell_cmd(
                     DockerRunArgs {
-                        image: JUPYTER_IMAGE.to_owned(),
+                        image: docker_images::JUPYTER.to_owned(),
                         container_name: Some("kamu-jupyter".to_owned()),
                         volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
                         ..DockerRunArgs::default()

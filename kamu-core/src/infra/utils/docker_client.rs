@@ -75,6 +75,13 @@ impl DockerClient {
         Self {}
     }
 
+    pub fn pull_cmd(&self, image: &str) -> Command {
+        let mut cmd = Command::new("docker");
+        cmd.arg("pull");
+        cmd.arg(image);
+        cmd
+    }
+
     pub fn run_cmd(&self, args: DockerRunArgs) -> Command {
         let mut cmd = Command::new("docker");
         cmd.arg("run");
