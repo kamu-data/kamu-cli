@@ -117,6 +117,24 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .index(1)
                         .help("ID of the dataset"),
                 ),
+            SubCommand::with_name("new")
+                .about("Creates a new dataset manifest")
+                .arg(
+                    Arg::with_name("root")
+                        .long("root")
+                        .help("Create a root dataset")
+                )
+                .arg(
+                    Arg::with_name("derivative")
+                        .long("derivative")
+                        .help("Create a derivative dataset"),
+                )
+                .arg(
+                    Arg::with_name("id")
+                        .required(true)
+                        .index(1)
+                        .help("ID of the new dataset"),
+                ),
             SubCommand::with_name("notebook")
                 .about("Starts the notebook server for exploring the data in the workspace")
                 .after_help(indoc::indoc!(

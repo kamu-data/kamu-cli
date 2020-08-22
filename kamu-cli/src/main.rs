@@ -83,14 +83,18 @@ fn main() {
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
         ("list", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
-            ("depgraph", _) => {
-                Box::new(DepgraphCommand::new(metadata_repo.clone(), &output_format))
-            }
+            ("depgraph", _) => Box::new(DepgraphCommand::new(metadata_repo.clone())),
             _ => unimplemented!(),
         },
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+        )),
+        ("new", Some(submatches)) => Box::new(NewDatasetCommand::new(
+            submatches.value_of("id").unwrap(),
+            submatches.is_present("root"),
+            submatches.is_present("derivative"),
+            None::<&str>,
         )),
         ("notebook", Some(submatches)) => Box::new(NotebookCommand::new(
             &workspace_layout,

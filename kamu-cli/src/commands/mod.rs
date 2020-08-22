@@ -24,6 +24,9 @@ pub use log_command::*;
 mod init_command;
 pub use init_command::*;
 
+mod new_dataset_command;
+pub use new_dataset_command::*;
+
 mod notebook_command;
 pub use notebook_command::*;
 

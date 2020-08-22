@@ -1,5 +1,4 @@
 use super::{Command, Error};
-use crate::output::OutputFormat;
 use kamu::domain::*;
 use kamu::infra::serde::yaml::DatasetKind;
 
@@ -8,17 +7,12 @@ use std::rc::Rc;
 
 pub struct DepgraphCommand {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    output_format: OutputFormat,
 }
 
 impl DepgraphCommand {
-    pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        output_format: &OutputFormat,
-    ) -> Self {
+    pub fn new(metadata_repo: Rc<RefCell<dyn MetadataRepository>>) -> Self {
         Self {
             metadata_repo: metadata_repo,
-            output_format: output_format.clone(),
         }
     }
 }
