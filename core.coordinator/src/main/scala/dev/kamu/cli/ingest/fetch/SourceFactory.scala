@@ -103,14 +103,14 @@ class SourceFactory(systemClock: Clock) {
       .toVector
 
     val orderBy = kind.order.getOrElse(
-      if (kind.eventTime.isDefined) SourceOrdering.ByEventTime()
-      else SourceOrdering.ByName()
+      if (kind.eventTime.isDefined) SourceOrdering.ByEventTime
+      else SourceOrdering.ByName
     )
 
     val sorted = orderBy match {
-      case SourceOrdering.ByName() =>
+      case SourceOrdering.ByName =>
         globbed.sortBy(_.path.getFileName.toString.toLowerCase())
-      case SourceOrdering.ByEventTime() =>
+      case SourceOrdering.ByEventTime =>
         globbed.sortBy(eventTimeSource.getEventTime)
     }
 

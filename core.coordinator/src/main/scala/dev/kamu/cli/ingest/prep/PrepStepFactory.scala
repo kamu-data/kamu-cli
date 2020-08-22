@@ -8,7 +8,7 @@
 
 package dev.kamu.cli.ingest.prep
 
-import dev.kamu.core.manifests.{PrepStep => PrepStepCfg}
+import dev.kamu.core.manifests.{PrepStep => PrepStepCfg, CompressionFormat}
 import org.apache.logging.log4j.LogManager
 
 class PrepStepFactory() {
@@ -19,17 +19,13 @@ class PrepStepFactory() {
   ): PrepStep = {
     config match {
       case dc: PrepStepCfg.Decompress =>
-        dc.format.toLowerCase match {
-          case "gzip" =>
+        dc.format match {
+          case CompressionFormat.Gzip =>
             logger.debug("Extracting gzip")
             new DecompressGZIPStep()
-          case "zip" =>
+          case CompressionFormat.Zip =>
             logger.debug("Extracting zip")
             new DecompressZIPStep(dc)
-          case _ =>
-            throw new NotImplementedError(
-              s"Unknown compression format: ${dc.format}"
-            )
         }
       case pipe: PrepStepCfg.Pipe =>
         new ProcessPipeStep(pipe.command)

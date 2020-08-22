@@ -30,7 +30,7 @@ class DependencyGraphCommand(
 
     datasets.foreach(
       ds =>
-        ds.datasetDependencies
+        ds.dependencies
           .foreach(d => println(s"${quote(d)} -> ${quote(ds.id)};"))
     )
 

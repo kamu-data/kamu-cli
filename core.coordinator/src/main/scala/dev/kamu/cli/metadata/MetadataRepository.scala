@@ -116,7 +116,7 @@ class MetadataRepository(
     if (isRemote(id))
       List.empty
     else
-      getDatasetSummary(id).datasetDependencies.toList
+      getDatasetSummary(id).dependencies.toList
   }
 
   def getDatasetsInDependencyOrder(
@@ -212,7 +212,7 @@ class MetadataRepository(
     // Validate references
     val referencedBy = getAllDatasets()
       .map(getDatasetSummary)
-      .filter(_.datasetDependencies.contains(id))
+      .filter(_.dependencies.contains(id))
 
     if (referencedBy.nonEmpty)
       throw new DanglingReferenceException(referencedBy.map(_.id), id)

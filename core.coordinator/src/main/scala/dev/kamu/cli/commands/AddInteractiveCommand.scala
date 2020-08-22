@@ -76,9 +76,12 @@ class AddInteractiveCommand(
             "Compression",
             "What's the compression format?",
             Seq("zip", "gzip")
-          )
+          ) match {
+            case "zip"  => CompressionFormat.Zip
+            case "gzip" => CompressionFormat.Gzip
+          }
 
-          val subPath = if (Seq("zip").contains(compression)) {
+          val subPath = if (compression == CompressionFormat.Zip) {
             inputOptional(
               "Sub-path",
               "If this archive can contain multiple files - specify the path regex to " +

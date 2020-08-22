@@ -37,7 +37,7 @@ class MetadataChain(datasetDir: Path) {
     val initialSummary = DatasetSummary(
       id = ds.id,
       kind = ds.kind,
-      datasetDependencies = ds.dependsOn.toSet,
+      dependencies = ds.dependsOn.toSet,
       vocab = ds.vocab,
       lastPulled = None,
       numRecords = 0,
