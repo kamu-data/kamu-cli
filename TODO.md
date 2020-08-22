@@ -1,7 +1,7 @@
 # TODO
 
 ## Catch-up
-- Support SQL shell
+- SQL shell script, format, and params
 - depgraph support
 - Remotes & Push support
 - reset support
@@ -25,3 +25,4 @@
 - rethink "uncacheable" warning
 - use cargo-crev?
 - Add self-help info to error output
+- SQL shell uses pseudo-tty

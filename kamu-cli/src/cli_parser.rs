@@ -132,8 +132,8 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("env")
                         .short("e")
                         .long("env")
-                        .value_name("VAR")
                         .takes_value(true)
+                        .value_name("VAR")
                         .multiple(true)
                         .help("Pass specified environment variable into the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                 ),
@@ -198,17 +198,23 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .arg(
                     Arg::with_name("url")
                         .long("url")
+                        .takes_value(true)
+                        .value_name("URL")
                         .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10090)"),
                 )
                 .arg(
                     Arg::with_name("command")
                         .short("c")
                         .long("command")
+                        .takes_value(true)
+                        .value_name("CMD")
                         .help("SQL command to run"),
                 )
                 .arg(
                     Arg::with_name("script")
                         .long("script")
+                        .takes_value(true)
+                        .value_name("FILE")
                         .help("SQL script file to execute"),
                 ),
         ])

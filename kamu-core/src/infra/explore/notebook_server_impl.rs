@@ -52,7 +52,6 @@ impl NotebookServerImpl {
                 } else {
                     vec![]
                 },
-                interactive: true,
                 ..DockerRunArgs::default()
             })
             .stdout(if inherit_stdio {
@@ -76,7 +75,6 @@ impl NotebookServerImpl {
                 network: Some(network_name.to_owned()),
                 expose_ports: vec![80],
                 volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
-                interactive: true,
                 environment_vars: environment_vars,
                 ..DockerRunArgs::default()
             })

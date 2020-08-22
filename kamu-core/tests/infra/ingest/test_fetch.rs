@@ -321,10 +321,6 @@ impl HttpServer {
             .wait_for_socket(host_port, Duration::from_secs(5))
             .unwrap();
 
-        // TODO: Investigate why without this extra sleep first requests fail
-        // with IncompleteMessage
-        std::thread::sleep(Duration::from_millis(100));
-
         Self {
             container_name: server_name,
             process: process,
@@ -401,10 +397,6 @@ impl FtpServer {
         docker
             .wait_for_socket(host_port, Duration::from_secs(5))
             .unwrap();
-
-        // TODO: Investigate why without this extra sleep first requests fail
-        // with IncompleteMessage
-        std::thread::sleep(Duration::from_millis(100));
 
         Self {
             container_name: server_name,

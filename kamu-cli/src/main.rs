@@ -100,7 +100,12 @@ fn main() {
             &output_format,
         )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
-            ("", None) => Box::new(SqlShellCommand::new()),
+            ("", None) => Box::new(SqlShellCommand::new(
+                &workspace_layout,
+                &local_volume_layout,
+                &output_format,
+                logger.new(o!()),
+            )),
             ("server", Some(server_matches)) => Box::new(SqlServerCommand::new(
                 server_matches.value_of("address").unwrap(),
                 value_t_or_exit!(server_matches.value_of("port"), u16),

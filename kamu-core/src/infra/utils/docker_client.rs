@@ -6,50 +6,53 @@ use std::backtrace::Backtrace;
 use thiserror::Error;
 
 pub struct DockerRunArgs {
-    pub image: String,
     pub args: Vec<String>,
     pub container_name: Option<String>,
-    pub hostname: Option<String>,
-    pub network: Option<String>,
+    pub detached: bool,
+    pub entry_point: Option<String>,
+    pub environment_vars: Vec<(String, String)>,
     pub expose_all_ports: bool,
     pub expose_ports: Vec<u16>,
     pub expose_port_map: Vec<(u16, u16)>,
     pub expose_port_map_range: Vec<((u16, u16), (u16, u16))>,
-    pub volume_map: Vec<(PathBuf, PathBuf)>,
-    pub work_dir: Option<PathBuf>,
-    pub environment_vars: Vec<(String, String)>,
-    pub entry_point: Option<String>,
+    pub hostname: Option<String>,
+    pub image: String,
+    pub interactive: bool,
+    pub network: Option<String>,
     pub remove: bool,
     pub tty: bool,
-    pub interactive: bool,
-    pub detached: bool,
+    pub user: Option<String>,
+    pub volume_map: Vec<(PathBuf, PathBuf)>,
+    pub work_dir: Option<PathBuf>,
 }
 
 pub struct ExecArgs {
     pub tty: bool,
     pub interactive: bool,
+    pub work_dir: Option<PathBuf>,
 }
 
 impl Default for DockerRunArgs {
     fn default() -> Self {
         Self {
-            image: "".to_owned(),
             args: Vec::new(),
             container_name: None,
-            hostname: None,
-            network: None,
+            detached: false,
+            entry_point: None,
+            environment_vars: Vec::new(),
             expose_all_ports: false,
             expose_ports: Vec::new(),
             expose_port_map: Vec::new(),
             expose_port_map_range: Vec::new(),
-            volume_map: Vec::new(),
-            work_dir: None,
-            environment_vars: Vec::new(),
-            entry_point: None,
+            hostname: None,
+            image: "".to_owned(),
+            interactive: false,
+            network: None,
             remove: true,
             tty: false,
-            interactive: false,
-            detached: false,
+            user: None,
+            volume_map: Vec::new(),
+            work_dir: None,
         }
     }
 }
@@ -59,6 +62,7 @@ impl Default for ExecArgs {
         Self {
             tty: false,
             interactive: false,
+            work_dir: None,
         }
     }
 }
@@ -111,6 +115,7 @@ impl DockerClient {
             cmd.arg("-v");
             cmd.arg(format!("{}:{}", h.display(), c.display()));
         });
+        args.user.map(|v| cmd.arg(format!("--user={}", v)));
         args.work_dir
             .map(|v| cmd.arg(format!("--workdir={}", v.display())));
         args.environment_vars.iter().for_each(|(n, v)| {
@@ -154,6 +159,9 @@ impl DockerClient {
         if exec_args.interactive {
             cmd.arg("-i");
         }
+        exec_args
+            .work_dir
+            .map(|v| cmd.arg(format!("--workdir={}", v.display())));
         cmd.arg(container_name);
         cmd.args(cmd_args);
         cmd
@@ -242,6 +250,31 @@ impl DockerClient {
         }
     }
 
+    pub fn wait_for_container(
+        &self,
+        container_name: &str,
+        timeout: Duration,
+    ) -> Result<(), TimeoutError> {
+        let start = Instant::now();
+
+        loop {
+            let res = Command::new("docker")
+                .arg("inspect")
+                .arg(container_name)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+
+            if res.is_ok() && res.unwrap().success() {
+                break Ok(());
+            } else if start.elapsed() >= timeout {
+                break Err(TimeoutError::new(timeout));
+            } else {
+                std::thread::sleep(Duration::from_millis(500));
+            }
+        }
+    }
+
     pub fn wait_for_host_port(
         &self,
         container_name: &str,
@@ -262,10 +295,26 @@ impl DockerClient {
     }
 
     pub fn check_socket(&self, host_port: u16) -> bool {
+        use std::io::Read;
         use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), host_port);
-        TcpStream::connect_timeout(&addr, Duration::from_millis(100)).is_ok()
+        let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
+            Ok(s) => s,
+            _ => return false,
+        };
+
+        stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+
+        let mut buf = [0; 1];
+        match stream.read(&mut buf) {
+            Ok(0) => false,
+            Ok(_) => true,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => true,
+            Err(_) => false,
+        }
     }
 
     pub fn wait_for_socket(&self, host_port: u16, timeout: Duration) -> Result<(), TimeoutError> {
