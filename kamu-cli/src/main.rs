@@ -81,7 +81,13 @@ fn main() {
             submatches.is_present("yes"),
         )),
         ("init", Some(_)) => Box::new(InitCommand::new(&workspace_layout)),
-        ("list", Some(_)) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
+        ("list", Some(submatches)) => match submatches.subcommand() {
+            ("", None) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
+            ("depgraph", _) => {
+                Box::new(DepgraphCommand::new(metadata_repo.clone(), &output_format))
+            }
+            _ => unimplemented!(),
+        },
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
@@ -110,9 +116,9 @@ fn main() {
                 server_matches.value_of("address").unwrap(),
                 value_t_or_exit!(server_matches.value_of("port"), u16),
             )),
-            _ => panic!("Unrecognized command"),
+            _ => unimplemented!(),
         },
-        _ => panic!("Unrecognized command"),
+        _ => unimplemented!(),
     };
 
     let result = if command.needs_workspace() && !workspace_layout.kamu_root_dir.is_dir() {

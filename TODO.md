@@ -2,14 +2,18 @@
 
 ## Catch-up
 - SQL shell script, format, and params
-- depgraph support
+- SQL server
 - Remotes & Push support
 - reset support
 - recursive/all delete
 - Windows support
+- interactive add replacement
+
+## Pre-Merge
+- Automated tests/releases
 
 ## Post catch-up
-- interactive add replacement
+- Spark 3
 - SIGINT handling during pull
 - pretty hashes
 - Support fast cat/head/tail (SQL-like?)

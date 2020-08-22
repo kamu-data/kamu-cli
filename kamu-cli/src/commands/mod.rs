@@ -12,6 +12,9 @@ pub use completions_command::*;
 mod delete_command;
 pub use delete_command::*;
 
+mod depgraph_command;
+pub use depgraph_command::*;
+
 mod list_command;
 pub use list_command::*;
 
