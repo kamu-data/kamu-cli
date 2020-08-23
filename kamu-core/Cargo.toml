@@ -22,12 +22,13 @@ serde_yaml = "*"
 # Ingest
 url = "*"
 fs_extra = "*"  # Copy files with progress, get directory sizes
-curl = { version = "*", features = ["http2", "protocol-ftp"] }
+curl = { version = "*", features = ["http2", "protocol-ftp", "static-curl", "static-ssl"] }  # TODO: reconsider static linking
 curl-sys = "*"
 zip = "*"
 ringbuf = "*"
 
 # Utils
+cfg-if = "*"  # Conditional compilation
 slog = "*"
 rand = "*"
 regex = "*"
@@ -36,7 +37,9 @@ itertools = "*"
 signal-hook = "*"
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
-users = "*"  # For getting uid:gid on Unix
+
+[target.'cfg(unix)'.dependencies]
+users = "*"  # For getting uid:gid
 
 [dev-dependencies]
 kamu-test = { path = "../kamu-core-test" }

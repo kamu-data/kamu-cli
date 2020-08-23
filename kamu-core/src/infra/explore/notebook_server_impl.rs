@@ -123,25 +123,27 @@ impl NotebookServerImpl {
         token_extractor.handle.join().unwrap();
 
         // Fix permissions
-        if cfg!(unix) {
-            docker_client
-                .run_shell_cmd(
-                    DockerRunArgs {
-                        image: docker_images::JUPYTER.to_owned(),
-                        container_name: Some("kamu-jupyter".to_owned()),
-                        volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
-                        ..DockerRunArgs::default()
-                    },
-                    &[format!(
-                        "chown -R {}:{} {}",
-                        users::get_current_uid(),
-                        users::get_current_gid(),
-                        "/opt/workdir"
-                    )],
-                )
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()?;
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                docker_client
+                    .run_shell_cmd(
+                        DockerRunArgs {
+                            image: docker_images::JUPYTER.to_owned(),
+                            container_name: Some("kamu-jupyter".to_owned()),
+                            volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
+                            ..DockerRunArgs::default()
+                        },
+                        &[format!(
+                            "chown -R {}:{} {}",
+                            users::get_current_uid(),
+                            users::get_current_gid(),
+                            "/opt/workdir"
+                        )],
+                    )
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()?;
+            }
         }
 
         Ok(())

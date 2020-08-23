@@ -1,5 +1,8 @@
 # Kamu CLI
 
+![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)
+![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)
+
 Kamu is a new-generation data management and exploration tool which aims to enable effective collaboration of people around data. To put it simply, it tries to accomplish what `git` and other version control systems did for software - provide a reliable, transparent, and trustworthy way of iteratively improving something as a community - but does it in a way that is most suitable to data.
 
 https://kamu.dev

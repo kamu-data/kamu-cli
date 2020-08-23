@@ -1,15 +1,21 @@
-os: linux
-services:
-- docker
-language: rust
-rust:
-- nightly
-cache: cargo
-env: RUST_BACKTRACE=1
-script:
-  - docker pull kamudata/engine-spark:0.8.1
-  - docker pull kamudata/engine-flink:0.6.0
-  - docker pull httpd:2.4
-  - docker pull bogem/ftp
-  - cargo build --verbose --all
-  - cargo test --verbose --all
+#os: linux
+#services:
+#- docker
+#language: rust
+#rust:
+#- nightly
+#cache: cargo
+#env: RUST_BACKTRACE=1
+#script:
+#- docker pull kamudata/engine-spark:0.8.1
+#- docker pull kamudata/engine-flink:0.6.0
+#- docker pull httpd:2.4
+#- docker pull bogem/ftp
+#- cargo build --verbose --all
+#- cargo test --verbose --all
+#deploy:
+#  edge: true
+#  provider: releases
+#  file: target/scala-2.11/kamu
+#  on:
+#    tags: true

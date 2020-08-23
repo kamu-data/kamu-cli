@@ -78,6 +78,19 @@ impl SparkEngine {
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
         let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
 
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                let chown = format!(
+                    "; chown -R {}:{} {}",
+                    users::get_current_uid(),
+                    users::get_current_gid(),
+                    self.volume_dir_in_container().display()
+                );
+            } else {
+                let chown = "".to_owned();
+            }
+        };
+
         let status = docker
             .run_shell_cmd(
                 DockerRunArgs {
@@ -95,12 +108,7 @@ impl SparkEngine {
                         /opt/engine/bin/engine.spark.jar",
                         app_class,
                     ),
-                    format!(
-                        "; chown -R {}:{} {}",
-                        users::get_current_uid(),
-                        users::get_current_gid(),
-                        self.volume_dir_in_container().display()
-                    ),
+                    chown,
                 ],
             )
             .stdout(std::process::Stdio::from(stdout_file))

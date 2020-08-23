@@ -135,21 +135,29 @@ impl FlinkEngine {
             .map(|p| format!("-s {}", p.display()))
             .unwrap_or_default();
 
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                let chown = format!(
+                    "; chown -R {}:{} {}",
+                    users::get_current_uid(),
+                    users::get_current_gid(),
+                    self.volume_dir_in_container().display()
+                );
+            } else {
+                let chown = "".to_owned();
+            }
+        };
+
         let run_status = docker
             .exec_shell_cmd(
                 ExecArgs::default(),
                 job_manager.name(),
                 &[
-                    "flink",
-                    "run",
-                    &savepoint_args,
-                    "/opt/engine/bin/engine.flink.jar",
-                    &format!(
-                        "; chown -R {}:{} {}",
-                        users::get_current_uid(),
-                        users::get_current_gid(),
-                        self.volume_dir_in_container().display()
-                    ),
+                    "flink".to_owned(),
+                    "run".to_owned(),
+                    savepoint_args,
+                    "/opt/engine/bin/engine.flink.jar".to_owned(),
+                    chown,
                 ],
             )
             .stdout(Stdio::from(File::create(&submit_stdout_path)?))

@@ -329,11 +329,11 @@ impl HttpServer {
             .unwrap();
 
         let host_port = docker
-            .wait_for_host_port(&server_name, server_port, Duration::from_secs(5))
+            .wait_for_host_port(&server_name, server_port, Duration::from_secs(20))
             .unwrap();
 
         docker
-            .wait_for_socket(host_port, Duration::from_secs(5))
+            .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
         Self {
@@ -416,11 +416,11 @@ impl FtpServer {
             .unwrap();
 
         let host_port = docker
-            .wait_for_host_port(&server_name, 21, Duration::from_secs(5))
+            .wait_for_host_port(&server_name, 21, Duration::from_secs(20))
             .unwrap();
 
         docker
-            .wait_for_socket(host_port, Duration::from_secs(5))
+            .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
         Self {
