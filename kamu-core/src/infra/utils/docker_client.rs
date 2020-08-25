@@ -118,9 +118,13 @@ impl DockerClient {
                 cmd.arg("-p");
                 cmd.arg(format!("{}-{}:{}-{}", hl, hr, cl, cr));
             });
-        args.volume_map.iter().for_each(|(h, c)| {
+        args.volume_map.into_iter().for_each(|(h, c)| {
             cmd.arg("-v");
-            cmd.arg(format!("{}:{}", h.display(), c.display()));
+            cmd.arg(format!(
+                "{}:{}",
+                self.format_host_path(h),
+                self.format_container_path(c),
+            ));
         });
         args.user.map(|v| cmd.arg(format!("--user={}", v)));
         args.work_dir
@@ -334,6 +338,29 @@ impl DockerClient {
             } else {
                 std::thread::sleep(Duration::from_millis(500));
             }
+        }
+    }
+
+    pub fn format_host_path(&self, path: PathBuf) -> String {
+        if !cfg!(windows) {
+            path.to_str().unwrap().to_owned()
+        } else {
+            // Boot2Docker scenario
+            let re = regex::Regex::new("([a-zA-Z]):").unwrap();
+            let s = path.to_str().unwrap();
+            re.replace(s, |caps: &regex::Captures| {
+                format!("/{}", caps[1].to_lowercase())
+            })
+            .replace("\\", "/")
+        }
+    }
+
+    pub fn format_container_path(&self, path: PathBuf) -> String {
+        if !cfg!(windows) {
+            path.to_str().unwrap().to_owned()
+        } else {
+            // When formatting path on windows we may get wrong separators
+            path.to_str().unwrap().replace("\\", "/")
         }
     }
 }
