@@ -5,6 +5,7 @@ use crate::infra::*;
 use super::engine_flink::*;
 use super::engine_spark::*;
 
+use slog::{o, Logger};
 use std::sync::{Arc, Mutex};
 
 pub struct EngineFactory {
@@ -13,15 +14,17 @@ pub struct EngineFactory {
 }
 
 impl EngineFactory {
-    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
+    pub fn new(workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
         Self {
             spark_engine: Arc::new(Mutex::new(SparkEngine::new(
                 docker_images::SPARK,
                 workspace_layout,
+                logger.new(o!("engine" => "spark")),
             ))),
             flink_engine: Arc::new(Mutex::new(FlinkEngine::new(
                 docker_images::FLINK,
                 workspace_layout,
+                logger.new(o!("engine" => "flink")),
             ))),
         }
     }

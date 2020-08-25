@@ -4,6 +4,7 @@ use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
 use rand::Rng;
+use slog::{info, o, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
@@ -12,13 +13,15 @@ use std::time::Duration;
 pub struct FlinkEngine {
     image: String,
     workspace_layout: WorkspaceLayout,
+    logger: Logger,
 }
 
 impl FlinkEngine {
-    pub fn new(image: &str, workspace_layout: &WorkspaceLayout) -> Self {
+    pub fn new(image: &str, workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
         Self {
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
+            logger: logger,
         }
     }
 
@@ -100,6 +103,7 @@ impl FlinkEngine {
             },
             &job_manager_stdout_path,
             &job_manager_stderr_path,
+            self.logger.new(o!("name" => "jobmanager")),
         )?;
 
         let _task_manager = Container::new(
@@ -122,6 +126,7 @@ impl FlinkEngine {
             },
             &task_manager_stdout_path,
             &task_manager_stderr_path,
+            self.logger.new(o!("name" => "taskmanager")),
         )?;
 
         docker
@@ -148,18 +153,21 @@ impl FlinkEngine {
             }
         };
 
-        let run_status = docker
-            .exec_shell_cmd(
-                ExecArgs::default(),
-                job_manager.name(),
-                &[
-                    "flink".to_owned(),
-                    "run".to_owned(),
-                    savepoint_args,
-                    "/opt/engine/bin/engine.flink.jar".to_owned(),
-                    chown,
-                ],
-            )
+        let mut run_cmd = docker.exec_shell_cmd(
+            ExecArgs::default(),
+            job_manager.name(),
+            &[
+                "flink".to_owned(),
+                "run".to_owned(),
+                savepoint_args,
+                "/opt/engine/bin/engine.flink.jar".to_owned(),
+                chown,
+            ],
+        );
+
+        info!(self.logger, "Running Flink job"; "command" => ?run_cmd);
+
+        let run_status = run_cmd
             .stdout(Stdio::from(File::create(&submit_stdout_path)?))
             .stderr(Stdio::from(File::create(&submit_stderr_path)?))
             .status()?;
@@ -309,6 +317,7 @@ struct Container {
     docker: DockerClient,
     name: String,
     child: Child,
+    logger: Logger,
 }
 
 impl Container {
@@ -316,18 +325,25 @@ impl Container {
         args: DockerRunArgs,
         stdout_path: &Path,
         stderr_path: &Path,
+        logger: Logger,
     ) -> Result<Self, std::io::Error> {
         let docker = DockerClient::new();
         let name = args.container_name.as_ref().unwrap().clone();
-        let child = docker
-            .run_cmd(args)
+
+        let mut cmd = docker.run_cmd(args);
+
+        info!(logger, "Spawning container"; "command" => ?cmd);
+
+        let child = cmd
             .stdout(Stdio::from(File::create(stdout_path)?))
             .stderr(Stdio::from(File::create(stderr_path)?))
             .spawn()?;
+
         Ok(Self {
             docker: docker,
             name: name,
             child: child,
+            logger: logger,
         })
     }
 
@@ -336,6 +352,7 @@ impl Container {
     }
 
     fn kill(&mut self) -> Result<(), std::io::Error> {
+        info!(self.logger, "Sending kill to container");
         self.docker
             .kill_cmd(&self.name)
             .stdout(Stdio::null())
@@ -345,7 +362,10 @@ impl Container {
     }
 
     fn join(&mut self) -> Result<std::process::ExitStatus, std::io::Error> {
-        self.child.wait()
+        info!(self.logger, "Waiting for container to stop");
+        let res = self.child.wait();
+        info!(self.logger, "Container stopped");
+        res
     }
 }
 

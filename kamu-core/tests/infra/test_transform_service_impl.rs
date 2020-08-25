@@ -81,7 +81,10 @@ fn test_get_next_operation() {
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         // TODO: Use a mock
-        Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
+        Arc::new(Mutex::new(EngineFactory::new(
+            &workspace_layout,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))),
         &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     );

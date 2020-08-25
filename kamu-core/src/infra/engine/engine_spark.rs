@@ -4,12 +4,14 @@ use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
 use rand::Rng;
+use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
     image: String,
     workspace_layout: WorkspaceLayout,
+    logger: Logger,
 }
 
 struct RunInfo {
@@ -40,10 +42,11 @@ impl RunInfo {
 }
 
 impl SparkEngine {
-    pub fn new(image: &str, workspace_layout: &WorkspaceLayout) -> Self {
+    pub fn new(image: &str, workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
         Self {
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
+            logger: logger,
         }
     }
 
@@ -91,26 +94,29 @@ impl SparkEngine {
             }
         };
 
-        let status = docker
-            .run_shell_cmd(
-                DockerRunArgs {
-                    image: self.image.clone(),
-                    volume_map: volume_map,
-                    ..DockerRunArgs::default()
-                },
-                &[
-                    format!(
-                        "/opt/spark/bin/spark-submit \
+        let mut cmd = docker.run_shell_cmd(
+            DockerRunArgs {
+                image: self.image.clone(),
+                volume_map: volume_map,
+                ..DockerRunArgs::default()
+            },
+            &[
+                format!(
+                    "/opt/spark/bin/spark-submit \
                         --master=local[4] \
                         --driver-memory=2g \
                         --conf spark.sql.warehouse.dir=/opt/spark-warehouse \
                         --class={} \
                         /opt/engine/bin/engine.spark.jar",
-                        app_class,
-                    ),
-                    chown,
-                ],
-            )
+                    app_class,
+                ),
+                chown,
+            ],
+        );
+
+        info!(self.logger, "Running Spark job"; "command" => ?cmd);
+
+        let status = cmd
             .stdout(std::process::Stdio::from(stdout_file))
             .stderr(std::process::Stdio::from(stderr_file))
             .status()

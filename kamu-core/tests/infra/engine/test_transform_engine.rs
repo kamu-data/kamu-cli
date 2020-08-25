@@ -22,7 +22,10 @@ fn test_transform_with_engine_spark() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
+    )));
 
     let mut ingest_svc = IngestServiceImpl::new(
         metadata_repo.clone(),
@@ -190,7 +193,10 @@ fn test_transform_with_engine_flink() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        slog::Logger::root(slog::Discard, slog::o!()),
+    )));
 
     let mut ingest_svc = IngestServiceImpl::new(
         metadata_repo.clone(),

@@ -24,7 +24,10 @@ fn test_ingest_with_engine() {
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
         metadata_repo.clone(),
-        Arc::new(Mutex::new(EngineFactory::new(&workspace_layout))),
+        Arc::new(Mutex::new(EngineFactory::new(
+            &workspace_layout,
+            slog::Logger::root(slog::Discard, slog::o!()),
+        ))),
         &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     )));

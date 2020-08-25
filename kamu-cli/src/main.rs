@@ -36,7 +36,10 @@ fn main() {
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(&workspace_layout)));
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        logger.new(o!()),
+    )));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
@@ -197,10 +200,10 @@ fn configure_logging(output_format: &OutputFormat, workspace_layout: &WorkspaceL
 
     let logger = raw_logger.new(o!("version" => VERSION));
 
-    info!(logger, "Running with arguments"; "args" => FnValue(|_| {
+    info!(logger, "Initializing"; "args" => FnValue(|_| {
          let v: Vec<_> = std::env::args().collect();
          format!("{:?}", v)
-    }));
+    }), "workspace" => ?workspace_layout);
 
     logger
 }
