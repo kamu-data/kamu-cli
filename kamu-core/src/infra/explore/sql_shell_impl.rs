@@ -73,7 +73,7 @@ impl SqlShellImpl {
 
             info!(logger, "Waiting for container");
             docker_client
-                .wait_for_container("kamu-spark", std::time::Duration::from_secs(10))
+                .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
                 .expect("Container did not start");
 
             info!(logger, "Starting Thrift Server");

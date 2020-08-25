@@ -12,7 +12,7 @@ use slog::{info, o, Drain, FnValue, Logger};
 use std::backtrace::BacktraceStatus;
 use std::cell::RefCell;
 use std::error::Error as StdError;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -150,12 +150,26 @@ fn main() {
 }
 
 fn find_workspace() -> WorkspaceLayout {
-    let cwd = Path::new(".").canonicalize().unwrap();
+    let cwd = strip_unc(Path::new(".").canonicalize().unwrap());
     if let Some(ws) = find_workspace_rec(&cwd) {
         ws
     } else {
         WorkspaceLayout::new(&cwd)
     }
+}
+
+fn strip_unc(path: PathBuf) -> PathBuf {
+    if !cfg!(windows) {
+        path
+    } else {
+        let s = path.to_str().unwrap();
+        let s_norm = if s.starts_with("\\\\?\\") {
+             &s[4..]
+         } else {
+             &s
+         };
+         PathBuf::from(s_norm)
+     }
 }
 
 fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {

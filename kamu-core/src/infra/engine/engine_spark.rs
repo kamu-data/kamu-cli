@@ -64,7 +64,9 @@ impl SparkEngine {
         let rel = path
             .strip_prefix(&self.workspace_layout.local_volume_dir)
             .unwrap();
-        self.volume_dir_in_container().join(rel)
+        let joined = self.volume_dir_in_container().join(rel);
+        let unix_path = joined.to_str().unwrap().replace("\\", "/");
+        PathBuf::from(unix_path)
     }
 
     fn submit(&self, app_class: &str, run_info: &RunInfo) -> Result<(), EngineError> {
@@ -140,28 +142,27 @@ impl SparkEngine {
         resource_name: &str,
     ) -> Result<(), EngineError>
     where
-        T: ::serde::ser::Serialize,
+        T: ::serde::ser::Serialize + std::fmt::Debug,
     {
         let path = run_info.in_out_dir.join("request.yaml");
 
-        let file = File::create(&path)?;
+        let manifest = Manifest {
+            api_version: 1,
+            kind: resource_name.to_owned(),
+            content: request,
+        };
+        info!(self.logger, "Writing request"; "request" => ?manifest, "path" => ?path);
 
-        serde_yaml::to_writer(
-            file,
-            &Manifest {
-                api_version: 1,
-                kind: resource_name.to_owned(),
-                content: request,
-            },
-        )
-        .map_err(|e| EngineError::internal(e))?;
+        let file = File::create(&path)?;
+        serde_yaml::to_writer(file, &manifest)
+            .map_err(|e| EngineError::internal(e))?;
 
         Ok(())
     }
 
     fn read_response<T>(&self, run_info: &RunInfo, resource_name: &str) -> Result<T, EngineError>
     where
-        T: ::serde::de::DeserializeOwned,
+        T: ::serde::de::DeserializeOwned + std::fmt::Debug,
     {
         let path = run_info.in_out_dir.join("result.yaml");
 
@@ -178,6 +179,8 @@ impl SparkEngine {
 
         let manifest: Manifest<T> =
             serde_yaml::from_reader(file).map_err(|e| EngineError::internal(e))?;
+
+        info!(self.logger, "Read response"; "response" => ?manifest);
         assert_eq!(manifest.kind, resource_name);
 
         Ok(manifest.content)
@@ -194,6 +197,7 @@ impl Engine for SparkEngine {
 
         let request_adj = IngestRequest {
             ingest_path: self.to_container_path(&request.ingest_path),
+            checkpoints_dir: self.to_container_path(&request.checkpoints_dir),
             data_dir: self.to_container_path(&request.data_dir),
             ..request
         };
