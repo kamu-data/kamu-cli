@@ -305,11 +305,20 @@ impl DockerClient {
         }
     }
 
+    pub fn get_docker_addr(&self) -> String {
+        std::env::var("DOCKER_HOST")
+            .ok()
+            .and_then(|s| url::Url::parse(&s).ok())
+            .map(|url| format!("{}", url.host().unwrap()))
+            .unwrap_or("127.0.0.1".to_owned())
+    }
+
     pub fn check_socket(&self, host_port: u16) -> bool {
         use std::io::Read;
-        use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
+        use std::net::{TcpStream, ToSocketAddrs};
 
-        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), host_port);
+        let saddr = format!("{}:{}", self.get_docker_addr(), host_port);
+        let addr = saddr.to_socket_addrs().unwrap().next().unwrap();
         let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
             Ok(s) => s,
             _ => return false,
@@ -324,6 +333,7 @@ impl DockerClient {
             Ok(0) => false,
             Ok(_) => true,
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => true,
+            Err(e) if e.kind() == std::io::ErrorKind::TimedOut => true,
             Err(_) => false,
         }
     }

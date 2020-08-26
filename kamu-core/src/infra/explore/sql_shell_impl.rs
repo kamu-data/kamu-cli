@@ -95,7 +95,7 @@ impl SqlShellImpl {
 
             let host_port = docker_client.get_host_port("kamu-spark", 10000).unwrap();
             docker_client
-                .wait_for_socket(host_port, std::time::Duration::from_secs(30))
+                .wait_for_socket(host_port, std::time::Duration::from_secs(60))
                 .expect("Thrift Server did not start");
 
             info!(logger, "Starting SQL shell");
