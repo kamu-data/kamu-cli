@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use slog::{info, Logger};
 
 pub struct NotebookServerImpl;
 
@@ -18,6 +19,7 @@ impl NotebookServerImpl {
         inherit_stdio: bool,
         on_started: StartedClb,
         on_shutdown: ShutdownClb,
+        logger: Logger,
     ) -> Result<(), std::io::Error>
     where
         StartedClb: FnOnce(&str) + Send + 'static,
@@ -35,7 +37,7 @@ impl NotebookServerImpl {
         let jupyter_stdout_path = workspace_layout.run_info_dir.join("jupyter.out.txt");
         let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
 
-        let mut livy = docker_client
+        let mut livy_cmd = docker_client
             .run_cmd(DockerRunArgs {
                 image: docker_images::LIVY.to_owned(),
                 container_name: Some("kamu-livy".to_owned()),
@@ -51,8 +53,11 @@ impl NotebookServerImpl {
                     vec![]
                 },
                 ..DockerRunArgs::default()
-            })
-            .stdout(if inherit_stdio {
+            });
+
+        info!(logger, "Starting Livy container"; "command" => ?livy_cmd);
+
+        let mut livy = livy_cmd.stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {
                 Stdio::from(File::create(&livy_stdout_path)?)
@@ -65,8 +70,7 @@ impl NotebookServerImpl {
             .spawn()?;
         let _drop_livy = DropContainer::new(docker_client.clone(), "kamu-livy");
 
-        // TODO: env vars propagation
-        let mut jupyter = docker_client
+        let mut jupyter_cmd = docker_client
             .run_cmd(DockerRunArgs {
                 image: docker_images::JUPYTER.to_owned(),
                 container_name: Some("kamu-jupyter".to_owned()),
@@ -75,7 +79,11 @@ impl NotebookServerImpl {
                 volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
                 environment_vars: environment_vars,
                 ..DockerRunArgs::default()
-            })
+            });
+
+        info!(logger, "Starting Jupyter container"; "command" => ?jupyter_cmd);
+
+        let mut jupyter = jupyter_cmd
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {
@@ -84,12 +92,13 @@ impl NotebookServerImpl {
             .stderr(Stdio::piped())
             .spawn()?;
         let _drop_jupyter = DropContainer::new(docker_client.clone(), "kamu-jupyter");
+
+        let docker_host = docker_client.get_docker_addr();
         let jupyter_port = docker_client
             .wait_for_host_port("kamu-jupyter", 80, std::time::Duration::from_secs(5))
             .unwrap_or_default();
-
         let token_clb = move |token: &str| {
-            let url = format!("http://localhost:{}/?token={}", jupyter_port, token);
+            let url = format!("http://{}:{}/?token={}", docker_host, jupyter_port, token);
             on_started(&url);
         };
 

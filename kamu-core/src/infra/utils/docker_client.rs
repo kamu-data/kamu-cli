@@ -357,7 +357,8 @@ impl DockerClient {
         } else {
             // Boot2Docker scenario
             let re = regex::Regex::new("([a-zA-Z]):").unwrap();
-            let s = path.to_str().unwrap();
+            let norm_path = self.strip_unc(path);
+            let s = norm_path.to_str().unwrap();
             re.replace(s, |caps: &regex::Captures| {
                 format!("/{}", caps[1].to_lowercase())
             })
@@ -372,6 +373,21 @@ impl DockerClient {
             // When formatting path on windows we may get wrong separators
             path.to_str().unwrap().replace("\\", "/")
         }
+    }
+
+    // TODO: move to utils
+    fn strip_unc(&self, path: PathBuf) -> PathBuf {
+        if !cfg!(windows) {
+            path
+        } else {
+            let s = path.to_str().unwrap();
+            let s_norm = if s.starts_with("\\\\?\\") {
+                 &s[4..]
+             } else {
+                 &s
+             };
+             PathBuf::from(s_norm)
+         }
     }
 }
 

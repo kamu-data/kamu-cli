@@ -4,13 +4,14 @@ use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
-use indoc::indoc;
+use slog::{Logger, o};
 
 pub struct NotebookCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_format: OutputFormat,
     env_vars: Vec<(String, Option<String>)>,
+    logger: Logger,
 }
 
 impl NotebookCommand {
@@ -19,6 +20,7 @@ impl NotebookCommand {
         volume_layout: &VolumeLayout,
         output_format: &OutputFormat,
         env_vars: Iter,
+        logger: Logger,
     ) -> Self
     where
         Iter: IntoIterator<Item = Str>,
@@ -41,6 +43,7 @@ impl NotebookCommand {
                     }
                 })
                 .collect(),
+            logger: logger,
         }
     }
 }
@@ -87,18 +90,11 @@ impl Command for NotebookCommand {
                     s("Jupyter server is now running at:").green().bold(),
                     s(url).bold(),
                 );
-                eprintln!(
-                    "{}",
-                    s(indoc!(
-                        "Note: On some platforms that run Docker in the virtual machine you may
-                        need to substitute `localhost` with the VM's address (e.g. `boot2docker`)."
-                    ))
-                    .dim()
-                );
                 eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
                 let _ = webbrowser::open(url);
             },
             || eprintln!("{}", s("Shutting down").yellow()),
+            self.logger.new(o!()),
         )?;
         Ok(())
     }
