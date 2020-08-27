@@ -66,7 +66,7 @@ impl ListCommand {
 
         table.set_titles(row![bc->"ID", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
 
-        for id in datasets {
+        for id in datasets.iter() {
             let summary = self.metadata_repo.borrow().get_summary(&id)?;
 
             table.add_row(Row::new(vec![
@@ -75,6 +75,17 @@ impl ListCommand {
                 Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                 Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
                 Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
+            ]));
+        }
+
+        // Header doesn't render when there are no data rows in the table
+        if datasets.is_empty() {
+            table.add_row(Row::new(vec![
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
             ]));
         }
 
