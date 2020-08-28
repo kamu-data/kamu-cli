@@ -11,8 +11,10 @@ pub enum Error {
     AlreadyInWorkspace,
     #[error("Directory is not a kamu workspace")]
     NotInWorkspace,
+    /// Indicates that an operation was aborted and no changes were made
     #[error("Operation aborted")]
     Aborted,
+    /// Indicates that an operation has failed while some changes were already applied
     #[error("Partial failure")]
     PartialFailure,
     #[error("IO error: {source}")]

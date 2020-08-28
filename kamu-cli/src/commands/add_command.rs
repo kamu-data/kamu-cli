@@ -41,7 +41,8 @@ impl AddCommand {
                     r.clone(),
                     self.resource_loader
                         .borrow()
-                        .load_dataset_snapshot_from_ref(r),
+                        .load_dataset_snapshot_from_ref(r)
+                        .map_err(|e| DomainError::InfraError(e.into())),
                 )
             })
             .collect()
@@ -63,7 +64,7 @@ impl AddCommand {
                     self.resource_loader
                         .borrow()
                         .load_dataset_snapshot_from_path(&p)
-                        .map_err(|e| e.into()),
+                        .map_err(|e| DomainError::InfraError(e.into())),
                 )
             })
             .collect()
