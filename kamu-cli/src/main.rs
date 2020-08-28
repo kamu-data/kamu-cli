@@ -124,6 +124,7 @@ fn main() {
                 &workspace_layout,
                 &local_volume_layout,
                 &output_format,
+                submatches.value_of("command"),
                 logger.new(o!()),
             )),
             ("server", Some(server_matches)) => Box::new(SqlServerCommand::new(
@@ -170,8 +171,8 @@ fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
     }
 }
 
-fn configure_logging(output_format: &OutputFormat, workspace_layout: &WorkspaceLayout) -> Logger {
-    let raw_logger = if output_format.verbosity_level > 0 {
+fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceLayout) -> Logger {
+    let raw_logger = if output_config.verbosity_level > 0 {
         // Log into stderr for verbose output
         let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
         let drain = slog_term::CompactFormat::new(decorator).build().fuse();
@@ -209,16 +210,38 @@ fn configure_logging(output_format: &OutputFormat, workspace_layout: &WorkspaceL
     logger
 }
 
-fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputFormat {
-    let verbosity_level = matches.occurrences_of("v") as u8;
+fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
+    let is_tty = console::Term::stdout().is_term();
 
+    let verbosity_level = matches.occurrences_of("v") as u8;
     if verbosity_level > 0 {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    OutputFormat {
+    let format_str = if let (_, Some(submatches)) = matches.subcommand() {
+        submatches.value_of("output-format")
+    } else {
+        None
+    };
+
+    let format = match format_str {
+        Some("csv") => OutputFormat::Csv,
+        Some("json") => OutputFormat::Json,
+        Some("table") => OutputFormat::Table,
+        Some(f) => unimplemented!("Unrecognized format: {:?}", f),
+        None => {
+            if is_tty {
+                OutputFormat::Table
+            } else {
+                OutputFormat::Csv
+            }
+        }
+    };
+
+    OutputConfig {
         verbosity_level: verbosity_level,
-        is_tty: console::Term::stdout().is_term(),
+        is_tty: is_tty,
+        format: format,
     }
 }
 

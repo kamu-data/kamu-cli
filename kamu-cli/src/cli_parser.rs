@@ -1,5 +1,73 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
 
+fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
+    app.args(&[
+        Arg::with_name("output-format")
+            .long("output-format")
+            .short("o")
+            .takes_value(true)
+            .value_name("FMT")
+            .possible_values(&[
+                "table", // "vertical",
+                "csv",
+                // "tsv",
+                // "xmlattrs",
+                // "xmlelements",
+                "json",
+            ])
+            .help("Format to display the results in"),
+        /*Arg::with_name("no-color")
+            .long("no-color")
+            .help("Control whether color is used for display"),
+        Arg::with_name("incremental")
+            .long("incremental")
+            .help("Display result rows immediately as they are fetched"),
+        Arg::with_name("no-header")
+            .long("no-header")
+            .help("Whether to show column names in query results"),
+        Arg::with_name("header-interval")
+            .long("header-interval")
+            .takes_value(true)
+            .value_name("INT")
+            .help("The number of rows between which headers are displayed"),
+        Arg::with_name("csv-delimiter")
+            .long("csv-delimiter")
+            .takes_value(true)
+            .value_name("DELIM")
+            .help("Delimiter in the csv output format"),
+        Arg::with_name("csv-quote-character")
+            .long("csv-quote-character")
+            .takes_value(true)
+            .value_name("CHAR")
+            .help("Quote character in the csv output format"),
+        Arg::with_name("null-value")
+            .long("null-value")
+            .takes_value(true)
+            .value_name("VAL")
+            .help("Use specified string in place of NULL values"),
+        Arg::with_name("number-format")
+            .long("number-format")
+            .takes_value(true)
+            .value_name("FMT")
+            .help("Format numbers using DecimalFormat pattern"),
+        Arg::with_name("date-format")
+            .long("date-format")
+            .takes_value(true)
+            .value_name("FMT")
+            .help("Format dates using SimpleDateFormat pattern"),
+        Arg::with_name("time-format")
+            .long("time-format")
+            .takes_value(true)
+            .value_name("FMT")
+            .help("Format times using SimpleDateFormat pattern"),
+        Arg::with_name("timestamp-format")
+            .long("timestamp-format")
+            .takes_value(true)
+            .value_name("FMT")
+            .help("Format timestamps using SimpleDateFormat pattern"),*/
+    ])
+}
+
 pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'static> {
     App::new(binary_name)
         .global_settings(&[AppSettings::ColoredHelp])
@@ -94,7 +162,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .long("pull-images")
                         .help("Only pull docker images and exit"),
                 ),
-            SubCommand::with_name("list")
+            tabular_output_params(SubCommand::with_name("list")
                 .about("List all datasets in the workspace")
                 .subcommand(
                     SubCommand::with_name("depgraph")
@@ -108,7 +176,8 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             kamu list depgraph | dot -Tpng > depgraph.png
                         "
                     )),
-                ),
+                )
+            ),
             SubCommand::with_name("log")
                 .about("Show dataset's metadata history")
                 .arg(
@@ -195,7 +264,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .long("yes")
                         .help("Don't ask for confirmation")
                 ),
-            SubCommand::with_name("sql")
+            tabular_output_params(SubCommand::with_name("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
                     SubCommand::with_name("server")
@@ -234,6 +303,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .takes_value(true)
                         .value_name("FILE")
                         .help("SQL script file to execute"),
-                ),
+                )
+            ),
         ])
 }

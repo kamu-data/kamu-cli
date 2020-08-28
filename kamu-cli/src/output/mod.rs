@@ -1,2 +1,2 @@
-mod output_format;
-pub use output_format::*;
+mod output_config;
+pub use output_config::*;

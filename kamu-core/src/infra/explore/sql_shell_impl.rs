@@ -13,13 +13,17 @@ pub struct SqlShellImpl;
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
-    pub fn run<StartedClb>(
+    pub fn run<S1, S2, StartedClb>(
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
+        output_format: Option<S1>,
+        command: Option<S2>,
         logger: Logger,
         started_clb: StartedClb,
     ) -> Result<(), std::io::Error>
     where
+        S1: AsRef<str>,
+        S2: AsRef<str>,
         StartedClb: FnOnce() + Send + 'static,
     {
         let tempdir = tempfile::tempdir()?;
@@ -103,7 +107,7 @@ impl SqlShellImpl {
             started_clb();
 
             // Relying on shell to send signal to child processes
-            docker_client
+            let mut beeline_cmd = docker_client
                 .exec_shell_cmd(
                     ExecArgs {
                         tty: true,
@@ -111,10 +115,21 @@ impl SqlShellImpl {
                         work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
                     },
                     "kamu-spark",
-                    &["../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql --color=true"],
-                )
-                .spawn()?
-                .wait()?;
+                    &[
+                        "../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql --color=true".to_owned(),
+                        match command {
+                            Some(s) => format!("-e '{}'", s.as_ref()),
+                            None => "".to_owned(),
+                        },
+                        match output_format {
+                            Some(s) => format!("--outputformat={}", s.as_ref()),
+                            None => "".to_owned(),
+                        }
+                    ],
+                );
+
+            info!(logger, "Running beeline"; "command" => ?beeline_cmd);
+            beeline_cmd.spawn()?.wait()?;
         }
 
         spark.wait()?;

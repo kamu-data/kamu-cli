@@ -1,15 +1,15 @@
 use super::{Command, Error};
-use crate::output::OutputFormat;
+use crate::output::OutputConfig;
 use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
-use slog::{Logger, o};
+use slog::{o, Logger};
 
 pub struct NotebookCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
-    output_format: OutputFormat,
+    output_config: OutputConfig,
     env_vars: Vec<(String, Option<String>)>,
     logger: Logger,
 }
@@ -18,7 +18,7 @@ impl NotebookCommand {
     pub fn new<Iter, Str>(
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
-        output_format: &OutputFormat,
+        output_config: &OutputConfig,
         env_vars: Iter,
         logger: Logger,
     ) -> Self
@@ -29,7 +29,7 @@ impl NotebookCommand {
         Self {
             workspace_layout: workspace_layout.clone(),
             volume_layout: volume_layout.clone(),
-            output_format: output_format.clone(),
+            output_config: output_config.clone(),
             env_vars: env_vars
                 .into_iter()
                 .map(|elem| {
@@ -64,7 +64,7 @@ impl Command for NotebookCommand {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let spinner = if self.output_format.verbosity_level == 0 {
+        let spinner = if self.output_config.verbosity_level == 0 {
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
                 indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"),
@@ -80,7 +80,7 @@ impl Command for NotebookCommand {
             &self.workspace_layout,
             &self.volume_layout,
             environment_vars,
-            self.output_format.verbosity_level > 0,
+            self.output_config.verbosity_level > 0,
             move |url| {
                 if let Some(s) = spinner {
                     s.finish_and_clear()

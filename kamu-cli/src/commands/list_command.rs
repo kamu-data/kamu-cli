@@ -1,5 +1,5 @@
 use super::{Command, Error};
-use crate::output::OutputFormat;
+use crate::output::*;
 use kamu::domain::*;
 
 use chrono::{DateTime, Utc};
@@ -9,17 +9,17 @@ use std::rc::Rc;
 
 pub struct ListCommand {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    output_format: OutputFormat,
+    output_config: OutputConfig,
 }
 
 impl ListCommand {
     pub fn new(
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        output_format: &OutputFormat,
+        output_config: &OutputConfig,
     ) -> Self {
         Self {
             metadata_repo: metadata_repo,
-            output_format: output_format.clone(),
+            output_config: output_config.clone(),
         }
     }
 
@@ -138,10 +138,11 @@ impl ListCommand {
 
 impl Command for ListCommand {
     fn run(&mut self) -> Result<(), Error> {
-        if self.output_format.is_tty {
-            self.print_pretty()?
-        } else {
-            self.print_machine_readable()?
+        // TODO: replace with formatters
+        match self.output_config.format {
+            OutputFormat::Table => self.print_pretty()?,
+            OutputFormat::Csv => self.print_machine_readable()?,
+            _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
         }
 
         Ok(())

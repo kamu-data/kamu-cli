@@ -1,6 +1,6 @@
 use kamu::domain::*;
 use kamu_cli::commands::*;
-use kamu_cli::output::OutputFormat;
+use kamu_cli::output::OutputConfig;
 
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -14,7 +14,7 @@ fn main() {
         ["a"].iter(),
         false,
         false,
-        &OutputFormat::default(),
+        &OutputConfig::default(),
     );
     cmd.run().unwrap();
 }

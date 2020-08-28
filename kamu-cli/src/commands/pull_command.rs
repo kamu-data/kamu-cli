@@ -1,5 +1,5 @@
 use super::{Command, Error};
-use crate::output::OutputFormat;
+use crate::output::OutputConfig;
 use kamu::domain::*;
 
 use std::backtrace::BacktraceStatus;
@@ -18,7 +18,7 @@ pub struct PullCommand {
     ids: Vec<String>,
     all: bool,
     recursive: bool,
-    output_format: OutputFormat,
+    output_config: OutputConfig,
 }
 
 impl PullCommand {
@@ -27,7 +27,7 @@ impl PullCommand {
         ids: I,
         all: bool,
         recursive: bool,
-        output_format: &OutputFormat,
+        output_config: &OutputConfig,
     ) -> Self
     where
         I: Iterator<Item = S>,
@@ -38,7 +38,7 @@ impl PullCommand {
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
             recursive: recursive,
-            output_format: output_format.clone(),
+            output_config: output_config.clone(),
         }
     }
 
@@ -98,7 +98,7 @@ impl Command for PullCommand {
             }
         };
 
-        let results = if self.output_format.verbosity_level == 0 {
+        let results = if self.output_config.verbosity_level == 0 {
             self.pull_with_progress(dataset_ids)
         } else {
             self.pull_quiet(dataset_ids)
