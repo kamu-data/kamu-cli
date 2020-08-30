@@ -63,8 +63,9 @@ fn test_load_from_http_url() {
 
     let http_server = HttpServer::new(tempdir.path());
     let url = url::Url::parse(&format!(
-        "http://localhost:{}/test.yaml",
-        http_server.host_port
+        "http://{}:{}/test.yaml",
+        http_server.address,
+        http_server.host_port,
     ))
     .unwrap();
 
@@ -83,8 +84,9 @@ fn test_load_from_http_url_404() {
 
     let http_server = HttpServer::new(tempdir.path());
     let url = url::Url::parse(&format!(
-        "http://localhost:{}/test.yaml",
-        http_server.host_port
+        "http://{}:{}/test.yaml",
+        http_server.address,
+        http_server.host_port,
     ))
     .unwrap();
 

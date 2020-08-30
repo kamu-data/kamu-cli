@@ -70,10 +70,13 @@ impl ResourceLoader for ResourceLoaderImpl {
     }
 
     fn load_dataset_snapshot_from_ref(&self, sref: &str) -> Result<DatasetSnapshot, ResourceError> {
-        if let Ok(url) = Url::parse(sref) {
+        let path = Path::new(sref);
+        if path.exists() {
+            self.load_dataset_snapshot_from_path(path)
+        } else if let Ok(url) = Url::parse(sref) {
             self.load_dataset_snapshot_from_url(&url)
         } else {
-            self.load_dataset_snapshot_from_path(Path::new(sref))
+            self.load_dataset_snapshot_from_path(path)
         }
     }
 }

@@ -8,6 +8,7 @@ use std::time::Duration;
 // TODO: Consider replacing with in-process server for speed
 pub struct HttpServer {
     pub container_name: String,
+    pub address: String,
     pub host_port: u16,
     process: std::process::Child,
 }
@@ -67,6 +68,7 @@ impl HttpServer {
         Self {
             container_name: server_name,
             process: process,
+            address: docker.get_docker_addr(),
             host_port: host_port,
         }
     }
