@@ -2,7 +2,7 @@ use crate::domain::*;
 use crate::infra::serde::yaml::*;
 use crate::infra::*;
 
-use slog::{info, Logger};
+use slog::{info, o, Logger};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -81,6 +81,12 @@ impl TransformServiceImpl {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Option<ExecuteQueryRequest>, DomainError> {
+        let logger = self
+            .logger
+            .new(o!("output_dataset" => dataset_id.as_str().to_owned()));
+
+        info!(logger, "Evaluating next transform operation");
+
         let output_chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
 
         // TODO: limit traversal depth
@@ -99,23 +105,38 @@ impl TransformServiceImpl {
             _ => panic!("Transform called on non-derivative dataset {}", dataset_id),
         };
 
-        let mut non_empty = 0;
+        if source
+            .inputs
+            .iter()
+            .any(|id| self.is_never_pulled(id).unwrap())
+        {
+            info!(
+                logger,
+                "Not processing because one of the inputs was never pulled"
+            );
+            return Ok(None);
+        }
+
+        let mut non_empty_slices = 0;
         let input_slices: BTreeMap<_, _> = source
             .inputs
             .iter()
             .enumerate()
             .map(|(index, input_id)| {
-                let (slice, empty) = self
-                    .get_input_slice(index, input_id, output_chain.as_ref())
-                    .unwrap();
+                let (slice, empty_slice) = self.get_input_slice(
+                    index,
+                    input_id,
+                    output_chain.as_ref(),
+                    logger.new(o!("input_dataset" => input_id.as_str().to_owned())),
+                )?;
 
-                if !empty {
-                    non_empty += 1;
+                if !empty_slice {
+                    non_empty_slices += 1;
                 }
 
-                (input_id.clone(), slice)
+                Ok((input_id.clone(), slice))
             })
-            .collect();
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
         let mut vocabs: BTreeMap<_, _> = source
             .inputs
@@ -156,7 +177,7 @@ impl TransformServiceImpl {
 
         data_dirs.insert(dataset_id.to_owned(), output_layout.data_dir);
 
-        if non_empty > 0 {
+        if non_empty_slices > 0 {
             Ok(Some(ExecuteQueryRequest {
                 dataset_id: dataset_id.to_owned(),
                 checkpoints_dir: output_layout.checkpoints_dir, // TODO: move down a layer
@@ -170,12 +191,22 @@ impl TransformServiceImpl {
         }
     }
 
+    fn is_never_pulled(&self, dataset_id: &DatasetID) -> Result<bool, DomainError> {
+        let chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        Ok(chain
+            .iter_blocks()
+            .filter_map(|b| b.output_slice)
+            .next()
+            .is_none())
+    }
+
     // TODO: Avoid iterating through output chain multiple times
     fn get_input_slice(
         &self,
         index: usize,
         dataset_id: &DatasetID,
         output_chain: &dyn MetadataChain,
+        logger: Logger,
     ) -> Result<(InputDataSlice, bool), DomainError> {
         // Determine processed data range
         // Result is either: () or (inf, upper] or (lower, upper]
@@ -220,6 +251,14 @@ impl TransformServiceImpl {
 
         let empty = !blocks_unprocessed.iter().any(|b| b.output_slice.is_some())
             && explicit_watermarks.is_empty();
+
+        info!(logger, "Computed input slice";
+            "iv_unprocessed" => ?iv_unprocessed,
+            "iv_available" => ?iv_available,
+            "iv_to_process" => ?iv_to_process,
+            "unprocessed_blocks" => blocks_unprocessed.len(),
+            "watermarks" => ?explicit_watermarks,
+            "empty" => empty);
 
         Ok((
             InputDataSlice {

@@ -118,6 +118,7 @@ impl IngestService for TestIngestService {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        _exhaust_sources: bool,
         _maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();

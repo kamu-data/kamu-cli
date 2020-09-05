@@ -5,6 +5,8 @@ use kamu::infra::ingest::*;
 use kamu::infra::serde::yaml::*;
 use kamu_test::*;
 
+use chrono::prelude::*;
+use chrono::Utc;
 use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -24,7 +26,7 @@ fn test_fetch_url_file() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
     // No file to fetch
     assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), IngestError::NotFound {..});
@@ -79,7 +81,7 @@ fn test_fetch_url_http_unreachable() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
     assert_err!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
@@ -102,7 +104,7 @@ fn test_fetch_url_http_not_found() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
     assert_err!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
@@ -139,7 +141,7 @@ fn test_fetch_url_http_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
     let mut listener = TestListener::new();
 
     let res = fetch_svc
@@ -228,7 +230,7 @@ fn test_fetch_url_ftp_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
     let mut listener = TestListener::new();
 
     let res = fetch_svc
@@ -244,6 +246,157 @@ fn test_fetch_url_ftp_ok() {
             total_bytes: 37,
             fetched_bytes: 37
         })
+    );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// FilesGlob
+///////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_fetch_files_glob() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let src_path_1 = tempdir.path().join("data-2020-10-01.csv");
+    let target_path = tempdir.path().join("fetched.bin");
+
+    let fetch_step = FetchStep::FilesGlob(FetchStepFilesGlob {
+        path: tempdir
+            .path()
+            .join("data-*.csv")
+            .to_str()
+            .unwrap()
+            .to_owned(),
+        event_time: Some(EventTimeSource::FromPath(EventTimeSourceFromPath {
+            pattern: r"data-(\d+-\d+-\d+)\.csv".to_owned(),
+            timestamp_format: Some("%Y-%m-%d".to_owned()),
+        })),
+        cache: None,
+        order: None,
+    });
+
+    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+
+    // No file to fetch
+    assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), IngestError::NotFound {..});
+    assert!(!target_path.exists());
+
+    std::fs::write(
+        &src_path_1,
+        indoc!(
+            "
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    // Normal fetch
+    let res = fetch_svc
+        .fetch(&fetch_step, None, &target_path, None)
+        .unwrap();
+    assert_eq!(res.was_up_to_date, false);
+    assert!(target_path.exists());
+    assert_eq!(
+        res.checkpoint.last_filename,
+        Some("data-2020-10-01.csv".to_owned())
+    );
+    assert_eq!(
+        res.checkpoint.source_event_time,
+        Some(Utc.ymd(2020, 10, 1).and_hms(0, 0, 0))
+    );
+
+    // No modifications
+    let res2 = fetch_svc
+        .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .unwrap();
+    assert_eq!(res2.was_up_to_date, true);
+
+    // Doesn't fetch again if mtime changed
+    filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
+    let res3 = fetch_svc
+        .fetch(&fetch_step, Some(res2.checkpoint), &target_path, None)
+        .unwrap();
+    assert_eq!(res3.was_up_to_date, true);
+
+    // Doesn't consider files with names lexicographically "smaller" than last fetched
+    let src_path_0 = tempdir.path().join("data-2020-01-01.csv");
+    std::fs::write(
+        &src_path_0,
+        indoc!(
+            "
+            city,population
+            A,100
+            B,200
+            C,300
+            "
+        ),
+    )
+    .unwrap();
+
+    let res4 = fetch_svc
+        .fetch(&fetch_step, Some(res3.checkpoint), &target_path, None)
+        .unwrap();
+    assert_eq!(res4.was_up_to_date, true);
+    assert_eq!(
+        res4.checkpoint.last_filename,
+        Some("data-2020-10-01.csv".to_owned())
+    );
+
+    // Multiple available
+    let src_path_2 = tempdir.path().join("data-2020-10-05.csv");
+    std::fs::write(
+        &src_path_2,
+        indoc!(
+            "
+            city,population
+            A,1010
+            "
+        ),
+    )
+    .unwrap();
+
+    let src_path_3 = tempdir.path().join("data-2020-10-10.csv");
+    std::fs::write(
+        &src_path_3,
+        indoc!(
+            "
+            city,population
+            A,1020
+            "
+        ),
+    )
+    .unwrap();
+
+    let res5 = fetch_svc
+        .fetch(&fetch_step, Some(res4.checkpoint), &target_path, None)
+        .unwrap();
+    assert_eq!(res5.was_up_to_date, false);
+    assert!(target_path.exists());
+    assert_eq!(
+        res5.checkpoint.last_filename,
+        Some("data-2020-10-05.csv".to_owned())
+    );
+    assert_eq!(
+        res5.checkpoint.source_event_time,
+        Some(Utc.ymd(2020, 10, 5).and_hms(0, 0, 0))
+    );
+
+    let res6 = fetch_svc
+        .fetch(&fetch_step, Some(res5.checkpoint), &target_path, None)
+        .unwrap();
+    assert_eq!(res6.was_up_to_date, false);
+    assert!(target_path.exists());
+    assert_eq!(
+        res6.checkpoint.last_filename,
+        Some("data-2020-10-10.csv".to_owned())
+    );
+    assert_eq!(
+        res6.checkpoint.source_event_time,
+        Some(Utc.ymd(2020, 10, 10).and_hms(0, 0, 0))
     );
 }
 

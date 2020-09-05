@@ -41,7 +41,10 @@ impl IngestServiceImpl {
     ) -> Result<(), IngestError> {
         match result {
             IngestResult::UpToDate => Ok(()),
-            IngestResult::Updated { block_hash } => {
+            IngestResult::Updated {
+                block_hash,
+                has_more: _,
+            } => {
                 let mut metadata_repo = self.metadata_repo.borrow_mut();
 
                 let mut summary = metadata_repo
@@ -120,6 +123,7 @@ impl IngestService for IngestServiceImpl {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        exhaust_sources: bool,
         maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let null_multi_listener: Arc<Mutex<dyn IngestMultiListener>> =
@@ -159,8 +163,21 @@ impl IngestService for IngestServiceImpl {
                             logger,
                         );
 
-                        let res = ingest_task.ingest();
-                        (id, res)
+                        let mut results = Vec::new();
+                        loop {
+                            let res = ingest_task.ingest();
+                            let has_more = match res {
+                                Ok(IngestResult::Updated { has_more, .. }) => {
+                                    has_more && exhaust_sources
+                                }
+                                _ => false,
+                            };
+                            results.push((id.clone(), res));
+                            if !has_more {
+                                break;
+                            }
+                        }
+                        results
                     })
                     .unwrap()
             })
@@ -168,7 +185,7 @@ impl IngestService for IngestServiceImpl {
 
         let results: Vec<_> = thread_handles
             .into_iter()
-            .map(|h| h.join().unwrap())
+            .flat_map(|h| h.join().unwrap())
             .collect();
 
         results

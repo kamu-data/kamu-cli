@@ -77,7 +77,10 @@ impl PullServiceImpl {
         match res {
             Ok(res) => Ok(match res {
                 IngestResult::UpToDate => PullResult::UpToDate,
-                IngestResult::Updated { block_hash } => PullResult::Updated {
+                IngestResult::Updated {
+                    block_hash,
+                    has_more: _,
+                } => PullResult::Updated {
                     block_hash: block_hash,
                 },
             }),
@@ -145,13 +148,12 @@ impl PullService for PullServiceImpl {
             let (depth, level, tail) = self.slice(rest);
             rest = tail;
 
-            // See: https://internals.rust-lang.org/t/should-option-mut-t-implement-copy/3715/6
-            // For listener option magic explanation
             let results_level: Vec<_> = if depth == 0 {
                 self.ingest_svc
                     .borrow_mut()
                     .ingest_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
+                        true,
                         ingest_listener.clone(),
                     )
                     .into_iter()

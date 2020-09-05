@@ -20,6 +20,7 @@ pub trait IngestService {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        exhaust_sources: bool,
         listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
 }
@@ -27,7 +28,7 @@ pub trait IngestService {
 #[derive(Debug)]
 pub enum IngestResult {
     UpToDate,
-    Updated { block_hash: String },
+    Updated { block_hash: String, has_more: bool },
 }
 
 ///////////////////////////////////////////////////////////////////////////////

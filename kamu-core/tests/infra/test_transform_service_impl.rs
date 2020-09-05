@@ -97,6 +97,8 @@ fn test_get_next_operation() {
 
     let foo_system_time = append_data_block(&metadata_repo, foo);
 
+    println!("{:?}", transform_svc.get_next_operation(bar));
+
     assert!(matches!(
         transform_svc.get_next_operation(bar).unwrap(),
         Some(ExecuteQueryRequest { source, input_slices, .. })

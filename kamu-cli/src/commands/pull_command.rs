@@ -351,9 +351,10 @@ impl IngestListener for PrettyIngestProgress {
     fn success(&mut self, result: &IngestResult) {
         let msg = match result {
             IngestResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
-            IngestResult::Updated { ref block_hash } => {
-                console::style(format!("Committed new block {}", block_hash)).green()
-            }
+            IngestResult::Updated {
+                ref block_hash,
+                has_more: _,
+            } => console::style(format!("Committed new block {}", block_hash)).green(),
         };
         self.curr_progress
             .finish_with_message(&Self::spinner_message(

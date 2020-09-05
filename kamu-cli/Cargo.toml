@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.23.0"
+version = "0.30.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"

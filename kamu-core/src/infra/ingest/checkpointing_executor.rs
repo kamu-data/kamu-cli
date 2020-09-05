@@ -4,7 +4,7 @@ use std::fs::File;
 use std::path::Path;
 use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExecutionResult<C> {
     pub was_up_to_date: bool,
     pub checkpoint: C,
@@ -20,6 +20,7 @@ impl CheckpointingExecutor {
     pub fn execute<C, F, E>(
         &self,
         checkpoint_path: &Path,
+        checkpoint_kind: &str,
         fun: F,
     ) -> Result<Result<ExecutionResult<C>, E>, CheckpointingError>
     where
@@ -27,7 +28,6 @@ impl CheckpointingExecutor {
         F: FnOnce(Option<C>) -> Result<ExecutionResult<C>, E>,
         E: std::error::Error,
     {
-        let checkpoint_kind = std::any::type_name::<C>();
         let old_checkpoint = self.read_checkpoint(checkpoint_path, checkpoint_kind)?;
 
         match fun(old_checkpoint) {
@@ -45,7 +45,7 @@ impl CheckpointingExecutor {
         }
     }
 
-    fn read_checkpoint<C: serde::de::DeserializeOwned>(
+    pub fn read_checkpoint<C: serde::de::DeserializeOwned>(
         &self,
         path: &Path,
         kind: &str,

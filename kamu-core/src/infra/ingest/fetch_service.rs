@@ -3,19 +3,22 @@ use crate::domain::*;
 use crate::infra::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
 use crate::infra::serde::yaml::*;
 
-use chrono::{DateTime, SubsecRound, Utc};
+use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
+use slog::{info, Logger};
 use std::io::prelude::*;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use url::Url;
 
-pub struct FetchService {}
+pub struct FetchService {
+    logger: Logger,
+}
 
 impl FetchService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(logger: Logger) -> Self {
+        Self { logger: logger }
     }
 
     pub fn fetch(
@@ -54,10 +57,108 @@ impl FetchService {
                         target,
                         listener,
                     ),
-                    _ => unimplemented!(),
+                    scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
-            _ => unimplemented!(),
+            FetchStep::FilesGlob(ref fglob) => {
+                self.fetch_files_glob(fglob, old_checkpoint, target, listener)
+            }
+        }
+    }
+
+    fn fetch_files_glob(
+        &self,
+        fglob: &FetchStepFilesGlob,
+        old_checkpoint: Option<FetchCheckpoint>,
+        target: &Path,
+        listener: &mut dyn FetchProgressListener,
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+        match &fglob.order {
+            None => (),
+            Some(SourceOrdering::ByName) => (),
+            Some(ord) => panic!(
+                "Files glob source can only be ordered by name, found: {:?}",
+                ord
+            ),
+        }
+
+        let event_time_source = match &fglob.event_time {
+            None => None,
+            Some(EventTimeSource::FromPath(fp)) => Some(fp),
+            Some(src) => panic!(
+                "Files glob source only supports deriving event time from file path, found: {:?}",
+                src
+            ),
+        };
+
+        let last_filename = match old_checkpoint {
+            Some(FetchCheckpoint {
+                last_filename: Some(ref name),
+                ..
+            }) => Some(name.clone()),
+            _ => None,
+        };
+
+        let matched_paths = glob::glob(&fglob.path)
+            .map_err(|e| IngestError::internal(e))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| IngestError::internal(e))?;
+
+        let mut matched_files: Vec<(String, PathBuf)> = matched_paths
+            .into_iter()
+            .filter(|p| p.is_file())
+            .map(|p| (p.file_name().unwrap().to_str().unwrap().to_owned(), p))
+            .filter(|(name, _)| {
+                if let Some(ref lfn) = last_filename {
+                    name > lfn
+                } else {
+                    true
+                }
+            })
+            .collect();
+
+        matched_files.sort_by(|a, b| b.0.cmp(&a.0));
+
+        info!(self.logger, "Matched the glob pattern"; "pattern" => &fglob.path, "last_filename" => &last_filename, "matches" => ?matched_files);
+
+        if matched_files.is_empty() {
+            return if let Some(cp) = old_checkpoint {
+                Ok(ExecutionResult {
+                    was_up_to_date: true,
+                    checkpoint: cp,
+                })
+            } else {
+                Err(IngestError::not_found(fglob.path.clone(), None))
+            };
+        }
+
+        let (first_filename, first_path) = matched_files.pop().unwrap();
+        let res = self.fetch_file(
+            &first_path,
+            fglob.event_time.as_ref(),
+            None,
+            target,
+            listener,
+        );
+
+        let event_time = match event_time_source {
+            None => None,
+            Some(src) => Some(self.extract_event_time(&first_filename, &src)?),
+        };
+
+        match res {
+            Ok(exec_res) => Ok(ExecutionResult {
+                was_up_to_date: exec_res.was_up_to_date,
+                checkpoint: FetchCheckpoint {
+                    last_fetched: exec_res.checkpoint.last_fetched,
+                    source_event_time: event_time,
+                    last_filename: Some(first_filename),
+                    has_more: !matched_files.is_empty(),
+                    etag: None,
+                    last_modified: None,
+                },
+            }),
+            Err(e) => Err(e),
         }
     }
 
@@ -72,6 +173,8 @@ impl FetchService {
         listener: &mut dyn FetchProgressListener,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         use fs_extra::file::*;
+
+        info!(self.logger, "Ingesting file"; "path" => ?path);
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => IngestError::not_found(path, Some(e.into())),
@@ -98,6 +201,8 @@ impl FetchService {
             last_modified: Some(mod_time),
             etag: None,
             source_event_time: Some(mod_time),
+            last_filename: None,
+            has_more: false,
         };
 
         let mut options = CopyOptions::new();
@@ -217,6 +322,8 @@ impl FetchService {
                         last_modified: last_modified,
                         etag: etag,
                         source_event_time: last_modified,
+                        last_filename: None,
+                        has_more: false,
                     },
                 })
             }
@@ -303,6 +410,8 @@ impl FetchService {
                 last_modified: None,
                 etag: None,
                 source_event_time: None,
+                last_filename: None,
+                has_more: false,
             },
         })
     }
@@ -322,6 +431,44 @@ impl FetchService {
             .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {}: {}", val, e))
             .into()
     }
+
+    fn extract_event_time(
+        &self,
+        filename: &str,
+        src: &EventTimeSourceFromPath,
+    ) -> Result<DateTime<Utc>, IngestError> {
+        let time_re = regex::Regex::new(&src.pattern).map_err(|e| IngestError::internal(e))?;
+
+        let time_fmt = match src.timestamp_format {
+            Some(ref fmt) => fmt,
+            None => "%Y-%m-%d",
+        };
+
+        if let Some(capture) = time_re.captures(&filename) {
+            if let Some(group) = capture.get(1) {
+                match Utc.datetime_from_str(group.as_str(), time_fmt) {
+                    Ok(dt) => Ok(dt),
+                    Err(_) => {
+                        let date = chrono::NaiveDate::parse_from_str(group.as_str(), time_fmt)
+                            .map_err(|e| EventTimeSourceError::bad_pattern(time_fmt, e))?;
+                        Ok(Utc.from_local_date(&date).and_hms_opt(0, 0, 0).unwrap())
+                    }
+                }
+            } else {
+                Err(EventTimeSourceError::failed_extract(format!(
+                    "Pattern {} doesn't have group 1",
+                    src.pattern
+                ))
+                .into())
+            }
+        } else {
+            Err(EventTimeSourceError::failed_extract(format!(
+                "Failed to match pattern {} to {}",
+                src.pattern, filename
+            ))
+            .into())
+        }
+    }
 }
 
 #[skip_serializing_none]
@@ -335,11 +482,13 @@ pub struct FetchCheckpoint {
     pub etag: Option<String>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub source_event_time: Option<DateTime<Utc>>,
+    pub last_filename: Option<String>,
+    pub has_more: bool,
 }
 
 impl FetchCheckpoint {
     pub fn is_cacheable(&self) -> bool {
-        self.last_modified.is_some() || self.etag.is_some()
+        self.last_modified.is_some() || self.etag.is_some() || self.last_filename.is_some()
     }
 }
 
@@ -376,6 +525,46 @@ impl HttpStatusError {
 
 impl std::convert::From<curl::Error> for IngestError {
     fn from(e: curl::Error) -> Self {
+        Self::internal(e)
+    }
+}
+
+#[derive(Error, Debug)]
+enum EventTimeSourceError {
+    #[error("Bad event time pattern: {0}")]
+    BadPattern(#[from] EventTimeSourcePatternError),
+    #[error("Error when extracting event time: {0}")]
+    Extract(#[from] EventTimeSourceExtractError),
+}
+
+impl EventTimeSourceError {
+    fn bad_pattern(pattern: &str, error: chrono::ParseError) -> EventTimeSourceError {
+        EventTimeSourceError::BadPattern(EventTimeSourcePatternError {
+            pattern: pattern.to_owned(),
+            error: error,
+        })
+    }
+
+    fn failed_extract(message: String) -> EventTimeSourceError {
+        EventTimeSourceError::Extract(EventTimeSourceExtractError { message: message })
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("{error} in pattern {pattern}")]
+struct EventTimeSourcePatternError {
+    pub pattern: String,
+    pub error: chrono::ParseError,
+}
+
+#[derive(Error, Debug)]
+#[error("{message}")]
+struct EventTimeSourceExtractError {
+    pub message: String,
+}
+
+impl std::convert::From<EventTimeSourceError> for IngestError {
+    fn from(e: EventTimeSourceError) -> Self {
         Self::internal(e)
     }
 }
