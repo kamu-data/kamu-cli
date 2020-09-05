@@ -1,5 +1,6 @@
 # Architecture
 
+Note: this page is outdated. See [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) for technical details.
 
 ## 3rd Party Components
 

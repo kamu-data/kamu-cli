@@ -2,10 +2,12 @@
 
 Kamu is a new-generation data management and exploration tool which aims to enable effective collaboration of people around data. To put it simply, it tries to accomplish what `git` and other version control systems did for software - provide a reliable, transparent, and trustworthy way of iteratively improving something as a community - but does it in a way that is most suitable to data.
 
-https://kamu.dev
+Kamu is a reference implementation of the [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) data exchange and transformation protocol. Please see the protocol specification for more technical details.
 
-![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)
-![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)
+Website: https://kamu.dev
+
+[![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
+[![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 
 ## Features
 
@@ -26,5 +28,4 @@ https://kamu.dev
 ## Documentation
 - [Installation](docs/install.md)
 - [First Steps](docs/first_steps.md)
-- [Architecture](docs/architecture.md)
 - [Developer Guide](docs/developer_guide.md)

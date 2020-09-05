@@ -131,7 +131,7 @@ Under the hood it starts [Apache Spark](https://spark.apache.org/), so all of it
 You can immediately run a query against any dataset:
 
 ```bash
-0: kamu> select school_name from parquet.`ca.vancouver.opendata.schools` limit 5;
+0: kamu> select school_name from `ca.vancouver.opendata.schools` limit 5;
 +---------------------------------------+
 |              school_name              |
 +---------------------------------------+
@@ -147,7 +147,7 @@ You can immediately run a query against any dataset:
 This is a bit verbose, so usually you'd want to create an alias to the dataset:
 
 ```bash
-0: kamu> create temporary view schools as (select * from parquet.`ca.vancouver.opendata.schools`);
+0: kamu> create temporary view schools as (select * from `ca.vancouver.opendata.schools`);
 +--------+
 | Result |
 +--------+
