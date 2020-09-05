@@ -95,3 +95,46 @@ fn test_prep_decompress_zip_single_file() {
 
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }
+
+#[test]
+fn test_prep_decompress_gzip() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let src_path = tempdir.path().join("data.gz");
+    let target_path = tempdir.path().join("prepared.bin");
+
+    let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
+        format: CompressionFormat::Gzip,
+        sub_path: None,
+    })];
+
+    let content = indoc!(
+        "
+        city,population
+        A,1000
+        B,2000
+        C,3000
+        "
+    );
+
+    {
+        // Create archive
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        let mut gzip = GzEncoder::new(
+            std::fs::File::create(&src_path).unwrap(),
+            Compression::fast(),
+        );
+        gzip.write(content.as_bytes()).unwrap();
+    }
+
+    let prep_svc = PrepService::new();
+
+    let res = prep_svc
+        .prepare(&prep_steps, Utc::now(), None, &src_path, &target_path)
+        .unwrap();
+    assert_eq!(res.was_up_to_date, false);
+    assert!(target_path.exists());
+
+    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+}

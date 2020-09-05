@@ -43,7 +43,7 @@ impl PrepService {
                     CompressionFormat::Zip => Box::new(
                         DecompressZipStream::new(stream).map_err(|e| IngestError::internal(e))?,
                     ),
-                    CompressionFormat::Gzip => unimplemented!(),
+                    CompressionFormat::Gzip => Box::new(DecompressGzipStream::new(stream)),
                 },
             };
         }
@@ -232,6 +232,37 @@ impl Stream for DecompressZipStream {
 
     fn join(self: Box<Self>) {
         self.ingress.join().unwrap()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// DecompressGzipStream
+///////////////////////////////////////////////////////////////////////////////
+
+struct DecompressGzipStream {
+    decoder: flate2::read::GzDecoder<Box<dyn Stream>>,
+}
+
+impl DecompressGzipStream {
+    fn new(input: Box<dyn Stream>) -> Self {
+        let decoder = flate2::read::GzDecoder::new(input);
+        Self { decoder: decoder }
+    }
+}
+
+impl Read for DecompressGzipStream {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
+        self.decoder.read(buf)
+    }
+}
+
+impl Stream for DecompressGzipStream {
+    fn as_read(&mut self) -> &mut dyn std::io::Read {
+        self
+    }
+
+    fn join(self: Box<Self>) {
+        self.decoder.into_inner().join()
     }
 }
 
