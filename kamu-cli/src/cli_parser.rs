@@ -226,24 +226,26 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ),
             SubCommand::with_name("pull")
                 .about("Pull new data into the datasets")
-                .arg(
+                .args(&[
                     Arg::with_name("all")
                         .short("a")
                         .long("all")
                         .help("Pull all datasets in the workspace"),
-                )
-                .arg(
                     Arg::with_name("recursive")
                         .short("r")
                         .long("recursive")
                         .help("Also pull all transitive dependencies of specified datasets"),
-                )
-                .arg(
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
                         .help("Dataset ID(s)"),
-                ),
+                    Arg::with_name("set-watermark")
+                        .long("set-watermark")
+                        .takes_value(true)
+                        .value_name("T")
+                        .help("Injects a manual watermark into the dataset to signify that \
+                            no data is expected to arrive with event time that precedes it")
+                ]),
             SubCommand::with_name("reset")
                 .about("Revert the dataset back to the specified state")
                 .arg(

@@ -36,6 +36,9 @@ pub use pull_command::*;
 mod pull_images_command;
 pub use pull_images_command::*;
 
+mod set_watermark_command;
+pub use set_watermark_command::*;
+
 mod sql_server_command;
 pub use sql_server_command::*;
 

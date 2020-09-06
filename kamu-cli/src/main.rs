@@ -112,13 +112,27 @@ fn main() {
             submatches.values_of("env").unwrap_or_default(),
             logger.new(o!()),
         )),
-        ("pull", Some(submatches)) => Box::new(PullCommand::new(
-            pull_svc.clone(),
-            submatches.values_of("dataset").unwrap_or_default(),
-            submatches.is_present("all"),
-            submatches.is_present("recursive"),
-            &output_format,
-        )),
+        ("pull", Some(submatches)) => {
+            if submatches.is_present("set-watermark") {
+                let datasets = submatches.values_of("dataset").unwrap_or_default();
+                if datasets.len() != 1 {}
+                Box::new(SetWatermarkCommand::new(
+                    pull_svc.clone(),
+                    submatches.values_of("dataset").unwrap_or_default(),
+                    submatches.is_present("all"),
+                    submatches.is_present("recursive"),
+                    submatches.value_of("set-watermark").unwrap(),
+                ))
+            } else {
+                Box::new(PullCommand::new(
+                    pull_svc.clone(),
+                    submatches.values_of("dataset").unwrap_or_default(),
+                    submatches.is_present("all"),
+                    submatches.is_present("recursive"),
+                    &output_format,
+                ))
+            }
+        }
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new(
                 &workspace_layout,

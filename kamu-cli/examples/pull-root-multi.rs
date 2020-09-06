@@ -2,6 +2,7 @@ use kamu::domain::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
 
+use chrono::{DateTime, Utc};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::rc::Rc;
@@ -102,5 +103,13 @@ impl PullService for TestPullService {
         .collect();
 
         handles.into_iter().map(|h| h.join().unwrap()).collect()
+    }
+
+    fn set_watermark(
+        &mut self,
+        _dataset_id: &DatasetID,
+        _watermark: DateTime<Utc>,
+    ) -> Result<PullResult, PullError> {
+        unimplemented!()
     }
 }

@@ -133,6 +133,12 @@ impl Command for CompleteCommand {
                     println!("{}", full_name);
                 }
             }
+            for opt in last_cmd.opts.iter() {
+                let full_name = format!("--{}", opt.s.long.unwrap());
+                if full_name.starts_with(to_complete) {
+                    println!("{}", full_name);
+                }
+            }
         }
 
         Ok(())

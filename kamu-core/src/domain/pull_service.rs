@@ -1,7 +1,8 @@
 use super::ingest_service::*;
 use super::transform_service::*;
-use crate::domain::{DatasetID, DatasetIDBuf};
+use crate::domain::{DatasetID, DatasetIDBuf, DomainError};
 
+use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -18,6 +19,12 @@ pub trait PullService {
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
+
+    fn set_watermark(
+        &mut self,
+        dataset_id: &DatasetID,
+        watermark: DateTime<Utc>,
+    ) -> Result<PullResult, PullError>;
 }
 
 #[derive(Debug)]
@@ -32,6 +39,8 @@ pub enum PullResult {
 
 #[derive(Debug, Error)]
 pub enum PullError {
+    #[error("Domain error: {0}")]
+    DomainError(#[from] DomainError),
     #[error("Ingest error: {0}")]
     IngestError(#[from] IngestError),
     #[error("Transform error: {0}")]

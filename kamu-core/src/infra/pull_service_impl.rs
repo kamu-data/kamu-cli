@@ -1,5 +1,7 @@
 use crate::domain::*;
+use crate::infra::serde::yaml::*;
 
+use chrono::prelude::*;
 use slog::{info, Logger};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -179,5 +181,33 @@ impl PullService for PullServiceImpl {
         }
 
         results
+    }
+
+    fn set_watermark(
+        &mut self,
+        dataset_id: &DatasetID,
+        watermark: DateTime<Utc>,
+    ) -> Result<PullResult, PullError> {
+        let mut chain = self
+            .metadata_repo
+            .borrow_mut()
+            .get_metadata_chain(dataset_id)?;
+
+        let last_hash = chain.read_ref(&BlockRef::Head).unwrap();
+
+        let new_block = MetadataBlock {
+            block_hash: "".to_owned(),
+            prev_block_hash: last_hash,
+            system_time: Utc::now(),
+            output_slice: None,
+            output_watermark: Some(watermark),
+            input_slices: None,
+            source: None,
+        };
+
+        let new_hash = chain.append(new_block);
+        Ok(PullResult::Updated {
+            block_hash: new_hash,
+        })
     }
 }
