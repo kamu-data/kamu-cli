@@ -29,11 +29,19 @@ impl Command for InitCommand {
         fs::create_dir_all(&self.workspace_layout.datasets_dir)?;
         fs::create_dir_all(&self.workspace_layout.remotes_dir)?;
         fs::create_dir_all(&self.workspace_layout.run_info_dir)?;
+        fs::create_dir_all(&self.workspace_layout.local_volume_dir)?;
 
-        let gitignore_path = self.workspace_layout.kamu_root_dir.join(".gitignore");
-        let mut gitignore = fs::File::create(gitignore_path)?;
-        writeln!(gitignore, "/config")?;
-        gitignore.sync_all()?;
+        {
+            let gitignore_path = self.workspace_layout.kamu_root_dir.join(".gitignore");
+            let mut gitignore = fs::File::create(gitignore_path)?;
+            writeln!(gitignore, "/config")?;
+            gitignore.sync_all()?;
+        }
+
+        {
+            let gitignore_path = self.workspace_layout.local_volume_dir.join(".gitignore");
+            fs::write(gitignore_path, "*\n".as_bytes())?;
+        }
 
         eprintln!(
             "{}",
