@@ -354,7 +354,7 @@ impl IngestListener for PrettyIngestProgress {
             IngestResult::Updated {
                 ref block_hash,
                 has_more: _,
-            } => console::style(format!("Committed new block {}", block_hash)).green(),
+            } => console::style(format!("Committed new block {}", &block_hash[..8])).green(),
         };
         self.curr_progress
             .finish_with_message(&Self::spinner_message(
@@ -431,7 +431,7 @@ impl TransformListener for PrettyTransformProgress {
                 console::style("Dataset is up-to-date".to_owned()).yellow()
             }
             TransformResult::Updated { ref block_hash } => {
-                console::style(format!("Committed new block {}", block_hash)).green()
+                console::style(format!("Committed new block {}", &block_hash[..8])).green()
             }
         };
         self.curr_progress
