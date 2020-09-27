@@ -23,7 +23,7 @@ config:
   # Explicitly set the number of rows
   # or use `auto` to take the current
   # number of rows of your shell
-  rows: 30
+  rows: 23
 
   # Amount of times to repeat GIF
   # If value is -1, play once
@@ -42,7 +42,7 @@ config:
   # Maximum delay between frames in ms
   # Ignored if the `frameDelay` isn't set to `auto`
   # Set to `auto` to prevent limiting the max idle time
-  maxIdleTime: 2000
+  maxIdleTime: 10000
 
   # The surrounding frame box
   # The `type` can be null, window, floating, or solid`
@@ -79,7 +79,7 @@ config:
   fontFamily: "Monaco, Lucida Console, Ubuntu Mono, Monospace"
 
   # The size of the font
-  fontSize: 12
+  fontSize: 14
 
   # The height of lines
   lineHeight: 1
@@ -113,23 +113,23 @@ config:
 records:
   - delay: 876
     content: "\e[01;32m\x02$\e[00m "
-  - delay: 716
+  - delay: 500
     content: k
-  - delay: 60
+  - delay: 80
     content: a
-  - delay: 109
+  - delay: 80
     content: m
-  - delay: 601
+  - delay: 80
     content: u
-  - delay: 141
+  - delay: 80
     content: ' '
-  - delay: 313
+  - delay: 80
     content: s
-  - delay: 102
+  - delay: 80
     content: q
-  - delay: 151
+  - delay: 80
     content: l
-  - delay: 326
+  - delay: 80
     content: "\r\n"
   - delay: 23
     content: "\e[36m⠁\e[0m Starting Spark SQL shell\r\n"
@@ -153,159 +153,157 @@ records:
     content: "\e[1A\r\e[2K\e[1B\e[1A"
   - delay: 5
     content: "Beeline version 2.3.7 by Apache Hive\r\n0: kamu> "
-  - delay: 1162
+  - delay: 1000
     content: s
-  - delay: 130
+  - delay: 80
     content: h
-  - delay: 102
+  - delay: 80
     content: o
-  - delay: 139
+  - delay: 80
     content: w
-  - delay: 473
+  - delay: 80
     content: ' '
-  - delay: 269
+  - delay: 80
     content: t
-  - delay: 137
+  - delay: 80
     content: a
-  - delay: 401
+  - delay: 80
     content: b
-  - delay: 162
+  - delay: 80
     content: l
-  - delay: 63
+  - delay: 80
     content: e
-  - delay: 196
+  - delay: 80
     content: s
-  - delay: 506
+  - delay: 80
     content: ;
-  - delay: 663
+  - delay: 500
     content: "\r\n"
-  - delay: 503
+  - delay: 500
     content: "\e[1;32m+-\e[m\e[1;32m----------+-------------------------------------------+-------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m\e[1mdatabase \e[m\e[1;32m | \e[m\e[1m                tableName                \e[m\e[1;32m | \e[m\e[1misTemporary \e[m\e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m----------+-------------------------------------------+-------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m         \e[1;32m | \e[mus.cityofnewyork.data.zipcode-boundaries \e[1;32m | \e[mtrue        \e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m----------+-------------------------------------------+-------------\e[m\e[1;32m-+\e[m\r\n1 row selected (0.504 seconds)\r\n0: kamu> "
   - delay: 2158
     content: d
-  - delay: 82
+  - delay: 80
     content: e
-  - delay: 224
+  - delay: 80
     content: s
-  - delay: 136
+  - delay: 80
     content: c
-  - delay: 328
+  - delay: 80
     content: r
-  - delay: 149
+  - delay: 80
     content: i
-  - delay: 195
+  - delay: 80
     content: b
-  - delay: 106
+  - delay: 80
     content: e
-  - delay: 208
+  - delay: 80
     content: ' '
-  - delay: 363
+  - delay: 80
     content: '`'
-  - delay: 572
+  - delay: 80
     content: us.cityofnewyork.data.zipcode-boundaries
-  - delay: 461
+  - delay: 80
     content: '`'
-  - delay: 678
+  - delay: 80
     content: ;
-  - delay: 595
+  - delay: 500
     content: "\r\n"
   - delay: 66
-    content: "\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m\e[1m  col_name  \e[m\e[1;32m | \e[m\e[1m   data_type   \e[m\e[1;32m | \e[m\e[1mcomment \e[m\e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[msystem_time \e[1;32m | \e[mtimestamp      \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mevent_time  \e[1;32m | \e[mtimestamp      \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mobserved    \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mgeometry    \e[1;32m | \e[marray<tinyint> \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mZIPCODE     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mBLDGZIP     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mPO_NAME     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mPOPULATION  \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mAREA        \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSTATE       \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mCOUNTY      \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mST_FIPS     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mCTY_FIPS    \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mURL         \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSHAPE_AREA  \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSHAPE_LEN   \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n16 rows selected (0.071 seconds)\r\n0: kamu> "
+    content: "\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m\e[1m  col_name  \e[m\e[1;32m | \e[m\e[1m   data_type   \e[m\e[1;32m | \e[m\e[1mcomment \e[m\e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[msystem_time \e[1;32m | \e[mtimestamp      \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mevent_time  \e[1;32m | \e[mtimestamp      \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mobserved    \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mgeometry    \e[1;32m | \e[marray<tinyint> \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mZIPCODE     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mBLDGZIP     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mPO_NAME     \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mPOPULATION  \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mAREA        \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSTATE       \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mCOUNTY      \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSHAPE_AREA  \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m| \e[mSHAPE_LEN   \e[1;32m | \e[mstring         \e[1;32m | \e[mNULL    \e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m-------------+-----------------+---------\e[m\e[1;32m-+\e[m\r\n16 rows selected (0.071 seconds)\r\n0: kamu> "
   - delay: 1490
     content: s
-  - delay: 75
+  - delay: 80
     content: e
-  - delay: 102
+  - delay: 80
     content: l
-  - delay: 104
+  - delay: 80
     content: e
-  - delay: 261
+  - delay: 80
     content: c
-  - delay: 521
+  - delay: 80
     content: t
-  - delay: 171
+  - delay: 80
     content: ' '
-  - delay: 1877
+  - delay: 80
     content: P
   - delay: 80
     content: O
-  - delay: 184
+  - delay: 80
     content: _
-  - delay: 427
+  - delay: 80
     content: 'N'
-  - delay: 72
+  - delay: 80
     content: A
-  - delay: 120
+  - delay: 80
     content: M
-  - delay: 64
+  - delay: 80
     content: E
-  - delay: 166
+  - delay: 80
     content: ','
   - delay: 80
     content: ' '
-  - delay: 794
+  - delay: 80
     content: P
-  - delay: 67
+  - delay: 80
     content: O
-  - delay: 165
+  - delay: 80
     content: P
-  - delay: 287
+  - delay: 80
     content: U
-  - delay: 214
+  - delay: 80
     content: L
-  - delay: 76
+  - delay: 80
     content: A
-  - delay: 210
+  - delay: 80
     content: T
-  - delay: 76
+  - delay: 80
     content: I
-  - delay: 54
+  - delay: 80
     content: O
-  - delay: 129
+  - delay: 80
     content: 'N'
-  - delay: 318
+  - delay: 80
     content: ' '
-  - delay: 233
+  - delay: 80
     content: f
-  - delay: 660
+  - delay: 80
     content: r
-  - delay: 199
+  - delay: 80
     content: o
-  - delay: 83
+  - delay: 80
     content: m
-  - delay: 144
+  - delay: 80
     content: ' '
-  - delay: 732
+  - delay: 80
     content: '`'
-  - delay: 441
+  - delay: 80
     content: us.cityofnewyork.data.zipcode-boundaries
-  - delay: 498
+  - delay: 80
     content: '`'
-  - delay: 1460
+  - delay: 80
     content: ' '
-  - delay: 177
+  - delay: 80
     content: l
-  - delay: 96
+  - delay: 80
     content: i
-  - delay: 167
+  - delay: 80
     content: m
-  - delay: 86
+  - delay: 80
     content: i
-  - delay: 170
+  - delay: 80
     content: t
-  - delay: 124
+  - delay: 80
     content: ' '
-  - delay: 437
+  - delay: 80
     content: '1'
-  - delay: 79
+  - delay: 80
     content: '0'
-  - delay: 344
+  - delay: 80
     content: ;
-  - delay: 281
+  - delay: 500
     content: "\r\n"
   - delay: 598
     content: "\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m\e[1m   PO_NAME    \e[m\e[1;32m | \e[m\e[1m  POPULATION   \e[m\e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m| \e[mStaten Island \e[1;32m | \e[m33114.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m41125.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m94480.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mAstoria       \e[1;32m | \e[m38665.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m74.00000000    \e[1;32m |\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m72280.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBronx         \e[1;32m | \e[m76104.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n10 rows selected (0.599 seconds)\r\n0: kamu> "
-  - delay: 1244
-    content: "\r\n0: kamu> "
   - delay: 5451
     content: " "

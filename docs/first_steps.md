@@ -119,7 +119,7 @@ kamu> describe `us.cityofnewyork.data.zipcode-boundaries`;
 
 > Note the extra back ticks needed to treat the dataset ID containing dots as a table name.
 
-For brevity you can aliases as:
+For brevity you can create aliases as:
 
 ```bash
 kamu> create temp view zipcodes as (select * from `us.cityofnewyork.data.zipcode-boundaries`);
@@ -128,7 +128,7 @@ kamu> create temp view zipcodes as (select * from `us.cityofnewyork.data.zipcode
 And of course you can run queries against any dataset:
 
 ```bash
-0: kamu> select PO_NAME, SUM(POPULATION) from zipcodes group by PO_NAME;
+0: kamu> select po_name, sum(population) from zipcodes group by po_name;
 ```
 
 Use `Ctrl+D` to exit the SQL shell.

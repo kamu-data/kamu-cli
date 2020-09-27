@@ -42,7 +42,7 @@ config:
   # Maximum delay between frames in ms
   # Ignored if the `frameDelay` isn't set to `auto`
   # Set to `auto` to prevent limiting the max idle time
-  maxIdleTime: 2000
+  maxIdleTime: 10000
 
   # The surrounding frame box
   # The `type` can be null, window, floating, or solid`
@@ -79,7 +79,7 @@ config:
   fontFamily: "Monaco, Lucida Console, Ubuntu Mono, Monospace"
 
   # The size of the font
-  fontSize: 12
+  fontSize: 14
 
   # The height of lines
   lineHeight: 1
