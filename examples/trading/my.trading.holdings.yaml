@@ -1,0 +1,16 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: my.trading.holdings
+  source:
+    kind: derivative
+    inputs:
+      - my.trading.transactions
+    transform:
+      engine: flink
+      query: >
+        SELECT
+          *,
+          sum(quantity) over(partition by symbol order by event_time rows unbounded preceding) as cum_quantity,
+          sum(settlement) over(partition by symbol order by event_time rows unbounded preceding) as cum_balance
+        FROM `my.trading.transactions`

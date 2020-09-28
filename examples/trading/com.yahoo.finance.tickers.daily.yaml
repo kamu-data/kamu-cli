@@ -1,0 +1,39 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: com.yahoo.finance.tickers.daily
+  source:
+    kind: root
+    fetch:
+      kind: filesGlob
+      path: data/tickers.csv
+    read:
+      kind: csv
+      header: true
+      schema:
+      - "`Date` TIMESTAMP"
+      - "`Symbol` VARCHAR(10)"
+      - "`Adj Close` DECIMAL(18,4)"
+      - "`Close` DECIMAL(18,4)"
+      - "`High` DECIMAL(18,4)"
+      - "`Low` DECIMAL(18,4)"
+      - "`Open` DECIMAL(18,4)"
+      - "`Volume` DECIMAL(18,4)"
+    preprocess:
+      engine: sparkSQL
+      query: >
+        SELECT
+          `Date` as event_time,
+          `Symbol` as symbol,
+          `Adj Close` as close_adj,
+          `Close` as close,
+          `High` as high,
+          `Low` as low,
+          `Open` as open,
+          `Volume` as volume
+        FROM input
+    merge:
+      kind: ledger
+      primaryKey:
+      - event_time
+      - symbol

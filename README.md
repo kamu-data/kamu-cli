@@ -12,6 +12,8 @@ Website: https://kamu.dev
 ## Documentation
 - [Installation](docs/install.md)
 - [First Steps](docs/first_steps.md)
+- Examples
+  - [Stock Market Trading Data Analysis](docs/examples/trading.md)
 - Ingesting Data
   - Supported Formats
   - Merge Strategies

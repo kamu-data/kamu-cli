@@ -2,3 +2,6 @@
 /kamu-core/target
 /kamu-core-test/target
 /kamu-cli/target
+/examples/**/.kamu
+/examples/**/.kamu.local
+/examples/**/.ipynb_checkpoints
