@@ -29,6 +29,14 @@ Create a temporary kamu workspace in that folder using:
 $ kamu init
 ```
 
+You can either follow the example steps below or fast-track through it by running:
+
+```sh
+# Add all dataset manifests found in the current directory
+$ kamu add . --recursive
+$ kamu pull --all
+```
+
 ## Root Datasets
 We will be using two root datasets:
 - `com.yahoo.finance.tickers.daily` - contains daily price summaries (candles) of several major tickers.
