@@ -14,6 +14,7 @@ Website: https://kamu.dev
 - [First Steps](docs/first_steps.md)
 - Examples
   - [Stock Market Trading Data Analysis](docs/examples/trading.md)
+  - [Overdue Order Shipments Detection](docs/examples/overdue_shipments.md)
 - Ingesting Data
   - Supported Formats
   - Merge Strategies

@@ -1,0 +1,44 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: com.acme.shipments.overdue
+  source:
+    kind: derivative
+    inputs:
+    - com.acme.orders
+    - com.acme.shipments
+    transform:
+      engine: flink
+      queries:
+      - alias: order_shipments
+        query: >
+          SELECT
+            o.event_time as order_time,
+            o.order_id,
+            o.quantity as order_quantity,
+            CAST(s.event_time as TIMESTAMP) as shipped_time,
+            COALESCE(s.quantity, 0) as shipped_quantity
+          FROM `com.acme.orders` as o
+          LEFT JOIN `com.acme.shipments` as s
+          ON
+            o.order_id = s.order_id
+            AND s.event_time BETWEEN o.event_time AND o.event_time + INTERVAL '2' DAY
+      - alias: order_shipments_agg
+        query: >
+          SELECT
+            TUMBLE_START(order_time, INTERVAL '1' DAY) as order_time,
+            order_id,
+            count(*) as num_shipments,
+            min(shipped_time) as first_shipment,
+            max(shipped_time) as last_shipment,
+            max(order_quantity) as order_quantity,
+            sum(shipped_quantity) as shipped_quantity_total
+          FROM order_shipments
+          GROUP BY TUMBLE(order_time, INTERVAL '1' DAY), order_id
+      - alias: com.acme.shipments.overdue
+        query: >
+          SELECT *
+          FROM order_shipments_agg
+          WHERE order_quantity <> shipped_quantity_total
+  vocab:
+    eventTimeColumn: order_time

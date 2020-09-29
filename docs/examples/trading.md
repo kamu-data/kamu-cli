@@ -16,7 +16,7 @@
 - Watermarks
 
 # Summary
-Stock market data is one of the problems where time dimension plays a crucial importance and cannot be left out. This example shows how `kamu` and streaming SQL can be used to build your personal trading performance dashboard which is more powerful than what most trading platforms provide. You will learn how to perform aggregations and join temporal stream and the role of watermarks in this process.
+Stock market data analysis is one of the problems where time dimension plays a crucial importance and cannot be left out. This example shows how `kamu` and streaming SQL can be used to build your personal trading performance dashboard which is more powerful than what most trading platforms provide. You will learn how to perform aggregations and join temporal stream and the role of watermarks in this process.
 
 # Steps
 
