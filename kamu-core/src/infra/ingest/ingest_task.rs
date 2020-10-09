@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 
 pub struct IngestTask {
     dataset_id: DatasetIDBuf,
+    options: IngestOptions,
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
     source: DatasetSourceRoot,
@@ -28,6 +29,7 @@ pub struct IngestTask {
 impl IngestTask {
     pub fn new<'a>(
         dataset_id: &DatasetID,
+        options: IngestOptions,
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
         vocab: DatasetVocabulary,
@@ -43,6 +45,7 @@ impl IngestTask {
 
         Self {
             dataset_id: dataset_id.to_owned(),
+            options: options,
             layout: layout,
             meta_chain: RefCell::new(meta_chain),
             source: source,
@@ -139,7 +142,7 @@ impl IngestTask {
                 "FetchCheckpoint",
                 |old_checkpoint: Option<FetchCheckpoint>| {
                     if let Some(ref cp) = old_checkpoint {
-                        if !cp.is_cacheable() {
+                        if !cp.is_cacheable() && !self.options.force_uncacheable {
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,
                                 checkpoint: old_checkpoint.unwrap(),

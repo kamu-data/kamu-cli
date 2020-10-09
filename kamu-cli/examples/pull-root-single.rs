@@ -15,6 +15,7 @@ fn main() {
         ["a"].iter(),
         false,
         false,
+        false,
         &OutputConfig::default(),
     );
     cmd.run().unwrap();
@@ -26,8 +27,7 @@ impl PullService for TestPullService {
     fn pull_multi(
         &mut self,
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
-        _recursive: bool,
-        _all: bool,
+        _options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         _transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {

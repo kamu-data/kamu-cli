@@ -80,6 +80,7 @@ impl IngestService for IngestServiceImpl {
     fn ingest(
         &mut self,
         dataset_id: &DatasetID,
+        options: IngestOptions,
         maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError> {
         let null_listener: Arc<Mutex<dyn IngestListener>> =
@@ -107,6 +108,7 @@ impl IngestService for IngestServiceImpl {
 
         let mut ingest_task = IngestTask::new(
             dataset_id,
+            options,
             layout,
             meta_chain,
             vocab,
@@ -123,7 +125,7 @@ impl IngestService for IngestServiceImpl {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        exhaust_sources: bool,
+        options: IngestOptions,
         maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let null_multi_listener: Arc<Mutex<dyn IngestMultiListener>> =
@@ -140,6 +142,7 @@ impl IngestService for IngestServiceImpl {
                 let meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
                 let vocab = self.metadata_repo.borrow().get_summary(&id).unwrap().vocab;
                 let engine_factory = self.engine_factory.clone();
+                let task_options = options.clone();
 
                 let null_listener = Arc::new(Mutex::new(NullIngestListener {}));
                 let listener = multi_listener
@@ -153,8 +156,11 @@ impl IngestService for IngestServiceImpl {
                 std::thread::Builder::new()
                     .name("ingest_multi".to_owned())
                     .spawn(move || {
+                        let exhaust_sources = task_options.exhaust_sources;
+
                         let mut ingest_task = IngestTask::new(
                             &id,
+                            task_options,
                             layout,
                             meta_chain,
                             vocab,

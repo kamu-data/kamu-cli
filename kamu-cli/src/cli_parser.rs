@@ -235,6 +235,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .short("r")
                         .long("recursive")
                         .help("Also pull all transitive dependencies of specified datasets"),
+                    Arg::with_name("force-uncacheable")
+                        .long("force-uncacheable")
+                        .help("Pull latest data from the uncacheable data sources"),
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)

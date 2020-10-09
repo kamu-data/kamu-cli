@@ -88,7 +88,9 @@ fn test_ingest_with_engine() {
         .add_dataset(dataset_snapshot)
         .unwrap();
 
-    let res = ingest_svc.borrow_mut().ingest(&dataset_id, None);
+    let res = ingest_svc
+        .borrow_mut()
+        .ingest(&dataset_id, IngestOptions::default(), None);
     assert_ok!(res, IngestResult::Updated {..});
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);

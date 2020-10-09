@@ -118,12 +118,11 @@ impl PullService for PullServiceImpl {
     fn pull_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        recursive: bool,
-        all: bool,
+        options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
-        let starting_dataset_ids: std::collections::HashSet<DatasetIDBuf> = if !all {
+        let starting_dataset_ids: std::collections::HashSet<DatasetIDBuf> = if !options.all {
             dataset_ids.map(|id| id.to_owned()).collect()
         } else {
             self.metadata_repo.borrow().get_all_datasets().collect()
@@ -134,7 +133,7 @@ impl PullService for PullServiceImpl {
         let datasets_labeled = self
             .get_datasets_ordered_by_depth(&mut starting_dataset_ids.iter().map(|id| id.as_ref()));
 
-        let datasets_to_pull = if recursive || all {
+        let datasets_to_pull = if options.recursive || options.all {
             datasets_labeled
         } else {
             datasets_labeled
@@ -155,7 +154,7 @@ impl PullService for PullServiceImpl {
                     .borrow_mut()
                     .ingest_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
-                        true,
+                        options.ingest_options.clone(),
                         ingest_listener.clone(),
                     )
                     .into_iter()

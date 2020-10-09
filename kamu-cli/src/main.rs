@@ -129,6 +129,7 @@ fn main() {
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
+                    submatches.is_present("force-uncacheable"),
                     &output_format,
                 ))
             }

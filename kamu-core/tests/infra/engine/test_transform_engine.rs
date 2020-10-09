@@ -101,7 +101,9 @@ fn test_transform_with_engine_spark() {
         .add_dataset(root_snapshot)
         .unwrap();
 
-    ingest_svc.ingest(&root_id, None).unwrap();
+    ingest_svc
+        .ingest(&root_id, IngestOptions::default(), None)
+        .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup
@@ -272,7 +274,9 @@ fn test_transform_with_engine_flink() {
         .add_dataset(root_snapshot)
         .unwrap();
 
-    ingest_svc.ingest(&root_id, None).unwrap();
+    ingest_svc
+        .ingest(&root_id, IngestOptions::default(), None)
+        .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
     // Derivative setup

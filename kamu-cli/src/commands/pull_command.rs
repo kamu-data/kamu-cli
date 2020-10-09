@@ -18,6 +18,7 @@ pub struct PullCommand {
     ids: Vec<String>,
     all: bool,
     recursive: bool,
+    force_uncacheable: bool,
     output_config: OutputConfig,
 }
 
@@ -27,6 +28,7 @@ impl PullCommand {
         ids: I,
         all: bool,
         recursive: bool,
+        force_uncacheable: bool,
         output_config: &OutputConfig,
     ) -> Self
     where
@@ -38,6 +40,7 @@ impl PullCommand {
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
             recursive: recursive,
+            force_uncacheable: force_uncacheable,
             output_config: output_config.clone(),
         }
     }
@@ -48,8 +51,14 @@ impl PullCommand {
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
         self.pull_svc.borrow_mut().pull_multi(
             &mut dataset_ids.iter().map(|id| id.as_ref()),
-            self.recursive,
-            self.all,
+            PullOptions {
+                recursive: self.recursive,
+                all: self.all,
+                ingest_options: IngestOptions {
+                    force_uncacheable: self.force_uncacheable,
+                    exhaust_sources: true,
+                },
+            },
             None,
             None,
         )
@@ -68,8 +77,14 @@ impl PullCommand {
 
         let results = self.pull_svc.borrow_mut().pull_multi(
             &mut dataset_ids.iter().map(|id| id.as_ref()),
-            self.recursive,
-            self.all,
+            PullOptions {
+                recursive: self.recursive,
+                all: self.all,
+                ingest_options: IngestOptions {
+                    force_uncacheable: self.force_uncacheable,
+                    exhaust_sources: true,
+                },
+            },
             Some(listener.clone()),
             Some(listener.clone()),
         );

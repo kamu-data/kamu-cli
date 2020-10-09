@@ -14,8 +14,7 @@ pub trait PullService {
     fn pull_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        recursive: bool,
-        all: bool,
+        options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
@@ -25,6 +24,26 @@ pub trait PullService {
         dataset_id: &DatasetID,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct PullOptions {
+    /// Pull all dataset dependencies recursively in depth-first order
+    pub recursive: bool,
+    /// Pull all known datasets
+    pub all: bool,
+    /// Ingest-specific options
+    pub ingest_options: IngestOptions,
+}
+
+impl Default for PullOptions {
+    fn default() -> Self {
+        Self {
+            recursive: false,
+            all: false,
+            ingest_options: IngestOptions::default(),
+        }
+    }
 }
 
 #[derive(Debug)]

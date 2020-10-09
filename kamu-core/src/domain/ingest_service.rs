@@ -14,15 +14,34 @@ pub trait IngestService {
     fn ingest(
         &mut self,
         dataset_id: &DatasetID,
+        options: IngestOptions,
         listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        exhaust_sources: bool,
+        options: IngestOptions,
         listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
+}
+
+#[derive(Debug, Clone)]
+pub struct IngestOptions {
+    /// Fetch latest data from uncacheable data sources
+    pub force_uncacheable: bool,
+    /// Pull sources that yield multiple data files until they are
+    /// fully exhausted
+    pub exhaust_sources: bool,
+}
+
+impl Default for IngestOptions {
+    fn default() -> Self {
+        Self {
+            force_uncacheable: false,
+            exhaust_sources: false,
+        }
+    }
 }
 
 #[derive(Debug)]

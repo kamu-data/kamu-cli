@@ -68,8 +68,7 @@ fn test_pull_batching() {
 
     pull_svc.pull_multi(
         &mut [id("e")].iter().map(|id| id.as_ref()),
-        false,
-        false,
+        PullOptions::default(),
         None,
         None,
     );
@@ -82,8 +81,10 @@ fn test_pull_batching() {
 
     pull_svc.pull_multi(
         &mut [id("e")].iter().map(|id| id.as_ref()),
-        true,
-        false,
+        PullOptions {
+            recursive: true,
+            ..PullOptions::default()
+        },
         None,
         None,
     );
@@ -110,6 +111,7 @@ impl IngestService for TestIngestService {
     fn ingest(
         &mut self,
         _dataset_id: &DatasetID,
+        _ingest_options: IngestOptions,
         _maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!();
@@ -118,7 +120,7 @@ impl IngestService for TestIngestService {
     fn ingest_multi(
         &mut self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        _exhaust_sources: bool,
+        _ingest_options: IngestOptions,
         _maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
