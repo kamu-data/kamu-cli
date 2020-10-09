@@ -207,7 +207,7 @@ content:
 
 Using `temporalTables` section we instruct the Flink engine to use `my.trading.holdings` event stream to create a temporal table of the same name.
 
-Here's how this three-dimensional would look like when sliced at different points in time:
+Here's how this three-dimensional table would look like when sliced at different points in time:
 
 ```sql
 my.trading.holdings:

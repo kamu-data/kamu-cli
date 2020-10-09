@@ -1,0 +1,28 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: my.trading.transactions.cad
+  source:
+    kind: derivative
+    inputs:
+    - io.exchangeratesapi.daily.usd-cad
+    - my.trading.transactions
+    transform:
+      engine: flink
+      temporalTables:
+      - id: io.exchangeratesapi.daily.usd-cad
+        primaryKey:
+        - currency_base
+      query: >
+        SELECT
+          tr.`event_time`,
+          tr.`symbol`,
+          tr.`quantity`,
+          tr.`price` as `price_usd`,
+          tr.`price` * exc.`rate` as `price_cad`,
+          tr.`settlement` as `settlement_usd`,
+          tr.`settlement` * exc.`rate` as `settlement_cad`
+        FROM
+          `my.trading.transactions` as tr,
+          LATERAL TABLE (`io.exchangeratesapi.daily.usd-cad`(tr.`event_time`)) as exc
+        WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'

@@ -1,0 +1,29 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: io.exchangeratesapi.daily.usd-cad
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: https://api.exchangeratesapi.io/history?base=USD&symbols=CAD&start_at=1900-01-01&end_at=2200-01-01
+    prepare:
+    - kind: pipe
+      command:
+      - 'jq'
+      - '-r'
+      - '.rates | with_entries(.value |= .CAD) | to_entries[] | [.key, "USD", "CAD", .value] | @csv'
+    read:
+      kind: csv
+      header: false
+      schema:
+      - event_time TIMESTAMP
+      - currency_base VARCHAR(5)
+      - currency_target VARCHAR(5)
+      - rate DECIMAL(18,10)
+    merge:
+      kind: ledger
+      primaryKey:
+      - event_time
+      - currency_base
+      - currency_target

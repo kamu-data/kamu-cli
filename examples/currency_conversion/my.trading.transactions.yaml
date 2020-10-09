@@ -1,0 +1,23 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: my.trading.transactions
+  source:
+    kind: root
+    fetch:
+      kind: filesGlob
+      path: data/transactions.csv
+    read:
+      kind: csv
+      header: true
+      schema:
+      - "event_time TIMESTAMP"
+      - "symbol VARCHAR(10)"
+      - "quantity BIGINT"
+      - "price DECIMAL(18,4)"
+      - "settlement DECIMAL(18,4)"
+      - "currency VARCHAR(5)"
+    merge:
+      kind: ledger
+      primaryKey:
+      - event_time

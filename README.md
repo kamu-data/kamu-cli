@@ -12,9 +12,10 @@ Website: https://kamu.dev
 ## Documentation
 - [Installation](docs/install.md)
 - [First Steps](docs/first_steps.md)
-- Examples
-  - [Stock Market Trading Data Analysis](docs/examples/trading.md)
-  - [Overdue Order Shipments Detection](docs/examples/overdue_shipments.md)
+- **Examples**
+  - [Currency Conversion](docs/examples/currency_conversion.md) (temporal-table joins)
+  - [Stock Market Trading Data Analysis](docs/examples/trading.md) (aggregations, temporal-table joins, watermarks)
+  - [Overdue Order Shipments Detection](docs/examples/overdue_shipments.md) (stream-to-stream joins, watermarks)
 - Ingesting Data
   - Supported Formats
   - Merge Strategies
@@ -26,6 +27,7 @@ Website: https://kamu.dev
   - Geo-Spatial Data
 - Exploring Data
 - Sharing data
+- Troubleshooting
 - Reference
   - [Metadata Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema)
   - Supported Engines
