@@ -1,0 +1,21 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: ca.vancouver.opendata.property.block-outlines
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: ftp://webftp.vancouver.ca/OpenData/shape/shape_property_information.zip
+    read:
+      kind: esriShapefile
+      subPath: block_outlines.*
+    preprocess:
+      engine: sparkSQL
+      query: >
+        SELECT
+          ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry
+        FROM input
+    merge:
+      # TODO
+      kind: append

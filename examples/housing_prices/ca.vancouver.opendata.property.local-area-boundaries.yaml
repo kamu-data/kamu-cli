@@ -1,0 +1,22 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: ca.vancouver.opendata.property.local-area-boundaries
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: ftp://webftp.vancouver.ca/OpenData/shape/local_area_boundary_shp.zip
+    read:
+      kind: esriShapefile
+    preprocess:
+      engine: sparkSQL
+      query: >
+        SELECT
+          ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry,
+          MAPID,
+          NAME
+        FROM input
+    merge:
+      # TODO
+      kind: append

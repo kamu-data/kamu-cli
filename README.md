@@ -14,8 +14,9 @@ Website: https://kamu.dev
 - [First Steps](docs/first_steps.md)
 - **Examples**
   - [Currency Conversion](docs/examples/currency_conversion.md) (temporal-table joins)
-  - [Stock Market Trading Data Analysis](docs/examples/trading.md) (aggregations, temporal-table joins, watermarks)
+  - [Stock Market Trading Data Analysis](docs/examples/trading.md) (aggregations, temporal-table joins, watermarks, notebooks)
   - [Overdue Order Shipments Detection](docs/examples/overdue_shipments.md) (stream-to-stream joins, watermarks)
+  - [Housing Prices Analysis](docs/examples/housing_prices.md) (GIS functions and joins, notebooks)
 - Ingesting Data
   - Supported Formats
   - Merge Strategies
