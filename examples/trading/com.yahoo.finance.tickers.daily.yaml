@@ -20,7 +20,8 @@ content:
       - "`Open` DECIMAL(18,4)"
       - "`Volume` DECIMAL(18,4)"
     preprocess:
-      engine: sparkSQL
+      kind: sql
+      engine: spark
       query: >
         SELECT
           `Date` as event_time,

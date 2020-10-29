@@ -33,7 +33,7 @@ impl ReadService {
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
-        let engine = self.engine_factory.lock().unwrap().get_engine("sparkSQL")?;
+        let engine = self.engine_factory.lock().unwrap().get_engine("spark")?;
 
         let request = IngestRequest {
             dataset_id: dataset_id.to_owned(),

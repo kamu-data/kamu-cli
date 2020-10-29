@@ -90,6 +90,7 @@ content:
     - io.exchangeratesapi.daily.usd-cad
     - my.trading.transactions
     transform:
+      kind: sql
       engine: flink
       temporalTables:
       - id: io.exchangeratesapi.daily.usd-cad

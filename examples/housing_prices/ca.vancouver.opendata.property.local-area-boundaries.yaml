@@ -10,7 +10,8 @@ content:
     read:
       kind: esriShapefile
     preprocess:
-      engine: sparkSQL
+      kind: sql
+      engine: spark
       query: >
         SELECT
           ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry,

@@ -9,8 +9,6 @@ use crate::domain::TimeInterval;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use serde_yaml::Value;
-use std::collections::BTreeMap;
 
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetSource
@@ -73,6 +71,19 @@ pub enum SourceCaching {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TemporalTable {
+  pub id: String,
+  pub primary_key: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,6 +109,19 @@ pub struct DataSlice {
   pub hash: String,
   pub interval: TimeInterval,
   pub num_records: i64,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SqlQueryStep {
+  pub alias: Option<String>,
+  pub query: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -233,12 +257,22 @@ pub struct ReadStepEsriShapefile {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Transform {
+pub enum Transform {
+  #[serde(rename_all = "camelCase")]
+  Sql(TransformSql),
+}
+
+#[skip_serializing_none]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransformSql {
   pub engine: String,
-  #[serde(flatten)]
-  pub additional_properties: BTreeMap<String, Value>,
+  pub version: Option<String>,
+  pub query: Option<String>,
+  pub queries: Option<Vec<SqlQueryStep>>,
+  pub temporal_tables: Option<Vec<TemporalTable>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

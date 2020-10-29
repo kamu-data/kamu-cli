@@ -132,34 +132,11 @@ records:
   - delay: 80
     content: ' '
   - delay: 80
-    content: >-
-      https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/us.cityofnewyork.data/zipcode-boundaries.yaml
+    content: zipcode-boundaries.yaml
   - delay: 500
     content: "\r\n"
   - delay: 361
     content: "\e[32mAdded\e[0m: us.cityofnewyork.data.zipcode-boundaries\r\n\e[32m\e[1mAdded 1 dataset(s)\e[0m\r\n\e]0;smikhtoniuk@smikhtoniuk-rb15:~/Work/projects/kamu/workspaces/my-repo\a\e[01;32m\x02$\e[00m "
-  - delay: 1117
-    content: k
-  - delay: 80
-    content: a
-  - delay: 80
-    content: m
-  - delay: 80
-    content: u
-  - delay: 80
-    content: ' '
-  - delay: 80
-    content: l
-  - delay: 80
-    content: i
-  - delay: 80
-    content: s
-  - delay: 80
-    content: t
-  - delay: 500
-    content: "\r\n"
-  - delay: 17
-    content: "┌──────────────────────────────────────────┬──────┬────────┬─────────┬──────┐\r\n│ \e[1m                   ID                   \e(B\e[m │ \e[1mKind\e(B\e[m │ \e[1mPulled\e(B\e[m │ \e[1mRecords\e(B\e[m │ \e[1mSize\e(B\e[m │\r\n├──────────────────────────────────────────┼──────┼────────┼─────────┼──────┤\r\n│ us.cityofnewyork.data.zipcode-boundaries\e(B\e[m │ Root\e(B\e[m │   -   \e(B\e[m │       -\e(B\e[m │    -\e(B\e[m │\r\n└──────────────────────────────────────────┴──────┴────────┴─────────┴──────┘\r\n\e]0;smikhtoniuk@smikhtoniuk-rb15:~/Work/projects/kamu/workspaces/my-repo\a\e[01;32m\x02$\e[00m "
   - delay: 939
     content: k
   - delay: 80
@@ -346,5 +323,5 @@ records:
     content: "\r\n"
   - delay: 17
     content: "\e[32mBlock:\e[0m \e[33m42012470e20e90036b3098da71e1056ce0e561031bc41fa47faa1d1269f93a2e\e[0m\r\n\e[2mDate\e[0m\e[2m:\e[0m 2020-09-26 23:20:18.760 UTC\r\n\e[2mOutput.Records\e[0m\e[2m:\e[0m 248\r\n\e[2mOutput.Interval\e[0m\e[2m:\e[0m [2020-09-26T23:20:18.760Z, 2020-09-26T23:20:18.760Z]\r\n\e[2mOutput.Hash\e[0m\e[2m:\e[0m 36622bafd9dd6fcd5e418878732379cf78b73bee89478f377eb86c1791833010\r\n\e[2mOutput.Watermark\e[0m\e[2m:\e[0m 2020-09-26 23:20:18.760 UTC\r\n\r\n\e[32mBlock:\e[0m \e[33ma7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a\e[0m\r\n\e[2mDate\e[0m\e[2m:\e[0m 2020-09-26 23:20:02.280 UTC\r\n\e[2mSource\e[0m\e[2m:\e[0m <Root source updated>\r\n\r\n\e]0;smikhtoniuk@smikhtoniuk-rb15:~/Work/projects/kamu/workspaces/my-repo\a\e[01;32m\x02$\e[00m "
-  - delay: 10000
+  - delay: 3000
     content: " "

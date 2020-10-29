@@ -62,7 +62,8 @@ impl Command for NewDatasetCommand {
                               - \"city STRING\"
                               - \"population BIGINT\"
                             # preprocess:
-                            #   engine: sparkSQL
+                            #   kind: sql
+                            #   engine: spark
                             #   query: >
                             #     SELECT
                             #       Date as date,
@@ -101,7 +102,8 @@ impl Command for NewDatasetCommand {
                             inputs:
                             - com.example.city-populations
                             transform:
-                              engine: sparkSQL
+                              kind: sql
+                              engine: spark
                               query: >
                                 SELECT
                                   date,

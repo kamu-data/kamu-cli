@@ -41,7 +41,8 @@ We also use a custom preprocessing step to convert GIS data into a different, mo
 
 ```yaml
 preprocess:
-  engine: sparkSQL
+  kind: sql
+  engine: spark
   query: >
     SELECT
       ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry

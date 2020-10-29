@@ -115,7 +115,7 @@ fn test_transform_with_engine_spark() {
             MetadataFactory::dataset_source_deriv([&root_id].iter())
                 .transform(
                     MetadataFactory::transform()
-                        .engine("sparkSQL")
+                        .engine("spark")
                         .query(
                             "SELECT event_time, city, population * 10 as population_x10 FROM root",
                         )

@@ -305,5 +305,5 @@ records:
     content: "\r\n"
   - delay: 598
     content: "\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[m\e[1m   PO_NAME    \e[m\e[1;32m | \e[m\e[1m  POPULATION   \e[m\e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m| \e[mStaten Island \e[1;32m | \e[m33114.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m41125.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m94480.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mAstoria       \e[1;32m | \e[m38665.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m74.00000000    \e[1;32m |\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m| \e[mBrooklyn      \e[1;32m | \e[m72280.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mBronx         \e[1;32m | \e[m76104.00000000 \e[1;32m |\e[m\r\n\e[1;32m| \e[mNew York      \e[1;32m | \e[m0.00000000     \e[1;32m |\e[m\r\n\e[1;32m+-\e[m\e[1;32m---------------+----------------\e[m\e[1;32m-+\e[m\r\n10 rows selected (0.599 seconds)\r\n0: kamu> "
-  - delay: 5451
+  - delay: 2000
     content: " "

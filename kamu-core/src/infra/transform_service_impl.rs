@@ -62,7 +62,9 @@ impl TransformServiceImpl {
         let engine = engine_factory
             .lock()
             .unwrap()
-            .get_engine(&request.source.transform.engine)?;
+            .get_engine(match request.source.transform {
+                Transform::Sql(ref sql) => &sql.engine,
+            })?;
 
         let result = engine.lock().unwrap().transform(request)?;
 

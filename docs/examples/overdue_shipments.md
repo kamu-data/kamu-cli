@@ -151,6 +151,7 @@ content:
     - com.acme.orders
     - com.acme.shipments
     transform:
+      kind: sql
       engine: flink
       queries:
       - alias: order_shipments

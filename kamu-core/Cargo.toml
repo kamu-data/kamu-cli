@@ -15,6 +15,7 @@ rust-crypto = "*"  # Data and metadata hashing
 
 # Serialization
 flatbuffers = "*"
+hex = "*"
 serde = { version = "*", features = ["derive"] }
 serde_with = "*"
 serde_yaml = "*"

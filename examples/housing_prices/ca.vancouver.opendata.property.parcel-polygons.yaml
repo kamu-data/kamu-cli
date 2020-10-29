@@ -11,7 +11,8 @@ content:
       kind: esriShapefile
       subPath: property_parcel_polygons.*
     preprocess:
-      engine: sparkSQL
+      kind: sql
+      engine: spark
       query: >
         SELECT
           ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry,

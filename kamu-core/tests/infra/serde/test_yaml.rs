@@ -5,43 +5,6 @@ use std::convert::TryFrom;
 use kamu::domain::*;
 use kamu::infra::serde::yaml::*;
 
-macro_rules! map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::std::collections::BTreeMap::new();
-            $(
-                m.insert($key, $value);
-            )+
-            m
-        }
-     };
-);
-
-macro_rules! yaml_map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::serde_yaml::Mapping::new();
-            $(
-                m.insert($key, $value);
-            )+
-            ::serde_yaml::Value::Mapping(m)
-        }
-     };
-);
-
-macro_rules! yaml_seq(
-    () => (
-        ::serde_yaml::Value::Sequence(vec!)
-    );
-    ($($x:expr),+ $(,)?) => (
-        ::serde_yaml::Value::Sequence(vec![$($x),+])
-    );
-);
-
-fn yaml_str(s: &str) -> serde_yaml::Value {
-    serde_yaml::to_value(s).unwrap()
-}
-
 #[test]
 fn de_dataset_snapshot_root() {
     let data = indoc!(
@@ -66,7 +29,8 @@ fn de_dataset_snapshot_root() {
               kind: csv
               header: true
             preprocess:
-              engine: sparkSQL
+              kind: sql
+              engine: spark
               query: >
                 SELECT * FROM input
             merge:
@@ -115,12 +79,13 @@ fn de_dataset_snapshot_root() {
                     timestamp_format: None,
                     multi_line: None,
                 }),
-                preprocess: Some(Transform {
-                    engine: "sparkSQL".to_owned(),
-                    additional_properties: map! {
-                        "query".to_owned() => yaml_str("SELECT * FROM input\n")
-                    },
-                }),
+                preprocess: Some(Transform::Sql(TransformSql {
+                    engine: "spark".to_owned(),
+                    version: None,
+                    query: Some("SELECT * FROM input\n".to_owned()),
+                    queries: None,
+                    temporal_tables: None,
+                })),
                 merge: MergeStrategy::Snapshot(MergeStrategySnapshot {
                     primary_key: vec!["id".to_owned()],
                     compare_columns: None,
@@ -152,10 +117,11 @@ fn de_dataset_snapshot_derivative() {
           source:
             kind: derivative
             inputs:
-            - com.naturalearthdata.10m.admin0
-            - com.naturalearthdata.50m.admin0
+              - com.naturalearthdata.10m.admin0
+              - com.naturalearthdata.50m.admin0
             transform:
-              engine: sparkSQL
+              kind: sql
+              engine: spark
               query: SOME_SQL"
     );
 
@@ -171,18 +137,20 @@ fn de_dataset_snapshot_derivative() {
                     DatasetIDBuf::try_from("com.naturalearthdata.10m.admin0").unwrap(),
                     DatasetIDBuf::try_from("com.naturalearthdata.50m.admin0").unwrap(),
                 ],
-                transform: Transform {
-                    engine: "sparkSQL".to_owned(),
-                    additional_properties: map! {
-                        "query".to_owned() => yaml_str("SOME_SQL")
-                    },
-                },
+                transform: Transform::Sql(TransformSql {
+                    engine: "spark".to_owned(),
+                    version: None,
+                    query: Some("SOME_SQL".to_owned()),
+                    queries: None,
+                    temporal_tables: None,
+                }),
             }),
             vocab: None,
         },
     };
 
     assert_eq!(expected, actual);
+    assert_eq!(data, serde_yaml::to_string(&expected).unwrap());
 }
 
 #[test]
@@ -195,28 +163,28 @@ fn de_metadata_block() {
         content:
           blockHash: ddeeaaddbbeeff
           prevBlockHash: ffeebbddaaeedd
-          systemTime: '2020-01-01T12:00:00.000Z'
+          systemTime: \"2020-01-01T12:00:00.000Z\"
+          outputSlice:
+            hash: ffaabb
+            interval: \"[2020-01-01T12:00:00.000Z, 2020-01-01T12:00:00.000Z]\"
+            numRecords: 10
+          outputWatermark: \"2020-01-01T12:00:00.000Z\"
+          inputSlices:
+            - hash: aa
+              interval: \"(-inf, 2020-01-01T12:00:00.000Z]\"
+              numRecords: 10
+            - hash: zz
+              interval: ()
+              numRecords: 0
           source:
             kind: derivative
             inputs:
-            - input1
-            - input2
+              - input1
+              - input2
             transform:
-              engine: sparkSQL
-              query: >
-                SELECT * FROM input1 UNION ALL SELECT * FROM input2
-          outputSlice:
-            hash: ffaabb
-            interval: '[2020-01-01T12:00:00.000Z, 2020-01-01T12:00:00.000Z]'
-            numRecords: 10
-          outputWatermark: '2020-01-01T12:00:00.000Z'
-          inputSlices:
-          - hash: aa
-            interval: '(-inf, 2020-01-01T12:00:00.000Z]'
-            numRecords: 10
-          - hash: zz
-            interval: '()'
-            numRecords: 0"
+              kind: sql
+              engine: spark
+              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2"
     );
 
     let actual: Manifest<MetadataBlock> = serde_yaml::from_str(data).unwrap();
@@ -233,12 +201,13 @@ fn de_metadata_block() {
                     DatasetIDBuf::try_from("input1").unwrap(),
                     DatasetIDBuf::try_from("input2").unwrap(),
                 ],
-                transform: Transform {
-                    engine: "sparkSQL".to_owned(),
-                    additional_properties: map! {
-                        "query".to_owned() => yaml_str("SELECT * FROM input1 UNION ALL SELECT * FROM input2\n")
-                    },
-                },
+                transform: Transform::Sql(TransformSql {
+                    engine: "spark".to_owned(),
+                    version: None,
+                    query: Some("SELECT * FROM input1 UNION ALL SELECT * FROM input2".to_owned()),
+                    queries: None,
+                    temporal_tables: None,
+                }),
             })),
             output_slice: Some(DataSlice {
                 hash: "ffaabb".to_owned(),
@@ -264,6 +233,7 @@ fn de_metadata_block() {
     };
 
     assert_eq!(expected, actual);
+    assert_eq!(data, serde_yaml::to_string(&expected).unwrap());
 }
 
 #[test]
@@ -369,6 +339,7 @@ fn serde_transform() {
     let data = indoc!(
         "
         ---
+        kind: sql
         engine: flink
         temporalTables:
         - id: foo
@@ -382,23 +353,19 @@ fn serde_transform() {
 
     let actual: Transform = serde_yaml::from_str(data).unwrap();
 
-    let expected = Transform {
+    let expected = Transform::Sql(TransformSql {
         engine: "flink".to_owned(),
-        additional_properties: map! {
-            "temporalTables".to_owned() => yaml_seq![
-                yaml_map! {
-                    yaml_str("id") => yaml_str("foo"),
-                    yaml_str("primaryKey") => yaml_seq![yaml_str("id")]
-                }
-            ],
-            "queries".to_owned() => yaml_seq![
-                yaml_map! {
-                    yaml_str("alias") => yaml_str("bar"),
-                    yaml_str("query") => yaml_str("SELECT * FROM foo")
-                }
-            ]
-        },
-    };
+        version: None,
+        query: None,
+        temporal_tables: Some(vec![TemporalTable {
+            id: "foo".to_owned(),
+            primary_key: vec!["id".to_owned()],
+        }]),
+        queries: Some(vec![SqlQueryStep {
+            alias: Some("bar".to_owned()),
+            query: "SELECT * FROM foo".to_owned(),
+        }]),
+    });
 
     assert_eq!(expected, actual);
 
@@ -407,6 +374,7 @@ fn serde_transform() {
         indoc!(
             "
             ---
+            kind: sql
             engine: flink
             queries:
               - alias: bar

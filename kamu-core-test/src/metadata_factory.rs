@@ -8,8 +8,8 @@ use std::path::Path;
 pub struct MetadataFactory;
 
 impl MetadataFactory {
-    pub fn transform() -> TransformBuilder {
-        TransformBuilder::new()
+    pub fn transform() -> TransformSqlBuilder {
+        TransformSqlBuilder::new()
     }
 
     pub fn dataset_source_root() -> DatasetSourceBuilderRoot {
@@ -37,16 +37,19 @@ impl MetadataFactory {
 // Transform Builder
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct TransformBuilder {
-    v: Transform,
+pub struct TransformSqlBuilder {
+    v: TransformSql,
 }
 
-impl TransformBuilder {
+impl TransformSqlBuilder {
     fn new() -> Self {
         Self {
-            v: Transform {
+            v: TransformSql {
                 engine: "some_engine".to_owned(),
-                additional_properties: std::collections::BTreeMap::new(),
+                version: None,
+                query: None,
+                queries: None,
+                temporal_tables: None,
             },
         }
     }
@@ -56,17 +59,13 @@ impl TransformBuilder {
         self
     }
 
-    pub fn property(mut self, key: &str, value: serde_yaml::Value) -> Self {
-        self.v.additional_properties.insert(key.to_owned(), value);
+    pub fn query(mut self, query: &str) -> Self {
+        self.v.query = Some(query.to_owned());
         self
     }
 
-    pub fn query(self, query: &str) -> Self {
-        self.property("query", serde_yaml::to_value(query).unwrap())
-    }
-
     pub fn build(self) -> Transform {
-        self.v
+        Transform::Sql(self.v)
     }
 }
 
@@ -147,7 +146,7 @@ impl DatasetSourceBuilderDeriv {
                 inputs: inputs
                     .map(|s| DatasetIDBuf::try_from(s.as_ref()).unwrap())
                     .collect(),
-                transform: TransformBuilder::new().build(),
+                transform: TransformSqlBuilder::new().build(),
             },
         }
     }

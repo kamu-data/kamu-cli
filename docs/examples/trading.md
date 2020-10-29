@@ -94,6 +94,7 @@ content:
     inputs:
       - my.trading.transactions
     transform:
+      kind: sql
       engine: flink
       query: >
         SELECT
@@ -187,6 +188,7 @@ content:
     - com.yahoo.finance.tickers.daily
     - my.trading.holdings
     transform:
+      kind: sql
       engine: flink
       temporalTables:
       - id: my.trading.holdings

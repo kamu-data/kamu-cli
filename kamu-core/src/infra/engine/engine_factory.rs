@@ -31,7 +31,7 @@ impl EngineFactory {
 
     pub fn get_engine(&mut self, engine_id: &str) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
         match engine_id {
-            "sparkSQL" => Ok(self.spark_engine.clone()),
+            "spark" => Ok(self.spark_engine.clone()),
             "flink" => Ok(self.flink_engine.clone()),
             _ => Err(EngineError::not_found(engine_id)),
         }
