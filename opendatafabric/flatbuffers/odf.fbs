@@ -1,0 +1,309 @@
+////////////////////////////////////////////////////////////////////////////////
+// WARNING: This file is auto-generated from Open Data Fabric Schemas
+// See: http://opendatafabric.org/
+////////////////////////////////////////////////////////////////////////////////
+
+struct Option_bool { value: bool; }
+struct Option_int64 { value: int64; }
+
+struct Timestamp {
+  year: int32;
+  ordinal: uint16;
+  seconds_from_midnight: uint32;
+  nanoseconds: uint32;
+}
+
+enum TimeIntervalType: uint8 {
+  Closed,
+  Open,
+  LeftHalfOpen,
+  RightHalfOpen,
+  UnboundedClosedRight,
+  UnboundedOpenRight,
+  UnboundedClosedLeft,
+  UnboundedOpenLeft,
+  Singleton,
+  Unbounded,
+  Empty,
+}
+
+struct TimeInterval {
+  type: TimeIntervalType;
+  left: Timestamp;
+  right: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// EventTimeSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table EventTimeSourceFromMetadata {
+}
+
+table EventTimeSourceFromPath {
+  pattern: string;
+  timestamp_format: string;
+}
+
+union EventTimeSource {
+  EventTimeSourceFromMetadata,
+  EventTimeSourceFromPath,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceCaching
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table SourceCachingForever {
+}
+
+union SourceCaching {
+  SourceCachingForever,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// FetchStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table FetchStepUrl {
+  url: string;
+  event_time: EventTimeSource;
+  cache: SourceCaching;
+}
+
+enum SourceOrdering: int32 {
+  ByEventTime,
+  ByName,
+}
+
+struct Option_SourceOrdering { value: SourceOrdering; }
+
+table FetchStepFilesGlob {
+  path: string;
+  event_time: EventTimeSource;
+  cache: SourceCaching;
+  order: Option_SourceOrdering;
+}
+
+union FetchStep {
+  FetchStepUrl,
+  FetchStepFilesGlob,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PrepStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+enum CompressionFormat: int32 {
+  Gzip,
+  Zip,
+}
+
+struct Option_CompressionFormat { value: CompressionFormat; }
+
+table PrepStepDecompress {
+  format: Option_CompressionFormat;
+  sub_path: string;
+}
+
+table PrepStepPipe {
+  command: [string];
+}
+
+union PrepStep {
+  PrepStepDecompress,
+  PrepStepPipe,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ReadStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepCsv {
+  schema: [string];
+  separator: string;
+  encoding: string;
+  quote: string;
+  escape: string;
+  comment: string;
+  header: Option_bool;
+  enforce_schema: Option_bool;
+  infer_schema: Option_bool;
+  ignore_leading_white_space: Option_bool;
+  ignore_trailing_white_space: Option_bool;
+  null_value: string;
+  empty_value: string;
+  nan_value: string;
+  positive_inf: string;
+  negative_inf: string;
+  date_format: string;
+  timestamp_format: string;
+  multi_line: Option_bool;
+}
+
+table ReadStepJsonLines {
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  multi_line: Option_bool;
+  primitives_as_string: Option_bool;
+  timestamp_format: string;
+}
+
+table ReadStepGeoJson {
+  schema: [string];
+}
+
+table ReadStepEsriShapefile {
+  schema: [string];
+  sub_path: string;
+}
+
+union ReadStep {
+  ReadStepCsv,
+  ReadStepJsonLines,
+  ReadStepGeoJson,
+  ReadStepEsriShapefile,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Transform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformSql {
+  engine: string;
+  version: string;
+  query: string;
+  queries: [SqlQueryStep];
+  temporal_tables: [TemporalTable];
+}
+
+union Transform {
+  TransformSql,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MergeStrategy
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyAppend {
+}
+
+table MergeStrategyLedger {
+  primary_key: [string];
+}
+
+table MergeStrategySnapshot {
+  primary_key: [string];
+  compare_columns: [string];
+  observation_column: string;
+  obsv_added: string;
+  obsv_changed: string;
+  obsv_removed: string;
+}
+
+union MergeStrategy {
+  MergeStrategyAppend,
+  MergeStrategyLedger,
+  MergeStrategySnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table PrepStepWrapper { value: PrepStep; }
+
+table DatasetSourceRoot {
+  fetch: FetchStep;
+  prepare: [PrepStepWrapper];
+  read: ReadStep;
+  preprocess: Transform;
+  merge: MergeStrategy;
+}
+
+table DatasetSourceDerivative {
+  inputs: [string];
+  transform: Transform;
+}
+
+union DatasetSource {
+  DatasetSourceRoot,
+  DatasetSourceDerivative,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetVocabulary
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetvocabulary-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DatasetVocabulary {
+  system_time_column: string;
+  event_time_column: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TemporalTable {
+  id: string;
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetSnapshot
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DatasetSnapshot {
+  id: string;
+  source: DatasetSource;
+  vocab: DatasetVocabulary;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DataSlice {
+  hash: [ubyte];
+  interval: TimeInterval;
+  num_records: Option_int64;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table SqlQueryStep {
+  alias: string;
+  query: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataBlock
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table MetadataBlock {
+  block_hash: [ubyte];
+  prev_block_hash: [ubyte];
+  system_time: Timestamp;
+  output_slice: DataSlice;
+  output_watermark: Timestamp;
+  input_slices: [DataSlice];
+  source: DatasetSource;
+}
+
