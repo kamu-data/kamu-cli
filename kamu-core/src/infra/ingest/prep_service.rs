@@ -1,11 +1,11 @@
 use super::*;
 use crate::domain::*;
-use crate::infra::serde::yaml::formats::datetime_rfc3339;
-use crate::infra::serde::yaml::*;
+use opendatafabric::serde::yaml::formats::datetime_rfc3339;
+use opendatafabric::*;
 
+use ::serde::{Deserialize, Serialize};
+use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;

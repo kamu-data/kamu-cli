@@ -9,7 +9,7 @@ pub mod datetime_rfc3339 {
         date: &DateTime<Utc>,
         serializer: S,
     ) -> Result<S::Ok, S::Error> {
-        let s = date.to_rfc3339_opts(SecondsFormat::Millis, true);
+        let s = date.to_rfc3339_opts(SecondsFormat::AutoSi, true);
         serializer.serialize_str(&s)
     }
 
@@ -24,8 +24,8 @@ pub mod datetime_rfc3339 {
 }
 
 pub mod datetime_rfc3339_opt {
-    use chrono::{DateTime, SecondsFormat, Utc};
-    use serde::{Deserialize, Deserializer, Serializer};
+    use chrono::{DateTime, Utc};
+    use serde::{Deserializer, Serializer};
 
     pub fn serialize<S: Serializer>(
         option: &Option<DateTime<Utc>>,
@@ -33,19 +33,13 @@ pub mod datetime_rfc3339_opt {
     ) -> Result<S::Ok, S::Error> {
         match option {
             None => serializer.serialize_none(),
-            Some(date) => {
-                serializer.serialize_str(&date.to_rfc3339_opts(SecondsFormat::Millis, true))
-            }
+            Some(date) => super::datetime_rfc3339::serialize(&date, serializer),
         }
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(
         deserializer: D,
     ) -> Result<Option<DateTime<Utc>>, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        DateTime::parse_from_rfc3339(&s)
-            .map(|dt| dt.into())
-            .map(Some)
-            .map_err(serde::de::Error::custom)
+        super::datetime_rfc3339::deserialize(deserializer).map(Some)
     }
 }

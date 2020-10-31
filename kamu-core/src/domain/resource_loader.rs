@@ -1,4 +1,4 @@
-use crate::infra::serde::yaml::DatasetSnapshot;
+use opendatafabric::DatasetSnapshot;
 
 use std::backtrace::Backtrace;
 use thiserror::Error;

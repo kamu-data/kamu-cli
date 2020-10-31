@@ -1,7 +1,7 @@
 use kamu::domain::*;
-use kamu::infra::serde::yaml::*;
 use kamu::infra::*;
 use kamu_test::*;
+use opendatafabric::*;
 
 use chrono::{DateTime, TimeZone, Utc};
 use std::cell::RefCell;
@@ -60,7 +60,7 @@ fn append_data_block(
         MetadataFactory::metadata_block()
             .prev(&chain.read_ref(&BlockRef::Head).unwrap())
             .output_slice(DataSlice {
-                hash: "12345".to_owned(),
+                hash: Sha3_256::zero(),
                 num_records: 100,
                 interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             })
@@ -96,8 +96,6 @@ fn test_get_next_operation() {
     assert_eq!(transform_svc.get_next_operation(bar).unwrap(), None);
 
     let foo_system_time = append_data_block(&metadata_repo, foo);
-
-    println!("{:?}", transform_svc.get_next_operation(bar));
 
     assert!(matches!(
         transform_svc.get_next_operation(bar).unwrap(),

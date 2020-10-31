@@ -1,4 +1,4 @@
-use crate::infra::serde::yaml::*;
+use crate::infra::Manifest;
 
 use std::fs::File;
 use std::path::Path;

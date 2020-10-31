@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.31.0"
+version = "0.32.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 
@@ -8,13 +8,12 @@ edition = "2018"
 skip_docker_tests = []
 
 [dependencies]
+opendatafabric = { path = "../opendatafabric" }
+
 # Domain
 chrono = { version = "*", features = ["serde"] }
-intervals-general = "*"
-rust-crypto = "*"  # Data and metadata hashing
 
 # Serialization
-flatbuffers = "*"
 hex = "*"
 serde = { version = "*", features = ["derive"] }
 serde_with = "*"

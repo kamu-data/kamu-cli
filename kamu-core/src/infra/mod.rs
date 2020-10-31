@@ -3,7 +3,6 @@ pub use engine::*;
 
 pub mod explore;
 pub mod ingest;
-pub mod serde;
 pub mod utils;
 
 mod error;
@@ -11,6 +10,12 @@ pub use error::*;
 
 mod dataset_layout;
 pub use dataset_layout::*;
+
+mod dataset_summary;
+pub use dataset_summary::*;
+
+mod manifest;
+pub use manifest::*;
 
 mod ingest_service_impl;
 pub use ingest_service_impl::*;

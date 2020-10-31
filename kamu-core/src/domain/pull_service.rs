@@ -1,6 +1,7 @@
 use super::ingest_service::*;
 use super::transform_service::*;
-use crate::domain::{DatasetID, DatasetIDBuf, DomainError};
+use crate::domain::DomainError;
+use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
 
 use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
@@ -49,7 +50,7 @@ impl Default for PullOptions {
 #[derive(Debug)]
 pub enum PullResult {
     UpToDate,
-    Updated { block_hash: String },
+    Updated { block_hash: Sha3_256 },
 }
 
 ///////////////////////////////////////////////////////////////////////////////

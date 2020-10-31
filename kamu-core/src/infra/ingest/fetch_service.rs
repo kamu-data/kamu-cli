@@ -1,11 +1,11 @@
 use super::*;
 use crate::domain::*;
-use crate::infra::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
-use crate::infra::serde::yaml::*;
+use opendatafabric::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
+use opendatafabric::*;
 
+use ::serde::{Deserialize, Serialize};
+use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use slog::{info, Logger};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};

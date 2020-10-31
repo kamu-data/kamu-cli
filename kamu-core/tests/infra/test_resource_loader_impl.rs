@@ -1,23 +1,19 @@
 use crate::utils::HttpServer;
 use kamu::domain::{ResourceError, ResourceLoader};
-use kamu::infra::serde::yaml::*;
 use kamu::infra::ResourceLoaderImpl;
 use kamu_test::*;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 
 use std::path::Path;
 
 fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
     let snapshot = MetadataFactory::dataset_snapshot().id("test").build();
-    let manifest = Manifest {
-        api_version: 1,
-        kind: "DatasetSnapshot".to_owned(),
-        content: snapshot,
-    };
-
-    let file = std::fs::File::create(path).unwrap();
-    serde_yaml::to_writer(file, &manifest).unwrap();
-
-    manifest.content
+    let buffer = YamlDatasetSnapshotSerializer
+        .write_manifest(&snapshot)
+        .unwrap();
+    std::fs::write(path, &buffer).unwrap();
+    snapshot
 }
 
 #[test]
@@ -64,8 +60,7 @@ fn test_load_from_http_url() {
     let http_server = HttpServer::new(tempdir.path());
     let url = url::Url::parse(&format!(
         "http://{}:{}/test.yaml",
-        http_server.address,
-        http_server.host_port,
+        http_server.address, http_server.host_port,
     ))
     .unwrap();
 
@@ -85,8 +80,7 @@ fn test_load_from_http_url_404() {
     let http_server = HttpServer::new(tempdir.path());
     let url = url::Url::parse(&format!(
         "http://{}:{}/test.yaml",
-        http_server.address,
-        http_server.host_port,
+        http_server.address, http_server.host_port,
     ))
     .unwrap();
 

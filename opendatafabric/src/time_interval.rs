@@ -152,7 +152,7 @@ impl Eq for TimeInterval {}
 impl fmt::Display for TimeInterval {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fn fmt_elem(v: &Element) -> String {
-            v.to_rfc3339_opts(SecondsFormat::Millis, true)
+            v.to_rfc3339_opts(SecondsFormat::AutoSi, true)
         }
 
         match self.0 {

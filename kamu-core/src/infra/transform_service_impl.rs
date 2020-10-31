@@ -1,6 +1,6 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
 use crate::infra::*;
+use opendatafabric::*;
 
 use slog::{info, o, Logger};
 use std::cell::RefCell;
@@ -57,7 +57,7 @@ impl TransformServiceImpl {
         mut meta_chain: Box<dyn MetadataChain>,
         engine_factory: Arc<Mutex<EngineFactory>>,
     ) -> Result<TransformResult, TransformError> {
-        let prev_hash = meta_chain.read_ref(&BlockRef::Head).unwrap();
+        let prev_hash = meta_chain.read_ref(&BlockRef::Head);
 
         let engine = engine_factory
             .lock()

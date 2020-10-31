@@ -1,5 +1,5 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
+use opendatafabric::*;
 
 use chrono::prelude::*;
 use slog::{info, Logger};
@@ -192,10 +192,10 @@ impl PullService for PullServiceImpl {
             .borrow_mut()
             .get_metadata_chain(dataset_id)?;
 
-        let last_hash = chain.read_ref(&BlockRef::Head).unwrap();
+        let last_hash = chain.read_ref(&BlockRef::Head);
 
         let new_block = MetadataBlock {
-            block_hash: "".to_owned(),
+            block_hash: Sha3_256::zero(),
             prev_block_hash: last_hash,
             system_time: Utc::now(),
             output_slice: None,

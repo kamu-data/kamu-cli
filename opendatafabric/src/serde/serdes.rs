@@ -83,7 +83,7 @@ impl<T> Buffer<T> {
         T: Default + Copy,
     {
         if self.head < space_left || self.buf.len() - self.tail < space_right {
-            let nlen = self.buf.len() + space_left + space_right;
+            let nlen = self.tail - self.head + space_left + space_right;
             let ntail = nlen - space_right;
             let mut nbuf = vec![T::default(); nlen];
             nbuf[space_left..nlen - space_right].copy_from_slice(&self.buf[self.head..self.tail]);
@@ -104,6 +104,12 @@ impl<T> std::ops::Deref for Buffer<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.buf[self.head..self.tail]
+    }
+}
+
+impl<T> std::convert::AsRef<[T]> for Buffer<T> {
+    fn as_ref(&self) -> &[T] {
+        &self.buf
     }
 }
 

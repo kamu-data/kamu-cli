@@ -1,5 +1,4 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
 use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
@@ -246,8 +245,7 @@ impl FlinkEngine {
         info!(self.logger, "Writing request"; "request" => ?manifest, "path" => ?path);
 
         let file = File::create(&path)?;
-        serde_yaml::to_writer(file, &manifest)
-            .map_err(|e| EngineError::internal(e))?;
+        serde_yaml::to_writer(file, &manifest).map_err(|e| EngineError::internal(e))?;
 
         Ok(())
     }

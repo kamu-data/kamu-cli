@@ -1,6 +1,6 @@
 use indoc::indoc;
 use kamu::infra::ingest::*;
-use kamu::infra::serde::yaml::*;
+use opendatafabric::*;
 
 use chrono::Utc;
 use std::io::prelude::*;

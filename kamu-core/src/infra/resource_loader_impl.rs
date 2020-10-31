@@ -1,5 +1,6 @@
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 
 use std::path::Path;
 use std::time::Duration;
@@ -36,10 +37,10 @@ impl ResourceLoaderImpl {
 
         match h.response_code()? {
             200 => {
-                let manifest: Manifest<DatasetSnapshot> =
-                    serde_yaml::from_slice(&buffer).map_err(|e| ResourceError::serde(e))?;
-                assert_eq!(manifest.kind, "DatasetSnapshot");
-                Ok(manifest.content)
+                let snapshot = YamlDatasetSnapshotDeserializer
+                    .read_manifest(&buffer)
+                    .map_err(|e| ResourceError::serde(e))?;
+                Ok(snapshot)
             }
             404 => Err(ResourceError::not_found(url.as_str().to_owned(), None)),
             _ => Err(ResourceError::unreachable(url.as_str().to_owned(), None)),
@@ -52,11 +53,11 @@ impl ResourceLoader for ResourceLoaderImpl {
         &self,
         path: &Path,
     ) -> Result<DatasetSnapshot, ResourceError> {
-        let file = std::fs::File::open(path).map_err(|e| ResourceError::internal(e))?;
-        let manifest: Manifest<DatasetSnapshot> =
-            serde_yaml::from_reader(file).map_err(|e| ResourceError::serde(e))?;
-        assert_eq!(manifest.kind, "DatasetSnapshot");
-        Ok(manifest.content)
+        let buffer = std::fs::read(path).map_err(|e| ResourceError::internal(e))?;
+        let snapshot = YamlDatasetSnapshotDeserializer
+            .read_manifest(&buffer)
+            .map_err(|e| ResourceError::serde(e))?;
+        Ok(snapshot)
     }
 
     fn load_dataset_snapshot_from_url(&self, url: &Url) -> Result<DatasetSnapshot, ResourceError> {

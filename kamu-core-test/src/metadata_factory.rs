@@ -1,7 +1,6 @@
-use kamu::domain::*;
-use kamu::infra::serde::yaml::*;
+use opendatafabric::*;
 
-use chrono::{DateTime, SubsecRound, Utc};
+use chrono::{DateTime, Utc};
 use std::convert::TryFrom;
 use std::path::Path;
 
@@ -177,9 +176,9 @@ impl MetadataBlockBuilder {
     fn new() -> Self {
         Self {
             v: MetadataBlock {
-                block_hash: "".to_owned(),
-                prev_block_hash: "".to_owned(),
-                system_time: Utc::now().round_subsecs(3),
+                block_hash: Sha3_256::zero(),
+                prev_block_hash: None,
+                system_time: Utc::now(),
                 output_slice: None,
                 output_watermark: None,
                 input_slices: None,
@@ -188,9 +187,8 @@ impl MetadataBlockBuilder {
         }
     }
 
-    pub fn prev(mut self, prev_block_hash: &str) -> Self {
-        self.v.prev_block_hash.clear();
-        self.v.prev_block_hash.push_str(prev_block_hash);
+    pub fn prev(mut self, prev_block_hash: &Sha3_256) -> Self {
+        self.v.prev_block_hash = Some(*prev_block_hash);
         self
     }
 

@@ -1,5 +1,6 @@
 use super::{Command, Error};
 use kamu::domain::*;
+use opendatafabric::*;
 
 use chrono::DateTime;
 use std::cell::RefCell;

@@ -5,23 +5,6 @@ use kamu_test::*;
 use chrono::{TimeZone, Utc};
 
 #[test]
-fn test_block_hashing() {
-    assert_eq!(
-        MetadataChainImpl::block_hash(&MetadataFactory::metadata_block().build()),
-        "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"
-    );
-    assert_eq!(
-        MetadataChainImpl::block_hash(
-            &MetadataFactory::metadata_block()
-                .prev("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")
-                .build()
-        ),
-        "42012470e20e90036b3098da71e1056ce0e561031bc41fa47faa1d1269f93a2e"
-    );
-    // TODO: other fields
-}
-
-#[test]
 fn test_create_new_chain() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain_dir = tmp_dir.path().join("foo.test");
@@ -34,7 +17,7 @@ fn test_create_new_chain() {
 }
 
 #[test]
-fn test_create_new_chain_err() {
+fn test_create_new_chain_error_dir_already_exists() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
     let block = MetadataFactory::metadata_block().build();
@@ -51,18 +34,19 @@ fn test_append_and_iter_blocks() {
     let mut block1 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
         .build();
+    let (mut chain, block1_hash) = MetadataChainImpl::create(&chain_dir, block1.clone()).unwrap();
+    block1.block_hash = block1_hash;
+
     let mut block2 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
+        .prev(&block1.block_hash)
         .build();
+    block2.block_hash = chain.append(block2.clone());
+
     let mut block3 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 3).and_hms(12, 0, 0))
+        .prev(&block2.block_hash)
         .build();
-
-    let (mut chain, hash) = MetadataChainImpl::create(&chain_dir, block1.clone()).unwrap();
-    block1.block_hash = hash;
-    block2.prev_block_hash = block1.block_hash.clone();
-    block2.block_hash = chain.append(block2.clone());
-    block3.prev_block_hash = block2.block_hash.clone();
     block3.block_hash = chain.append(block3.clone());
 
     let mut block_iter = chain.iter_blocks();

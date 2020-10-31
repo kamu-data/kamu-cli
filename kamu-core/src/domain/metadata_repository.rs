@@ -1,6 +1,6 @@
 use super::*;
-
-use crate::infra::serde::yaml::*;
+use crate::infra::DatasetSummary;
+use opendatafabric::*;
 
 pub trait MetadataRepository {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;

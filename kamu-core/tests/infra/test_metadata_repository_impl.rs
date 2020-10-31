@@ -1,6 +1,7 @@
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu_test::*;
+use opendatafabric::*;
 
 #[test]
 fn test_delete_dataset() {

@@ -1,5 +1,6 @@
 use super::{Command, Error};
 use kamu::domain::*;
+use opendatafabric::*;
 
 use std::cell::RefCell;
 use std::convert::TryFrom;

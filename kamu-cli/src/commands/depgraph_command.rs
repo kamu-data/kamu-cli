@@ -1,6 +1,6 @@
 use super::{Command, Error};
 use kamu::domain::*;
-use kamu::infra::serde::yaml::DatasetKind;
+use kamu::infra::DatasetKind;
 
 use std::cell::RefCell;
 use std::rc::Rc;

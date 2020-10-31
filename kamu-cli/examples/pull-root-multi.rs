@@ -1,6 +1,7 @@
 use kamu::domain::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
+use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use std::cell::RefCell;
@@ -21,17 +22,11 @@ fn main() {
     cmd.run().unwrap();
 }
 
-fn rand_hash() -> String {
-    use rand::distributions::Standard;
-    use rand::Rng;
-    use std::fmt::Write;
-
-    let mut res = String::with_capacity(64);
-    rand::thread_rng()
-        .sample_iter::<u8, _>(&Standard)
-        .take(32)
-        .for_each(|b| write!(&mut res, "{:02x}", b).unwrap());
-    res
+fn rand_hash() -> Sha3_256 {
+    use rand::RngCore;
+    let mut hash = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut hash);
+    Sha3_256::new(hash)
 }
 
 pub struct TestPullService;

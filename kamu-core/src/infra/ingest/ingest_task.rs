@@ -1,8 +1,8 @@
 use super::*;
 use crate::domain::*;
-use crate::infra::serde::yaml::formats::datetime_rfc3339;
-use crate::infra::serde::yaml::*;
 use crate::infra::*;
+use opendatafabric::serde::yaml::formats::datetime_rfc3339;
+use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
@@ -252,7 +252,7 @@ impl IngestTask {
         &mut self,
         fetch_result: ExecutionResult<FetchCheckpoint>,
         read_result: ExecutionResult<ReadCheckpoint>,
-        prev_hash: String,
+        prev_hash: Sha3_256,
     ) -> Result<ExecutionResult<CommitCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("commit.yaml");
 
@@ -271,12 +271,12 @@ impl IngestTask {
                     }
 
                     let new_block = MetadataBlock {
-                        prev_block_hash: prev_hash,
+                        prev_block_hash: Some(prev_hash),
                         ..read_result.checkpoint.last_block
                     };
 
                     let hash = self.meta_chain.borrow_mut().append(new_block);
-                    info!(self.logger, "Committed new block"; "hash" => &hash);
+                    info!(self.logger, "Committed new block"; "hash" => hash.to_string());
 
                     Ok(ExecutionResult {
                         was_up_to_date: false,
@@ -317,5 +317,5 @@ pub struct CommitCheckpoint {
     pub for_read_at: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_fetched_at: DateTime<Utc>,
-    pub last_hash: String,
+    pub last_hash: Sha3_256,
 }

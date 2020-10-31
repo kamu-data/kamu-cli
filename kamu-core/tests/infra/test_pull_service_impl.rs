@@ -1,6 +1,7 @@
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu_test::*;
+use opendatafabric::*;
 
 use itertools::Itertools;
 use std::cell::RefCell;

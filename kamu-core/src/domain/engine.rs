@@ -1,10 +1,11 @@
-use crate::domain::*;
-use crate::infra::serde::yaml::formats::datetime_rfc3339_opt;
-use crate::infra::serde::yaml::*;
+use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
+use opendatafabric::serde::yaml::generated::*;
+use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
+use ::serde_with::serde_as;
+use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use serde_with::skip_serializing_none;
 use std::backtrace::Backtrace;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -28,7 +29,9 @@ pub struct IngestRequest {
     pub ingest_path: PathBuf,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub event_time: Option<DateTime<Utc>>,
+    #[serde(with = "DatasetSourceRootDef")]
     pub source: DatasetSourceRoot,
+    #[serde(with = "DatasetVocabularyDef")]
     pub dataset_vocab: DatasetVocabulary,
     pub checkpoints_dir: PathBuf,
     pub data_dir: PathBuf,
@@ -38,16 +41,20 @@ pub struct IngestRequest {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IngestResponse {
+    #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
 }
 
 #[skip_serializing_none]
+#[serde_as]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecuteQueryRequest {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
+    #[serde(with = "DatasetSourceDerivativeDef")]
     pub source: DatasetSourceDerivative,
+    #[serde_as(as = "BTreeMap<_, DatasetVocabularyDef>")]
     pub dataset_vocabs: BTreeMap<DatasetIDBuf, DatasetVocabulary>,
     pub input_slices: BTreeMap<DatasetIDBuf, InputDataSlice>,
     pub data_dirs: BTreeMap<DatasetIDBuf, PathBuf>,
@@ -58,6 +65,7 @@ pub struct ExecuteQueryRequest {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecuteQueryResponse {
+    #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
     pub data_file_name: Option<String>,
 }

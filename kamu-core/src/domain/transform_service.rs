@@ -1,5 +1,5 @@
 use super::EngineError;
-use crate::domain::{DatasetID, DatasetIDBuf};
+use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
 
 use std::backtrace::Backtrace;
 use std::sync::{Arc, Mutex};
@@ -26,7 +26,7 @@ pub trait TransformService {
 #[derive(Debug)]
 pub enum TransformResult {
     UpToDate,
-    Updated { block_hash: String },
+    Updated { block_hash: Sha3_256 },
 }
 
 ///////////////////////////////////////////////////////////////////////////////

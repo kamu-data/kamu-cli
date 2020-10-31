@@ -1,6 +1,6 @@
 use super::{Command, Error};
 use kamu::domain::*;
-use kamu::infra::serde::yaml::*;
+use opendatafabric::*;
 
 use console::style;
 use std::cell::RefCell;

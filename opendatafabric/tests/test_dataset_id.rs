@@ -1,4 +1,5 @@
-use kamu::domain::{DatasetID, DatasetIDBuf};
+use opendatafabric::*;
+
 use std::convert::TryFrom;
 
 #[test]

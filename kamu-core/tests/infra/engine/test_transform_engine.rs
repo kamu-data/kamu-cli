@@ -1,8 +1,8 @@
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::infra::serde::yaml::*;
 use kamu::infra::*;
 use kamu_test::*;
+use opendatafabric::*;
 
 use parquet::{
     file::reader::{FileReader, SerializedFileReader},

@@ -8,7 +8,7 @@ use std::path;
 use std::rc::Rc;
 
 pub struct CompleteCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
     app: clap::App<'static, 'static>,
     input: String,
     current: usize,
@@ -18,7 +18,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
         app: clap::App<'static, 'static>,
         input: String,
         current: usize,
@@ -32,9 +32,11 @@ impl CompleteCommand {
     }
 
     fn complete_dataset(&self, prefix: &str) {
-        for dataset_id in self.metadata_repo.borrow().get_all_datasets() {
-            if dataset_id.starts_with(prefix) {
-                println!("{}", dataset_id);
+        if let Some(repo) = self.metadata_repo.as_ref() {
+            for dataset_id in repo.borrow().get_all_datasets() {
+                if dataset_id.starts_with(prefix) {
+                    println!("{}", dataset_id);
+                }
             }
         }
     }

@@ -1,6 +1,7 @@
 use super::ingest::*;
 use crate::domain::*;
 use crate::infra::*;
+use opendatafabric::*;
 
 use slog::{info, o, Logger};
 use std::cell::RefCell;

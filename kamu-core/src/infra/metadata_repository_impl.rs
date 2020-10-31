@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::*;
-use crate::infra::serde::yaml::*;
+use opendatafabric::*;
 
 use chrono::Utc;
 use std::collections::HashSet;
@@ -110,8 +110,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
         };
 
         let first_block = MetadataBlock {
-            block_hash: "".to_owned(),
-            prev_block_hash: "".to_owned(),
+            block_hash: Sha3_256::zero(),
+            prev_block_hash: None,
             system_time: Utc::now(),
             source: Some(snapshot.source),
             output_slice: None,

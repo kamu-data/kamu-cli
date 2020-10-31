@@ -1,6 +1,7 @@
 use kamu::domain::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
+use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use std::cell::RefCell;
@@ -66,7 +67,10 @@ impl PullService for TestPullService {
 
         sleep(1000);
 
-        let hash = "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a";
+        let hash =
+            Sha3_256::from_str("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a")
+                .unwrap();
+
         let result = IngestResult::Updated {
             block_hash: hash.to_owned(),
             has_more: false,

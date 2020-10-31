@@ -1,12 +1,13 @@
 use super::*;
 use crate::domain::*;
-use crate::infra::serde::yaml::formats::datetime_rfc3339;
-use crate::infra::serde::yaml::*;
 use crate::infra::*;
+use opendatafabric::serde::yaml::formats::datetime_rfc3339;
+use opendatafabric::serde::yaml::generated::MetadataBlockDef;
+use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
+use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use serde_with::skip_serializing_none;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -66,5 +67,6 @@ pub struct ReadCheckpoint {
     pub last_read: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_prepared_at: DateTime<Utc>,
+    #[serde(with = "MetadataBlockDef")]
     pub last_block: MetadataBlock,
 }

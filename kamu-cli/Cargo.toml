@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.31.0"
+version = "0.32.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"
@@ -13,6 +13,7 @@ categories = ["command-line-utilities"]
 
 
 [dependencies]
+opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 
 # UI

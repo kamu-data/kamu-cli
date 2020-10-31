@@ -1,18 +1,9 @@
-use super::dtos_odf::DatasetVocabulary;
-use super::formats::datetime_rfc3339_opt;
-use crate::domain::*;
 use chrono::{DateTime, Utc};
+use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
+use opendatafabric::serde::yaml::generated::DatasetVocabularyDef;
+use opendatafabric::{DatasetIDBuf, DatasetVocabulary};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-
-#[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Manifest<T> {
-    pub api_version: i32,
-    pub kind: String,
-    pub content: T,
-}
 
 #[skip_serializing_none]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -34,14 +25,6 @@ pub struct DatasetSummary {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
+    #[serde(with = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
-}
-
-impl Default for DatasetVocabulary {
-    fn default() -> Self {
-        Self {
-            system_time_column: None,
-            event_time_column: None,
-        }
-    }
 }

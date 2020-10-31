@@ -1,10 +1,10 @@
 #![feature(backtrace)]
 
-use kamu::domain::*;
 use kamu::infra::*;
 use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
 use kamu_cli::output::*;
+use opendatafabric::DatasetIDBuf;
 
 use clap::value_t_or_exit;
 use console::style;
@@ -67,7 +67,11 @@ fn main() {
             submatches.is_present("recursive"),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
-            metadata_repo.clone(),
+            if in_workspace(&workspace_layout) {
+                Some(metadata_repo.clone())
+            } else {
+                None
+            },
             cli_parser::cli(BINARY_NAME, VERSION),
             submatches.value_of("input").unwrap().into(),
             submatches.value_of("current").unwrap().parse().unwrap(),
@@ -151,7 +155,7 @@ fn main() {
         _ => unimplemented!(),
     };
 
-    let result = if command.needs_workspace() && !workspace_layout.kamu_root_dir.is_dir() {
+    let result = if command.needs_workspace() && !in_workspace(&workspace_layout) {
         Err(Error::NotInWorkspace)
     } else {
         command.run()
@@ -184,6 +188,10 @@ fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
     } else {
         None
     }
+}
+
+fn in_workspace(workspace_layout: &WorkspaceLayout) -> bool {
+    workspace_layout.kamu_root_dir.is_dir()
 }
 
 fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceLayout) -> Logger {
@@ -226,7 +234,7 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
 }
 
 fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
-    let is_tty = console::Term::stdout().is_term();
+    let is_tty = console::Term::stdout().features().is_attended();
 
     let verbosity_level = matches.occurrences_of("v") as u8;
     if verbosity_level > 0 {

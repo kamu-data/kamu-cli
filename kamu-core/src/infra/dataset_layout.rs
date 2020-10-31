@@ -1,5 +1,5 @@
 use super::VolumeLayout;
-use crate::domain::DatasetID;
+use opendatafabric::DatasetID;
 use std::path::PathBuf;
 
 /// Describes the layout of the dataset on disk

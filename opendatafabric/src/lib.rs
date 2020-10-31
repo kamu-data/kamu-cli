@@ -12,12 +12,11 @@ pub use time_interval::*;
 mod sha;
 pub use sha::*;
 
-mod manifest;
-pub use manifest::*;
-
 mod dtos;
 pub use dtos::*;
 
 pub mod dynamic;
 
 pub mod serde;
+
+mod defaults;

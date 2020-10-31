@@ -4,6 +4,8 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::ops;
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Sha3_256([u8; 32]);
 
@@ -18,6 +20,12 @@ impl Sha3_256 {
         Self([0; Self::LENGTH])
     }
 
+    pub fn from_str(s: &str) -> Result<Self, hex::FromHexError> {
+        let mut slice: [u8; 32] = [0; 32];
+        hex::decode_to_slice(s, &mut slice)?;
+        Ok(Self(slice))
+    }
+
     pub fn is_zero(&self) -> bool {
         for b in &self.0 {
             if *b != 0 {
@@ -30,7 +38,17 @@ impl Sha3_256 {
     pub fn as_array(&self) -> &[u8; 32] {
         &self.0
     }
+
+    pub fn to_string(&self) -> String {
+        hex::encode(&self.0)
+    }
+
+    pub fn short(&self) -> Sha3_256Short {
+        Sha3_256Short(self, 8)
+    }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 impl ops::Deref for Sha3_256 {
     type Target = [u8];
@@ -44,9 +62,7 @@ impl TryFrom<&str> for Sha3_256 {
     type Error = hex::FromHexError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut slice: [u8; 32] = [0; 32];
-        hex::decode_to_slice(value, &mut slice)?;
-        Ok(Sha3_256(slice))
+        Self::from_str(value)
     }
 }
 
@@ -89,5 +105,17 @@ impl<'de> Visitor<'de> for Sha3_256Visitor {
 impl<'de> Deserialize<'de> for Sha3_256 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_str(Sha3_256Visitor)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy)]
+pub struct Sha3_256Short<'a>(&'a Sha3_256, usize);
+
+impl fmt::Display for Sha3_256Short<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = hex::encode(&self.0.as_array()[..self.1 / 2]);
+        write!(f, "{}", s)
     }
 }

@@ -2,8 +2,8 @@ use crate::utils::{FtpServer, HttpServer};
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra::ingest::*;
-use kamu::infra::serde::yaml::*;
 use kamu_test::*;
+use opendatafabric::*;
 
 use chrono::prelude::*;
 use chrono::Utc;

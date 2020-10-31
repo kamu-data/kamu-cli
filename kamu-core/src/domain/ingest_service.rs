@@ -1,5 +1,5 @@
 use super::EngineError;
-use crate::domain::{DatasetID, DatasetIDBuf};
+use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
 
 use std::backtrace::Backtrace;
 use std::path::Path;
@@ -47,7 +47,10 @@ impl Default for IngestOptions {
 #[derive(Debug)]
 pub enum IngestResult {
     UpToDate,
-    Updated { block_hash: String, has_more: bool },
+    Updated {
+        block_hash: Sha3_256,
+        has_more: bool,
+    },
 }
 
 ///////////////////////////////////////////////////////////////////////////////

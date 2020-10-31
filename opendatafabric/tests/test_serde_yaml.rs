@@ -170,15 +170,15 @@ fn serde_metadata_block() {
         content:
           blockHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-          systemTime: \"2020-01-01T12:00:00.000Z\"
+          systemTime: \"2020-01-01T12:00:00Z\"
           outputSlice:
             hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-            interval: \"[2020-01-01T12:00:00.000Z, 2020-01-01T12:00:00.000Z]\"
+            interval: \"[2020-01-01T12:00:00Z, 2020-01-01T12:00:00Z]\"
             numRecords: 10
-          outputWatermark: \"2020-01-01T12:00:00.000Z\"
+          outputWatermark: \"2020-01-01T12:00:00Z\"
           inputSlices:
             - hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-              interval: \"(-inf, 2020-01-01T12:00:00.000Z]\"
+              interval: \"(-inf, 2020-01-01T12:00:00Z]\"
               numRecords: 10
             - hash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
               interval: ()
@@ -247,24 +247,24 @@ fn serde_metadata_block() {
 }
 
 #[test]
-fn ser_metadata_block_hashes() {
+fn serde_metadata_block_hashes() {
     let expected = indoc!(
         "
         ---
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: efd99d69eba17c25d16bd58f296786f26234f63404a098339e646204cc9e1eeb
+          blockHash: decbb0476956d47e98ad2c30698d6282490ea6ee19f99139b2b6396a3589da9f
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-          systemTime: \"2020-01-01T12:00:00.000Z\"
+          systemTime: \"2020-01-01T12:00:00.123456789Z\"
           outputSlice:
             hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-            interval: \"[2020-01-01T12:00:00.000Z, 2020-01-01T12:00:00.000Z]\"
+            interval: \"[2020-01-01T12:00:00Z, 2020-01-01T12:00:00Z]\"
             numRecords: 10
-          outputWatermark: \"2020-01-01T12:00:00.000Z\"
+          outputWatermark: \"2020-01-01T12:00:00Z\"
           inputSlices:
             - hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-              interval: \"(-inf, 2020-01-01T12:00:00.000Z]\"
+              interval: \"(-inf, 2020-01-01T12:00:00Z]\"
               numRecords: 10
             - hash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
               interval: ()
@@ -283,7 +283,7 @@ fn ser_metadata_block_hashes() {
     let block = MetadataBlock {
         block_hash: Sha3_256::new([0; 32]),
         prev_block_hash: Some(Sha3_256::new([0x0b; 32])),
-        system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
+        system_time: Utc.ymd(2020, 1, 1).and_hms_nano(12, 0, 0, 123456789),
         source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
             inputs: vec![
                 DatasetIDBuf::try_from("input1").unwrap(),
@@ -321,6 +321,17 @@ fn ser_metadata_block_hashes() {
 
     let (_, actual) = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
     assert_eq!(expected, std::str::from_utf8(&actual).unwrap());
+
+    let actual_block = YamlMetadataBlockDeserializer
+        .read_manifest(&actual)
+        .unwrap();
+    assert_eq!(
+        block,
+        MetadataBlock {
+            block_hash: Sha3_256::zero(),
+            ..actual_block
+        }
+    );
 }
 
 #[test]
