@@ -20,7 +20,6 @@ impl Command for PullImagesCommand {
 
         let images = [
             docker_images::SPARK,
-            docker_images::SPARK_V3,
             docker_images::FLINK,
             docker_images::JUPYTER,
         ];

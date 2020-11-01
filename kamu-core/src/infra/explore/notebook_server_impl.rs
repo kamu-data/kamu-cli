@@ -44,6 +44,7 @@ impl NotebookServerImpl {
                 hostname: Some("kamu-livy".to_owned()),
                 network: Some(network_name.to_owned()),
                 args: vec!["livy".to_owned()],
+                user: Some("root".to_owned()),
                 volume_map: if volume_layout.data_dir.exists() {
                     vec![(
                         volume_layout.data_dir.clone(),

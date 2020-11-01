@@ -42,7 +42,7 @@ impl SqlShellImpl {
         signal_hook::flag::register(signal_hook::SIGTERM, exit.clone())?;
 
         let mut cmd = docker_client.run_cmd(DockerRunArgs {
-            image: docker_images::SPARK_V3.to_owned(),
+            image: docker_images::SPARK.to_owned(),
             container_name: Some("kamu-spark".to_owned()),
             user: Some("root".to_owned()),
             expose_ports: vec![8080, 10000],
@@ -50,17 +50,18 @@ impl SqlShellImpl {
                 vec![
                     (
                         volume_layout.data_dir.clone(),
-                        PathBuf::from("/opt/bitnami/spark/kamu_data"),
+                        PathBuf::from("/opt/spark/kamu_data"),
                     ),
-                    (cwd, PathBuf::from("/opt/bitnami/spark/kamu_shell")),
+                    (cwd, PathBuf::from("/opt/spark/kamu_shell")),
                     (
                         init_script_path,
-                        PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
+                        PathBuf::from("/opt/spark/shell_init.sql"),
                     ),
                 ]
             } else {
                 vec![]
             },
+            args: vec![String::from("sleep"), String::from("999999")],
             ..DockerRunArgs::default()
         });
 
@@ -86,10 +87,11 @@ impl SqlShellImpl {
                     ExecArgs {
                         tty: false,
                         interactive: false,
+                        work_dir: Some(PathBuf::from("/opt/spark")),
                         ..ExecArgs::default()
                     },
                     "kamu-spark",
-                    &["sbin/start-thriftserver.sh && cp conf/log4j.properties.template conf/log4j.properties"],
+                    &["sbin/start-thriftserver.sh"],
                 )
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
@@ -112,7 +114,7 @@ impl SqlShellImpl {
                     ExecArgs {
                         tty: true,
                         interactive: true,
-                        work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
+                        work_dir: Some(PathBuf::from("/opt/spark/kamu_shell")),
                     },
                     "kamu-spark",
                     &[

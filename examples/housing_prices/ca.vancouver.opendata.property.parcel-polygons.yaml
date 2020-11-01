@@ -6,21 +6,22 @@ content:
     kind: root
     fetch:
       kind: url
-      url: ftp://webftp.vancouver.ca/OpenData/shape/shape_property_information.zip
+      url: https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/download/?format=geojson&timezone=America/Los_Angeles&lang=en
+    prepare:
+    # Transforms the single object GeoJson with "FeatureCollection" at the root
+    # into file with one "Feature" object per line
+    # as expected by Apache Sedona.
+    # In future this will not be required.
+    - kind: pipe
+      # Apache Sedona is unfortunately very sensitive to number of keys in "properties"
+      # so we have to ensure that all objects have the same set of properties with
+      # null values if needed.
+      command:
+      - 'jq'
+      - '-c'
+      - '.features[] | {type: .type, geometry: .geometry, properties: {tax_coord: .properties.tax_coord, civic_number: .properties.civic_number, site_id: .properties.site_id, street_name: .properties.streetname}}'
     read:
-      kind: esriShapefile
-      subPath: property_parcel_polygons.*
-    preprocess:
-      kind: sql
-      engine: spark
-      query: >
-        SELECT
-          ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry,
-          CAST(SITE_ID as LONG) as SITE_ID,
-          CAST(CIVIC_NO as LONG) as CIVIC_NO,
-          CAST(TAX_COORD as LONG) as TAX_COORD,
-          STREETNAME
-        FROM input
+      kind: geoJson
     merge:
       # TODO
       kind: append

@@ -6,18 +6,19 @@ content:
     kind: root
     fetch:
       kind: url
-      url: ftp://webftp.vancouver.ca/OpenData/shape/local_area_boundary_shp.zip
+      url: https://opendata.vancouver.ca/explore/dataset/local-area-boundary/download/?format=geojson&timezone=America/Los_Angeles&lang=en
+    # Transforms the single object GeoJson with "FeatureCollection" at the root
+    # into file with one "Feature" object per line
+    # as expected by Apache Sedona.
+    # In future this will not be required.
+    prepare:
+    - kind: pipe
+      command:
+      - 'jq'
+      - '-c'
+      - '.features[]'
     read:
-      kind: esriShapefile
-    preprocess:
-      kind: sql
-      engine: spark
-      query: >
-        SELECT
-          ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry,
-          MAPID,
-          NAME
-        FROM input
+      kind: geoJson
     merge:
       # TODO
       kind: append

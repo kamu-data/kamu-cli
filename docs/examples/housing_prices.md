@@ -35,9 +35,9 @@ We will be using following root datasets:
 - `ca.vancouver.opendata.property.block-outlines` - contains geographical block outlines
 - `ca.vancouver.opendata.property.local-area-boundaries` - contains outlines and names of Vancouver's districts
 
-If you take a look at the definitions of these datasets you will notice that `parcel-polygons` is loaded using the special `esriShapefile` reader that loads GIS data from the proprietary [ESRI Shapefile](https://en.wikipedia.org/wiki/Shapefile) format which is very widespread in GIS world.
+For geospatial data `kamu` supports several input formats including [ESRI Shapefile](https://en.wikipedia.org/wiki/Shapefile) and [GeoJson](https://geojson.org/). Take a look at dataset definitions to understand how data is being ingested.
 
-We also use a custom preprocessing step to convert GIS data into a different, more commonly used projection which is expected by our visualization tools:
+Quite often when ingesting GIS data you will need to deal with different projections. Example below shows how you can use a pre-processing step to convert data into another projection:
 
 ```yaml
 preprocess:
@@ -48,6 +48,8 @@ preprocess:
       ST_Transform(geometry, "epsg:3157", "epsg:4326") as geometry
     FROM input
 ```
+
+> Note: [epsg:4326](https://epsg.io/4326) is one of the more commonly used projections which is expected by many visualization tools.
 
 The `ST_Transform` function here comes from [Apache Sedona](http://sedona.apache.org/) extension for the Apache Spark engine for working with GIS data. We will be relying on many of its function throughout this example.
 
