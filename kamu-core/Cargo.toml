@@ -12,6 +12,7 @@ opendatafabric = { path = "../opendatafabric" }
 
 # Domain
 chrono = { version = "*", features = ["serde"] }
+url = { version = "*", features = ["serde"] }
 
 # Serialization
 hex = "*"
@@ -20,7 +21,6 @@ serde_with = "*"
 serde_yaml = "*"
 
 # Ingest
-url = "*"
 flate2 = "*"  # GZip decoder
 fs_extra = "*"  # Copy files with progress, get directory sizes
 curl = { version = "*", features = ["http2", "protocol-ftp", "static-curl", "static-ssl"] }  # TODO: reconsider static linking

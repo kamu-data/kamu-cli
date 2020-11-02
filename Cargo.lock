@@ -706,6 +706,7 @@ dependencies = [
  "slog-term",
  "tempfile",
  "thiserror",
+ "url",
  "webbrowser",
 ]
 
@@ -1605,6 +1606,7 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

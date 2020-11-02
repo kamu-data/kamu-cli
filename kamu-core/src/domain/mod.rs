@@ -20,6 +20,9 @@ pub use metadata_repository::*;
 mod pull_service;
 pub use pull_service::*;
 
+mod remote;
+pub use remote::*;
+
 mod resource_loader;
 pub use resource_loader::*;
 

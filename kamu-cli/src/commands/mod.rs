@@ -36,6 +36,15 @@ pub use pull_command::*;
 mod pull_images_command;
 pub use pull_images_command::*;
 
+mod remote_add_command;
+pub use remote_add_command::*;
+
+mod remote_delete_command;
+pub use remote_delete_command::*;
+
+mod remote_list_command;
+pub use remote_list_command::*;
+
 mod set_watermark_command;
 pub use set_watermark_command::*;
 

@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::path::PathBuf;
+use url::Url;
 
 pub struct MetadataRepositoryImpl {
     workspace_layout: WorkspaceLayout,
@@ -19,9 +20,10 @@ impl MetadataRepositoryImpl {
         }
     }
 
-    fn get_all_datasets_impl(&self) -> Result<ListDatasetsIter, std::io::Error> {
+    fn get_all_datasets_impl(&self) -> Result<impl Iterator<Item = DatasetIDBuf>, std::io::Error> {
         let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir)?;
-        Ok(ListDatasetsIter { rd: read_dir })
+        let it = read_dir.map(|i| DatasetIDBuf::try_from(&i.unwrap().file_name()).unwrap());
+        Ok(it)
     }
 
     fn dataset_exists(&self, id: &DatasetID) -> bool {
@@ -261,33 +263,84 @@ impl MetadataRepository for MetadataRepositoryImpl {
             .join(dataset_id)
             .join("summary");
 
-        let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
-
         let manifest = Manifest {
             api_version: 1,
             kind: "DatasetSummary".to_owned(),
             content: summary,
         };
 
+        let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
         serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
         Ok(())
     }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-// Used by get_all_datasets
-///////////////////////////////////////////////////////////////////////////////
+    fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
+        let read_dir = std::fs::read_dir(&self.workspace_layout.remotes_dir).unwrap();
+        Box::new(read_dir.map(|i| i.unwrap().file_name().into_string().unwrap()))
+    }
 
-struct ListDatasetsIter {
-    rd: std::fs::ReadDir,
-}
+    fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError> {
+        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
 
-impl Iterator for ListDatasetsIter {
-    type Item = DatasetIDBuf;
-    fn next(&mut self) -> Option<Self::Item> {
-        let res = self.rd.next()?;
-        let path = res.unwrap();
-        let name = path.file_name();
-        Some(DatasetIDBuf::try_from(&name).unwrap())
+        if !file_path.exists() {
+            return Err(DomainError::does_not_exist(
+                ResourceKind::Remote,
+                remote_id.to_string(),
+            ));
+        }
+
+        let file = std::fs::File::open(&file_path).unwrap_or_else(|e| {
+            panic!(
+                "Failed to open the Remote file at {}: {}",
+                file_path.display(),
+                e
+            )
+        });
+
+        let manifest: Manifest<Remote> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+            panic!(
+                "Failed to deserialize the Remote at {}: {}",
+                file_path.display(),
+                e
+            )
+        });
+
+        assert_eq!(manifest.kind, "Remote");
+        Ok(manifest.content)
+    }
+
+    fn add_remote(&mut self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError> {
+        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
+
+        if file_path.exists() {
+            return Err(DomainError::already_exists(
+                ResourceKind::Remote,
+                remote_id.to_string(),
+            ));
+        }
+
+        let manifest = Manifest {
+            api_version: 1,
+            kind: "Remote".to_owned(),
+            content: Remote { url: url },
+        };
+
+        let file = std::fs::File::create(&file_path).map_err(|e| InfraError::from(e).into())?;
+        serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
+        Ok(())
+    }
+
+    fn delete_remote(&mut self, remote_id: &RemoteID) -> Result<(), DomainError> {
+        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
+
+        if !file_path.exists() {
+            return Err(DomainError::does_not_exist(
+                ResourceKind::Remote,
+                remote_id.to_string(),
+            ));
+        }
+
+        std::fs::remove_file(&file_path).map_err(|e| InfraError::from(e).into())?;
+        Ok(())
     }
 }

@@ -38,6 +38,7 @@ slog-async = "*"
 slog-term = "*"
 tempfile = "*"
 thiserror = "*"  # Structured error derivations
+url = "*"
 
 # TODO: Move to core
 parquet = { git = "https://github.com/apache/arrow" }

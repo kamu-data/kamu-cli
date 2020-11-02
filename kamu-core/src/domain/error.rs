@@ -6,6 +6,7 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 #[derive(Debug)]
 pub enum ResourceKind {
     Dataset,
+    Remote,
 }
 
 #[derive(Error, Debug)]

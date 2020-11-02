@@ -95,7 +95,7 @@ fn main() {
             }
         }
         ("list", Some(submatches)) => match submatches.subcommand() {
-            ("", None) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
+            ("", _) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
             ("depgraph", _) => Box::new(DepgraphCommand::new(metadata_repo.clone())),
             _ => unimplemented!(),
         },
@@ -138,6 +138,24 @@ fn main() {
                 ))
             }
         }
+        ("remote", Some(remote_matches)) => match remote_matches.subcommand() {
+            ("add", Some(add_matches)) => Box::new(RemoteAddCommand::new(
+                metadata_repo.clone(),
+                add_matches.value_of("name").unwrap(),
+                add_matches.value_of("url").unwrap(),
+            )),
+            ("delete", Some(delete_matches)) => Box::new(RemoteDeleteCommand::new(
+                metadata_repo.clone(),
+                delete_matches.values_of("remote").unwrap_or_default(),
+                delete_matches.is_present("all"),
+                delete_matches.is_present("yes"),
+            )),
+            ("list", _) => Box::new(RemoteListCommand::new(
+                metadata_repo.clone(),
+                &output_format,
+            )),
+            _ => unimplemented!(),
+        },
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new(
                 &workspace_layout,

@@ -82,19 +82,17 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
         .subcommands(vec![
             SubCommand::with_name("add")
                 .about("Add a new dataset or modify an existing one")
-                .arg(
+                .args(&[
                     Arg::with_name("recursive")
                         .short("r")
                         .long("recursive")
                         .help("Recursively search for all snapshots in the specified directory"),
-                )
-                .arg(
                     Arg::with_name("snapshot")
                         .multiple(true)
                         .required(true)
                         .index(1)
                         .help("Dataset snapshot reference(s) (path, URL, or remote)"),
-                ),
+                ]),
             SubCommand::with_name("complete")
                 .about("Completes a command in the shell")
                 .setting(AppSettings::Hidden)
@@ -131,30 +129,24 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ),
             SubCommand::with_name("delete")
                 .about("Delete a dataset")
-                .arg(
+                .args(&[
                     Arg::with_name("all")
                         .short("a")
                         .long("all")
                         .help("Delete all datasets in the workspace"),
-                )
-                .arg(
                     Arg::with_name("recursive")
                         .short("r")
                         .long("recursive")
                         .help("Also delete all transitive dependencies of specified datasets"),
-                )
-                .arg(
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
                         .help("Dataset ID(s)"),
-                )
-                .arg(
                     Arg::with_name("yes")
                         .short("y")
                         .long("yes")
                         .help("Don't ask for confirmation"),
-                ),
+                ]),
             SubCommand::with_name("init")
                 .about("Initialize an empty workspace in the current directory")
                 .arg(
@@ -188,22 +180,18 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ),
             SubCommand::with_name("new")
                 .about("Creates a new dataset manifest")
-                .arg(
+                .args(&[
                     Arg::with_name("root")
                         .long("root")
-                        .help("Create a root dataset")
-                )
-                .arg(
+                        .help("Create a root dataset"),
                     Arg::with_name("derivative")
                         .long("derivative")
                         .help("Create a derivative dataset"),
-                )
-                .arg(
                     Arg::with_name("id")
                         .required(true)
                         .index(1)
                         .help("ID of the new dataset"),
-                ),
+                ]),
             SubCommand::with_name("notebook")
                 .about("Starts the notebook server for exploring the data in the workspace")
                 .after_help(indoc::indoc!(
@@ -251,64 +239,89 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ]),
             SubCommand::with_name("reset")
                 .about("Revert the dataset back to the specified state")
-                .arg(
+                .args(&[
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
-                        .help("ID of the dataset")
-                )
-                .arg(
+                        .help("ID of the dataset"),
                     Arg::with_name("hash")
                         .required(true)
                         .index(2)
-                        .help("Hash of the block to reset to")
-                )
-                .arg(
+                        .help("Hash of the block to reset to"),
                     Arg::with_name("yes")
                         .short("y")
                         .long("yes")
-                        .help("Don't ask for confirmation")
-                ),
+                        .help("Don't ask for confirmation"),
+                ]),
+            SubCommand::with_name("remote")
+                .about("Manage set of tracked repositories")
+                .subcommands(vec![
+                    SubCommand::with_name("add")
+                        .about("Adds a remote repository")
+                        .args(&[
+                            Arg::with_name("name")
+                                .required(true)
+                                .index(1)
+                                .help("Local alias of the remote repository"),
+                            Arg::with_name("url")
+                                .required(true)
+                                .index(2)
+                                .help("URL of the remote repository"),
+                        ]),
+                    SubCommand::with_name("delete")
+                        .about("Deletes a reference to remote repository")
+                        .args(&[
+                            Arg::with_name("all")
+                                .short("a")
+                                .long("all")
+                                .help("Delete all known remotes"),
+                            Arg::with_name("remote")
+                                .multiple(true)
+                                .index(1)
+                                .help("Remote name(s)"),
+                            Arg::with_name("yes")
+                                .short("y")
+                                .long("yes")
+                                .help("Don't ask for confirmation"),
+                        ]),
+                    tabular_output_params(SubCommand::with_name("list")
+                        .about("Lists known remote repositories")
+                    ),
+                ]),
             tabular_output_params(SubCommand::with_name("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
                     SubCommand::with_name("server")
                         .about("Run JDBC server only")
-                        .arg(
+                        .args(&[
                             Arg::with_name("address")
                                 .long("address")
                                 .default_value("127.0.0.1")
                                 .help("Expose JDBC server on specific network interface"),
-                        )
-                        .arg(
                             Arg::with_name("port")
                                 .long("port")
                                 .default_value("8080")
                                 .help("Expose JDBC server on specific port"),
-                        ),
+                        ]),
                 )
-                .arg(
+                .args(&[
                     Arg::with_name("url")
                         .long("url")
                         .takes_value(true)
                         .value_name("URL")
                         .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10090)"),
-                )
-                .arg(
                     Arg::with_name("command")
                         .short("c")
                         .long("command")
                         .takes_value(true)
                         .value_name("CMD")
                         .help("SQL command to run"),
-                )
-                .arg(
                     Arg::with_name("script")
                         .long("script")
                         .takes_value(true)
                         .value_name("FILE")
                         .help("SQL script file to execute"),
-                )
+                ])
             ),
         ])
 }

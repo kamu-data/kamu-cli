@@ -8,14 +8,28 @@ pub mod utils;
 mod error;
 pub use error::*;
 
+///////////////////////////////////////////////////////////////////////////////
+// Manifests
+///////////////////////////////////////////////////////////////////////////////
+
+mod manifest;
+pub use manifest::*;
+
 mod dataset_layout;
 pub use dataset_layout::*;
 
 mod dataset_summary;
 pub use dataset_summary::*;
 
-mod manifest;
-pub use manifest::*;
+mod volume_layout;
+pub use volume_layout::*;
+
+mod workspace_layout;
+pub use workspace_layout::*;
+
+///////////////////////////////////////////////////////////////////////////////
+// Services
+///////////////////////////////////////////////////////////////////////////////
 
 mod ingest_service_impl;
 pub use ingest_service_impl::*;
@@ -34,9 +48,3 @@ pub use resource_loader_impl::*;
 
 mod transform_service_impl;
 pub use transform_service_impl::*;
-
-mod volume_layout;
-pub use volume_layout::*;
-
-mod workspace_layout;
-pub use workspace_layout::*;

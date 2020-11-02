@@ -41,6 +41,16 @@ impl CompleteCommand {
         }
     }
 
+    fn complete_remote(&self, prefix: &str) {
+        if let Some(repo) = self.metadata_repo.as_ref() {
+            for remote_id in repo.borrow().get_all_remotes() {
+                if remote_id.starts_with(prefix) {
+                    println!("{}", remote_id);
+                }
+            }
+        }
+    }
+
     fn complete_path(&self, prefix: &str) {
         let path = path::Path::new(prefix);
         let mut matched_dirs = 0;
@@ -118,6 +128,7 @@ impl Command for CompleteCommand {
         for pos in last_cmd.positionals.iter() {
             match pos.1.b.name {
                 "dataset" => self.complete_dataset(to_complete),
+                "remote" => self.complete_remote(to_complete),
                 "snapshot" => self.complete_path(to_complete),
                 _ => (),
             }
