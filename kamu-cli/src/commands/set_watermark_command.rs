@@ -64,6 +64,10 @@ impl Command for SetWatermarkCommand {
             .borrow_mut()
             .set_watermark(dataset_id, watermark.into())
         {
+            Ok(PullResult::UpToDate) => {
+                eprintln!("{}", console::style("Watermark was up-to-date").yellow());
+                Ok(())
+            }
             Ok(PullResult::Updated { block_hash }) => {
                 eprintln!(
                     "{}",
@@ -71,7 +75,6 @@ impl Command for SetWatermarkCommand {
                 );
                 Ok(())
             }
-            Ok(_) => panic!("Unexpected result"),
             Err(e) => Err(DomainError::InfraError(e.into()).into()),
         }
     }

@@ -192,6 +192,16 @@ impl PullService for PullServiceImpl {
             .borrow_mut()
             .get_metadata_chain(dataset_id)?;
 
+        if let Some(last_watermark) = chain
+            .iter_blocks()
+            .filter_map(|b| b.output_watermark)
+            .next()
+        {
+            if last_watermark >= watermark {
+                return Ok(PullResult::UpToDate);
+            }
+        }
+
         let last_hash = chain.read_ref(&BlockRef::Head);
 
         let new_block = MetadataBlock {

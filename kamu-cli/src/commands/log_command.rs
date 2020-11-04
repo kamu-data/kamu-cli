@@ -2,6 +2,7 @@ use super::{Command, Error};
 use kamu::domain::*;
 use opendatafabric::*;
 
+use chrono::prelude::*;
 use console::style;
 use std::cell::RefCell;
 use std::fmt::Display;
@@ -36,7 +37,10 @@ impl LogCommand {
         }
 
         if let Some(ref wm) = block.output_watermark {
-            self.render_property("Output.Watermark", &wm);
+            self.render_property(
+                "Output.Watermark",
+                &wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+            );
         }
 
         if let Some(ref slices) = block.input_slices {

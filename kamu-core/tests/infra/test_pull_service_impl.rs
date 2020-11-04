@@ -3,6 +3,7 @@ use kamu::infra::*;
 use kamu_test::*;
 use opendatafabric::*;
 
+use chrono::prelude::*;
 use itertools::Itertools;
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -96,6 +97,61 @@ fn test_pull_batching() {
         test_transform_svc.borrow().calls,
         vec![vec![id("c"), id("d")], vec![id("e")]]
     );
+}
+
+#[test]
+fn test_set_watermark() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(
+        &WorkspaceLayout::create(tmp_dir.path()).unwrap(),
+    )));
+    let test_ingest_svc = Rc::new(RefCell::new(TestIngestService::new()));
+    let test_transform_svc = Rc::new(RefCell::new(TestTransformService::new()));
+    let mut pull_svc = PullServiceImpl::new(
+        repo.clone(),
+        test_ingest_svc.clone(),
+        test_transform_svc.clone(),
+        slog::Logger::root(slog::Discard, slog::o!()),
+    );
+
+    let dataset_id = DatasetIDBuf::try_from("foo").unwrap();
+
+    repo.borrow_mut()
+        .add_dataset(MetadataFactory::dataset_snapshot().id(&dataset_id).build())
+        .unwrap();
+
+    let num_blocks = || {
+        repo.borrow()
+            .get_metadata_chain(&dataset_id)
+            .unwrap()
+            .iter_blocks()
+            .count()
+    };
+    assert_eq!(num_blocks(), 1);
+
+    assert!(matches!(
+        pull_svc.set_watermark(&dataset_id, Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)),
+        Ok(PullResult::Updated { .. })
+    ));
+    assert_eq!(num_blocks(), 2);
+
+    assert!(matches!(
+        pull_svc.set_watermark(&dataset_id, Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)),
+        Ok(PullResult::Updated { .. })
+    ));
+    assert_eq!(num_blocks(), 3);
+
+    assert!(matches!(
+        pull_svc.set_watermark(&dataset_id, Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)),
+        Ok(PullResult::UpToDate)
+    ));
+    assert_eq!(num_blocks(), 3);
+
+    assert!(matches!(
+        pull_svc.set_watermark(&dataset_id, Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)),
+        Ok(PullResult::UpToDate)
+    ));
+    assert_eq!(num_blocks(), 3);
 }
 
 pub struct TestIngestService {
