@@ -58,6 +58,13 @@ fn main() {
         transform_svc.clone(),
         logger.new(o!()),
     )));
+    let remote_factory = Arc::new(Mutex::new(RemoteFactory::new(logger.new(o!()))));
+    let sync_svc = Rc::new(RefCell::new(SyncServiceImpl::new(
+        workspace_layout.clone(),
+        metadata_repo.clone(),
+        remote_factory.clone(),
+        logger.new(o!()),
+    )));
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
@@ -127,6 +134,13 @@ fn main() {
                     submatches.is_present("recursive"),
                     submatches.value_of("set-watermark").unwrap(),
                 ))
+            } else if submatches.is_present("remote") {
+                Box::new(SyncFromCommand::new(
+                    sync_svc.clone(),
+                    submatches.values_of("dataset").unwrap_or_default(),
+                    submatches.value_of("remote"),
+                    &output_format,
+                ))
             } else {
                 Box::new(PullCommand::new(
                     pull_svc.clone(),
@@ -138,6 +152,12 @@ fn main() {
                 ))
             }
         }
+        ("push", Some(push_matches)) => Box::new(PushCommand::new(
+            sync_svc.clone(),
+            push_matches.values_of("dataset").unwrap_or_default(),
+            push_matches.value_of("remote"),
+            &output_format,
+        )),
         ("remote", Some(remote_matches)) => match remote_matches.subcommand() {
             ("add", Some(add_matches)) => Box::new(RemoteAddCommand::new(
                 metadata_repo.clone(),

@@ -84,7 +84,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Box::new(self.get_all_datasets_impl().unwrap())
     }
 
-    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError> {
+    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
         let dataset_metadata_dir = self.get_dataset_metadata_dir(&snapshot.id);
 
         if dataset_metadata_dir.exists() {
@@ -121,7 +121,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
             input_slices: None,
         };
 
-        MetadataChainImpl::create(&dataset_metadata_dir, first_block).map_err(|e| e.into())?;
+        let (_chain, block_hash) =
+            MetadataChainImpl::create(&dataset_metadata_dir, first_block).map_err(|e| e.into())?;
 
         let summary = DatasetSummary {
             id: snapshot.id.clone(),
@@ -134,13 +135,13 @@ impl MetadataRepository for MetadataRepositoryImpl {
         };
 
         self.update_summary(&snapshot.id, summary)?;
-        Ok(())
+        Ok(block_hash)
     }
 
     fn add_datasets(
         &mut self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
-    ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)> {
+    ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)> {
         let snapshots_ordered = self.sort_snapshots_in_dependency_order(snapshots.collect());
 
         snapshots_ordered

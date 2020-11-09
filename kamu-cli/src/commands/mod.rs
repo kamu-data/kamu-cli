@@ -36,6 +36,9 @@ pub use pull_command::*;
 mod pull_images_command;
 pub use pull_images_command::*;
 
+mod push_command;
+pub use push_command::*;
+
 mod remote_add_command;
 pub use remote_add_command::*;
 
@@ -53,6 +56,9 @@ pub use sql_server_command::*;
 
 mod sql_shell_command;
 pub use sql_shell_command::*;
+
+mod sync_from_command;
+pub use sync_from_command::*;
 
 pub trait Command {
     fn needs_workspace(&self) -> bool {

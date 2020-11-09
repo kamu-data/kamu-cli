@@ -26,5 +26,8 @@ pub use remote::*;
 mod resource_loader;
 pub use resource_loader::*;
 
+mod sync_service;
+pub use sync_service::*;
+
 mod transform_service;
 pub use transform_service::*;

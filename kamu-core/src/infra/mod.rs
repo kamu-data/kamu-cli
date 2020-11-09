@@ -1,6 +1,9 @@
 mod engine;
 pub use engine::*;
 
+mod remote;
+pub use remote::*;
+
 pub mod explore;
 pub mod ingest;
 pub mod utils;
@@ -45,6 +48,9 @@ pub use pull_service_impl::*;
 
 mod resource_loader_impl;
 pub use resource_loader_impl::*;
+
+mod sync_service_impl;
+pub use sync_service_impl::*;
 
 mod transform_service_impl;
 pub use transform_service_impl::*;

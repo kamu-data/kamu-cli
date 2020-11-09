@@ -1,6 +1,7 @@
 use super::{Command, Error};
 use kamu::domain::*;
 
+use chrono::prelude::*;
 use glob;
 use std::cell::RefCell;
 use std::fs;
@@ -29,6 +30,10 @@ impl CompleteCommand {
             input: input,
             current: current,
         }
+    }
+
+    fn complete_timestamp(&self) {
+        println!("{}", Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true));
     }
 
     fn complete_dataset(&self, prefix: &str) {
@@ -109,13 +114,32 @@ impl Command for CompleteCommand {
             for s in last_cmd.subcommands.iter() {
                 if s.p.meta.name == *arg {
                     last_cmd = &s.p;
-                    continue;
                 }
             }
         }
 
         let empty = "".to_owned();
+        let prev = args.get(self.current - 1).unwrap_or(&empty);
         let to_complete = args.get(self.current).unwrap_or(&empty);
+
+        // Complete option values
+        if prev.starts_with("--") {
+            for opt in last_cmd.opts.iter() {
+                let full_name = format!("--{}", opt.s.long.unwrap());
+                if full_name == *prev {
+                    if let Some(val_names) = &opt.v.val_names {
+                        for (_, name) in val_names.iter() {
+                            match *name {
+                                "REMOTE" => self.complete_remote(to_complete),
+                                "TIME" => self.complete_timestamp(),
+                                _ => (),
+                            }
+                        }
+                        return Ok(());
+                    }
+                }
+            }
+        }
 
         // Complete commands
         for s in last_cmd.subcommands.iter() {
@@ -136,6 +160,9 @@ impl Command for CompleteCommand {
 
         // Complete flags and options
         if to_complete.starts_with("-") {
+            if "--help".starts_with(to_complete) {
+                println!("--help");
+            }
             for flg in last_cmd.flags.iter() {
                 let full_name = if flg.s.long.is_some() {
                     format!("--{}", flg.s.long.unwrap())

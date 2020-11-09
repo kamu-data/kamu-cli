@@ -22,6 +22,8 @@ impl MetadataChainImpl {
     meta_path: &Path,
     first_block: MetadataBlock,
   ) -> Result<(Self, Sha3_256), InfraError> {
+    assert_eq!(first_block.prev_block_hash, None);
+
     std::fs::create_dir(&meta_path)?;
     std::fs::create_dir(meta_path.join("blocks"))?;
     std::fs::create_dir(meta_path.join("refs"))?;
@@ -31,6 +33,32 @@ impl MetadataChainImpl {
     chain.write_ref(&BlockRef::Head, &hash)?;
 
     Ok((chain, hash))
+  }
+
+  pub fn from_blocks(
+    meta_path: &Path,
+    blocks: &mut dyn Iterator<Item = MetadataBlock>,
+  ) -> Result<(Self, Sha3_256), InfraError> {
+    std::fs::create_dir(&meta_path)?;
+    std::fs::create_dir(meta_path.join("blocks"))?;
+    std::fs::create_dir(meta_path.join("refs"))?;
+
+    let mut chain = Self::new(meta_path);
+    let mut last_hash = Sha3_256::zero();
+
+    for b in blocks {
+      last_hash = if last_hash.is_zero() {
+        assert_eq!(b.prev_block_hash, None);
+        let hash = chain.write_block(&b)?;
+        chain.write_ref(&BlockRef::Head, &hash)?;
+        hash
+      } else {
+        chain.append(b)
+      };
+    }
+
+    assert!(!last_hash.is_zero());
+    Ok((chain, last_hash))
   }
 
   fn read_block(path: &Path) -> MetadataBlock {

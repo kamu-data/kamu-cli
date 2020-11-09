@@ -233,9 +233,35 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("set-watermark")
                         .long("set-watermark")
                         .takes_value(true)
-                        .value_name("T")
+                        .value_name("TIME")
                         .help("Injects a manual watermark into the dataset to signify that \
-                            no data is expected to arrive with event time that precedes it")
+                            no data is expected to arrive with event time that precedes it"),
+                    Arg::with_name("remote")
+                        .long("remote")
+                        .takes_value(true)
+                        .value_name("REMOTE")
+                        .help("Specifies which remote to pull data from"),
+                ]),
+            SubCommand::with_name("push")
+                .about("Push local data into the remote repository")
+                .args(&[
+                    // Arg::with_name("all")
+                    //     .short("a")
+                    //     .long("all")
+                    //     .help("Push all datasets in the workspace"),
+                    // Arg::with_name("recursive")
+                    //     .short("r")
+                    //     .long("recursive")
+                    //     .help("Also push all transitive dependencies of specified datasets"),
+                    Arg::with_name("dataset")
+                        .multiple(true)
+                        .index(1)
+                        .help("Dataset ID(s)"),
+                    Arg::with_name("remote")
+                        .long("remote")
+                        .takes_value(true)
+                        .value_name("REMOTE")
+                        .help("Specifies which remote to push data into"),
                 ]),
             SubCommand::with_name("reset")
                 .about("Revert the dataset back to the specified state")

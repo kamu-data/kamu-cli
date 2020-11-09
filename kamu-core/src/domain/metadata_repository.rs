@@ -7,12 +7,12 @@ use url::Url;
 pub trait MetadataRepository {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
 
-    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<(), DomainError>;
+    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;
 
     fn add_datasets(
         &mut self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
-    ) -> Vec<(DatasetIDBuf, Result<(), DomainError>)>;
+    ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)>;
 
     fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError>;
 

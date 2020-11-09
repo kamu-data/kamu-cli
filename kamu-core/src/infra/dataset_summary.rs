@@ -11,7 +11,6 @@ use serde_with::skip_serializing_none;
 pub enum DatasetKind {
     Root,
     Derivative,
-    Remote,
 }
 
 #[skip_serializing_none]
