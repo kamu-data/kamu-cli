@@ -80,7 +80,7 @@ fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
     let t = Utc::now();
     let file_name = format!(
         "{}.snappy.parquet",
-        t.to_rfc3339_opts(SecondsFormat::Nanos, true),
+        t.to_rfc3339_opts(SecondsFormat::Nanos, true).replace(':', ""),
     );
 
     std::fs::create_dir_all(&dataset_layout.data_dir).unwrap();
