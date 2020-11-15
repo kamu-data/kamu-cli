@@ -51,10 +51,19 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub enum RemoteError {
     #[error("Dataset does not exist")]
     DoesNotExist,
-    #[error("Dataset diverged")]
-    Diverged,
+    #[error("Dataset have diverged")]
+    Diverged {
+        remote_head: Sha3_256,
+        local_head: Sha3_256,
+    },
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently,
+    #[error("Remote appears to have corrupted data: {message}")]
+    Corrupted {
+        message: String,
+        #[source]
+        source: Option<BoxedError>,
+    },
     #[error("IO error")]
     IOError {
         #[from]
@@ -63,5 +72,26 @@ pub enum RemoteError {
         backtrace: Backtrace,
     },
     #[error("Protocol error")]
-    ProtocolError(BoxedError),
+    ProtocolError {
+        #[source]
+        source: BoxedError,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+}
+
+impl RemoteError {
+    pub fn protocol(e: BoxedError) -> Self {
+        Self::ProtocolError {
+            source: e,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn corrupted(message: String, source: Option<BoxedError>) -> Self {
+        Self::Corrupted {
+            message: message,
+            source: source,
+        }
+    }
 }

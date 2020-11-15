@@ -27,8 +27,8 @@ impl RemoteClient for RemoteLocalFS {
         .iter()
         .collect();
         if ref_path.exists() {
-            let hash = std::fs::read_to_string(&ref_path)
-                .map_err(|e| RemoteError::ProtocolError(e.into()))?;
+            let hash =
+                std::fs::read_to_string(&ref_path).map_err(|e| RemoteError::protocol(e.into()))?;
             Ok(Some(Sha3_256::from_str(&hash).expect("Malformed hash")))
         } else {
             Ok(None)
@@ -79,11 +79,11 @@ impl RemoteClient for RemoteLocalFS {
 
         // TODO: This is really bad but we need to
         // establish proper checkpoint naming and rotation first
-        if checkpoint_dir.exists() {
-            if out_checkpoint_dir.exists() {
-                std::fs::remove_dir_all(&out_checkpoint_dir)?;
-            }
+        if out_checkpoint_dir.exists() {
+            std::fs::remove_dir_all(&out_checkpoint_dir)?;
+        }
 
+        if checkpoint_dir.exists() {
             fs_extra::dir::copy(
                 &checkpoint_dir,
                 &out_checkpoint_dir,
@@ -94,7 +94,7 @@ impl RemoteClient for RemoteLocalFS {
             )
             .map_err(|e| match e.kind {
                 fs_extra::error::ErrorKind::Io(io_error) => io_error.into(),
-                _ => RemoteError::ProtocolError(e.into()),
+                _ => RemoteError::protocol(e.into()),
             })?;
         }
 
@@ -148,7 +148,10 @@ impl RemoteClient for RemoteLocalFS {
         }
 
         if !found_last_seen_block && last_seen_block.is_some() {
-            return Err(RemoteError::Diverged);
+            return Err(RemoteError::Diverged {
+                remote_head: expected_head,
+                local_head: last_seen_block.unwrap(),
+            });
         }
 
         // TODO: limit the set of files based on metadata
@@ -160,19 +163,21 @@ impl RemoteClient for RemoteLocalFS {
             result.data_files.push(out_path);
         }
 
-        fs_extra::dir::copy(
-            &in_checkpoint_dir,
-            &result.checkpoint_dir,
-            &fs_extra::dir::CopyOptions {
-                content_only: true,
-                copy_inside: true,
-                ..fs_extra::dir::CopyOptions::default()
-            },
-        )
-        .map_err(|e| match e.kind {
-            fs_extra::error::ErrorKind::Io(io_error) => io_error.into(),
-            _ => RemoteError::ProtocolError(e.into()),
-        })?;
+        if in_checkpoint_dir.exists() {
+            fs_extra::dir::copy(
+                &in_checkpoint_dir,
+                &result.checkpoint_dir,
+                &fs_extra::dir::CopyOptions {
+                    content_only: true,
+                    copy_inside: true,
+                    ..fs_extra::dir::CopyOptions::default()
+                },
+            )
+            .map_err(|e| match e.kind {
+                fs_extra::error::ErrorKind::Io(io_error) => io_error.into(),
+                _ => RemoteError::protocol(e.into()),
+            })?;
+        }
 
         Ok(result)
     }

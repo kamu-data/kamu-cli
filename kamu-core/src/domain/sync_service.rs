@@ -1,4 +1,4 @@
-use super::{RemoteID, RemoteIDBuf};
+use super::{RemoteError, RemoteID, RemoteIDBuf};
 use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
 
 use std::sync::{Arc, Mutex};
@@ -90,12 +90,35 @@ pub enum SyncError {
         local_head: Sha3_256,
         remote_head: Sha3_256,
     },
-    #[error("Inconsistent metadata")]
-    InconsistentMetadata(BoxedError),
+    #[error("Remote appears to have corrupted data: {message}")]
+    Corrupted {
+        message: String,
+        #[source]
+        source: Option<BoxedError>,
+    },
     #[error("Protocol error")]
-    ProtocolError(BoxedError),
+    ProtocolError(#[source] BoxedError),
     #[error("Internal error")]
-    InternalError(BoxedError),
+    InternalError(#[source] BoxedError),
+}
+
+impl From<RemoteError> for SyncError {
+    fn from(e: RemoteError) -> Self {
+        match e {
+            RemoteError::Diverged {
+                remote_head,
+                local_head,
+            } => SyncError::DatasetsDiverged {
+                remote_head: remote_head,
+                local_head: local_head,
+            },
+            RemoteError::Corrupted { message, source } => SyncError::Corrupted {
+                message: message,
+                source: source,
+            },
+            _ => Self::InternalError(e.into()),
+        }
+    }
 }
 
 impl From<std::io::Error> for SyncError {

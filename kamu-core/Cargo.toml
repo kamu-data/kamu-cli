@@ -28,6 +28,13 @@ curl-sys = "*"
 zip = "*"
 ringbuf = "*"
 
+# Remotes
+bytes = "*"
+futures = "0.3"
+tokio = { version = "0.2", features=[]}  # Have to use older version to match rusoto. See: https://github.com/rusoto/rusoto/issues/1845
+rusoto_core = {version = "*", default_features = false, features=["rustls"]}
+rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
+
 # Utils
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for glob fetch
@@ -39,6 +46,7 @@ itertools = "*"
 signal-hook = "*"
 thiserror = "*"  # Structured error derivations
 tempfile = "*"
+walkdir = "*"
 
 [target.'cfg(unix)'.dependencies]
 users = "*"  # For getting uid:gid

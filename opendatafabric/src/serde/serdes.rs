@@ -34,6 +34,7 @@ pub trait DatasetSnapshotDeserializer {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: Consider using `bytes` crate
 #[derive(Clone, Debug)]
 pub struct Buffer<T> {
     buf: Vec<T>,

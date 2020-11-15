@@ -75,6 +75,19 @@ impl DockerClient {
         Self {}
     }
 
+    pub fn has_image(&self, image: &str) -> bool {
+        Command::new("docker")
+            .arg("image")
+            .arg("inspect")
+            .arg(image)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("Docker process failed")
+            .success()
+    }
+
     pub fn pull_cmd(&self, image: &str) -> Command {
         let mut cmd = Command::new("docker");
         cmd.arg("pull");
@@ -382,12 +395,12 @@ impl DockerClient {
         } else {
             let s = path.to_str().unwrap();
             let s_norm = if s.starts_with("\\\\?\\") {
-                 &s[4..]
-             } else {
-                 &s
-             };
-             PathBuf::from(s_norm)
-         }
+                &s[4..]
+            } else {
+                &s
+            };
+            PathBuf::from(s_norm)
+        }
     }
 }
 

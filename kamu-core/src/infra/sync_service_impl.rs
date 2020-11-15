@@ -166,11 +166,7 @@ impl SyncService for SyncServiceImpl {
                     remote_id: remote_id.to_owned(),
                     dataset_id: remote_dataset_id.to_owned(),
                 },
-                RemoteError::Diverged => SyncError::DatasetsDiverged {
-                    remote_head: remote_head,
-                    local_head: local_head.unwrap(),
-                },
-                _ => SyncError::InternalError(e.into()),
+                e => e.into(),
             })?;
 
         let de = YamlMetadataBlockDeserializer;
@@ -180,9 +176,10 @@ impl SyncService for SyncServiceImpl {
             .map(|data| de.read_manifest(&data))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| match e {
-                opendatafabric::serde::Error::InvalidHash { .. } => {
-                    SyncError::InconsistentMetadata(e.into())
-                }
+                opendatafabric::serde::Error::InvalidHash { .. } => SyncError::Corrupted {
+                    message: "Inconsistent metadata".to_owned(),
+                    source: Some(e.into()),
+                },
                 _ => SyncError::ProtocolError(e.into()),
             })?;
 
@@ -339,14 +336,7 @@ impl SyncService for SyncServiceImpl {
             &mut blocks_to_sync.into_iter(),
             &mut data_files_to_sync.iter().map(|e| e as &Path),
             &dataset_layout.checkpoints_dir,
-        )
-        .map_err(|e| match e {
-            RemoteError::Diverged => SyncError::DatasetsDiverged {
-                remote_head: remote_head.unwrap(),
-                local_head: local_head,
-            },
-            _ => SyncError::InternalError(e.into()),
-        })?;
+        )?;
 
         Ok(SyncResult::Updated {
             old_head: remote_head,
