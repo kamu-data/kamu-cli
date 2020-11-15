@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.34.0"
+version = "0.35.0"
 dependencies = [
  "assert_matches",
  "bytes",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.34.0"
+version = "0.35.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1070,7 +1070,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-test"
-version = "0.34.0"
+version = "0.35.0"
 dependencies = [
  "chrono",
  "opendatafabric",
@@ -1388,7 +1388,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.34.0"
+version = "0.35.0"
 dependencies = [
  "byteorder",
  "chrono",
