@@ -48,7 +48,8 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
   - Collaborate on cleaning and improving data of existing datasets
   - Create derivative datasets by transforming, enriching, and summarizing data others have published
   - Write query once - run it forever with one of our state of the art stream processing engines
-  - Allways stay up-to-date by pulling latest updates from the data sources with just one command
+  - Always stay up-to-date by pulling latest updates from the data sources with just one command
+  - Built-in support for GIS data
 
 - **For Data Consumers**
   - Download a dataset from a shared repository
@@ -56,8 +57,8 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
   - Audit the chain of transformations this data went through
   - Validate that downloaded data was in fact produced by the declared transformations
 
-- **For Everyone**
-  - Explore data and run adhoc SQL queries (backed by the power of Apache Spark)
+- **For Data Exploration**
+  - Explore data and run ad-hoc SQL queries (backed by the power of Apache Spark)
     ![SQL Shell](docs/first_steps_files/sql.gif)
   - Launch a Jupyter notebook with one command
   - Join, filter, and shape your data using SQL
