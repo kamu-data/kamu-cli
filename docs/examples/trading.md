@@ -1,6 +1,5 @@
-# Example: Stock Market Trading Data Analysis
+# Example: Stock Market Trading Data Analysis <!-- omit in toc -->
 
-- [Example: Stock Market Trading Data Analysis](#example-stock-market-trading-data-analysis)
 - [Summary](#summary)
 - [Steps](#steps)
   - [Getting Started](#getting-started)

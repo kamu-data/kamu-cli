@@ -1,6 +1,5 @@
-# Example: Currency Conversion
+# Example: Currency Conversion <!-- omit in toc -->
 
-- [Example: Currency Conversion](#example-currency-conversion)
 - [Summary](#summary)
 - [Steps](#steps)
   - [Getting Started](#getting-started)

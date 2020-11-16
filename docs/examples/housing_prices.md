@@ -1,6 +1,5 @@
-# Example: Housing Prices Analysis
+# Example: Housing Prices Analysis <!-- omit in toc -->
 
-- [Example: Housing Prices Analysis](#example-housing-prices-analysis)
 - [Summary](#summary)
 - [Steps](#steps)
   - [Getting Started](#getting-started)

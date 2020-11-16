@@ -1,6 +1,5 @@
-# Example: Overdue Order Shipments Detection
+# Example: Overdue Order Shipments Detection <!-- omit in toc -->
 
-- [Example: Overdue Order Shipments Detection](#example-overdue-order-shipments-detection)
 - [Summary](#summary)
 - [Steps](#steps)
   - [Getting Started](#getting-started)
