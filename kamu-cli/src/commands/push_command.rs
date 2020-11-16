@@ -16,7 +16,7 @@ pub struct PushCommand {
     sync_svc: Rc<RefCell<dyn SyncService>>,
     ids: Vec<String>,
     remote: Option<String>,
-    _output_config: OutputConfig,
+    output_config: OutputConfig,
 }
 
 impl PushCommand {
@@ -35,7 +35,7 @@ impl PushCommand {
             sync_svc: sync_svc,
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             remote: remote.map(|v| v.as_ref().to_owned()),
-            _output_config: output_config.clone(),
+            output_config: output_config.clone(),
         }
     }
 
@@ -69,6 +69,18 @@ impl Command for PushCommand {
 
         let dataset_ids: Vec<DatasetIDBuf> = self.ids.iter().map(|s| s.parse().unwrap()).collect();
 
+        let spinner = if self.output_config.verbosity_level == 0 {
+            let s = indicatif::ProgressBar::new_spinner();
+            s.set_style(
+                indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"),
+            );
+            s.set_message("Pushing dataset(s) to a remote");
+            s.enable_steady_tick(100);
+            Some(s)
+        } else {
+            None
+        };
+
         let mut updated = 0;
         let mut up_to_date = 0;
         let mut errors = 0;
@@ -83,6 +95,10 @@ impl Command for PushCommand {
                 },
                 Err(_) => errors += 1,
             }
+        }
+
+        if let Some(s) = spinner {
+            s.finish_and_clear()
         }
 
         if updated != 0 {

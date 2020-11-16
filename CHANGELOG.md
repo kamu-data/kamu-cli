@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Engine errors will not list all relevant log files
+- UI improvements
 
 ## [0.35.0] - 2020-11-14
 ### Added
