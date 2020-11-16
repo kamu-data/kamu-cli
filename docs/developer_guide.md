@@ -1,8 +1,7 @@
-# Developer Guide
+# Developer Guide <!-- omit in toc -->
 
-- [Developer Guide](#developer-guide)
-  - [Building Locally](#building-locally)
-  - [Release Procedure](#release-procedure)
+- [Building Locally](#building-locally)
+- [Release Procedure](#release-procedure)
 
 ## Building Locally
 Prerequisites:

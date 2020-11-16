@@ -1,16 +1,15 @@
-# Kamu
+# Kamu <!-- omit in toc -->
 
 [![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 [![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 
 Welcome to `kamu` - a new-generation data management and transformation tool!
 
-- [Kamu](#kamu)
-  - [About](#about)
-  - [Learning Materials](#learning-materials)
-  - [Features](#features)
-  - [Important Disclaimer](#important-disclaimer)
-  - [Documentation](#documentation)
+- [About](#about)
+- [Learning Materials](#learning-materials)
+- [Features](#features)
+- [Important Disclaimer](#important-disclaimer)
+- [Documentation](#documentation)
 
 
 ## About

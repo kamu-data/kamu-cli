@@ -1,8 +1,7 @@
-# Exploring Data
+# Exploring Data <!-- omit in toc -->
 
-- [Exploring Data](#exploring-data)
-  - [SQL Console](#sql-console)
-  - [Jupyter Notebooks](#jupyter-notebooks)
+- [SQL Console](#sql-console)
+- [Jupyter Notebooks](#jupyter-notebooks)
 
 While `kamu` focuses primarily on the problem of data management, you often may want to do some basic data exploration before exporting data for further use in your data science projects. Just like `gitk` in `git` we decided to provide a few simple exploration tools for you to assess the state of data without leaving the comfort of one tool.
 

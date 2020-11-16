@@ -1,6 +1,5 @@
-# First Steps
+# First Steps <!-- omit in toc -->
 
-- [First Steps](#first-steps)
 - [Getting data in](#getting-data-in)
   - [Initializing the workspace](#initializing-the-workspace)
   - [Adding a dataset](#adding-a-dataset)
@@ -15,9 +14,9 @@ We assume that you have already followed the [installation steps](./install.md) 
 Throughout this tutorial we will be using the [Zip Code Boundaries](https://data.cityofnewyork.us/Business/Zip-Code-Boundaries/i8iw-xf4u) dataset, which can be found on [New York Open Data Portal](http://opendata.cityofnewyork.us/).
 
 
-# Getting data in
+## Getting data in
 
-## Initializing the workspace
+### Initializing the workspace
 To work with `kamu` you first need a **workspace** - this is where kamu will store the important information about datasets and the cached data. Let's create one:
 
 ![kamu init](./first_steps_files/init.gif)
@@ -31,7 +30,7 @@ $ kamu list
 
 As you'd expect the workspace is currently empty.
 
-## Adding a dataset
+### Adding a dataset
 One of the design principles of `kamu` is to always know exactly where any piece of data came from, so it never simply copies data - instead we create source links to an external data (we'll get into the details of that later). For now let's create such link.
 
 ![kamu init](./first_steps_files/pull.gif)
@@ -87,13 +86,13 @@ For now it suffices to say that all data is tracked by `kamu` in a series of blo
 $ kamu log us.cityofnewyork.data.zipcode-boundaries
 ```
 
-# Exploring data
+## Exploring data
 
 Since you might not have worked with this dataset before you'd want to explore it first. For this `kamu` provides two tools:
 * SQL shell
 * Jupyter Notebooks integration
 
-## SQL shell
+### SQL shell
 SQL is the _lingua franca_ of the data science and `kamu` uses it extensively. So naturally it provides you a simple way to run ad-hoc queries on data.
 
 ![kamu sql](./first_steps_files/sql.gif)
@@ -141,7 +140,7 @@ $ kamu sql server
 
 The `kamu sql` is a very powerful command that you can use both interactively or for scripting. We encourage you to explore more of its options through `kamu sql --help`.
 
-## Notebooks
+### Notebooks
 
 Kamu also connects the power of Apache Spark with the [Jupyter Notebook](https://jupyter.org/) server. You can get started by running:
 

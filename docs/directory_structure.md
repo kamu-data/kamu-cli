@@ -1,9 +1,8 @@
-# Directory Structure
+# Directory Structure <!-- omit in toc -->
 
-- [Directory Structure](#directory-structure)
-  - [Workspace](#workspace)
-  - [Metadata Repository](#metadata-repository)
-  - [Data Volume](#data-volume)
+- [Workspace](#workspace)
+- [Metadata Repository](#metadata-repository)
+- [Data Volume](#data-volume)
 
 ## Workspace
 

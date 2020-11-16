@@ -1,14 +1,13 @@
-# Installation
+# Installation <!-- omit in toc -->
 
-- [Installation](#installation)
-  - [General Information](#general-information)
-  - [Supported Platforms](#supported-platforms)
-    - [Linux](#linux)
-    - [MacOS X](#macos-x)
-    - [Windows (using Docker Desktop)](#windows-using-docker-desktop)
-    - [Windows (using WSL 2)](#windows-using-wsl-2)
-  - [Installing shell completions](#installing-shell-completions)
-  - [A Note on Security](#a-note-on-security)
+- [General Information](#general-information)
+- [Supported Platforms](#supported-platforms)
+  - [Linux](#linux)
+  - [MacOS X](#macos-x)
+  - [Windows (using Docker Desktop)](#windows-using-docker-desktop)
+  - [Windows (using WSL 2)](#windows-using-wsl-2)
+- [Installing shell completions](#installing-shell-completions)
+- [A Note on Security](#a-note-on-security)
 
 
 ## General Information

@@ -1,9 +1,8 @@
-# Troubleshooting
+# Troubleshooting <!-- omit in toc -->
 
-- [Troubleshooting](#troubleshooting)
-  - [Standard Logging](#standard-logging)
-  - [Verbose Logging](#verbose-logging)
-  - [Engine Errors](#engine-errors)
+- [Standard Logging](#standard-logging)
+- [Verbose Logging](#verbose-logging)
+- [Engine Errors](#engine-errors)
 
 ## Standard Logging
 When `kamu` runs it logs into `.kamu/run` directory. This directory is cleaned up on every run.
