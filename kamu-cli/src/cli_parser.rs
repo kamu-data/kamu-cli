@@ -281,9 +281,20 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ]),
             SubCommand::with_name("remote")
                 .about("Manage set of tracked repositories")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommands(vec![
                     SubCommand::with_name("add")
                         .about("Adds a remote repository")
+                        .after_help(indoc::indoc!(r"
+                            For Local Filesystem basic remote use following URL formats:
+                                file:///home/me/example/remote
+                                file:///c:/Users/me/example/remote
+
+                            For S3-compatible basic remote use following URL formats:
+                                s3://bucket.my-company.example
+                                s3+http://my-minio-server:9000/bucket
+                                s3+https://my-minio-server:9000/bucket
+                        "))
                         .args(&[
                             Arg::with_name("name")
                                 .required(true)
