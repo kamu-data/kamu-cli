@@ -117,16 +117,14 @@ pub enum EngineError {
 #[derive(Debug, Error)]
 pub struct ProcessError {
     exit_code: Option<i32>,
-    stdout_path: Option<PathBuf>,
-    stderr_path: Option<PathBuf>,
+    log_files: Vec<PathBuf>,
     backtrace: Backtrace,
 }
 
 #[derive(Debug, Error)]
 pub struct ContractError {
     reason: String,
-    stdout_path: Option<PathBuf>,
-    stderr_path: Option<PathBuf>,
+    log_files: Vec<PathBuf>,
     backtrace: Backtrace,
 }
 
@@ -147,15 +145,10 @@ impl EngineError {
 }
 
 impl ProcessError {
-    pub fn new(
-        exit_code: Option<i32>,
-        stdout_path: Option<PathBuf>,
-        stderr_path: Option<PathBuf>,
-    ) -> Self {
+    pub fn new(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
         Self {
             exit_code: exit_code,
-            stdout_path: stdout_path,
-            stderr_path: stderr_path,
+            log_files: log_files,
             backtrace: Backtrace::capture(),
         }
     }
@@ -168,11 +161,11 @@ impl std::fmt::Display for ProcessError {
             None => write!(f, "Process terminated by a signal")?,
         }
 
-        if let Some(ref out) = self.stdout_path {
-            write!(f, ", process stdout: {}", out.display())?;
-        }
-        if let Some(ref err) = self.stderr_path {
-            write!(f, ", process stderr: {}", err.display())?;
+        if self.log_files.len() != 0 {
+            write!(f, ", see log files for details:")?;
+            for path in self.log_files.iter() {
+                write!(f, " {}", path.display())?;
+            }
         }
 
         Ok(())
@@ -180,11 +173,10 @@ impl std::fmt::Display for ProcessError {
 }
 
 impl ContractError {
-    pub fn new(reason: &str, stdout_path: Option<PathBuf>, stderr_path: Option<PathBuf>) -> Self {
+    pub fn new(reason: &str, log_files: Vec<PathBuf>) -> Self {
         Self {
             reason: reason.to_owned(),
-            stdout_path: stdout_path,
-            stderr_path: stderr_path,
+            log_files: log_files,
             backtrace: Backtrace::capture(),
         }
     }
@@ -194,11 +186,11 @@ impl std::fmt::Display for ContractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.reason)?;
 
-        if let Some(ref out) = self.stdout_path {
-            write!(f, ", process stdout: {}", out.display())?;
-        }
-        if let Some(ref err) = self.stderr_path {
-            write!(f, ", process stderr: {}", err.display())?;
+        if self.log_files.len() != 0 {
+            write!(f, ", see log files for details:")?;
+            for path in self.log_files.iter() {
+                write!(f, " {}", path.display())?;
+            }
         }
 
         Ok(())

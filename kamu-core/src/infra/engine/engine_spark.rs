@@ -129,8 +129,7 @@ impl SparkEngine {
             Some(code) if code == 0 => Ok(()),
             _ => Err(ProcessError::new(
                 status.code(),
-                Some(run_info.stdout_path.clone()),
-                Some(run_info.stderr_path.clone()),
+                vec![run_info.stdout_path.clone(), run_info.stderr_path.clone()],
             )
             .into()),
         }
@@ -169,8 +168,7 @@ impl SparkEngine {
         if !path.exists() {
             return Err(ContractError::new(
                 "Engine did not write a response file",
-                Some(run_info.stdout_path.clone()),
-                Some(run_info.stderr_path.clone()),
+                vec![run_info.stdout_path.clone(), run_info.stderr_path.clone()],
             )
             .into());
         }

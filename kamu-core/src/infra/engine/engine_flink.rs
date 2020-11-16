@@ -15,6 +15,56 @@ pub struct FlinkEngine {
     logger: Logger,
 }
 
+struct RunInfo {
+    run_id: String,
+    in_out_dir: PathBuf,
+    checkpoints_dir: PathBuf,
+    job_manager_stdout_path: PathBuf,
+    job_manager_stderr_path: PathBuf,
+    task_manager_stdout_path: PathBuf,
+    task_manager_stderr_path: PathBuf,
+    submit_stdout_path: PathBuf,
+    submit_stderr_path: PathBuf,
+}
+
+impl RunInfo {
+    fn new(run_id: String, in_out_dir: PathBuf, checkpoints_dir: PathBuf, logs_dir: &Path) -> Self {
+        let job_manager_stdout_path =
+            logs_dir.join(format!("flink-jobmanager-{}.out.txt", &run_id));
+        let job_manager_stderr_path =
+            logs_dir.join(format!("flink-jobmanager-{}.err.txt", &run_id));
+        let task_manager_stdout_path =
+            logs_dir.join(format!("flink-taskmanager-{}.out.txt", &run_id));
+        let task_manager_stderr_path =
+            logs_dir.join(format!("flink-taskmanager-{}.err.txt", &run_id));
+        let submit_stdout_path = logs_dir.join(format!("flink-submit-{}.out.txt", &run_id));
+        let submit_stderr_path = logs_dir.join(format!("flink-submit-{}.err.txt", &run_id));
+
+        Self {
+            run_id: run_id,
+            in_out_dir: in_out_dir,
+            checkpoints_dir: checkpoints_dir,
+            job_manager_stdout_path: job_manager_stdout_path,
+            job_manager_stderr_path: job_manager_stderr_path,
+            task_manager_stdout_path: task_manager_stdout_path,
+            task_manager_stderr_path: task_manager_stderr_path,
+            submit_stdout_path: submit_stdout_path,
+            submit_stderr_path: submit_stderr_path,
+        }
+    }
+
+    fn get_log_files(&self) -> Vec<PathBuf> {
+        vec![
+            self.submit_stdout_path.clone(),
+            self.submit_stderr_path.clone(),
+            self.task_manager_stdout_path.clone(),
+            self.task_manager_stderr_path.clone(),
+            self.job_manager_stdout_path.clone(),
+            self.job_manager_stderr_path.clone(),
+        ]
+    }
+}
+
 impl FlinkEngine {
     pub fn new(image: &str, workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
         Self {
@@ -43,43 +93,11 @@ impl FlinkEngine {
         PathBuf::from(unix_path)
     }
 
-    fn submit(
-        &self,
-        run_id: &str,
-        in_out_dir: &Path,
-        checkpoints_dir: &Path,
-    ) -> Result<(), EngineError> {
+    fn submit(&self, run_info: &RunInfo) -> Result<(), EngineError> {
         let docker = DockerClient::new();
 
-        let network_name = format!("kamu-flink-{}", run_id);
+        let network_name = format!("kamu-flink-{}", &run_info.run_id);
         let _network = docker.create_network(&network_name);
-
-        let job_manager_stdout_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-jobmanager-{}.out.txt", run_id));
-        let job_manager_stderr_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-jobmanager-{}.err.txt", run_id));
-
-        let task_manager_stdout_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-taskmanager-{}.out.txt", run_id));
-        let task_manager_stderr_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-taskmanager-{}.err.txt", run_id));
-
-        let submit_stdout_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-submit-{}.out.txt", run_id));
-        let submit_stderr_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(format!("flink-submit-{}.err.txt", run_id));
 
         let job_manager = Container::new(
             DockerRunArgs {
@@ -94,7 +112,7 @@ impl FlinkEngine {
                 )],
                 expose_ports: vec![6123, 8081],
                 volume_map: vec![
-                    (in_out_dir.to_owned(), self.in_out_dir_in_container()),
+                    (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
                     (
                         self.workspace_layout.local_volume_dir.clone(),
                         self.volume_dir_in_container(),
@@ -102,8 +120,8 @@ impl FlinkEngine {
                 ],
                 ..DockerRunArgs::default()
             },
-            &job_manager_stdout_path,
-            &job_manager_stderr_path,
+            &run_info.job_manager_stdout_path,
+            &run_info.job_manager_stderr_path,
             self.logger.new(o!("name" => "jobmanager")),
         )?;
 
@@ -125,8 +143,8 @@ impl FlinkEngine {
                 )],
                 ..DockerRunArgs::default()
             },
-            &task_manager_stdout_path,
-            &task_manager_stderr_path,
+            &run_info.task_manager_stdout_path,
+            &run_info.task_manager_stderr_path,
             self.logger.new(o!("name" => "taskmanager")),
         )?;
 
@@ -134,7 +152,7 @@ impl FlinkEngine {
             .wait_for_host_port(job_manager.name(), 8081, Duration::from_secs(15))
             .map_err(|e| EngineError::internal(e))?;
 
-        let prev_savepoint = self.get_prev_savepoint(checkpoints_dir)?;
+        let prev_savepoint = self.get_prev_savepoint(&run_info.checkpoints_dir)?;
         let savepoint_args = prev_savepoint
             .as_ref()
             .map(|p| self.to_container_path(&p))
@@ -169,8 +187,8 @@ impl FlinkEngine {
         info!(self.logger, "Running Flink job"; "command" => ?run_cmd);
 
         let run_status = run_cmd
-            .stdout(Stdio::from(File::create(&submit_stdout_path)?))
-            .stderr(Stdio::from(File::create(&submit_stderr_path)?))
+            .stdout(Stdio::from(File::create(&run_info.submit_stdout_path)?))
+            .stderr(Stdio::from(File::create(&run_info.submit_stderr_path)?))
             .status()?;
 
         if run_status.success() {
@@ -179,12 +197,7 @@ impl FlinkEngine {
 
         match run_status.code() {
             Some(code) if code == 0 => Ok(()),
-            _ => Err(ProcessError::new(
-                run_status.code(),
-                Some(submit_stdout_path),
-                Some(submit_stderr_path),
-            )
-            .into()),
+            _ => Err(ProcessError::new(run_status.code(), run_info.get_log_files()).into()),
         }
     }
 
@@ -228,14 +241,14 @@ impl FlinkEngine {
 
     fn write_request<T>(
         &self,
-        in_out_dir: &Path,
+        run_info: &RunInfo,
         request: T,
         resource_name: &str,
     ) -> Result<(), EngineError>
     where
         T: ::serde::ser::Serialize + std::fmt::Debug,
     {
-        let path = in_out_dir.join("request.yaml");
+        let path = run_info.in_out_dir.join("request.yaml");
 
         let manifest = Manifest {
             api_version: 1,
@@ -250,16 +263,18 @@ impl FlinkEngine {
         Ok(())
     }
 
-    fn read_response<T>(&self, in_out_dir: &Path, resource_name: &str) -> Result<T, EngineError>
+    fn read_response<T>(&self, run_info: &RunInfo, resource_name: &str) -> Result<T, EngineError>
     where
         T: ::serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let path = in_out_dir.join("result.yaml");
+        let path = run_info.in_out_dir.join("result.yaml");
 
         if !path.exists() {
-            return Err(
-                ContractError::new("Engine did not write a response file", None, None).into(),
-            );
+            return Err(ContractError::new(
+                "Engine did not write a response file",
+                run_info.get_log_files(),
+            )
+            .into());
         }
 
         let file = File::open(path)?;
@@ -280,10 +295,6 @@ impl Engine for FlinkEngine {
     }
 
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
-        let in_out_dir = tempfile::Builder::new()
-            .prefix("kamu-transform-")
-            .tempdir()?;
-
         let mut run_id = String::with_capacity(10);
         run_id.extend(
             rand::thread_rng()
@@ -291,10 +302,20 @@ impl Engine for FlinkEngine {
                 .take(10),
         );
 
+        let in_out_dir = tempfile::Builder::new()
+            .prefix("kamu-transform-")
+            .tempdir()?;
+
+        let run_info = RunInfo::new(
+            run_id,
+            in_out_dir.path().to_owned(),
+            request.checkpoints_dir.clone(),
+            &self.workspace_layout.run_info_dir,
+        );
+
         // Remove data_dir if it exists but empty as it will confuse Spark
         let output_dir = request.data_dirs.get(&request.dataset_id).unwrap();
         let _ = std::fs::remove_dir(&output_dir);
-        let checkpoints_dir = request.checkpoints_dir.clone();
 
         let request_adj = ExecuteQueryRequest {
             data_dirs: request
@@ -306,11 +327,11 @@ impl Engine for FlinkEngine {
             ..request
         };
 
-        self.write_request(in_out_dir.path(), request_adj, "ExecuteQueryRequest")?;
+        self.write_request(&run_info, request_adj, "ExecuteQueryRequest")?;
 
-        self.submit(&run_id, in_out_dir.path(), &checkpoints_dir)?;
+        self.submit(&run_info)?;
 
-        self.read_response(in_out_dir.path(), "ExecuteQueryResult")
+        self.read_response(&run_info, "ExecuteQueryResult")
     }
 }
 
