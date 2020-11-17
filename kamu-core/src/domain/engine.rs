@@ -16,6 +16,14 @@ pub trait Engine {
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError>;
 }
 
+pub trait PullImageListener {
+    fn begin(&mut self, _image: &str) {}
+    fn success(&mut self) {}
+}
+
+pub struct NullPullImageListener;
+impl PullImageListener for NullPullImageListener {}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Request / Response DTOs
 ///////////////////////////////////////////////////////////////////////////////

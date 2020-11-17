@@ -241,6 +241,7 @@ impl IngestTask {
                         prep_result.checkpoint.last_prepared,
                         old_checkpoint,
                         &self.layout.cache_dir.join("prepared.bin"),
+                        self.listener.clone(),
                     )
                 },
             )

@@ -33,8 +33,12 @@ impl ReadService {
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
+        listener: Arc<Mutex<dyn IngestListener>>,
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
-        let engine = self.engine_factory.lock().unwrap().get_engine("spark")?;
+        let engine = self.engine_factory.lock().unwrap().get_engine(
+            "spark",
+            listener.lock().unwrap().get_pull_image_listener(),
+        )?;
 
         let request = IngestRequest {
             dataset_id: dataset_id.to_owned(),

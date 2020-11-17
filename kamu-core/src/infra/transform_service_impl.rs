@@ -39,7 +39,7 @@ impl TransformServiceImpl {
     ) -> Result<TransformResult, TransformError> {
         listener.lock().unwrap().begin();
 
-        match Self::do_transform_inner(request, meta_chain, engine_factory) {
+        match Self::do_transform_inner(request, meta_chain, engine_factory, listener.clone()) {
             Ok(res) => {
                 listener.lock().unwrap().success(&res);
                 Ok(res)
@@ -56,15 +56,16 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         mut meta_chain: Box<dyn MetadataChain>,
         engine_factory: Arc<Mutex<EngineFactory>>,
+        listener: Arc<Mutex<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let prev_hash = meta_chain.read_ref(&BlockRef::Head);
 
-        let engine = engine_factory
-            .lock()
-            .unwrap()
-            .get_engine(match request.source.transform {
+        let engine = engine_factory.lock().unwrap().get_engine(
+            match request.source.transform {
                 Transform::Sql(ref sql) => &sql.engine,
-            })?;
+            },
+            listener.lock().unwrap().get_pull_image_listener(),
+        )?;
 
         let result = engine.lock().unwrap().transform(request)?;
 

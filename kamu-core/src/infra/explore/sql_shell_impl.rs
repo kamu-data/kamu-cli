@@ -1,3 +1,4 @@
+use crate::domain::PullImageListener;
 use crate::infra::utils::docker_client::*;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
@@ -13,6 +14,11 @@ pub struct SqlShellImpl;
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
+    pub fn ensure_images(listener: &mut dyn PullImageListener) {
+        let docker_client = DockerClient::new();
+        docker_client.ensure_image(docker_images::SPARK, Some(listener));
+    }
+
     pub fn run<S1, S2, StartedClb>(
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
@@ -53,10 +59,7 @@ impl SqlShellImpl {
                         PathBuf::from("/opt/spark/kamu_data"),
                     ),
                     (cwd, PathBuf::from("/opt/spark/kamu_shell")),
-                    (
-                        init_script_path,
-                        PathBuf::from("/opt/spark/shell_init.sql"),
-                    ),
+                    (init_script_path, PathBuf::from("/opt/spark/shell_init.sql")),
                 ]
             } else {
                 vec![]

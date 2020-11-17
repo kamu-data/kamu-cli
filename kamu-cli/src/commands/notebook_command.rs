@@ -1,5 +1,6 @@
 use super::{Command, Error};
 use crate::output::OutputConfig;
+use kamu::domain::PullImageListener;
 use kamu::infra::explore::*;
 use kamu::infra::*;
 
@@ -65,6 +66,9 @@ impl Command for NotebookCommand {
             .collect::<Result<Vec<_>, _>>()?;
 
         let spinner = if self.output_config.verbosity_level == 0 {
+            let mut pull_progress = PullImageProgress { progress_bar: None };
+            NotebookServerImpl::ensure_images(&mut pull_progress);
+
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
                 indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"),
@@ -97,5 +101,23 @@ impl Command for NotebookCommand {
             self.logger.new(o!()),
         )?;
         Ok(())
+    }
+}
+
+struct PullImageProgress {
+    progress_bar: Option<indicatif::ProgressBar>,
+}
+
+impl PullImageListener for PullImageProgress {
+    fn begin(&mut self, image: &str) {
+        let s = indicatif::ProgressBar::new_spinner();
+        s.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        s.set_message(&format!("Pulling docker image {}", image));
+        s.enable_steady_tick(100);
+        self.progress_bar = Some(s);
+    }
+
+    fn success(&mut self) {
+        self.progress_bar = None;
     }
 }

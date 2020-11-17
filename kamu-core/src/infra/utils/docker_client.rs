@@ -1,3 +1,5 @@
+use crate::domain::{NullPullImageListener, PullImageListener};
+
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -86,6 +88,25 @@ impl DockerClient {
             .status()
             .expect("Docker process failed")
             .success()
+    }
+
+    pub fn ensure_image(&self, image: &str, maybe_listener: Option<&mut dyn PullImageListener>) {
+        let mut null_listener = NullPullImageListener;
+        let listener = maybe_listener.unwrap_or(&mut null_listener);
+
+        if !self.has_image(image) {
+            listener.begin(image);
+
+            // TODO: Handle pull errors gracefully
+            self.pull_cmd(image)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .expect("Failed to pull image");
+
+            listener.success();
+        }
     }
 
     pub fn pull_cmd(&self, image: &str) -> Command {

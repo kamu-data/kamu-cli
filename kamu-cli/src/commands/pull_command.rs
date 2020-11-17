@@ -397,13 +397,33 @@ impl IngestListener for PrettyIngestProgress {
                 console::style("Failed to update root dataset").red(),
             ));
     }
+
+    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+        Some(self)
+    }
+}
+
+impl PullImageListener for PrettyIngestProgress {
+    fn begin(&mut self, image: &str) {
+        // This currently happens during the Read stage
+        self.curr_progress.set_message(&Self::spinner_message(
+            &self.dataset_id,
+            IngestStage::Read as u32,
+            format!("Pulling engine image {}", image),
+        ));
+    }
+
+    fn success(&mut self) {
+        self.curr_progress.finish();
+        self.on_stage_progress(self.stage, 0, 0);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettyTransformProgress {
     dataset_id: DatasetIDBuf,
-    //multi_progress: Arc<indicatif::MultiProgress>,
+    multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
 }
 
@@ -416,7 +436,7 @@ impl PrettyTransformProgress {
                 0,
                 "Applying derivative transformations",
             ))),
-            //multi_progress: multi_progress,
+            multi_progress: multi_progress,
         }
     }
 
@@ -461,5 +481,30 @@ impl TransformListener for PrettyTransformProgress {
                 0,
                 console::style("Failed to update derivative dataset").red(),
             ));
+    }
+
+    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+        Some(self)
+    }
+}
+
+impl PullImageListener for PrettyTransformProgress {
+    fn begin(&mut self, image: &str) {
+        self.curr_progress.set_message(&Self::spinner_message(
+            &self.dataset_id,
+            0,
+            format!("Pulling engine image {}", image),
+        ));
+    }
+
+    fn success(&mut self) {
+        self.curr_progress.finish();
+        self.curr_progress = self
+            .multi_progress
+            .add(Self::new_spinner(&Self::spinner_message(
+                &self.dataset_id,
+                0,
+                "Applying derivative transformations",
+            )));
     }
 }

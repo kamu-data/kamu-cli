@@ -63,7 +63,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#e2f1e0107c555a544b43b0721cb7f4ded4f074a3"
+source = "git+https://github.com/apache/arrow#e5fce7f6a70c370c758b133f025444c98cdd305d"
 dependencies = [
  "chrono",
  "csv",
@@ -1000,7 +1000,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "assert_matches",
  "bytes",
@@ -1040,7 +1040,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1070,7 +1070,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-test"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "chrono",
  "opendatafabric",
@@ -1218,7 +1218,7 @@ checksum = "0840c1c50fd55e521b247f949c241c9997709f23bd7f023b9762cd561e935656"
 dependencies = [
  "log",
  "mio",
- "miow 0.3.5",
+ "miow 0.3.6",
  "winapi 0.3.9",
 ]
 
@@ -1247,9 +1247,9 @@ dependencies = [
 
 [[package]]
 name = "miow"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07b88fb9795d4d36d62a012dfbf49a8f5cf12751f36d31a9dbe66d528e58979e"
+checksum = "5a33c1b55807fbed163481b5ba66db4b2fa6cde694a5027be10fb724206c5897"
 dependencies = [
  "socket2",
  "winapi 0.3.9",
@@ -1388,7 +1388,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.35.0"
+version = "0.36.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -1444,7 +1444,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "3.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#e2f1e0107c555a544b43b0721cb7f4ded4f074a3"
+source = "git+https://github.com/apache/arrow#e5fce7f6a70c370c758b133f025444c98cdd305d"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2160,9 +2160,9 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "standback"
-version = "0.2.11"
+version = "0.2.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4e0831040d2cf2bdfd51b844be71885783d489898a192f254ae25d57cce725c"
+checksum = "cf906c8b8fc3f6ecd1046e01da1d8ddec83e48c8b08b84dcc02b585a6bedf5a8"
 dependencies = [
  "version_check",
 ]

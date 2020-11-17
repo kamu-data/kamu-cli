@@ -1,4 +1,4 @@
-use super::EngineError;
+use super::{EngineError, PullImageListener};
 use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
 
 use std::backtrace::Backtrace;
@@ -75,6 +75,10 @@ pub trait IngestListener: Send {
     fn success(&mut self, _result: &IngestResult) {}
     fn uncacheable(&mut self) {}
     fn error(&mut self, _error: &IngestError) {}
+
+    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+        None
+    }
 }
 
 pub struct NullIngestListener;
