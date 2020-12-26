@@ -133,7 +133,7 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("7d5c8d887e706bb2fada712e4bb892794c611c5b4347c195582d88704079afb4")
+        Sha3_256::try_from("c276863b8e2bda32936517ae3f3cd3f4afaef355a87c571105487fe12261a424")
             .unwrap()
     );
 }

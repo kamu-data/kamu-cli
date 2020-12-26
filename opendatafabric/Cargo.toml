@@ -12,7 +12,7 @@ rust-crypto = "*"  # Data and metadata hashing
 
 # Serialization
 byteorder = "*"
-flatbuffers = "*"
+flatbuffers = "0.7.0"  # https://github.com/google/flatbuffers/issues/6359
 hex = "*"
 serde = { version = "*", features = ["derive"] }
 serde_with = "*"

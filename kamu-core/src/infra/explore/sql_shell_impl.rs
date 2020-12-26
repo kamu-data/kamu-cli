@@ -44,8 +44,8 @@ impl SqlShellImpl {
         let spark_stderr_path = workspace_layout.run_info_dir.join("spark.err.txt");
 
         let exit = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(signal_hook::SIGINT, exit.clone())?;
-        signal_hook::flag::register(signal_hook::SIGTERM, exit.clone())?;
+        signal_hook::flag::register(libc::SIGINT, exit.clone())?;
+        signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
         let mut cmd = docker_client.run_cmd(DockerRunArgs {
             image: docker_images::SPARK.to_owned(),

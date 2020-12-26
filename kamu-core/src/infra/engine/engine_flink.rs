@@ -295,12 +295,11 @@ impl Engine for FlinkEngine {
     }
 
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
-        let mut run_id = String::with_capacity(10);
-        run_id.extend(
-            rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(10),
-        );
+        let run_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
 
         let in_out_dir = tempfile::Builder::new()
             .prefix("kamu-transform-")

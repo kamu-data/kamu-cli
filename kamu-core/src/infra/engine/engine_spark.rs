@@ -21,12 +21,11 @@ struct RunInfo {
 
 impl RunInfo {
     fn new(in_out_dir: &Path, workspace_layout: &WorkspaceLayout) -> Self {
-        let mut run_id = String::with_capacity(10);
-        run_id.extend(
-            rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(10),
-        );
+        let run_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
 
         Self {
             in_out_dir: in_out_dir.to_owned(),

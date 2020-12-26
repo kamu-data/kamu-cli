@@ -124,8 +124,8 @@ impl NotebookServerImpl {
         };
 
         let exit = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(signal_hook::SIGINT, exit.clone())?;
-        signal_hook::flag::register(signal_hook::SIGTERM, exit.clone())?;
+        signal_hook::flag::register(libc::SIGINT, exit.clone())?;
+        signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
         // Relying on shell to send signal to child processes
         while !exit.load(Ordering::Relaxed) {

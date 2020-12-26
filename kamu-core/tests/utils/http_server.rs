@@ -23,7 +23,8 @@ impl HttpServer {
         server_name.extend(
             rand::thread_rng()
                 .sample_iter(&rand::distributions::Alphanumeric)
-                .take(30),
+                .take(30)
+                .map(char::from),
         );
         let server_port = 80;
 

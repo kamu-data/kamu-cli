@@ -201,10 +201,13 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetVocabulary<'fb>> for odf::Dataset
 impl<'fb> FlatbuffersEnumSerializable<'fb, fb::SourceCaching> for odf::SourceCaching {
     fn serialize(
         &self,
-        _fb: &mut FlatBufferBuilder<'fb>,
+        fb: &mut FlatBufferBuilder<'fb>,
     ) -> (fb::SourceCaching, Option<WIPOffset<UnionWIPOffset>>) {
         match self {
-            odf::SourceCaching::Forever => (fb::SourceCaching::SourceCachingForever, None),
+            odf::SourceCaching::Forever => (
+                fb::SourceCaching::SourceCachingForever,
+                Some(empty_table(fb).as_union_value()),
+            ),
         }
     }
 }
@@ -362,7 +365,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MergeStrategy> for odf::MergeStra
         fb: &mut FlatBufferBuilder<'fb>,
     ) -> (fb::MergeStrategy, Option<WIPOffset<UnionWIPOffset>>) {
         match self {
-            odf::MergeStrategy::Append => (fb::MergeStrategy::MergeStrategyAppend, None),
+            odf::MergeStrategy::Append => (
+                fb::MergeStrategy::MergeStrategyAppend,
+                Some(empty_table(fb).as_union_value()),
+            ),
             odf::MergeStrategy::Ledger(v) => (
                 fb::MergeStrategy::MergeStrategyLedger,
                 Some(v.serialize(fb).as_union_value()),
@@ -1078,9 +1084,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::EventTimeSource> for odf::EventTi
         fb: &mut FlatBufferBuilder<'fb>,
     ) -> (fb::EventTimeSource, Option<WIPOffset<UnionWIPOffset>>) {
         match self {
-            odf::EventTimeSource::FromMetadata => {
-                (fb::EventTimeSource::EventTimeSourceFromMetadata, None)
-            }
+            odf::EventTimeSource::FromMetadata => (
+                fb::EventTimeSource::EventTimeSourceFromMetadata,
+                Some(empty_table(fb).as_union_value()),
+            ),
             odf::EventTimeSource::FromPath(v) => (
                 fb::EventTimeSource::EventTimeSourceFromPath,
                 Some(v.serialize(fb).as_union_value()),
@@ -1249,4 +1256,11 @@ fn fb_to_interval(iv: &fb::TimeInterval) -> odf::TimeInterval {
         fb::TimeIntervalType::Unbounded => odf::TimeInterval::unbounded(),
         fb::TimeIntervalType::Empty => odf::TimeInterval::empty(),
     }
+}
+
+fn empty_table<'fb>(
+    fb: &mut FlatBufferBuilder<'fb>,
+) -> WIPOffset<flatbuffers::TableFinishedWIPOffset> {
+    let wip = fb.start_table();
+    fb.end_table(wip)
 }
