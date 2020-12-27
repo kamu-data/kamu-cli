@@ -15,6 +15,7 @@ fn serde_dataset_summary() {
     content:
       id: foo.bar
       kind: root
+      lastBlockHash: 8b310549db6da0e1fedadda588a0e3c809f99454879f9953b06dbbb8af6a91ca
       dependencies:
         - foo
         - bar
@@ -31,6 +32,10 @@ fn serde_dataset_summary() {
     content: DatasetSummary {
       id: DatasetIDBuf::try_from("foo.bar").unwrap(),
       kind: DatasetKind::Root,
+      last_block_hash: Sha3_256::from_str(
+        "8b310549db6da0e1fedadda588a0e3c809f99454879f9953b06dbbb8af6a91ca",
+      )
+      .unwrap(),
       dependencies: vec![
         DatasetIDBuf::try_from("foo").unwrap(),
         DatasetIDBuf::try_from("bar").unwrap(),

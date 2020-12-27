@@ -3,7 +3,6 @@ use crate::domain::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use chrono::Utc;
 use slog::Logger;
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -30,67 +29,6 @@ impl SyncServiceImpl {
             remote_factory: remote_factory,
             _logger: logger,
         }
-    }
-
-    fn update_summary(
-        &self,
-        dataset_id: &DatasetID,
-        blocks: Vec<MetadataBlock>,
-    ) -> Result<(), SyncError> {
-        let mut metadata_repo = self.metadata_repo.borrow_mut();
-
-        let mut summary = match metadata_repo.get_summary(dataset_id) {
-            Ok(sum) => sum,
-            Err(DomainError::DoesNotExist { .. }) => DatasetSummary {
-                id: dataset_id.to_owned(),
-                kind: blocks
-                    .iter()
-                    .flat_map(|b| b.source.as_ref())
-                    .next()
-                    .map(|s| match s {
-                        DatasetSource::Root(_) => DatasetKind::Root,
-                        DatasetSource::Derivative(_) => DatasetKind::Derivative,
-                    })
-                    .expect("Chain had no source block"),
-                dependencies: Vec::new(),
-                last_pulled: None,
-                num_records: 0,
-                data_size: 0,
-            },
-            Err(e) => return Err(SyncError::InternalError(e.into())),
-        };
-
-        for b in blocks.iter() {
-            summary.num_records += b
-                .output_slice
-                .as_ref()
-                .map(|s| s.num_records as u64)
-                .unwrap_or(0);
-
-            match b.source.as_ref() {
-                Some(DatasetSource::Derivative(deriv)) => {
-                    for id in deriv.inputs.iter() {
-                        if !summary.dependencies.contains(id) {
-                            summary.dependencies.push(id.clone());
-                        }
-                    }
-                }
-                _ => (),
-            }
-        }
-
-        summary.last_pulled = Some(Utc::now());
-
-        let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
-        let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
-        summary.data_size = fs_extra::dir::get_size(dataset_layout.data_dir).unwrap_or(0);
-        summary.data_size += fs_extra::dir::get_size(dataset_layout.checkpoints_dir).unwrap_or(0);
-
-        metadata_repo
-            .update_summary(dataset_id, summary)
-            .map_err(|e| SyncError::InternalError(e.into()))?;
-
-        Ok(())
     }
 }
 
@@ -227,7 +165,6 @@ impl SyncService for SyncServiceImpl {
         }
 
         std::fs::remove_dir_all(&tmp_dir)?;
-        self.update_summary(local_dataset_id, new_blocks)?;
 
         // TODO: race condition on remote head
         Ok(SyncResult::Updated {

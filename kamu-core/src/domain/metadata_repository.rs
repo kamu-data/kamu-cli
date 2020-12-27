@@ -25,12 +25,6 @@ pub trait MetadataRepository {
 
     fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError>;
 
-    fn update_summary(
-        &mut self,
-        dataset_id: &DatasetID,
-        summary: DatasetSummary,
-    ) -> Result<(), DomainError>;
-
     fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's>;
 
     fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError>;

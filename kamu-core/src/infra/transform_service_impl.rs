@@ -265,44 +265,6 @@ impl TransformServiceImpl {
         let vocab = chain.iter_blocks().filter_map(|b| b.vocab).next();
         Ok(vocab.unwrap_or_default())
     }
-
-    fn update_summary(
-        &self,
-        dataset_id: &DatasetID,
-        result: &TransformResult,
-    ) -> Result<(), TransformError> {
-        match result {
-            TransformResult::UpToDate => Ok(()),
-            TransformResult::Updated { block_hash } => {
-                let mut metadata_repo = self.metadata_repo.borrow_mut();
-
-                let mut summary = metadata_repo
-                    .get_summary(dataset_id)
-                    .map_err(|e| TransformError::internal(e))?;
-
-                let block = metadata_repo
-                    .get_metadata_chain(dataset_id)
-                    .unwrap()
-                    .get_block(block_hash)
-                    .unwrap();
-
-                summary.num_records = match block.output_slice {
-                    Some(slice) => summary.num_records + slice.num_records as u64,
-                    _ => 0,
-                };
-
-                summary.last_pulled = Some(block.system_time);
-
-                let layout = DatasetLayout::new(&self.volume_layout, dataset_id);
-                summary.data_size = fs_extra::dir::get_size(layout.data_dir).unwrap_or(0);
-                summary.data_size += fs_extra::dir::get_size(layout.checkpoints_dir).unwrap_or(0);
-
-                metadata_repo
-                    .update_summary(dataset_id, summary)
-                    .map_err(|e| TransformError::internal(e))
-            }
-        }
-    }
 }
 
 impl TransformService for TransformServiceImpl {
@@ -327,10 +289,7 @@ impl TransformService for TransformServiceImpl {
                 .get_metadata_chain(&dataset_id)
                 .unwrap();
 
-            let res =
-                Self::do_transform(request, meta_chain, listener, self.engine_factory.clone())?;
-            self.update_summary(dataset_id, &res)?;
-            Ok(res)
+            Self::do_transform(request, meta_chain, listener, self.engine_factory.clone())
         } else {
             Ok(TransformResult::UpToDate)
         }
@@ -398,14 +357,6 @@ impl TransformService for TransformServiceImpl {
             .collect();
 
         results.extend(thread_handles.into_iter().map(|h| h.join().unwrap()));
-
-        results
-            .iter()
-            .filter(|(_, res)| res.is_ok())
-            .for_each(|(dataset_id, res)| {
-                self.update_summary(dataset_id, res.as_ref().unwrap())
-                    .unwrap()
-            });
 
         results
     }
