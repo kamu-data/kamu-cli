@@ -498,6 +498,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
             fb.create_vector(&offsets)
         });
         let source_offset = self.source.as_ref().map(|v| v.serialize(fb));
+        let vocab_offset = self.vocab.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::MetadataBlockBuilder::new(fb);
         builder.add_block_hash(block_hash_offset);
         prev_block_hash_offset.map(|off| builder.add_prev_block_hash(off));
@@ -513,6 +514,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
             builder.add_source_type(off.0);
             off.1.map(|v| builder.add_source(v));
         });
+        vocab_offset.map(|off| builder.add_vocab(off));
         builder.finish()
     }
 }
@@ -534,6 +536,9 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
                 .input_slices()
                 .map(|v| v.iter().map(|i| odf::DataSlice::deserialize(i)).collect()),
             source: odf::DatasetSource::deserialize(proxy.source(), proxy.source_type()),
+            vocab: proxy
+                .vocab()
+                .map(|v| odf::DatasetVocabulary::deserialize(v)),
         }
     }
 }

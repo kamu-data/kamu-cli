@@ -39,6 +39,10 @@ fn get_block_root() -> MetadataBlock {
                 primary_key: vec!["a".to_owned()],
             }),
         })),
+        vocab: Some(DatasetVocabulary {
+            system_time_column: None,
+            event_time_column: Some("date".to_owned()),
+        }),
     }
 }
 
@@ -60,6 +64,10 @@ fn get_block_deriv() -> MetadataBlock {
                 temporal_tables: None,
             }),
         })),
+        vocab: Some(DatasetVocabulary {
+            system_time_column: None,
+            event_time_column: Some("date".to_owned()),
+        }),
         output_slice: Some(DataSlice {
             hash: Sha3_256::new([0x0a; 32]),
             interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -133,7 +141,7 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("c276863b8e2bda32936517ae3f3cd3f4afaef355a87c571105487fe12261a424")
+        Sha3_256::try_from("f64cac020bc6c15f6d818296e851b7ad2c3da9407220a1741b2d1818d44ddca1")
             .unwrap()
     );
 }
@@ -148,7 +156,7 @@ fn serializer_hashes_are_stable_deriv() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("efd99d69eba17c25d16bd58f296786f26234f63404a098339e646204cc9e1eeb")
+        Sha3_256::try_from("34e8caff978659f26c6d9e879e3d8ad9e122c20140b5df61b0183329d0d5c41a")
             .unwrap()
     );
 }

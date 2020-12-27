@@ -32,24 +32,36 @@ impl IngestTask {
         options: IngestOptions,
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
-        vocab: DatasetVocabulary,
         listener: Arc<Mutex<dyn IngestListener>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
         logger: Logger,
     ) -> Self {
-        // TODO: this is expensive
-        let source = match meta_chain.iter_blocks().filter_map(|b| b.source).next() {
-            Some(DatasetSource::Root(src)) => src,
-            _ => panic!("Failed to find source definition"),
-        };
+        // TODO: this is expensive and could be cached
+        let mut source = None;
+        let mut vocab = None;
+        for block in meta_chain.iter_blocks() {
+            if source.is_none() {
+                match block.source {
+                    Some(DatasetSource::Root(src)) => source = Some(src),
+                    _ => (),
+                }
+            }
+            if vocab.is_none() && block.vocab.is_some() {
+                vocab = block.vocab;
+            }
+        }
+
+        if source.is_none() {
+            panic!("Failed to find source definition");
+        }
 
         Self {
             dataset_id: dataset_id.to_owned(),
             options: options,
             layout: layout,
             meta_chain: RefCell::new(meta_chain),
-            source: source,
-            vocab: vocab,
+            source: source.unwrap(),
+            vocab: vocab.unwrap_or_default(),
             listener: listener,
             checkpointing_executor: CheckpointingExecutor::new(),
             fetch_service: FetchService::new(logger.new(o!())),

@@ -212,6 +212,7 @@ impl PullService for PullServiceImpl {
             output_watermark: Some(watermark),
             input_slices: None,
             source: None,
+            vocab: None,
         };
 
         let new_hash = chain.append(new_block);

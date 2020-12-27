@@ -191,7 +191,9 @@ fn serde_metadata_block() {
             transform:
               kind: sql
               engine: spark
-              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2"
+              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
+          vocab:
+            eventTimeColumn: date"
     );
 
     let expected = MetadataBlock {
@@ -211,6 +213,10 @@ fn serde_metadata_block() {
                 temporal_tables: None,
             }),
         })),
+        vocab: Some(DatasetVocabulary {
+            system_time_column: None,
+            event_time_column: Some("date".to_owned()),
+        }),
         output_slice: Some(DataSlice {
             hash: Sha3_256::new([0x0a; 32]),
             interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -254,7 +260,7 @@ fn serde_metadata_block_hashes() {
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: decbb0476956d47e98ad2c30698d6282490ea6ee19f99139b2b6396a3589da9f
+          blockHash: 2421af4d7b82d03cc3807fb7b00d82b410efb31ef36b407868ae5ae137d14186
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00.123456789Z\"
           outputSlice:
@@ -277,7 +283,9 @@ fn serde_metadata_block_hashes() {
             transform:
               kind: sql
               engine: spark
-              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2"
+              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
+          vocab:
+            eventTimeColumn: date"
     );
 
     let block = MetadataBlock {
@@ -297,6 +305,10 @@ fn serde_metadata_block_hashes() {
                 temporal_tables: None,
             }),
         })),
+        vocab: Some(DatasetVocabulary {
+            system_time_column: None,
+            event_time_column: Some("date".to_owned()),
+        }),
         output_slice: Some(DataSlice {
             hash: Sha3_256::new([0x0a; 32]),
             interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),

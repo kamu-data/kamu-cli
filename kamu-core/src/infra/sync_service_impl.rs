@@ -56,7 +56,6 @@ impl SyncServiceImpl {
                 last_pulled: None,
                 num_records: 0,
                 data_size: 0,
-                vocab: DatasetVocabulary::default(),
             },
             Err(e) => return Err(SyncError::InternalError(e.into())),
         };

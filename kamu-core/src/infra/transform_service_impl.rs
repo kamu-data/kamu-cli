@@ -141,29 +141,16 @@ impl TransformServiceImpl {
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-        let mut vocabs: BTreeMap<_, _> = source
+        let mut vocabs = source
             .inputs
             .iter()
             .map(|input_id| {
-                (
-                    input_id.clone(),
-                    self.metadata_repo
-                        .borrow()
-                        .get_summary(input_id)
-                        .unwrap()
-                        .vocab,
-                )
+                self.get_vocab(input_id)
+                    .map(|vocab| (input_id.clone(), vocab))
             })
-            .collect();
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-        vocabs.insert(
-            dataset_id.to_owned(),
-            self.metadata_repo
-                .borrow()
-                .get_summary(dataset_id)
-                .unwrap()
-                .vocab,
-        );
+        vocabs.insert(dataset_id.to_owned(), self.get_vocab(dataset_id)?);
 
         let output_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
 
@@ -270,6 +257,13 @@ impl TransformServiceImpl {
             },
             empty,
         ))
+    }
+
+    // TODO: Avoid iterating through output chain multiple times
+    fn get_vocab(&self, dataset_id: &DatasetID) -> Result<DatasetVocabulary, DomainError> {
+        let chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        let vocab = chain.iter_blocks().filter_map(|b| b.vocab).next();
+        Ok(vocab.unwrap_or_default())
     }
 
     fn update_summary(

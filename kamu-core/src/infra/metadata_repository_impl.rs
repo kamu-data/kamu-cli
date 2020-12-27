@@ -116,6 +116,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
             prev_block_hash: None,
             system_time: Utc::now(),
             source: Some(snapshot.source),
+            vocab: snapshot.vocab,
             output_slice: None,
             output_watermark: None,
             input_slices: None,
@@ -131,7 +132,6 @@ impl MetadataRepository for MetadataRepositoryImpl {
             last_pulled: None,
             num_records: 0,
             data_size: 0,
-            vocab: snapshot.vocab.unwrap_or_default(),
         };
 
         self.update_summary(&snapshot.id, summary)?;

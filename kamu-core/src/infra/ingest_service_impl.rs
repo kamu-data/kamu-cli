@@ -96,13 +96,6 @@ impl IngestService for IngestServiceImpl {
             .get_metadata_chain(dataset_id)
             .unwrap();
 
-        let vocab = self
-            .metadata_repo
-            .borrow()
-            .get_summary(dataset_id)
-            .unwrap()
-            .vocab;
-
         let layout = self.get_dataset_layout(dataset_id);
 
         let logger = self.logger.new(o!("dataset" => dataset_id.to_string()));
@@ -112,7 +105,6 @@ impl IngestService for IngestServiceImpl {
             options,
             layout,
             meta_chain,
-            vocab,
             listener,
             self.engine_factory.clone(),
             logger,
@@ -141,7 +133,6 @@ impl IngestService for IngestServiceImpl {
             .map(|id| {
                 let layout = self.get_dataset_layout(&id);
                 let meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
-                let vocab = self.metadata_repo.borrow().get_summary(&id).unwrap().vocab;
                 let engine_factory = self.engine_factory.clone();
                 let task_options = options.clone();
 
@@ -164,7 +155,6 @@ impl IngestService for IngestServiceImpl {
                             task_options,
                             layout,
                             meta_chain,
-                            vocab,
                             listener,
                             engine_factory,
                             logger,

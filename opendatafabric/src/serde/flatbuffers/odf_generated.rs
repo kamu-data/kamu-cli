@@ -3829,6 +3829,7 @@ impl<'a> MetadataBlock<'a> {
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
         args: &'args MetadataBlockArgs<'args>) -> flatbuffers::WIPOffset<MetadataBlock<'bldr>> {
       let mut builder = MetadataBlockBuilder::new(_fbb);
+      if let Some(x) = args.vocab { builder.add_vocab(x); }
       if let Some(x) = args.source { builder.add_source(x); }
       if let Some(x) = args.input_slices { builder.add_input_slices(x); }
       if let Some(x) = args.output_watermark { builder.add_output_watermark(x); }
@@ -3848,6 +3849,7 @@ impl<'a> MetadataBlock<'a> {
     pub const VT_INPUT_SLICES: flatbuffers::VOffsetT = 14;
     pub const VT_SOURCE_TYPE: flatbuffers::VOffsetT = 16;
     pub const VT_SOURCE: flatbuffers::VOffsetT = 18;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 20;
 
   #[inline]
   pub fn block_hash(&self) -> Option<&'a [u8]> {
@@ -3882,6 +3884,10 @@ impl<'a> MetadataBlock<'a> {
     self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(MetadataBlock::VT_SOURCE, None)
   }
   #[inline]
+  pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
+    self._tab.get::<flatbuffers::ForwardsUOffset<DatasetVocabulary<'a>>>(MetadataBlock::VT_VOCAB, None)
+  }
+  #[inline]
   #[allow(non_snake_case)]
   pub fn source_as_dataset_source_root(&self) -> Option<DatasetSourceRoot<'a>> {
     if self.source_type() == DatasetSource::DatasetSourceRoot {
@@ -3912,6 +3918,7 @@ pub struct MetadataBlockArgs<'a> {
     pub input_slices: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a , flatbuffers::ForwardsUOffset<DataSlice<'a >>>>>,
     pub source_type: DatasetSource,
     pub source: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a >>>,
 }
 impl<'a> Default for MetadataBlockArgs<'a> {
     #[inline]
@@ -3925,6 +3932,7 @@ impl<'a> Default for MetadataBlockArgs<'a> {
             input_slices: None,
             source_type: DatasetSource::NONE,
             source: None,
+            vocab: None,
         }
     }
 }
@@ -3964,6 +3972,10 @@ impl<'a: 'b, 'b> MetadataBlockBuilder<'a, 'b> {
   #[inline]
   pub fn add_source(&mut self, source: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
     self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(MetadataBlock::VT_SOURCE, source);
+  }
+  #[inline]
+  pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b >>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(MetadataBlock::VT_VOCAB, vocab);
   }
   #[inline]
   pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> MetadataBlockBuilder<'a, 'b> {

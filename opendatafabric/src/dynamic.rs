@@ -393,6 +393,7 @@ pub trait MetadataBlock {
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
     fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn DataSlice> + '_>>;
     fn source(&self) -> Option<DatasetSource>;
+    fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
 }
 
 impl MetadataBlock for super::MetadataBlock {
@@ -423,6 +424,9 @@ impl MetadataBlock for super::MetadataBlock {
     fn source(&self) -> Option<DatasetSource> {
         self.source.as_ref().map(|v| -> DatasetSource { v.into() })
     }
+    fn vocab(&self) -> Option<&dyn DatasetVocabulary> {
+        self.vocab.as_ref().map(|v| -> &dyn DatasetVocabulary { v })
+    }
 }
 
 impl Into<super::MetadataBlock> for &dyn MetadataBlock {
@@ -435,6 +439,7 @@ impl Into<super::MetadataBlock> for &dyn MetadataBlock {
             output_watermark: self.output_watermark().map(|v| v),
             input_slices: self.input_slices().map(|v| v.map(|i| i.into()).collect()),
             source: self.source().map(|v| v.into()),
+            vocab: self.vocab().map(|v| v.into()),
         }
     }
 }

@@ -183,6 +183,7 @@ impl MetadataBlockBuilder {
                 output_watermark: None,
                 input_slices: None,
                 source: None,
+                vocab: None,
             },
         }
     }

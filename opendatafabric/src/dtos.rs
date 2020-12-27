@@ -3,7 +3,7 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
-use super::{DatasetIDBuf, TimeInterval, Sha3_256};
+use super::{DatasetIDBuf, Sha3_256, TimeInterval};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +140,7 @@ pub struct MetadataBlock {
     pub output_watermark: Option<DateTime<Utc>>,
     pub input_slices: Option<Vec<DataSlice>>,
     pub source: Option<DatasetSource>,
+    pub vocab: Option<DatasetVocabulary>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -294,4 +295,3 @@ pub struct EventTimeSourceFromPath {
     pub pattern: String,
     pub timestamp_format: Option<String>,
 }
-

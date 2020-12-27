@@ -509,6 +509,9 @@ pub struct MetadataBlockDef {
   #[serde_as(as = "Option<DatasetSourceDef>")]
   #[serde(default)]
   pub source: Option<DatasetSource>,
+  #[serde_as(as = "Option<DatasetVocabularyDef>")]
+  #[serde(default)]
+  pub vocab: Option<DatasetVocabulary>,
 }
 
 impl serde_with::SerializeAs<MetadataBlock> for MetadataBlockDef {

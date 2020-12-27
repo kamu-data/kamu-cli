@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
-use opendatafabric::serde::yaml::generated::DatasetVocabularyDef;
-use opendatafabric::{DatasetIDBuf, DatasetVocabulary};
+use opendatafabric::DatasetIDBuf;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -24,6 +23,4 @@ pub struct DatasetSummary {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
-    #[serde(with = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
 }

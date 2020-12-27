@@ -20,6 +20,10 @@ fn load() -> MetadataBlock {
                 temporal_tables: None,
             }),
         })),
+        vocab: Some(DatasetVocabulary {
+            system_time_column: None,
+            event_time_column: Some("date".to_owned()),
+        }),
         output_slice: Some(DataSlice {
             hash: Sha3_256::new([0xA; 32]),
             interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),

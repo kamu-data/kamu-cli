@@ -305,5 +305,6 @@ table MetadataBlock {
   output_watermark: Timestamp;
   input_slices: [DataSlice];
   source: DatasetSource;
+  vocab: DatasetVocabulary;
 }
 
