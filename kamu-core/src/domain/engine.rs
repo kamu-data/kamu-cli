@@ -41,8 +41,10 @@ pub struct IngestRequest {
     pub source: DatasetSourceRoot,
     #[serde(with = "DatasetVocabularyDef")]
     pub dataset_vocab: DatasetVocabulary,
-    pub checkpoints_dir: PathBuf,
+    pub prev_checkpoint_dir: Option<PathBuf>,
+    pub new_checkpoint_dir: PathBuf,
     pub data_dir: PathBuf,
+    pub out_data_path: PathBuf,
 }
 
 #[skip_serializing_none]
@@ -65,8 +67,9 @@ pub struct ExecuteQueryRequest {
     #[serde_as(as = "BTreeMap<_, DatasetVocabularyDef>")]
     pub dataset_vocabs: BTreeMap<DatasetIDBuf, DatasetVocabulary>,
     pub input_slices: BTreeMap<DatasetIDBuf, InputDataSlice>,
-    pub data_dirs: BTreeMap<DatasetIDBuf, PathBuf>,
-    pub checkpoints_dir: PathBuf,
+    pub prev_checkpoint_dir: Option<PathBuf>,
+    pub new_checkpoint_dir: PathBuf,
+    pub out_data_path: PathBuf,
 }
 
 #[skip_serializing_none]
@@ -75,7 +78,6 @@ pub struct ExecuteQueryRequest {
 pub struct ExecuteQueryResponse {
     #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
-    pub data_file_name: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -83,6 +85,9 @@ pub struct ExecuteQueryResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputDataSlice {
     pub interval: TimeInterval,
+    pub data_paths: Vec<PathBuf>,
+    // TODO: Replace with just DDL schema
+    pub schema_file: PathBuf,
     pub explicit_watermarks: Vec<Watermark>,
 }
 

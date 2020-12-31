@@ -77,15 +77,13 @@ fn assert_in_sync(
 }
 
 fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
-    let t = Utc::now();
-    let file_name = format!(
-        "{}.snappy.parquet",
-        t.to_rfc3339_opts(SecondsFormat::Nanos, true).replace(':', ""),
-    );
+    use rand::RngCore;
+
+    let mut hash = Sha3_256::zero();
+    rand::thread_rng().fill_bytes(hash.as_array_mut());
 
     std::fs::create_dir_all(&dataset_layout.data_dir).unwrap();
-
-    let path = dataset_layout.data_dir.join(file_name);
+    let path = dataset_layout.data_dir.join(hash.to_string());
     std::fs::write(&path, "<data>".as_bytes()).unwrap();
     path
 }

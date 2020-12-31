@@ -17,6 +17,7 @@ pub struct IngestTask {
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
     source: DatasetSourceRoot,
+    prev_checkpoint: Option<Sha3_256>,
     vocab: DatasetVocabulary,
     listener: Arc<Mutex<dyn IngestListener>>,
     checkpointing_executor: CheckpointingExecutor,
@@ -36,8 +37,9 @@ impl IngestTask {
         engine_factory: Arc<Mutex<EngineFactory>>,
         logger: Logger,
     ) -> Self {
-        // TODO: this is expensive and could be cached
+        // TODO: PERF: This is expensive and could be cached
         let mut source = None;
+        let mut prev_checkpoint = None;
         let mut vocab = None;
         for block in meta_chain.iter_blocks() {
             if source.is_none() {
@@ -46,8 +48,16 @@ impl IngestTask {
                     _ => (),
                 }
             }
+            // TODO: Verify assumption that only blocks with output_slice have checkpoints
+            if prev_checkpoint.is_none() && block.output_slice.is_some() {
+                prev_checkpoint = Some(block.block_hash)
+            }
             if vocab.is_none() && block.vocab.is_some() {
                 vocab = block.vocab;
+            }
+
+            if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
+                break;
             }
         }
 
@@ -61,6 +71,7 @@ impl IngestTask {
             layout: layout,
             meta_chain: RefCell::new(meta_chain),
             source: source.unwrap(),
+            prev_checkpoint: prev_checkpoint,
             vocab: vocab.unwrap_or_default(),
             listener: listener,
             checkpointing_executor: CheckpointingExecutor::new(),
@@ -248,8 +259,9 @@ impl IngestTask {
                         &self.dataset_id,
                         &self.layout,
                         &self.source,
-                        source_event_time,
+                        self.prev_checkpoint,
                         &self.vocab,
+                        source_event_time,
                         prep_result.checkpoint.last_prepared,
                         old_checkpoint,
                         &self.layout.cache_dir.join("prepared.bin"),
@@ -290,6 +302,20 @@ impl IngestTask {
 
                     let hash = self.meta_chain.borrow_mut().append(new_block);
                     info!(self.logger, "Committed new block"; "hash" => hash.to_string());
+
+                    // TODO: Data should be moved before writing block file
+                    std::fs::rename(
+                        &read_result.checkpoint.out_data_path,
+                        self.layout.data_dir.join(hash.to_string()),
+                    )
+                    .map_err(|e| IngestError::internal(e))?;
+
+                    // TODO: Checkpoint should be moved before writing block file
+                    std::fs::rename(
+                        &read_result.checkpoint.new_checkpoint_dir,
+                        self.layout.checkpoints_dir.join(hash.to_string()),
+                    )
+                    .map_err(|e| IngestError::internal(e))?;
 
                     Ok(ExecutionResult {
                         was_up_to_date: false,

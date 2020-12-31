@@ -3,7 +3,7 @@ use kamu::infra::*;
 use kamu_test::*;
 use opendatafabric::*;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -54,7 +54,7 @@ fn new_deriv(
 fn append_data_block(
     metadata_repo: &Rc<RefCell<MetadataRepositoryImpl>>,
     id: &DatasetID,
-) -> DateTime<Utc> {
+) -> MetadataBlock {
     let mut chain = metadata_repo.borrow_mut().get_metadata_chain(id).unwrap();
     chain.append(
         MetadataFactory::metadata_block()
@@ -67,8 +67,7 @@ fn append_data_block(
             .output_watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
             .build(),
     );
-
-    chain.iter_blocks().next().unwrap().system_time
+    chain.iter_blocks().next().unwrap()
 }
 
 #[test]
@@ -90,21 +89,25 @@ fn test_get_next_operation() {
     );
 
     let foo = new_root(&metadata_repo, "foo");
+    let foo_layout = DatasetLayout::new(&volume_layout, foo);
+
     let (bar, bar_source) = new_deriv(&metadata_repo, "bar", &[foo]);
 
     // No data - no work
     assert_eq!(transform_svc.get_next_operation(bar).unwrap(), None);
 
-    let foo_system_time = append_data_block(&metadata_repo, foo);
+    let foo_block = append_data_block(&metadata_repo, foo);
 
     assert!(matches!(
         transform_svc.get_next_operation(bar).unwrap(),
         Some(ExecuteQueryRequest { source, input_slices, .. })
         if source == bar_source &&
         input_slices == map! { foo.to_owned() => InputDataSlice {
-            interval: TimeInterval::unbounded_closed_right(foo_system_time),
+            interval: TimeInterval::unbounded_closed_right(foo_block.system_time),
+            data_paths: vec![foo_layout.data_dir.join(foo_block.block_hash.to_string())],
+            schema_file: foo_layout.data_dir.join(foo_block.block_hash.to_string()),
             explicit_watermarks: vec![Watermark {
-                system_time: foo_system_time,
+                system_time: foo_block.system_time,
                 event_time: Utc.ymd(2020, 1, 1).and_hms(10, 0, 0),
             }],
         }}

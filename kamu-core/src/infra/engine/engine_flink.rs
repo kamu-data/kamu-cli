@@ -18,7 +18,7 @@ pub struct FlinkEngine {
 struct RunInfo {
     run_id: String,
     in_out_dir: PathBuf,
-    checkpoints_dir: PathBuf,
+    prev_checkpoint_dir: Option<PathBuf>,
     job_manager_stdout_path: PathBuf,
     job_manager_stderr_path: PathBuf,
     task_manager_stdout_path: PathBuf,
@@ -28,7 +28,12 @@ struct RunInfo {
 }
 
 impl RunInfo {
-    fn new(run_id: String, in_out_dir: PathBuf, checkpoints_dir: PathBuf, logs_dir: &Path) -> Self {
+    fn new(
+        run_id: String,
+        in_out_dir: PathBuf,
+        prev_checkpoint_dir: Option<PathBuf>,
+        logs_dir: &Path,
+    ) -> Self {
         let job_manager_stdout_path =
             logs_dir.join(format!("flink-jobmanager-{}.out.txt", &run_id));
         let job_manager_stderr_path =
@@ -43,7 +48,7 @@ impl RunInfo {
         Self {
             run_id: run_id,
             in_out_dir: in_out_dir,
-            checkpoints_dir: checkpoints_dir,
+            prev_checkpoint_dir: prev_checkpoint_dir,
             job_manager_stdout_path: job_manager_stdout_path,
             job_manager_stderr_path: job_manager_stderr_path,
             task_manager_stdout_path: task_manager_stdout_path,
@@ -152,13 +157,15 @@ impl FlinkEngine {
             .wait_for_host_port(job_manager.name(), 8081, Duration::from_secs(15))
             .map_err(|e| EngineError::internal(e))?;
 
-        let prev_savepoint = self.get_prev_savepoint(&run_info.checkpoints_dir)?;
-        let savepoint_args = prev_savepoint
+        let savepoint_args = run_info
+            .prev_checkpoint_dir
             .as_ref()
+            .map(|p| self.get_savepoint(p).unwrap())
             .map(|p| self.to_container_path(&p))
             .map(|p| format!("-s {}", p.display()))
             .unwrap_or_default();
 
+        // TODO: chown hides exit status
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
                 let chown = format!(
@@ -191,10 +198,6 @@ impl FlinkEngine {
             .stderr(Stdio::from(File::create(&run_info.submit_stderr_path)?))
             .status()?;
 
-        if run_status.success() {
-            self.commit_savepoint(prev_savepoint)?;
-        }
-
         match run_status.code() {
             Some(code) if code == 0 => Ok(()),
             _ => Err(ProcessError::new(run_status.code(), run_info.get_log_files()).into()),
@@ -202,19 +205,14 @@ impl FlinkEngine {
     }
 
     // TODO: Atomicity
-    fn get_prev_savepoint(
-        &self,
-        checkpoints_dir: &Path,
-    ) -> Result<Option<PathBuf>, std::io::Error> {
-        if !checkpoints_dir.exists() {
-            return Ok(None);
-        }
-
-        let mut checkpoints = std::fs::read_dir(checkpoints_dir)?
+    // TODO: Error handling
+    fn get_savepoint(&self, checkpoint_dir: &Path) -> Result<PathBuf, std::io::Error> {
+        let mut savepoints = std::fs::read_dir(checkpoint_dir)?
             .filter_map(|res| match res {
                 Ok(e) => {
                     let path = e.path();
-                    if path.is_dir() {
+                    let name = path.file_name().unwrap().to_string_lossy();
+                    if path.is_dir() && name.starts_with("savepoint-") {
                         Some(Ok(path))
                     } else {
                         None
@@ -224,19 +222,14 @@ impl FlinkEngine {
             })
             .collect::<Result<Vec<_>, std::io::Error>>()?;
 
-        if checkpoints.len() > 1 {
-            panic!("Multiple checkpoints found: {:?}", checkpoints)
+        if savepoints.len() != 1 {
+            panic!(
+                "Could not find a savepoint in checkpoint location: {}",
+                checkpoint_dir.display()
+            )
         }
 
-        Ok(checkpoints.pop())
-    }
-
-    // TODO: Atomicity
-    fn commit_savepoint(&self, old_savepoint: Option<PathBuf>) -> Result<(), std::io::Error> {
-        if let Some(path) = old_savepoint {
-            std::fs::remove_dir_all(path)?
-        }
-        Ok(())
+        Ok(savepoints.pop().unwrap())
     }
 
     fn write_request<T>(
@@ -308,21 +301,36 @@ impl Engine for FlinkEngine {
         let run_info = RunInfo::new(
             run_id,
             in_out_dir.path().to_owned(),
-            request.checkpoints_dir.clone(),
+            request.prev_checkpoint_dir.clone(),
             &self.workspace_layout.run_info_dir,
         );
 
-        // Remove data_dir if it exists but empty as it will confuse Spark
-        let output_dir = request.data_dirs.get(&request.dataset_id).unwrap();
-        let _ = std::fs::remove_dir(&output_dir);
+        let input_slices_adj = request
+            .input_slices
+            .into_iter()
+            .map(|(id, slice)| {
+                (
+                    id,
+                    InputDataSlice {
+                        data_paths: slice
+                            .data_paths
+                            .iter()
+                            .map(|p| self.to_container_path(p))
+                            .collect(),
+                        schema_file: self.to_container_path(&slice.schema_file),
+                        ..slice
+                    },
+                )
+            })
+            .collect();
 
         let request_adj = ExecuteQueryRequest {
-            data_dirs: request
-                .data_dirs
-                .into_iter()
-                .map(|(id, path)| (id, self.to_container_path(&path)))
-                .collect(),
-            checkpoints_dir: self.to_container_path(&request.checkpoints_dir),
+            input_slices: input_slices_adj,
+            prev_checkpoint_dir: request
+                .prev_checkpoint_dir
+                .map(|p| self.to_container_path(&p)),
+            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            out_data_path: self.to_container_path(&request.out_data_path),
             ..request
         };
 

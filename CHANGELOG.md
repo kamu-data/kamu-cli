@@ -4,12 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.37.0] - 2020-12-30
 ### Changed
 - Breaking: Metadata restructuring means you'll need to re-create your datasets
+- Data files as well as checkpoints are now named with the hash of the block they are associated with
+- Protocol between coordinator and engines was modified to pass data files (in the right order) as well as checkpoints explicitly
+- Intermediate checkpoints are now preserved (for faster validation and resets)
 - Vocabulary has been incorporated into the metadata block (ODF `0.17.0`)
 - Lazily computing dataset summaries
-- Upgraded many dependencies
+- Upgraded dependencies
+- Happy New Year!
 
 ## [0.36.0] - 2020-11-16
 ### Changed

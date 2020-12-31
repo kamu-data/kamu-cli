@@ -39,6 +39,10 @@ impl Sha3_256 {
         &self.0
     }
 
+    pub fn as_array_mut(&mut self) -> &mut [u8; 32] {
+        &mut self.0
+    }
+
     pub fn to_string(&self) -> String {
         hex::encode(&self.0)
     }

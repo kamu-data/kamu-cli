@@ -132,8 +132,10 @@ fn test_transform_with_engine_spark() {
         .add_dataset(deriv_snapshot)
         .unwrap();
 
-    let res = transform_svc.transform(&deriv_id, None).unwrap();
-    assert!(matches!(res, TransformResult::Updated {.. }));
+    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+        TransformResult::Updated { block_hash } => block_hash,
+        v @ _ => panic!("Unexpected result: {:?}", v),
+    };
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
     assert!(dataset_layout.data_dir.exists());
@@ -147,14 +149,7 @@ fn test_transform_with_engine_spark() {
         2
     );
 
-    let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {
-        Some(Ok(entry)) => entry.path(),
-        _ => panic!(
-            "Data file not found in {}",
-            dataset_layout.data_dir.display()
-        ),
-    };
-
+    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
     let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
     let columns: Vec<_> = parquet_reader
         .metadata()
@@ -184,6 +179,42 @@ fn test_transform_with_engine_spark() {
             ("C".to_owned(), 30000)
         ]
     );
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Round 2
+    ///////////////////////////////////////////////////////////////////////////
+
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            D,4000
+            E,5000
+            "
+        ),
+    )
+    .unwrap();
+
+    ingest_svc
+        .ingest(&root_id, IngestOptions::default(), None)
+        .unwrap();
+
+    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+        TransformResult::Updated { block_hash } => block_hash,
+        v @ _ => panic!("Unexpected result: {:?}", v),
+    };
+
+    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
+
+    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let records: Vec<_> = parquet_reader
+        .get_row_iter(None)
+        .unwrap()
+        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .collect();
+
+    assert_eq!(records, [("D".to_owned(), 40000), ("E".to_owned(), 50000),]);
 }
 
 #[test]
@@ -305,8 +336,10 @@ fn test_transform_with_engine_flink() {
         .add_dataset(deriv_snapshot)
         .unwrap();
 
-    let res = transform_svc.transform(&deriv_id, None).unwrap();
-    assert!(matches!(res, TransformResult::Updated {.. }));
+    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+        TransformResult::Updated { block_hash } => block_hash,
+        v @ _ => panic!("Unexpected result: {:?}", v),
+    };
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
     assert!(dataset_layout.data_dir.exists());
@@ -320,22 +353,7 @@ fn test_transform_with_engine_flink() {
         2
     );
 
-    let part_file = dataset_layout
-        .data_dir
-        .read_dir()
-        .unwrap()
-        .map(|r| r.unwrap())
-        .filter_map(|e| {
-            let p = e.path();
-            if p.file_name().unwrap().to_str().unwrap().starts_with(".") {
-                None
-            } else {
-                Some(p)
-            }
-        })
-        .next()
-        .expect("Data file not found");
-
+    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
     let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
     let columns: Vec<_> = parquet_reader
         .metadata()
@@ -365,4 +383,40 @@ fn test_transform_with_engine_flink() {
             ("C".to_owned(), 30000)
         ]
     );
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Round 2
+    ///////////////////////////////////////////////////////////////////////////
+
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            D,4000
+            E,5000
+            "
+        ),
+    )
+    .unwrap();
+
+    ingest_svc
+        .ingest(&root_id, IngestOptions::default(), None)
+        .unwrap();
+
+    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+        TransformResult::Updated { block_hash } => block_hash,
+        v @ _ => panic!("Unexpected result: {:?}", v),
+    };
+
+    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
+
+    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let records: Vec<_> = parquet_reader
+        .get_row_iter(None)
+        .unwrap()
+        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .collect();
+
+    assert_eq!(records, [("D".to_owned(), 40000), ("E".to_owned(), 50000),]);
 }

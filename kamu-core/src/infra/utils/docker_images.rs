@@ -1,6 +1,6 @@
-pub const SPARK: &str = "kamudata/engine-spark:0.9.1";
+pub const SPARK: &str = "kamudata/engine-spark:0.10.0";
 pub const LIVY: &str = SPARK;
-pub const FLINK: &str = "kamudata/engine-flink:0.6.2";
+pub const FLINK: &str = "kamudata/engine-flink:0.7.0";
 pub const JUPYTER: &str = "kamudata/jupyter-uber:0.0.1";
 
 // Test Images

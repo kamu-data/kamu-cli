@@ -194,8 +194,12 @@ impl Engine for SparkEngine {
 
         let request_adj = IngestRequest {
             ingest_path: self.to_container_path(&request.ingest_path),
-            checkpoints_dir: self.to_container_path(&request.checkpoints_dir),
+            prev_checkpoint_dir: request
+                .prev_checkpoint_dir
+                .map(|p| self.to_container_path(&p)),
+            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
             data_dir: self.to_container_path(&request.data_dir),
+            out_data_path: self.to_container_path(&request.out_data_path),
             ..request
         };
 
@@ -213,17 +217,32 @@ impl Engine for SparkEngine {
 
         let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
 
-        // Remove data_dir if it exists but empty as it will confuse Spark
-        let output_dir = request.data_dirs.get(&request.dataset_id).unwrap();
-        let _ = std::fs::remove_dir(&output_dir);
+        let input_slices_adj = request
+            .input_slices
+            .into_iter()
+            .map(|(id, slice)| {
+                (
+                    id,
+                    InputDataSlice {
+                        data_paths: slice
+                            .data_paths
+                            .iter()
+                            .map(|p| self.to_container_path(p))
+                            .collect(),
+                        schema_file: self.to_container_path(&slice.schema_file),
+                        ..slice
+                    },
+                )
+            })
+            .collect();
 
         let request_adj = ExecuteQueryRequest {
-            data_dirs: request
-                .data_dirs
-                .into_iter()
-                .map(|(id, path)| (id, self.to_container_path(&path)))
-                .collect(),
-            checkpoints_dir: self.to_container_path(&request.checkpoints_dir),
+            input_slices: input_slices_adj,
+            prev_checkpoint_dir: request
+                .prev_checkpoint_dir
+                .map(|p| self.to_container_path(&p)),
+            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            out_data_path: self.to_container_path(&request.out_data_path),
             ..request
         };
 

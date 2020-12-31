@@ -34,12 +34,19 @@ impl TransformServiceImpl {
     fn do_transform(
         request: ExecuteQueryRequest,
         meta_chain: Box<dyn MetadataChain>,
+        dataset_layout: DatasetLayout,
         listener: Arc<Mutex<dyn TransformListener>>,
         engine_factory: Arc<Mutex<EngineFactory>>,
     ) -> Result<TransformResult, TransformError> {
         listener.lock().unwrap().begin();
 
-        match Self::do_transform_inner(request, meta_chain, engine_factory, listener.clone()) {
+        match Self::do_transform_inner(
+            request,
+            meta_chain,
+            dataset_layout,
+            engine_factory,
+            listener.clone(),
+        ) {
             Ok(res) => {
                 listener.lock().unwrap().success(&res);
                 Ok(res)
@@ -55,10 +62,13 @@ impl TransformServiceImpl {
     fn do_transform_inner(
         request: ExecuteQueryRequest,
         mut meta_chain: Box<dyn MetadataChain>,
+        dataset_layout: DatasetLayout,
         engine_factory: Arc<Mutex<EngineFactory>>,
         listener: Arc<Mutex<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let prev_hash = meta_chain.read_ref(&BlockRef::Head);
+        let new_checkpoint_dir = request.new_checkpoint_dir.clone();
+        let out_data_path = request.out_data_path.clone();
 
         let engine = engine_factory.lock().unwrap().get_engine(
             match request.source.transform {
@@ -69,17 +79,44 @@ impl TransformServiceImpl {
 
         let result = engine.lock().unwrap().transform(request)?;
 
+        if let Some(ref slice) = result.block.output_slice {
+            if slice.num_records != 0 && !out_data_path.exists() {
+                return Err(EngineError::ContractError(ContractError::new(
+                    "Engine did not write a response data file",
+                    Vec::new(),
+                ))
+                .into());
+            }
+        }
+
         let new_block = MetadataBlock {
             prev_block_hash: prev_hash,
             ..result.block
         };
         let block_hash = meta_chain.append(new_block);
 
+        // TODO: Data should be moved before writing block file
+        if out_data_path.exists() {
+            std::fs::rename(
+                &out_data_path,
+                dataset_layout.data_dir.join(block_hash.to_string()),
+            )
+            .map_err(|e| TransformError::internal(e))?;
+        }
+
+        // TODO: Checkpoint should be moved before writing block file
+        std::fs::rename(
+            &new_checkpoint_dir,
+            dataset_layout.checkpoints_dir.join(block_hash.to_string()),
+        )
+        .map_err(|e| TransformError::internal(e))?;
+
         Ok(TransformResult::Updated {
             block_hash: block_hash,
         })
     }
 
+    // TODO: PERF: Avoid multiple passes over metadata chain
     pub fn get_next_operation(
         &self,
         dataset_id: &DatasetID,
@@ -126,9 +163,12 @@ impl TransformServiceImpl {
             .iter()
             .enumerate()
             .map(|(index, input_id)| {
+                let input_layout = DatasetLayout::new(&self.volume_layout, input_id);
+
                 let (slice, empty_slice) = self.get_input_slice(
                     index,
                     input_id,
+                    &input_layout,
                     output_chain.as_ref(),
                     logger.new(o!("input_dataset" => input_id.as_str().to_owned())),
                 )?;
@@ -140,6 +180,17 @@ impl TransformServiceImpl {
                 Ok((input_id.clone(), slice))
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
+
+        if non_empty_slices == 0 {
+            return Ok(None);
+        }
+
+        // TODO: Verify assumption that only blocks with output_slice have checkpoints
+        let prev_checkpoint = output_chain
+            .iter_blocks()
+            .filter(|b| b.output_slice.is_some())
+            .map(|b| b.block_hash)
+            .next();
 
         let mut vocabs = source
             .inputs
@@ -153,32 +204,30 @@ impl TransformServiceImpl {
         vocabs.insert(dataset_id.to_owned(), self.get_vocab(dataset_id)?);
 
         let output_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+        let out_data_path = output_layout.data_dir.join(".pending");
+        let new_checkpoint_dir = output_layout.checkpoints_dir.join(".pending");
 
-        let mut data_dirs: BTreeMap<_, _> = source
-            .inputs
-            .iter()
-            .map(|input_id| {
-                (
-                    input_id.clone(),
-                    DatasetLayout::new(&self.volume_layout, &input_id).data_dir,
-                )
-            })
-            .collect();
-
-        data_dirs.insert(dataset_id.to_owned(), output_layout.data_dir);
-
-        if non_empty_slices > 0 {
-            Ok(Some(ExecuteQueryRequest {
-                dataset_id: dataset_id.to_owned(),
-                checkpoints_dir: output_layout.checkpoints_dir, // TODO: move down a layer
-                source: source,
-                dataset_vocabs: vocabs,
-                input_slices: input_slices,
-                data_dirs: data_dirs, // TODO: move down a layer
-            }))
-        } else {
-            Ok(None)
+        // Clean up previous state leftovers
+        if out_data_path.exists() {
+            std::fs::remove_file(&out_data_path).map_err(|e| DomainError::InfraError(e.into()))?;
         }
+        if new_checkpoint_dir.exists() {
+            std::fs::remove_dir_all(&new_checkpoint_dir)
+                .map_err(|e| DomainError::InfraError(e.into()))?;
+        }
+        std::fs::create_dir_all(&new_checkpoint_dir)
+            .map_err(|e| DomainError::InfraError(e.into()))?;
+
+        Ok(Some(ExecuteQueryRequest {
+            dataset_id: dataset_id.to_owned(),
+            prev_checkpoint_dir: prev_checkpoint
+                .map(|hash| output_layout.checkpoints_dir.join(hash.to_string())),
+            new_checkpoint_dir: new_checkpoint_dir.clone(),
+            source: source,
+            dataset_vocabs: vocabs,
+            input_slices: input_slices,
+            out_data_path: out_data_path,
+        }))
     }
 
     fn is_never_pulled(&self, dataset_id: &DatasetID) -> Result<bool, DomainError> {
@@ -195,6 +244,7 @@ impl TransformServiceImpl {
         &self,
         index: usize,
         dataset_id: &DatasetID,
+        dataset_layout: &DatasetLayout,
         output_chain: &dyn MetadataChain,
         logger: Logger,
     ) -> Result<(InputDataSlice, bool), DomainError> {
@@ -229,6 +279,16 @@ impl TransformServiceImpl {
         // Result is either: () or (lower, upper]
         let iv_to_process = iv_available.intersect(&iv_unprocessed);
 
+        // List of part files that will be read by the engine
+        // Note: Order is important
+        // Note: Engine will still filter the rows by system time interval
+        let data_paths: Vec<_> = blocks_unprocessed
+            .iter()
+            .rev()
+            .filter(|b| b.output_slice.is_some())
+            .map(|b| dataset_layout.data_dir.join(b.block_hash.to_string()))
+            .collect();
+
         let explicit_watermarks: Vec<_> = blocks_unprocessed
             .iter()
             .rev()
@@ -242,17 +302,34 @@ impl TransformServiceImpl {
         let empty = !blocks_unprocessed.iter().any(|b| b.output_slice.is_some())
             && explicit_watermarks.is_empty();
 
+        let schema_file = if !data_paths.is_empty() {
+            data_paths.get(0).unwrap().clone()
+        } else {
+            // TODO: Migrate to providing schema directly
+            // TODO: Will not work with schema evolution
+            let first_file = std::fs::read_dir(&dataset_layout.data_dir)
+                .unwrap()
+                .next()
+                .unwrap()
+                .unwrap();
+            first_file.path()
+        };
+
         info!(logger, "Computed input slice";
             "iv_unprocessed" => ?iv_unprocessed,
             "iv_available" => ?iv_available,
             "iv_to_process" => ?iv_to_process,
             "unprocessed_blocks" => blocks_unprocessed.len(),
+            "data_paths" => ?data_paths,
+            "schema_file" => ?schema_file,
             "watermarks" => ?explicit_watermarks,
             "empty" => empty);
 
         Ok((
             InputDataSlice {
                 interval: iv_to_process,
+                data_paths: data_paths,
+                schema_file: schema_file,
                 explicit_watermarks: explicit_watermarks,
             },
             empty,
@@ -283,13 +360,21 @@ impl TransformService for TransformServiceImpl {
             .get_next_operation(dataset_id)
             .map_err(|e| TransformError::internal(e))?
         {
+            let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+
             let meta_chain = self
                 .metadata_repo
                 .borrow()
                 .get_metadata_chain(&dataset_id)
                 .unwrap();
 
-            Self::do_transform(request, meta_chain, listener, self.engine_factory.clone())
+            Self::do_transform(
+                request,
+                meta_chain,
+                dataset_layout,
+                listener,
+                self.engine_factory.clone(),
+            )
         } else {
             Ok(TransformResult::UpToDate)
         }
@@ -330,23 +415,33 @@ impl TransformService for TransformServiceImpl {
                 }
                 Some(request) => {
                     let null_listener = Arc::new(Mutex::new(NullTransformListener {}));
+
                     let listener = multi_listener
                         .lock()
                         .unwrap()
                         .begin_transform(&dataset_id)
                         .unwrap_or(null_listener);
+
                     let meta_chain = self
                         .metadata_repo
                         .borrow()
                         .get_metadata_chain(&dataset_id)
                         .unwrap();
+
+                    let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
+
                     let engine_factory = self.engine_factory.clone();
 
                     let thread_handle = std::thread::Builder::new()
                         .name("transform_multi".to_owned())
                         .spawn(move || {
-                            let res =
-                                Self::do_transform(request, meta_chain, listener, engine_factory);
+                            let res = Self::do_transform(
+                                request,
+                                meta_chain,
+                                dataset_layout,
+                                listener,
+                                engine_factory,
+                            );
                             (dataset_id, res)
                         })
                         .unwrap();
