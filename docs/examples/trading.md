@@ -41,7 +41,7 @@ We will be using two root datasets:
 - `com.yahoo.finance.tickers.daily` - contains daily price summaries (candles) of several major tickers.
 - `my.trading.transactions` - contains a log of transaction from a fake trading account similar to what you'd get in data export from your trading platform.
 
-Both datasets are sourcing their data from files located in `data/` sub-directory. Once comfortable with this example you can explore sourcing ticker data from some financial APIs and using your own trading transaction history.
+Both datasets are sourcing their data from files located in `data/` sub-directory. Once comfortable with this example you can explore sourcing ticker data from external financial APIs (e.g. as name suggests from `finance.yahoo.com`) and using your own trading transaction history.
 
 Let's add the root datasets and ingest data:
 

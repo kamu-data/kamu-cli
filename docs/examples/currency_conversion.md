@@ -33,10 +33,10 @@ $ kamu pull --all
 
 ## Root Datasets
 We will be using two root datasets:
-- `io.exchangeratesapi.daily.usd-cad` - contains daily exchange rates between `USD` and `CAD` obtained using [exchangeratesapi.io](http://exchangeratesapi.io/) API.
+- `io.exchangeratesapi.daily.usd-cad` - contains daily exchange rates between `USD` and `CAD`.
 - `my.trading.transactions` - contains a log of transaction from a fake trading account similar to what you'd get in data export from your trading platform.
 
-Both datasets are sourcing their data from files located in `data/` sub-directory. Once comfortable with this example you can explore sourcing ticker data from some financial APIs and using your own trading transaction history.
+The `my.trading.transactions` is sourcing its data from a file located in `data/` sub-directory, while the exchange rates are obtained from an external source using the [exchangeratesapi.io](http://exchangeratesapi.io/) API.
 
 Let's add the root datasets and ingest data:
 
