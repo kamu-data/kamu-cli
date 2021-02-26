@@ -243,6 +243,7 @@ impl FetchService {
         h.get(true)?;
         h.connect_timeout(Duration::from_secs(30))?;
         h.progress(true)?;
+        h.follow_location(true)?;
 
         if let Some(ref cp) = old_checkpoint {
             let mut list = curl::easy::List::new();
