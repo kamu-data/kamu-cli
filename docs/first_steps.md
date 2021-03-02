@@ -1,11 +1,16 @@
 # First Steps <!-- omit in toc -->
 
+This tutorial is also available in a video form:
+
+[![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
+
 - [Getting data in](#getting-data-in)
   - [Initializing the workspace](#initializing-the-workspace)
   - [Adding a dataset](#adding-a-dataset)
 - [Exploring data](#exploring-data)
   - [SQL shell](#sql-shell)
   - [Notebooks](#notebooks)
+
 
 This tutorial will give you a high-level tour of `kamu` and show you how it works through examples.
 

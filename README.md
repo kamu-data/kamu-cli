@@ -60,9 +60,12 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
 
 ## Learning Materials
 
+[![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
+
 - [Kamu Blog: Introducing Open Data Fabric](https://www.kamu.dev/blog/introducing-odf/) - a casual introduction.
+- [Kamu 101 - First Steps](http://www.youtube.com/watch?v=UpT2tvf3r0Y) - a video overview of key features.
 - [Open Data Fabric protocol specification](https://github.com/kamu-data/open-data-fabric) - technical overview and many gory details.
-- [Data+AI Summit 2020 Talk: Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark)
+- [Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark) - Technical talk from **Data+AI Summit 2020**
 
 
 ## Features
