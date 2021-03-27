@@ -2,17 +2,15 @@ use crate::domain::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::{DatasetID, Sha3_256};
 
-use bytes::Bytes;
-use core::pin::Pin;
-use core::task::{Context, Poll};
-use futures::{ready, Stream};
+use bytes::BytesMut;
+use futures::TryStreamExt;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::*;
 use slog::{info, Logger};
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 pub struct RemoteS3 {
     s3: S3Client,
@@ -362,11 +360,13 @@ impl RemoteS3 {
         let file = tokio::fs::File::open(file_path).await?;
         let meta = file.metadata().await?;
 
+        let stream = FramedRead::new(file, BytesCodec::new()).map_ok(BytesMut::freeze);
+
         self.s3
             .put_object(PutObjectRequest {
                 bucket: self.bucket.clone(),
                 key: key,
-                body: Some(StreamingBody::new(AsyncReadToByteStream(file))),
+                body: Some(StreamingBody::new(stream)),
                 content_length: Some(meta.len() as i64),
                 ..PutObjectRequest::default()
             })
@@ -518,22 +518,6 @@ enum IfExists {
     Skip,
     Overwrite,
     Fail,
-}
-
-struct AsyncReadToByteStream<R>(R);
-
-impl<R: AsyncRead + Unpin> Stream for AsyncReadToByteStream<R> {
-    type Item = Result<Bytes, std::io::Error>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        let mut buf = vec![0_u8; 8 * 1024];
-
-        match ready!(Pin::new(&mut self.0).poll_read(cx, &mut buf[..])) {
-            Ok(n) if n != 0 => Some(Ok(Bytes::from(buf))).into(),
-            Ok(_) => None.into(),
-            Err(e) => Some(Err(e)).into(),
-        }
-    }
 }
 
 impl<E: 'static + std::error::Error + Send + Sync> From<RusotoError<E>> for RemoteError {

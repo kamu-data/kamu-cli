@@ -29,9 +29,10 @@ zip = "*"
 ringbuf = "*"
 
 # Remotes
-bytes = "0.5"  # Have to use older version to match rusoto
-futures = "0.3"
-tokio = { version = "0.2", features=[]}  # Have to use older version to match rusoto. See: https://github.com/rusoto/rusoto/issues/1845
+bytes = "*"
+futures = "*"
+tokio = { version = "*", features=["fs"]}
+tokio-util = { version = "*", features=["codec"]}
 rusoto_core = {version = "*", default_features = false, features=["rustls"]}
 rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 

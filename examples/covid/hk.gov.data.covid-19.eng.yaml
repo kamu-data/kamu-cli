@@ -1,0 +1,36 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: hk.gov.data.covid-19.eng
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: https://www.chp.gov.hk/files/misc/enhanced_sur_covid_19_eng.csv
+    read:
+      kind: csv
+      separator: ','
+      header: true
+      nullValue: ''
+    preprocess:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            CAST(`Case_no.` as BIGINT) as case_no,
+            CAST(UNIX_TIMESTAMP(`Report_date`, "dd/MM/yyyy") as TIMESTAMP) as report_date,
+            CAST(UNIX_TIMESTAMP(`Date_of_onset`, "dd/MM/yyyy") as TIMESTAMP) as onset_date,
+            `Gender` as gender,
+            CAST(`Age` as INTEGER) as age,
+            `Name_of_hospital_admitted` as hospital_admitted,
+            `Hospitalised/Discharged/Deceased` as hospitalization_status,
+            `HK/Non-HK_resident` as resident,
+            `Case_classification*` as classification,
+            `Confirmed/probable` as confirmation_status
+          FROM input
+    merge:
+      kind: ledger
+      primaryKey:
+      - case_no
+  vocab:
+    eventTimeColumn: report_date

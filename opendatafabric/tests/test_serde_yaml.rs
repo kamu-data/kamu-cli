@@ -38,7 +38,7 @@ fn serde_dataset_snapshot_root() {
               primaryKey:
                 - id
           vocab:
-            eventTimeColumn: date"
+            eventTimeColumn: date\n"
     );
 
     let expected = DatasetSnapshot {
@@ -126,7 +126,7 @@ fn serde_dataset_snapshot_derivative() {
             transform:
               kind: sql
               engine: spark
-              query: SOME_SQL"
+              query: SOME_SQL\n"
     );
 
     let expected = DatasetSnapshot {
@@ -193,7 +193,7 @@ fn serde_metadata_block() {
               engine: spark
               query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
           vocab:
-            eventTimeColumn: date"
+            eventTimeColumn: date\n"
     );
 
     let expected = MetadataBlock {
@@ -285,7 +285,7 @@ fn serde_metadata_block_hashes() {
               engine: spark
               query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
           vocab:
-            eventTimeColumn: date"
+            eventTimeColumn: date\n"
     );
 
     let block = MetadataBlock {
@@ -381,7 +381,7 @@ fn serde_fetch_step_files_glob() {
             path: /opt/x/*.txt
             cache:
               kind: forever
-            order: byName"
+            order: byName\n"
         )
     );
 }
@@ -437,7 +437,7 @@ fn serde_transform() {
             temporalTables:
               - id: foo
                 primaryKey:
-                  - id"
+                  - id\n"
         )
     );
 }

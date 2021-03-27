@@ -1,0 +1,34 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: ph.gov.covid-19
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: https://docs.google.com/spreadsheets/d/1wdxIwD0b58znX4UrH6JJh_0IhnZP0YWn23Uqs7lHB6Q/export?format=csv
+    read:
+      kind: csv
+      separator: ','
+      header: true
+      nullValue: ''
+    preprocess:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            CAST(`Case_#` as BIGINT) as case_no,
+            CAST(UNIX_TIMESTAMP(CONCAT(`Tested_Positive`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as report_date,
+            CAST(UNIX_TIMESTAMP(CONCAT(`Onset_of_Symptoms`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as onset_date,
+            `Sex` as gender,
+            CAST(`Age` as INTEGER) as age,
+            `Nationality` as nationality,
+            `Status` as status
+          FROM input
+          WHERE UNIX_TIMESTAMP(CONCAT(`Tested_Positive`, " 2020"), "MMMM d yyyy") IS NOT NULL
+    merge:
+      kind: ledger
+      primaryKey:
+      - case_no
+  vocab:
+    eventTimeColumn: report_date
