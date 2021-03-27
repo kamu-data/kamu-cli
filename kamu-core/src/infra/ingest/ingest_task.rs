@@ -347,8 +347,8 @@ impl FetchProgressListener for FetchProgressListenerBridge {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CommitCheckpoint {
     #[serde(with = "datetime_rfc3339")]
     pub last_committed: DateTime<Utc>,

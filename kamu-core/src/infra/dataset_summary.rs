@@ -5,16 +5,16 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub enum DatasetKind {
     Root,
     Derivative,
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSummary {
     pub id: DatasetIDBuf,
     pub kind: DatasetKind,

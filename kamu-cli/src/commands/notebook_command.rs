@@ -105,6 +105,7 @@ impl Command for NotebookCommand {
 }
 
 struct PullImageProgress {
+    #[allow(dead_code)]
     progress_bar: Option<indicatif::ProgressBar>,
 }
 

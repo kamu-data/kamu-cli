@@ -473,8 +473,8 @@ impl FetchService {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchCheckpoint {
     #[serde(with = "datetime_rfc3339")]
     pub last_fetched: DateTime<Utc>,

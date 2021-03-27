@@ -13,8 +13,8 @@ use ::serde::{Deserialize, Serialize};
 // ManifestDef
 ///////////////////////////////////////////////////////////////////////////////
 
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ManifestDefMetadataBlock {
     pub api_version: i32,
     pub kind: String,
@@ -22,8 +22,8 @@ struct ManifestDefMetadataBlock {
     pub content: MetadataBlock,
 }
 
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ManifestDefDatasetSnapshot {
     pub api_version: i32,
     pub kind: String,

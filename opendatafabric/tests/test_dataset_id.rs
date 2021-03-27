@@ -33,7 +33,7 @@ fn datasetid_equality() {
 fn datasetid_validation() {
     match DatasetID::try_from("valid.dataset-id") {
         Ok(act) => assert_eq!(act, "valid.dataset-id"),
-        Err(e) => assert!(false, e),
+        Err(e) => assert!(false, "{}", e),
     }
 
     assert!(DatasetID::try_from(".invalid").is_err());

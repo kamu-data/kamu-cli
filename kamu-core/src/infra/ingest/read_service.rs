@@ -93,8 +93,8 @@ impl ReadService {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadCheckpoint {
     #[serde(with = "datetime_rfc3339")]
     pub last_read: DateTime<Utc>,

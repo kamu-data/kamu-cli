@@ -29,8 +29,8 @@ impl PullImageListener for NullPullImageListener {}
 ///////////////////////////////////////////////////////////////////////////////
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IngestRequest {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
@@ -48,8 +48,8 @@ pub struct IngestRequest {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IngestResponse {
     #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
@@ -57,8 +57,8 @@ pub struct IngestResponse {
 
 #[skip_serializing_none]
 #[serde_as]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryRequest {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
@@ -73,16 +73,16 @@ pub struct ExecuteQueryRequest {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryResponse {
     #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InputDataSlice {
     pub interval: TimeInterval,
     pub data_paths: Vec<PathBuf>,
@@ -92,8 +92,8 @@ pub struct InputDataSlice {
 }
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Watermark {
     pub system_time: DateTime<Utc>,
     pub event_time: DateTime<Utc>,

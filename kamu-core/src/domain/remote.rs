@@ -11,8 +11,8 @@ pub type RemoteID = str;
 pub type RemoteIDBuf = String;
 
 #[skip_serializing_none]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Remote {
     pub url: Url,
 }
