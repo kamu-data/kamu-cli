@@ -105,7 +105,9 @@ impl FlatbuffersMetadataBlockDeserializer {
     }
 
     fn validate_hash_buffer_position(data: &[u8]) -> Result<(), Error> {
-        let proxy = flatbuffers::get_root::<super::odf_generated::MetadataBlock>(data);
+        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(data)
+            .map_err(|e| Error::serde(e))?;
+
         let block_hash = proxy.block_hash().unwrap();
 
         if block_hash.len() != Sha3_256::LENGTH {
@@ -160,7 +162,9 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
 
         Self::validate_block_hash(tail)?;
 
-        let proxy = flatbuffers::get_root::<super::odf_generated::MetadataBlock>(tail);
+        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(tail)
+            .map_err(|e| Error::serde(e))?;
+
         Ok(MetadataBlock::deserialize(proxy))
     }
 
@@ -171,7 +175,9 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
         assert_eq!(version, 1);
         assert_eq!(kind, "MetadataBlock");
 
-        let proxy = flatbuffers::get_root::<super::odf_generated::MetadataBlock>(tail);
+        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(tail)
+            .map_err(|e| Error::serde(e))?;
+
         Ok(MetadataBlock::deserialize(proxy))
     }
 }

@@ -260,7 +260,7 @@ fn serde_metadata_block_hashes() {
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: 2421af4d7b82d03cc3807fb7b00d82b410efb31ef36b407868ae5ae137d14186
+          blockHash: 95ddbfebb877b823babcb90cb5c7a0a50561d9265eca45b324f8ac7b0f1c14a0
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00.123456789Z\"
           outputSlice:

@@ -3,9 +3,6 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
-struct Option_bool { value: bool; }
-struct Option_int64 { value: int64; }
-
 struct Timestamp {
   year: int32;
   ordinal: uint16;
@@ -79,13 +76,11 @@ enum SourceOrdering: int32 {
   ByName,
 }
 
-struct Option_SourceOrdering { value: SourceOrdering; }
-
 table FetchStepFilesGlob {
   path: string;
   event_time: EventTimeSource;
   cache: SourceCaching;
-  order: Option_SourceOrdering;
+  order: SourceOrdering = null;
 }
 
 union FetchStep {
@@ -103,10 +98,8 @@ enum CompressionFormat: int32 {
   Zip,
 }
 
-struct Option_CompressionFormat { value: CompressionFormat; }
-
 table PrepStepDecompress {
-  format: Option_CompressionFormat;
+  format: CompressionFormat;
   sub_path: string;
 }
 
@@ -131,11 +124,11 @@ table ReadStepCsv {
   quote: string;
   escape: string;
   comment: string;
-  header: Option_bool;
-  enforce_schema: Option_bool;
-  infer_schema: Option_bool;
-  ignore_leading_white_space: Option_bool;
-  ignore_trailing_white_space: Option_bool;
+  header: bool = null;
+  enforce_schema: bool = null;
+  infer_schema: bool = null;
+  ignore_leading_white_space: bool = null;
+  ignore_trailing_white_space: bool = null;
   null_value: string;
   empty_value: string;
   nan_value: string;
@@ -143,15 +136,15 @@ table ReadStepCsv {
   negative_inf: string;
   date_format: string;
   timestamp_format: string;
-  multi_line: Option_bool;
+  multi_line: bool = null;
 }
 
 table ReadStepJsonLines {
   schema: [string];
   date_format: string;
   encoding: string;
-  multi_line: Option_bool;
-  primitives_as_string: Option_bool;
+  multi_line: bool = null;
+  primitives_as_string: bool = null;
   timestamp_format: string;
 }
 
@@ -279,7 +272,7 @@ table DatasetSnapshot {
 table DataSlice {
   hash: [ubyte];
   interval: TimeInterval;
-  num_records: Option_int64;
+  num_records: int64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

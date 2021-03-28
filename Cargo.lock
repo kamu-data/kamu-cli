@@ -65,12 +65,12 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#51c97799b8302466b9dfbb657dc23fd3f0cd8e61"
+source = "git+https://github.com/apache/arrow#5be69789eeac0f2c357cfcd0d329c518848adebc"
 dependencies = [
  "cfg_aliases",
  "chrono",
  "csv",
- "flatbuffers 0.8.3",
+ "flatbuffers",
  "hex",
  "indexmap",
  "lazy_static",
@@ -553,16 +553,6 @@ dependencies = [
  "libc",
  "redox_syscall 0.2.5",
  "winapi",
-]
-
-[[package]]
-name = "flatbuffers"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbf606a9d6674ad82094652789cf69b0e6e598c2d3c9137c28970eec13f11644"
-dependencies = [
- "bitflags",
- "smallvec",
 ]
 
 [[package]]
@@ -1308,7 +1298,7 @@ version = "0.37.0"
 dependencies = [
  "byteorder",
  "chrono",
- "flatbuffers 0.7.0",
+ "flatbuffers",
  "hex",
  "indoc",
  "intervals-general",
@@ -1360,7 +1350,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#51c97799b8302466b9dfbb657dc23fd3f0cd8e61"
+source = "git+https://github.com/apache/arrow#5be69789eeac0f2c357cfcd0d329c518848adebc"
 dependencies = [
  "arrow",
  "base64 0.12.3",

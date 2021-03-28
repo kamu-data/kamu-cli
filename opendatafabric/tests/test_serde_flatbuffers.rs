@@ -141,7 +141,7 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("f64cac020bc6c15f6d818296e851b7ad2c3da9407220a1741b2d1818d44ddca1")
+        Sha3_256::try_from("d8be7cde15b4507b98226444a8e75c3459be33de5aa2abf59974ed8f9a71faea")
             .unwrap()
     );
 }
@@ -156,7 +156,7 @@ fn serializer_hashes_are_stable_deriv() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("34e8caff978659f26c6d9e879e3d8ad9e122c20140b5df61b0183329d0d5c41a")
+        Sha3_256::try_from("9c8da1a7e766716f919f6a3b005d511e0498c33beab8dbae30f434f25f697296")
             .unwrap()
     );
 }
