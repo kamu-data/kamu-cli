@@ -81,6 +81,7 @@ impl TestPullService {
         let result = IngestResult::Updated {
             block_hash: hash.to_owned(),
             has_more: false,
+            uncacheable: false,
         };
         listener.success(&result);
 

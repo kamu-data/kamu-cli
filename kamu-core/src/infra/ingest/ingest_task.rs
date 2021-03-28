@@ -86,12 +86,8 @@ impl IngestTask {
         self.listener.lock().unwrap().begin();
 
         match self.ingest_inner() {
-            Ok((res, cacheable)) => {
-                if cacheable {
-                    self.listener.lock().unwrap().success(&res);
-                } else {
-                    self.listener.lock().unwrap().uncacheable();
-                }
+            Ok(res) => {
+                self.listener.lock().unwrap().success(&res);
                 Ok(res)
             }
             Err(err) => {
@@ -102,7 +98,7 @@ impl IngestTask {
     }
 
     // Note: Can be called from multiple threads
-    pub fn ingest_inner(&mut self) -> Result<(IngestResult, bool), IngestError> {
+    pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
         self.listener
             .lock()
             .unwrap()
@@ -139,15 +135,18 @@ impl IngestTask {
         let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash)?;
 
         let res = if commit_result.was_up_to_date {
-            IngestResult::UpToDate
+            IngestResult::UpToDate {
+                uncacheable: !cacheable,
+            }
         } else {
             IngestResult::Updated {
                 block_hash: commit_result.checkpoint.last_hash,
                 has_more: has_more,
+                uncacheable: !cacheable,
             }
         };
 
-        Ok((res, cacheable))
+        Ok(res)
     }
 
     fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {

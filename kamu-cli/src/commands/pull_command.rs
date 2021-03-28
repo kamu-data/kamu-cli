@@ -365,28 +365,46 @@ impl IngestListener for PrettyIngestProgress {
     }
 
     fn success(&mut self, result: &IngestResult) {
-        let msg = match result {
-            IngestResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
+        match result {
+            IngestResult::UpToDate { uncacheable } => {
+                self.curr_progress
+                    .finish_with_message(&Self::spinner_message(
+                        &self.dataset_id,
+                        IngestStage::Commit as u32,
+                        if *uncacheable {
+                            console::style(
+                                "Dataset is uncachable (use --force-uncacheable to update)"
+                                    .to_owned(),
+                            )
+                            .yellow()
+                        } else {
+                            console::style("Dataset is up-to-date".to_owned()).yellow()
+                        },
+                    ));
+            }
             IngestResult::Updated {
                 ref block_hash,
                 has_more: _,
-            } => console::style(format!("Committed new block {}", block_hash.short())).green(),
+                uncacheable,
+            } => {
+                if *uncacheable {
+                    self.curr_progress
+                        .finish_with_message(&Self::spinner_message(
+                            &self.dataset_id,
+                            IngestStage::Commit as u32,
+                            console::style("Data source is uncacheable").yellow(),
+                        ));
+                    self.curr_progress = self.multi_progress.add(Self::new_spinner(""));
+                };
+                self.curr_progress
+                    .finish_with_message(&Self::spinner_message(
+                        &self.dataset_id,
+                        IngestStage::Commit as u32,
+                        console::style(format!("Committed new block {}", block_hash.short()))
+                            .green(),
+                    ));
+            }
         };
-        self.curr_progress
-            .finish_with_message(&Self::spinner_message(
-                &self.dataset_id,
-                IngestStage::Commit as u32,
-                msg,
-            ));
-    }
-
-    fn uncacheable(&mut self) {
-        self.curr_progress
-            .finish_with_message(&Self::spinner_message(
-                &self.dataset_id,
-                IngestStage::Commit as u32,
-                console::style("Data source is uncacheable and will not be updated").yellow(),
-            ));
     }
 
     fn error(&mut self, _error: &IngestError) {

@@ -46,10 +46,13 @@ impl Default for IngestOptions {
 
 #[derive(Debug)]
 pub enum IngestResult {
-    UpToDate,
+    UpToDate {
+        uncacheable: bool,
+    },
     Updated {
         block_hash: Sha3_256,
         has_more: bool,
+        uncacheable: bool,
     },
 }
 
@@ -73,7 +76,6 @@ pub trait IngestListener: Send {
     fn on_stage_progress(&mut self, _stage: IngestStage, _n: u64, _out_of: u64) {}
 
     fn success(&mut self, _result: &IngestResult) {}
-    fn uncacheable(&mut self) {}
     fn error(&mut self, _error: &IngestError) {}
 
     fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {

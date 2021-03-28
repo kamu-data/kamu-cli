@@ -65,7 +65,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#5be69789eeac0f2c357cfcd0d329c518848adebc"
+source = "git+https://github.com/apache/arrow#2661fc31648ba621f0d70eaf91ae47dfe552fedd"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -309,9 +309,9 @@ dependencies = [
 
 [[package]]
 name = "const_fn"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b9d6de7f49e22cf97ad17fc4036ece69300032f45f78f30b4a4482cdc3f4a6"
+checksum = "076a6803b0dacd6a88cfe64deba628b01533ff5ef265687e6938280c1afd0a28"
 
 [[package]]
 name = "constant_time_eq"
@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.37.0"
+version = "0.38.0"
 dependencies = [
  "assert_matches",
  "bytes",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.37.0"
+version = "0.38.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1023,7 +1023,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-test"
-version = "0.37.0"
+version = "0.38.0"
 dependencies = [
  "chrono",
  "opendatafabric",
@@ -1294,7 +1294,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.37.0"
+version = "0.38.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -1350,7 +1350,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#5be69789eeac0f2c357cfcd0d329c518848adebc"
+source = "git+https://github.com/apache/arrow#2661fc31648ba621f0d70eaf91ae47dfe552fedd"
 dependencies = [
  "arrow",
  "base64 0.12.3",
@@ -1890,9 +1890,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.1.2"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d493c5f39e02dfb062cd8f33301f90f9b13b650e8c1b1d0fd75c19dd64bff69d"
+checksum = "3670b1d2fdf6084d192bc71ead7aabe6c06aa2ea3fbd9cc3ac111fa5c2b1bd84"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -1903,9 +1903,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.1.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dee48cdde5ed250b0d3252818f646e174ab414036edb884dde62d80a3ac6082d"
+checksum = "3676258fd3cfe2c9a0ec99ce3038798d847ce3e4bb17746373eb9f0f1ac16339"
 dependencies = [
  "core-foundation-sys",
  "libc",

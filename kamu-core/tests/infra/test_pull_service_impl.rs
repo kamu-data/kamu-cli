@@ -183,7 +183,12 @@ impl IngestService for TestIngestService {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
         let results = ids
             .iter()
-            .map(|id| (id.clone(), Ok(IngestResult::UpToDate)))
+            .map(|id| {
+                (
+                    id.clone(),
+                    Ok(IngestResult::UpToDate { uncacheable: false }),
+                )
+            })
             .collect();
         self.calls.push(ids);
         results

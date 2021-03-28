@@ -78,10 +78,11 @@ impl PullServiceImpl {
     ) -> Result<PullResult, PullError> {
         match res {
             Ok(res) => Ok(match res {
-                IngestResult::UpToDate => PullResult::UpToDate,
+                IngestResult::UpToDate { uncacheable: _ } => PullResult::UpToDate,
                 IngestResult::Updated {
                     block_hash,
                     has_more: _,
+                    uncacheable: _,
                 } => PullResult::Updated {
                     block_hash: block_hash,
                 },
