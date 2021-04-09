@@ -17,15 +17,15 @@ content:
         engine: spark
         query: >
           SELECT
-            CAST(`Case_#` as BIGINT) as case_no,
-            CAST(UNIX_TIMESTAMP(CONCAT(`Tested_Positive`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as report_date,
-            CAST(UNIX_TIMESTAMP(CONCAT(`Onset_of_Symptoms`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as onset_date,
+            CAST(`Case #` as BIGINT) as case_no,
+            CAST(UNIX_TIMESTAMP(CONCAT(`Tested Positive`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as report_date,
+            CAST(UNIX_TIMESTAMP(CONCAT(`Onset of Symptoms`, " 2020"), "MMMM d yyyy") as TIMESTAMP) as onset_date,
             `Sex` as gender,
             CAST(`Age` as INTEGER) as age,
             `Nationality` as nationality,
             `Status` as status
           FROM input
-          WHERE UNIX_TIMESTAMP(CONCAT(`Tested_Positive`, " 2020"), "MMMM d yyyy") IS NOT NULL
+          WHERE UNIX_TIMESTAMP(CONCAT(`Tested Positive`, " 2020"), "MMMM d yyyy") IS NOT NULL
     merge:
       kind: ledger
       primaryKey:
