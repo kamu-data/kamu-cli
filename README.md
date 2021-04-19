@@ -30,6 +30,9 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
 
 
 ## Documentation
+
+> Our documentation is still evolving, so many topics (those without links) have not been covered yet. Answers to most questions around theory, however, can be found in the [ODF specification](https://github.com/kamu-data/open-data-fabric)
+
 - **[Installation](docs/install.md)**
 - **[First Steps](docs/first_steps.md)**
 - **Examples**
@@ -39,20 +42,39 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
   - **[Housing Prices Analysis](docs/examples/housing_prices.md)** [GIS functions and joins, notebooks]
 - **Ingesting Data**
   - Supported Formats
-  - Merge Strategies
+  - **[Merge Strategies](docs/merge_strategies.md)**
+- **Exporting Data**
 - **Transforming Data**
+  - Transformation model
+  - Supported Engines
+  - Projections
   - Streaming Aggregations
   - Temporal Table Joins
   - Stream-to-Stream Joins
   - Watermarks
   - Geo-Spatial Data
+- **Dataset Evolution**
+  - Schema Evolution
+    - Adding / deprecating columns
+    - Upstream schema changes
+    - Backwards incompatible changes
+  - Root Dataset Evolution
+    - Handling source URL changes
+    - Handling upstream format changes
+  - Derivative Dataset Evolution
+    - Handling upstream changes
+    - Evolving transformations
+- **Handling Bad Data**
+  - Corrections and compensations
+  - Bad data upon ingestion
+  - Bad data in upstream datasets
+  - PII and sensitive data
 - **[Exploring Data](docs/exploring_data.md)**
 - **[Sharing data](docs/sharing_data.md)**
+  - **[Supported Remotes](docs/sharing_data.md#remote-types)**
 - **[Troubleshooting](docs/troubleshooting.md)**
 - **Reference**
-  - **[Metadata Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema)**
-  - Supported Engines
-  - **[Supported Remotes](docs/sharing_data.md#remote-types)**
+  - **[Manifests Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadata-reference)**
 - **Contributing**
   - Contribution Guidelines
   - **[Developer Guide](docs/developer_guide.md)**
