@@ -153,7 +153,7 @@ impl Command for CompleteCommand {
             match pos.1.b.name {
                 "dataset" => self.complete_dataset(to_complete),
                 "remote" => self.complete_remote(to_complete),
-                "snapshot" => self.complete_path(to_complete),
+                "manifest" => self.complete_path(to_complete),
                 _ => (),
             }
         }

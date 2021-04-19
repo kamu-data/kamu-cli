@@ -70,7 +70,7 @@ fn main() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
             resource_loader.clone(),
             metadata_repo.clone(),
-            submatches.values_of("snapshot").unwrap(),
+            submatches.values_of("manifest").unwrap(),
             submatches.is_present("recursive"),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
