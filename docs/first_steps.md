@@ -4,6 +4,7 @@ This tutorial is also available in a video form:
 
 [![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
 
+- [Using the help command](#using-the-help-command)
 - [Getting data in](#getting-data-in)
   - [Initializing the workspace](#initializing-the-workspace)
   - [Adding a dataset](#adding-a-dataset)
@@ -18,6 +19,13 @@ We assume that you have already followed the [installation steps](./install.md) 
 
 Throughout this tutorial we will be using the [Zip Code Boundaries](https://data.cityofnewyork.us/Business/Zip-Code-Boundaries/i8iw-xf4u) dataset, which can be found on [New York Open Data Portal](http://opendata.cityofnewyork.us/).
 
+
+## Using the help command
+When you execute `kamu` or `kamu -h` - the help message about all top-level commands will be displayed.
+
+To get help on individual commands type `kamu <command> -h` - this will usually contain a detailed description of what command does along with usage examples.
+
+Note that some command also have sub-commands, e.g. `kamu remote {add,list,...}`, same help pattern applies to those as well, e.g. `kamu remote add -h`.
 
 ## Getting data in
 
@@ -40,7 +48,7 @@ One of the design principles of `kamu` is to always know exactly where any piece
 
 ![kamu init](./first_steps_files/pull.gif)
 
-We will use a dataset definition from the [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib/blob/master/us.cityofnewyork.data/zipcode-boundaries.yaml) which looks like this:
+We will use a dataset manifest from the [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib/blob/master/us.cityofnewyork.data/zipcode-boundaries.yaml) which looks like this:
 
 ```yaml
 apiVersion: 1
@@ -67,7 +75,9 @@ Such dataset in `kamu` is called a **root** dataset and is defined by a sequence
 - `preprocess` (optional) - shaping the structured data and converting types into best suited form
 - `merge` - merging the new data from the source with the history of previously seen data
 
-Note that the data file we are ingesting is in ESRI Shapefile format, which is a common format for geo-spatial data, so we are using a special `esriShapefile` reader in our dataset definition.
+> To create your own dataset manifests use `kamu new` command - it outputs a well-annotated template that you can customize for your needs.
+
+Note that the data file we are ingesting is in ESRI Shapefile format, which is a common format for geo-spatial data, so we are using a special `esriShapefile` reader in our dataset manifest.
 
 Let's add it to our workspace by giving `kamu` this file's URL:
 
