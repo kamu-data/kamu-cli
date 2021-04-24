@@ -518,7 +518,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                     Execute SQL command and return its output in CSV format:
 
-                        kamu sql -c 'SELECT * FROM org.example.data LIMIT 10' -o csv
+                        kamu sql -c 'SELECT * FROM `org.example.data` LIMIT 10' -o csv
 
                     Run SQL server to use with external data processing tools:
 
