@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.38.3] - 2021-04-23
+### Fixed
+- An error in the `sql` command help message
+- Release binaries will now be packaged as `kamu`, not `kamu-cli`
+
 ## [0.38.2] - 2021-04-18
 ### Added
 - Detailed help and examples to all CLI commands
