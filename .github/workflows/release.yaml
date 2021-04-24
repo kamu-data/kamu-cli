@@ -31,7 +31,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}
+          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
           if-no-files-found: error
   build_macos:
     name: Build / MacOS
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}
+          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
           if-no-files-found: error
   build_windows:
     name: Build / Windows
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}.exe
+          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
           if-no-files-found: error
   create_release:
     name: Create Release
