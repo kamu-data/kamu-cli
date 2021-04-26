@@ -65,7 +65,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#f1ac15d38aa0df1fafd26ebf24638af789a1e1b5"
+source = "git+https://github.com/apache/arrow#ca83a14e264d00c6b4b29560cc2816c6718f52e7"
 dependencies = [
  "cfg_aliases",
  "chrono",
@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.38.3"
+version = "0.39.0"
 dependencies = [
  "assert_matches",
  "bytes",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.38.3"
+version = "0.39.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1023,7 +1023,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-test"
-version = "0.38.3"
+version = "0.39.0"
 dependencies = [
  "chrono",
  "opendatafabric",
@@ -1294,7 +1294,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.38.3"
+version = "0.39.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -1350,7 +1350,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/apache/arrow#f1ac15d38aa0df1fafd26ebf24638af789a1e1b5"
+source = "git+https://github.com/apache/arrow#ca83a14e264d00c6b4b29560cc2816c6718f52e7"
 dependencies = [
  "arrow",
  "base64 0.12.3",

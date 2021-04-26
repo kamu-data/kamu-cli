@@ -94,6 +94,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .short("r")
                         .long("recursive")
                         .help("Recursively search for all manifest in the specified directory"),
+                    Arg::with_name("replace")
+                        .long("replace")
+                        .help("Delete and re-add datasets that already exist"),
                     Arg::with_name("manifest")
                         .multiple(true)
                         .required(true)

@@ -1,6 +1,9 @@
+use super::common;
 use super::{Command, Error};
 use kamu::domain::*;
 use opendatafabric::*;
+
+use thiserror::Error;
 
 use std::cell::RefCell;
 use std::io::Read;
@@ -11,6 +14,7 @@ pub struct AddCommand {
     metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
     snapshot_refs: Vec<String>,
     recursive: bool,
+    replace: bool,
 }
 
 impl AddCommand {
@@ -19,6 +23,7 @@ impl AddCommand {
         metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
         snapshot_refs_iter: I,
         recursive: bool,
+        replace: bool,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -28,27 +33,25 @@ impl AddCommand {
             metadata_repo: metadata_repo,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive: recursive,
+            replace: replace,
         }
     }
 }
 
 impl AddCommand {
-    fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, DomainError>)> {
+    fn load_specific(&self) -> Vec<Result<DatasetSnapshot, DatasetAddError>> {
         self.snapshot_refs
             .iter()
             .map(|r| {
-                (
-                    r.clone(),
-                    self.resource_loader
-                        .borrow()
-                        .load_dataset_snapshot_from_ref(r)
-                        .map_err(|e| DomainError::InfraError(e.into())),
-                )
+                self.resource_loader
+                    .borrow()
+                    .load_dataset_snapshot_from_ref(r)
+                    .map_err(|e| DatasetAddError::new(r.clone(), DomainError::InfraError(e.into())))
             })
             .collect()
     }
 
-    fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, DomainError>)> {
+    fn load_recursive(&self) -> Vec<Result<DatasetSnapshot, DatasetAddError>> {
         self.snapshot_refs
             .iter()
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
@@ -59,13 +62,15 @@ impl AddCommand {
             .map(|e| e.unwrap())
             .filter(|p| self.is_snapshot_file(p))
             .map(|p| {
-                (
-                    p.to_str().unwrap().to_owned(),
-                    self.resource_loader
-                        .borrow()
-                        .load_dataset_snapshot_from_path(&p)
-                        .map_err(|e| DomainError::InfraError(e.into())),
-                )
+                self.resource_loader
+                    .borrow()
+                    .load_dataset_snapshot_from_path(&p)
+                    .map_err(|e| {
+                        DatasetAddError::new(
+                            p.to_str().unwrap().to_owned(),
+                            DomainError::InfraError(e.into()),
+                        )
+                    })
             })
             .collect()
     }
@@ -84,44 +89,67 @@ impl AddCommand {
 
 impl Command for AddCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let mut load_results = if !self.recursive {
+        let load_results = if !self.recursive {
             self.load_specific()
         } else {
             self.load_recursive()
         };
 
-        load_results.sort_by(|(ref_a, _), (ref_b, _)| ref_a.cmp(&ref_b));
+        let (snapshots, errors): (Vec<_>, Vec<_>) =
+            load_results.into_iter().partition(Result::is_ok);
+        let snapshots: Vec<_> = snapshots.into_iter().map(Result::unwrap).collect();
+        let mut errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
 
-        let (mut added, mut errors) = (0, 0);
-
-        load_results.iter().for_each(|(r, res)| match res {
-            Err(error) => {
-                eprintln!("{}: {}", console::style(r).red(), error);
-                errors += 1;
+        if errors.len() != 0 {
+            errors.sort_by(|a, b| a.dataset_ref.cmp(&b.dataset_ref));
+            for e in errors {
+                eprintln!("{}: {}", console::style(e.dataset_ref).red(), e.source);
             }
-            _ => (),
-        });
-
-        if errors != 0 {
             return Err(Error::Aborted);
         }
 
-        let mut add_results =
-            self.metadata_repo
-                .borrow_mut()
-                .add_datasets(
-                    &mut load_results.into_iter().filter_map(|(_, res)| match res {
-                        Ok(snapshot) => Some(snapshot),
-                        _ => None,
-                    }),
-                );
+        // Delete existing datasets if we are replacing
+        if self.replace {
+            let already_exist: Vec<_> = snapshots
+                .iter()
+                .filter(|s| self.metadata_repo.borrow().get_summary(&s.id).is_ok())
+                .collect();
+
+            if already_exist.len() != 0 {
+                let confirmed = common::prompt_yes_no(&format!(
+                    "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
+                    console::style("You are about to replace following dataset(s)").yellow(),
+                    already_exist
+                        .iter()
+                        .map(|s| s.id.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    console::style("This operation is irreversible!").yellow(),
+                ));
+
+                if !confirmed {
+                    return Err(Error::Aborted);
+                }
+
+                for s in already_exist {
+                    self.metadata_repo.borrow_mut().delete_dataset(&s.id)?;
+                }
+            }
+        };
+
+        let mut add_results = self
+            .metadata_repo
+            .borrow_mut()
+            .add_datasets(&mut snapshots.into_iter());
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
+
+        let (mut num_added, mut num_errors) = (0, 0);
 
         for (id, res) in add_results {
             match res {
                 Ok(_) => {
-                    added += 1;
+                    num_added += 1;
                     eprintln!("{}: {}", console::style("Added").green(), id);
                 }
                 Err(DomainError::AlreadyExists { .. }) => {
@@ -132,7 +160,7 @@ impl Command for AddCommand {
                     );
                 }
                 Err(err) => {
-                    errors += 1;
+                    num_errors += 1;
                     eprintln!("{}: {}: {}", console::style("Error").red(), id, err);
                 }
             }
@@ -140,17 +168,34 @@ impl Command for AddCommand {
 
         eprintln!(
             "{}",
-            console::style(format!("Added {} dataset(s)", added))
+            console::style(format!("Added {} dataset(s)", num_added))
                 .green()
                 .bold()
         );
 
-        if errors == 0 {
+        if num_errors == 0 {
             Ok(())
-        } else if added > 0 {
+        } else if num_added > 0 {
             Err(Error::PartialFailure)
         } else {
             Err(Error::Aborted)
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("Failed to add {dataset_ref}")]
+struct DatasetAddError {
+    pub dataset_ref: String,
+    #[source]
+    pub source: DomainError,
+}
+
+impl DatasetAddError {
+    pub fn new(dataset_ref: String, source: DomainError) -> Self {
+        DatasetAddError {
+            dataset_ref: dataset_ref,
+            source: source,
         }
     }
 }

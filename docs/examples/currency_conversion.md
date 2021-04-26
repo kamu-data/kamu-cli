@@ -67,6 +67,9 @@ Remember that after adding a dataset from a `yaml` file - `kamu` creates an inte
 $ kamu delete io.exchangeratesapi.daily.usd-cad
 # ... Make changes to the yaml file ...
 $ kamu add io.exchangeratesapi.daily.usd-cad.yaml
+
+# Or alternatively
+$ kamu add --replace io.exchangeratesapi.daily.usd-cad.yaml
 ```
 
 ## Converting transaction values into CAD

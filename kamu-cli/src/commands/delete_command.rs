@@ -1,3 +1,4 @@
+use super::common;
 use super::{Command, Error};
 use kamu::domain::*;
 use opendatafabric::*;
@@ -34,24 +35,6 @@ impl DeleteCommand {
             no_confirmation: no_confirmation,
         }
     }
-
-    fn prompt_yes_no(&self, msg: &str) -> bool {
-        use read_input::prelude::*;
-
-        let answer: String = input()
-            .repeat_msg(msg)
-            .default("n".to_owned())
-            .add_test(|v| match v.as_ref() {
-                "n" | "N" | "no" | "y" | "Y" | "yes" => true,
-                _ => false,
-            })
-            .get();
-
-        match answer.as_ref() {
-            "n" | "N" | "no" => false,
-            _ => true,
-        }
-    }
 }
 
 impl Command for DeleteCommand {
@@ -74,7 +57,7 @@ impl Command for DeleteCommand {
         let confirmed = if self.no_confirmation {
             true
         } else {
-            self.prompt_yes_no(&format!(
+            common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
                 dataset_ids

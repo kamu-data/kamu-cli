@@ -72,6 +72,7 @@ fn main() {
             metadata_repo.clone(),
             submatches.values_of("manifest").unwrap(),
             submatches.is_present("recursive"),
+            submatches.is_present("replace"),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
             if in_workspace(&workspace_layout) {
