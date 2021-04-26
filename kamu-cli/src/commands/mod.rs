@@ -1,5 +1,7 @@
 pub use super::error::Error;
 
+mod common;
+
 mod add_command;
 pub use add_command::*;
 

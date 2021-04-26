@@ -72,6 +72,9 @@ Remember that after adding a dataset from a `yaml` file - `kamu` creates an inte
 $ kamu delete com.yahoo.finance.tickers.daily
 # ... Make changes to the yaml file ...
 $ kamu add com.yahoo.finance.tickers.daily.yaml
+
+# Or alternatively
+$ kamu add --replace com.yahoo.finance.tickers.daily.yaml
 ```
 
 ## Deriving current holdings from the transaction log
