@@ -11,6 +11,7 @@ pub struct SqlShellCommand {
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
     command: Option<String>,
+    url: Option<String>,
     logger: Logger,
 }
 
@@ -20,6 +21,7 @@ impl SqlShellCommand {
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
         command: Option<&str>,
+        url: Option<&str>,
         logger: Logger,
     ) -> Self {
         Self {
@@ -27,6 +29,7 @@ impl SqlShellCommand {
             volume_layout: volume_layout.clone(),
             output_config: output_config.clone(),
             command: command.map(|v| v.to_owned()),
+            url: url.map(|v| v.to_owned()),
             logger: logger,
         }
     }
@@ -57,6 +60,7 @@ impl Command for SqlShellCommand {
                 OutputFormat::Json => Some("json"),
                 OutputFormat::Table => Some("table"),
             },
+            self.url.clone(),
             self.command.as_ref(),
             self.logger.clone(),
             || {
@@ -65,6 +69,7 @@ impl Command for SqlShellCommand {
                 }
             },
         )?;
+
         Ok(())
     }
 }

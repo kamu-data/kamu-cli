@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.40.0] - 2021-04-29
+### Added
+- Implemented `sql server` command - now it's possible to run Thrift server on a specific address/port and connect to it remotely.
+
 ## [0.39.0] - 2021-04-25
 ### Added
 - Added `--replace` flag to the `add` command allowing to delete and re-add a dataset in a single step.

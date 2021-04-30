@@ -16,6 +16,7 @@ pub struct DockerRunArgs {
     pub expose_all_ports: bool,
     pub expose_ports: Vec<u16>,
     pub expose_port_map: Vec<(u16, u16)>,
+    pub expose_port_map_addr: Vec<(String, u16, u16)>,
     pub expose_port_map_range: Vec<((u16, u16), (u16, u16))>,
     pub hostname: Option<String>,
     pub image: String,
@@ -45,6 +46,7 @@ impl Default for DockerRunArgs {
             expose_all_ports: false,
             expose_ports: Vec::new(),
             expose_port_map: Vec::new(),
+            expose_port_map_addr: Vec::new(),
             expose_port_map_range: Vec::new(),
             hostname: None,
             image: "".to_owned(),
@@ -145,6 +147,10 @@ impl DockerClient {
         args.expose_port_map.iter().for_each(|(h, c)| {
             cmd.arg("-p");
             cmd.arg(format!("{}:{}", h, c));
+        });
+        args.expose_port_map_addr.iter().for_each(|(addr, h, c)| {
+            cmd.arg("-p");
+            cmd.arg(format!("{}:{}:{}", addr, h, c));
         });
         args.expose_port_map_range
             .iter()
