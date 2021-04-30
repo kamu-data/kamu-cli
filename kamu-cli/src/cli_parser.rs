@@ -487,7 +487,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                                 .help("Expose JDBC server on specific network interface"),
                             Arg::with_name("port")
                                 .long("port")
-                                .default_value("8080")
+                                .default_value("10000")
                                 .help("Expose JDBC server on specific port"),
                         ]),
                 )
@@ -496,7 +496,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .long("url")
                         .takes_value(true)
                         .value_name("URL")
-                        .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10090)"),
+                        .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)"),
                     Arg::with_name("command")
                         .short("c")
                         .long("command")
@@ -526,6 +526,14 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Run SQL server to use with external data processing tools:
 
                         kamu sql server --address 0.0.0.0 --port 8080
+
+                    Connect to a remote SQL server:
+
+                        kamu sql --url jdbc:hive2://example.com:10000
+
+                    Note: Currently when connecting to a remote SQL kamu server you will need to manually instruct it to load datasets from the data files. This can be done using the following command:
+
+                        CREATE TEMP VIEW `my.dataset` AS (SELECT * FROM parquet.`kamu_data/my.dataset`);
                     "
                 ))
             ),
