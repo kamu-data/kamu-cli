@@ -1,3 +1,5 @@
+# This is not a trustworthy dataset, used for demonstration purposes only
+# Source: https://www.reddit.com/r/Coronavirus_PH/comments/fehzke/ph_covid19_case_database_is_now_live/
 apiVersion: 1
 kind: DatasetSnapshot
 content:
@@ -25,7 +27,9 @@ content:
             `Nationality` as nationality,
             `Status` as status
           FROM input
-          WHERE UNIX_TIMESTAMP(CONCAT(`Tested Positive`, " 2020"), "MMMM d yyyy") IS NOT NULL
+          WHERE
+            UNIX_TIMESTAMP(CONCAT(`Tested Positive`, " 2020"), "MMMM d yyyy") IS NOT NULL
+            AND CAST(`Case #` as BIGINT) IS NOT NULL
     merge:
       kind: ledger
       primaryKey:
