@@ -15,8 +15,11 @@ pub struct FlatbuffersMetadataBlockSerializer;
 ///////////////////////////////////////////////////////////////////////////////
 
 impl FlatbuffersMetadataBlockSerializer {
+    const METADATA_BLOCK_SIZE_ESTIMATE: usize = 10 * 1024;
+
     pub fn serialize_metadata_block(&self, block: &MetadataBlock) -> Buffer<u8> {
-        let mut fb = flatbuffers::FlatBufferBuilder::new_with_capacity(0);
+        let mut fb =
+            flatbuffers::FlatBufferBuilder::with_capacity(Self::METADATA_BLOCK_SIZE_ESTIMATE);
         let offset = block.serialize(&mut fb);
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();

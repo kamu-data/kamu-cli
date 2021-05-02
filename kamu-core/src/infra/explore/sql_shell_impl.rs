@@ -56,7 +56,10 @@ impl SqlShellImpl {
                     (init_script_path, PathBuf::from("/opt/spark/shell_init.sql")),
                 ]
             } else {
-                vec![]
+                vec![
+                    (cwd, PathBuf::from("/opt/spark/kamu_shell")),
+                    (init_script_path, PathBuf::from("/opt/spark/shell_init.sql")),
+                ]
             },
             args: vec![String::from("sleep"), String::from("999999")],
             ..DockerRunArgs::default()
@@ -248,6 +251,11 @@ impl SqlShellImpl {
 
     fn prepare_shell_init(volume_layout: &VolumeLayout) -> Result<String, std::io::Error> {
         use std::fmt::Write;
+
+        if !volume_layout.data_dir.exists() {
+            return Ok(String::default());
+        }
+
         let mut ret = String::with_capacity(2048);
         for entry in std::fs::read_dir(&volume_layout.data_dir)? {
             let p = entry?.path();
