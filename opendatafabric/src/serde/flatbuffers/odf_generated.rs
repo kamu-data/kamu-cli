@@ -6,7 +6,7 @@ use std::mem;
 use std::cmp::Ordering;
 
 extern crate flatbuffers;
-use self::flatbuffers::EndianScalar;
+use self::flatbuffers::{EndianScalar, Follow};
 
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_TIME_INTERVAL_TYPE: u8 = 0;
@@ -91,7 +91,9 @@ impl<'a> flatbuffers::Follow<'a> for TimeIntervalType {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -100,7 +102,7 @@ impl flatbuffers::Push for TimeIntervalType {
     type Output = TimeIntervalType;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -111,6 +113,7 @@ impl flatbuffers::EndianScalar for TimeIntervalType {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -179,7 +182,9 @@ impl<'a> flatbuffers::Follow<'a> for EventTimeSource {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -188,7 +193,7 @@ impl flatbuffers::Push for EventTimeSource {
     type Output = EventTimeSource;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -199,6 +204,7 @@ impl flatbuffers::EndianScalar for EventTimeSource {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -265,7 +271,9 @@ impl<'a> flatbuffers::Follow<'a> for SourceCaching {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -274,7 +282,7 @@ impl flatbuffers::Push for SourceCaching {
     type Output = SourceCaching;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -285,6 +293,7 @@ impl flatbuffers::EndianScalar for SourceCaching {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -351,7 +360,9 @@ impl<'a> flatbuffers::Follow<'a> for SourceOrdering {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<i32>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<i32>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -360,7 +371,7 @@ impl flatbuffers::Push for SourceOrdering {
     type Output = SourceOrdering;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<i32>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<i32>(dst, self.0); }
     }
 }
 
@@ -371,6 +382,7 @@ impl flatbuffers::EndianScalar for SourceOrdering {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = i32::from_le(self.0);
     Self(b)
@@ -439,7 +451,9 @@ impl<'a> flatbuffers::Follow<'a> for FetchStep {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -448,7 +462,7 @@ impl flatbuffers::Push for FetchStep {
     type Output = FetchStep;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -459,6 +473,7 @@ impl flatbuffers::EndianScalar for FetchStep {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -527,7 +542,9 @@ impl<'a> flatbuffers::Follow<'a> for CompressionFormat {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<i32>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<i32>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -536,7 +553,7 @@ impl flatbuffers::Push for CompressionFormat {
     type Output = CompressionFormat;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<i32>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<i32>(dst, self.0); }
     }
 }
 
@@ -547,6 +564,7 @@ impl flatbuffers::EndianScalar for CompressionFormat {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = i32::from_le(self.0);
     Self(b)
@@ -615,7 +633,9 @@ impl<'a> flatbuffers::Follow<'a> for PrepStep {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -624,7 +644,7 @@ impl flatbuffers::Push for PrepStep {
     type Output = PrepStep;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -635,6 +655,7 @@ impl flatbuffers::EndianScalar for PrepStep {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -713,7 +734,9 @@ impl<'a> flatbuffers::Follow<'a> for ReadStep {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -722,7 +745,7 @@ impl flatbuffers::Push for ReadStep {
     type Output = ReadStep;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -733,6 +756,7 @@ impl flatbuffers::EndianScalar for ReadStep {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -799,7 +823,9 @@ impl<'a> flatbuffers::Follow<'a> for Transform {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -808,7 +834,7 @@ impl flatbuffers::Push for Transform {
     type Output = Transform;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -819,6 +845,7 @@ impl flatbuffers::EndianScalar for Transform {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -893,7 +920,9 @@ impl<'a> flatbuffers::Follow<'a> for MergeStrategy {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -902,7 +931,7 @@ impl flatbuffers::Push for MergeStrategy {
     type Output = MergeStrategy;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -913,6 +942,7 @@ impl flatbuffers::EndianScalar for MergeStrategy {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -983,7 +1013,9 @@ impl<'a> flatbuffers::Follow<'a> for DatasetSource {
   type Inner = Self;
   #[inline]
   fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-    let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+    let b = unsafe {
+      flatbuffers::read_scalar_at::<u8>(buf, loc)
+    };
     Self(b)
   }
 }
@@ -992,7 +1024,7 @@ impl flatbuffers::Push for DatasetSource {
     type Output = DatasetSource;
     #[inline]
     fn push(&self, dst: &mut [u8], _rest: &[u8]) {
-        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        unsafe { flatbuffers::emplace_scalar::<u8>(dst, self.0); }
     }
 }
 
@@ -1003,6 +1035,7 @@ impl flatbuffers::EndianScalar for DatasetSource {
     Self(b)
   }
   #[inline]
+  #[allow(clippy::wrong_self_convention)]
   fn from_little_endian(self) -> Self {
     let b = u8::from_le(self.0);
     Self(b)
@@ -1091,7 +1124,7 @@ impl<'a> flatbuffers::Verifiable for Timestamp {
     v.in_buffer::<Self>(pos)
   }
 }
-impl Timestamp {
+impl<'a> Timestamp {
   #[allow(clippy::too_many_arguments)]
   pub fn new(
     year: i32,
@@ -1267,7 +1300,7 @@ impl<'a> flatbuffers::Verifiable for TimeInterval {
     v.in_buffer::<Self>(pos)
   }
 }
-impl TimeInterval {
+impl<'a> TimeInterval {
   #[allow(clippy::too_many_arguments)]
   pub fn new(
     type_: TimeIntervalType,

@@ -286,7 +286,7 @@ impl PrettyIngestProgress {
             indicatif::ProgressStyle::default_bar()
             .template("{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
             .progress_chars("#>-"));
-        pb.set_prefix(prefix);
+        pb.set_prefix(prefix.to_owned());
         pb.set_length(len);
         pb.set_position(pos);
         if let Some(d) = draw_delta {
@@ -298,7 +298,7 @@ impl PrettyIngestProgress {
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
         pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
-        pb.set_message(msg);
+        pb.set_message(msg.to_owned());
         pb.enable_steady_tick(100);
         pb
     }
@@ -357,7 +357,7 @@ impl IngestListener for PrettyIngestProgress {
             }
         } else {
             self.curr_progress
-                .set_message(&self.message_for_stage(stage));
+                .set_message(self.message_for_stage(stage));
             if self.curr_progress_style == ProgressStyle::Bar {
                 self.curr_progress.set_position(n)
             }
@@ -368,7 +368,7 @@ impl IngestListener for PrettyIngestProgress {
         match result {
             IngestResult::UpToDate { uncacheable } => {
                 self.curr_progress
-                    .finish_with_message(&Self::spinner_message(
+                    .finish_with_message(Self::spinner_message(
                         &self.dataset_id,
                         IngestStage::Commit as u32,
                         if *uncacheable {
@@ -389,7 +389,7 @@ impl IngestListener for PrettyIngestProgress {
             } => {
                 if *uncacheable {
                     self.curr_progress
-                        .finish_with_message(&Self::spinner_message(
+                        .finish_with_message(Self::spinner_message(
                             &self.dataset_id,
                             IngestStage::Commit as u32,
                             console::style("Data source is uncacheable").yellow(),
@@ -397,7 +397,7 @@ impl IngestListener for PrettyIngestProgress {
                     self.curr_progress = self.multi_progress.add(Self::new_spinner(""));
                 };
                 self.curr_progress
-                    .finish_with_message(&Self::spinner_message(
+                    .finish_with_message(Self::spinner_message(
                         &self.dataset_id,
                         IngestStage::Commit as u32,
                         console::style(format!("Committed new block {}", block_hash.short()))
@@ -409,7 +409,7 @@ impl IngestListener for PrettyIngestProgress {
 
     fn error(&mut self, _error: &IngestError) {
         self.curr_progress
-            .finish_with_message(&Self::spinner_message(
+            .finish_with_message(Self::spinner_message(
                 &self.dataset_id,
                 self.stage as u32,
                 console::style("Failed to update root dataset").red(),
@@ -424,7 +424,7 @@ impl IngestListener for PrettyIngestProgress {
 impl PullImageListener for PrettyIngestProgress {
     fn begin(&mut self, image: &str) {
         // This currently happens during the Read stage
-        self.curr_progress.set_message(&Self::spinner_message(
+        self.curr_progress.set_message(Self::spinner_message(
             &self.dataset_id,
             IngestStage::Read as u32,
             format!("Pulling engine image {}", image),
@@ -461,7 +461,7 @@ impl PrettyTransformProgress {
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
         pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
-        pb.set_message(msg);
+        pb.set_message(msg.to_owned());
         pb.enable_steady_tick(100);
         pb
     }
@@ -489,12 +489,12 @@ impl TransformListener for PrettyTransformProgress {
             }
         };
         self.curr_progress
-            .finish_with_message(&Self::spinner_message(&self.dataset_id, 0, msg));
+            .finish_with_message(Self::spinner_message(&self.dataset_id, 0, msg));
     }
 
     fn error(&mut self, _error: &TransformError) {
         self.curr_progress
-            .finish_with_message(&Self::spinner_message(
+            .finish_with_message(Self::spinner_message(
                 &self.dataset_id,
                 0,
                 console::style("Failed to update derivative dataset").red(),
@@ -508,7 +508,7 @@ impl TransformListener for PrettyTransformProgress {
 
 impl PullImageListener for PrettyTransformProgress {
     fn begin(&mut self, image: &str) {
-        self.curr_progress.set_message(&Self::spinner_message(
+        self.curr_progress.set_message(Self::spinner_message(
             &self.dataset_id,
             0,
             format!("Pulling engine image {}", image),

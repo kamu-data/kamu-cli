@@ -91,7 +91,7 @@ impl PullImageListener for PullImageProgress {
     fn begin(&mut self, image: &str) {
         let s = indicatif::ProgressBar::new_spinner();
         s.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
-        s.set_message(&format!("Pulling engine image {}", image));
+        s.set_message(format!("Pulling engine image {}", image));
         s.enable_steady_tick(100);
         self.progress_bar = Some(s);
     }
