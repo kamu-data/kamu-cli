@@ -40,9 +40,9 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
   - **[Stock Market Trading Data Analysis](docs/examples/trading.md)** [aggregations, temporal-table joins, watermarks, notebooks]
   - **[Overdue Order Shipments Detection](docs/examples/overdue_shipments.md)** [stream-to-stream joins, watermarks]
   - **[Housing Prices Analysis](docs/examples/housing_prices.md)** [GIS functions and joins, notebooks]
-- **Ingesting Data**
-  - Supported Formats
+- **[Ingesting Data](docs/ingest.md)**
   - **[Merge Strategies](docs/merge_strategies.md)**
+  - **[Ingestion Examples](docs/ingest_examples.md)**
 - **Exporting Data**
 - **Transforming Data**
   - Transformation model
