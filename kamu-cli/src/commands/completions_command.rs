@@ -7,7 +7,7 @@ _kamu_()
     if test $? -ne 0; then
         return 1
     fi
-    readarray -t COMPREPLY < <( echo -n \"$_COMP_OUTPUTSTR\" )
+    COMPREPLY=($( echo -n \"$_COMP_OUTPUTSTR\" ))
 }
 
 complete -F _kamu_ kamu

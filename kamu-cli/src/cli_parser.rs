@@ -144,13 +144,19 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                     #### BASH ####
 
-                    Simplest way to enable completions in bash is to append the following line
-                    to your `~/.bashrc`:
+                    Append the following to your `~/.bashrc`:
 
                         source <(kamu completions bash)
 
                     You will need to reload your shell session (or execute the same command in your
                     current one) for changes to take effect.
+
+                    #### ZSH ####
+
+                    Append the following to your `~/.zshrc`:
+
+                        autoload -U +X bashcompinit && bashcompinit
+                        source <(kamu completions bash)
 
                     Please contribute a guide for your favorite shell!
                     "
