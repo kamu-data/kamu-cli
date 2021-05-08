@@ -58,9 +58,16 @@ TODO: Please contribute instructions!
 ## Installing shell completions
 To be able to auto-complete the `kamu` commands please install completion scripts for the shell of your choosing. You can find detailed instructions by running `kamu completions --help`.
 
-For example if you use `bash` you can add following into your `~/.bashrc` file:
+If you use `bash` add the following to your `~/.bashrc` file:
 
 ```bash
+source <(kamu completions bash)
+```
+
+If you use `zsh` add the following to your `~/.zshrc` file:
+
+```bash
+autoload -U +X bashcompinit && bashcompinit
 source <(kamu completions bash)
 ```
 
