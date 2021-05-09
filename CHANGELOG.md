@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.41.0] - 2021-05-08
+### Added
+- `zsh` completions support (via `bashcompinit`)
+### Fixed
+- Improved error handling of pipe preprocessing commands
+### Changed
+- Replaced `io.exchangeratesapi.daily.usd-cad` dataset in examples with `ca.bankofcanada.exchange-rates.daily` as it became for-profit.
+
 ## [0.40.1] - 2021-05-02
 ### Fixed
 - Improved error handling when `kamu sql` is ran in an empty workspace
