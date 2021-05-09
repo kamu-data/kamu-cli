@@ -13,6 +13,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use thiserror::Error;
 
 const BUFFER_SIZE: usize = 8096;
 
@@ -37,7 +38,8 @@ impl PrepService {
         for step in prep_steps.iter() {
             stream = match step {
                 PrepStep::Pipe(ref p) => Box::new(
-                    PipeStream::new(&p.command, stream).map_err(|e| IngestError::internal(e))?,
+                    PipeStream::new(&p.command, stream)
+                        .map_err(|e| IngestError::pipe(p.command.clone(), e))?,
                 ),
                 PrepStep::Decompress(ref dc) => match dc.format {
                     CompressionFormat::Zip => Box::new(
@@ -51,7 +53,7 @@ impl PrepService {
         let target_file = File::create(target_path).map_err(|e| IngestError::internal(e))?;
         let sink = Box::new(FileSink::new(target_file, stream));
 
-        sink.join();
+        sink.join()?;
 
         Ok(ExecutionResult {
             was_up_to_date: false,
@@ -82,7 +84,7 @@ pub struct PrepCheckpoint {
 trait Stream: std::io::Read + Send {
     fn as_read(&mut self) -> &mut dyn std::io::Read;
 
-    fn join(self: Box<Self>);
+    fn join(self: Box<Self>) -> Result<(), IngestError>;
 }
 
 impl Stream for std::fs::File {
@@ -90,7 +92,9 @@ impl Stream for std::fs::File {
         self
     }
 
-    fn join(self: Box<Self>) {}
+    fn join(self: Box<Self>) -> Result<(), IngestError> {
+        Ok(())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,19 +102,21 @@ impl Stream for std::fs::File {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PipeStream {
-    ingress: std::thread::JoinHandle<()>,
+    ingress: std::thread::JoinHandle<Result<(), IngestError>>,
     stdout: std::process::ChildStdout,
 }
 
 impl PipeStream {
     fn new(cmd: &Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
-        let process = Command::new(cmd.get(0).unwrap())
+        let mut process = Command::new(cmd.get(0).unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
 
-        let mut stdin = process.stdin.unwrap();
+        let stdout = process.stdout.take().unwrap();
+        let mut stdin = process.stdin.take().unwrap();
+        let cmd = cmd.clone();
         let ingress = std::thread::Builder::new()
             .name("pipe_stream".to_owned())
             .spawn(move || {
@@ -124,13 +130,27 @@ impl PipeStream {
                     stdin.write_all(&buf[..read]).unwrap();
                 }
 
-                input.join();
+                drop(stdin);
+                input.join()?;
+
+                let status = process.wait().unwrap();
+
+                if !status.success() {
+                    Err(IngestError::pipe(
+                        cmd,
+                        BadStatusCode {
+                            code: status.code().unwrap(),
+                        },
+                    ))
+                } else {
+                    Ok(())
+                }
             })
             .unwrap();
 
         Ok(Self {
             ingress: ingress,
-            stdout: process.stdout.unwrap(),
+            stdout: stdout,
         })
     }
 }
@@ -146,9 +166,15 @@ impl Stream for PipeStream {
         self
     }
 
-    fn join(self: Box<Self>) {
+    fn join(self: Box<Self>) -> Result<(), IngestError> {
         self.ingress.join().unwrap()
     }
+}
+
+#[derive(Debug, Error)]
+#[error("Command exited with code {code}")]
+struct BadStatusCode {
+    code: i32,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -164,7 +190,7 @@ impl Read for ReaderHelper {
 }
 
 struct DecompressZipStream {
-    ingress: std::thread::JoinHandle<()>,
+    ingress: std::thread::JoinHandle<Result<(), IngestError>>,
     consumer: ringbuf::Consumer<u8>,
     done_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
@@ -199,7 +225,7 @@ impl DecompressZipStream {
                 }
 
                 done_flag_thread.store(true, Ordering::Release);
-                reader.0.join();
+                reader.0.join()
             })
             .unwrap();
 
@@ -230,7 +256,7 @@ impl Stream for DecompressZipStream {
         self
     }
 
-    fn join(self: Box<Self>) {
+    fn join(self: Box<Self>) -> Result<(), IngestError> {
         self.ingress.join().unwrap()
     }
 }
@@ -261,7 +287,7 @@ impl Stream for DecompressGzipStream {
         self
     }
 
-    fn join(self: Box<Self>) {
+    fn join(self: Box<Self>) -> Result<(), IngestError> {
         self.decoder.into_inner().join()
     }
 }
@@ -271,7 +297,7 @@ impl Stream for DecompressGzipStream {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct FileSink {
-    ingress: std::thread::JoinHandle<()>,
+    ingress: std::thread::JoinHandle<Result<(), IngestError>>,
 }
 
 impl FileSink {
@@ -289,14 +315,14 @@ impl FileSink {
                     file.write_all(&buf[..read]).unwrap();
                 }
 
-                input.join();
+                input.join()
             })
             .unwrap();
 
         Self { ingress: ingress }
     }
 
-    fn join(self: Box<Self>) {
-        self.ingress.join().unwrap();
+    fn join(self: Box<Self>) -> Result<(), IngestError> {
+        self.ingress.join().unwrap()
     }
 }
