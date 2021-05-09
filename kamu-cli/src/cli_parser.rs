@@ -123,7 +123,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                     Add a dataset from manifest hosted externally (e.g. on GihHub):
 
-                        kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/io.exchangeratesapi.daily.usd-cad.yaml
+                        kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.bankofcanada.exchange-rates.daily.yaml
 
                     To add a dataset from remote see `kamu pull --remote` command.
                     "

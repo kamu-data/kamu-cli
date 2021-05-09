@@ -1,0 +1,62 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: ca.bankofcanada.exchange-rates.daily
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: https://www.bankofcanada.ca/valet/observations/group/FX_RATES_DAILY/csv?start_date=2017-01-03
+    prepare:
+    - kind: pipe
+      command:
+      - sed
+      - -e
+      - 1,/OBSERVATIONS/d
+    read:
+      kind: csv
+      header: true
+      schema:
+      - date TIMESTAMP
+      - FXAUDCAD DECIMAL(18,10)
+      - FXBRLCAD DECIMAL(18,10)
+      - FXCNYCAD DECIMAL(18,10)
+      - FXEURCAD DECIMAL(18,10)
+      - FXHKDCAD DECIMAL(18,10)
+      - FXINRCAD DECIMAL(18,10)
+      - FXIDRCAD DECIMAL(18,10)
+      - FXJPYCAD DECIMAL(18,10)
+      - FXMYRCAD DECIMAL(18,10)
+      - FXMXNCAD DECIMAL(18,10)
+      - FXNZDCAD DECIMAL(18,10)
+      - FXNOKCAD DECIMAL(18,10)
+      - FXPENCAD DECIMAL(18,10)
+      - FXRUBCAD DECIMAL(18,10)
+      - FXSARCAD DECIMAL(18,10)
+      - FXSGDCAD DECIMAL(18,10)
+      - FXZARCAD DECIMAL(18,10)
+      - FXKRWCAD DECIMAL(18,10)
+      - FXSEKCAD DECIMAL(18,10)
+      - FXCHFCAD DECIMAL(18,10)
+      - FXTWDCAD DECIMAL(18,10)
+      - FXTHBCAD DECIMAL(18,10)
+      - FXTRYCAD DECIMAL(18,10)
+      - FXGBPCAD DECIMAL(18,10)
+      - FXUSDCAD DECIMAL(18,10)
+      - FXVNDCAD DECIMAL(18,10)
+    merge:
+      kind: ledger
+      primaryKey:
+      - date
+    preprocess:
+      kind: sql
+      engine: spark
+      query: >
+        SELECT 
+          date,
+          "USD" as currency_base,
+          "CAD" as currency_target,
+          FXUSDCAD as rate
+        FROM input
+  vocab:
+    eventTimeColumn: date
