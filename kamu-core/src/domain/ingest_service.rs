@@ -117,6 +117,12 @@ pub enum IngestError {
     },
     #[error("Engine error: {0}")]
     EngineError(#[from] EngineError),
+    #[error("Pipe command error: {command:?} {source}")]
+    PipeError {
+        command: Vec<String>,
+        source: BoxedError,
+        backtrace: Backtrace,
+    },
     #[error("Internal error: {source}")]
     InternalError {
         #[from]
@@ -137,6 +143,14 @@ impl IngestError {
         IngestError::NotFound {
             path: path.as_ref().to_str().unwrap().to_owned(),
             source: source,
+        }
+    }
+
+    pub fn pipe(command: Vec<String>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        IngestError::PipeError {
+            command: command,
+            source: e.into(),
+            backtrace: Backtrace::capture(),
         }
     }
 
