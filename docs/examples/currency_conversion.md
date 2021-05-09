@@ -33,15 +33,15 @@ $ kamu pull --all
 
 ## Root Datasets
 We will be using two root datasets:
-- `io.exchangeratesapi.daily.usd-cad` - contains daily exchange rates between `USD` and `CAD`.
+- `ca.bankofcanada.exchange-rates.daily` - contains daily exchange rates between `USD` and `CAD`.
 - `my.trading.transactions` - contains a log of transaction from a fake trading account similar to what you'd get in data export from your trading platform.
 
-The `my.trading.transactions` is sourcing its data from a file located in `data/` sub-directory, while the exchange rates are obtained from an external source using the [exchangeratesapi.io](http://exchangeratesapi.io/) API.
+The `my.trading.transactions` is sourcing its data from a file located in `data/` sub-directory, while the exchange rates are obtained from an external source - the [Bank of Canada historical exchange rates](https://www.bankofcanada.ca/rates/exchange/) dataset.
 
 Let's add the root datasets and ingest data:
 
 ```sh
-$ kamu add io.exchangeratesapi.daily.usd-cad.yaml my.trading.transactions.yaml
+$ kamu add ca.bankofcanada.exchange-rates.daily.yaml my.trading.transactions.yaml
 $ kamu pull --all
 ```
 
@@ -49,7 +49,7 @@ You can verify the result using the SQL shell:
 
 ```sql
 $ kamu sql
-0: kamu> select * from `io.exchangeratesapi.daily.usd-cad` limit 5;
+0: kamu> select * from `ca.bankofcanada.exchange-rates.daily` limit 5;
 +-------------+------------+---------------+-----------------+--------------+
 | system_time |    date    | currency_base | currency_target |     rate     |
 +-------------+------------+---------------+-----------------+--------------+
@@ -64,12 +64,12 @@ $ kamu sql
 Remember that after adding a dataset from a `yaml` file - `kamu` creates an internal representation of it in the workspace `.kamu` directory, so if you want to make any changes to the dataset you will need to re-add the dataset again after changing the `yaml` file.
 
 ```sh
-$ kamu delete io.exchangeratesapi.daily.usd-cad
+$ kamu delete my.trading.transactions
 # ... Make changes to the yaml file ...
-$ kamu add io.exchangeratesapi.daily.usd-cad.yaml
+$ kamu add my.trading.transactions.yaml
 
 # Or alternatively
-$ kamu add --replace io.exchangeratesapi.daily.usd-cad.yaml
+$ kamu add --replace my.trading.transactions.yaml
 ```
 
 ## Converting transaction values into CAD
@@ -89,13 +89,13 @@ content:
   source:
     kind: derivative
     inputs:
-    - io.exchangeratesapi.daily.usd-cad
+    - ca.bankofcanada.exchange-rates.daily
     - my.trading.transactions
     transform:
       kind: sql
       engine: flink
       temporalTables:
-      - id: io.exchangeratesapi.daily.usd-cad
+      - id: ca.bankofcanada.exchange-rates.daily
         primaryKey:
         - currency_base
       query: >
@@ -109,18 +109,18 @@ content:
           tr.`settlement` * exc.`rate` as `settlement_cad`
         FROM
           `my.trading.transactions` as tr,
-          LATERAL TABLE (`io.exchangeratesapi.daily.usd-cad`(tr.`event_time`)) as exc
+          LATERAL TABLE (`ca.bankofcanada.exchange-rates.daily`(tr.`event_time`)) as exc
         WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'
 ```
 
 > Note: The excessive use of back ticks is currency caused by the SQL parser used by Apache Flink which is overly sensitive to reserved words - this should improve in future versions.
 
-Using the `temporalTables` section we instruct the Flink engine to use `io.exchangeratesapi.daily.usd-cad` event stream to create a temporal table of the same name.
+Using the `temporalTables` section we instruct the Flink engine to use `ca.bankofcanada.exchange-rates.daily` event stream to create a temporal table of the same name.
 
 Here's how this three-dimensional table would look like when sliced at different points in time:
 
 ```sql
-io.exchangeratesapi.daily.usd-cad:
+ca.bankofcanada.exchange-rates.daily:
 
 @ 1999-01-04
 +---------------+-----------------+--------------+
@@ -146,7 +146,7 @@ io.exchangeratesapi.daily.usd-cad:
 
 It basically remembers the last observed value of every column grouped by the provided `primaryKey` (`currency_base` in our case).
 
-The `LATERAL TABLE (``io.exchangeratesapi.daily.usd-cad``(tr.``event_time``))` part can be interpreted as us taking every transaction event from `my.trading.transactions`, indexing the temporal table `io.exchangeratesapi.daily.usd-cad` at this event's `event_time` and then joining the same event with the resulting (now ordinary two-dimensional) table.
+The `LATERAL TABLE (``ca.bankofcanada.exchange-rates.daily``(tr.``event_time``))` part can be interpreted as us taking every transaction event from `my.trading.transactions`, indexing the temporal table `ca.bankofcanada.exchange-rates.daily` at this event's `event_time` and then joining the same event with the resulting (now ordinary two-dimensional) table.
 
 With theory out of the way, it's time to give this a try:
 

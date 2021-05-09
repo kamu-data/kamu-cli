@@ -5,13 +5,13 @@ content:
   source:
     kind: derivative
     inputs:
-    - io.exchangeratesapi.daily.usd-cad
+    - ca.bankofcanada.exchange-rates.daily
     - my.trading.transactions
     transform:
       kind: sql
       engine: flink
       temporalTables:
-      - id: io.exchangeratesapi.daily.usd-cad
+      - id: ca.bankofcanada.exchange-rates.daily
         primaryKey:
         - currency_base
       query: >
@@ -25,5 +25,5 @@ content:
           tr.`settlement` * exc.`rate` as `settlement_cad`
         FROM
           `my.trading.transactions` as tr,
-          LATERAL TABLE (`io.exchangeratesapi.daily.usd-cad`(tr.`event_time`)) as exc
+          LATERAL TABLE (`ca.bankofcanada.exchange-rates.daily`(tr.`event_time`)) as exc
         WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'
