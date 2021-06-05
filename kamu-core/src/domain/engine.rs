@@ -175,9 +175,9 @@ impl std::fmt::Display for ProcessError {
         }
 
         if self.log_files.len() != 0 {
-            write!(f, ", see log files for details:")?;
+            write!(f, ", see log files for details:\n")?;
             for path in self.log_files.iter() {
-                write!(f, " {}", path.display())?;
+                write!(f, "- {}\n", path.display())?;
             }
         }
 
@@ -200,9 +200,9 @@ impl std::fmt::Display for ContractError {
         write!(f, "{}", self.reason)?;
 
         if self.log_files.len() != 0 {
-            write!(f, ", see log files for details:")?;
+            write!(f, ", see log files for details:\n")?;
             for path in self.log_files.iter() {
-                write!(f, " {}", path.display())?;
+                write!(f, "- {}\n", path.display())?;
             }
         }
 

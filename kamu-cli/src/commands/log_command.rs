@@ -26,7 +26,12 @@ impl LogCommand {
 
     fn render_block(&self, block: &MetadataBlock) {
         self.render_header(block);
-        self.render_property("Date", &block.system_time);
+        self.render_property(
+            "Date",
+            &block
+                .system_time
+                .to_rfc3339_opts(SecondsFormat::AutoSi, true),
+        );
 
         if let Some(ref s) = block.output_slice {
             self.render_property("Output.Records", &s.num_records);

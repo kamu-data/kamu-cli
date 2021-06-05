@@ -48,8 +48,10 @@ impl IngestTask {
                     _ => (),
                 }
             }
-            // TODO: Verify assumption that only blocks with output_slice have checkpoints
-            if prev_checkpoint.is_none() && block.output_slice.is_some() {
+            // TODO: Verify assumption that only blocks with output_slice or output_watermark have checkpoints
+            if prev_checkpoint.is_none()
+                && (block.output_slice.is_some() || block.output_watermark.is_some())
+            {
                 prev_checkpoint = Some(block.block_hash)
             }
             if vocab.is_none() && block.vocab.is_some() {

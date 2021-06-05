@@ -70,7 +70,14 @@ impl ReadService {
         let response = engine.lock().unwrap().ingest(request)?;
 
         if let Some(ref slice) = response.block.output_slice {
-            if slice.num_records != 0 && !out_data_path.exists() {
+            if slice.num_records == 0 {
+                return Err(EngineError::ContractError(ContractError::new(
+                    "Engine returned an output slice with zero records",
+                    Vec::new(),
+                ))
+                .into());
+            }
+            if !out_data_path.exists() {
                 return Err(EngineError::ContractError(ContractError::new(
                     "Engine did not write a response data file",
                     Vec::new(),

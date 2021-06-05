@@ -80,7 +80,14 @@ impl TransformServiceImpl {
         let result = engine.lock().unwrap().transform(request)?;
 
         if let Some(ref slice) = result.block.output_slice {
-            if slice.num_records != 0 && !out_data_path.exists() {
+            if slice.num_records == 0 {
+                return Err(EngineError::ContractError(ContractError::new(
+                    "Engine returned an output slice with zero records",
+                    Vec::new(),
+                ))
+                .into());
+            }
+            if !out_data_path.exists() {
                 return Err(EngineError::ContractError(ContractError::new(
                     "Engine did not write a response data file",
                     Vec::new(),
@@ -185,10 +192,10 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        // TODO: Verify assumption that only blocks with output_slice have checkpoints
+        // TODO: Verify assumption that only blocks with output_slice or output_watermark have checkpoints
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter(|b| b.output_slice.is_some())
+            .filter(|b| b.output_slice.is_some() || b.output_watermark.is_some())
             .map(|b| b.block_hash)
             .next();
 
