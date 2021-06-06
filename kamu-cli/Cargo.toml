@@ -27,9 +27,16 @@ num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser
 
+# Config
+merge = "*"
+serde = { version = "*", features = ["derive"] }
+serde_with = "*"
+serde_yaml = "*"
+
 # Utils
 chrono = "*"
 glob = "*"  # Used for path completions
+dirs = "*"
 indoc = "*"
 itertools = "*"
 shlex = "*"  # Parsing partial input for custom completions

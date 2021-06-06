@@ -166,6 +166,72 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .required(true)
                         .possible_values(&Shell::variants()),
                 ),
+            SubCommand::with_name("config")
+                .about("Get or set configuration options")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommands(vec![
+                    SubCommand::with_name("list")
+                        .about("Display current configuration combined from all config files")
+                        .args(&[
+                            Arg::with_name("user")
+                                .long("user")
+                                .help("Show only user scope configuration"),
+                        ]),
+                    SubCommand::with_name("get")
+                        .about("Get current configuration value")
+                        .args(&[
+                            Arg::with_name("user")
+                                .long("user")
+                                .help("Operate on the user scope configuration file"),
+                            Arg::with_name("key")
+                                .required(true)
+                                .index(1)
+                                .help("Path to the config option"),
+                        ]),
+                    SubCommand::with_name("set")
+                        .about("Set or unset configuration value")
+                        .args(&[
+                            Arg::with_name("user")
+                                .long("user")
+                                .help("Operate on the user scope configuration file"),
+                            Arg::with_name("key")
+                                .required(true)
+                                .index(1)
+                                .help("Path to the config option"),
+                            Arg::with_name("value")
+                                .index(2)
+                                .help("New value to set"),
+                        ]),
+                ])
+                .after_help(indoc::indoc!(
+                    r"
+                    Configuration in `kamu` is managed very similarly to `git`. Starting with your current workspace and going up the directory tree you can have multiple `.kamuconfig` YAML files which are all merged together to get the resulting config. 
+                    
+                    Most commonly you will have a workspace-scoped config inside the `.kamu` directory and the user-scoped config residing in your home directory.
+
+                    ### Examples ###
+
+                    List current configuration as combined view of config files:
+
+                        kamu config list
+
+                    Get current configuration value:
+
+                        kamu config get engine.runtime
+
+                    Set configuration value in workspace scope:
+
+                        kamu config set engine.runtime podman
+                    
+                    Set configuration value in user scope:
+
+                        kamu config set --user engine.runtime podman
+
+                    Unset or revert to default value:
+
+                        kamu config set --user engine.runtime
+                    "
+                )),
             SubCommand::with_name("delete")
                 .about("Delete a dataset")
                 .args(&[

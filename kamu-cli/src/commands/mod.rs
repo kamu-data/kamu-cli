@@ -11,6 +11,9 @@ pub use complete_command::*;
 mod completions_command;
 pub use completions_command::*;
 
+mod config_command;
+pub use config_command::*;
+
 mod delete_command;
 pub use delete_command::*;
 
