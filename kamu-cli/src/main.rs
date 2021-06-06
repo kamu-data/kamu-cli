@@ -3,6 +3,7 @@
 use kamu::infra::*;
 use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
+use kamu_cli::config;
 use kamu_cli::output::*;
 use opendatafabric::DatasetIDBuf;
 
@@ -25,6 +26,10 @@ fn main() {
 
     let workspace_layout = find_workspace();
     let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+
+    let config_service = Rc::new(RefCell::new(config::ConfigService::new(
+        workspace_layout.kamu_root_dir.clone(),
+    )));
 
     // Cleanup run info dir
     if workspace_layout.run_info_dir.exists() {
@@ -88,6 +93,24 @@ fn main() {
             cli_parser::cli(BINARY_NAME, VERSION),
             value_t_or_exit!(submatches.value_of("shell"), clap::Shell),
         )),
+        ("config", Some(config_matches)) => match config_matches.subcommand() {
+            ("list", Some(list_matches)) => Box::new(ConfigListCommand::new(
+                config_service.clone(),
+                list_matches.is_present("user"),
+            )),
+            ("get", Some(get_matches)) => Box::new(ConfigGetCommand::new(
+                config_service.clone(),
+                get_matches.is_present("user"),
+                get_matches.value_of("key").unwrap(),
+            )),
+            ("set", Some(set_matches)) => Box::new(ConfigSetCommand::new(
+                config_service.clone(),
+                set_matches.is_present("user"),
+                set_matches.value_of("key").unwrap(),
+                set_matches.value_of("value"),
+            )),
+            _ => unimplemented!(),
+        },
         ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
             metadata_repo.clone(),
             submatches.values_of("dataset").unwrap_or_default(),

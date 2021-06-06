@@ -1010,18 +1010,23 @@ dependencies = [
  "chrono-humanize",
  "clap",
  "console",
+ "dirs",
  "glob",
  "humansize",
  "indicatif",
  "indoc",
  "itertools",
  "kamu",
+ "merge",
  "num-format",
  "opendatafabric",
  "parquet",
  "prettytable-rs",
  "rand 0.8.3",
  "read_input",
+ "serde",
+ "serde_with",
+ "serde_yaml",
  "shlex 1.0.0",
  "slog",
  "slog-async",
@@ -1141,6 +1146,28 @@ name = "memchr"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
+
+[[package]]
+name = "merge"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10bbef93abb1da61525bbc45eeaff6473a41907d19f8f9aa5168d214e10693e9"
+dependencies = [
+ "merge_derive",
+ "num-traits",
+]
+
+[[package]]
+name = "merge_derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "209d075476da2e63b4b29e72a2ef627b840589588e71400a25e3565c4f849d07"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "miniz_oxide"
@@ -1448,6 +1475,30 @@ dependencies = [
  "lazy_static",
  "term 0.5.2",
  "unicode-width",
+]
+
+[[package]]
+name = "proc-macro-error"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da25490ff9892aab3fcf7c36f08cfb902dd3e71ca0f9f9517bea02a73a5ce38c"
+dependencies = [
+ "proc-macro-error-attr",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "version_check",
+]
+
+[[package]]
+name = "proc-macro-error-attr"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1be40180e52ecc98ad80b184934baf3d0d29f979574e439af5a55274b35f869"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "version_check",
 ]
 
 [[package]]
