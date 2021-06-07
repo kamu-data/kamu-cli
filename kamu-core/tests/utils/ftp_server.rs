@@ -2,7 +2,6 @@ use kamu::infra::utils::docker_client::*;
 use kamu::infra::utils::docker_images;
 
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::Duration;
 
 // TODO: Consider replacing with in-process server for speed
@@ -31,21 +30,17 @@ impl FtpServer {
             std::fs::create_dir(&server_dir).unwrap();
         }
 
-        let image = docker_images::FTP;
-
-        container_runtime
-            .pull_cmd(image)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .unwrap();
+        assert!(
+            container_runtime.has_image(docker_images::FTP),
+            "Please pull {} image before running this test",
+            docker_images::FTP
+        );
 
         // TODO: this is likely very brittle because of all the port mapping
         // FTP is a crazy protocol :(
         let process = container_runtime
             .run_cmd(DockerRunArgs {
-                image: image.to_owned(),
+                image: docker_images::FTP.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![21],
                 expose_port_map_range: vec![((47400, 47470), (47400, 47470))],

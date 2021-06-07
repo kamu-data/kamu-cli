@@ -396,7 +396,7 @@ impl DockerClient {
         };
 
         stream
-            .set_read_timeout(Some(Duration::from_millis(100)))
+            .set_read_timeout(Some(Duration::from_millis(1000)))
             .unwrap();
 
         let mut buf = [0; 1];

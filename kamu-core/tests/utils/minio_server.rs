@@ -2,7 +2,6 @@ use kamu::infra::utils::docker_client::*;
 use kamu::infra::utils::docker_images;
 
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::Duration;
 
 pub struct MinioServer {
@@ -34,21 +33,11 @@ impl MinioServer {
             std::fs::create_dir(&server_dir).unwrap();
         }
 
-        // assert!(
-        //     docker.has_image(docker_images::MINIO),
-        //     "Please pull {} image before running this test",
-        //     docker_images::MINIO
-        // );
-
-        // TODO: Would be nice to avoid pulling in tests every time but this
-        // means automated tests need an extra step to get all images
-        container_runtime
-            .pull_cmd(docker_images::MINIO)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .unwrap();
+        assert!(
+            container_runtime.has_image(docker_images::MINIO),
+            "Please pull {} image before running this test",
+            docker_images::MINIO
+        );
 
         let process = container_runtime
             .run_cmd(DockerRunArgs {
