@@ -1,8 +1,8 @@
 use super::{Command, Error};
 use crate::output::OutputConfig;
-use kamu::domain::PullImageListener;
 use kamu::infra::explore::*;
 use kamu::infra::*;
+use kamu::{domain::PullImageListener, infra::utils::docker_client::DockerClient};
 
 use console::style as s;
 use slog::{o, Logger};
@@ -10,6 +10,7 @@ use slog::{o, Logger};
 pub struct NotebookCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
+    container_runtime: DockerClient,
     output_config: OutputConfig,
     env_vars: Vec<(String, Option<String>)>,
     logger: Logger,
@@ -20,6 +21,7 @@ impl NotebookCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
+        container_runtime: DockerClient,
         env_vars: Iter,
         logger: Logger,
     ) -> Self
@@ -30,6 +32,7 @@ impl NotebookCommand {
         Self {
             workspace_layout: workspace_layout.clone(),
             volume_layout: volume_layout.clone(),
+            container_runtime: container_runtime,
             output_config: output_config.clone(),
             env_vars: env_vars
                 .into_iter()
@@ -51,6 +54,8 @@ impl NotebookCommand {
 
 impl Command for NotebookCommand {
     fn run(&mut self) -> Result<(), Error> {
+        let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
+
         let environment_vars = self
             .env_vars
             .iter()
@@ -67,7 +72,7 @@ impl Command for NotebookCommand {
 
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };
-            NotebookServerImpl::ensure_images(&mut pull_progress);
+            notebook_server.ensure_images(&mut pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
@@ -80,7 +85,7 @@ impl Command for NotebookCommand {
             None
         };
 
-        NotebookServerImpl::run(
+        notebook_server.run(
             &self.workspace_layout,
             &self.volume_layout,
             environment_vars,

@@ -10,16 +10,23 @@ use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-pub struct SqlShellImpl;
+pub struct SqlShellImpl {
+    container_runtime: DockerClient,
+}
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
-    pub fn ensure_images(listener: &mut dyn PullImageListener) {
-        let docker_client = DockerClient::new();
-        docker_client.ensure_image(docker_images::SPARK, Some(listener));
+    pub fn new(container_runtime: DockerClient) -> Self {
+        Self { container_runtime }
+    }
+
+    pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
+        self.container_runtime
+            .ensure_image(docker_images::SPARK, Some(listener));
     }
 
     pub fn run_server(
+        &self,
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         logger: Logger,
@@ -30,12 +37,12 @@ impl SqlShellImpl {
         let init_script_path = tempdir.path().join("init.sql");
         std::fs::write(&init_script_path, Self::prepare_shell_init(volume_layout)?)?;
 
-        let docker_client = DockerClient::new();
-
         let cwd = Path::new(".").canonicalize().unwrap();
 
         let spark_stdout_path = workspace_layout.run_info_dir.join("spark.out.txt");
         let spark_stderr_path = workspace_layout.run_info_dir.join("spark.err.txt");
+        let thrift_stdout_path = workspace_layout.run_info_dir.join("thrift.out.txt");
+        let thrift_stderr_path = workspace_layout.run_info_dir.join("thrift.err.txt");
 
         // TODO: probably does not belong here?
         let exit = Arc::new(AtomicBool::new(false));
@@ -78,7 +85,7 @@ impl SqlShellImpl {
             }
         };
 
-        let mut cmd = docker_client.run_cmd(args);
+        let mut cmd = self.container_runtime.run_cmd(args);
 
         info!(logger, "Starting Spark container"; "command" => ?cmd, "stdout" => ?spark_stdout_path, "stderr" => ?spark_stderr_path);
 
@@ -89,12 +96,12 @@ impl SqlShellImpl {
             .spawn()?;
 
         info!(logger, "Waiting for container");
-        docker_client
+        self.container_runtime
             .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
             .expect("Container did not start");
 
         info!(logger, "Starting Thrift Server");
-        docker_client
+        self.container_runtime
             .exec_shell_cmd(
                 ExecArgs {
                     tty: false,
@@ -106,18 +113,20 @@ impl SqlShellImpl {
                 &["sbin/start-thriftserver.sh"],
             )
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
+            .stderr(Stdio::from(File::create(&thrift_stderr_path)?))
             .spawn()?
             .wait()?;
 
         let host_port = if let Some(p) = port {
             p
         } else {
-            docker_client.get_host_port("kamu-spark", 10000).unwrap()
+            self.container_runtime
+                .get_host_port("kamu-spark", 10000)
+                .unwrap()
         };
 
-        docker_client
+        self.container_runtime
             .wait_for_socket(host_port, std::time::Duration::from_secs(60))
             .expect("Thrift Server did not start");
 
@@ -125,6 +134,7 @@ impl SqlShellImpl {
     }
 
     pub fn run_shell<S1, S2>(
+        &self,
         output_format: Option<S1>,
         command: Option<S2>,
         logger: Logger,
@@ -136,8 +146,7 @@ impl SqlShellImpl {
     {
         info!(logger, "Starting SQL shell");
 
-        let docker_client = DockerClient::new();
-        let mut cmd = docker_client.run_cmd(DockerRunArgs {
+        let mut cmd = self.container_runtime.run_cmd(DockerRunArgs {
             image: docker_images::SPARK.to_owned(),
             container_name: Some("kamu-spark-shell".to_owned()),
             user: Some("root".to_owned()),
@@ -167,6 +176,7 @@ impl SqlShellImpl {
     }
 
     pub fn run_two_in_one<S1, S2, StartedClb>(
+        &self,
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_format: Option<S1>,
@@ -179,18 +189,17 @@ impl SqlShellImpl {
         S2: AsRef<str>,
         StartedClb: FnOnce() + Send + 'static,
     {
-        let docker_client = DockerClient::new();
         let mut spark =
-            Self::run_server(workspace_layout, volume_layout, logger.clone(), None, None)?;
+            self.run_server(workspace_layout, volume_layout, logger.clone(), None, None)?;
 
         {
-            let _drop_spark = DropContainer::new(docker_client.clone(), "kamu-spark");
+            let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
 
             started_clb();
             info!(logger, "Starting SQL shell");
 
             // Relying on shell to send signal to child processes
-            let mut beeline_cmd = docker_client
+            let mut beeline_cmd = self.container_runtime
                 .exec_shell_cmd(
                     ExecArgs {
                         tty: true,
@@ -221,6 +230,7 @@ impl SqlShellImpl {
     }
 
     pub fn run<S1, S2, StartedClb>(
+        &self,
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_format: Option<S1>,
@@ -236,9 +246,9 @@ impl SqlShellImpl {
     {
         if let Some(url) = url {
             started_clb();
-            Self::run_shell(output_format, command, logger, url)
+            self.run_shell(output_format, command, logger, url)
         } else {
-            Self::run_two_in_one(
+            self.run_two_in_one(
                 workspace_layout,
                 volume_layout,
                 output_format,

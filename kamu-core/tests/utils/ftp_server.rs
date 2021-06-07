@@ -7,6 +7,7 @@ use std::time::Duration;
 
 // TODO: Consider replacing with in-process server for speed
 pub struct FtpServer {
+    container_runtime: DockerClient,
     pub container_name: String,
     pub host_port: u16,
     process: std::process::Child,
@@ -16,7 +17,7 @@ impl FtpServer {
     pub fn new(server_dir: &Path) -> Self {
         use rand::Rng;
 
-        let docker = DockerClient::new();
+        let container_runtime = DockerClient::default();
 
         let mut server_name = "kamu-test-ftp-".to_owned();
         server_name.extend(
@@ -32,7 +33,7 @@ impl FtpServer {
 
         let image = docker_images::FTP;
 
-        docker
+        container_runtime
             .pull_cmd(image)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -42,7 +43,7 @@ impl FtpServer {
 
         // TODO: this is likely very brittle because of all the port mapping
         // FTP is a crazy protocol :(
-        let process = docker
+        let process = container_runtime
             .run_cmd(DockerRunArgs {
                 image: image.to_owned(),
                 container_name: Some(server_name.to_owned()),
@@ -61,15 +62,16 @@ impl FtpServer {
             .spawn()
             .unwrap();
 
-        let host_port = docker
+        let host_port = container_runtime
             .wait_for_host_port(&server_name, 21, Duration::from_secs(20))
             .unwrap();
 
-        docker
+        container_runtime
             .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
         Self {
+            container_runtime,
             container_name: server_name,
             process: process,
             host_port: host_port,
@@ -79,8 +81,8 @@ impl FtpServer {
 
 impl Drop for FtpServer {
     fn drop(&mut self) {
-        let docker = DockerClient::new();
-        let _ = docker
+        let _ = self
+            .container_runtime
             .kill_cmd(&self.container_name)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

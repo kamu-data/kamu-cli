@@ -8,6 +8,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
+    container_runtime: DockerClient,
     image: String,
     workspace_layout: WorkspaceLayout,
     logger: Logger,
@@ -40,8 +41,14 @@ impl RunInfo {
 }
 
 impl SparkEngine {
-    pub fn new(image: &str, workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
+    pub fn new(
+        container_runtime: DockerClient,
+        image: &str,
+        workspace_layout: &WorkspaceLayout,
+        logger: Logger,
+    ) -> Self {
         Self {
+            container_runtime: container_runtime,
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
             logger: logger,
@@ -68,8 +75,6 @@ impl SparkEngine {
     }
 
     fn submit(&self, app_class: &str, run_info: &RunInfo) -> Result<(), EngineError> {
-        let docker = DockerClient::new();
-
         let volume_map = vec![
             (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
             (
@@ -81,20 +86,25 @@ impl SparkEngine {
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
         let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
 
+        // TODO: chown hides exit status
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
-                let chown = format!(
-                    "; chown -R {}:{} {}",
-                    users::get_current_uid(),
-                    users::get_current_gid(),
-                    self.volume_dir_in_container().display()
-                );
+                let chown = if self.container_runtime.runtime_type == ContainerRuntimeType::Docker {
+                    format!(
+                        "; chown -R {}:{} {}",
+                        users::get_current_uid(),
+                        users::get_current_gid(),
+                        self.volume_dir_in_container().display()
+                    )
+                } else {
+                    "".to_owned()
+                };
             } else {
                 let chown = "".to_owned();
             }
         };
 
-        let mut cmd = docker.run_shell_cmd(
+        let mut cmd = self.container_runtime.run_shell_cmd(
             DockerRunArgs {
                 image: self.image.clone(),
                 volume_map: volume_map,

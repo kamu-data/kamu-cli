@@ -10,6 +10,7 @@ use std::process::{Child, Stdio};
 use std::time::Duration;
 
 pub struct FlinkEngine {
+    container_runtime: DockerClient,
     image: String,
     workspace_layout: WorkspaceLayout,
     logger: Logger,
@@ -71,8 +72,14 @@ impl RunInfo {
 }
 
 impl FlinkEngine {
-    pub fn new(image: &str, workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
+    pub fn new(
+        container_runtime: DockerClient,
+        image: &str,
+        workspace_layout: &WorkspaceLayout,
+        logger: Logger,
+    ) -> Self {
         Self {
+            container_runtime: container_runtime,
             image: image.to_owned(),
             workspace_layout: workspace_layout.clone(),
             logger: logger,
@@ -99,12 +106,11 @@ impl FlinkEngine {
     }
 
     fn submit(&self, run_info: &RunInfo) -> Result<(), EngineError> {
-        let docker = DockerClient::new();
-
         let network_name = format!("kamu-flink-{}", &run_info.run_id);
-        let _network = docker.create_network(&network_name);
+        let _network = self.container_runtime.create_network(&network_name);
 
         let job_manager = Container::new(
+            self.container_runtime.clone(),
             DockerRunArgs {
                 image: self.image.clone(),
                 network: Some(network_name.clone()),
@@ -131,6 +137,7 @@ impl FlinkEngine {
         )?;
 
         let _task_manager = Container::new(
+            self.container_runtime.clone(),
             DockerRunArgs {
                 image: self.image.clone(),
                 network: Some(network_name.clone()),
@@ -153,7 +160,7 @@ impl FlinkEngine {
             self.logger.new(o!("name" => "taskmanager")),
         )?;
 
-        docker
+        self.container_runtime
             .wait_for_host_port(job_manager.name(), 8081, Duration::from_secs(15))
             .map_err(|e| EngineError::internal(e))?;
 
@@ -168,18 +175,22 @@ impl FlinkEngine {
         // TODO: chown hides exit status
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
-                let chown = format!(
-                    "; chown -R {}:{} {}",
-                    users::get_current_uid(),
-                    users::get_current_gid(),
-                    self.volume_dir_in_container().display()
-                );
+                let chown = if self.container_runtime.runtime_type == ContainerRuntimeType::Docker {
+                    format!(
+                        "; chown -R {}:{} {}",
+                        users::get_current_uid(),
+                        users::get_current_gid(),
+                        self.volume_dir_in_container().display()
+                    )
+                } else {
+                    "".to_owned()
+                };
             } else {
                 let chown = "".to_owned();
             }
         };
 
-        let mut run_cmd = docker.exec_shell_cmd(
+        let mut run_cmd = self.container_runtime.exec_shell_cmd(
             ExecArgs::default(),
             job_manager.name(),
             &[
@@ -343,7 +354,7 @@ impl Engine for FlinkEngine {
 }
 
 struct Container {
-    docker: DockerClient,
+    container_runtime: DockerClient,
     name: String,
     child: Child,
     logger: Logger,
@@ -351,15 +362,15 @@ struct Container {
 
 impl Container {
     fn new(
+        container_runtime: DockerClient,
         args: DockerRunArgs,
         stdout_path: &Path,
         stderr_path: &Path,
         logger: Logger,
     ) -> Result<Self, std::io::Error> {
-        let docker = DockerClient::new();
         let name = args.container_name.as_ref().unwrap().clone();
 
-        let mut cmd = docker.run_cmd(args);
+        let mut cmd = container_runtime.run_cmd(args);
 
         info!(logger, "Spawning container"; "command" => ?cmd);
 
@@ -369,7 +380,7 @@ impl Container {
             .spawn()?;
 
         Ok(Self {
-            docker: docker,
+            container_runtime: container_runtime,
             name: name,
             child: child,
             logger: logger,
@@ -382,7 +393,7 @@ impl Container {
 
     fn kill(&mut self) -> Result<(), std::io::Error> {
         info!(self.logger, "Sending kill to container");
-        self.docker
+        self.container_runtime
             .kill_cmd(&self.name)
             .stdout(Stdio::null())
             .stderr(Stdio::null())

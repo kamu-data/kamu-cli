@@ -6,6 +6,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 pub struct MinioServer {
+    container_runtime: DockerClient,
     pub container_name: String,
     pub address: String,
     pub host_port: u16,
@@ -18,7 +19,7 @@ impl MinioServer {
     pub fn new(server_dir: &Path, access_key: &str, secret_key: &str) -> Self {
         use rand::Rng;
 
-        let docker = DockerClient::new();
+        let container_runtime = DockerClient::default();
 
         let mut server_name = "kamu-test-minio-".to_owned();
         server_name.extend(
@@ -41,7 +42,7 @@ impl MinioServer {
 
         // TODO: Would be nice to avoid pulling in tests every time but this
         // means automated tests need an extra step to get all images
-        docker
+        container_runtime
             .pull_cmd(docker_images::MINIO)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -49,7 +50,7 @@ impl MinioServer {
             .status()
             .unwrap();
 
-        let process = docker
+        let process = container_runtime
             .run_cmd(DockerRunArgs {
                 image: docker_images::MINIO.to_owned(),
                 container_name: Some(server_name.to_owned()),
@@ -67,18 +68,21 @@ impl MinioServer {
             .spawn()
             .unwrap();
 
-        let host_port = docker
+        let host_port = container_runtime
             .wait_for_host_port(&server_name, server_port, Duration::from_secs(20))
             .unwrap();
 
-        docker
+        container_runtime
             .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
+        let address = container_runtime.get_docker_addr();
+
         Self {
+            container_runtime,
             container_name: server_name,
             process: process,
-            address: docker.get_docker_addr(),
+            address: address,
             host_port: host_port,
             access_key: access_key.to_owned(),
             secret_key: secret_key.to_owned(),
@@ -88,8 +92,8 @@ impl MinioServer {
 
 impl Drop for MinioServer {
     fn drop(&mut self) {
-        let docker = DockerClient::new();
-        let _ = docker
+        let _ = self
+            .container_runtime
             .kill_cmd(&self.container_name)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

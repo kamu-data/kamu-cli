@@ -14,10 +14,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
-      - run: docker pull kamudata/engine-spark:0.8.1
-      - run: docker pull kamudata/engine-flink:0.6.0
-      - run: docker pull httpd:2.4
-      - run: docker pull bogem/ftp
+      - run: cargo build
+      - run: cargo run config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
+      - run: cargo run init --pull-test-images
       - run: cargo test --verbose
   test_macos:
     name: Test / MacOS

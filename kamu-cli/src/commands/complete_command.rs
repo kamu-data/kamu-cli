@@ -1,3 +1,5 @@
+use crate::config::ConfigService;
+
 use super::{Command, Error};
 use kamu::domain::*;
 
@@ -10,6 +12,7 @@ use std::rc::Rc;
 
 pub struct CompleteCommand {
     metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
+    config_service: Rc<RefCell<ConfigService>>,
     app: clap::App<'static, 'static>,
     input: String,
     current: usize,
@@ -20,12 +23,14 @@ pub struct CompleteCommand {
 impl CompleteCommand {
     pub fn new(
         metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
+        config_service: Rc<RefCell<ConfigService>>,
         app: clap::App<'static, 'static>,
         input: String,
         current: usize,
     ) -> Self {
         Self {
             metadata_repo: metadata_repo,
+            config_service: config_service,
             app: app,
             input: input,
             current: current,
@@ -52,6 +57,14 @@ impl CompleteCommand {
                 if remote_id.starts_with(prefix) {
                     println!("{}", remote_id);
                 }
+            }
+        }
+    }
+
+    fn complete_config_key(&self, prefix: &str) {
+        for key in self.config_service.borrow().all_keys() {
+            if key.starts_with(prefix) {
+                println!("{}", key);
             }
         }
     }
@@ -154,6 +167,7 @@ impl Command for CompleteCommand {
                 "dataset" => self.complete_dataset(to_complete),
                 "remote" => self.complete_remote(to_complete),
                 "manifest" => self.complete_path(to_complete),
+                "cfgkey" => self.complete_config_key(to_complete),
                 _ => (),
             }
         }

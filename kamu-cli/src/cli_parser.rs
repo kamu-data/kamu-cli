@@ -183,7 +183,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("user")
                                 .long("user")
                                 .help("Operate on the user scope configuration file"),
-                            Arg::with_name("key")
+                            Arg::with_name("cfgkey")
                                 .required(true)
                                 .index(1)
                                 .help("Path to the config option"),
@@ -194,7 +194,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("user")
                                 .long("user")
                                 .help("Operate on the user scope configuration file"),
-                            Arg::with_name("key")
+                            Arg::with_name("cfgkey")
                                 .required(true)
                                 .index(1)
                                 .help("Path to the config option"),
@@ -263,11 +263,15 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 )),
             SubCommand::with_name("init")
                 .about("Initialize an empty workspace in the current directory")
-                .arg(
+                .args(&[
                     Arg::with_name("pull-images")
                         .long("pull-images")
                         .help("Only pull docker images and exit"),
-                )
+                    Arg::with_name("pull-test-images")
+                        .long("pull-test-images")
+                        .help("Only pull test-related docker images and exit")
+                        .hidden(true),
+                ])
                 .after_help(indoc::indoc!(
                     r"
                     A workspace is where kamu stores all the important information about datasets (metadata) and in some cases raw data.

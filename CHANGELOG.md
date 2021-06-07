@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.43.0] - 2021-06-06
+### Added
+- New `kamu config` command group provides `git`-like configuration.
+- Experimental support for `podman` container runtime - a daemon-less and root-less alternative to `docker` that fixes the permission escalation problem. To give it a try run `kamu config set --user engine.runtime podman`.
+### Fixed
+- The `kamu notebook` command no longer fails if `kamu` network in `docker` was not cleaned up.
+
 ## [0.42.0] - 2021-06-05
 ### Changed
 - Upgraded Flink engine to latest `v1.13.1`

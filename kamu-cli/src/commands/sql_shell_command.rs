@@ -1,8 +1,8 @@
 use super::{Command, Error};
 use crate::output::*;
-use kamu::domain::PullImageListener;
 use kamu::infra::explore::*;
 use kamu::infra::*;
+use kamu::{domain::PullImageListener, infra::utils::docker_client::DockerClient};
 
 use slog::Logger;
 
@@ -10,6 +10,7 @@ pub struct SqlShellCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
+    container_runtime: DockerClient,
     command: Option<String>,
     url: Option<String>,
     logger: Logger,
@@ -20,6 +21,7 @@ impl SqlShellCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
+        container_runtime: DockerClient,
         command: Option<&str>,
         url: Option<&str>,
         logger: Logger,
@@ -28,6 +30,7 @@ impl SqlShellCommand {
             workspace_layout: workspace_layout.clone(),
             volume_layout: volume_layout.clone(),
             output_config: output_config.clone(),
+            container_runtime: container_runtime,
             command: command.map(|v| v.to_owned()),
             url: url.map(|v| v.to_owned()),
             logger: logger,
@@ -37,9 +40,11 @@ impl SqlShellCommand {
 
 impl Command for SqlShellCommand {
     fn run(&mut self) -> Result<(), Error> {
+        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };
-            SqlShellImpl::ensure_images(&mut pull_progress);
+            sql_shell.ensure_images(&mut pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
@@ -52,7 +57,7 @@ impl Command for SqlShellCommand {
             None
         };
 
-        SqlShellImpl::run(
+        sql_shell.run(
             &self.workspace_layout,
             &self.volume_layout,
             match self.output_config.format {

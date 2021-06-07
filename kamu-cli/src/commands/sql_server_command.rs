@@ -12,6 +12,7 @@ pub struct SqlServerCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
+    container_runtime: DockerClient,
     logger: Logger,
     address: String,
     port: u16,
@@ -22,6 +23,7 @@ impl SqlServerCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
+        container_runtime: DockerClient,
         logger: Logger,
         address: &str,
         port: u16,
@@ -30,6 +32,7 @@ impl SqlServerCommand {
             workspace_layout: workspace_layout.clone(),
             volume_layout: volume_layout.clone(),
             output_config: output_config.clone(),
+            container_runtime: container_runtime,
             logger: logger,
             address: address.to_owned(),
             port: port,
@@ -39,9 +42,11 @@ impl SqlServerCommand {
 
 impl Command for SqlServerCommand {
     fn run(&mut self) -> Result<(), Error> {
+        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };
-            SqlShellImpl::ensure_images(&mut pull_progress);
+            sql_shell.ensure_images(&mut pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
@@ -54,7 +59,7 @@ impl Command for SqlServerCommand {
             None
         };
 
-        let mut spark = SqlShellImpl::run_server(
+        let mut spark = sql_shell.run_server(
             &self.workspace_layout,
             &self.volume_layout,
             self.logger.clone(),
@@ -63,8 +68,7 @@ impl Command for SqlServerCommand {
         )?;
 
         // TODO: Move into a container whapper type
-        let docker_client = DockerClient::new();
-        let _drop_spark = DropContainer::new(docker_client.clone(), "kamu-spark");
+        let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
 
         if let Some(s) = spinner {
             s.finish_and_clear();

@@ -1,5 +1,6 @@
 use indoc::indoc;
 use kamu::domain::*;
+use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu_test::*;
 use opendatafabric::*;
@@ -24,6 +25,7 @@ fn test_transform_with_engine_spark() {
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
         &workspace_layout,
+        DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     )));
 
@@ -228,6 +230,7 @@ fn test_transform_with_engine_flink() {
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
         &workspace_layout,
+        DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     )));
 

@@ -1,5 +1,6 @@
 use indoc::indoc;
 use kamu::domain::*;
+use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu_test::*;
 use opendatafabric::*;
@@ -22,12 +23,16 @@ fn test_ingest_with_engine() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
+
+    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+        &workspace_layout,
+        DockerClient::default(),
+        slog::Logger::root(slog::Discard, slog::o!()),
+    )));
+
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
         metadata_repo.clone(),
-        Arc::new(Mutex::new(EngineFactory::new(
-            &workspace_layout,
-            slog::Logger::root(slog::Discard, slog::o!()),
-        ))),
+        engine_factory,
         &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     )));
@@ -91,7 +96,7 @@ fn test_ingest_with_engine() {
     let res = ingest_svc
         .borrow_mut()
         .ingest(&dataset_id, IngestOptions::default(), None);
-    assert_ok!(res, IngestResult::Updated {..});
+    assert_ok!(res, IngestResult::Updated { .. });
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);
     assert!(dataset_layout.data_dir.exists());

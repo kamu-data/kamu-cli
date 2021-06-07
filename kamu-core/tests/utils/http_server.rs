@@ -7,6 +7,7 @@ use std::time::Duration;
 
 // TODO: Consider replacing with in-process server for speed
 pub struct HttpServer {
+    container_runtime: DockerClient,
     pub container_name: String,
     pub address: String,
     pub host_port: u16,
@@ -17,7 +18,7 @@ impl HttpServer {
     pub fn new(server_dir: &Path) -> Self {
         use rand::Rng;
 
-        let docker = DockerClient::new();
+        let container_runtime = DockerClient::default();
 
         let mut server_name = "kamu-test-http-".to_owned();
         server_name.extend(
@@ -34,7 +35,7 @@ impl HttpServer {
 
         let image = docker_images::HTTPD;
 
-        docker
+        container_runtime
             .pull_cmd(image)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -42,7 +43,7 @@ impl HttpServer {
             .status()
             .unwrap();
 
-        let process = docker
+        let process = container_runtime
             .run_cmd(DockerRunArgs {
                 image: image.to_owned(),
                 container_name: Some(server_name.to_owned()),
@@ -58,18 +59,21 @@ impl HttpServer {
             .spawn()
             .unwrap();
 
-        let host_port = docker
+        let host_port = container_runtime
             .wait_for_host_port(&server_name, server_port, Duration::from_secs(20))
             .unwrap();
 
-        docker
+        container_runtime
             .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
+        let address = container_runtime.get_docker_addr();
+
         Self {
+            container_runtime,
             container_name: server_name,
             process: process,
-            address: docker.get_docker_addr(),
+            address: address,
             host_port: host_port,
         }
     }
@@ -77,8 +81,8 @@ impl HttpServer {
 
 impl Drop for HttpServer {
     fn drop(&mut self) {
-        let docker = DockerClient::new();
-        let _ = docker
+        let _ = self
+            .container_runtime
             .kill_cmd(&self.container_name)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())

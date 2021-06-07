@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use serde::{Deserialize, Serialize};
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
@@ -71,16 +72,41 @@ impl Default for ExecArgs {
     }
 }
 
-#[derive(Clone)]
-pub struct DockerClient;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ContainerRuntimeType {
+    Docker,
+    Podman,
+}
+
+#[derive(Debug, Clone)]
+pub struct DockerClient {
+    pub runtime_type: ContainerRuntimeType,
+}
+
+impl Default for DockerClient {
+    fn default() -> Self {
+        Self::new(ContainerRuntimeType::Podman)
+    }
+}
 
 impl DockerClient {
-    pub fn new() -> Self {
-        Self {}
+    // TODO: Generalize into ContainerRuntime trait
+    pub fn new(runtime_type: ContainerRuntimeType) -> Self {
+        Self {
+            runtime_type: runtime_type,
+        }
+    }
+
+    fn new_command(&self) -> Command {
+        Command::new(match self.runtime_type {
+            ContainerRuntimeType::Docker => "docker",
+            ContainerRuntimeType::Podman => "podman",
+        })
     }
 
     pub fn has_image(&self, image: &str) -> bool {
-        Command::new("docker")
+        self.new_command()
             .arg("image")
             .arg("inspect")
             .arg(image)
@@ -112,14 +138,14 @@ impl DockerClient {
     }
 
     pub fn pull_cmd(&self, image: &str) -> Command {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("pull");
         cmd.arg(image);
         cmd
     }
 
     pub fn run_cmd(&self, args: DockerRunArgs) -> Command {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("run");
         if args.remove {
             cmd.arg("--rm");
@@ -202,7 +228,7 @@ impl DockerClient {
         I: IntoIterator<Item = S>,
         S: AsRef<std::ffi::OsStr>,
     {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("exec");
         if exec_args.tty {
             cmd.arg("-t");
@@ -238,19 +264,19 @@ impl DockerClient {
     }
 
     pub fn kill_cmd(&self, container_name: &str) -> Command {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("kill").arg(container_name);
         cmd
     }
 
     pub fn create_network_cmd(&self, network_name: &str) -> Command {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("network").arg("create").arg(network_name);
         cmd
     }
 
     pub fn remove_network_cmd(&self, network_name: &str) -> Command {
-        let mut cmd = Command::new("docker");
+        let mut cmd = self.new_command();
         cmd.arg("network").arg("rm").arg(network_name);
         cmd
     }
@@ -265,7 +291,7 @@ impl DockerClient {
 
         if !output.status.success() {
             panic!(
-                "Failed to create docker network: exit code: {} stdout: {} stderr: {}",
+                "Failed to create network: exit code: {} stdout: {} stderr: {}",
                 output.status,
                 std::str::from_utf8(&output.stdout).unwrap(),
                 std::str::from_utf8(&output.stderr).unwrap(),
@@ -285,7 +311,8 @@ impl DockerClient {
         //let formatEscaped =
         //  if (!OS.isWindows) format else format.replace("\"", "\\\"")
 
-        let res = Command::new("docker")
+        let res = self
+            .new_command()
             .arg("inspect")
             .arg(format)
             .arg(container_name)
@@ -309,7 +336,8 @@ impl DockerClient {
         let start = Instant::now();
 
         loop {
-            let res = Command::new("docker")
+            let res = self
+                .new_command()
                 .arg("inspect")
                 .arg(container_name)
                 .stdout(Stdio::null())
@@ -346,11 +374,14 @@ impl DockerClient {
     }
 
     pub fn get_docker_addr(&self) -> String {
-        std::env::var("DOCKER_HOST")
-            .ok()
-            .and_then(|s| url::Url::parse(&s).ok())
-            .map(|url| format!("{}", url.host().unwrap()))
-            .unwrap_or("127.0.0.1".to_owned())
+        match self.runtime_type {
+            ContainerRuntimeType::Podman => "127.0.0.1".to_owned(),
+            ContainerRuntimeType::Docker => std::env::var("DOCKER_HOST")
+                .ok()
+                .and_then(|s| url::Url::parse(&s).ok())
+                .map(|url| format!("{}", url.host().unwrap()))
+                .unwrap_or("127.0.0.1".to_owned()),
+        }
     }
 
     pub fn check_socket(&self, host_port: u16) -> bool {
