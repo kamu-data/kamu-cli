@@ -1,4 +1,5 @@
 use kamu::domain::*;
+use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu_test::*;
 use opendatafabric::*;
@@ -82,6 +83,7 @@ fn test_get_next_operation() {
         // TODO: Use a mock
         Arc::new(Mutex::new(EngineFactory::new(
             &workspace_layout,
+            DockerClient::default(),
             slog::Logger::root(slog::Discard, slog::o!()),
         ))),
         &volume_layout,

@@ -1,10 +1,11 @@
 #![feature(backtrace)]
 
+use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
-use kamu_cli::cli_parser;
 use kamu_cli::commands::*;
 use kamu_cli::config;
 use kamu_cli::output::*;
+use kamu_cli::{cli_parser, config::ConfigScope};
 use opendatafabric::DatasetIDBuf;
 
 use clap::value_t_or_exit;
@@ -27,10 +28,6 @@ fn main() {
     let workspace_layout = find_workspace();
     let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let config_service = Rc::new(RefCell::new(config::ConfigService::new(
-        workspace_layout.kamu_root_dir.clone(),
-    )));
-
     // Cleanup run info dir
     if workspace_layout.run_info_dir.exists() {
         std::fs::remove_dir_all(&workspace_layout.run_info_dir).unwrap();
@@ -39,10 +36,19 @@ fn main() {
 
     let logger = configure_logging(&output_format, &workspace_layout);
 
+    let config_service = Rc::new(RefCell::new(config::ConfigService::new(
+        workspace_layout.kamu_root_dir.clone(),
+    )));
+
+    let config = config_service
+        .borrow()
+        .load_with_defaults(ConfigScope::Flattened);
+    let container_runtime = DockerClient::new(config.engine.unwrap().runtime.unwrap());
     let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
     let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
     let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
         &workspace_layout,
+        container_runtime.clone(),
         logger.new(o!()),
     )));
     let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
@@ -85,6 +91,7 @@ fn main() {
             } else {
                 None
             },
+            config_service.clone(),
             cli_parser::cli(BINARY_NAME, VERSION),
             submatches.value_of("input").unwrap().into(),
             submatches.value_of("current").unwrap().parse().unwrap(),
@@ -101,12 +108,12 @@ fn main() {
             ("get", Some(get_matches)) => Box::new(ConfigGetCommand::new(
                 config_service.clone(),
                 get_matches.is_present("user"),
-                get_matches.value_of("key").unwrap(),
+                get_matches.value_of("cfgkey").unwrap(),
             )),
             ("set", Some(set_matches)) => Box::new(ConfigSetCommand::new(
                 config_service.clone(),
                 set_matches.is_present("user"),
-                set_matches.value_of("key").unwrap(),
+                set_matches.value_of("cfgkey").unwrap(),
                 set_matches.value_of("value"),
             )),
             _ => unimplemented!(),
@@ -119,10 +126,12 @@ fn main() {
             submatches.is_present("yes"),
         )),
         ("init", Some(submatches)) => {
-            if !submatches.is_present("pull-images") {
-                Box::new(InitCommand::new(&workspace_layout))
+            if submatches.is_present("pull-images") {
+                Box::new(PullImagesCommand::new(container_runtime.clone(), false))
+            } else if submatches.is_present("pull-test-images") {
+                Box::new(PullImagesCommand::new(container_runtime.clone(), true))
             } else {
-                Box::new(PullImagesCommand::new())
+                Box::new(InitCommand::new(&workspace_layout))
             }
         }
         ("list", Some(submatches)) => match submatches.subcommand() {
@@ -144,6 +153,7 @@ fn main() {
             &workspace_layout,
             &local_volume_layout,
             &output_format,
+            container_runtime.clone(),
             submatches.values_of("env").unwrap_or_default(),
             logger.new(o!()),
         )),
@@ -205,6 +215,7 @@ fn main() {
                 &workspace_layout,
                 &local_volume_layout,
                 &output_format,
+                container_runtime.clone(),
                 submatches.value_of("command"),
                 submatches.value_of("url"),
                 logger.new(o!()),
@@ -213,6 +224,7 @@ fn main() {
                 &workspace_layout,
                 &local_volume_layout,
                 &output_format,
+                container_runtime.clone(),
                 logger.new(o!()),
                 server_matches.value_of("address").unwrap(),
                 value_t_or_exit!(server_matches.value_of("port"), u16),

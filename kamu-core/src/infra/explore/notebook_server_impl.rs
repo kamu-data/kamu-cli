@@ -10,16 +10,24 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-pub struct NotebookServerImpl;
+pub struct NotebookServerImpl {
+    container_runtime: DockerClient,
+}
 
 impl NotebookServerImpl {
-    pub fn ensure_images(listener: &mut dyn PullImageListener) {
-        let docker_client = DockerClient::new();
-        docker_client.ensure_image(docker_images::LIVY, Some(listener));
-        docker_client.ensure_image(docker_images::JUPYTER, Some(listener));
+    pub fn new(container_runtime: DockerClient) -> Self {
+        Self { container_runtime }
+    }
+
+    pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
+        self.container_runtime
+            .ensure_image(docker_images::LIVY, Some(listener));
+        self.container_runtime
+            .ensure_image(docker_images::JUPYTER, Some(listener));
     }
 
     pub fn run<StartedClb, ShutdownClb>(
+        &self,
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         environment_vars: Vec<(String, String)>,
@@ -32,10 +40,17 @@ impl NotebookServerImpl {
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
     {
-        let docker_client = DockerClient::new();
-
         let network_name = "kamu";
-        let _network = docker_client.create_network(network_name);
+
+        // Delete network if exists from previous run
+        let _ = self
+            .container_runtime
+            .remove_network_cmd(network_name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output();
+
+        let _network = self.container_runtime.create_network(network_name);
 
         let cwd = Path::new(".").canonicalize().unwrap();
 
@@ -44,7 +59,7 @@ impl NotebookServerImpl {
         let jupyter_stdout_path = workspace_layout.run_info_dir.join("jupyter.out.txt");
         let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
 
-        let mut livy_cmd = docker_client.run_cmd(DockerRunArgs {
+        let mut livy_cmd = self.container_runtime.run_cmd(DockerRunArgs {
             image: docker_images::LIVY.to_owned(),
             container_name: Some("kamu-livy".to_owned()),
             hostname: Some("kamu-livy".to_owned()),
@@ -76,9 +91,9 @@ impl NotebookServerImpl {
                 Stdio::from(File::create(&livy_stderr_path)?)
             })
             .spawn()?;
-        let _drop_livy = DropContainer::new(docker_client.clone(), "kamu-livy");
+        let _drop_livy = DropContainer::new(self.container_runtime.clone(), "kamu-livy");
 
-        let mut jupyter_cmd = docker_client.run_cmd(DockerRunArgs {
+        let mut jupyter_cmd = self.container_runtime.run_cmd(DockerRunArgs {
             image: docker_images::JUPYTER.to_owned(),
             container_name: Some("kamu-jupyter".to_owned()),
             network: Some(network_name.to_owned()),
@@ -98,10 +113,11 @@ impl NotebookServerImpl {
             })
             .stderr(Stdio::piped())
             .spawn()?;
-        let _drop_jupyter = DropContainer::new(docker_client.clone(), "kamu-jupyter");
+        let _drop_jupyter = DropContainer::new(self.container_runtime.clone(), "kamu-jupyter");
 
-        let docker_host = docker_client.get_docker_addr();
-        let jupyter_port = docker_client
+        let docker_host = self.container_runtime.get_docker_addr();
+        let jupyter_port = self
+            .container_runtime
             .wait_for_host_port("kamu-jupyter", 80, std::time::Duration::from_secs(5))
             .unwrap_or_default();
         let token_clb = move |token: &str| {
@@ -139,26 +155,28 @@ impl NotebookServerImpl {
         token_extractor.handle.join().unwrap();
 
         // Fix permissions
-        cfg_if::cfg_if! {
-            if #[cfg(unix)] {
-                docker_client
-                    .run_shell_cmd(
-                        DockerRunArgs {
-                            image: docker_images::JUPYTER.to_owned(),
-                            container_name: Some("kamu-jupyter".to_owned()),
-                            volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
-                            ..DockerRunArgs::default()
-                        },
-                        &[format!(
-                            "chown -R {}:{} {}",
-                            users::get_current_uid(),
-                            users::get_current_gid(),
-                            "/opt/workdir"
-                        )],
-                    )
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()?;
+        if self.container_runtime.runtime_type == ContainerRuntimeType::Docker {
+            cfg_if::cfg_if! {
+                if #[cfg(unix)] {
+                    self.container_runtime
+                        .run_shell_cmd(
+                            DockerRunArgs {
+                                image: docker_images::JUPYTER.to_owned(),
+                                container_name: Some("kamu-jupyter".to_owned()),
+                                volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
+                                ..DockerRunArgs::default()
+                            },
+                            &[format!(
+                                "chown -R {}:{} {}",
+                                users::get_current_uid(),
+                                users::get_current_gid(),
+                                "/opt/workdir"
+                            )],
+                        )
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()?;
+                }
             }
         }
 

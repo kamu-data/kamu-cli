@@ -1,6 +1,7 @@
 use core::panic;
 use std::path::{Path, PathBuf};
 
+use kamu::infra::utils::docker_client::ContainerRuntimeType;
 use kamu::infra::Manifest;
 
 use merge::Merge;
@@ -9,6 +10,8 @@ use serde_with::skip_serializing_none;
 use std::fmt::Write;
 
 use crate::error::Error;
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 const CONFIG_VERSION: i32 = 1;
 const CONFIG_FILENAME: &str = ".kamuconfig";
@@ -20,12 +23,20 @@ const CONFIG_FILENAME: &str = ".kamuconfig";
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
-    engine: Option<EngineConfig>,
+    pub engine: Option<EngineConfig>,
+}
+
+impl CLIConfig {
+    pub fn new() -> Self {
+        Self { engine: None }
+    }
 }
 
 impl Default for CLIConfig {
     fn default() -> Self {
-        Self { engine: None }
+        Self {
+            engine: Some(EngineConfig::default()),
+        }
     }
 }
 
@@ -35,20 +46,21 @@ impl Default for CLIConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EngineConfig {
-    runtime: Option<EngineRuntime>,
+    pub runtime: Option<ContainerRuntimeType>,
 }
 
-impl Default for EngineConfig {
-    fn default() -> Self {
+impl EngineConfig {
+    pub fn new() -> Self {
         Self { runtime: None }
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum EngineRuntime {
-    Docker,
-    Podman,
+impl Default for EngineConfig {
+    fn default() -> Self {
+        Self {
+            runtime: Some(ContainerRuntimeType::Docker),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -71,43 +83,13 @@ impl ConfigService {
         }
     }
 
-    fn path_for_scope(&self, scope: ConfigScope) -> PathBuf {
-        match scope {
-            ConfigScope::User => dirs::home_dir()
-                .expect("Cannot determine user home directory")
-                .join(&CONFIG_FILENAME),
-            ConfigScope::Workspace => self.workspace_kamu_dir.join(&CONFIG_FILENAME),
-            _ => panic!(),
-        }
-    }
-
-    fn load_from(&self, config_path: &Path) -> CLIConfig {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .open(config_path)
-            .unwrap();
-
-        let manifest: Manifest<CLIConfig> = serde_yaml::from_reader(file).unwrap();
-
-        // TODO: Migrations
-        assert_eq!(manifest.kind, "CLIConfig");
-        assert_eq!(manifest.api_version, CONFIG_VERSION);
-
-        manifest.content
-    }
-
-    fn to_raw(&self, config: CLIConfig) -> serde_yaml::Value {
-        let s = serde_yaml::to_string(&config).unwrap();
-        serde_yaml::from_str(&s).unwrap()
-    }
-
     pub fn load(&self, scope: ConfigScope) -> CLIConfig {
         match scope {
             ConfigScope::Flattened => self.load_flattened(),
             _ => {
                 let config_path = &self.path_for_scope(scope);
                 if !config_path.exists() {
-                    CLIConfig::default()
+                    CLIConfig::new()
                 } else {
                     self.load_from(config_path)
                 }
@@ -115,7 +97,13 @@ impl ConfigService {
         }
     }
 
-    pub fn load_flattened(&self) -> CLIConfig {
+    pub fn load_with_defaults(&self, scope: ConfigScope) -> CLIConfig {
+        let mut config = self.load(scope);
+        config.merge(CLIConfig::default());
+        config
+    }
+
+    fn load_flattened(&self) -> CLIConfig {
         let mut to_load: Vec<PathBuf> = Vec::new();
         let mut current: &Path = &self.workspace_kamu_dir;
 
@@ -136,7 +124,7 @@ impl ConfigService {
             to_load.push(user_config);
         }
 
-        let mut result = CLIConfig::default();
+        let mut result = CLIConfig::new();
         for path in to_load {
             let cfg = self.load_from(&path);
             result.merge(cfg);
@@ -283,8 +271,69 @@ impl ConfigService {
         self.strip_yaml(&yaml).to_owned()
     }
 
+    pub fn all_keys(&self) -> Vec<String> {
+        let mut result = Vec::new();
+        let full_config = CLIConfig::default();
+        let raw_config = self.to_raw(full_config);
+        self.visit_keys_recursive("", &raw_config, &mut |key| result.push(key));
+        result
+    }
+
+    fn visit_keys_recursive(
+        &self,
+        prefix: &str,
+        value: &serde_yaml::Value,
+        fun: &mut impl FnMut(String),
+    ) {
+        if let Some(mapping) = value.as_mapping() {
+            for (k, v) in mapping.iter() {
+                if let Some(key) = k.as_str() {
+                    let mut full_key = String::with_capacity(prefix.len() + key.len());
+                    full_key.push_str(prefix);
+                    full_key.push_str(key);
+
+                    full_key.push_str(".");
+                    self.visit_keys_recursive(&full_key, v, fun);
+
+                    full_key.pop();
+                    fun(full_key);
+                }
+            }
+        }
+    }
+
     fn strip_yaml<'a>(&self, yaml_str: &'a str) -> &'a str {
         yaml_str.split_once('\n').unwrap().1.trim_end()
+    }
+
+    fn path_for_scope(&self, scope: ConfigScope) -> PathBuf {
+        match scope {
+            ConfigScope::User => dirs::home_dir()
+                .expect("Cannot determine user home directory")
+                .join(&CONFIG_FILENAME),
+            ConfigScope::Workspace => self.workspace_kamu_dir.join(&CONFIG_FILENAME),
+            _ => panic!(),
+        }
+    }
+
+    fn load_from(&self, config_path: &Path) -> CLIConfig {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(config_path)
+            .unwrap();
+
+        let manifest: Manifest<CLIConfig> = serde_yaml::from_reader(file).unwrap();
+
+        // TODO: Migrations
+        assert_eq!(manifest.kind, "CLIConfig");
+        assert_eq!(manifest.api_version, CONFIG_VERSION);
+
+        manifest.content
+    }
+
+    fn to_raw(&self, config: CLIConfig) -> serde_yaml::Value {
+        let s = serde_yaml::to_string(&config).unwrap();
+        serde_yaml::from_str(&s).unwrap()
     }
 }
 

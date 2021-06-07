@@ -14,24 +14,30 @@ use std::sync::{Arc, Mutex};
 pub struct EngineFactory {
     spark_engine: Arc<Mutex<SparkEngine>>,
     flink_engine: Arc<Mutex<FlinkEngine>>,
-    docker_client: DockerClient,
+    container_runtime: DockerClient,
     known_images: HashSet<String>,
 }
 
 impl EngineFactory {
-    pub fn new(workspace_layout: &WorkspaceLayout, logger: Logger) -> Self {
+    pub fn new(
+        workspace_layout: &WorkspaceLayout,
+        container_runtime: DockerClient,
+        logger: Logger,
+    ) -> Self {
         Self {
             spark_engine: Arc::new(Mutex::new(SparkEngine::new(
+                container_runtime.clone(),
                 docker_images::SPARK,
                 workspace_layout,
                 logger.new(o!("engine" => "spark")),
             ))),
             flink_engine: Arc::new(Mutex::new(FlinkEngine::new(
+                container_runtime.clone(),
                 docker_images::FLINK,
                 workspace_layout,
                 logger.new(o!("engine" => "flink")),
             ))),
-            docker_client: DockerClient::new(),
+            container_runtime: container_runtime,
             known_images: HashSet::new(),
         }
     }
@@ -54,14 +60,14 @@ impl EngineFactory {
         }?;
 
         if !self.known_images.contains(image) {
-            if !self.docker_client.has_image(image) {
+            if !self.container_runtime.has_image(image) {
                 let mut null_listener = NullPullImageListener;
                 let listener = maybe_listener.unwrap_or(&mut null_listener);
 
                 listener.begin(image);
 
                 // TODO: Return better errors
-                self.docker_client
+                self.container_runtime
                     .pull_cmd(image)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
