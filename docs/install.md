@@ -5,8 +5,8 @@
 - [Supported Platforms](#supported-platforms)
   - [Linux](#linux)
   - [MacOS X](#macos-x)
-  - [Windows (using Docker Desktop)](#windows-using-docker-desktop)
   - [Windows (using WSL 2)](#windows-using-wsl-2)
+  - [Windows (using Docker Desktop)](#windows-using-docker-desktop)
 - [Installing shell completions](#installing-shell-completions)
 - [A Note on Security](#a-note-on-security)
 
@@ -18,7 +18,7 @@
 It relies on `docker` container-based virtualization to run such heavyweight frameworks like Spark, Flink, and Jupyter in isolated environments without needing you to install thousands of libraries and bloating your beloved laptop with their dependencies.
 
 ### Experimental: Podman
-> Note: We added an experimental support for `podman` - an alternative container runtime that fixes the shortcomings of `docker` [related to security](#a-note-on-security). We highly recommend you to give it a try, as we are planning to make it a default runtime in the near future.
+> Note: We added an experimental support for [`podman`](https://podman.io/) - an alternative container runtime that fixes the shortcomings of `docker` [related to security](#a-note-on-security). We highly recommend you to give it a try, as we are planning to make it a default runtime in the near future.
 
 
 ## Supported Platforms
@@ -26,10 +26,10 @@ It relies on `docker` container-based virtualization to run such heavyweight fra
 ### Linux
 Linux is our primary target environment. We don't have packages for various Linux flavors yet, but since the tool is just a simple binary it's very easy to get started:
 - Install `docker` using your distro's package manager (alternatively try [podman](#experimental-podman))
-- Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
+  - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
 - Download the latest version of `kamu` from the GitHub release page
 - Unpack and, `chown +x` it
-- Link it into your preferred location on your `PATH`.
+- Link it into your preferred location on your `PATH`
 - Use `kamu init --pull-images` to pre-load all Docker images
 
 See also:
@@ -38,9 +38,21 @@ See also:
 
 ### MacOS X
 Installing on MacOS X is very similar to Linux with following differences:
-* Install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/) (alternatively try [podman](#experimental-podman)).
+* Install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/)
 * `kamu` uses your system temp directory to store temporary files. This directory is not mounted into Docker's VM by default so you may need to use `VitualBox` to mount this directory into VM under the same path as on your host.
 * Also consider allocating more CPUs and memory to the Docker VM.
+
+### Windows (using WSL 2)
+- Install WSL following [these steps](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
+- Install Ubuntu distro from Microsoft Store
+- Install `docker` (alternatively try [podman](#experimental-podman))
+  - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
+- Download the latest version of `kamu` from the GitHub release page (note that you should download Linux release)
+- Unpack and, `chown +x` it
+- Link it into your preferred location on your `PATH`
+
+See also:
+* [Installing shell completions](#installing-shell-completions)
 
 ### Windows (using Docker Desktop)
 * Install and run [Docker Desktop](https://docs.docker.com/docker-for-windows/install/).
@@ -54,10 +66,6 @@ Installing on MacOS X is very similar to Linux with following differences:
 Docker Toolbox runs Docker in a Virtual Machine. This means to mount a file from your host file system into a Docker container the file first needs to be mounted into VM, so make sure all paths that `kamu` will need are mapped in VirtualBox VM settings.
 
 > **Example:** Lets assume your workspace directory is `C:\Users\me\kamu`. When `kamu` runs it will detect that Docker runs in a VM it will convert it to `/c/Users/me/kamu`. So in your VM settings you may need to add a mapping from `C:\Users\me` to `/c/Users/me`.
-
-### Windows (using WSL 2)
-TODO: Please contribute instructions!
-
 
 ## Installing shell completions
 To be able to auto-complete the `kamu` commands please install completion scripts for the shell of your choosing. You can find detailed instructions by running `kamu completions --help`.
