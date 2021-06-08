@@ -24,7 +24,7 @@ See also:
 
 ### Linux
 Linux is our primary target environment. We don't have packages for various Linux flavors yet, but since the tool is just a simple binary it's very easy to get started:
-- Install `docker` using your distro's package manager (alternatively try [podman](#experimental-podman))
+- Install `docker` using your distro's package manager (alternatively try [podman](#experimental-using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
 - Download the latest version of `kamu` from the GitHub release page
 - Unpack and, `chown +x` it
@@ -51,7 +51,7 @@ See also:
 ### Windows (using WSL 2)
 - Install WSL following [these steps](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
 - Install Ubuntu distro from Microsoft Store
-- Install `docker` (alternatively try [podman](#experimental-podman))
+- Install `docker` (alternatively try [podman](#experimental-using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
 - Download the latest version of `kamu` from the GitHub release page (note that you should download Linux release)
 - Unpack and, `chown +x` it
