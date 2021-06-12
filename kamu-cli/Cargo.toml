@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.43.1"
+version = "0.44.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"
@@ -46,9 +46,6 @@ slog-term = "*"
 tempfile = "*"
 thiserror = "*"  # Structured error derivations
 url = "*"
-
-# TODO: Move to core
-parquet = { git = "https://github.com/apache/arrow" }
 
 
 [dev-dependencies]

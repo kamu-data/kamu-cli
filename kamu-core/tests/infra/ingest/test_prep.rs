@@ -1,5 +1,7 @@
 use indoc::indoc;
+use kamu::domain::IngestError;
 use kamu::infra::ingest::*;
+use kamu_test::assert_err;
 use opendatafabric::*;
 
 use chrono::Utc;
@@ -94,6 +96,26 @@ fn test_prep_decompress_zip_single_file() {
     assert!(target_path.exists());
 
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+}
+
+#[test]
+fn test_prep_decompress_zip_bad_file() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let src_path = tempdir.path().join("data.zip");
+    let target_path = tempdir.path().join("prepared.bin");
+
+    let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
+        format: CompressionFormat::Zip,
+        sub_path: None,
+    })];
+
+    std::fs::write(&src_path, "garbage").unwrap();
+
+    let prep_svc = PrepService::new();
+
+    let res = prep_svc.prepare(&prep_steps, Utc::now(), None, &src_path, &target_path);
+    assert_err!(res, IngestError::InternalError { .. });
 }
 
 #[test]

@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.43.1"
+version = "0.44.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 
@@ -57,4 +57,4 @@ users = "*"  # For getting uid:gid
 kamu-test = { path = "../kamu-core-test" }
 assert_matches = "*"
 filetime = "*"
-parquet = { git = "https://github.com/apache/arrow" }
+parquet = "*"
