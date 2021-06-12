@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.44.0] - 2021-06-11
+### Fixed
+- Support for Zip files that cannot be decoded in a streaming fashion.
+- Dependency upgrades.
+
 ## [0.43.1] - 2021-06-06
 ### Fixed
 - Increased socket check timeout to prevent `kamu sql` trying to connect before Spark server is fully up.

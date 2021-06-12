@@ -11,8 +11,6 @@ use std::io::prelude::*;
 use std::io::Error as IOError;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use thiserror::Error;
 
 const BUFFER_SIZE: usize = 8096;
@@ -84,6 +82,8 @@ pub struct PrepCheckpoint {
 trait Stream: std::io::Read + Send {
     fn as_read(&mut self) -> &mut dyn std::io::Read;
 
+    fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek>;
+
     fn join(self: Box<Self>) -> Result<(), IngestError>;
 }
 
@@ -92,10 +92,18 @@ impl Stream for std::fs::File {
         self
     }
 
+    fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
+        Some(self)
+    }
+
     fn join(self: Box<Self>) -> Result<(), IngestError> {
         Ok(())
     }
 }
+
+impl ReadAndSeek for std::fs::File {}
+
+trait ReadAndSeek: std::io::Read + std::io::Seek {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Pipe Streams
@@ -166,6 +174,10 @@ impl Stream for PipeStream {
         self
     }
 
+    fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
+        None
+    }
+
     fn join(self: Box<Self>) -> Result<(), IngestError> {
         self.ingress.join().unwrap()
     }
@@ -181,9 +193,9 @@ struct BadStatusCode {
 // DecompressZipStream
 ///////////////////////////////////////////////////////////////////////////////
 
-struct ReaderHelper(Box<dyn Stream>);
+struct ReaderHelper<'a>(&'a mut dyn Stream);
 
-impl Read for ReaderHelper {
+impl<'a> Read for ReaderHelper<'a> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         self.0.read(buf)
     }
@@ -192,55 +204,68 @@ impl Read for ReaderHelper {
 struct DecompressZipStream {
     ingress: std::thread::JoinHandle<Result<(), IngestError>>,
     consumer: ringbuf::Consumer<u8>,
-    done_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    done_recvr: std::sync::mpsc::Receiver<usize>,
 }
 
 impl DecompressZipStream {
-    fn new(input: Box<dyn Stream>) -> Result<Self, IOError> {
+    fn new(mut input: Box<dyn Stream>) -> Result<Self, IOError> {
         let (mut producer, consumer) = ringbuf::RingBuffer::<u8>::new(BUFFER_SIZE).split();
 
-        let done_flag = Arc::new(AtomicBool::new(false));
-        let done_flag_thread = done_flag.clone();
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
         // TODO: Threading is a complete overkill here
-        // Only reason for this is the `read_zipfile_from_stream` API that forces
-        // use of mutable reference
+        // Only reason for this is the ownership/lifetime issues when creating archive from references
         // See: https://github.com/mvdnes/zip-rs/issues/111
         let ingress = std::thread::Builder::new()
             .name("decompress_zip_stream".to_owned())
             .spawn(move || {
-                let mut reader = ReaderHelper(input);
+                if let Some(seekable) = input.as_seekable_read() {
+                    let mut archive = zip::read::ZipArchive::new(seekable)
+                        .map_err(|e| IngestError::internal(e))?;
+                    let mut file = archive.by_index(0).map_err(|e| IngestError::internal(e))?;
 
-                {
-                    let mut zipfile = zip::read::read_zipfile_from_stream(&mut reader)
+                    loop {
+                        let read = producer.read_from(&mut file, None).unwrap();
+                        tx.send(read).unwrap();
+                        if read == 0 {
+                            break;
+                        }
+                    }
+                } else {
+                    let mut read_helper = ReaderHelper(input.as_mut());
+                    let mut file = zip::read::read_zipfile_from_stream(&mut read_helper)
                         .unwrap()
                         .unwrap();
 
                     loop {
-                        let read = producer.read_from(&mut zipfile, None).unwrap();
+                        let read = producer.read_from(&mut file, None).unwrap();
+                        tx.send(read).unwrap();
                         if read == 0 {
                             break;
                         }
                     }
                 }
 
-                done_flag_thread.store(true, Ordering::Release);
-                reader.0.join()
+                input.join()
             })
             .unwrap();
 
         Ok(Self {
             ingress: ingress,
             consumer: consumer,
-            done_flag: done_flag,
+            done_recvr: rx,
         })
     }
 }
 
 impl Read for DecompressZipStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
-        while self.consumer.is_empty() && !self.done_flag.load(Ordering::Acquire) {
-            std::thread::sleep(std::time::Duration::from_millis(1));
+        while self.consumer.is_empty() {
+            match self.done_recvr.recv() {
+                Ok(0) => break,
+                Ok(_) => (),
+                Err(_) => break,
+            }
         }
 
         if !self.consumer.is_empty() {
@@ -254,6 +279,10 @@ impl Read for DecompressZipStream {
 impl Stream for DecompressZipStream {
     fn as_read(&mut self) -> &mut dyn std::io::Read {
         self
+    }
+
+    fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
+        None
     }
 
     fn join(self: Box<Self>) -> Result<(), IngestError> {
@@ -285,6 +314,10 @@ impl Read for DecompressGzipStream {
 impl Stream for DecompressGzipStream {
     fn as_read(&mut self) -> &mut dyn std::io::Read {
         self
+    }
+
+    fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
+        None
     }
 
     fn join(self: Box<Self>) -> Result<(), IngestError> {
