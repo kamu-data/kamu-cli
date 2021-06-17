@@ -112,4 +112,15 @@ In order to instruct `kamu` to use `podman` run:
 kamu config set --user engine.runtime podman
 kamu init --pull-images
 ```
+
+Note: On some systems you need to separately install `podman-dnsname` package to allow contaiers to communicate with one another via hostnames. To check whether you have it run:
+
+```bash
+podman network create test
+podman network ls
+# NETWORK ID    NAME    VERSION  PLUGINS
+# 9f86d081884c  test    0.4.0    bridge,portmap,firewall,tuning,dnsname
+#                                                               ^^^ plugin installed
+podman network prune
+```
  
