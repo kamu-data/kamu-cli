@@ -1,35 +1,58 @@
-# Kamu <!-- omit in toc -->
+<div align="center">
+  <h1>Kamu</h1>
+  <p>
+    <strong>World's first decentralized data warehouse, on your laptop</strong>
+  </p>
+  <p>
 
 [![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 [![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 
-Welcome to `kamu` - a new-generation data management and transformation tool!
+  </p>
+</div>
+
 
 - [About](#about)
-- [Documentation](#documentation)
 - [Learning Materials](#learning-materials)
+- [Documentation Index](#documentation-index)
 - [Features](#features)
 - [Project Status Disclaimer](#project-status-disclaimer)
 
 
 ## About
 
-`kamu` is a reference implementation of [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) - a **Web 3.0 technology** that powers a distributed structured data supply chain for providing timely, high-quality, and verifiable data for data science, smart contracts, web and applications.
+`kamu` is a command-line tool for managing and transforming structured data. 
+
+In short it can be described as:
+* Git for data (think collaboration)
+* Distributed data warehouse
+* Decentralized stream-processing data pipeline
+* A supply chain for structured data
+* Blockchain for Big Data
+* Or even Kubernetes for data :)
+
+Following the "**data as code**" philosophy it lets you build arbitrarily complex data pipelines. First, you define where to get data from and how to ingest it, and the tool will **keep datasets always up-to-date**. You can then **create derivative datasets** by joining or transforming other data - you write an **SQL query** and the tool will take care of updating derivative data as input datasets get new data. 
+
+All datasets can be easily shared with others, creating a decentralized data pipeline, where all data by design is **reproducible**, **verifiable** and maintains a complete **provenance** trail. In the spirit of Open-Source Software it lets you collaborate with people you don't necessarily know, but still be certain that data is trustworthy.
+
+`kamu` is a reference implementation of [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) - a **Web 3.0 technology** for providing timely, high-quality, and verifiable data for data science, smart contracts, web and applications.
 
 <p align="center">
 <img src="./docs/readme_files/dataset_graph.png" alt="Open Data Fabric">
 </p>
 
-Using `kamu` you can become a member of the world's first **peer-to-peer data pipeline** that:
 
-- Connects publishers and consumers of data **worldwide**.
-- Enables effective **collaboration** of people around data transformation and cleaning.
-- Ensures data propagates with **minimal latency**.
-- Provides the most complete, secure, and fully accurate **lineage and provenance** information on where every piece of data came from and how it was produced.
-- Guarantees **reproducibility** of all data workflows.
+## Learning Materials
+
+[![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
+
+- [Kamu Blog: Introducing Open Data Fabric](https://www.kamu.dev/blog/introducing-odf/) - a casual introduction.
+- [Kamu 101 - First Steps](http://www.youtube.com/watch?v=UpT2tvf3r0Y) - a video overview of key features.
+- [Open Data Fabric protocol specification](https://github.com/kamu-data/open-data-fabric) - technical overview and many gory details.
+- [Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark) - technical talk from **Data+AI Summit 2020**
 
 
-## Documentation
+## Documentation Index
 
 > Our documentation is still evolving, so many topics (those without links) have not been covered yet. Answers to most questions around theory, however, can be found in the [ODF specification](https://github.com/kamu-data/open-data-fabric)
 
@@ -78,16 +101,6 @@ Using `kamu` you can become a member of the world's first **peer-to-peer data pi
 - **Contributing**
   - Contribution Guidelines
   - **[Developer Guide](docs/developer_guide.md)**
-
-
-## Learning Materials
-
-[![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
-
-- [Kamu Blog: Introducing Open Data Fabric](https://www.kamu.dev/blog/introducing-odf/) - a casual introduction.
-- [Kamu 101 - First Steps](http://www.youtube.com/watch?v=UpT2tvf3r0Y) - a video overview of key features.
-- [Open Data Fabric protocol specification](https://github.com/kamu-data/open-data-fabric) - technical overview and many gory details.
-- [Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark) - Technical talk from **Data+AI Summit 2020**
 
 
 ## Features
