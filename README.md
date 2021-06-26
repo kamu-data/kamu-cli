@@ -1,5 +1,5 @@
 <div align="center">
-  <h1>Kamu</h1>
+  <h1>kamu</h1>
   <p>
     <strong>World's first decentralized data warehouse, on your laptop</strong>
   </p>
