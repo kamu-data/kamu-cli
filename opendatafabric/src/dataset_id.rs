@@ -109,11 +109,15 @@ impl DatasetIDBuf {
     pub fn new() -> Self {
         Self(String::new())
     }
+
+    pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
+        Self::from(DatasetID::new_unchecked(s))
+    }
 }
 
-impl Default for DatasetIDBuf {
-    fn default() -> Self {
-        Self::new()
+impl Into<String> for DatasetIDBuf {
+    fn into(self) -> String {
+        self.0
     }
 }
 

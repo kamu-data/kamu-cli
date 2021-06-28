@@ -4,7 +4,7 @@ use opendatafabric::*;
 
 use url::Url;
 
-pub trait MetadataRepository {
+pub trait MetadataRepository: Send {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
 
     fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;

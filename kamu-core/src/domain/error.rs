@@ -38,6 +38,8 @@ pub enum DomainError {
         to_id: String,
         backtrace: Backtrace,
     },
+    #[error("Underlying storage is read-only")]
+    ReadOnly,
     #[error("{0}")]
     InfraError(BoxedError),
 }

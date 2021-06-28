@@ -9,9 +9,13 @@ use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MetadataRepositoryImpl {
     workspace_layout: WorkspaceLayout,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 impl MetadataRepositoryImpl {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
@@ -152,6 +156,8 @@ impl MetadataRepositoryImpl {
         Ok(summary)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 impl MetadataRepository for MetadataRepositoryImpl {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's> {
@@ -372,5 +378,76 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
         std::fs::remove_file(&file_path).map_err(|e| InfraError::from(e).into())?;
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Null
+////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MetadataRepositoryNull;
+
+impl MetadataRepository for MetadataRepositoryNull {
+    fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's> {
+        Box::new(std::iter::empty())
+    }
+
+    fn add_dataset(&mut self, _snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
+        Err(DomainError::ReadOnly)
+    }
+
+    fn add_datasets(
+        &mut self,
+        snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
+    ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)> {
+        snapshots
+            .map(|s| (s.id, Err(DomainError::ReadOnly)))
+            .collect()
+    }
+
+    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Dataset,
+            dataset_id.as_str().to_owned(),
+        ))
+    }
+
+    fn get_metadata_chain(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Box<dyn MetadataChain>, DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Dataset,
+            dataset_id.as_str().to_owned(),
+        ))
+    }
+
+    fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Dataset,
+            dataset_id.as_str().to_owned(),
+        ))
+    }
+
+    fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
+        Box::new(std::iter::empty())
+    }
+
+    fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Remote,
+            remote_id.to_string(),
+        ))
+    }
+
+    fn add_remote(&mut self, _remote_id: &RemoteID, _url: Url) -> Result<(), DomainError> {
+        Err(DomainError::ReadOnly)
+    }
+
+    fn delete_remote(&mut self, remote_id: &RemoteID) -> Result<(), DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Remote,
+            remote_id.to_string(),
+        ))
     }
 }
