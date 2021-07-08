@@ -142,6 +142,7 @@ fn main() {
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             metadata_repo.clone(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+            &output_format,
         )),
         ("new", Some(submatches)) => Box::new(NewDatasetCommand::new(
             submatches.value_of("id").unwrap(),
