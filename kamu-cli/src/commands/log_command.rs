@@ -6,27 +6,26 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use console::style;
-use std::cell::RefCell;
 use std::fmt::Display;
 use std::io::Write;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct LogCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     dataset_id: DatasetIDBuf,
     output_config: OutputConfig,
 }
 
 impl LogCommand {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        metadata_repo: Arc<dyn MetadataRepository>,
         dataset_id: DatasetIDBuf,
-        output_config: &OutputConfig,
+        output_config: OutputConfig,
     ) -> Self {
         Self {
-            metadata_repo: metadata_repo,
-            dataset_id: dataset_id,
-            output_config: output_config.clone(),
+            metadata_repo,
+            dataset_id,
+            output_config,
         }
     }
 
@@ -127,10 +126,7 @@ impl LogCommand {
 
 impl Command for LogCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let chain = self
-            .metadata_repo
-            .borrow()
-            .get_metadata_chain(&self.dataset_id)?;
+        let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
 
         if self.output_config.is_tty {
             // TODO: add pager

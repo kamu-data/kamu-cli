@@ -9,15 +9,15 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait TransformService {
+pub trait TransformService: Send + Sync {
     fn transform(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         listener: Option<Arc<Mutex<dyn TransformListener>>>,
     ) -> Result<TransformResult, TransformError>;
 
     fn transform_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)>;

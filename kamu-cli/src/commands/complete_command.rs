@@ -5,14 +5,13 @@ use kamu::domain::*;
 
 use chrono::prelude::*;
 use glob;
-use std::cell::RefCell;
 use std::fs;
 use std::path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct CompleteCommand {
-    metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
-    config_service: Rc<RefCell<ConfigService>>,
+    metadata_repo: Option<Arc<dyn MetadataRepository>>,
+    config_service: Arc<ConfigService>,
     app: clap::App<'static, 'static>,
     input: String,
     current: usize,
@@ -22,18 +21,18 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new(
-        metadata_repo: Option<Rc<RefCell<dyn MetadataRepository>>>,
-        config_service: Rc<RefCell<ConfigService>>,
+        metadata_repo: Option<Arc<dyn MetadataRepository>>,
+        config_service: Arc<ConfigService>,
         app: clap::App<'static, 'static>,
         input: String,
         current: usize,
     ) -> Self {
         Self {
-            metadata_repo: metadata_repo,
-            config_service: config_service,
-            app: app,
-            input: input,
-            current: current,
+            metadata_repo,
+            config_service,
+            app,
+            input,
+            current,
         }
     }
 
@@ -43,7 +42,7 @@ impl CompleteCommand {
 
     fn complete_dataset(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for dataset_id in repo.borrow().get_all_datasets() {
+            for dataset_id in repo.get_all_datasets() {
                 if dataset_id.starts_with(prefix) {
                     println!("{}", dataset_id);
                 }
@@ -53,7 +52,7 @@ impl CompleteCommand {
 
     fn complete_remote(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for remote_id in repo.borrow().get_all_remotes() {
+            for remote_id in repo.get_all_remotes() {
                 if remote_id.starts_with(prefix) {
                     println!("{}", remote_id);
                 }
@@ -62,7 +61,7 @@ impl CompleteCommand {
     }
 
     fn complete_config_key(&self, prefix: &str) {
-        for key in self.config_service.borrow().all_keys() {
+        for key in self.config_service.all_keys() {
             if key.starts_with(prefix) {
                 println!("{}", key);
             }

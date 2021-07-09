@@ -3,30 +3,30 @@ use crate::domain::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
+use dill::*;
 use slog::Logger;
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct SyncServiceImpl {
     workspace_layout: WorkspaceLayout,
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     remote_factory: Arc<Mutex<RemoteFactory>>,
     _logger: Logger,
 }
 
+#[component(pub)]
 impl SyncServiceImpl {
     pub fn new(
-        workspace_layout: WorkspaceLayout,
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        workspace_layout: &WorkspaceLayout,
+        metadata_repo: Arc<dyn MetadataRepository>,
         remote_factory: Arc<Mutex<RemoteFactory>>,
         logger: Logger,
     ) -> Self {
         Self {
-            workspace_layout: workspace_layout,
-            metadata_repo: metadata_repo,
-            remote_factory: remote_factory,
+            workspace_layout: workspace_layout.clone(),
+            metadata_repo,
+            remote_factory,
             _logger: logger,
         }
     }
@@ -34,7 +34,7 @@ impl SyncServiceImpl {
 
 impl SyncService for SyncServiceImpl {
     fn sync_from(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_id: &DatasetID,
         remote_id: &RemoteID,
@@ -43,7 +43,6 @@ impl SyncService for SyncServiceImpl {
     ) -> Result<SyncResult, SyncError> {
         let remote = self
             .metadata_repo
-            .borrow()
             .get_remote(remote_id)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SyncError::RemoteDoesNotExist {
@@ -74,11 +73,7 @@ impl SyncService for SyncServiceImpl {
             }
         };
 
-        let chain = match self
-            .metadata_repo
-            .borrow()
-            .get_metadata_chain(local_dataset_id)
-        {
+        let chain = match self.metadata_repo.get_metadata_chain(local_dataset_id) {
             Ok(chain) => Some(chain),
             Err(DomainError::DoesNotExist { .. }) => None,
             Err(e @ _) => return Err(SyncError::InternalError(e.into())),
@@ -174,18 +169,14 @@ impl SyncService for SyncServiceImpl {
     }
 
     fn sync_to(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_id: &DatasetID,
         remote_id: &RemoteID,
         _options: SyncOptions,
         _listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError> {
-        let chain = match self
-            .metadata_repo
-            .borrow()
-            .get_metadata_chain(local_dataset_id)
-        {
+        let chain = match self.metadata_repo.get_metadata_chain(local_dataset_id) {
             Ok(c) => c,
             Err(DomainError::DoesNotExist { .. }) => {
                 return Err(SyncError::LocalDatasetDoesNotExist {
@@ -197,7 +188,6 @@ impl SyncService for SyncServiceImpl {
 
         let remote = self
             .metadata_repo
-            .borrow()
             .get_remote(remote_id)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SyncError::RemoteDoesNotExist {

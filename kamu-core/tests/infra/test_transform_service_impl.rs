@@ -5,9 +5,7 @@ use kamu_test::*;
 use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 macro_rules! map(
     { } => { ::std::collections::BTreeMap::new() };
@@ -22,22 +20,19 @@ macro_rules! map(
      };
 );
 
-fn new_root(
-    metadata_repo: &Rc<RefCell<MetadataRepositoryImpl>>,
-    id_str: &'static str,
-) -> &'static DatasetID {
+fn new_root(metadata_repo: &MetadataRepositoryImpl, id_str: &'static str) -> &'static DatasetID {
     let id = DatasetID::new_unchecked(id_str);
     let snap = MetadataFactory::dataset_snapshot()
         .id(id)
         .source(MetadataFactory::dataset_source_root().build())
         .build();
 
-    metadata_repo.borrow_mut().add_dataset(snap).unwrap();
+    metadata_repo.add_dataset(snap).unwrap();
     id
 }
 
 fn new_deriv(
-    metadata_repo: &Rc<RefCell<MetadataRepositoryImpl>>,
+    metadata_repo: &MetadataRepositoryImpl,
     id_str: &'static str,
     inputs: &[&'static DatasetID],
 ) -> (&'static DatasetID, DatasetSourceDerivative) {
@@ -48,15 +43,12 @@ fn new_deriv(
         .source(DatasetSource::Derivative(source.clone()))
         .build();
 
-    metadata_repo.borrow_mut().add_dataset(snap).unwrap();
+    metadata_repo.add_dataset(snap).unwrap();
     (id, source)
 }
 
-fn append_data_block(
-    metadata_repo: &Rc<RefCell<MetadataRepositoryImpl>>,
-    id: &DatasetID,
-) -> MetadataBlock {
-    let mut chain = metadata_repo.borrow_mut().get_metadata_chain(id).unwrap();
+fn append_data_block(metadata_repo: &MetadataRepositoryImpl, id: &DatasetID) -> MetadataBlock {
+    let mut chain = metadata_repo.get_metadata_chain(id).unwrap();
     chain.append(
         MetadataFactory::metadata_block()
             .prev(&chain.read_ref(&BlockRef::Head).unwrap())
@@ -77,15 +69,15 @@ fn test_get_next_operation() {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         // TODO: Use a mock
-        Arc::new(Mutex::new(EngineFactory::new(
+        Arc::new(EngineFactory::new(
             &workspace_layout,
             DockerClient::default(),
             slog::Logger::root(slog::Discard, slog::o!()),
-        ))),
+        )),
         &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     );

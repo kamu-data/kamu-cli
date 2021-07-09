@@ -2,29 +2,29 @@ use crate::domain::*;
 use crate::infra::*;
 use opendatafabric::*;
 
+use dill::*;
 use slog::{info, o, Logger};
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct TransformServiceImpl {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    engine_factory: Arc<Mutex<EngineFactory>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
+    engine_factory: Arc<EngineFactory>,
     volume_layout: VolumeLayout,
     logger: Logger,
 }
 
+#[component(pub)]
 impl TransformServiceImpl {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        engine_factory: Arc<Mutex<EngineFactory>>,
+        metadata_repo: Arc<dyn MetadataRepository>,
+        engine_factory: Arc<EngineFactory>,
         volume_layout: &VolumeLayout,
         logger: Logger,
     ) -> Self {
         Self {
-            metadata_repo: metadata_repo,
-            engine_factory: engine_factory,
+            metadata_repo,
+            engine_factory,
             volume_layout: volume_layout.clone(),
             logger: logger,
         }
@@ -36,7 +36,7 @@ impl TransformServiceImpl {
         meta_chain: Box<dyn MetadataChain>,
         dataset_layout: DatasetLayout,
         listener: Arc<Mutex<dyn TransformListener>>,
-        engine_factory: Arc<Mutex<EngineFactory>>,
+        engine_factory: Arc<EngineFactory>,
     ) -> Result<TransformResult, TransformError> {
         listener.lock().unwrap().begin();
 
@@ -63,14 +63,14 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         mut meta_chain: Box<dyn MetadataChain>,
         dataset_layout: DatasetLayout,
-        engine_factory: Arc<Mutex<EngineFactory>>,
+        engine_factory: Arc<EngineFactory>,
         listener: Arc<Mutex<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let prev_hash = meta_chain.read_ref(&BlockRef::Head);
         let new_checkpoint_dir = request.new_checkpoint_dir.clone();
         let out_data_path = request.out_data_path.clone();
 
-        let engine = engine_factory.lock().unwrap().get_engine(
+        let engine = engine_factory.get_engine(
             match request.source.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
@@ -134,7 +134,7 @@ impl TransformServiceImpl {
 
         info!(logger, "Evaluating next transform operation");
 
-        let output_chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        let output_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
         // TODO: limit traversal depth
         let mut sources: Vec<_> = output_chain
@@ -238,7 +238,7 @@ impl TransformServiceImpl {
     }
 
     fn is_never_pulled(&self, dataset_id: &DatasetID) -> Result<bool, DomainError> {
-        let chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        let chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
         Ok(chain
             .iter_blocks()
             .filter_map(|b| b.output_slice)
@@ -268,7 +268,7 @@ impl TransformServiceImpl {
         // Result is either: (-inf, inf) or (lower, inf)
         let iv_unprocessed = iv_processed.right_complement();
 
-        let input_chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        let input_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
         // Filter unprocessed input blocks
         let blocks_unprocessed: Vec<_> = input_chain
@@ -345,7 +345,7 @@ impl TransformServiceImpl {
 
     // TODO: Avoid iterating through output chain multiple times
     fn get_vocab(&self, dataset_id: &DatasetID) -> Result<DatasetVocabulary, DomainError> {
-        let chain = self.metadata_repo.borrow().get_metadata_chain(dataset_id)?;
+        let chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
         let vocab = chain.iter_blocks().filter_map(|b| b.vocab).next();
         Ok(vocab.unwrap_or_default())
     }
@@ -353,7 +353,7 @@ impl TransformServiceImpl {
 
 impl TransformService for TransformServiceImpl {
     fn transform(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
     ) -> Result<TransformResult, TransformError> {
@@ -369,11 +369,7 @@ impl TransformService for TransformServiceImpl {
         {
             let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
 
-            let meta_chain = self
-                .metadata_repo
-                .borrow()
-                .get_metadata_chain(&dataset_id)
-                .unwrap();
+            let meta_chain = self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
 
             Self::do_transform(
                 request,
@@ -388,7 +384,7 @@ impl TransformService for TransformServiceImpl {
     }
 
     fn transform_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         maybe_multi_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
@@ -429,11 +425,7 @@ impl TransformService for TransformServiceImpl {
                         .begin_transform(&dataset_id)
                         .unwrap_or(null_listener);
 
-                    let meta_chain = self
-                        .metadata_repo
-                        .borrow()
-                        .get_metadata_chain(&dataset_id)
-                        .unwrap();
+                    let meta_chain = self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
 
                     let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
 

@@ -1,5 +1,7 @@
 #![feature(backtrace)]
 
+use dill::*;
+use kamu::domain::*;
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu_cli::commands::*;
@@ -12,21 +14,61 @@ use clap::value_t_or_exit;
 use console::style;
 use slog::{info, o, Drain, FnValue, Logger};
 use std::backtrace::BacktraceStatus;
-use std::cell::RefCell;
 use std::error::Error as StdError;
 use std::path::Path;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 const BINARY_NAME: &str = "kamu";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+fn configure_catalog() -> Result<Catalog, InjectionError> {
+    let mut catalog = Catalog::new();
+
+    catalog.add::<config::ConfigService>();
+    catalog.add::<DockerClient>();
+
+    catalog.add::<MetadataRepositoryImpl>();
+    catalog.bind::<dyn MetadataRepository, MetadataRepositoryImpl>()?;
+
+    catalog.add::<ResourceLoaderImpl>();
+    catalog.bind::<dyn ResourceLoader, ResourceLoaderImpl>()?;
+
+    catalog.add::<IngestServiceImpl>();
+    catalog.bind::<dyn IngestService, IngestServiceImpl>()?;
+
+    catalog.add::<TransformServiceImpl>();
+    catalog.bind::<dyn TransformService, TransformServiceImpl>()?;
+
+    catalog.add::<PullServiceImpl>();
+    catalog.bind::<dyn PullService, PullServiceImpl>()?;
+
+    catalog.add::<SyncServiceImpl>();
+    catalog.bind::<dyn SyncService, SyncServiceImpl>()?;
+
+    catalog.add::<RemoteFactory>();
+    catalog.add::<EngineFactory>();
+
+    Ok(catalog)
+}
+
+fn load_config(catalog: &mut Catalog) {
+    let config_svc = catalog.get_one::<config::ConfigService>().unwrap();
+    let config = config_svc.load_with_defaults(ConfigScope::Flattened);
+
+    catalog.add_value(config.engine.unwrap().runtime.unwrap());
+}
+
 fn main() {
+    let mut catalog = configure_catalog().unwrap();
+
     let matches = cli_parser::cli(BINARY_NAME, VERSION).get_matches();
     let output_format = configure_output_format(&matches);
 
     let workspace_layout = find_workspace();
     let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+
+    catalog.add_value(workspace_layout.clone());
+    catalog.add_value(local_volume_layout.clone());
+    catalog.add_value(output_format.clone());
 
     // Cleanup run info dir
     if workspace_layout.run_info_dir.exists() {
@@ -35,63 +77,26 @@ fn main() {
     }
 
     let logger = configure_logging(&output_format, &workspace_layout);
+    let logger_moved = logger.clone();
+    catalog.add_factory(move || logger_moved.new(o!()));
 
-    let config_service = Rc::new(RefCell::new(config::ConfigService::new(
-        workspace_layout.kamu_root_dir.clone(),
-    )));
-
-    let config = config_service
-        .borrow()
-        .load_with_defaults(ConfigScope::Flattened);
-    let container_runtime = DockerClient::new(config.engine.unwrap().runtime.unwrap());
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let resource_loader = Rc::new(RefCell::new(ResourceLoaderImpl::new()));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
-        &workspace_layout,
-        container_runtime.clone(),
-        logger.new(o!()),
-    )));
-    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
-        metadata_repo.clone(),
-        engine_factory.clone(),
-        &local_volume_layout,
-        logger.new(o!()),
-    )));
-    let transform_svc = Rc::new(RefCell::new(TransformServiceImpl::new(
-        metadata_repo.clone(),
-        engine_factory.clone(),
-        &local_volume_layout,
-        logger.new(o!()),
-    )));
-    let pull_svc = Rc::new(RefCell::new(PullServiceImpl::new(
-        metadata_repo.clone(),
-        ingest_svc.clone(),
-        transform_svc.clone(),
-        logger.new(o!()),
-    )));
-    let remote_factory = Arc::new(Mutex::new(RemoteFactory::new(logger.new(o!()))));
-    let sync_svc = Rc::new(RefCell::new(SyncServiceImpl::new(
-        workspace_layout.clone(),
-        metadata_repo.clone(),
-        remote_factory.clone(),
-        logger.new(o!()),
-    )));
+    load_config(&mut catalog);
 
     let mut command: Box<dyn Command> = match matches.subcommand() {
         ("add", Some(submatches)) => Box::new(AddCommand::new(
-            resource_loader.clone(),
-            metadata_repo.clone(),
+            catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
             submatches.values_of("manifest").unwrap(),
             submatches.is_present("recursive"),
             submatches.is_present("replace"),
         )),
         ("complete", Some(submatches)) => Box::new(CompleteCommand::new(
             if in_workspace(&workspace_layout) {
-                Some(metadata_repo.clone())
+                Some(catalog.get_one().unwrap())
             } else {
                 None
             },
-            config_service.clone(),
+            catalog.get_one().unwrap(),
             cli_parser::cli(BINARY_NAME, VERSION),
             submatches.value_of("input").unwrap().into(),
             submatches.value_of("current").unwrap().parse().unwrap(),
@@ -102,24 +107,24 @@ fn main() {
         )),
         ("config", Some(config_matches)) => match config_matches.subcommand() {
             ("list", Some(list_matches)) => Box::new(ConfigListCommand::new(
-                config_service.clone(),
+                catalog.get_one().unwrap(),
                 list_matches.is_present("user"),
             )),
             ("get", Some(get_matches)) => Box::new(ConfigGetCommand::new(
-                config_service.clone(),
+                catalog.get_one().unwrap(),
                 get_matches.is_present("user"),
-                get_matches.value_of("cfgkey").unwrap(),
+                get_matches.value_of("cfgkey").unwrap().to_owned(),
             )),
             ("set", Some(set_matches)) => Box::new(ConfigSetCommand::new(
-                config_service.clone(),
+                catalog.get_one().unwrap(),
                 set_matches.is_present("user"),
-                set_matches.value_of("cfgkey").unwrap(),
-                set_matches.value_of("value"),
+                set_matches.value_of("cfgkey").unwrap().to_owned(),
+                set_matches.value_of("value").map(|s| s.to_owned()),
             )),
             _ => unimplemented!(),
         },
         ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
-            metadata_repo.clone(),
+            catalog.get_one().unwrap(),
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
@@ -127,22 +132,25 @@ fn main() {
         )),
         ("init", Some(submatches)) => {
             if submatches.is_present("pull-images") {
-                Box::new(PullImagesCommand::new(container_runtime.clone(), false))
+                Box::new(PullImagesCommand::new(catalog.get_one().unwrap(), false))
             } else if submatches.is_present("pull-test-images") {
-                Box::new(PullImagesCommand::new(container_runtime.clone(), true))
+                Box::new(PullImagesCommand::new(catalog.get_one().unwrap(), true))
             } else {
                 Box::new(InitCommand::new(&workspace_layout))
             }
         }
         ("list", Some(submatches)) => match submatches.subcommand() {
-            ("", _) => Box::new(ListCommand::new(metadata_repo.clone(), &output_format)),
-            ("depgraph", _) => Box::new(DepgraphCommand::new(metadata_repo.clone())),
+            ("", _) => Box::new(ListCommand::new(
+                catalog.get_one().unwrap(),
+                catalog.get_one().unwrap(),
+            )),
+            ("depgraph", _) => Box::new(DepgraphCommand::new(catalog.get_one().unwrap())),
             _ => unimplemented!(),
         },
         ("log", Some(submatches)) => Box::new(LogCommand::new(
-            metadata_repo.clone(),
+            catalog.get_one().unwrap(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
-            &output_format,
+            output_format.clone(),
         )),
         ("new", Some(submatches)) => Box::new(NewDatasetCommand::new(
             submatches.value_of("id").unwrap(),
@@ -154,7 +162,7 @@ fn main() {
             &workspace_layout,
             &local_volume_layout,
             &output_format,
-            container_runtime.clone(),
+            catalog.get_one().unwrap(),
             submatches.values_of("env").unwrap_or_default(),
             logger.new(o!()),
         )),
@@ -163,7 +171,7 @@ fn main() {
                 let datasets = submatches.values_of("dataset").unwrap_or_default();
                 if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
-                    pull_svc.clone(),
+                    catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
@@ -171,14 +179,14 @@ fn main() {
                 ))
             } else if submatches.is_present("remote") {
                 Box::new(SyncFromCommand::new(
-                    sync_svc.clone(),
+                    catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.value_of("remote"),
                     &output_format,
                 ))
             } else {
                 Box::new(PullCommand::new(
-                    pull_svc.clone(),
+                    catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
@@ -188,25 +196,25 @@ fn main() {
             }
         }
         ("push", Some(push_matches)) => Box::new(PushCommand::new(
-            sync_svc.clone(),
+            catalog.get_one().unwrap(),
             push_matches.values_of("dataset").unwrap_or_default(),
             push_matches.value_of("remote"),
             &output_format,
         )),
         ("remote", Some(remote_matches)) => match remote_matches.subcommand() {
             ("add", Some(add_matches)) => Box::new(RemoteAddCommand::new(
-                metadata_repo.clone(),
+                catalog.get_one().unwrap(),
                 add_matches.value_of("name").unwrap(),
                 add_matches.value_of("url").unwrap(),
             )),
             ("delete", Some(delete_matches)) => Box::new(RemoteDeleteCommand::new(
-                metadata_repo.clone(),
+                catalog.get_one().unwrap(),
                 delete_matches.values_of("remote").unwrap_or_default(),
                 delete_matches.is_present("all"),
                 delete_matches.is_present("yes"),
             )),
             ("list", _) => Box::new(RemoteListCommand::new(
-                metadata_repo.clone(),
+                catalog.get_one().unwrap(),
                 &output_format,
             )),
             _ => unimplemented!(),
@@ -216,7 +224,7 @@ fn main() {
                 &workspace_layout,
                 &local_volume_layout,
                 &output_format,
-                container_runtime.clone(),
+                catalog.get_one().unwrap(),
                 submatches.value_of("command"),
                 submatches.value_of("url"),
                 logger.new(o!()),
@@ -225,7 +233,7 @@ fn main() {
                 &workspace_layout,
                 &local_volume_layout,
                 &output_format,
-                container_runtime.clone(),
+                catalog.get_one().unwrap(),
                 logger.new(o!()),
                 server_matches.value_of("address").unwrap(),
                 value_t_or_exit!(server_matches.value_of("port"), u16),

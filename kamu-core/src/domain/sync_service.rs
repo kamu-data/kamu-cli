@@ -8,9 +8,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait SyncService {
+pub trait SyncService: Send + Sync {
     fn sync_from(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_id: &DatasetID,
         remote_id: &RemoteID,
@@ -19,7 +19,7 @@ pub trait SyncService {
     ) -> Result<SyncResult, SyncError>;
 
     fn sync_to(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_id: &DatasetID,
         remote_id: &RemoteID,

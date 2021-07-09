@@ -9,10 +9,8 @@ use parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };
-use std::cell::RefCell;
 use std::fs::File;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
@@ -22,21 +20,21 @@ fn test_transform_with_engine_spark() {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let engine_factory = Arc::new(EngineFactory::new(
         &workspace_layout,
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
-    )));
+    ));
 
-    let mut ingest_svc = IngestServiceImpl::new(
+    let ingest_svc = IngestServiceImpl::new(
+        &volume_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
-        &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     );
 
-    let mut transform_svc = TransformServiceImpl::new(
+    let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
@@ -98,10 +96,7 @@ fn test_transform_with_engine_spark() {
 
     let root_id = root_snapshot.id.clone();
 
-    metadata_repo
-        .borrow_mut()
-        .add_dataset(root_snapshot)
-        .unwrap();
+    metadata_repo.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
         .ingest(&root_id, IngestOptions::default(), None)
@@ -129,10 +124,7 @@ fn test_transform_with_engine_spark() {
 
     let deriv_id = deriv_snapshot.id.clone();
 
-    metadata_repo
-        .borrow_mut()
-        .add_dataset(deriv_snapshot)
-        .unwrap();
+    metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
         TransformResult::Updated { block_hash } => block_hash,
@@ -143,7 +135,6 @@ fn test_transform_with_engine_spark() {
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
         metadata_repo
-            .borrow_mut()
             .get_metadata_chain(&deriv_id)
             .unwrap()
             .iter_blocks()
@@ -227,21 +218,21 @@ fn test_transform_with_engine_flink() {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let engine_factory = Arc::new(EngineFactory::new(
         &workspace_layout,
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
-    )));
+    ));
 
-    let mut ingest_svc = IngestServiceImpl::new(
+    let ingest_svc = IngestServiceImpl::new(
+        &volume_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
-        &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
     );
 
-    let mut transform_svc = TransformServiceImpl::new(
+    let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
@@ -303,10 +294,7 @@ fn test_transform_with_engine_flink() {
 
     let root_id = root_snapshot.id.clone();
 
-    metadata_repo
-        .borrow_mut()
-        .add_dataset(root_snapshot)
-        .unwrap();
+    metadata_repo.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
         .ingest(&root_id, IngestOptions::default(), None)
@@ -334,10 +322,7 @@ fn test_transform_with_engine_flink() {
 
     let deriv_id = deriv_snapshot.id.clone();
 
-    metadata_repo
-        .borrow_mut()
-        .add_dataset(deriv_snapshot)
-        .unwrap();
+    metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
         TransformResult::Updated { block_hash } => block_hash,
@@ -348,7 +333,6 @@ fn test_transform_with_engine_flink() {
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
         metadata_repo
-            .borrow_mut()
             .get_metadata_chain(&deriv_id)
             .unwrap()
             .iter_blocks()

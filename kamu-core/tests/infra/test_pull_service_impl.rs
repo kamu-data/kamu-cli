@@ -5,9 +5,7 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use itertools::Itertools;
-use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 fn id(s: &str) -> DatasetIDBuf {
@@ -15,7 +13,7 @@ fn id(s: &str) -> DatasetIDBuf {
 }
 
 fn create_graph(
-    repo: &mut MetadataRepositoryImpl,
+    repo: &MetadataRepositoryImpl,
     associations: Vec<(DatasetIDBuf, Option<DatasetIDBuf>)>,
 ) {
     for (dataset_id, group) in &associations.into_iter().group_by(|(id, _)| id.clone()) {
@@ -38,12 +36,12 @@ fn create_graph(
 #[test]
 fn test_pull_batching() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(
+    let repo = Arc::new(MetadataRepositoryImpl::new(
         &WorkspaceLayout::create(tmp_dir.path()).unwrap(),
-    )));
-    let test_ingest_svc = Rc::new(RefCell::new(TestIngestService::new()));
-    let test_transform_svc = Rc::new(RefCell::new(TestTransformService::new()));
-    let mut pull_svc = PullServiceImpl::new(
+    ));
+    let test_ingest_svc = Arc::new(TestIngestService::new());
+    let test_transform_svc = Arc::new(TestTransformService::new());
+    let pull_svc = PullServiceImpl::new(
         repo.clone(),
         test_ingest_svc.clone(),
         test_transform_svc.clone(),
@@ -56,7 +54,7 @@ fn test_pull_batching() {
     //         /
     // B - - -/
     create_graph(
-        &mut repo.borrow_mut(),
+        repo.as_ref(),
         vec![
             (id("a"), None),
             (id("b"), None),
@@ -75,11 +73,14 @@ fn test_pull_batching() {
         None,
     );
 
-    assert!(test_ingest_svc.borrow().calls.is_empty());
+    assert!(test_ingest_svc.calls.lock().unwrap().is_empty());
 
-    assert_eq!(test_transform_svc.borrow().calls, vec![vec![id("e")]]);
+    assert_eq!(
+        *test_transform_svc.calls.lock().unwrap(),
+        vec![vec![id("e")]]
+    );
 
-    test_transform_svc.borrow_mut().calls.clear();
+    test_transform_svc.calls.lock().unwrap().clear();
 
     pull_svc.pull_multi(
         &mut [id("e")].iter().map(|id| id.as_ref()),
@@ -91,10 +92,13 @@ fn test_pull_batching() {
         None,
     );
 
-    assert_eq!(test_ingest_svc.borrow().calls, vec![vec![id("a"), id("b")]]);
+    assert_eq!(
+        *test_ingest_svc.calls.lock().unwrap(),
+        vec![vec![id("a"), id("b")]]
+    );
 
     assert_eq!(
-        test_transform_svc.borrow().calls,
+        *test_transform_svc.calls.lock().unwrap(),
         vec![vec![id("c"), id("d")], vec![id("e")]]
     );
 }
@@ -102,12 +106,12 @@ fn test_pull_batching() {
 #[test]
 fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(
+    let repo = Arc::new(MetadataRepositoryImpl::new(
         &WorkspaceLayout::create(tmp_dir.path()).unwrap(),
-    )));
-    let test_ingest_svc = Rc::new(RefCell::new(TestIngestService::new()));
-    let test_transform_svc = Rc::new(RefCell::new(TestTransformService::new()));
-    let mut pull_svc = PullServiceImpl::new(
+    ));
+    let test_ingest_svc = Arc::new(TestIngestService::new());
+    let test_transform_svc = Arc::new(TestTransformService::new());
+    let pull_svc = PullServiceImpl::new(
         repo.clone(),
         test_ingest_svc.clone(),
         test_transform_svc.clone(),
@@ -116,13 +120,11 @@ fn test_set_watermark() {
 
     let dataset_id = DatasetIDBuf::try_from("foo").unwrap();
 
-    repo.borrow_mut()
-        .add_dataset(MetadataFactory::dataset_snapshot().id(&dataset_id).build())
+    repo.add_dataset(MetadataFactory::dataset_snapshot().id(&dataset_id).build())
         .unwrap();
 
     let num_blocks = || {
-        repo.borrow()
-            .get_metadata_chain(&dataset_id)
+        repo.get_metadata_chain(&dataset_id)
             .unwrap()
             .iter_blocks()
             .count()
@@ -155,18 +157,20 @@ fn test_set_watermark() {
 }
 
 pub struct TestIngestService {
-    calls: Vec<Vec<DatasetIDBuf>>,
+    calls: Mutex<Vec<Vec<DatasetIDBuf>>>,
 }
 
 impl TestIngestService {
     pub fn new() -> Self {
-        Self { calls: Vec::new() }
+        Self {
+            calls: Mutex::new(Vec::new()),
+        }
     }
 }
 
 impl IngestService for TestIngestService {
     fn ingest(
-        &mut self,
+        &self,
         _dataset_id: &DatasetID,
         _ingest_options: IngestOptions,
         _maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
@@ -175,7 +179,7 @@ impl IngestService for TestIngestService {
     }
 
     fn ingest_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         _ingest_options: IngestOptions,
         _maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
@@ -190,24 +194,26 @@ impl IngestService for TestIngestService {
                 )
             })
             .collect();
-        self.calls.push(ids);
+        self.calls.lock().unwrap().push(ids);
         results
     }
 }
 
 pub struct TestTransformService {
-    calls: Vec<Vec<DatasetIDBuf>>,
+    calls: Mutex<Vec<Vec<DatasetIDBuf>>>,
 }
 
 impl TestTransformService {
     pub fn new() -> Self {
-        Self { calls: Vec::new() }
+        Self {
+            calls: Mutex::new(Vec::new()),
+        }
     }
 }
 
 impl TransformService for TestTransformService {
     fn transform(
-        &mut self,
+        &self,
         _dataset_id: &DatasetID,
         _maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
     ) -> Result<TransformResult, TransformError> {
@@ -215,7 +221,7 @@ impl TransformService for TestTransformService {
     }
 
     fn transform_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         _maybe_multi_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
@@ -224,7 +230,7 @@ impl TransformService for TestTransformService {
             .iter()
             .map(|id| (id.clone(), Ok(TransformResult::UpToDate)))
             .collect();
-        self.calls.push(ids);
+        self.calls.lock().unwrap().push(ids);
         results
     }
 }

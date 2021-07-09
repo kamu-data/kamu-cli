@@ -34,7 +34,7 @@ impl IngestTask {
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
         listener: Arc<Mutex<dyn IngestListener>>,
-        engine_factory: Arc<Mutex<EngineFactory>>,
+        engine_factory: Arc<EngineFactory>,
         logger: Logger,
     ) -> Self {
         // TODO: PERF: This is expensive and could be cached

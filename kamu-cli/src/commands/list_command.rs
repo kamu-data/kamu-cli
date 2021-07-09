@@ -5,22 +5,21 @@ use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct ListCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    output_config: OutputConfig,
+    metadata_repo: Arc<dyn MetadataRepository>,
+    output_config: Arc<OutputConfig>,
 }
 
 impl ListCommand {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        output_config: &OutputConfig,
+        metadata_repo: Arc<dyn MetadataRepository>,
+        output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            metadata_repo: metadata_repo,
-            output_config: output_config.clone(),
+            metadata_repo,
+            output_config,
         }
     }
 
@@ -28,8 +27,7 @@ impl ListCommand {
     fn print_machine_readable(&self) -> Result<(), Error> {
         use std::io::Write;
 
-        let mut datasets: Vec<DatasetIDBuf> =
-            self.metadata_repo.borrow().get_all_datasets().collect();
+        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.get_all_datasets().collect();
 
         datasets.sort();
 
@@ -37,7 +35,7 @@ impl ListCommand {
         write!(out, "ID,Kind,Pulled,Records,Size\n")?;
 
         for id in datasets {
-            let summary = self.metadata_repo.borrow().get_summary(&id)?;
+            let summary = self.metadata_repo.get_summary(&id)?;
             write!(
                 out,
                 "{},{:?},{},{},{}\n",
@@ -57,8 +55,7 @@ impl ListCommand {
     fn print_pretty(&self) -> Result<(), Error> {
         use prettytable::*;
 
-        let mut datasets: Vec<DatasetIDBuf> =
-            self.metadata_repo.borrow().get_all_datasets().collect();
+        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.get_all_datasets().collect();
 
         datasets.sort();
 
@@ -68,7 +65,7 @@ impl ListCommand {
         table.set_titles(row![bc->"ID", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
 
         for id in datasets.iter() {
-            let summary = self.metadata_repo.borrow().get_summary(&id)?;
+            let summary = self.metadata_repo.get_summary(&id)?;
 
             table.add_row(Row::new(vec![
                 Cell::new(&id),

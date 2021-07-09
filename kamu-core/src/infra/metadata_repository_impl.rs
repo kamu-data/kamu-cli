@@ -3,6 +3,7 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use chrono::Utc;
+use dill::*;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::convert::TryFrom;
@@ -17,6 +18,7 @@ pub struct MetadataRepositoryImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl MetadataRepositoryImpl {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
@@ -164,7 +166,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Box::new(self.get_all_datasets_impl().unwrap())
     }
 
-    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
+    fn add_dataset(&self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
         let dataset_metadata_dir = self.get_dataset_metadata_dir(&snapshot.id);
 
         if dataset_metadata_dir.exists() {
@@ -205,7 +207,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
     }
 
     fn add_datasets(
-        &mut self,
+        &self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)> {
         let snapshots_ordered = self.sort_snapshots_in_dependency_order(snapshots.collect());
@@ -220,7 +222,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
             .collect()
     }
 
-    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError> {
+    fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DomainError> {
         if !self.dataset_exists(dataset_id) {
             return Err(DomainError::does_not_exist(
                 ResourceKind::Dataset,
@@ -345,7 +347,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Ok(manifest.content)
     }
 
-    fn add_remote(&mut self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError> {
+    fn add_remote(&self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError> {
         let file_path = self.workspace_layout.remotes_dir.join(remote_id);
 
         if file_path.exists() {
@@ -366,7 +368,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Ok(())
     }
 
-    fn delete_remote(&mut self, remote_id: &RemoteID) -> Result<(), DomainError> {
+    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError> {
         let file_path = self.workspace_layout.remotes_dir.join(remote_id);
 
         if !file_path.exists() {
@@ -392,12 +394,12 @@ impl MetadataRepository for MetadataRepositoryNull {
         Box::new(std::iter::empty())
     }
 
-    fn add_dataset(&mut self, _snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
+    fn add_dataset(&self, _snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
         Err(DomainError::ReadOnly)
     }
 
     fn add_datasets(
-        &mut self,
+        &self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)> {
         snapshots
@@ -405,7 +407,7 @@ impl MetadataRepository for MetadataRepositoryNull {
             .collect()
     }
 
-    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError> {
+    fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DomainError> {
         Err(DomainError::does_not_exist(
             ResourceKind::Dataset,
             dataset_id.as_str().to_owned(),
@@ -440,11 +442,11 @@ impl MetadataRepository for MetadataRepositoryNull {
         ))
     }
 
-    fn add_remote(&mut self, _remote_id: &RemoteID, _url: Url) -> Result<(), DomainError> {
+    fn add_remote(&self, _remote_id: &RemoteID, _url: Url) -> Result<(), DomainError> {
         Err(DomainError::ReadOnly)
     }
 
-    fn delete_remote(&mut self, remote_id: &RemoteID) -> Result<(), DomainError> {
+    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError> {
         Err(DomainError::does_not_exist(
             ResourceKind::Remote,
             remote_id.to_string(),

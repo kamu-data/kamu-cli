@@ -1,24 +1,20 @@
-use std::{cell::RefCell, rc::Rc};
-
+use super::{Command, Error};
 use crate::config::{ConfigScope, ConfigService};
 
-use super::{Command, Error};
+use std::sync::Arc;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // List
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ConfigListCommand {
-    config_svc: Rc<RefCell<ConfigService>>,
+    config_svc: Arc<ConfigService>,
     user: bool,
 }
 
 impl ConfigListCommand {
-    pub fn new(config_svc: Rc<RefCell<ConfigService>>, user: bool) -> Self {
-        Self {
-            config_svc: config_svc,
-            user: user,
-        }
+    pub fn new(config_svc: Arc<ConfigService>, user: bool) -> Self {
+        Self { config_svc, user }
     }
 }
 
@@ -28,7 +24,7 @@ impl Command for ConfigListCommand {
     }
 
     fn run(&mut self) -> Result<(), Error> {
-        let result = self.config_svc.borrow().list(if self.user {
+        let result = self.config_svc.list(if self.user {
             ConfigScope::User
         } else {
             ConfigScope::Flattened
@@ -45,20 +41,17 @@ impl Command for ConfigListCommand {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ConfigGetCommand {
-    config_svc: Rc<RefCell<ConfigService>>,
+    config_svc: Arc<ConfigService>,
     user: bool,
     key: String,
 }
 
 impl ConfigGetCommand {
-    pub fn new<S>(config_svc: Rc<RefCell<ConfigService>>, user: bool, key: S) -> Self
-    where
-        S: AsRef<str>,
-    {
+    pub fn new(config_svc: Arc<ConfigService>, user: bool, key: String) -> Self {
         Self {
-            config_svc: config_svc,
-            user: user,
-            key: key.as_ref().to_owned(),
+            config_svc,
+            user,
+            key,
         }
     }
 }
@@ -75,7 +68,7 @@ impl Command for ConfigGetCommand {
             ConfigScope::Flattened
         };
 
-        if let Some(value) = self.config_svc.borrow().get(&self.key, scope) {
+        if let Some(value) = self.config_svc.get(&self.key, scope) {
             println!("{}", value);
         } else {
             return Err(Error::UsageError {
@@ -92,28 +85,24 @@ impl Command for ConfigGetCommand {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ConfigSetCommand {
-    config_svc: Rc<RefCell<ConfigService>>,
+    config_svc: Arc<ConfigService>,
     user: bool,
     key: String,
     value: Option<String>,
 }
 
 impl ConfigSetCommand {
-    pub fn new<S1, S2>(
-        config_svc: Rc<RefCell<ConfigService>>,
+    pub fn new(
+        config_svc: Arc<ConfigService>,
         user: bool,
-        key: S1,
-        value: Option<S2>,
-    ) -> Self
-    where
-        S1: AsRef<str>,
-        S2: AsRef<str>,
-    {
+        key: String,
+        value: Option<String>,
+    ) -> Self {
         Self {
-            config_svc: config_svc,
-            user: user,
-            key: key.as_ref().to_owned(),
-            value: value.map(|v| v.as_ref().to_owned()),
+            config_svc,
+            user,
+            key,
+            value,
         }
     }
 }
@@ -131,7 +120,7 @@ impl Command for ConfigSetCommand {
         };
 
         if let Some(value) = &self.value {
-            self.config_svc.borrow_mut().set(&self.key, &value, scope)?;
+            self.config_svc.set(&self.key, &value, scope)?;
 
             eprintln!(
                 "{} {} {} {} {} {} {}",
@@ -144,7 +133,7 @@ impl Command for ConfigSetCommand {
                 console::style("scope").green().bold(),
             );
         } else {
-            self.config_svc.borrow_mut().unset(&self.key, scope)?;
+            self.config_svc.unset(&self.key, scope)?;
 
             eprintln!(
                 "{} {} {}",

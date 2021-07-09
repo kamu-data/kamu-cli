@@ -480,6 +480,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "dill"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9ed2d69fbc6357555e2116884ef79e5f5bb69d0853dd6ffa32b4d5be3dce0df"
+dependencies = [
+ "dill-impl",
+ "multimap",
+ "thiserror",
+]
+
+[[package]]
+name = "dill-impl"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b5c484e9fa9e9ef291f027ac4cb764d1ff6a3fbbf5d94d1e9008f6380ab3ff8"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "dirs"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -998,6 +1021,7 @@ dependencies = [
  "chrono",
  "curl",
  "curl-sys",
+ "dill",
  "filetime",
  "flate2",
  "fs_extra",
@@ -1038,6 +1062,7 @@ dependencies = [
  "chrono-humanize",
  "clap",
  "console",
+ "dill",
  "dirs 3.0.2",
  "glob",
  "humansize",
@@ -1231,6 +1256,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9f1c5b025cda876f66ef43a113f91ebc9f4ccef34843000e0adf6ebbab84e21"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "multimap"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

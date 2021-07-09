@@ -5,12 +5,13 @@ use kamu::infra::*;
 use kamu::{domain::PullImageListener, infra::utils::docker_client::DockerClient};
 
 use slog::Logger;
+use std::sync::Arc;
 
 pub struct SqlShellCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
     command: Option<String>,
     url: Option<String>,
     logger: Logger,
@@ -21,7 +22,7 @@ impl SqlShellCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
-        container_runtime: DockerClient,
+        container_runtime: Arc<DockerClient>,
         command: Option<&str>,
         url: Option<&str>,
         logger: Logger,
@@ -40,7 +41,7 @@ impl SqlShellCommand {
 
 impl Command for SqlShellCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+        let sql_shell = SqlShellImpl::new(self.container_runtime.as_ref().clone());
 
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };

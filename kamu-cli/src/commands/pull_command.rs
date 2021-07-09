@@ -4,9 +4,7 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use std::backtrace::BacktraceStatus;
-use std::cell::RefCell;
 use std::error::Error as StdError;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -15,7 +13,7 @@ use std::sync::{Arc, Mutex};
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct PullCommand {
-    pull_svc: Rc<RefCell<dyn PullService>>,
+    pull_svc: Arc<dyn PullService>,
     ids: Vec<String>,
     all: bool,
     recursive: bool,
@@ -25,7 +23,7 @@ pub struct PullCommand {
 
 impl PullCommand {
     pub fn new<I, S>(
-        pull_svc: Rc<RefCell<dyn PullService>>,
+        pull_svc: Arc<dyn PullService>,
         ids: I,
         all: bool,
         recursive: bool,
@@ -50,7 +48,7 @@ impl PullCommand {
         &self,
         dataset_ids: Vec<DatasetIDBuf>,
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
-        self.pull_svc.borrow_mut().pull_multi(
+        self.pull_svc.pull_multi(
             &mut dataset_ids.iter().map(|id| id.as_ref()),
             PullOptions {
                 recursive: self.recursive,
@@ -76,7 +74,7 @@ impl PullCommand {
             pull_progress.draw();
         });
 
-        let results = self.pull_svc.borrow_mut().pull_multi(
+        let results = self.pull_svc.pull_multi(
             &mut dataset_ids.iter().map(|id| id.as_ref()),
             PullOptions {
                 recursive: self.recursive,

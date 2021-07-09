@@ -9,10 +9,8 @@ use parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };
-use std::cell::RefCell;
 use std::fs::File;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
@@ -22,20 +20,20 @@ fn test_ingest_with_engine() {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
 
-    let engine_factory = Arc::new(Mutex::new(EngineFactory::new(
+    let engine_factory = Arc::new(EngineFactory::new(
         &workspace_layout,
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
-    )));
+    ));
 
-    let ingest_svc = Rc::new(RefCell::new(IngestServiceImpl::new(
+    let ingest_svc = Arc::new(IngestServiceImpl::new(
+        &volume_layout,
         metadata_repo.clone(),
         engine_factory,
-        &volume_layout,
         slog::Logger::root(slog::Discard, slog::o!()),
-    )));
+    ));
 
     let src_path = tempdir.path().join("data.csv");
     std::fs::write(
@@ -88,14 +86,9 @@ fn test_ingest_with_engine() {
 
     let dataset_id = dataset_snapshot.id.clone();
 
-    metadata_repo
-        .borrow_mut()
-        .add_dataset(dataset_snapshot)
-        .unwrap();
+    metadata_repo.add_dataset(dataset_snapshot).unwrap();
 
-    let res = ingest_svc
-        .borrow_mut()
-        .ingest(&dataset_id, IngestOptions::default(), None);
+    let res = ingest_svc.ingest(&dataset_id, IngestOptions::default(), None);
     assert_ok!(res, IngestResult::Updated { .. });
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);
