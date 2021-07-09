@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use kamu::infra::utils::docker_client::ContainerRuntimeType;
 use kamu::infra::Manifest;
+use kamu::infra::WorkspaceLayout;
 
+use dill::*;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -76,10 +78,11 @@ pub struct ConfigService {
     workspace_kamu_dir: PathBuf,
 }
 
+#[component(pub)]
 impl ConfigService {
-    pub fn new(workspace_kamu_dir: PathBuf) -> Self {
+    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
-            workspace_kamu_dir: workspace_kamu_dir,
+            workspace_kamu_dir: workspace_layout.kamu_root_dir.clone(),
         }
     }
 
@@ -133,7 +136,7 @@ impl ConfigService {
         result
     }
 
-    pub fn save(&mut self, config: CLIConfig, scope: ConfigScope) {
+    pub fn save(&self, config: CLIConfig, scope: ConfigScope) {
         let config_path = self.path_for_scope(scope);
 
         let file = std::fs::OpenOptions::new()
@@ -172,7 +175,7 @@ impl ConfigService {
         return Some(result);
     }
 
-    pub fn set(&mut self, key: &str, value: &str, scope: ConfigScope) -> Result<(), Error> {
+    pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), Error> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
             return Err(Error::NotInWorkspace);
         }
@@ -204,7 +207,7 @@ impl ConfigService {
         Ok(())
     }
 
-    pub fn unset(&mut self, key: &str, scope: ConfigScope) -> Result<(), Error> {
+    pub fn unset(&self, key: &str, scope: ConfigScope) -> Result<(), Error> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
             return Err(Error::NotInWorkspace);
         }

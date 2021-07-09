@@ -2,31 +2,31 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use chrono::prelude::*;
+use dill::*;
 use slog::{info, Logger};
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct PullServiceImpl {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    ingest_svc: Rc<RefCell<dyn IngestService>>,
-    transform_svc: Rc<RefCell<dyn TransformService>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
+    ingest_svc: Arc<dyn IngestService>,
+    transform_svc: Arc<dyn TransformService>,
     logger: Logger,
 }
 
+#[component(pub)]
 impl PullServiceImpl {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        ingest_svc: Rc<RefCell<dyn IngestService>>,
-        transform_svc: Rc<RefCell<dyn TransformService>>,
+        metadata_repo: Arc<dyn MetadataRepository>,
+        ingest_svc: Arc<dyn IngestService>,
+        transform_svc: Arc<dyn TransformService>,
         logger: Logger,
     ) -> Self {
         Self {
-            metadata_repo: metadata_repo,
-            ingest_svc: ingest_svc,
-            transform_svc: transform_svc,
-            logger: logger,
+            metadata_repo,
+            ingest_svc,
+            transform_svc,
+            logger,
         }
     }
 
@@ -59,7 +59,7 @@ impl PullServiceImpl {
             return *v;
         }
 
-        let summary = self.metadata_repo.borrow().get_summary(dataset_id).unwrap();
+        let summary = self.metadata_repo.get_summary(dataset_id).unwrap();
 
         let depth = summary
             .dependencies
@@ -117,7 +117,7 @@ impl PullServiceImpl {
 
 impl PullService for PullServiceImpl {
     fn pull_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
@@ -126,7 +126,7 @@ impl PullService for PullServiceImpl {
         let starting_dataset_ids: std::collections::HashSet<DatasetIDBuf> = if !options.all {
             dataset_ids.map(|id| id.to_owned()).collect()
         } else {
-            self.metadata_repo.borrow().get_all_datasets().collect()
+            self.metadata_repo.get_all_datasets().collect()
         };
 
         info!(self.logger, "Performing pull_multi"; "datasets" => ?starting_dataset_ids);
@@ -152,7 +152,6 @@ impl PullService for PullServiceImpl {
 
             let results_level: Vec<_> = if depth == 0 {
                 self.ingest_svc
-                    .borrow_mut()
                     .ingest_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
                         options.ingest_options.clone(),
@@ -163,7 +162,6 @@ impl PullService for PullServiceImpl {
                     .collect()
             } else {
                 self.transform_svc
-                    .borrow_mut()
                     .transform_multi(
                         &mut level.iter().map(|(id, _)| id.as_ref()),
                         transform_listener.clone(),
@@ -184,14 +182,11 @@ impl PullService for PullServiceImpl {
     }
 
     fn set_watermark(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError> {
-        let mut chain = self
-            .metadata_repo
-            .borrow_mut()
-            .get_metadata_chain(dataset_id)?;
+        let mut chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
         if let Some(last_watermark) = chain
             .iter_blocks()

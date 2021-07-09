@@ -3,6 +3,7 @@ use crate::domain::*;
 use super::remote_local_fs::*;
 use super::remote_s3::*;
 
+use dill::*;
 use slog::{info, o, Logger};
 use std::backtrace::Backtrace;
 use std::sync::{Arc, Mutex};
@@ -13,13 +14,14 @@ pub struct RemoteFactory {
     logger: Logger,
 }
 
+#[component(pub)]
 impl RemoteFactory {
     pub fn new(logger: Logger) -> Self {
         Self { logger: logger }
     }
 
     pub fn get_remote_client(
-        &mut self,
+        &self,
         remote: &Remote,
     ) -> Result<Arc<Mutex<dyn RemoteClient>>, RemoteFactoryError> {
         match remote.url.scheme() {
@@ -33,10 +35,7 @@ impl RemoteFactory {
         }
     }
 
-    fn get_s3_client(
-        &mut self,
-        url: &Url,
-    ) -> Result<Arc<Mutex<dyn RemoteClient>>, RemoteFactoryError> {
+    fn get_s3_client(&self, url: &Url) -> Result<Arc<Mutex<dyn RemoteClient>>, RemoteFactoryError> {
         // TODO: Support virtual hosted style URLs once rusoto supports them
         // See: https://github.com/rusoto/rusoto/issues/1482
         let (endpoint, bucket): (Option<String>, String) =

@@ -3,12 +3,11 @@ use super::{Command, Error};
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct DeleteCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     ids: Vec<String>,
     all: bool,
     recursive: bool,
@@ -17,7 +16,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     pub fn new<I, S>(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        metadata_repo: Arc<dyn MetadataRepository>,
         ids: I,
         all: bool,
         recursive: bool,
@@ -74,7 +73,7 @@ impl Command for DeleteCommand {
         }
 
         for id in dataset_ids.iter() {
-            self.metadata_repo.borrow_mut().delete_dataset(&id)?;
+            self.metadata_repo.delete_dataset(&id)?;
         }
 
         eprintln!(

@@ -2,10 +2,12 @@ use crate::domain::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
+use dill::component;
 use std::path::Path;
 use std::time::Duration;
 use url::Url;
 
+#[component]
 pub struct ResourceLoaderImpl {}
 
 impl ResourceLoaderImpl {

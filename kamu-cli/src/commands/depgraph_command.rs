@@ -2,18 +2,15 @@ use super::{Command, Error};
 use kamu::domain::*;
 use kamu::infra::DatasetKind;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct DepgraphCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
 }
 
 impl DepgraphCommand {
-    pub fn new(metadata_repo: Rc<RefCell<dyn MetadataRepository>>) -> Self {
-        Self {
-            metadata_repo: metadata_repo,
-        }
+    pub fn new(metadata_repo: Arc<dyn MetadataRepository>) -> Self {
+        Self { metadata_repo }
     }
 }
 
@@ -21,9 +18,8 @@ impl Command for DepgraphCommand {
     fn run(&mut self) -> Result<(), Error> {
         let mut summaries = self
             .metadata_repo
-            .borrow()
             .get_all_datasets()
-            .map(|id| self.metadata_repo.borrow().get_summary(&id))
+            .map(|id| self.metadata_repo.get_summary(&id))
             .collect::<Result<Vec<_>, _>>()?;
 
         summaries.sort_by(|a, b| a.id.cmp(&b.id));

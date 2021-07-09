@@ -4,13 +4,11 @@ use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
-use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 fn main() {
-    let pull_svc = Rc::new(RefCell::new(TestPullService {}));
+    let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
         ["a"].iter(),
@@ -119,7 +117,7 @@ impl TestPullService {
 
 impl PullService for TestPullService {
     fn pull_multi(
-        &mut self,
+        &self,
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
         _options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
@@ -162,7 +160,7 @@ impl PullService for TestPullService {
     }
 
     fn set_watermark(
-        &mut self,
+        &self,
         _dataset_id: &DatasetID,
         _watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError> {

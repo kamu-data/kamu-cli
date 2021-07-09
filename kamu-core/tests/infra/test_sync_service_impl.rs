@@ -6,9 +6,7 @@ use opendatafabric::*;
 
 use assert_matches::assert_matches;
 use chrono::prelude::*;
-use std::cell::RefCell;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use url::Url;
 
@@ -97,11 +95,11 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     let workspace_layout = WorkspaceLayout::create(tmp_workspace_dir).unwrap();
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
-    let metadata_repo = Rc::new(RefCell::new(MetadataRepositoryImpl::new(&workspace_layout)));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
     let remote_factory = Arc::new(Mutex::new(RemoteFactory::new(logger.clone())));
 
-    let mut sync_svc = SyncServiceImpl::new(
-        workspace_layout.clone(),
+    let sync_svc = SyncServiceImpl::new(
+        &workspace_layout,
         metadata_repo.clone(),
         remote_factory.clone(),
         logger.clone(),
@@ -109,10 +107,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     // Add remote
     let remote_id = String::from("remote");
-    metadata_repo
-        .borrow_mut()
-        .add_remote(&remote_id, remote_url)
-        .unwrap();
+    metadata_repo.add_remote(&remote_id, remote_url).unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
@@ -143,7 +138,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
         .source(MetadataFactory::dataset_source_root().build())
         .build();
 
-    let b1 = metadata_repo.borrow_mut().add_dataset(snapshot).unwrap();
+    let b1 = metadata_repo.add_dataset(snapshot).unwrap();
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -167,7 +162,6 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     // Subsequent sync ////////////////////////////////////////////////////////
     create_fake_data_file(&dataset_layout);
     let b2 = metadata_repo
-        .borrow_mut()
         .get_metadata_chain(dataset_id)
         .unwrap()
         .append(
@@ -183,7 +177,6 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     create_fake_data_file(&dataset_layout);
     let b3 = metadata_repo
-        .borrow_mut()
         .get_metadata_chain(dataset_id)
         .unwrap()
         .append(
@@ -258,7 +251,6 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     // Push a new block into dataset_2 (which we were pulling into before)
     let diverged_head = metadata_repo
-        .borrow_mut()
         .get_metadata_chain(dataset_id_2)
         .unwrap()
         .append(

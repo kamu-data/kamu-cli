@@ -3,7 +3,7 @@ use opendatafabric::DatasetSnapshot;
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
-pub trait ResourceLoader {
+pub trait ResourceLoader: Send + Sync {
     fn load_dataset_snapshot_from_path(
         &self,
         path: &std::path::Path,

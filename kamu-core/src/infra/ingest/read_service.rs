@@ -12,11 +12,11 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub struct ReadService {
-    engine_factory: Arc<Mutex<EngineFactory>>,
+    engine_factory: Arc<EngineFactory>,
 }
 
 impl ReadService {
-    pub fn new(engine_factory: Arc<Mutex<EngineFactory>>) -> Self {
+    pub fn new(engine_factory: Arc<EngineFactory>) -> Self {
         Self {
             engine_factory: engine_factory,
         }
@@ -38,8 +38,6 @@ impl ReadService {
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
         let engine = self
             .engine_factory
-            .lock()
-            .unwrap()
             .get_engine("spark", listener.lock().unwrap().get_pull_image_listener())?;
 
         let out_data_path = dataset_layout.data_dir.join(".pending");

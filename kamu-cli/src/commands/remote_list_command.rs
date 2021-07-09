@@ -2,21 +2,17 @@ use super::{Command, Error};
 use crate::output::*;
 use kamu::domain::*;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct RemoteListCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     output_config: OutputConfig,
 }
 
 impl RemoteListCommand {
-    pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        output_config: &OutputConfig,
-    ) -> Self {
+    pub fn new(metadata_repo: Arc<dyn MetadataRepository>, output_config: &OutputConfig) -> Self {
         Self {
-            metadata_repo: metadata_repo,
+            metadata_repo,
             output_config: output_config.clone(),
         }
     }
@@ -25,14 +21,14 @@ impl RemoteListCommand {
     fn print_machine_readable(&self) -> Result<(), Error> {
         use std::io::Write;
 
-        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.borrow().get_all_remotes().collect();
+        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.get_all_remotes().collect();
         remotes.sort();
 
         let mut out = std::io::stdout();
         write!(out, "ID,URL\n")?;
 
         for id in remotes {
-            let remote = self.metadata_repo.borrow().get_remote(&id)?;
+            let remote = self.metadata_repo.get_remote(&id)?;
             write!(out, "{},\"{}\"\n", id, remote.url)?;
         }
         Ok(())
@@ -41,7 +37,7 @@ impl RemoteListCommand {
     fn print_pretty(&self) -> Result<(), Error> {
         use prettytable::*;
 
-        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.borrow().get_all_remotes().collect();
+        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.get_all_remotes().collect();
         remotes.sort();
 
         let mut table = Table::new();
@@ -50,7 +46,7 @@ impl RemoteListCommand {
         table.set_titles(row![bc->"ID", bc->"URL"]);
 
         for id in remotes.iter() {
-            let remote = self.metadata_repo.borrow().get_remote(&id)?;
+            let remote = self.metadata_repo.get_remote(&id)?;
             table.add_row(Row::new(vec![
                 Cell::new(&id),
                 Cell::new(&remote.url.to_string()),

@@ -1,11 +1,10 @@
 use super::{Command, Error};
 use kamu::domain::*;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct RemoteDeleteCommand {
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     names: Vec<String>,
     all: bool,
     no_confirmation: bool,
@@ -13,7 +12,7 @@ pub struct RemoteDeleteCommand {
 
 impl RemoteDeleteCommand {
     pub fn new<I, S>(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        metadata_repo: Arc<dyn MetadataRepository>,
         names: I,
         all: bool,
         no_confirmation: bool,
@@ -52,7 +51,7 @@ impl RemoteDeleteCommand {
 impl Command for RemoteDeleteCommand {
     fn run(&mut self) -> Result<(), Error> {
         let remote_ids: Vec<RemoteIDBuf> = if self.all {
-            self.metadata_repo.borrow().get_all_remotes().collect()
+            self.metadata_repo.get_all_remotes().collect()
         } else {
             self.names.clone()
         };
@@ -72,7 +71,7 @@ impl Command for RemoteDeleteCommand {
         }
 
         for id in remote_ids.iter() {
-            self.metadata_repo.borrow_mut().delete_remote(id)?;
+            self.metadata_repo.delete_remote(id)?;
         }
 
         eprintln!(

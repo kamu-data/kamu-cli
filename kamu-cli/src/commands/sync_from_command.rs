@@ -4,16 +4,15 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use std::backtrace::BacktraceStatus;
-use std::cell::RefCell;
 use std::error::Error as StdError;
-use std::rc::Rc;
+use std::sync::Arc;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncFromCommand {
-    sync_svc: Rc<RefCell<dyn SyncService>>,
+    sync_svc: Arc<dyn SyncService>,
     ids: Vec<String>,
     remote: Option<String>,
     output_config: OutputConfig,
@@ -21,7 +20,7 @@ pub struct SyncFromCommand {
 
 impl SyncFromCommand {
     pub fn new<I, S, S2>(
-        sync_svc: Rc<RefCell<dyn SyncService>>,
+        sync_svc: Arc<dyn SyncService>,
         ids: I,
         remote: Option<S2>,
         output_config: &OutputConfig,
@@ -46,7 +45,7 @@ impl SyncFromCommand {
         dataset_ids
             .into_iter()
             .map(|id| {
-                let result = self.sync_svc.borrow_mut().sync_from(
+                let result = self.sync_svc.sync_from(
                     &id,
                     &id,
                     self.remote.as_ref().unwrap(),

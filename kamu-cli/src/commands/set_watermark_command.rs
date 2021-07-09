@@ -3,11 +3,10 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use chrono::DateTime;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct SetWatermarkCommand {
-    pull_svc: Rc<RefCell<dyn PullService>>,
+    pull_svc: Arc<dyn PullService>,
     ids: Vec<String>,
     all: bool,
     recursive: bool,
@@ -16,7 +15,7 @@ pub struct SetWatermarkCommand {
 
 impl SetWatermarkCommand {
     pub fn new<I, S, S2>(
-        pull_svc: Rc<RefCell<dyn PullService>>,
+        pull_svc: Arc<dyn PullService>,
         ids: I,
         all: bool,
         recursive: bool,
@@ -59,11 +58,7 @@ impl Command for SetWatermarkCommand {
 
         let dataset_id = DatasetID::try_from(self.ids.get(0).unwrap()).unwrap();
 
-        match self
-            .pull_svc
-            .borrow_mut()
-            .set_watermark(dataset_id, watermark.into())
-        {
+        match self.pull_svc.set_watermark(dataset_id, watermark.into()) {
             Ok(PullResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())

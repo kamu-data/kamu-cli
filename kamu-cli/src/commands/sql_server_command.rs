@@ -7,12 +7,13 @@ use kamu::infra::*;
 
 use console::style as s;
 use slog::Logger;
+use std::sync::Arc;
 
 pub struct SqlServerCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
     logger: Logger,
     address: String,
     port: u16,
@@ -23,7 +24,7 @@ impl SqlServerCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
-        container_runtime: DockerClient,
+        container_runtime: Arc<DockerClient>,
         logger: Logger,
         address: &str,
         port: u16,
@@ -42,7 +43,7 @@ impl SqlServerCommand {
 
 impl Command for SqlServerCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+        let sql_shell = SqlShellImpl::new(self.container_runtime.as_ref().clone());
 
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };
@@ -68,7 +69,7 @@ impl Command for SqlServerCommand {
         )?;
 
         // TODO: Move into a container whapper type
-        let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
+        let _drop_spark = DropContainer::new(self.container_runtime.as_ref().clone(), "kamu-spark");
 
         if let Some(s) = spinner {
             s.finish_and_clear();

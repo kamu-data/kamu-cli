@@ -1,32 +1,32 @@
 use super::ingest::*;
 use crate::domain::*;
 use crate::infra::*;
+use dill::*;
 use opendatafabric::*;
 
 use slog::{info, o, Logger};
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-    engine_factory: Arc<Mutex<EngineFactory>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
+    engine_factory: Arc<EngineFactory>,
     logger: Logger,
 }
 
+#[component(pub)]
 impl IngestServiceImpl {
     pub fn new(
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
-        engine_factory: Arc<Mutex<EngineFactory>>,
         volume_layout: &VolumeLayout,
+        metadata_repo: Arc<dyn MetadataRepository>,
+        engine_factory: Arc<EngineFactory>,
         logger: Logger,
     ) -> Self {
         Self {
             volume_layout: volume_layout.clone(),
-            metadata_repo: metadata_repo,
-            engine_factory: engine_factory,
-            logger: logger,
+            metadata_repo,
+            engine_factory,
+            logger,
         }
     }
 
@@ -38,7 +38,7 @@ impl IngestServiceImpl {
 
 impl IngestService for IngestServiceImpl {
     fn ingest(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         options: IngestOptions,
         maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
@@ -49,11 +49,7 @@ impl IngestService for IngestServiceImpl {
 
         info!(self.logger, "Ingesting single dataset"; "dataset" => dataset_id.as_str());
 
-        let meta_chain = self
-            .metadata_repo
-            .borrow()
-            .get_metadata_chain(dataset_id)
-            .unwrap();
+        let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
 
         let layout = self.get_dataset_layout(dataset_id);
 
@@ -73,7 +69,7 @@ impl IngestService for IngestServiceImpl {
     }
 
     fn ingest_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
@@ -89,7 +85,7 @@ impl IngestService for IngestServiceImpl {
             .into_iter()
             .map(|id| {
                 let layout = self.get_dataset_layout(&id);
-                let meta_chain = self.metadata_repo.borrow().get_metadata_chain(&id).unwrap();
+                let meta_chain = self.metadata_repo.get_metadata_chain(&id).unwrap();
                 let engine_factory = self.engine_factory.clone();
                 let task_options = options.clone();
 

@@ -5,13 +5,12 @@ use opendatafabric::*;
 
 use thiserror::Error;
 
-use std::cell::RefCell;
 use std::io::Read;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct AddCommand {
-    resource_loader: Rc<RefCell<dyn ResourceLoader>>,
-    metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+    resource_loader: Arc<dyn ResourceLoader>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -19,8 +18,8 @@ pub struct AddCommand {
 
 impl AddCommand {
     pub fn new<'s, I>(
-        resource_loader: Rc<RefCell<dyn ResourceLoader>>,
-        metadata_repo: Rc<RefCell<dyn MetadataRepository>>,
+        resource_loader: Arc<dyn ResourceLoader>,
+        metadata_repo: Arc<dyn MetadataRepository>,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -29,22 +28,19 @@ impl AddCommand {
         I: Iterator<Item = &'s str>,
     {
         Self {
-            resource_loader: resource_loader,
-            metadata_repo: metadata_repo,
+            resource_loader,
+            metadata_repo,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
-            recursive: recursive,
-            replace: replace,
+            recursive,
+            replace,
         }
     }
-}
 
-impl AddCommand {
     fn load_specific(&self) -> Vec<Result<DatasetSnapshot, DatasetAddError>> {
         self.snapshot_refs
             .iter()
             .map(|r| {
                 self.resource_loader
-                    .borrow()
                     .load_dataset_snapshot_from_ref(r)
                     .map_err(|e| DatasetAddError::new(r.clone(), DomainError::InfraError(e.into())))
             })
@@ -63,7 +59,6 @@ impl AddCommand {
             .filter(|p| self.is_snapshot_file(p))
             .map(|p| {
                 self.resource_loader
-                    .borrow()
                     .load_dataset_snapshot_from_path(&p)
                     .map_err(|e| {
                         DatasetAddError::new(
@@ -112,7 +107,7 @@ impl Command for AddCommand {
         if self.replace {
             let already_exist: Vec<_> = snapshots
                 .iter()
-                .filter(|s| self.metadata_repo.borrow().get_summary(&s.id).is_ok())
+                .filter(|s| self.metadata_repo.get_summary(&s.id).is_ok())
                 .collect();
 
             if already_exist.len() != 0 {
@@ -132,15 +127,12 @@ impl Command for AddCommand {
                 }
 
                 for s in already_exist {
-                    self.metadata_repo.borrow_mut().delete_dataset(&s.id)?;
+                    self.metadata_repo.delete_dataset(&s.id)?;
                 }
             }
         };
 
-        let mut add_results = self
-            .metadata_repo
-            .borrow_mut()
-            .add_datasets(&mut snapshots.into_iter());
+        let mut add_results = self.metadata_repo.add_datasets(&mut snapshots.into_iter());
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
 

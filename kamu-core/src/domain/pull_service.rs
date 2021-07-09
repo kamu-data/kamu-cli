@@ -11,9 +11,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait PullService {
+pub trait PullService: Send + Sync {
     fn pull_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
@@ -21,7 +21,7 @@ pub trait PullService {
     ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
 
     fn set_watermark(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError>;

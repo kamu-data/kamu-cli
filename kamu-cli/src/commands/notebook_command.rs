@@ -6,11 +6,12 @@ use kamu::{domain::PullImageListener, infra::utils::docker_client::DockerClient}
 
 use console::style as s;
 use slog::{o, Logger};
+use std::sync::Arc;
 
 pub struct NotebookCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
     output_config: OutputConfig,
     env_vars: Vec<(String, Option<String>)>,
     logger: Logger,
@@ -21,7 +22,7 @@ impl NotebookCommand {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         output_config: &OutputConfig,
-        container_runtime: DockerClient,
+        container_runtime: Arc<DockerClient>,
         env_vars: Iter,
         logger: Logger,
     ) -> Self
@@ -54,7 +55,7 @@ impl NotebookCommand {
 
 impl Command for NotebookCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
+        let notebook_server = NotebookServerImpl::new(self.container_runtime.as_ref().clone());
 
         let environment_vars = self
             .env_vars

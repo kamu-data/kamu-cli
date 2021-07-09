@@ -6,6 +6,7 @@ use crate::infra::*;
 use super::engine_flink::*;
 use super::engine_spark::*;
 
+use dill::*;
 use slog::{o, Logger};
 use std::collections::HashSet;
 use std::process::Stdio;
@@ -15,9 +16,10 @@ pub struct EngineFactory {
     spark_engine: Arc<Mutex<SparkEngine>>,
     flink_engine: Arc<Mutex<FlinkEngine>>,
     container_runtime: DockerClient,
-    known_images: HashSet<String>,
+    known_images: Mutex<HashSet<String>>,
 }
 
+#[component(pub)]
 impl EngineFactory {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
@@ -38,12 +40,12 @@ impl EngineFactory {
                 logger.new(o!("engine" => "flink")),
             ))),
             container_runtime: container_runtime,
-            known_images: HashSet::new(),
+            known_images: Mutex::new(HashSet::new()),
         }
     }
 
     pub fn get_engine(
-        &mut self,
+        &self,
         engine_id: &str,
         maybe_listener: Option<&mut dyn PullImageListener>,
     ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
@@ -59,7 +61,9 @@ impl EngineFactory {
             _ => Err(EngineError::not_found(engine_id)),
         }?;
 
-        if !self.known_images.contains(image) {
+        let mut known_images = self.known_images.lock().unwrap();
+
+        if !known_images.contains(image) {
             if !self.container_runtime.has_image(image) {
                 let mut null_listener = NullPullImageListener;
                 let listener = maybe_listener.unwrap_or(&mut null_listener);
@@ -75,7 +79,7 @@ impl EngineFactory {
 
                 listener.success();
             }
-            self.known_images.insert(image.to_owned());
+            known_images.insert(image.to_owned());
         }
 
         Ok(engine)

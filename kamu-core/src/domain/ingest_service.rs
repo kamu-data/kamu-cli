@@ -10,16 +10,16 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait IngestService {
+pub trait IngestService: Send + Sync {
     fn ingest(
-        &mut self,
+        &self,
         dataset_id: &DatasetID,
         options: IngestOptions,
         listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_multi(
-        &mut self,
+        &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: IngestOptions,
         listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,

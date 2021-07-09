@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use dill::*;
 use serde::{Deserialize, Serialize};
 use std::backtrace::Backtrace;
 use thiserror::Error;
@@ -90,6 +91,7 @@ impl Default for DockerClient {
     }
 }
 
+#[component(pub)]
 impl DockerClient {
     // TODO: Generalize into ContainerRuntime trait
     pub fn new(runtime_type: ContainerRuntimeType) -> Self {

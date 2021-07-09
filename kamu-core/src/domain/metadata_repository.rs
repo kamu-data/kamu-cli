@@ -4,17 +4,17 @@ use opendatafabric::*;
 
 use url::Url;
 
-pub trait MetadataRepository: Send {
+pub trait MetadataRepository: Send + Sync {
     fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
 
-    fn add_dataset(&mut self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;
+    fn add_dataset(&self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;
 
     fn add_datasets(
-        &mut self,
+        &self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
     ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)>;
 
-    fn delete_dataset(&mut self, dataset_id: &DatasetID) -> Result<(), DomainError>;
+    fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DomainError>;
 
     // TODO: Separate mutable and immutable paths
     // See: https://github.com/rust-lang/rfcs/issues/2035
@@ -29,9 +29,9 @@ pub trait MetadataRepository: Send {
 
     fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError>;
 
-    fn add_remote(&mut self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError>;
+    fn add_remote(&self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError>;
 
-    fn delete_remote(&mut self, remote_id: &RemoteID) -> Result<(), DomainError>;
+    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError>;
 }
 
 pub trait DatasetDependencyVisitor {

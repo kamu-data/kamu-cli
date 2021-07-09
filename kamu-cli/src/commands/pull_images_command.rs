@@ -1,14 +1,16 @@
+use std::sync::Arc;
+
 use super::{Command, Error};
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::utils::docker_images;
 
 pub struct PullImagesCommand {
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
     pull_test_deps: bool,
 }
 
 impl PullImagesCommand {
-    pub fn new<'a>(container_runtime: DockerClient, pull_test_deps: bool) -> Self {
+    pub fn new<'a>(container_runtime: Arc<DockerClient>, pull_test_deps: bool) -> Self {
         Self {
             container_runtime,
             pull_test_deps,
