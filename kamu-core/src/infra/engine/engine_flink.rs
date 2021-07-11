@@ -175,7 +175,7 @@ impl FlinkEngine {
         // TODO: chown hides exit status
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
-                let chown = if self.container_runtime.runtime_type == ContainerRuntimeType::Docker {
+                let chown = if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
                     format!(
                         "; chown -R {}:{} {}",
                         users::get_current_uid(),

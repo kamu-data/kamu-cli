@@ -10,11 +10,16 @@ use std::sync::Arc;
 pub struct ConfigListCommand {
     config_svc: Arc<ConfigService>,
     user: bool,
+    with_defaults: bool,
 }
 
 impl ConfigListCommand {
-    pub fn new(config_svc: Arc<ConfigService>, user: bool) -> Self {
-        Self { config_svc, user }
+    pub fn new(config_svc: Arc<ConfigService>, user: bool, with_defaults: bool) -> Self {
+        Self {
+            config_svc,
+            user,
+            with_defaults,
+        }
     }
 }
 
@@ -24,11 +29,14 @@ impl Command for ConfigListCommand {
     }
 
     fn run(&mut self) -> Result<(), Error> {
-        let result = self.config_svc.list(if self.user {
-            ConfigScope::User
-        } else {
-            ConfigScope::Flattened
-        });
+        let result = self.config_svc.list(
+            if self.user {
+                ConfigScope::User
+            } else {
+                ConfigScope::Flattened
+            },
+            self.with_defaults,
+        );
 
         println!("{}", result);
 
@@ -43,14 +51,21 @@ impl Command for ConfigListCommand {
 pub struct ConfigGetCommand {
     config_svc: Arc<ConfigService>,
     user: bool,
+    with_defaults: bool,
     key: String,
 }
 
 impl ConfigGetCommand {
-    pub fn new(config_svc: Arc<ConfigService>, user: bool, key: String) -> Self {
+    pub fn new(
+        config_svc: Arc<ConfigService>,
+        user: bool,
+        with_defaults: bool,
+        key: String,
+    ) -> Self {
         Self {
             config_svc,
             user,
+            with_defaults,
             key,
         }
     }
@@ -68,7 +83,7 @@ impl Command for ConfigGetCommand {
             ConfigScope::Flattened
         };
 
-        if let Some(value) = self.config_svc.get(&self.key, scope) {
+        if let Some(value) = self.config_svc.get(&self.key, scope, self.with_defaults) {
             println!("{}", value);
         } else {
             return Err(Error::UsageError {

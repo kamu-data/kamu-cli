@@ -155,7 +155,7 @@ impl NotebookServerImpl {
         token_extractor.handle.join().unwrap();
 
         // Fix permissions
-        if self.container_runtime.runtime_type == ContainerRuntimeType::Docker {
+        if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
             cfg_if::cfg_if! {
                 if #[cfg(unix)] {
                     self.container_runtime

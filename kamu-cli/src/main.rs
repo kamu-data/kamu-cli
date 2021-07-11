@@ -2,7 +2,7 @@
 
 use dill::*;
 use kamu::domain::*;
-use kamu::infra::utils::docker_client::DockerClient;
+use kamu::infra::utils::docker_client::{ContainerRuntimeConfig, DockerClient};
 use kamu::infra::*;
 use kamu_cli::commands::*;
 use kamu_cli::config;
@@ -54,7 +54,10 @@ fn load_config(catalog: &mut Catalog) {
     let config_svc = catalog.get_one::<config::ConfigService>().unwrap();
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
-    catalog.add_value(config.engine.unwrap().runtime.unwrap());
+    catalog.add_value(ContainerRuntimeConfig {
+        runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
+        network_ns: config.engine.as_ref().unwrap().network_ns.unwrap(),
+    });
 }
 
 fn main() {
@@ -109,10 +112,12 @@ fn main() {
             ("list", Some(list_matches)) => Box::new(ConfigListCommand::new(
                 catalog.get_one().unwrap(),
                 list_matches.is_present("user"),
+                list_matches.is_present("with-defaults"),
             )),
             ("get", Some(get_matches)) => Box::new(ConfigGetCommand::new(
                 catalog.get_one().unwrap(),
                 get_matches.is_present("user"),
+                get_matches.is_present("with-defaults"),
                 get_matches.value_of("cfgkey").unwrap().to_owned(),
             )),
             ("set", Some(set_matches)) => Box::new(ConfigSetCommand::new(
