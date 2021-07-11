@@ -40,7 +40,7 @@ impl Command for PullImagesCommand {
 
         for img in images.iter() {
             eprintln!("{}: {}", console::style("Pulling image").bold(), img);
-            self.container_runtime.pull_cmd(img).status()?;
+            self.container_runtime.pull_cmd(img).status()?.exit_ok()?;
         }
 
         Ok(())

@@ -234,15 +234,29 @@ fn main() {
                 submatches.value_of("url"),
                 logger.new(o!()),
             )),
-            ("server", Some(server_matches)) => Box::new(SqlServerCommand::new(
-                &workspace_layout,
-                &local_volume_layout,
-                &output_format,
-                catalog.get_one().unwrap(),
-                logger.new(o!()),
-                server_matches.value_of("address").unwrap(),
-                value_t_or_exit!(server_matches.value_of("port"), u16),
-            )),
+            ("server", Some(server_matches)) => {
+                if !server_matches.is_present("livy") {
+                    Box::new(SqlServerCommand::new(
+                        &workspace_layout,
+                        &local_volume_layout,
+                        &output_format,
+                        catalog.get_one().unwrap(),
+                        logger.new(o!()),
+                        server_matches.value_of("address").unwrap(),
+                        value_t_or_exit!(server_matches.value_of("port"), u16),
+                    ))
+                } else {
+                    Box::new(SqlServerLivyCommand::new(
+                        &workspace_layout,
+                        &local_volume_layout,
+                        &output_format,
+                        catalog.get_one().unwrap(),
+                        logger.new(o!()),
+                        server_matches.value_of("address").unwrap(),
+                        value_t_or_exit!(server_matches.value_of("port"), u16),
+                    ))
+                }
+            }
             _ => unimplemented!(),
         },
         _ => unimplemented!(),

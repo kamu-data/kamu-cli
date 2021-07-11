@@ -6,10 +6,10 @@ use kamu::infra::utils::docker_client::*;
 use kamu::infra::*;
 
 use console::style as s;
-use slog::Logger;
+use slog::{o, Logger};
 use std::sync::Arc;
 
-pub struct SqlServerCommand {
+pub struct SqlServerLivyCommand {
     workspace_layout: WorkspaceLayout,
     volume_layout: VolumeLayout,
     output_config: OutputConfig,
@@ -19,7 +19,7 @@ pub struct SqlServerCommand {
     port: u16,
 }
 
-impl SqlServerCommand {
+impl SqlServerLivyCommand {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
@@ -41,48 +41,46 @@ impl SqlServerCommand {
     }
 }
 
-impl Command for SqlServerCommand {
+impl Command for SqlServerLivyCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+        let livy_server = LivyServerImpl::new(self.container_runtime.clone());
 
-        let spinner = if self.output_config.verbosity_level == 0 {
+        let spinner = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };
-            sql_shell.ensure_images(&mut pull_progress);
+            livy_server.ensure_images(&mut pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
                 indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"),
             );
-            s.set_message("Starting SQL server");
+            s.set_message("Starting Livy server");
             s.enable_steady_tick(100);
             Some(s)
         } else {
             None
         };
 
-        let mut spark = sql_shell.run_server(
+        let url = format!("{}:{}", self.address, self.port);
+
+        livy_server.run(
+            &self.address,
+            self.port,
             &self.workspace_layout,
             &self.volume_layout,
-            self.logger.clone(),
-            Some(&self.address),
-            Some(self.port),
+            self.output_config.verbosity_level > 0,
+            move || {
+                if let Some(s) = spinner {
+                    s.finish_and_clear()
+                }
+                eprintln!(
+                    "{} {}",
+                    s("Livy server is now running on:").green().bold(),
+                    s(url).bold(),
+                );
+                eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+            },
+            self.logger.new(o!()),
         )?;
-
-        // TODO: Move into a container whapper type
-        let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
-
-        if let Some(s) = spinner {
-            s.finish_and_clear();
-        }
-        eprintln!(
-            "{}\n  {}",
-            s("SQL server is now running at:").green().bold(),
-            s(format!("jdbc:hive2://{}:{}", self.address, self.port)).bold(),
-        );
-        eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-
-        spark.wait()?;
-
         Ok(())
     }
 }

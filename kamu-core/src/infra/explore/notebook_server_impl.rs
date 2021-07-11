@@ -11,11 +11,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub struct NotebookServerImpl {
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
 }
 
 impl NotebookServerImpl {
-    pub fn new(container_runtime: DockerClient) -> Self {
+    pub fn new(container_runtime: Arc<DockerClient>) -> Self {
         Self { container_runtime }
     }
 

@@ -23,4 +23,10 @@ pub enum Error {
         source: std::io::Error,
         backtrace: Backtrace,
     },
+    #[error("Unsuccessful exit status: {source}")]
+    ExitStatusError {
+        #[from]
+        source: std::process::ExitStatusError,
+        backtrace: Backtrace,
+    },
 }
