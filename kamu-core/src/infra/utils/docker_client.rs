@@ -73,6 +73,23 @@ impl Default for ExecArgs {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContainerRuntimeConfig {
+    pub runtime: ContainerRuntimeType,
+    pub network_ns: NetworkNamespaceType,
+}
+
+impl Default for ContainerRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            runtime: ContainerRuntimeType::Podman,
+            network_ns: NetworkNamespaceType::Private,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ContainerRuntimeType {
@@ -80,28 +97,32 @@ pub enum ContainerRuntimeType {
     Podman,
 }
 
-#[derive(Debug, Clone)]
-pub struct DockerClient {
-    pub runtime_type: ContainerRuntimeType,
+/// Corresponds to podman's containers.conf::netns
+/// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s) it usually runs
+/// uses host network namespace.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum NetworkNamespaceType {
+    Private,
+    Host,
 }
 
-impl Default for DockerClient {
-    fn default() -> Self {
-        Self::new(ContainerRuntimeType::Podman)
-    }
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Default)]
+pub struct DockerClient {
+    pub config: ContainerRuntimeConfig,
 }
 
 #[component(pub)]
 impl DockerClient {
     // TODO: Generalize into ContainerRuntime trait
-    pub fn new(runtime_type: ContainerRuntimeType) -> Self {
-        Self {
-            runtime_type: runtime_type,
-        }
+    pub fn new(config: ContainerRuntimeConfig) -> Self {
+        Self { config }
     }
 
     fn new_command(&self) -> Command {
-        Command::new(match self.runtime_type {
+        Command::new(match self.config.runtime {
             ContainerRuntimeType::Docker => "docker",
             ContainerRuntimeType::Podman => "podman",
         })
@@ -305,6 +326,10 @@ impl DockerClient {
     }
 
     pub fn get_host_port(&self, container_name: &str, container_port: u16) -> Option<u16> {
+        if self.config.network_ns == NetworkNamespaceType::Host {
+            return Some(container_port);
+        }
+
         let format = format!(
             "--format={{{{ (index (index .NetworkSettings.Ports \"{}/tcp\") 0).HostPort }}}}",
             container_port
@@ -376,7 +401,7 @@ impl DockerClient {
     }
 
     pub fn get_docker_addr(&self) -> String {
-        match self.runtime_type {
+        match self.config.runtime {
             ContainerRuntimeType::Podman => "127.0.0.1".to_owned(),
             ContainerRuntimeType::Docker => std::env::var("DOCKER_HOST")
                 .ok()

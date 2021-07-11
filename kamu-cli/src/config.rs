@@ -1,7 +1,7 @@
 use core::panic;
 use std::path::{Path, PathBuf};
 
-use kamu::infra::utils::docker_client::ContainerRuntimeType;
+use kamu::infra::utils::docker_client::{ContainerRuntimeType, NetworkNamespaceType};
 use kamu::infra::Manifest;
 use kamu::infra::WorkspaceLayout;
 
@@ -49,11 +49,15 @@ impl Default for CLIConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EngineConfig {
     pub runtime: Option<ContainerRuntimeType>,
+    pub network_ns: Option<NetworkNamespaceType>,
 }
 
 impl EngineConfig {
     pub fn new() -> Self {
-        Self { runtime: None }
+        Self {
+            runtime: None,
+            network_ns: None,
+        }
     }
 }
 
@@ -61,6 +65,7 @@ impl Default for EngineConfig {
     fn default() -> Self {
         Self {
             runtime: Some(ContainerRuntimeType::Docker),
+            network_ns: Some(NetworkNamespaceType::Private),
         }
     }
 }
@@ -155,8 +160,11 @@ impl ConfigService {
         serde_yaml::to_writer(file, &manifest).unwrap();
     }
 
-    pub fn get(&self, key: &str, scope: ConfigScope) -> Option<String> {
-        let config = self.load(scope);
+    pub fn get(&self, key: &str, scope: ConfigScope, with_defaults: bool) -> Option<String> {
+        let mut config = self.load(scope);
+        if with_defaults {
+            config.merge(CLIConfig::default())
+        }
         let config_raw = self.to_raw(config);
 
         let mut current = &config_raw;
@@ -268,8 +276,11 @@ impl ConfigService {
         }
     }
 
-    pub fn list(&self, scope: ConfigScope) -> String {
-        let config = self.load(scope);
+    pub fn list(&self, scope: ConfigScope, with_defaults: bool) -> String {
+        let mut config = self.load(scope);
+        if with_defaults {
+            config.merge(CLIConfig::default())
+        }
         let yaml = serde_yaml::to_string(&config).unwrap();
         self.strip_yaml(&yaml).to_owned()
     }

@@ -176,6 +176,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("user")
                                 .long("user")
                                 .help("Show only user scope configuration"),
+                            Arg::with_name("with-defaults")
+                                .long("with-defaults")
+                                .help("Show configuration with all default values applied"),
                         ]),
                     SubCommand::with_name("get")
                         .about("Get current configuration value")
@@ -183,6 +186,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("user")
                                 .long("user")
                                 .help("Operate on the user scope configuration file"),
+                            Arg::with_name("with-defaults")
+                                .long("with-defaults")
+                                .help("Get default value if config option is not explicitly set"),
                             Arg::with_name("cfgkey")
                                 .required(true)
                                 .index(1)

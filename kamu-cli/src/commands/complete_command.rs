@@ -176,7 +176,11 @@ impl Command for CompleteCommand {
             if "--help".starts_with(to_complete) {
                 println!("--help");
             }
-            for flg in last_cmd.flags.iter() {
+            for flg in last_cmd
+                .flags
+                .iter()
+                .filter(|f| !f.b.is_set(clap::ArgSettings::Hidden))
+            {
                 let full_name = if flg.s.long.is_some() {
                     format!("--{}", flg.s.long.unwrap())
                 } else {
