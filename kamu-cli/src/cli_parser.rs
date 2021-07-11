@@ -571,6 +571,10 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                                 .long("port")
                                 .default_value("10000")
                                 .help("Expose JDBC server on specific port"),
+                            Arg::with_name("livy")
+                                .long("livy")
+                                .help("Run Livy server instead of JDBC")
+                                .hidden(true),
                         ]),
                 )
                 .args(&[

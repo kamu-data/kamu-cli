@@ -1,3 +1,6 @@
+mod livy_server_impl;
+pub use livy_server_impl::*;
+
 mod notebook_server_impl;
 pub use notebook_server_impl::*;
 

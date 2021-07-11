@@ -59,6 +59,9 @@ pub use set_watermark_command::*;
 mod sql_server_command;
 pub use sql_server_command::*;
 
+mod sql_server_livy_command;
+pub use sql_server_livy_command::*;
+
 mod sql_shell_command;
 pub use sql_shell_command::*;
 

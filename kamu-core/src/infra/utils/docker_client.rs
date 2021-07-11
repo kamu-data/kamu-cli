@@ -2,6 +2,7 @@ use crate::domain::{NullPullImageListener, PullImageListener};
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use dill::*;
@@ -530,12 +531,12 @@ impl Drop for NetworkHandle {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DropContainer {
-    docker: DockerClient,
+    docker: Arc<DockerClient>,
     name: String,
 }
 
 impl DropContainer {
-    pub fn new(docker: DockerClient, name: &str) -> Self {
+    pub fn new(docker: Arc<DockerClient>, name: &str) -> Self {
         Self {
             docker: docker,
             name: name.to_owned(),

@@ -11,12 +11,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub struct SqlShellImpl {
-    container_runtime: DockerClient,
+    container_runtime: Arc<DockerClient>,
 }
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
-    pub fn new(container_runtime: DockerClient) -> Self {
+    pub fn new(container_runtime: Arc<DockerClient>) -> Self {
         Self { container_runtime }
     }
 

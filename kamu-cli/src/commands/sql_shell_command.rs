@@ -41,7 +41,7 @@ impl SqlShellCommand {
 
 impl Command for SqlShellCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.as_ref().clone());
+        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
 
         let spinner = if self.output_config.verbosity_level == 0 {
             let mut pull_progress = PullImageProgress { progress_bar: None };

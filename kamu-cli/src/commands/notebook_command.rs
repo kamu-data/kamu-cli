@@ -55,7 +55,7 @@ impl NotebookCommand {
 
 impl Command for NotebookCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let notebook_server = NotebookServerImpl::new(self.container_runtime.as_ref().clone());
+        let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
 
         let environment_vars = self
             .env_vars
