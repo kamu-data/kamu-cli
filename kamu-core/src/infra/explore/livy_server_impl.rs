@@ -91,9 +91,11 @@ impl LivyServerImpl {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
 
-        if !cfg!(windows) {
-            unsafe {
-                libc::kill(livy.id() as libc::pid_t, libc::SIGTERM);
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                unsafe {
+                    libc::kill(livy.id() as libc::pid_t, libc::SIGTERM);
+                }
             }
         }
 
