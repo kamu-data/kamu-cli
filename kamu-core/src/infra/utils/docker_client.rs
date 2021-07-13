@@ -138,7 +138,7 @@ impl DockerClient {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .expect("Docker process failed")
+            .expect("Process failed")
             .success()
     }
 
@@ -155,6 +155,8 @@ impl DockerClient {
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
+                .expect("Failed to start pull process")
+                .exit_ok()
                 .expect("Failed to pull image");
 
             listener.success();

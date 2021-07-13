@@ -97,6 +97,8 @@ impl NotebookServerImpl {
             image: docker_images::JUPYTER.to_owned(),
             container_name: Some("kamu-jupyter".to_owned()),
             network: Some(network_name.to_owned()),
+            user: Some("root".to_owned()),
+            work_dir: Some(PathBuf::from("/opt/workdir")),
             expose_ports: vec![80],
             volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
             environment_vars: environment_vars,
@@ -143,6 +145,7 @@ impl NotebookServerImpl {
         signal_hook::flag::register(libc::SIGINT, exit.clone())?;
         signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
+        // TODO: Detect crashed processes
         // Relying on shell to send signal to child processes
         while !exit.load(Ordering::Relaxed) {
             std::thread::sleep(std::time::Duration::from_millis(100));
@@ -162,6 +165,7 @@ impl NotebookServerImpl {
                         .run_shell_cmd(
                             DockerRunArgs {
                                 image: docker_images::JUPYTER.to_owned(),
+                                user: Some("root".to_owned()),
                                 container_name: Some("kamu-jupyter".to_owned()),
                                 volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
                                 ..DockerRunArgs::default()

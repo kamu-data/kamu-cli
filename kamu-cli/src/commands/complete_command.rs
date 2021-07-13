@@ -40,6 +40,14 @@ impl CompleteCommand {
         println!("{}", Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true));
     }
 
+    fn complete_env_var(&self, prefix: &str) {
+        for (k, _) in std::env::vars() {
+            if k.starts_with(prefix) {
+                println!("{}", k);
+            }
+        }
+    }
+
     fn complete_dataset(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
             for dataset_id in repo.get_all_datasets() {
@@ -144,6 +152,7 @@ impl Command for CompleteCommand {
                             match *name {
                                 "REMOTE" => self.complete_remote(to_complete),
                                 "TIME" => self.complete_timestamp(),
+                                "VAR" => self.complete_env_var(&to_complete),
                                 _ => (),
                             }
                         }

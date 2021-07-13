@@ -272,10 +272,10 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .args(&[
                     Arg::with_name("pull-images")
                         .long("pull-images")
-                        .help("Only pull docker images and exit"),
+                        .help("Only pull container images and exit"),
                     Arg::with_name("pull-test-images")
                         .long("pull-test-images")
-                        .help("Only pull test-related docker images and exit")
+                        .help("Only pull test-related container images and exit")
                         .hidden(true),
                 ])
                 .after_help(indoc::indoc!(

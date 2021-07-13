@@ -231,9 +231,9 @@ checksum = "631ae5198c9be5e753e5cc215e1bd73c2b466a3565173db433f52bb9d3e66dba"
 
 [[package]]
 name = "cc"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
+checksum = "e70cc2f62c6ce1868963827bd677764c62d07c3d9a3e1fb1177ee1a9ab199eb2"
 dependencies = [
  "jobserver",
 ]
@@ -1013,7 +1013,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.46.0"
+version = "0.47.0"
 dependencies = [
  "assert_matches",
  "bytes",
@@ -1056,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.46.0"
+version = "0.47.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1091,7 +1091,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-test"
-version = "0.46.0"
+version = "0.47.0"
 dependencies = [
  "chrono",
  "opendatafabric",
@@ -1418,7 +1418,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.46.0"
+version = "0.47.0"
 dependencies = [
  "byteorder",
  "chrono",
