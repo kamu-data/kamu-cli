@@ -9,7 +9,8 @@ skip_docker_tests = []
 
 [dependencies]
 opendatafabric = { path = "../opendatafabric" }
-dill = { version = "0.1.0" }  # path = "../../dill" }
+dill = { version = "~0.2.0" }
+# dill = { path = "../../dill" }
 
 # Domain
 chrono = { version = "*", features = ["serde"] }

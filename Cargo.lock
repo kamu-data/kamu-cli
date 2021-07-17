@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9ed2d69fbc6357555e2116884ef79e5f5bb69d0853dd6ffa32b4d5be3dce0df"
+checksum = "5da04afa03052eb65adf4d1edeb4bd37466f6d7d4bdf58995c0d63d239a041c1"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -492,9 +492,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b5c484e9fa9e9ef291f027ac4cb764d1ff6a3fbbf5d94d1e9008f6380ab3ff8"
+checksum = "eaa443f38c9a72c8a7752a5c45631831bd8935a7fe2d39eb59a063ee4e53936a"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -2231,9 +2231,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "subtle"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e81da0851ada1f3e9d4312c704aa4f8806f0f9d69faaf8df2f3464b4a9437c2"
+checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
 
 [[package]]
 name = "syn"

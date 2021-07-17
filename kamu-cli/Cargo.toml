@@ -15,7 +15,8 @@ categories = ["command-line-utilities"]
 [dependencies]
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
-dill = { version = "0.1.0" }  # path = "../../dill" }
+dill = { version = "~0.2.0" }
+# dill = { path = "../../dill" }
 
 # UI
 read_input = "*"  # Basic user input
