@@ -129,14 +129,33 @@ impl Command for LogCommand {
         let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
 
         if self.output_config.is_tty {
-            // TODO: add pager
-            self.render_blocks(&mut std::io::stdout(), chain.iter_blocks())
+            let mut pager = minus::Pager::new().unwrap();
+            pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
+            pager.set_prompt(self.dataset_id.clone());
+
+            self.render_blocks(&mut WritePager(&mut pager), chain.iter_blocks())
                 .unwrap();
+            minus::page_all(pager).unwrap();
         } else {
             self.render_blocks(&mut std::io::stdout(), chain.iter_blocks())
                 .unwrap();
         }
 
+        Ok(())
+    }
+}
+
+// TODO: Figure out how to use std::fmt::Write with std::io::stdout()
+struct WritePager<'a>(&'a mut minus::Pager);
+
+impl<'a> Write for WritePager<'a> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        use std::fmt::Write;
+        self.0.write_str(std::str::from_utf8(buf).unwrap()).unwrap();
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.47.0"
+version = "0.48.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"
@@ -25,6 +25,7 @@ clap = "*"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
+minus = { version = "*", features = ["static_output", "search"] }  # Terminal paginator
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser
