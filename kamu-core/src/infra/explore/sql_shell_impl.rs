@@ -29,14 +29,11 @@ impl SqlShellImpl {
         &self,
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
+        mut extra_volume_map: Vec<(PathBuf, PathBuf)>,
         logger: Logger,
         address: Option<&str>,
         port: Option<u16>,
     ) -> Result<std::process::Child, std::io::Error> {
-        let tempdir = tempfile::tempdir()?;
-        let init_script_path = tempdir.path().join("init.sql");
-        std::fs::write(&init_script_path, Self::prepare_shell_init(volume_layout)?)?;
-
         let cwd = Path::new(".").canonicalize().unwrap();
 
         let spark_stdout_path = workspace_layout.run_info_dir.join("spark.out.txt");
@@ -49,25 +46,20 @@ impl SqlShellImpl {
         signal_hook::flag::register(libc::SIGINT, exit.clone())?;
         signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
+        let mut volume_map = vec![(cwd, PathBuf::from("/opt/spark/kamu_shell"))];
+        if volume_layout.data_dir.exists() {
+            volume_map.push((
+                volume_layout.data_dir.clone(),
+                PathBuf::from("/opt/spark/kamu_data"),
+            ));
+        }
+        volume_map.append(&mut extra_volume_map);
+
         let args = DockerRunArgs {
             image: docker_images::SPARK.to_owned(),
             container_name: Some("kamu-spark".to_owned()),
             user: Some("root".to_owned()),
-            volume_map: if volume_layout.data_dir.exists() {
-                vec![
-                    (
-                        volume_layout.data_dir.clone(),
-                        PathBuf::from("/opt/spark/kamu_data"),
-                    ),
-                    (cwd, PathBuf::from("/opt/spark/kamu_shell")),
-                    (init_script_path, PathBuf::from("/opt/spark/shell_init.sql")),
-                ]
-            } else {
-                vec![
-                    (cwd, PathBuf::from("/opt/spark/kamu_shell")),
-                    (init_script_path, PathBuf::from("/opt/spark/shell_init.sql")),
-                ]
-            },
+            volume_map,
             args: vec![String::from("sleep"), String::from("999999")],
             ..DockerRunArgs::default()
         };
@@ -189,8 +181,18 @@ impl SqlShellImpl {
         S2: AsRef<str>,
         StartedClb: FnOnce() + Send + 'static,
     {
-        let mut spark =
-            self.run_server(workspace_layout, volume_layout, logger.clone(), None, None)?;
+        let tempdir = tempfile::tempdir()?;
+        let init_script_path = tempdir.path().join("init.sql");
+        std::fs::write(&init_script_path, Self::prepare_shell_init(volume_layout)?)?;
+
+        let mut spark = self.run_server(
+            workspace_layout,
+            volume_layout,
+            vec![(init_script_path, PathBuf::from("/opt/spark/shell_init.sql"))],
+            logger.clone(),
+            None,
+            None,
+        )?;
 
         {
             let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");

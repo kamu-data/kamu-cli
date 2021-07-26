@@ -63,6 +63,7 @@ impl Command for SqlServerCommand {
         let mut spark = sql_shell.run_server(
             &self.workspace_layout,
             &self.volume_layout,
+            Vec::new(),
             self.logger.clone(),
             Some(&self.address),
             Some(self.port),
