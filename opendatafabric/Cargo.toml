@@ -1,6 +1,6 @@
 [package]
 name = "opendatafabric"
-version = "0.48.0"
+version = "0.48.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 
