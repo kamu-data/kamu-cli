@@ -36,7 +36,6 @@ Metadata repository consists of:
 │   └── com.example.root.yaml
 ├── volumes
 │   └── public.s3.example.com.yaml
-├── .gitignore
 └── kamu.yaml
 ```
 
