@@ -7,7 +7,7 @@ use opendatafabric::*;
 use assert_matches::assert_matches;
 use chrono::prelude::*;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use url::Url;
 
 fn list_files(dir: &Path) -> Vec<PathBuf> {
@@ -96,7 +96,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
-    let remote_factory = Arc::new(Mutex::new(RemoteFactory::new(logger.clone())));
+    let remote_factory = Arc::new(RemoteFactory::new(logger.clone()));
 
     let sync_svc = SyncServiceImpl::new(
         &workspace_layout,

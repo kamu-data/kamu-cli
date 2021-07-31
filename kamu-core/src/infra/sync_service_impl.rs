@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 pub struct SyncServiceImpl {
     workspace_layout: WorkspaceLayout,
     metadata_repo: Arc<dyn MetadataRepository>,
-    remote_factory: Arc<Mutex<RemoteFactory>>,
+    remote_factory: Arc<RemoteFactory>,
     _logger: Logger,
 }
 
@@ -20,7 +20,7 @@ impl SyncServiceImpl {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
         metadata_repo: Arc<dyn MetadataRepository>,
-        remote_factory: Arc<Mutex<RemoteFactory>>,
+        remote_factory: Arc<RemoteFactory>,
         logger: Logger,
     ) -> Self {
         Self {
@@ -53,8 +53,6 @@ impl SyncService for SyncServiceImpl {
 
         let client = self
             .remote_factory
-            .lock()
-            .unwrap()
             .get_remote_client(&remote)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
@@ -198,8 +196,6 @@ impl SyncService for SyncServiceImpl {
 
         let client = self
             .remote_factory
-            .lock()
-            .unwrap()
             .get_remote_client(&remote)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
