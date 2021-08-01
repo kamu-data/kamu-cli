@@ -64,14 +64,21 @@ pub enum RemoteError {
         #[source]
         source: Option<BoxedError>,
     },
-    #[error("IO error")]
+    #[error("IO error: {source}")]
     IOError {
         #[from]
         source: std::io::Error,
         #[backtrace]
         backtrace: Backtrace,
     },
-    #[error("Protocol error")]
+    #[error("Credentials error: {source}")]
+    CredentialsError {
+        #[source]
+        source: BoxedError,
+        #[backtrace]
+        backtrace: Backtrace,
+    },
+    #[error("Protocol error: {source}")]
     ProtocolError {
         #[source]
         source: BoxedError,
@@ -81,6 +88,13 @@ pub enum RemoteError {
 }
 
 impl RemoteError {
+    pub fn credentials(e: BoxedError) -> Self {
+        Self::CredentialsError {
+            source: e,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
     pub fn protocol(e: BoxedError) -> Self {
         Self::ProtocolError {
             source: e,
