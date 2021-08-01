@@ -230,7 +230,7 @@ impl DatasetSnapshotBuilder {
     fn new() -> Self {
         Self {
             v: DatasetSnapshot {
-                id: DatasetIDBuf::new(),
+                id: DatasetIDBuf::try_from("com.example").unwrap(),
                 source: DatasetSourceBuilderRoot::new().build(),
                 vocab: None,
             },

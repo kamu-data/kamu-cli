@@ -1,6 +1,8 @@
+#![feature(assert_matches)]
+
 use opendatafabric::*;
 
-use std::convert::TryFrom;
+use std::{assert_matches::assert_matches, convert::TryFrom};
 
 #[test]
 fn datasetid_newtype() {
@@ -31,16 +33,12 @@ fn datasetid_equality() {
 
 #[test]
 fn datasetid_validation() {
-    match DatasetID::try_from("valid.dataset-id") {
-        Ok(act) => assert_eq!(act, "valid.dataset-id"),
-        Err(e) => assert!(false, "{}", e),
-    }
-
-    assert!(DatasetID::try_from(".invalid").is_err());
-    assert!(DatasetID::try_from("invalid-").is_err());
-    assert!(DatasetID::try_from("invalid--id").is_err());
-    assert!(DatasetID::try_from("invalid..id").is_err());
-    assert!(DatasetID::try_from("in^valid").is_err());
+    assert_matches!(DatasetID::try_from("local.id-only"), Ok(s) if s == "local.id-only");
+    assert_matches!(DatasetID::try_from(".invalid"), Err(_));
+    assert_matches!(DatasetID::try_from("invalid-"), Err(_));
+    assert_matches!(DatasetID::try_from("invalid--id"), Err(_));
+    assert_matches!(DatasetID::try_from("invalid..id"), Err(_));
+    assert_matches!(DatasetID::try_from("in^valid"), Err(_));
 }
 
 #[test]
@@ -77,4 +75,34 @@ fn datasetidbuf_equality() {
 
     assert_ne!(buf1, *DatasetID::new_unchecked("test2"));
     assert_eq!(buf1, *DatasetID::new_unchecked("test1"));
+}
+
+#[test]
+fn datasetref_validation() {
+    assert_matches!(DatasetRef::try_from("remote.name/local.id"), Ok(s) if s == "remote.name/local.id");
+
+    let dr = DatasetRef::try_from("remote.name/local.id").unwrap();
+    assert_eq!(dr.local_id(), "local.id");
+    assert_eq!(dr.username(), None);
+    assert_matches!(dr.remote_id(), Some(id) if id == "remote.name");
+
+    assert_matches!(DatasetRef::try_from("remote.name/.invalid"), Err(_));
+    assert_matches!(DatasetRef::try_from(".invalid/local.id"), Err(_));
+
+    assert_matches!(DatasetRef::try_from("remote.name/user-name/local.id"), Ok(s) if s == "remote.name/user-name/local.id");
+
+    let dr = DatasetRef::try_from("remote.name/user-name/local.id").unwrap();
+    assert_eq!(dr.local_id(), "local.id");
+    assert_matches!(dr.username(), Some(id) if id == "user-name");
+    assert_matches!(dr.remote_id(), Some(id) if id == "remote.name");
+
+    assert_matches!(
+        DatasetRef::try_from("remote.name/user-name/.invalid"),
+        Err(_)
+    );
+    assert_matches!(
+        DatasetRef::try_from("remote.name/user.name/local.id"),
+        Err(_)
+    );
+    assert_matches!(DatasetRef::try_from(".invalid/user-name/local.id"), Err(_));
 }

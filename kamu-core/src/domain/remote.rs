@@ -7,9 +7,6 @@ use std::backtrace::Backtrace;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-pub type RemoteID = str;
-pub type RemoteIDBuf = String;
-
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]

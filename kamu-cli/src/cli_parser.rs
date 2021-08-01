@@ -1,4 +1,5 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
+use opendatafabric::{DatasetID, RemoteID};
 
 fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     app.args(&[
@@ -125,7 +126,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                         kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.bankofcanada.exchange-rates.daily.yaml
 
-                    To add a dataset from remote see `kamu pull --remote` command.
+                    To add dataset from a remote see `kamu pull` command.
                     "
                 )),
             SubCommand::with_name("complete")
@@ -252,6 +253,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("Dataset ID(s)"),
                     Arg::with_name("yes")
                         .short("y")
@@ -324,6 +326,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("ID of the dataset"),
                 )
                 .after_help(indoc::indoc!(
@@ -349,6 +352,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("id")
                         .required(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("ID of the new dataset"),
                 ])
                 .after_help(indoc::indoc!(
@@ -399,6 +403,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("Dataset ID(s)"),
                     Arg::with_name("set-watermark")
                         .long("set-watermark")
@@ -409,6 +414,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("remote")
                         .long("remote")
                         .takes_value(true)
+                        .validator(validate_remote_id)
                         .value_name("REMOTE")
                         .help("Specifies which remote to pull data from"),
                 ])
@@ -453,10 +459,12 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("Dataset ID(s)"),
                     Arg::with_name("remote")
                         .long("remote")
                         .takes_value(true)
+                        .validator(validate_remote_id)
                         .value_name("REMOTE")
                         .help("Specifies which remote to push data into"),
                 ])
@@ -479,6 +487,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
+                        .validator(validate_dataset_id)
                         .help("ID of the dataset"),
                     Arg::with_name("hash")
                         .required(true)
@@ -516,6 +525,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("name")
                                 .required(true)
                                 .index(1)
+                                .validator(validate_remote_id)
                                 .help("Local alias of the remote repository"),
                             Arg::with_name("url")
                                 .required(true)
@@ -532,6 +542,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("remote")
                                 .multiple(true)
                                 .index(1)
+                                .validator(validate_remote_id)
                                 .help("Remote name(s)"),
                             Arg::with_name("yes")
                                 .short("y")
@@ -624,4 +635,22 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ))
             ),
         ])
+}
+
+fn validate_dataset_id(s: String) -> Result<(), String> {
+    match DatasetID::try_from(&s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "DatasetID can only contain alphanumerics, dashes, and dots",
+        )),
+    }
+}
+
+fn validate_remote_id(s: String) -> Result<(), String> {
+    match RemoteID::try_from(&s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "RemoteID can only contain alphanumerics, dashes, and dots",
+        )),
+    }
 }

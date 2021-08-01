@@ -1,7 +1,10 @@
-use super::{RemoteError, RemoteID, RemoteIDBuf};
-use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
+use super::RemoteError;
+use opendatafabric::{DatasetID, DatasetIDBuf, RemoteID, RemoteIDBuf, Sha3_256};
 
-use std::sync::{Arc, Mutex};
+use std::{
+    convert::TryFrom,
+    sync::{Arc, Mutex},
+};
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -128,7 +131,7 @@ impl From<RemoteError> for SyncError {
             RemoteError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
             RemoteError::ProtocolError { .. } => SyncError::CredentialsError(Box::new(e)),
             RemoteError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
-                remote_id: "unknown".to_owned(),
+                remote_id: RemoteIDBuf::try_from("unknown").unwrap(),
                 dataset_id: DatasetIDBuf::new_unchecked("unknown"),
             },
             RemoteError::UpdatedConcurrently => SyncError::UpdatedConcurrently(Box::new(e)),

@@ -48,7 +48,7 @@ impl SyncFromCommand {
                 let result = self.sync_svc.sync_from(
                     &id,
                     &id,
-                    self.remote.as_ref().unwrap(),
+                    RemoteID::try_from(self.remote.as_ref().unwrap()).unwrap(),
                     SyncOptions::default(),
                     None,
                 );

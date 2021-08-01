@@ -1,7 +1,8 @@
 use super::{Command, Error};
 use kamu::domain::*;
+use opendatafabric::RemoteIDBuf;
 
-use std::sync::Arc;
+use std::{convert::TryFrom, sync::Arc};
 
 pub struct RemoteDeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
@@ -53,7 +54,10 @@ impl Command for RemoteDeleteCommand {
         let remote_ids: Vec<RemoteIDBuf> = if self.all {
             self.metadata_repo.get_all_remotes().collect()
         } else {
-            self.names.clone()
+            self.names
+                .iter()
+                .map(|s| RemoteIDBuf::try_from(s.as_str()).unwrap())
+                .collect()
         };
 
         let confirmed = if self.no_confirmation {
@@ -62,7 +66,11 @@ impl Command for RemoteDeleteCommand {
             self.prompt_yes_no(&format!(
                 "{}: {}\nDo you whish to continue? [y/N]: ",
                 console::style("You are about to delete following remote(s)").yellow(),
-                remote_ids.join(", "),
+                remote_ids
+                    .iter()
+                    .map(|id| id.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(", "),
             ))
         };
 

@@ -48,7 +48,7 @@ impl PushCommand {
                 let result = self.sync_svc.sync_to(
                     &id,
                     &id,
-                    self.remote.as_ref().unwrap(),
+                    RemoteID::try_from(self.remote.as_ref().unwrap()).unwrap(),
                     SyncOptions::default(),
                     None,
                 );
