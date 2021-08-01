@@ -106,7 +106,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     );
 
     // Add remote
-    let remote_id = String::from("remote");
+    let remote_id = RemoteID::new_unchecked("remote");
     metadata_repo.add_remote(&remote_id, remote_url).unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////

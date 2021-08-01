@@ -7,6 +7,7 @@ use dill::*;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::convert::TryFrom;
+use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use url::Url;
 
@@ -122,9 +123,8 @@ impl MetadataRepositoryImpl {
         let chain = self.get_metadata_chain_impl(dataset_id)?;
 
         let mut summary = DatasetSummary {
-            id: dataset_id.to_owned(),
             last_block_hash: chain.read_ref(&BlockRef::Head).unwrap(),
-            ..DatasetSummary::default()
+            ..DatasetSummary::new(dataset_id.to_owned())
         };
 
         for block in chain.iter_blocks() {
@@ -297,7 +297,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
         let summary = if path.exists() {
             self.read_summary(&path)?
         } else {
-            DatasetSummary::default()
+            DatasetSummary::new(dataset_id.to_owned())
         };
 
         let chain = self.get_metadata_chain_impl(dataset_id)?;
@@ -314,7 +314,14 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
     fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
         let read_dir = std::fs::read_dir(&self.workspace_layout.remotes_dir).unwrap();
-        Box::new(read_dir.map(|i| i.unwrap().file_name().into_string().unwrap()))
+        Box::new(read_dir.map(|i| {
+            i.unwrap()
+                .file_name()
+                .into_string()
+                .unwrap()
+                .try_into()
+                .unwrap()
+        }))
     }
 
     fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError> {

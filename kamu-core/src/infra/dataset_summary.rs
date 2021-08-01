@@ -26,10 +26,10 @@ pub struct DatasetSummary {
     pub data_size: u64,
 }
 
-impl Default for DatasetSummary {
-    fn default() -> Self {
+impl DatasetSummary {
+    pub fn new(id: DatasetIDBuf) -> Self {
         Self {
-            id: DatasetIDBuf::new(),
+            id,
             kind: DatasetKind::Root,
             last_block_hash: Sha3_256::zero(),
             dependencies: Vec::new(),

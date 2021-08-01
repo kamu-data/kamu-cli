@@ -2,229 +2,188 @@ use std::borrow;
 use std::cmp;
 use std::convert::{AsRef, TryFrom};
 use std::fmt;
+use std::marker::PhantomData;
 use std::ops;
 
 use super::grammar::DatasetIDGrammar;
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetID (reference type)
+// Macro for defining zero-copy newtype idiom wrappers for strings
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct DatasetID(str);
+macro_rules! newtype_str {
+    ($ref_type:ident, $buf_type:ident, $parse:expr) => {
+        #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct $ref_type(str);
 
-impl DatasetID {
-    pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> &DatasetID {
-        unsafe { &*(s.as_ref() as *const str as *const DatasetID) }
-    }
+        impl $ref_type {
+            pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> &Self {
+                unsafe { &*(s.as_ref() as *const str as *const Self) }
+            }
 
-    pub fn try_from<S: AsRef<str> + ?Sized>(s: &S) -> Result<&DatasetID, InvalidDatasetID> {
-        match DatasetIDGrammar::match_dataset_id(s.as_ref()) {
-            Some((_, "")) => Ok(DatasetID::new_unchecked(s)),
-            _ => Err(InvalidDatasetID {
-                invalid_id: String::from(s.as_ref()),
-            }),
+            pub fn try_from<S: AsRef<str> + ?Sized>(
+                s: &S,
+            ) -> Result<&Self, InvalidValue<$ref_type>> {
+                match $parse(s.as_ref()) {
+                    Some((_, "")) => Ok(Self::new_unchecked(s)),
+                    _ => Err(InvalidValue::new(s)),
+                }
+            }
+
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
         }
-    }
 
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+        impl ops::Deref for $ref_type {
+            type Target = str;
 
-impl ops::Deref for DatasetID {
-    type Target = str;
+            fn deref(&self) -> &str {
+                &self.0
+            }
+        }
 
-    fn deref(&self) -> &str {
-        &self.0
-    }
-}
+        impl AsRef<str> for $ref_type {
+            fn as_ref(&self) -> &str {
+                &self.0
+            }
+        }
 
-impl AsRef<str> for DatasetID {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
+        impl AsRef<std::path::Path> for $ref_type {
+            fn as_ref(&self) -> &std::path::Path {
+                self.0.as_ref()
+            }
+        }
 
-impl AsRef<std::path::Path> for DatasetID {
-    fn as_ref(&self) -> &std::path::Path {
-        self.0.as_ref()
-    }
-}
+        impl ToOwned for $ref_type {
+            type Owned = $buf_type;
 
-impl ToOwned for DatasetID {
-    type Owned = DatasetIDBuf;
+            fn to_owned(&self) -> Self::Owned {
+                Self::Owned::from(self)
+            }
+        }
 
-    fn to_owned(&self) -> DatasetIDBuf {
-        DatasetIDBuf::from(self)
-    }
-}
+        impl cmp::PartialEq<str> for $ref_type {
+            fn eq(&self, other: &str) -> bool {
+                &self.0 == other
+            }
+        }
 
-impl cmp::PartialEq for DatasetID {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
+        impl fmt::Display for $ref_type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", &self.0)
+            }
+        }
 
-impl cmp::PartialEq<str> for DatasetID {
-    fn eq(&self, other: &str) -> bool {
-        &self.0 == other
-    }
-}
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct $buf_type(String);
 
-impl cmp::Eq for DatasetID {}
+        impl $buf_type {
+            pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
+                Self::from($ref_type::new_unchecked(s))
+            }
+        }
 
-impl cmp::Ord for DatasetID {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
+        impl Into<String> for $buf_type {
+            fn into(self) -> String {
+                self.0
+            }
+        }
 
-impl cmp::PartialOrd for DatasetID {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
+        impl From<&$ref_type> for $buf_type {
+            fn from(id: &$ref_type) -> Self {
+                Self(String::from(id as &str))
+            }
+        }
 
-impl fmt::Display for DatasetID {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.0)
-    }
-}
+        impl std::str::FromStr for $buf_type {
+            type Err = InvalidValue<$ref_type>;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Self::try_from(s)
+            }
+        }
 
-impl std::hash::Hash for DatasetID {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
-    }
-}
+        // TODO: Replace with AsRef matcher
+        // See: https://github.com/rust-lang/rust/issues/50133
+        impl TryFrom<&str> for $buf_type {
+            type Error = InvalidValue<$ref_type>;
+            fn try_from(s: &str) -> Result<Self, Self::Error> {
+                let val = $ref_type::try_from(s)?;
+                Ok(Self::from(val))
+            }
+        }
 
-////////////////////////////////////////////////////////////////////////////////
-// DatasetIDBuf (buffer type)
-////////////////////////////////////////////////////////////////////////////////
+        impl TryFrom<String> for $buf_type {
+            type Error = InvalidValue<$ref_type>;
+            fn try_from(s: String) -> Result<Self, Self::Error> {
+                $ref_type::try_from(&s)?;
+                Ok(Self(s))
+            }
+        }
 
-#[derive(Debug, Clone)]
-pub struct DatasetIDBuf(String);
+        impl TryFrom<&std::ffi::OsString> for $buf_type {
+            type Error = InvalidValue<$ref_type>;
+            fn try_from(s: &std::ffi::OsString) -> Result<Self, Self::Error> {
+                Self::try_from(s.to_str().unwrap())
+            }
+        }
 
-impl DatasetIDBuf {
-    pub fn new() -> Self {
-        Self(String::new())
-    }
+        impl ops::Deref for $buf_type {
+            type Target = $ref_type;
 
-    pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
-        Self::from(DatasetID::new_unchecked(s))
-    }
-}
+            fn deref(&self) -> &Self::Target {
+                Self::Target::new_unchecked(&self.0)
+            }
+        }
 
-impl Into<String> for DatasetIDBuf {
-    fn into(self) -> String {
-        self.0
-    }
-}
+        impl AsRef<str> for $buf_type {
+            fn as_ref(&self) -> &str {
+                self.0.as_ref()
+            }
+        }
 
-impl From<&DatasetID> for DatasetIDBuf {
-    fn from(id: &DatasetID) -> Self {
-        Self(String::from(id as &str))
-    }
-}
+        impl AsRef<std::path::Path> for $buf_type {
+            fn as_ref(&self) -> &std::path::Path {
+                self.0.as_ref()
+            }
+        }
 
-// TODO: Why TryFrom not enough?
-impl std::str::FromStr for DatasetIDBuf {
-    type Err = InvalidDatasetID;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from(s)
-    }
-}
+        impl AsRef<$ref_type> for $buf_type {
+            fn as_ref(&self) -> &$ref_type {
+                $ref_type::new_unchecked(&self.0)
+            }
+        }
 
-// TODO: Replace with AsRef matcher
-// See: https://github.com/rust-lang/rust/issues/50133
-impl TryFrom<&str> for DatasetIDBuf {
-    type Error = InvalidDatasetID;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let id = DatasetID::try_from(s)?;
-        Ok(Self::from(id))
-    }
-}
-impl TryFrom<&std::ffi::OsString> for DatasetIDBuf {
-    type Error = InvalidDatasetID;
-    fn try_from(s: &std::ffi::OsString) -> Result<Self, Self::Error> {
-        Self::try_from(s.to_str().unwrap())
-    }
-}
+        impl borrow::Borrow<$ref_type> for $buf_type {
+            fn borrow(&self) -> &$ref_type {
+                self
+            }
+        }
 
-impl ops::Deref for DatasetIDBuf {
-    type Target = DatasetID;
+        impl cmp::PartialEq<$ref_type> for $buf_type {
+            fn eq(&self, other: &$ref_type) -> bool {
+                self.0 == other.0
+            }
+        }
 
-    fn deref(&self) -> &DatasetID {
-        DatasetID::new_unchecked(&self.0)
-    }
-}
+        impl cmp::PartialEq<str> for $buf_type {
+            fn eq(&self, other: &str) -> bool {
+                &self.0 == other
+            }
+        }
 
-impl AsRef<str> for DatasetIDBuf {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
-    }
-}
+        impl fmt::Display for $buf_type {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}", &self.0)
+            }
+        }
 
-impl AsRef<std::path::Path> for DatasetIDBuf {
-    fn as_ref(&self) -> &std::path::Path {
-        self.0.as_ref()
-    }
-}
-
-impl AsRef<DatasetID> for DatasetIDBuf {
-    fn as_ref(&self) -> &DatasetID {
-        DatasetID::new_unchecked(&self.0)
-    }
-}
-
-impl borrow::Borrow<DatasetID> for DatasetIDBuf {
-    fn borrow(&self) -> &DatasetID {
-        self
-    }
-}
-
-impl cmp::PartialEq for DatasetIDBuf {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl cmp::PartialEq<DatasetID> for DatasetIDBuf {
-    fn eq(&self, other: &DatasetID) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl cmp::PartialEq<str> for DatasetIDBuf {
-    fn eq(&self, other: &str) -> bool {
-        &self.0 == other
-    }
-}
-
-impl cmp::Eq for DatasetIDBuf {}
-
-impl cmp::Ord for DatasetIDBuf {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.0.cmp(&other.0)
-    }
-}
-
-impl cmp::PartialOrd for DatasetIDBuf {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl fmt::Display for DatasetIDBuf {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.0)
-    }
-}
-
-impl std::hash::Hash for DatasetIDBuf {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
-    }
+        impl fmt::Display for InvalidValue<$ref_type> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "Invalid {}: {}", stringify!($ref_type), self.value)
+            }
+        }
+    };
 }
 
 impl serde::Serialize for DatasetIDBuf {
@@ -254,16 +213,69 @@ impl<'de> serde::de::Visitor<'de> for DatasetIDBufSerdeVisitor {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(DatasetID, DatasetIDBuf, DatasetIDGrammar::match_dataset_id);
+
+////////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(Username, UsernameBuf, DatasetIDGrammar::match_username);
+
+////////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(RemoteID, RemoteIDBuf, DatasetIDGrammar::match_remote_id);
+
+////////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(
+    DatasetRef,
+    DatasetRefBuf,
+    DatasetIDGrammar::match_dataset_ref
+);
+
+impl DatasetRef {
+    pub fn local_id(&self) -> &DatasetID {
+        DatasetID::new_unchecked(self.0.rsplit('/').next().unwrap())
+    }
+
+    pub fn username(&self) -> Option<&Username> {
+        let mut split = self.0.rsplit('/');
+        split.next();
+        let uname_or_remote = split.next();
+        let maybe_remote = split.next();
+        if maybe_remote.is_some() {
+            uname_or_remote.map(|s| Username::new_unchecked(s))
+        } else {
+            None
+        }
+    }
+
+    pub fn remote_id(&self) -> Option<&RemoteID> {
+        let mut split = self.0.rsplit('/');
+        split.next();
+        let uname_or_remote = split.next();
+        if let Some(remote) = split.next() {
+            Some(RemoteID::new_unchecked(remote))
+        } else {
+            uname_or_remote.map(|s| RemoteID::new_unchecked(s))
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Errors
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct InvalidDatasetID {
-    invalid_id: String,
+pub struct InvalidValue<T: ?Sized> {
+    value: String,
+    _ph: PhantomData<T>,
 }
 
-impl fmt::Display for InvalidDatasetID {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid DatasetID: {}", self.invalid_id)
+impl<T: ?Sized> InvalidValue<T> {
+    pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> Self {
+        Self {
+            value: s.as_ref().to_owned(),
+            _ph: PhantomData,
+        }
     }
 }

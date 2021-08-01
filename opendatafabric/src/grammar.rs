@@ -48,7 +48,7 @@ impl DatasetIDGrammar {
         Some((&s[0..h.len() + hh.len()], tt))
     }
 
-    pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
+    pub fn match_hostname(s: &str) -> Option<(&str, &str)> {
         let (h, t) = Self::match_subdomain(s)?;
 
         let (hh, tt) = Self::match_zero_or_many(t, |s| {
@@ -58,5 +58,41 @@ impl DatasetIDGrammar {
         })?;
 
         Some((&s[0..h.len() + hh.len()], tt))
+    }
+
+    pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
+        Self::match_hostname(s)
+    }
+
+    pub fn match_username(s: &str) -> Option<(&str, &str)> {
+        Self::match_subdomain(s)
+    }
+
+    pub fn match_remote_id(s: &str) -> Option<(&str, &str)> {
+        Self::match_hostname(s)
+    }
+
+    /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity
+    pub fn match_dataset_ref(s: &str) -> Option<(&str, &str)> {
+        // TODO: Should not be eagerly counting?
+        let seps = s.chars().filter(|c| *c == '/').count();
+        match seps {
+            0 => Self::match_dataset_id(s),
+            1 => {
+                let (rh, rt) = Self::match_remote_id(s)?;
+                let (_, st) = Self::match_char(rt, '/')?;
+                let (ih, it) = Self::match_dataset_id(st)?;
+                Some((&s[0..rh.len() + 1 + ih.len()], it))
+            }
+            2 => {
+                let (rh, rt) = Self::match_remote_id(s)?;
+                let (_, s1t) = Self::match_char(rt, '/')?;
+                let (uh, ut) = Self::match_username(s1t)?;
+                let (_, s2t) = Self::match_char(ut, '/')?;
+                let (ih, it) = Self::match_dataset_id(s2t)?;
+                Some((&s[0..rh.len() + 1 + uh.len() + 1 + ih.len()], it))
+            }
+            _ => None,
+        }
     }
 }

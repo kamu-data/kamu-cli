@@ -1,5 +1,6 @@
 use super::{Command, Error};
 use kamu::domain::*;
+use opendatafabric::RemoteID;
 
 use std::sync::Arc;
 use url::Url;
@@ -27,7 +28,8 @@ impl Command for RemoteAddCommand {
             Error::Aborted
         })?;
 
-        self.metadata_repo.add_remote(&self.name, url)?;
+        self.metadata_repo
+            .add_remote(RemoteID::try_from(&self.name).unwrap(), url)?;
 
         eprintln!("{}: {}", console::style("Added").green(), &self.name);
         Ok(())

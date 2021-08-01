@@ -1,6 +1,7 @@
 use super::{Command, Error};
 use crate::output::*;
 use kamu::domain::*;
+use opendatafabric::RemoteIDBuf;
 
 use std::sync::Arc;
 
