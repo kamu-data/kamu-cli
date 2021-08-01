@@ -522,6 +522,9 @@ enum IfExists {
 
 impl<E: 'static + std::error::Error + Send + Sync> From<RusotoError<E>> for RemoteError {
     fn from(e: RusotoError<E>) -> Self {
-        RemoteError::protocol(Box::new(e))
+        match e {
+            RusotoError::Credentials(_) => RemoteError::credentials(Box::new(e)),
+            _ => RemoteError::protocol(Box::new(e)),
+        }
     }
 }

@@ -108,7 +108,7 @@ impl SyncService for SyncServiceImpl {
             .map_err(|e| match e {
                 opendatafabric::serde::Error::InvalidHash { .. } => SyncError::Corrupted {
                     message: "Inconsistent metadata".to_owned(),
-                    source: Some(e.into()),
+                    source: e.into(),
                 },
                 _ => SyncError::ProtocolError(e.into()),
             })?;

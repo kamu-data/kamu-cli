@@ -94,11 +94,17 @@ pub enum SyncError {
     Corrupted {
         message: String,
         #[source]
-        source: Option<BoxedError>,
+        source: BoxedError,
     },
-    #[error("Protocol error")]
+    #[error("{0}")]
+    UpdatedConcurrently(#[source] BoxedError),
+    #[error("{0}")]
+    IOError(#[source] BoxedError),
+    #[error("{0}")]
+    CredentialsError(#[source] BoxedError),
+    #[error("{0}")]
     ProtocolError(#[source] BoxedError),
-    #[error("Internal error")]
+    #[error("{0}")]
     InternalError(#[source] BoxedError),
 }
 
@@ -112,11 +118,21 @@ impl From<RemoteError> for SyncError {
                 remote_head: remote_head,
                 local_head: local_head,
             },
-            RemoteError::Corrupted { message, source } => SyncError::Corrupted {
-                message: message,
-                source: source,
+            RemoteError::Corrupted {
+                ref message,
+                source: _,
+            } => SyncError::Corrupted {
+                message: message.clone(),
+                source: Box::new(e),
             },
-            _ => Self::InternalError(e.into()),
+            RemoteError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
+            RemoteError::ProtocolError { .. } => SyncError::CredentialsError(Box::new(e)),
+            RemoteError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
+                remote_id: "unknown".to_owned(),
+                dataset_id: DatasetIDBuf::new_unchecked("unknown"),
+            },
+            RemoteError::UpdatedConcurrently => SyncError::UpdatedConcurrently(Box::new(e)),
+            RemoteError::IOError { .. } => SyncError::IOError(Box::new(e)),
         }
     }
 }
