@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.XX.0] - 2021-08-XX
+## [0.49.0] - 2021-08-05
+### Added
+- Datasets can now be associated with remote repositories for ease of pulling and pushing
+- `push` and `pull` commands now allow renaming the remote or local datasets
 ### Fixed
 - Improved error reporting of invalid remote credentials
+- Ingest will not create a new block if neither data now watermark had changed
 
 ## [0.48.2] - 2021-07-31
 ### Fixed
