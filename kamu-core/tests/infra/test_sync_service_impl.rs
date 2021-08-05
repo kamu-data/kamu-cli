@@ -92,10 +92,10 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     let dataset_id_2 = DatasetID::new_unchecked("bar");
 
     let logger = slog::Logger::root(slog::Discard, slog::o!());
-    let workspace_layout = WorkspaceLayout::create(tmp_workspace_dir).unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let remote_factory = Arc::new(RemoteFactory::new(logger.clone()));
 
     let sync_svc = SyncServiceImpl::new(
@@ -107,14 +107,14 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     // Add remote
     let remote_id = RemoteID::new_unchecked("remote");
+    let remote_dataset_ref = DatasetRefBuf::new(Some(remote_id), None, dataset_id);
     metadata_repo.add_remote(&remote_id, remote_url).unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
         sync_svc.sync_to(
             dataset_id,
-            dataset_id,
-            &remote_id,
+            &remote_dataset_ref,
             SyncOptions::default(),
             None,
         ),
@@ -123,9 +123,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     assert_matches!(
         sync_svc.sync_from(
+            &remote_dataset_ref,
             dataset_id_2,
-            dataset_id,
-            &remote_id,
             SyncOptions::default(),
             None,
         ),
@@ -142,18 +141,20 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(dataset_id, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_to(dataset_id, &remote_dataset_ref,  SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
+            num_blocks: 1,
         }) if new_head == b1
     );
 
     assert_matches!(
-        sync_svc.sync_from(dataset_id_2, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_ref, dataset_id_2, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
+            num_blocks: 1,
         }) if new_head == b1
     );
 
@@ -199,24 +200,26 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     .unwrap();
 
     assert_matches!(
-        sync_svc.sync_from(dataset_id, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_ref, dataset_id, SyncOptions::default(), None),
         Err(SyncError::DatasetsDiverged { local_head, remote_head})
         if local_head == b3 && remote_head == b1
     );
 
     assert_matches!(
-        sync_svc.sync_to(dataset_id, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_to(dataset_id, &remote_dataset_ref, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
+            num_blocks: 2,
         }) if old_head == Some(b1) && new_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync_from(dataset_id_2, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_ref, dataset_id_2, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
+            num_blocks: 2,
         }) if old_head == Some(b1) && new_head == b3
     );
 
@@ -226,8 +229,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     assert_matches!(
         sync_svc.sync_to(
             dataset_id,
-            dataset_id,
-            &remote_id,
+            &remote_dataset_ref,
             SyncOptions::default(),
             None
         ),
@@ -236,9 +238,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 
     assert_matches!(
         sync_svc.sync_from(
+            &remote_dataset_ref,
             dataset_id_2,
-            dataset_id,
-            &remote_id,
             SyncOptions::default(),
             None
         ),
@@ -265,16 +266,17 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
         );
 
     assert_matches!(
-        sync_svc.sync_to(dataset_id_2, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_to(dataset_id_2, &remote_dataset_ref, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
+            num_blocks: 1,
         }) if old_head == Some(b3) && new_head == diverged_head
     );
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync_to(dataset_id, dataset_id, &remote_id, SyncOptions::default(), None),
+        sync_svc.sync_to(dataset_id, &remote_dataset_ref, SyncOptions::default(), None),
         Err(SyncError::DatasetsDiverged { local_head, remote_head })
         if local_head == b3 && remote_head == diverged_head
     );

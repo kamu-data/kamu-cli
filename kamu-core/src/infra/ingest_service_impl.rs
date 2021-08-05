@@ -34,6 +34,48 @@ impl IngestServiceImpl {
     fn get_dataset_layout(&self, dataset_id: &DatasetID) -> DatasetLayout {
         DatasetLayout::create(&self.volume_layout, dataset_id).unwrap()
     }
+
+    // TODO: Introduce intermediate structs to avoid full unpacking
+    fn merge_results(
+        combined_result: Option<IngestResult>,
+        new_result: IngestResult,
+    ) -> IngestResult {
+        if let None = combined_result {
+            return new_result;
+        }
+
+        if let IngestResult::UpToDate { .. } = new_result {
+            return combined_result.unwrap();
+        }
+
+        if let Some(IngestResult::Updated {
+            old_head: prev_old_head,
+            new_head: _,
+            num_blocks: prev_num_blocks,
+            has_more: _,
+            uncacheable: _,
+        }) = combined_result
+        {
+            if let IngestResult::Updated {
+                old_head: _,
+                new_head: new_new_head,
+                num_blocks: new_num_blocks,
+                has_more: new_has_more,
+                uncacheable: new_uncacheable,
+            } = new_result
+            {
+                return IngestResult::Updated {
+                    old_head: prev_old_head,
+                    new_head: new_new_head,
+                    num_blocks: prev_num_blocks + new_num_blocks,
+                    has_more: new_has_more,
+                    uncacheable: new_uncacheable,
+                };
+            }
+        }
+
+        unreachable!()
+    }
 }
 
 impl IngestService for IngestServiceImpl {
@@ -113,21 +155,26 @@ impl IngestService for IngestServiceImpl {
                             logger,
                         );
 
-                        let mut results = Vec::new();
+                        let mut combined_result = None;
                         loop {
-                            let res = ingest_task.ingest();
-                            let has_more = match res {
-                                Ok(IngestResult::Updated { has_more, .. }) => {
-                                    has_more && exhaust_sources
+                            match ingest_task.ingest() {
+                                Ok(res) => {
+                                    combined_result =
+                                        Some(Self::merge_results(combined_result, res));
+
+                                    if let Some(IngestResult::Updated { has_more, .. }) =
+                                        combined_result
+                                    {
+                                        if has_more && exhaust_sources {
+                                            continue;
+                                        }
+                                    }
                                 }
-                                _ => false,
-                            };
-                            results.push((id.clone(), res));
-                            if !has_more {
-                                break;
+                                Err(e) => return (id, Err(e)),
                             }
+                            break;
                         }
-                        results
+                        (id, Ok(combined_result.unwrap()))
                     })
                     .unwrap()
             })
@@ -135,7 +182,7 @@ impl IngestService for IngestServiceImpl {
 
         let results: Vec<_> = thread_handles
             .into_iter()
-            .flat_map(|h| h.join().unwrap())
+            .map(|h| h.join().unwrap())
             .collect();
 
         results

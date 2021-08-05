@@ -1,6 +1,6 @@
 use crate::domain::*;
 use opendatafabric::serde::yaml::*;
-use opendatafabric::{DatasetID, Sha3_256};
+use opendatafabric::{DatasetRef, Sha3_256};
 
 use bytes::BytesMut;
 use futures::TryStreamExt;
@@ -38,10 +38,10 @@ impl RemoteS3 {
 
     async fn read_ref_async(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
     ) -> Result<Option<Sha3_256>, RemoteError> {
         if let Some(body) = self
-            .read_object_buf(format!("{}/meta/refs/head", dataset_id))
+            .read_object_buf(format!("{}/meta/refs/head", dataset_ref.local_id()))
             .await?
         {
             Ok(Some(
@@ -56,14 +56,14 @@ impl RemoteS3 {
     // TODO: Locking
     async fn write_async(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Option<Sha3_256>,
         new_head: Sha3_256,
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RemoteError> {
-        if self.read_ref_async(dataset_id).await? != expected_head {
+        if self.read_ref_async(dataset_ref).await? != expected_head {
             return Err(RemoteError::UpdatedConcurrently);
         }
 
@@ -71,7 +71,7 @@ impl RemoteS3 {
             self.upload_object_file(
                 format!(
                     "{}/data/{}",
-                    dataset_id,
+                    dataset_ref.local_id(),
                     data_file.file_name().unwrap().to_str().unwrap()
                 ),
                 data_file,
@@ -82,7 +82,11 @@ impl RemoteS3 {
 
         for (hash, data) in blocks {
             self.upload_object_buf(
-                format!("{}/meta/blocks/{}", dataset_id, hash.to_string()),
+                format!(
+                    "{}/meta/blocks/{}",
+                    dataset_ref.local_id(),
+                    hash.to_string()
+                ),
                 data,
                 IfExists::Fail,
             )
@@ -91,13 +95,13 @@ impl RemoteS3 {
 
         // TODO: This is really bad but we need to
         // establish proper checkpoint naming and rotation first
-        self.delete_objects(format!("{}/checkpoint/", dataset_id))
+        self.delete_objects(format!("{}/checkpoint/", dataset_ref.local_id()))
             .await?;
 
         if checkpoint_dir.exists() {
             self.upload_objects_dir(
                 checkpoint_dir,
-                format!("{}/checkpoint/", dataset_id),
+                format!("{}/checkpoint/", dataset_ref.local_id()),
                 IfExists::Overwrite,
             )
             .await?;
@@ -105,7 +109,7 @@ impl RemoteS3 {
 
         let new_head_hash = new_head.to_string();
         self.upload_object_buf(
-            format!("{}/meta/refs/head", dataset_id),
+            format!("{}/meta/refs/head", dataset_ref.local_id()),
             Vec::from(new_head_hash.as_bytes()),
             IfExists::Overwrite,
         )
@@ -116,7 +120,7 @@ impl RemoteS3 {
 
     async fn read_async(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
@@ -127,7 +131,7 @@ impl RemoteS3 {
             checkpoint_dir: tmp_dir.join("checkpoint"),
         };
 
-        if self.read_ref_async(dataset_id).await? != Some(expected_head) {
+        if self.read_ref_async(dataset_ref).await? != Some(expected_head) {
             return Err(RemoteError::UpdatedConcurrently);
         }
 
@@ -137,7 +141,7 @@ impl RemoteS3 {
             let buf = self
                 .read_object_buf(format!(
                     "{}/meta/blocks/{}",
-                    dataset_id,
+                    dataset_ref.local_id(),
                     current_hash.unwrap()
                 ))
                 .await?
@@ -171,12 +175,15 @@ impl RemoteS3 {
 
         // Sync data
         result.data_files = self
-            .read_objects_to_dir(format!("{}/data/", dataset_id,), &tmp_dir.join("data"))
+            .read_objects_to_dir(
+                format!("{}/data/", dataset_ref.local_id()),
+                &tmp_dir.join("data"),
+            )
             .await?;
 
         // Sync checkpoints
         self.read_objects_to_dir(
-            format!("{}/checkpoint/", dataset_id,),
+            format!("{}/checkpoint/", dataset_ref.local_id()),
             &result.checkpoint_dir,
         )
         .await?;
@@ -471,16 +478,16 @@ impl RemoteS3 {
 }
 
 impl RemoteClient for RemoteS3 {
-    fn read_ref(&self, dataset_id: &DatasetID) -> Result<Option<Sha3_256>, RemoteError> {
+    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError> {
         self.runtime
             .borrow_mut()
-            .block_on(self.read_ref_async(dataset_id))
+            .block_on(self.read_ref_async(dataset_ref))
     }
 
     // TODO: Locking
     fn write(
         &mut self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Option<Sha3_256>,
         new_head: Sha3_256,
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
@@ -488,7 +495,7 @@ impl RemoteClient for RemoteS3 {
         checkpoint_dir: &Path,
     ) -> Result<(), RemoteError> {
         self.runtime.borrow_mut().block_on(self.write_async(
-            dataset_id,
+            dataset_ref,
             expected_head,
             new_head,
             blocks,
@@ -499,13 +506,13 @@ impl RemoteClient for RemoteS3 {
 
     fn read(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
     ) -> Result<RemoteReadResult, RemoteError> {
         self.runtime.borrow_mut().block_on(self.read_async(
-            dataset_id,
+            dataset_ref,
             expected_head,
             last_seen_block,
             tmp_dir,

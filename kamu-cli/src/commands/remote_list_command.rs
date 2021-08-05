@@ -7,14 +7,17 @@ use std::sync::Arc;
 
 pub struct RemoteListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    output_config: OutputConfig,
+    output_config: Arc<OutputConfig>,
 }
 
 impl RemoteListCommand {
-    pub fn new(metadata_repo: Arc<dyn MetadataRepository>, output_config: &OutputConfig) -> Self {
+    pub fn new(
+        metadata_repo: Arc<dyn MetadataRepository>,
+        output_config: Arc<OutputConfig>,
+    ) -> Self {
         Self {
             metadata_repo,
-            output_config: output_config.clone(),
+            output_config,
         }
     }
 

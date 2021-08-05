@@ -14,59 +14,65 @@ use std::sync::{Arc, Mutex};
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    ids: Vec<String>,
+    output_config: Arc<OutputConfig>,
+    refs: Vec<String>,
     all: bool,
     recursive: bool,
     force_uncacheable: bool,
-    output_config: OutputConfig,
+    as_id: Option<String>,
 }
 
 impl PullCommand {
     pub fn new<I, S>(
         pull_svc: Arc<dyn PullService>,
-        ids: I,
+        output_config: Arc<OutputConfig>,
+        refs: I,
         all: bool,
         recursive: bool,
         force_uncacheable: bool,
-        output_config: &OutputConfig,
+        as_id: Option<&str>,
     ) -> Self
     where
         I: Iterator<Item = S>,
         S: AsRef<str>,
     {
         Self {
-            pull_svc: pull_svc,
-            ids: ids.map(|s| s.as_ref().to_owned()).collect(),
+            pull_svc,
+            output_config,
+            refs: refs.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
-            recursive: recursive,
-            force_uncacheable: force_uncacheable,
-            output_config: output_config.clone(),
+            recursive,
+            force_uncacheable,
+            as_id: as_id.map(|s| s.to_owned()),
         }
     }
 
-    fn pull_quiet(
+    fn pull_quiet<'a>(
         &self,
-        dataset_ids: Vec<DatasetIDBuf>,
-    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
+        mut dataset_refs: impl Iterator<Item = &'a DatasetRef>,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         self.pull_svc.pull_multi(
-            &mut dataset_ids.iter().map(|id| id.as_ref()),
+            &mut dataset_refs,
             PullOptions {
                 recursive: self.recursive,
                 all: self.all,
+                create_remote_aliases: true,
                 ingest_options: IngestOptions {
                     force_uncacheable: self.force_uncacheable,
                     exhaust_sources: true,
                 },
+                sync_options: SyncOptions::default(),
             },
+            None,
             None,
             None,
         )
     }
 
-    fn pull_with_progress(
+    fn pull_with_progress<'a>(
         &self,
-        dataset_ids: Vec<DatasetIDBuf>,
-    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
+        mut dataset_refs: impl Iterator<Item = &'a DatasetRef>,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         let pull_progress = PrettyPullProgress::new();
         let listener = Arc::new(Mutex::new(pull_progress.clone()));
 
@@ -75,15 +81,18 @@ impl PullCommand {
         });
 
         let results = self.pull_svc.pull_multi(
-            &mut dataset_ids.iter().map(|id| id.as_ref()),
+            &mut dataset_refs,
             PullOptions {
                 recursive: self.recursive,
                 all: self.all,
+                create_remote_aliases: true,
                 ingest_options: IngestOptions {
                     force_uncacheable: self.force_uncacheable,
                     exhaust_sources: true,
                 },
+                sync_options: SyncOptions::default(),
             },
+            Some(listener.clone()),
             Some(listener.clone()),
             Some(listener.clone()),
         );
@@ -93,36 +102,96 @@ impl PullCommand {
 
         results
     }
+
+    fn pull_from_with_progress(
+        &self,
+        remote_ref: &DatasetRef,
+        local_id: &DatasetID,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
+        let mut pull_progress = PrettyPullProgress::new();
+        let pull_progress_2 = pull_progress.clone();
+        let listener = pull_progress.begin_sync(local_id, remote_ref);
+
+        let draw_thread = std::thread::spawn(move || {
+            pull_progress_2.draw();
+        });
+
+        let res = self.pull_svc.pull_from(
+            remote_ref,
+            local_id,
+            PullOptions {
+                create_remote_aliases: true,
+                ..PullOptions::default()
+            },
+            listener,
+        );
+
+        pull_progress.finish();
+        draw_thread.join().unwrap();
+
+        vec![(remote_ref.into(), res)]
+    }
+
+    fn pull_from_quiet(
+        &self,
+        remote_ref: &DatasetRef,
+        local_id: &DatasetID,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
+        let res = self.pull_svc.pull_from(
+            remote_ref,
+            local_id,
+            PullOptions {
+                create_remote_aliases: true,
+                ..PullOptions::default()
+            },
+            None,
+        );
+
+        vec![(remote_ref.into(), res)]
+    }
+
+    fn pull(&self) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
+        let pretty = self.output_config.is_tty && self.output_config.verbosity_level == 0;
+        if let Some(ref as_id) = self.as_id {
+            let local_id = DatasetID::try_from(as_id).unwrap();
+            let remote_ref = DatasetRef::try_from(&self.refs[0]).unwrap();
+            if pretty {
+                self.pull_from_with_progress(remote_ref, local_id)
+            } else {
+                self.pull_from_quiet(remote_ref, local_id)
+            }
+        } else {
+            let dataset_refs = self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap());
+            if pretty {
+                self.pull_with_progress(dataset_refs)
+            } else {
+                self.pull_quiet(dataset_refs)
+            }
+        }
+    }
 }
 
 impl Command for PullCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let dataset_ids: Vec<DatasetIDBuf> = match (&self.ids[..], self.recursive, self.all) {
-            ([], false, false) => {
-                return Err(Error::UsageError {
-                    msg: "Specify a dataset or pass --all".to_owned(),
-                })
-            }
-            ([], false, true) => vec![],
-            (ref ids, _, false) => ids.iter().map(|s| s.parse().unwrap()).collect(),
-            _ => {
-                return Err(Error::UsageError {
-                    msg: "Invalid combination of arguments".to_owned(),
-                })
-            }
-        };
+        match (self.recursive, self.all, self.as_id.as_ref()) {
+            (false, false, _) if self.refs.is_empty() => Err(Error::UsageError {
+                msg: "Specify a dataset or pass --all".to_owned(),
+            }),
+            (false, true, None) if self.refs.is_empty() => Ok(()),
+            (_, false, None) if !self.refs.is_empty() => Ok(()),
+            (false, false, Some(_)) if self.refs.len() == 1 => Ok(()),
+            _ => Err(Error::UsageError {
+                msg: "Invalid combination of arguments".to_owned(),
+            }),
+        }?;
 
-        let results = if self.output_config.verbosity_level == 0 {
-            self.pull_with_progress(dataset_ids)
-        } else {
-            self.pull_quiet(dataset_ids)
-        };
+        let pull_results = self.pull();
 
         let mut updated = 0;
         let mut up_to_date = 0;
         let mut errors = 0;
 
-        for (_, res) in results.iter() {
+        for (_, res) in pull_results.iter() {
             match res {
                 Ok(r) => match r {
                     PullResult::UpToDate => up_to_date += 1,
@@ -156,7 +225,7 @@ impl Command for PullCommand {
                     .bold(),
                 console::style("Summary of errors")
             );
-            results
+            pull_results
                 .into_iter()
                 .filter_map(|(id, res)| res.err().map(|e| (id, e)))
                 .for_each(|(id, err)| {
@@ -237,6 +306,20 @@ impl TransformMultiListener for PrettyPullProgress {
     ) -> Option<Arc<Mutex<dyn TransformListener>>> {
         Some(Arc::new(Mutex::new(PrettyTransformProgress::new(
             dataset_id,
+            self.multi_progress.clone(),
+        ))))
+    }
+}
+
+impl SyncMultiListener for PrettyPullProgress {
+    fn begin_sync(
+        &mut self,
+        local_dataset_id: &DatasetID,
+        remote_dataset_ref: &DatasetRef,
+    ) -> Option<Arc<Mutex<dyn SyncListener>>> {
+        Some(Arc::new(Mutex::new(PrettySyncProgress::new(
+            local_dataset_id.to_owned(),
+            remote_dataset_ref.to_owned(),
             self.multi_progress.clone(),
         ))))
     }
@@ -381,7 +464,9 @@ impl IngestListener for PrettyIngestProgress {
                     ));
             }
             IngestResult::Updated {
-                ref block_hash,
+                old_head: _,
+                ref new_head,
+                num_blocks: _,
                 has_more: _,
                 uncacheable,
             } => {
@@ -398,8 +483,7 @@ impl IngestListener for PrettyIngestProgress {
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_id,
                         IngestStage::Commit as u32,
-                        console::style(format!("Committed new block {}", block_hash.short()))
-                            .green(),
+                        console::style(format!("Committed new block {}", new_head.short())).green(),
                     ));
             }
         };
@@ -482,9 +566,11 @@ impl TransformListener for PrettyTransformProgress {
             TransformResult::UpToDate => {
                 console::style("Dataset is up-to-date".to_owned()).yellow()
             }
-            TransformResult::Updated { ref block_hash } => {
-                console::style(format!("Committed new block {}", block_hash.short())).green()
-            }
+            TransformResult::Updated {
+                old_head: _,
+                ref new_head,
+                num_blocks: _,
+            } => console::style(format!("Committed new block {}", new_head.short())).green(),
         };
         self.curr_progress
             .finish_with_message(Self::spinner_message(&self.dataset_id, 0, msg));
@@ -522,5 +608,77 @@ impl PullImageListener for PrettyTransformProgress {
                 0,
                 "Applying derivative transformations",
             )));
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct PrettySyncProgress {
+    local_id: DatasetIDBuf,
+    remote_ref: DatasetRefBuf,
+    _multi_progress: Arc<indicatif::MultiProgress>,
+    curr_progress: indicatif::ProgressBar,
+}
+
+impl PrettySyncProgress {
+    fn new(
+        local_id: DatasetIDBuf,
+        remote_ref: DatasetRefBuf,
+        multi_progress: Arc<indicatif::MultiProgress>,
+    ) -> Self {
+        let inst = Self {
+            local_id,
+            remote_ref,
+            curr_progress: multi_progress.add(Self::new_spinner("")),
+            _multi_progress: multi_progress,
+        };
+        inst.curr_progress
+            .set_message(inst.spinner_message(0, "Syncing remote dataset"));
+        inst
+    }
+
+    fn new_spinner(msg: &str) -> indicatif::ProgressBar {
+        let pb = indicatif::ProgressBar::hidden();
+        pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        pb.set_message(msg.to_owned());
+        pb.enable_steady_tick(100);
+        pb
+    }
+
+    fn spinner_message<T: std::fmt::Display>(&self, step: u32, msg: T) -> String {
+        let step_str = format!("[{}/1]", step + 1);
+        let dataset = format!("({} > {})", self.remote_ref, self.local_id);
+        format!(
+            "{} {} {}",
+            console::style(step_str).bold().dim(),
+            msg,
+            console::style(dataset).dim(),
+        )
+    }
+}
+
+impl SyncListener for PrettySyncProgress {
+    fn success(&mut self, result: &SyncResult) {
+        let msg = match result {
+            SyncResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
+            SyncResult::Updated {
+                old_head: _,
+                ref new_head,
+                num_blocks,
+            } => console::style(format!(
+                "Updated to {} ({} new blocks)",
+                new_head.short(),
+                num_blocks
+            ))
+            .green(),
+        };
+        self.curr_progress
+            .finish_with_message(self.spinner_message(0, msg));
+    }
+
+    fn error(&mut self, _error: &SyncError) {
+        self.curr_progress.finish_with_message(
+            self.spinner_message(0, console::style("Failed to sync remote dataset").red()),
+        );
     }
 }

@@ -6,8 +6,9 @@ use chrono::DateTime;
 use std::sync::Arc;
 
 pub struct SetWatermarkCommand {
+    metadata_repo: Arc<dyn MetadataRepository>,
     pull_svc: Arc<dyn PullService>,
-    ids: Vec<String>,
+    refs: Vec<String>,
     all: bool,
     recursive: bool,
     watermark: String,
@@ -15,6 +16,7 @@ pub struct SetWatermarkCommand {
 
 impl SetWatermarkCommand {
     pub fn new<I, S, S2>(
+        metadata_repo: Arc<dyn MetadataRepository>,
         pull_svc: Arc<dyn PullService>,
         ids: I,
         all: bool,
@@ -27,10 +29,11 @@ impl SetWatermarkCommand {
         S2: AsRef<str>,
     {
         Self {
-            pull_svc: pull_svc,
-            ids: ids.map(|s| s.as_ref().to_owned()).collect(),
-            all: all,
-            recursive: recursive,
+            metadata_repo,
+            pull_svc,
+            refs: ids.map(|s| s.as_ref().to_owned()).collect(),
+            all,
+            recursive,
             watermark: watermark.as_ref().to_owned(),
         }
     }
@@ -38,7 +41,7 @@ impl SetWatermarkCommand {
 
 impl Command for SetWatermarkCommand {
     fn run(&mut self) -> Result<(), Error> {
-        if self.ids.len() != 1 {
+        if self.refs.len() != 1 {
             return Err(Error::UsageError {
                 msg: "Only one dataset can be provided when setting a watermark".to_owned(),
             });
@@ -56,17 +59,32 @@ impl Command for SetWatermarkCommand {
                 ),
             })?;
 
-        let dataset_id = DatasetID::try_from(self.ids.get(0).unwrap()).unwrap();
+        let dataset_id = DatasetRef::try_from(&self.refs[0]).unwrap().local_id();
+
+        let aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        let pull_aliases: Vec<_> = aliases
+            .get_by_kind(RemoteAliasKind::Pull)
+            .map(|r| r.as_str())
+            .collect();
+
+        if !pull_aliases.is_empty() {
+            return Err(Error::UsageError {
+                msg: format!(
+                    "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
+                    pull_aliases.join("\n- ")
+                ),
+            });
+        }
 
         match self.pull_svc.set_watermark(dataset_id, watermark.into()) {
             Ok(PullResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())
             }
-            Ok(PullResult::Updated { block_hash }) => {
+            Ok(PullResult::Updated { new_head, .. }) => {
                 eprintln!(
                     "{}",
-                    console::style(format!("Committed new block {}", block_hash)).green()
+                    console::style(format!("Committed new block {}", new_head)).green()
                 );
                 Ok(())
             }

@@ -50,7 +50,9 @@ pub enum IngestResult {
         uncacheable: bool,
     },
     Updated {
-        block_hash: Sha3_256,
+        old_head: Sha3_256,
+        new_head: Sha3_256,
+        num_blocks: usize,
         has_more: bool,
         uncacheable: bool,
     },
