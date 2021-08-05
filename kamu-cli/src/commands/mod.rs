@@ -5,6 +5,15 @@ mod common;
 mod add_command;
 pub use add_command::*;
 
+mod alias_add_command;
+pub use alias_add_command::*;
+
+mod alias_delete_command;
+pub use alias_delete_command::*;
+
+mod alias_list_command;
+pub use alias_list_command::*;
+
 mod complete_command;
 pub use complete_command::*;
 
@@ -64,9 +73,6 @@ pub use sql_server_livy_command::*;
 
 mod sql_shell_command;
 pub use sql_shell_command::*;
-
-mod sync_from_command;
-pub use sync_from_command::*;
 
 pub trait Command {
     fn needs_workspace(&self) -> bool {

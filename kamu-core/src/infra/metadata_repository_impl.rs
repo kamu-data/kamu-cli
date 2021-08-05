@@ -9,22 +9,22 @@ use std::collections::LinkedList;
 use std::convert::TryFrom;
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone)]
 pub struct MetadataRepositoryImpl {
-    workspace_layout: WorkspaceLayout,
+    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl MetadataRepositoryImpl {
-    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
-        Self {
-            workspace_layout: workspace_layout.clone(),
-        }
+    pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
+        Self { workspace_layout }
     }
 
     fn get_all_datasets_impl(&self) -> Result<impl Iterator<Item = DatasetIDBuf>, std::io::Error> {
@@ -107,11 +107,11 @@ impl MetadataRepositoryImpl {
         Ok(manifest.content)
     }
 
-    fn write_summary(&self, path: &Path, summary: &DatasetSummary) -> Result<(), DomainError> {
+    fn write_summary(&self, path: &Path, summary: DatasetSummary) -> Result<(), DomainError> {
         let manifest = Manifest {
             api_version: 1,
             kind: "DatasetSummary".to_owned(),
-            content: summary.clone(),
+            content: summary,
         };
         let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
         serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
@@ -156,6 +156,68 @@ impl MetadataRepositoryImpl {
         summary.data_size += fs_extra::dir::get_size(layout.checkpoints_dir).unwrap_or(0);
 
         Ok(summary)
+    }
+
+    fn read_config(&self, path: &Path) -> Result<DatasetConfig, DomainError> {
+        let file = std::fs::File::open(&path).unwrap_or_else(|e| {
+            panic!(
+                "Failed to open the config file at {}: {}",
+                path.display(),
+                e
+            )
+        });
+
+        let manifest: Manifest<DatasetConfig> =
+            serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+                panic!(
+                    "Failed to deserialize the DatasetConfig at {}: {}",
+                    path.display(),
+                    e
+                )
+            });
+
+        assert_eq!(manifest.kind, "DatasetConfig");
+        Ok(manifest.content)
+    }
+
+    fn write_config(&self, path: &Path, config: DatasetConfig) -> Result<(), DomainError> {
+        let manifest = Manifest {
+            api_version: 1,
+            kind: "DatasetConfig".to_owned(),
+            content: config,
+        };
+        let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
+        serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
+        Ok(())
+    }
+
+    fn get_config(&self, dataset_id: &DatasetID) -> Result<DatasetConfig, DomainError> {
+        if !self.dataset_exists(dataset_id) {
+            return Err(DomainError::does_not_exist(
+                ResourceKind::Dataset,
+                dataset_id.as_str().to_owned(),
+            ));
+        }
+
+        let path = self.get_dataset_metadata_dir(dataset_id).join("config");
+
+        if path.exists() {
+            self.read_config(&path)
+        } else {
+            Ok(DatasetConfig::default())
+        }
+    }
+
+    fn set_config(&self, dataset_id: &DatasetID, config: DatasetConfig) -> Result<(), DomainError> {
+        if !self.dataset_exists(dataset_id) {
+            return Err(DomainError::does_not_exist(
+                ResourceKind::Dataset,
+                dataset_id.as_str().to_owned(),
+            ));
+        }
+
+        let path = self.get_dataset_metadata_dir(dataset_id).join("config");
+        self.write_config(&path, config)
     }
 }
 
@@ -305,11 +367,22 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
         if last_block_hash != summary.last_block_hash {
             let summary = self.summarize(dataset_id)?;
-            self.write_summary(&path, &summary)?;
+            self.write_summary(&path, summary.clone())?;
             Ok(summary)
         } else {
             Ok(summary)
         }
+    }
+
+    fn get_remote_aliases(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Box<dyn RemoteAliases>, DomainError> {
+        Ok(Box::new(RemoteAliasesImpl::new(
+            self.clone(),
+            dataset_id.to_owned(),
+            self.get_config(dataset_id)?,
+        )))
     }
 
     fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
@@ -391,6 +464,118 @@ impl MetadataRepository for MetadataRepositoryImpl {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+// RemoteAliasesImpl
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct RemoteAliasesImpl {
+    metadata_repo: MetadataRepositoryImpl,
+    dataset_id: DatasetIDBuf,
+    config: DatasetConfig,
+}
+
+impl RemoteAliasesImpl {
+    fn new(
+        metadata_repo: MetadataRepositoryImpl,
+        dataset_id: DatasetIDBuf,
+        config: DatasetConfig,
+    ) -> Self {
+        Self {
+            metadata_repo,
+            dataset_id,
+            config,
+        }
+    }
+}
+
+impl RemoteAliases for RemoteAliasesImpl {
+    fn get_by_kind<'a>(
+        &'a self,
+        kind: RemoteAliasKind,
+    ) -> Box<dyn Iterator<Item = &'a DatasetRef> + 'a> {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &self.config.pull_aliases,
+            RemoteAliasKind::Push => &self.config.push_aliases,
+        };
+        Box::new(aliases.iter().map(|r| r.as_ref()))
+    }
+
+    fn contains(&self, remote_ref: &DatasetRef, kind: RemoteAliasKind) -> bool {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &self.config.pull_aliases,
+            RemoteAliasKind::Push => &self.config.push_aliases,
+        };
+        for a in aliases {
+            if *a == *remote_ref {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn is_empty(&self, kind: RemoteAliasKind) -> bool {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &self.config.pull_aliases,
+            RemoteAliasKind::Push => &self.config.push_aliases,
+        };
+        aliases.is_empty()
+    }
+
+    fn add(
+        &mut self,
+        remote_ref: DatasetRefBuf,
+        kind: RemoteAliasKind,
+    ) -> Result<bool, DomainError> {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &mut self.config.pull_aliases,
+            RemoteAliasKind::Push => &mut self.config.push_aliases,
+        };
+
+        if !aliases.contains(&remote_ref) {
+            aliases.push(remote_ref);
+            self.metadata_repo
+                .set_config(&self.dataset_id, self.config.clone())?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn delete(
+        &mut self,
+        remote_ref: &DatasetRef,
+        kind: RemoteAliasKind,
+    ) -> Result<bool, DomainError> {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &mut self.config.pull_aliases,
+            RemoteAliasKind::Push => &mut self.config.push_aliases,
+        };
+
+        if let Some(i) = aliases.iter().position(|r| *r == *remote_ref) {
+            aliases.remove(i);
+            self.metadata_repo
+                .set_config(&self.dataset_id, self.config.clone())?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, DomainError> {
+        let aliases = match kind {
+            RemoteAliasKind::Pull => &mut self.config.pull_aliases,
+            RemoteAliasKind::Push => &mut self.config.push_aliases,
+        };
+        let len = aliases.len();
+        if !aliases.is_empty() {
+            aliases.clear();
+            self.metadata_repo
+                .set_config(&self.dataset_id, self.config.clone())?;
+        }
+        Ok(len)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
 // Null
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -457,6 +642,16 @@ impl MetadataRepository for MetadataRepositoryNull {
         Err(DomainError::does_not_exist(
             ResourceKind::Remote,
             remote_id.to_string(),
+        ))
+    }
+
+    fn get_remote_aliases(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Box<dyn RemoteAliases>, DomainError> {
+        Err(DomainError::does_not_exist(
+            ResourceKind::Dataset,
+            dataset_id.as_str().to_owned(),
         ))
     }
 }

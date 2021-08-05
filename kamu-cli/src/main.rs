@@ -38,11 +38,14 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<TransformServiceImpl>();
     catalog.bind::<dyn TransformService, TransformServiceImpl>()?;
 
+    catalog.add::<SyncServiceImpl>();
+    catalog.bind::<dyn SyncService, SyncServiceImpl>()?;
+
     catalog.add::<PullServiceImpl>();
     catalog.bind::<dyn PullService, PullServiceImpl>()?;
 
-    catalog.add::<SyncServiceImpl>();
-    catalog.bind::<dyn SyncService, SyncServiceImpl>()?;
+    catalog.add::<PushServiceImpl>();
+    catalog.bind::<dyn PushService, PushServiceImpl>()?;
 
     catalog.add::<RemoteFactory>();
     catalog.add::<EngineFactory>();
@@ -177,33 +180,31 @@ fn main() {
                 if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
                     catalog.get_one().unwrap(),
+                    catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
                     submatches.value_of("set-watermark").unwrap(),
                 ))
-            } else if submatches.is_present("remote") {
-                Box::new(SyncFromCommand::new(
-                    catalog.get_one().unwrap(),
-                    submatches.values_of("dataset").unwrap_or_default(),
-                    submatches.value_of("remote"),
-                    &output_format,
-                ))
             } else {
                 Box::new(PullCommand::new(
+                    catalog.get_one().unwrap(),
                     catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
                     submatches.is_present("force-uncacheable"),
-                    &output_format,
+                    submatches.value_of("as"),
                 ))
             }
         }
         ("push", Some(push_matches)) => Box::new(PushCommand::new(
             catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
             push_matches.values_of("dataset").unwrap_or_default(),
-            push_matches.value_of("remote"),
+            push_matches.is_present("all"),
+            push_matches.is_present("recursive"),
+            push_matches.value_of("as"),
             &output_format,
         )),
         ("remote", Some(remote_matches)) => match remote_matches.subcommand() {
@@ -220,8 +221,31 @@ fn main() {
             )),
             ("list", _) => Box::new(RemoteListCommand::new(
                 catalog.get_one().unwrap(),
-                &output_format,
+                catalog.get_one().unwrap(),
             )),
+            ("alias", Some(alias_matches)) => match alias_matches.subcommand() {
+                ("add", Some(add_matches)) => Box::new(AliasAddCommand::new(
+                    catalog.get_one().unwrap(),
+                    add_matches.value_of("dataset").unwrap().to_owned(),
+                    add_matches.value_of("alias").unwrap().to_owned(),
+                    add_matches.is_present("pull"),
+                    add_matches.is_present("push"),
+                )),
+                ("delete", Some(delete_matches)) => Box::new(AliasDeleteCommand::new(
+                    catalog.get_one().unwrap(),
+                    delete_matches.value_of("dataset").unwrap().to_owned(),
+                    delete_matches.value_of("alias").map(|s| s.to_owned()),
+                    delete_matches.is_present("all"),
+                    delete_matches.is_present("pull"),
+                    delete_matches.is_present("push"),
+                )),
+                ("list", Some(list_matches)) => Box::new(AliasListCommand::new(
+                    catalog.get_one().unwrap(),
+                    catalog.get_one().unwrap(),
+                    list_matches.value_of("dataset").map(|s| s.to_owned()),
+                )),
+                _ => unimplemented!(),
+            },
             _ => unimplemented!(),
         },
         ("sql", Some(submatches)) => match submatches.subcommand() {
@@ -348,11 +372,7 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let format_str = if let (_, Some(submatches)) = matches.subcommand() {
-        submatches.value_of("output-format")
-    } else {
-        None
-    };
+    let format_str = get_output_format_recursive(matches);
 
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
@@ -372,6 +392,18 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
         verbosity_level: verbosity_level,
         is_tty: is_tty,
         format: format,
+    }
+}
+
+fn get_output_format_recursive<'a>(matches: &'a clap::ArgMatches<'_>) -> Option<&'a str> {
+    if let (_, Some(submatches)) = matches.subcommand() {
+        if let Some(fmt) = submatches.value_of("output-format") {
+            Some(fmt)
+        } else {
+            get_output_format_recursive(submatches)
+        }
+    } else {
+        None
     }
 }
 

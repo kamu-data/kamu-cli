@@ -18,6 +18,9 @@ pub use error::*;
 mod manifest;
 pub use manifest::*;
 
+mod dataset_config;
+pub use dataset_config::*;
+
 mod dataset_layout;
 pub use dataset_layout::*;
 
@@ -45,6 +48,9 @@ pub use metadata_chain_impl::*;
 
 mod pull_service_impl;
 pub use pull_service_impl::*;
+
+mod push_service_impl;
+pub use push_service_impl::*;
 
 mod resource_loader_impl;
 pub use resource_loader_impl::*;

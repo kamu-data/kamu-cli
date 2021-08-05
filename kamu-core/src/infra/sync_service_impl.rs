@@ -30,17 +30,20 @@ impl SyncServiceImpl {
             _logger: logger,
         }
     }
-}
 
-impl SyncService for SyncServiceImpl {
-    fn sync_from(
+    fn do_sync_from(
         &self,
+        remote_dataset_ref: &DatasetRef,
         local_dataset_id: &DatasetID,
-        remote_dataset_id: &DatasetID,
-        remote_id: &RemoteID,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError> {
+        let remote_id = remote_dataset_ref.remote_id().unwrap_or_else(|| {
+            panic!(
+                "Non-remote reference passed to sync_from: {}",
+                remote_dataset_ref
+            )
+        });
+
         let remote = self
             .metadata_repo
             .get_remote(remote_id)
@@ -59,14 +62,13 @@ impl SyncService for SyncServiceImpl {
         let cl = client.lock().unwrap();
 
         let remote_head = match cl
-            .read_ref(remote_dataset_id)
+            .read_ref(remote_dataset_ref)
             .map_err(|e| SyncError::ProtocolError(e.into()))?
         {
             Some(hash) => hash,
             None => {
                 return Err(SyncError::RemoteDatasetDoesNotExist {
-                    remote_id: remote_id.to_owned(),
-                    dataset_id: remote_dataset_id.to_owned(),
+                    dataset_ref: remote_dataset_ref.to_owned(),
                 })
             }
         };
@@ -90,11 +92,10 @@ impl SyncService for SyncServiceImpl {
         let dataset_layout = DatasetLayout::new(&volume_layout, local_dataset_id);
 
         let read_result = cl
-            .read(remote_dataset_id, remote_head, local_head, &tmp_dir)
+            .read(remote_dataset_ref, remote_head, local_head, &tmp_dir)
             .map_err(|e| match e {
                 RemoteError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
-                    remote_id: remote_id.to_owned(),
-                    dataset_id: remote_dataset_id.to_owned(),
+                    dataset_ref: remote_dataset_ref.to_owned(),
                 },
                 e => e.into(),
             })?;
@@ -113,6 +114,7 @@ impl SyncService for SyncServiceImpl {
                 _ => SyncError::ProtocolError(e.into()),
             })?;
 
+        // TODO: Read only checkpoints and data for blocks we're syncing
         // TODO: This is very unsafe
         if dataset_layout.checkpoints_dir.exists() {
             std::fs::remove_dir_all(&dataset_layout.checkpoints_dir)?;
@@ -140,6 +142,8 @@ impl SyncService for SyncServiceImpl {
             }
         }
 
+        let num_blocks = new_blocks.len();
+
         // TODO: Remote assumption on block ordering
         match chain {
             None => {
@@ -157,22 +161,22 @@ impl SyncService for SyncServiceImpl {
             }
         }
 
+        // TODO: Error tolerance
         std::fs::remove_dir_all(&tmp_dir)?;
 
         // TODO: race condition on remote head
         Ok(SyncResult::Updated {
             old_head: local_head,
             new_head: remote_head,
+            num_blocks,
         })
     }
 
-    fn sync_to(
+    fn do_sync_to(
         &self,
         local_dataset_id: &DatasetID,
-        remote_dataset_id: &DatasetID,
-        remote_id: &RemoteID,
+        remote_dataset_ref: &DatasetRef,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError> {
         let chain = match self.metadata_repo.get_metadata_chain(local_dataset_id) {
             Ok(c) => c,
@@ -183,6 +187,13 @@ impl SyncService for SyncServiceImpl {
             }
             Err(e) => return Err(SyncError::InternalError(e.into())),
         };
+
+        let remote_id = remote_dataset_ref.remote_id().unwrap_or_else(|| {
+            panic!(
+                "Non-remote reference passed to sync_to: {}",
+                remote_dataset_ref
+            )
+        });
 
         let remote = self
             .metadata_repo
@@ -202,7 +213,7 @@ impl SyncService for SyncServiceImpl {
         let mut cl = client.lock().unwrap();
 
         let remote_head = cl
-            .read_ref(remote_dataset_id)
+            .read_ref(remote_dataset_ref)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
         let local_head = chain.read_ref(&BlockRef::Head).unwrap();
@@ -251,8 +262,10 @@ impl SyncService for SyncServiceImpl {
             Vec::new()
         };
 
+        let num_blocks = blocks_to_sync.len();
+
         cl.write(
-            remote_dataset_id,
+            remote_dataset_ref,
             remote_head,
             local_head,
             &mut blocks_to_sync.into_iter(),
@@ -263,6 +276,111 @@ impl SyncService for SyncServiceImpl {
         Ok(SyncResult::Updated {
             old_head: remote_head,
             new_head: local_head,
+            num_blocks,
         })
+    }
+}
+
+impl SyncService for SyncServiceImpl {
+    fn sync_from(
+        &self,
+        remote_ref: &DatasetRef,
+        local_id: &DatasetID,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<SyncResult, SyncError> {
+        let lst = listener.unwrap_or(Arc::new(Mutex::new(NullSyncListener)));
+        {
+            lst.lock().unwrap().begin();
+        }
+        match self.do_sync_from(remote_ref, local_id, options) {
+            Ok(result) => {
+                lst.lock().unwrap().success(&result);
+                Ok(result)
+            }
+            Err(err) => {
+                lst.lock().unwrap().error(&err);
+                Err(err)
+            }
+        }
+    }
+
+    // TODO: Parallelism
+    fn sync_from_multi(
+        &self,
+        datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)> {
+        let mut results = Vec::new();
+
+        for (remote_dataset_ref, local_dataset_id) in datasets {
+            let lst = if let Some(ref l) = listener {
+                l.lock()
+                    .unwrap()
+                    .begin_sync(local_dataset_id, remote_dataset_ref)
+            } else {
+                None
+            };
+
+            let res = self.sync_from(remote_dataset_ref, local_dataset_id, options.clone(), lst);
+            results.push((
+                (remote_dataset_ref.to_owned(), local_dataset_id.to_owned()),
+                res,
+            ));
+        }
+
+        results
+    }
+
+    fn sync_to(
+        &self,
+        local_id: &DatasetID,
+        remote_ref: &DatasetRef,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<SyncResult, SyncError> {
+        let lst = listener.unwrap_or(Arc::new(Mutex::new(NullSyncListener)));
+        {
+            lst.lock().unwrap().begin();
+        }
+        match self.do_sync_to(local_id, remote_ref, options) {
+            Ok(result) => {
+                lst.lock().unwrap().success(&result);
+                Ok(result)
+            }
+            Err(err) => {
+                lst.lock().unwrap().error(&err);
+                Err(err)
+            }
+        }
+    }
+
+    // TODO: Parallelism
+    fn sync_to_multi(
+        &self,
+        datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
+        let mut results = Vec::new();
+
+        for (local_dataset_id, remote_dataset_ref) in datasets {
+            let lst = if let Some(ref l) = listener {
+                l.lock()
+                    .unwrap()
+                    .begin_sync(local_dataset_id, remote_dataset_ref)
+            } else {
+                None
+            };
+
+            let res = self.sync_to(local_dataset_id, remote_dataset_ref, options.clone(), lst);
+            results.push((
+                (local_dataset_id.to_owned(), remote_dataset_ref.to_owned()),
+                res,
+            ));
+        }
+
+        results
     }
 }

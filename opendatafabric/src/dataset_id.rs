@@ -1,5 +1,6 @@
 use std::borrow;
 use std::cmp;
+use std::convert::TryInto;
 use std::convert::{AsRef, TryFrom};
 use std::fmt;
 use std::marker::PhantomData;
@@ -216,6 +217,12 @@ impl<'de> serde::de::Visitor<'de> for DatasetIDBufSerdeVisitor {
 
 newtype_str!(DatasetID, DatasetIDBuf, DatasetIDGrammar::match_dataset_id);
 
+impl DatasetID {
+    pub fn as_dataset_ref(&self) -> &DatasetRef {
+        DatasetRef::new_unchecked(&self.0)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 newtype_str!(Username, UsernameBuf, DatasetIDGrammar::match_username);
@@ -233,6 +240,14 @@ newtype_str!(
 );
 
 impl DatasetRef {
+    pub fn is_local(&self) -> bool {
+        self.0.chars().filter(|c| *c == '/').count() == 0
+    }
+
+    pub fn is_multitenant(&self) -> bool {
+        self.0.chars().filter(|c| *c == '/').count() == 2
+    }
+
     pub fn local_id(&self) -> &DatasetID {
         DatasetID::new_unchecked(self.0.rsplit('/').next().unwrap())
     }
@@ -258,6 +273,79 @@ impl DatasetRef {
         } else {
             uname_or_remote.map(|s| RemoteID::new_unchecked(s))
         }
+    }
+
+    pub fn as_local(&self) -> Option<&DatasetID> {
+        let mut split = self.0.rsplit('/');
+        let id = DatasetID::new_unchecked(split.next().unwrap());
+        if split.next().is_none() {
+            Some(id)
+        } else {
+            None
+        }
+    }
+}
+
+impl DatasetRefBuf {
+    pub fn new(
+        remote_id: Option<&RemoteID>,
+        username: Option<&Username>,
+        local_id: &DatasetID,
+    ) -> Self {
+        let mut s = String::new();
+        if let Some(r) = remote_id {
+            s.push_str(r);
+            s.push('/');
+        }
+        if let Some(u) = username {
+            s.push_str(u);
+            s.push('/');
+        }
+        s.push_str(local_id);
+        Self::try_from(s).unwrap()
+    }
+}
+
+impl From<DatasetIDBuf> for DatasetRefBuf {
+    fn from(id: DatasetIDBuf) -> Self {
+        Self(id.0)
+    }
+}
+
+impl TryInto<DatasetIDBuf> for DatasetRefBuf {
+    type Error = ();
+    fn try_into(self) -> Result<DatasetIDBuf, Self::Error> {
+        if self.is_local() {
+            Ok(DatasetIDBuf(self.0))
+        } else {
+            Err(())
+        }
+    }
+}
+
+impl serde::Serialize for DatasetRefBuf {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for DatasetRefBuf {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_string(DatasetRefBufSerdeVisitor)
+    }
+}
+
+struct DatasetRefBufSerdeVisitor;
+
+impl<'de> serde::de::Visitor<'de> for DatasetRefBufSerdeVisitor {
+    type Value = DatasetRefBuf;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a DatasetRef string")
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        DatasetRefBuf::try_from(v).map_err(serde::de::Error::custom)
     }
 }
 

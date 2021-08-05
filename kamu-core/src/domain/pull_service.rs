@@ -1,7 +1,8 @@
 use super::ingest_service::*;
+use super::sync_service::*;
 use super::transform_service::*;
 use crate::domain::DomainError;
-use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
+use opendatafabric::{DatasetID, DatasetRef, DatasetRefBuf, Sha3_256};
 
 use chrono::{DateTime, Utc};
 use std::sync::{Arc, Mutex};
@@ -14,11 +15,21 @@ use thiserror::Error;
 pub trait PullService: Send + Sync {
     fn pull_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)>;
+        sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)>;
+
+    /// A special version of pull that allows to sync dataset from a remote while renaming it
+    fn pull_from(
+        &self,
+        remote_ref: &DatasetRef,
+        local_id: &DatasetID,
+        options: PullOptions,
+        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<PullResult, PullError>;
 
     fn set_watermark(
         &self,
@@ -27,14 +38,20 @@ pub trait PullService: Send + Sync {
     ) -> Result<PullResult, PullError>;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct PullOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
     /// Pull all known datasets
     pub all: bool,
+    /// Whether the datasets pulled from remotes should be permanently associated with them
+    pub create_remote_aliases: bool,
     /// Ingest-specific options
     pub ingest_options: IngestOptions,
+    /// Sync-specific options,
+    pub sync_options: SyncOptions,
 }
 
 impl Default for PullOptions {
@@ -42,15 +59,76 @@ impl Default for PullOptions {
         Self {
             recursive: false,
             all: false,
+            create_remote_aliases: true,
             ingest_options: IngestOptions::default(),
+            sync_options: SyncOptions::default(),
         }
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub enum PullResult {
     UpToDate,
-    Updated { block_hash: Sha3_256 },
+    Updated {
+        old_head: Option<Sha3_256>,
+        new_head: Sha3_256,
+        num_blocks: usize,
+    },
+}
+
+impl From<IngestResult> for PullResult {
+    fn from(other: IngestResult) -> Self {
+        match other {
+            IngestResult::UpToDate { uncacheable: _ } => PullResult::UpToDate,
+            IngestResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+                has_more: _,
+                uncacheable: _,
+            } => PullResult::Updated {
+                old_head: Some(old_head),
+                new_head,
+                num_blocks,
+            },
+        }
+    }
+}
+
+impl From<TransformResult> for PullResult {
+    fn from(other: TransformResult) -> Self {
+        match other {
+            TransformResult::UpToDate => PullResult::UpToDate,
+            TransformResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+            } => PullResult::Updated {
+                old_head: Some(old_head),
+                new_head,
+                num_blocks,
+            },
+        }
+    }
+}
+
+impl From<SyncResult> for PullResult {
+    fn from(other: SyncResult) -> Self {
+        match other {
+            SyncResult::UpToDate => PullResult::UpToDate,
+            SyncResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+            } => PullResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+            },
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,10 +137,14 @@ pub enum PullResult {
 
 #[derive(Debug, Error)]
 pub enum PullError {
+    #[error("Cannot choose between multiple pull aliases")]
+    AmbiguousSource,
     #[error("Domain error: {0}")]
     DomainError(#[from] DomainError),
     #[error("Ingest error: {0}")]
     IngestError(#[from] IngestError),
     #[error("Transform error: {0}")]
     TransformError(#[from] TransformError),
+    #[error("Sync error: {0}")]
+    SyncError(#[from] SyncError),
 }

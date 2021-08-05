@@ -17,10 +17,10 @@ use std::sync::Arc;
 fn test_transform_with_engine_spark() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactory::new(
         &workspace_layout,
         DockerClient::default(),
@@ -127,7 +127,7 @@ fn test_transform_with_engine_spark() {
     metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
-        TransformResult::Updated { block_hash } => block_hash,
+        TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
@@ -194,7 +194,7 @@ fn test_transform_with_engine_spark() {
         .unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
-        TransformResult::Updated { block_hash } => block_hash,
+        TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
@@ -215,10 +215,10 @@ fn test_transform_with_engine_spark() {
 fn test_transform_with_engine_flink() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactory::new(
         &workspace_layout,
         DockerClient::default(),
@@ -325,7 +325,7 @@ fn test_transform_with_engine_flink() {
     metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
-        TransformResult::Updated { block_hash } => block_hash,
+        TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
@@ -392,7 +392,7 @@ fn test_transform_with_engine_flink() {
         .unwrap();
 
     let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
-        TransformResult::Updated { block_hash } => block_hash,
+        TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 

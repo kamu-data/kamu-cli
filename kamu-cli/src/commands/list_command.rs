@@ -1,6 +1,6 @@
 use super::{Command, Error};
 use crate::output::*;
-use kamu::domain::*;
+use kamu::{domain::*, infra::DatasetSummary};
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
@@ -38,9 +38,9 @@ impl ListCommand {
             let summary = self.metadata_repo.get_summary(&id)?;
             write!(
                 out,
-                "{},{:?},{},{},{}\n",
+                "{},{},{},{},{}\n",
                 id,
-                summary.kind,
+                self.get_kind(&summary)?,
                 match summary.last_pulled {
                     None => "".to_owned(),
                     Some(t) => t.to_rfc3339(),
@@ -69,7 +69,7 @@ impl ListCommand {
 
             table.add_row(Row::new(vec![
                 Cell::new(&id),
-                Cell::new(&format!("{:?}", summary.kind)).style_spec("c"),
+                Cell::new(&self.get_kind(&summary)?).style_spec("c"),
                 Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                 Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
                 Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
@@ -131,6 +131,20 @@ impl ListCommand {
             return "-".to_owned();
         }
         num.to_formatted_string(&Locale::en)
+    }
+
+    fn get_kind(&self, summary: &DatasetSummary) -> Result<String, DomainError> {
+        let is_remote = self
+            .metadata_repo
+            .get_remote_aliases(&summary.id)?
+            .get_by_kind(RemoteAliasKind::Pull)
+            .next()
+            .is_some();
+        Ok(if is_remote {
+            format!("Remote({:?})", summary.kind)
+        } else {
+            format!("{:?}", summary.kind)
+        })
     }
 }
 

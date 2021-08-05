@@ -1,10 +1,7 @@
 use super::RemoteError;
-use opendatafabric::{DatasetID, DatasetIDBuf, RemoteID, RemoteIDBuf, Sha3_256};
+use opendatafabric::{DatasetID, DatasetIDBuf, DatasetRef, DatasetRefBuf, RemoteIDBuf, Sha3_256};
 
-use std::{
-    convert::TryFrom,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,21 +11,33 @@ use thiserror::Error;
 pub trait SyncService: Send + Sync {
     fn sync_from(
         &self,
-        local_dataset_id: &DatasetID,
-        remote_dataset_id: &DatasetID,
-        remote_id: &RemoteID,
+        remote_ref: &DatasetRef,
+        local_id: &DatasetID,
         options: SyncOptions,
         listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError>;
 
+    fn sync_from_multi(
+        &self,
+        datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)>;
+
     fn sync_to(
         &self,
-        local_dataset_id: &DatasetID,
-        remote_dataset_id: &DatasetID,
-        remote_id: &RemoteID,
+        local_id: &DatasetID,
+        remote_ref: &DatasetRef,
         options: SyncOptions,
         listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError>;
+
+    fn sync_to_multi(
+        &self,
+        datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
+        options: SyncOptions,
+        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)>;
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +55,7 @@ pub enum SyncResult {
     Updated {
         old_head: Option<Sha3_256>,
         new_head: Sha3_256,
+        num_blocks: usize,
     },
 }
 
@@ -63,7 +73,11 @@ pub struct NullSyncListener;
 impl SyncListener for NullSyncListener {}
 
 pub trait SyncMultiListener {
-    fn begin_sync(&mut self, _dataset_id: &DatasetID) -> Option<Arc<Mutex<dyn SyncListener>>> {
+    fn begin_sync(
+        &mut self,
+        _local_id: &DatasetID,
+        _remote_ref: &DatasetRef,
+    ) -> Option<Arc<Mutex<dyn SyncListener>>> {
         None
     }
 }
@@ -81,11 +95,8 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub enum SyncError {
     #[error("Dataset {dataset_id} does not exist locally")]
     LocalDatasetDoesNotExist { dataset_id: DatasetIDBuf },
-    #[error("Dataset {dataset_id} does not exist in remote {remote_id}")]
-    RemoteDatasetDoesNotExist {
-        remote_id: RemoteIDBuf,
-        dataset_id: DatasetIDBuf,
-    },
+    #[error("Dataset {dataset_ref} does not exist in remote")]
+    RemoteDatasetDoesNotExist { dataset_ref: DatasetRefBuf },
     #[error("Remote {remote_id} does not exist")]
     RemoteDoesNotExist { remote_id: RemoteIDBuf },
     #[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged")]
@@ -131,8 +142,7 @@ impl From<RemoteError> for SyncError {
             RemoteError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
             RemoteError::ProtocolError { .. } => SyncError::CredentialsError(Box::new(e)),
             RemoteError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
-                remote_id: RemoteIDBuf::try_from("unknown").unwrap(),
-                dataset_id: DatasetIDBuf::new_unchecked("unknown"),
+                dataset_ref: DatasetRefBuf::new_unchecked("unknown/unknown"),
             },
             RemoteError::UpdatedConcurrently => SyncError::UpdatedConcurrently(Box::new(e)),
             RemoteError::IOError { .. } => SyncError::IOError(Box::new(e)),

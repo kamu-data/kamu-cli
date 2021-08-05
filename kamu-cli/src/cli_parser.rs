@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
-use opendatafabric::{DatasetID, RemoteID};
+use opendatafabric::{DatasetID, DatasetRef, RemoteID};
 
 fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     app.args(&[
@@ -403,24 +403,24 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
+                        .validator(validate_dataset_ref)
+                        .help("Dataset ID(s) / Ref(s)"),
+                    Arg::with_name("as")
+                        .long("as")
+                        .takes_value(true)
                         .validator(validate_dataset_id)
-                        .help("Dataset ID(s)"),
+                        .value_name("ID")
+                        .help("Local name of a dataset to use when syncing from remote"),
                     Arg::with_name("set-watermark")
                         .long("set-watermark")
                         .takes_value(true)
                         .value_name("TIME")
                         .help("Injects a manual watermark into the dataset to signify that \
                             no data is expected to arrive with event time that precedes it"),
-                    Arg::with_name("remote")
-                        .long("remote")
-                        .takes_value(true)
-                        .validator(validate_remote_id)
-                        .value_name("REMOTE")
-                        .help("Specifies which remote to pull data from"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Pull is a generic command that lets you refresh data in any dataset. It will act differently depending on the type of dataset it works with In case of a root dataset it implies ingesting data from an external source. In case of a derivative - processing previously unseen data of its dependencies. In case
+                    Pull is a generic command that lets you refresh data in any existing dataset or add a new dataset from the remote repository. It will act differently depending on the type of dataset it works with. In case of a root dataset it implies ingesting data from an external source. In case of a derivative - processing previously unseen data of its dependencies.
 
                     ### Examples ###
 
@@ -438,35 +438,39 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                     Fetch dataset from a remote:
 
-                        kamu pull org.example.data --remote org.example
+                        kamu pull kamu.dev/foobar/org.example.data
+                    
+                    Fetch dataset from a remote using a different local name:
+
+                        kamu pull kamu.dev/foobar/org.example.data --as my.data
 
                     Advance the watermark of a dataset:
 
-                        kamu --set-watermark 2020-01-01 org.example.data
+                        kamu pull --set-watermark 2020-01-01 org.example.data
                     "
                 )),
             SubCommand::with_name("push")
                 .about("Push local data into the remote repository")
                 .args(&[
-                    // Arg::with_name("all")
-                    //     .short("a")
-                    //     .long("all")
-                    //     .help("Push all datasets in the workspace"),
-                    // Arg::with_name("recursive")
-                    //     .short("r")
-                    //     .long("recursive")
-                    //     .help("Also push all transitive dependencies of specified datasets"),
+                    Arg::with_name("all")
+                        .short("a")
+                        .long("all")
+                        .help("Push all datasets in the workspace"),
+                    Arg::with_name("recursive")
+                        .short("r")
+                        .long("recursive")
+                        .help("Also push all transitive dependencies of specified datasets"),
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .validator(validate_dataset_id)
-                        .help("Dataset ID(s)"),
-                    Arg::with_name("remote")
-                        .long("remote")
+                        .validator(validate_dataset_ref)
+                        .help("Dataset ID(s) / Ref(s)"),
+                    Arg::with_name("as")
+                        .long("as")
                         .takes_value(true)
-                        .validator(validate_remote_id)
-                        .value_name("REMOTE")
-                        .help("Specifies which remote to push data into"),
+                        .validator(validate_dataset_ref)
+                        .value_name("REF")
+                        .help("Remote alias to use when pushing"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -476,9 +480,13 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                     ### Examples ###
 
-                    Upload all new data in a dataset to a remote:
+                    Push dataset and associate it with a remote:
 
-                        kamu push org.example.data --remote org.example
+                        kamu push org.example.data --as kamu.dev/me/org.example.data
+
+                    Push dataset previously associated with a remote:
+
+                        kamu push org.example.data
                     "
                 )),
             SubCommand::with_name("reset")
@@ -509,6 +517,9 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 .about("Manage set of tracked repositories")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommands(vec![
+                    tabular_output_params(SubCommand::with_name("list")
+                        .about("Lists known remote repositories")
+                    ),
                     SubCommand::with_name("add")
                         .about("Adds a remote repository")
                         .after_help(indoc::indoc!(r"
@@ -552,6 +563,82 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     tabular_output_params(SubCommand::with_name("list")
                         .about("Lists known remote repositories")
                     ),
+                    SubCommand::with_name("alias")
+                        .about("Manage set of remote aliases associated with datasets")
+                        .setting(AppSettings::SubcommandRequiredElseHelp)
+                        .subcommands(vec![
+                            tabular_output_params(SubCommand::with_name("list")
+                                .about("Lists remote aliases")
+                                .args(&[
+                                    Arg::with_name("dataset")
+                                        .index(1)
+                                        .validator(validate_dataset_id)
+                                        .help("ID of the dataset"),
+                                ])
+                            ),
+                            SubCommand::with_name("add")
+                                .about("Adds a remote alias to a dataset")
+                                .args(&[
+                                    Arg::with_name("dataset")
+                                        .required(true)
+                                        .index(1)
+                                        .validator(validate_dataset_id)
+                                        .help("ID of the dataset"),
+                                    Arg::with_name("alias")
+                                        .required(true)
+                                        .index(2)
+                                        .validator(validate_dataset_ref)
+                                        .help("Remote dataset reference"),
+                                    Arg::with_name("push")
+                                        .long("push")
+                                        .help("Add a push alias"),
+                                    Arg::with_name("pull")
+                                        .long("pull")
+                                        .help("Add a pull alias"),
+                                ]),
+                            SubCommand::with_name("delete")
+                                .about("Deletes a remote alias associated with a dataset")
+                                .args(&[
+                                    Arg::with_name("all")
+                                        .short("a")
+                                        .long("all")
+                                        .help("Delete all aliases"),
+                                    Arg::with_name("dataset")
+                                        .required(true)
+                                        .index(1)
+                                        .validator(validate_dataset_id)
+                                        .help("ID of the dataset"),
+                                    Arg::with_name("alias")
+                                        .index(2)
+                                        .validator(validate_dataset_ref)
+                                        .help("Remote dataset reference"),
+                                    Arg::with_name("push")
+                                        .long("push")
+                                        .help("Add a push alias"),
+                                    Arg::with_name("pull")
+                                        .long("pull")
+                                        .help("Add a pull alias"),
+                                ]),
+                        ])
+                        .after_help(indoc::indoc!(
+                            r"
+                            When you pull and push datasets from remote repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple remotes) you can use this command to manage the aliases.
+
+                            ### Examples ###
+
+                            List all aliases:
+
+                                kamu remote alias list
+
+                            List all aliases of a specific dataset:
+
+                                kamu remote alias list org.example.data
+
+                            Add a new pull alias:
+
+                                kamu remote alias add --pull org.example.data kamu.dev/me/org.example.data
+                            "
+                        )),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -642,6 +729,15 @@ fn validate_dataset_id(s: String) -> Result<(), String> {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "DatasetID can only contain alphanumerics, dashes, and dots",
+        )),
+    }
+}
+
+fn validate_dataset_ref(s: String) -> Result<(), String> {
+    match DatasetRef::try_from(&s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "DatasetRef should be in form: `dataset.id` or `remote.hostname.dataset.id` or `remote.hostname/username/dataset.id`",
         )),
     }
 }

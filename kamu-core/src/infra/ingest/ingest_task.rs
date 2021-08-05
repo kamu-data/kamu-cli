@@ -142,7 +142,9 @@ impl IngestTask {
             }
         } else {
             IngestResult::Updated {
-                block_hash: commit_result.checkpoint.last_hash,
+                old_head: prev_hash,
+                new_head: commit_result.checkpoint.last_hash,
+                num_blocks: 1,
                 has_more: has_more,
                 uncacheable: !cacheable,
             }

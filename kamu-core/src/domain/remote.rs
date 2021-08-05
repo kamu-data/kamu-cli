@@ -1,4 +1,4 @@
-use opendatafabric::{DatasetID, Sha3_256};
+use opendatafabric::{DatasetRef, Sha3_256};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -15,11 +15,11 @@ pub struct Remote {
 }
 
 pub trait RemoteClient {
-    fn read_ref(&self, dataset_id: &DatasetID) -> Result<Option<Sha3_256>, RemoteError>;
+    fn read_ref(&self, dataset_id: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError>;
 
     fn write(
         &mut self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Option<Sha3_256>,
         new_head: Sha3_256,
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
@@ -29,7 +29,7 @@ pub trait RemoteClient {
 
     fn read(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,

@@ -1,6 +1,6 @@
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::{DatasetID, Sha3_256};
+use opendatafabric::{DatasetRef, Sha3_256};
 
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -16,10 +16,10 @@ impl RemoteLocalFS {
 }
 
 impl RemoteClient for RemoteLocalFS {
-    fn read_ref(&self, dataset_id: &DatasetID) -> Result<Option<Sha3_256>, RemoteError> {
+    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError> {
         let ref_path: PathBuf = [
             self.path.as_ref() as &OsStr,
-            OsStr::new(dataset_id as &str),
+            OsStr::new(dataset_ref.local_id() as &str),
             OsStr::new("meta"),
             OsStr::new("refs"),
             OsStr::new("head"),
@@ -38,18 +38,18 @@ impl RemoteClient for RemoteLocalFS {
     // TODO: Locking
     fn write(
         &mut self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Option<Sha3_256>,
         new_head: Sha3_256,
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RemoteError> {
-        if self.read_ref(dataset_id)? != expected_head {
+        if self.read_ref(dataset_ref)? != expected_head {
             return Err(RemoteError::UpdatedConcurrently);
         }
 
-        let out_dataset_dir = self.path.join(dataset_id);
+        let out_dataset_dir = self.path.join(dataset_ref.local_id());
         let out_meta_dir = out_dataset_dir.join("meta");
         let out_blocks_dir = out_meta_dir.join("blocks");
         let out_refs_dir = out_meta_dir.join("refs");
@@ -104,12 +104,12 @@ impl RemoteClient for RemoteLocalFS {
 
     fn read(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRef,
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
     ) -> Result<RemoteReadResult, RemoteError> {
-        let in_dataset_dir = self.path.join(dataset_id);
+        let in_dataset_dir = self.path.join(dataset_ref.local_id());
         if !in_dataset_dir.exists() {
             return Err(RemoteError::DoesNotExist);
         }

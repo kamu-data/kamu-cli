@@ -26,7 +26,11 @@ pub trait TransformService: Send + Sync {
 #[derive(Debug)]
 pub enum TransformResult {
     UpToDate,
-    Updated { block_hash: Sha3_256 },
+    Updated {
+        old_head: Sha3_256,
+        new_head: Sha3_256,
+        num_blocks: usize,
+    },
 }
 
 ///////////////////////////////////////////////////////////////////////////////

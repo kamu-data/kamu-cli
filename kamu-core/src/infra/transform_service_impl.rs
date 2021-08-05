@@ -119,7 +119,9 @@ impl TransformServiceImpl {
         .map_err(|e| TransformError::internal(e))?;
 
         Ok(TransformResult::Updated {
-            block_hash: block_hash,
+            old_head: prev_hash.unwrap(),
+            new_head: block_hash,
+            num_blocks: 1,
         })
     }
 

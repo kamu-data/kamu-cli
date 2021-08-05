@@ -68,6 +68,24 @@ impl CompleteCommand {
         }
     }
 
+    fn complete_alias(&self, prefix: &str) {
+        if let Some(repo) = self.metadata_repo.as_ref() {
+            for dataset_id in repo.get_all_datasets() {
+                let aliases = repo.get_remote_aliases(&dataset_id).unwrap();
+                for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
+                    if alias.starts_with(prefix) {
+                        println!("{}", alias);
+                    }
+                }
+                for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
+                    if alias.starts_with(prefix) {
+                        println!("{}", alias);
+                    }
+                }
+            }
+        }
+    }
+
     fn complete_config_key(&self, prefix: &str) {
         for key in self.config_service.all_keys() {
             if key.starts_with(prefix) {
@@ -174,6 +192,7 @@ impl Command for CompleteCommand {
             match pos.1.b.name {
                 "dataset" => self.complete_dataset(to_complete),
                 "remote" => self.complete_remote(to_complete),
+                "alias" => self.complete_alias(to_complete),
                 "manifest" => self.complete_path(to_complete),
                 "cfgkey" => self.complete_config_key(to_complete),
                 _ => (),

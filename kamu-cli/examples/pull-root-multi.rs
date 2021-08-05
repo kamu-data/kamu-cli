@@ -11,11 +11,12 @@ fn main() {
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
+        Arc::new(OutputConfig::default()),
         ["a"].iter(),
         false,
         false,
         false,
-        &OutputConfig::default(),
+        None,
     );
     cmd.run().unwrap();
 }
@@ -31,9 +32,9 @@ pub struct TestPullService;
 
 impl TestPullService {
     fn ingest(
-        id: DatasetIDBuf,
+        id: DatasetRefBuf,
         l: Arc<Mutex<dyn IngestListener>>,
-    ) -> (DatasetIDBuf, Result<PullResult, PullError>) {
+    ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
         let sleep_rand = |min: u64, max: u64| {
             let d = (max - min) as f32;
@@ -75,9 +76,12 @@ impl TestPullService {
 
         sleep_rand(200, 1500);
 
-        let hash = rand_hash();
+        let old_head = rand_hash();
+        let new_head = rand_hash();
         let result = IngestResult::Updated {
-            block_hash: hash.to_owned(),
+            old_head,
+            new_head,
+            num_blocks: 1,
             has_more: false,
             uncacheable: false,
         };
@@ -86,30 +90,37 @@ impl TestPullService {
         (
             id,
             Ok(PullResult::Updated {
-                block_hash: hash.to_owned(),
+                old_head: Some(old_head),
+                new_head,
+                num_blocks: 1,
             }),
         )
     }
 
     fn transform(
-        id: DatasetIDBuf,
+        id: DatasetRefBuf,
         l: Arc<Mutex<dyn TransformListener>>,
-    ) -> (DatasetIDBuf, Result<PullResult, PullError>) {
+    ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
         let mut listener = l.lock().unwrap();
 
         listener.begin();
 
         std::thread::sleep(std::time::Duration::from_millis(2000));
 
-        let new_hash = rand_hash();
+        let old_head = rand_hash();
+        let new_head = rand_hash();
         listener.success(&TransformResult::Updated {
-            block_hash: new_hash.clone(),
+            new_head,
+            old_head,
+            num_blocks: 1,
         });
 
         (
             id,
             Ok(PullResult::Updated {
-                block_hash: new_hash,
+                old_head: Some(old_head),
+                new_head,
+                num_blocks: 1,
             }),
         )
     }
@@ -118,11 +129,12 @@ impl TestPullService {
 impl PullService for TestPullService {
     fn pull_multi(
         &self,
-        _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetID>,
+        _dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         _options: PullOptions,
         ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
         transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-    ) -> Vec<(DatasetIDBuf, Result<PullResult, PullError>)> {
+        _sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         let in_l = ingest_listener.unwrap();
         let tr_l = transform_listener.unwrap();
 
@@ -132,9 +144,9 @@ impl PullService for TestPullService {
             "gov.census.data",
         ]
         .iter()
-        .map(|s| DatasetIDBuf::try_from(*s).unwrap())
+        .map(|s| DatasetRefBuf::try_from(*s).unwrap())
         .map(|id| {
-            let listener = in_l.lock().unwrap().begin_ingest(&id).unwrap();
+            let listener = in_l.lock().unwrap().begin_ingest(id.local_id()).unwrap();
             std::thread::spawn(move || Self::ingest(id, listener))
         })
         .collect();
@@ -147,9 +159,9 @@ impl PullService for TestPullService {
         let transform_handles: Vec<_> =
             ["com.acme.census.normalized", "com.acme.census.geolocated"]
                 .iter()
-                .map(|s| DatasetIDBuf::try_from(*s).unwrap())
+                .map(|s| DatasetRefBuf::try_from(*s).unwrap())
                 .map(|id| {
-                    let listener = tr_l.lock().unwrap().begin_transform(&id).unwrap();
+                    let listener = tr_l.lock().unwrap().begin_transform(id.local_id()).unwrap();
                     std::thread::spawn(move || Self::transform(id, listener))
                 })
                 .collect();
@@ -157,6 +169,16 @@ impl PullService for TestPullService {
         let mut results = ingest_results;
         results.extend(transform_handles.into_iter().map(|h| h.join().unwrap()));
         results
+    }
+
+    fn pull_from(
+        &self,
+        _remote_ref: &DatasetRef,
+        _local_id: &DatasetID,
+        _options: PullOptions,
+        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<PullResult, PullError> {
+        unimplemented!()
     }
 
     fn set_watermark(

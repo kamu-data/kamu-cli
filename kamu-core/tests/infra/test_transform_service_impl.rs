@@ -66,10 +66,10 @@ fn append_data_block(metadata_repo: &MetadataRepositoryImpl, id: &DatasetID) -> 
 #[test]
 fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(&workspace_layout));
+    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         // TODO: Use a mock
