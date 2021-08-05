@@ -136,14 +136,14 @@ impl IngestTask {
 
         let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash)?;
 
-        let res = if commit_result.was_up_to_date {
+        let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
             IngestResult::UpToDate {
                 uncacheable: !cacheable,
             }
         } else {
             IngestResult::Updated {
                 old_head: prev_hash,
-                new_head: commit_result.checkpoint.last_hash,
+                new_head: commit_result.checkpoint.last_hash.unwrap(),
                 num_blocks: 1,
                 has_more: has_more,
                 uncacheable: !cacheable,
@@ -303,20 +303,38 @@ impl IngestTask {
                         ..read_result.checkpoint.last_block
                     };
 
-                    let hash = self.meta_chain.borrow_mut().append(new_block);
-                    info!(self.logger, "Committed new block"; "hash" => hash.to_string());
+                    // New block might not contain anything new, so we check for data
+                    // and watermark differences to see if commit should be skipped
+                    if new_block.output_slice.is_none() {
+                        let prev_watermark = self.meta_chain.borrow().iter_blocks().filter_map(|b| b.output_watermark).next();
+                        if new_block.output_watermark == prev_watermark {
+                            info!(self.logger, "Skipping commit of new block as it neither has new data or watermark");
+                            return Ok(ExecutionResult {
+                                was_up_to_date: false,  // The checkpoint is not up-to-date but dataset is
+                                checkpoint: CommitCheckpoint {
+                                    last_committed: Utc::now(),
+                                    for_read_at: read_result.checkpoint.last_read,
+                                    for_fetched_at: fetch_result.checkpoint.last_fetched,
+                                    last_hash: None,
+                                },
+                            })
+                        }
+                    }
+
+                    let new_head = self.meta_chain.borrow_mut().append(new_block);
+                    info!(self.logger, "Committed new block"; "new_head" => new_head.to_string());
 
                     // TODO: Data should be moved before writing block file
                     std::fs::rename(
                         &read_result.checkpoint.out_data_path,
-                        self.layout.data_dir.join(hash.to_string()),
+                        self.layout.data_dir.join(new_head.to_string()),
                     )
                     .map_err(|e| IngestError::internal(e))?;
 
                     // TODO: Checkpoint should be moved before writing block file
                     std::fs::rename(
                         &read_result.checkpoint.new_checkpoint_dir,
-                        self.layout.checkpoints_dir.join(hash.to_string()),
+                        self.layout.checkpoints_dir.join(new_head.to_string()),
                     )
                     .map_err(|e| IngestError::internal(e))?;
 
@@ -326,7 +344,7 @@ impl IngestTask {
                             last_committed: Utc::now(),
                             for_read_at: read_result.checkpoint.last_read,
                             for_fetched_at: fetch_result.checkpoint.last_fetched,
-                            last_hash: hash,
+                            last_hash: Some(new_head),
                         },
                     })
                 },
@@ -359,5 +377,5 @@ pub struct CommitCheckpoint {
     pub for_read_at: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_fetched_at: DateTime<Utc>,
-    pub last_hash: Sha3_256,
+    pub last_hash: Option<Sha3_256>,
 }

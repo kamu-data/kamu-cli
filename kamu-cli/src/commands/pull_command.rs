@@ -666,7 +666,7 @@ impl SyncListener for PrettySyncProgress {
                 ref new_head,
                 num_blocks,
             } => console::style(format!(
-                "Updated to {} ({} new blocks)",
+                "Updated to {} ({} block(s))",
                 new_head.short(),
                 num_blocks
             ))
