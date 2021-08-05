@@ -299,7 +299,7 @@ impl SyncListener for PrettySyncProgress {
                 ref new_head,
                 num_blocks,
             } => console::style(format!(
-                "Updated remote to {} ({} blocks pushed)",
+                "Updated remote to {} ({} block(s))",
                 new_head.short(),
                 num_blocks
             ))
