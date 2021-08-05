@@ -5,7 +5,7 @@
 - [Pulling Data](#pulling-data)
 - [Pushing Data](#pushing-data)
 
-While `kamu` is a very powerful tool for managing and processing data on your own computer the real power of it becomes apparent when you start exchanging data with other people. Thanks to its core properties it makes sharing data reliable and safe both within your organization and between multiple completely independent parties.
+While `kamu` is a very powerful tool for managing and processing data on your own computer, the real power of it becomes apparent only when you start exchanging data with other people. Thanks to its core properties it makes sharing data reliable and safe both within your organization and between multiple completely independent parties.
 
 
 ## Remote Types
@@ -34,19 +34,35 @@ This remote will now be visible in `kamu remote list`.
 If the remote you added already contains a dataset you're interested in you can download it using the `pull` command:
 
 ```bash
-kamu pull com.acme.shipments --remote acme
+# Pulls `acme/com.acme.shipments` into local dataset `com.acme.shipments`
+kamu pull acme/com.acme.shipments
+
+# Or pull `acme/com.acme.shipments` into local dataset named `shipments`
+kamu pull acme/com.acme.shipments --as shipments
 ```
 
-This command will download all contents of the dataset to your computer and validate the integrity of metadata.
-
-> Note: Currently the `pull` command with `--remote` flag does not create association between the downloaded dataset and the remote it came from, so executing `kamu pull com.acme.shipments` will make `kamu` attempt to perform ingest or derivative transformation (depending on the type of the dataset) instead of refreshing data from the remote. Bear with us while we improve the remotes API and continue to specify the `--remote` option for now.
-
-
-## Pushing Data
-If you have created a brand new dataset you would like to share or made some changes to a dataset you are sharing with your friends - you can upload the new data using the `push` command:
+These commands will associate the local dataset with remote, so next time you pull you can simply do:
 
 ```bash
-kamu push com.acme.orders --remote acme
+# Will pull from associated `acme/com.acme.shipments`
+kamu pull shipments
 ```
 
-This command will analyze the state of the dataset at the remote and will only upload data and metadata that wasn't previously seen.
+These associations are called "remote aliases" and can be viewed using:
+
+```bash
+kamu remote alias list
+```
+
+## Pushing Data
+If you have created a brand new dataset you would like to share, or made some changes to a dataset you are sharing with your friends - you can upload the new data using the `push` command:
+
+```bash
+# Push local dataset `orders` to remote `acme/com.acme.orders`
+kamu push orders --as acme/com.acme.orders
+
+# This creates push alias, so next time you can push as simply as
+kamu push orders
+```
+
+This command will analyze the state of the dataset at the remote and will only upload data and metadata that wasn't previously seen. It also detects any type of history collisions, so you will never overwrite someone else's changes.
