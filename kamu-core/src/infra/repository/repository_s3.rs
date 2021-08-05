@@ -12,14 +12,14 @@ use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-pub struct RemoteS3 {
+pub struct RepositoryS3 {
     s3: S3Client,
     bucket: String,
     runtime: RefCell<tokio::runtime::Runtime>,
     logger: Logger,
 }
 
-impl RemoteS3 {
+impl RepositoryS3 {
     pub fn new(endpoint: Option<String>, bucket: String, logger: Logger) -> Self {
         let region = match endpoint {
             None => Region::default(),
@@ -39,14 +39,14 @@ impl RemoteS3 {
     async fn read_ref_async(
         &self,
         dataset_ref: &DatasetRef,
-    ) -> Result<Option<Sha3_256>, RemoteError> {
+    ) -> Result<Option<Sha3_256>, RepositoryError> {
         if let Some(body) = self
             .read_object_buf(format!("{}/meta/refs/head", dataset_ref.local_id()))
             .await?
         {
             Ok(Some(
                 Sha3_256::from_str(std::str::from_utf8(&body).unwrap())
-                    .map_err(|e| RemoteError::protocol(e.into()))?,
+                    .map_err(|e| RepositoryError::protocol(e.into()))?,
             ))
         } else {
             Ok(None)
@@ -62,9 +62,9 @@ impl RemoteS3 {
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         if self.read_ref_async(dataset_ref).await? != expected_head {
-            return Err(RemoteError::UpdatedConcurrently);
+            return Err(RepositoryError::UpdatedConcurrently);
         }
 
         for data_file in data_files {
@@ -124,15 +124,15 @@ impl RemoteS3 {
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
-    ) -> Result<RemoteReadResult, RemoteError> {
-        let mut result = RemoteReadResult {
+    ) -> Result<RepositoryReadResult, RepositoryError> {
+        let mut result = RepositoryReadResult {
             blocks: Vec::new(),
             data_files: Vec::new(),
             checkpoint_dir: tmp_dir.join("checkpoint"),
         };
 
         if self.read_ref_async(dataset_ref).await? != Some(expected_head) {
-            return Err(RemoteError::UpdatedConcurrently);
+            return Err(RepositoryError::UpdatedConcurrently);
         }
 
         // Sync blocks
@@ -146,7 +146,7 @@ impl RemoteS3 {
                 ))
                 .await?
                 .ok_or_else(|| {
-                    RemoteError::corrupted(
+                    RepositoryError::corrupted(
                         format!("Block {} is missing", current_hash.unwrap()),
                         None,
                     )
@@ -156,7 +156,7 @@ impl RemoteS3 {
             let block = YamlMetadataBlockDeserializer
                 .read_manifest(&buf)
                 .map_err(|e| {
-                    RemoteError::corrupted(
+                    RepositoryError::corrupted(
                         "Cannot deserialize metadata block".to_owned(),
                         Some(e.into()),
                     )
@@ -167,7 +167,7 @@ impl RemoteS3 {
         }
 
         if current_hash != last_seen_block {
-            return Err(RemoteError::Diverged {
+            return Err(RepositoryError::Diverged {
                 remote_head: expected_head,
                 local_head: last_seen_block.unwrap(),
             });
@@ -191,7 +191,7 @@ impl RemoteS3 {
         Ok(result)
     }
 
-    async fn read_object_buf(&self, key: String) -> Result<Option<Vec<u8>>, RemoteError> {
+    async fn read_object_buf(&self, key: String) -> Result<Option<Vec<u8>>, RepositoryError> {
         info!(
             self.logger,
             "Reading object";
@@ -220,7 +220,7 @@ impl RemoteS3 {
         Ok(Some(body))
     }
 
-    async fn read_object_to_file(&self, key: String, path: &Path) -> Result<(), RemoteError> {
+    async fn read_object_to_file(&self, key: String, path: &Path) -> Result<(), RepositoryError> {
         info!(
             self.logger,
             "Reading object to file";
@@ -251,7 +251,7 @@ impl RemoteS3 {
         &self,
         key_prefix: String,
         out_dir: &Path,
-    ) -> Result<Vec<PathBuf>, RemoteError> {
+    ) -> Result<Vec<PathBuf>, RepositoryError> {
         info!(
             self.logger,
             "Reading objects into directory";
@@ -287,7 +287,7 @@ impl RemoteS3 {
         Ok(files)
     }
 
-    async fn delete_objects(&self, key_prefix: String) -> Result<(), RemoteError> {
+    async fn delete_objects(&self, key_prefix: String) -> Result<(), RepositoryError> {
         info!(
             self.logger,
             "Deleting objects";
@@ -335,7 +335,7 @@ impl RemoteS3 {
         key: String,
         file_path: &Path,
         if_exists: IfExists,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         info!(
             self.logger,
             "Uploading object from file";
@@ -356,7 +356,7 @@ impl RemoteS3 {
                 return if if_exists == IfExists::Skip {
                     Ok(())
                 } else {
-                    Err(RemoteError::corrupted(
+                    Err(RepositoryError::corrupted(
                         format!("Key {} already exists", key),
                         None,
                     ))
@@ -387,7 +387,7 @@ impl RemoteS3 {
         key: String,
         buf: Vec<u8>,
         if_exists: IfExists,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         info!(
             self.logger,
             "Uploading object data";
@@ -407,7 +407,7 @@ impl RemoteS3 {
                 return if if_exists == IfExists::Skip {
                     Ok(())
                 } else {
-                    Err(RemoteError::corrupted(
+                    Err(RepositoryError::corrupted(
                         format!("Key {} already exists", key),
                         None,
                     ))
@@ -434,7 +434,7 @@ impl RemoteS3 {
         dir: &Path,
         key_prefix: String,
         if_exists: IfExists,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         info!(
             self.logger,
             "Uploading objects from directory";
@@ -456,7 +456,7 @@ impl RemoteS3 {
         Ok(())
     }
 
-    async fn check_object_exists(&self, key: String) -> Result<bool, RemoteError> {
+    async fn check_object_exists(&self, key: String) -> Result<bool, RepositoryError> {
         match self
             .s3
             .head_object(HeadObjectRequest {
@@ -477,8 +477,8 @@ impl RemoteS3 {
     }
 }
 
-impl RemoteClient for RemoteS3 {
-    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError> {
+impl RepositoryClient for RepositoryS3 {
+    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RepositoryError> {
         self.runtime
             .borrow_mut()
             .block_on(self.read_ref_async(dataset_ref))
@@ -493,7 +493,7 @@ impl RemoteClient for RemoteS3 {
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         self.runtime.borrow_mut().block_on(self.write_async(
             dataset_ref,
             expected_head,
@@ -510,7 +510,7 @@ impl RemoteClient for RemoteS3 {
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
-    ) -> Result<RemoteReadResult, RemoteError> {
+    ) -> Result<RepositoryReadResult, RepositoryError> {
         self.runtime.borrow_mut().block_on(self.read_async(
             dataset_ref,
             expected_head,
@@ -527,11 +527,11 @@ enum IfExists {
     Fail,
 }
 
-impl<E: 'static + std::error::Error + Send + Sync> From<RusotoError<E>> for RemoteError {
+impl<E: 'static + std::error::Error + Send + Sync> From<RusotoError<E>> for RepositoryError {
     fn from(e: RusotoError<E>) -> Self {
         match e {
-            RusotoError::Credentials(_) => RemoteError::credentials(Box::new(e)),
-            _ => RemoteError::protocol(Box::new(e)),
+            RusotoError::Credentials(_) => RepositoryError::credentials(Box::new(e)),
+            _ => RepositoryError::protocol(Box::new(e)),
         }
     }
 }

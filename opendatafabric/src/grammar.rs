@@ -68,7 +68,7 @@ impl DatasetIDGrammar {
         Self::match_subdomain(s)
     }
 
-    pub fn match_remote_id(s: &str) -> Option<(&str, &str)> {
+    pub fn match_repository(s: &str) -> Option<(&str, &str)> {
         Self::match_hostname(s)
     }
 
@@ -79,13 +79,13 @@ impl DatasetIDGrammar {
         match seps {
             0 => Self::match_dataset_id(s),
             1 => {
-                let (rh, rt) = Self::match_remote_id(s)?;
+                let (rh, rt) = Self::match_repository(s)?;
                 let (_, st) = Self::match_char(rt, '/')?;
                 let (ih, it) = Self::match_dataset_id(st)?;
                 Some((&s[0..rh.len() + 1 + ih.len()], it))
             }
             2 => {
-                let (rh, rt) = Self::match_remote_id(s)?;
+                let (rh, rt) = Self::match_repository(s)?;
                 let (_, s1t) = Self::match_char(rt, '/')?;
                 let (uh, ut) = Self::match_username(s1t)?;
                 let (_, s2t) = Self::match_char(ut, '/')?;

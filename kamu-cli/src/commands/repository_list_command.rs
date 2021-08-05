@@ -1,16 +1,16 @@
 use super::{Command, Error};
 use crate::output::*;
 use kamu::domain::*;
-use opendatafabric::RemoteIDBuf;
+use opendatafabric::RepositoryBuf;
 
 use std::sync::Arc;
 
-pub struct RemoteListCommand {
+pub struct RepositoryListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     output_config: Arc<OutputConfig>,
 }
 
-impl RemoteListCommand {
+impl RepositoryListCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         output_config: Arc<OutputConfig>,
@@ -25,15 +25,15 @@ impl RemoteListCommand {
     fn print_machine_readable(&self) -> Result<(), Error> {
         use std::io::Write;
 
-        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.get_all_remotes().collect();
-        remotes.sort();
+        let mut repos: Vec<_> = self.metadata_repo.get_all_repositories().collect();
+        repos.sort();
 
         let mut out = std::io::stdout();
         write!(out, "ID,URL\n")?;
 
-        for id in remotes {
-            let remote = self.metadata_repo.get_remote(&id)?;
-            write!(out, "{},\"{}\"\n", id, remote.url)?;
+        for id in repos {
+            let repo = self.metadata_repo.get_repository(&id)?;
+            write!(out, "{},\"{}\"\n", id, repo.url)?;
         }
         Ok(())
     }
@@ -41,24 +41,24 @@ impl RemoteListCommand {
     fn print_pretty(&self) -> Result<(), Error> {
         use prettytable::*;
 
-        let mut remotes: Vec<RemoteIDBuf> = self.metadata_repo.get_all_remotes().collect();
-        remotes.sort();
+        let mut repos: Vec<RepositoryBuf> = self.metadata_repo.get_all_repositories().collect();
+        repos.sort();
 
         let mut table = Table::new();
         table.set_format(self.get_table_format());
 
         table.set_titles(row![bc->"ID", bc->"URL"]);
 
-        for id in remotes.iter() {
-            let remote = self.metadata_repo.get_remote(&id)?;
+        for id in repos.iter() {
+            let repo = self.metadata_repo.get_repository(&id)?;
             table.add_row(Row::new(vec![
                 Cell::new(&id),
-                Cell::new(&remote.url.to_string()),
+                Cell::new(&repo.url.to_string()),
             ]));
         }
 
         // Header doesn't render when there are no data rows in the table
-        if remotes.is_empty() {
+        if repos.is_empty() {
             table.add_row(Row::new(vec![Cell::new(""), Cell::new("")]));
         }
 
@@ -86,7 +86,7 @@ impl RemoteListCommand {
     }
 }
 
-impl Command for RemoteListCommand {
+impl Command for RepositoryListCommand {
     fn run(&mut self) -> Result<(), Error> {
         // TODO: replace with formatters
         match self.output_config.format {

@@ -30,7 +30,7 @@ curl-sys = "*"
 zip = "*"
 ringbuf = "*"
 
-# Remotes
+# Repositories
 bytes = "*"
 futures = "*"
 tokio = { version = "*", features=["fs"]}

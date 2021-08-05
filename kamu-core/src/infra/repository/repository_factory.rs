@@ -1,7 +1,7 @@
 use crate::domain::*;
 
-use super::remote_local_fs::*;
-use super::remote_s3::*;
+use super::repository_local_fs::*;
+use super::repository_s3::*;
 
 use dill::*;
 use slog::{info, o, Logger};
@@ -10,32 +10,35 @@ use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use url::Url;
 
-pub struct RemoteFactory {
+pub struct RepositoryFactory {
     logger: Logger,
 }
 
 #[component(pub)]
-impl RemoteFactory {
+impl RepositoryFactory {
     pub fn new(logger: Logger) -> Self {
         Self { logger: logger }
     }
 
-    pub fn get_remote_client(
+    pub fn get_repository_client(
         &self,
-        remote: &Remote,
-    ) -> Result<Arc<Mutex<dyn RemoteClient>>, RemoteFactoryError> {
-        match remote.url.scheme() {
-            "file" => Ok(Arc::new(Mutex::new(RemoteLocalFS::new(
-                remote.url.to_file_path().unwrap(),
+        repo: &Repository,
+    ) -> Result<Arc<Mutex<dyn RepositoryClient>>, RepositoryFactoryError> {
+        match repo.url.scheme() {
+            "file" => Ok(Arc::new(Mutex::new(RepositoryLocalFS::new(
+                repo.url.to_file_path().unwrap(),
             )))),
-            "s3" => self.get_s3_client(&remote.url),
-            "s3+http" => self.get_s3_client(&remote.url),
-            "s3+https" => self.get_s3_client(&remote.url),
-            s @ _ => Err(RemoteFactoryError::unsupported_protocol(s)),
+            "s3" => self.get_s3_client(&repo.url),
+            "s3+http" => self.get_s3_client(&repo.url),
+            "s3+https" => self.get_s3_client(&repo.url),
+            s @ _ => Err(RepositoryFactoryError::unsupported_protocol(s)),
         }
     }
 
-    fn get_s3_client(&self, url: &Url) -> Result<Arc<Mutex<dyn RemoteClient>>, RemoteFactoryError> {
+    fn get_s3_client(
+        &self,
+        url: &Url,
+    ) -> Result<Arc<Mutex<dyn RepositoryClient>>, RepositoryFactoryError> {
         // TODO: Support virtual hosted style URLs once rusoto supports them
         // See: https://github.com/rusoto/rusoto/issues/1482
         let (endpoint, bucket): (Option<String>, String) =
@@ -53,22 +56,22 @@ impl RemoteFactory {
                 ("s3+https", Some(host), Some(port), path) => {
                     (Some(format!("https://{}:{}", host, port)), path.to_owned())
                 }
-                _ => return Err(RemoteFactoryError::invalid_url(url.as_str())),
+                _ => return Err(RepositoryFactoryError::invalid_url(url.as_str())),
             };
 
         let bucket = bucket.trim_start_matches("/").to_owned();
         info!(self.logger, "Creating S3 client"; "endpoint" => &endpoint, "bucket" => &bucket);
-        Ok(Arc::new(Mutex::new(RemoteS3::new(
+        Ok(Arc::new(Mutex::new(RepositoryS3::new(
             endpoint,
             bucket,
-            self.logger.new(o!("remote" => "s3")),
+            self.logger.new(o!("repo" => "s3")),
         ))))
     }
 }
 
 #[derive(Debug, Error)]
-pub enum RemoteFactoryError {
-    #[error("No suitable remote implementation found for scheme \"{scheme}\"")]
+pub enum RepositoryFactoryError {
+    #[error("No suitable repository implementation found for scheme \"{scheme}\"")]
     UnsupportedProtocol {
         scheme: String,
         backtrace: Backtrace,
@@ -77,16 +80,16 @@ pub enum RemoteFactoryError {
     InvalidURL { url: String, backtrace: Backtrace },
 }
 
-impl RemoteFactoryError {
+impl RepositoryFactoryError {
     pub fn unsupported_protocol(scheme: &str) -> Self {
-        RemoteFactoryError::UnsupportedProtocol {
+        RepositoryFactoryError::UnsupportedProtocol {
             scheme: scheme.to_owned(),
             backtrace: Backtrace::capture(),
         }
     }
 
     pub fn invalid_url(url: &str) -> Self {
-        RemoteFactoryError::InvalidURL {
+        RepositoryFactoryError::InvalidURL {
             url: url.to_owned(),
             backtrace: Backtrace::capture(),
         }

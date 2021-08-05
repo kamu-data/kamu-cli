@@ -25,7 +25,7 @@ When you execute `kamu` or `kamu -h` - the help message about all top-level comm
 
 To get help on individual commands type `kamu <command> -h` - this will usually contain a detailed description of what command does along with usage examples.
 
-Note that some command also have sub-commands, e.g. `kamu remote {add,list,...}`, same help pattern applies to those as well, e.g. `kamu remote add -h`.
+Note that some command also have sub-commands, e.g. `kamu repo {add,list,...}`, same help pattern applies to those as well, e.g. `kamu repo add -h`.
 
 ## Getting data in
 

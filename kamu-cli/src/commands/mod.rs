@@ -53,14 +53,14 @@ pub use pull_images_command::*;
 mod push_command;
 pub use push_command::*;
 
-mod remote_add_command;
-pub use remote_add_command::*;
+mod repository_add_command;
+pub use repository_add_command::*;
 
-mod remote_delete_command;
-pub use remote_delete_command::*;
+mod repository_delete_command;
+pub use repository_delete_command::*;
 
-mod remote_list_command;
-pub use remote_list_command::*;
+mod repository_list_command;
+pub use repository_list_command::*;
 
 mod set_watermark_command;
 pub use set_watermark_command::*;

@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
-use opendatafabric::{DatasetID, DatasetRef, RemoteID};
+use opendatafabric::{DatasetID, DatasetRef, RepositoryID};
 
 fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     app.args(&[
@@ -126,7 +126,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                         kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.bankofcanada.exchange-rates.daily.yaml
 
-                    To add dataset from a remote see `kamu pull` command.
+                    To add dataset from a repository see `kamu pull` command.
                     "
                 )),
             SubCommand::with_name("complete")
@@ -264,7 +264,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     r"
                     This command deletes the dataset from your workspace, including both metadata and the raw data.
 
-                    Take great care when deleting root datasets. If you have not pushed your local changes to a remote - the data will be lost forever.
+                    Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
 
                     Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed.
                     "
@@ -287,7 +287,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     It is recommended to create one kamu workspace per data science project, grouping all related datasets together.
 
                     Initializing a workspace creates two directories:
-                        .kamu - contains dataset metadata as well as all supporting files (configs, known remotes etc.)
+                        .kamu - contains dataset metadata as well as all supporting files (configs, known repositories etc.)
                         .kamu.local - a local data volume where all raw data is stored
                     "
                 )),
@@ -410,7 +410,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .takes_value(true)
                         .validator(validate_dataset_id)
                         .value_name("ID")
-                        .help("Local name of a dataset to use when syncing from remote"),
+                        .help("Local name of a dataset to use when syncing from a repository"),
                     Arg::with_name("set-watermark")
                         .long("set-watermark")
                         .takes_value(true)
@@ -420,7 +420,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Pull is a generic command that lets you refresh data in any existing dataset or add a new dataset from the remote repository. It will act differently depending on the type of dataset it works with. In case of a root dataset it implies ingesting data from an external source. In case of a derivative - processing previously unseen data of its dependencies.
+                    Pull is a generic command that lets you refresh data in any existing dataset or add new dataset from a repository. It will act differently depending on the type of dataset it works with. In case of a root dataset it implies ingesting data from an external source. In case of a derivative - processing previously unseen data of its dependencies.
 
                     ### Examples ###
 
@@ -436,11 +436,11 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
 
                         kamu pull --all
 
-                    Fetch dataset from a remote:
+                    Fetch dataset from a repository:
 
                         kamu pull kamu.dev/foobar/org.example.data
                     
-                    Fetch dataset from a remote using a different local name:
+                    Fetch dataset from a repository using a different local name:
 
                         kamu pull kamu.dev/foobar/org.example.data --as my.data
 
@@ -450,7 +450,7 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     "
                 )),
             SubCommand::with_name("push")
-                .about("Push local data into the remote repository")
+                .about("Push local data into a repository")
                 .args(&[
                     Arg::with_name("all")
                         .short("a")
@@ -474,17 +474,17 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the remote and will only upload data and metadata that wasn't previously seen.
+                    Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen.
 
                     Similarly to git, if someone else modified the dataset concurrently with you - your push will be rejected and you will have to resolve the conflict.
 
                     ### Examples ###
 
-                    Push dataset and associate it with a remote:
+                    Push dataset to a repository and create an association between the two:
 
                         kamu push org.example.data --as kamu.dev/me/org.example.data
 
-                    Push dataset previously associated with a remote:
+                    Push dataset previously associated with a repository:
 
                         kamu push org.example.data
                     "
@@ -510,24 +510,24 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     r"
                     Resetting a dataset to the specified block erases all metadata blocks that followed it and deletes all data added since that point. This can sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
-                    Keep in mind that blocks that were already pushed to a remote could've been already observed by other people, so resetting the history will not let you take that data back.
+                    Keep in mind that blocks that were already pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back.
                     "
                 )),
-            SubCommand::with_name("remote")
+            SubCommand::with_name("repo")
                 .about("Manage set of tracked repositories")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommands(vec![
                     tabular_output_params(SubCommand::with_name("list")
-                        .about("Lists known remote repositories")
+                        .about("Lists known repositories")
                     ),
                     SubCommand::with_name("add")
-                        .about("Adds a remote repository")
+                        .about("Adds a repository")
                         .after_help(indoc::indoc!(r"
-                            For Local Filesystem basic remote use following URL formats:
-                                file:///home/me/example/remote
-                                file:///c:/Users/me/example/remote
+                            For Local Filesystem basic repository use following URL formats:
+                                file:///home/me/example/repository
+                                file:///c:/Users/me/example/repository
 
-                            For S3-compatible basic remote use following URL formats:
+                            For S3-compatible basic repository use following URL formats:
                                 s3://bucket.my-company.example
                                 s3+http://my-minio-server:9000/bucket
                                 s3+https://my-minio-server:9000/bucket
@@ -536,32 +536,32 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                             Arg::with_name("name")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_remote_id)
-                                .help("Local alias of the remote repository"),
+                                .validator(validate_repository_id)
+                                .help("Local alias of the repository"),
                             Arg::with_name("url")
                                 .required(true)
                                 .index(2)
-                                .help("URL of the remote repository"),
+                                .help("URL of the repository"),
                         ]),
                     SubCommand::with_name("delete")
-                        .about("Deletes a reference to remote repository")
+                        .about("Deletes a reference to repository")
                         .args(&[
                             Arg::with_name("all")
                                 .short("a")
                                 .long("all")
-                                .help("Delete all known remotes"),
-                            Arg::with_name("remote")
+                                .help("Delete all known repository"),
+                            Arg::with_name("repository")
                                 .multiple(true)
                                 .index(1)
-                                .validator(validate_remote_id)
-                                .help("Remote name(s)"),
+                                .validator(validate_repository_id)
+                                .help("Repository name(s)"),
                             Arg::with_name("yes")
                                 .short("y")
                                 .long("yes")
                                 .help("Don't ask for confirmation"),
                         ]),
                     tabular_output_params(SubCommand::with_name("list")
-                        .about("Lists known remote repositories")
+                        .about("Lists known repositories")
                     ),
                     SubCommand::with_name("alias")
                         .about("Manage set of remote aliases associated with datasets")
@@ -622,37 +622,37 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         ])
                         .after_help(indoc::indoc!(
                             r"
-                            When you pull and push datasets from remote repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple remotes) you can use this command to manage the aliases.
+                            When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
 
                             ### Examples ###
 
                             List all aliases:
 
-                                kamu remote alias list
+                                kamu repo alias list
 
                             List all aliases of a specific dataset:
 
-                                kamu remote alias list org.example.data
+                                kamu repo alias list org.example.data
 
                             Add a new pull alias:
 
-                                kamu remote alias add --pull org.example.data kamu.dev/me/org.example.data
+                                kamu repo alias add --pull org.example.data kamu.dev/me/org.example.data
                             "
                         )),
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Remotes are nodes on the network that let users exchange datasets. In the most basic form, a remote can simply be a location where the dataset files are hosted over one of the supported file or object-based data transfer protocols. The owner of a dataset will have push privileges to this location, while other participants can pull data from it.
+                    Repositories are nodes on the network that let users exchange datasets. In the most basic form, a repository can simply be a location where the dataset files are hosted over one of the supported file or object-based data transfer protocols. The owner of a dataset will have push privileges to this location, while other participants can pull data from it.
 
                     ### Examples ###
 
-                    Add S3 bucket as a remote:
+                    Show available repositories:
 
-                        kamu remote add example-remote s3://bucket.my-company.example
+                        kamu repo list
 
-                    Show available remotes:
+                    Add S3 bucket as a repository:
 
-                        kamu remote list
+                        kamu repo add example-repo s3://bucket.my-company.example
                     "
                 )),
             tabular_output_params(SubCommand::with_name("sql")
@@ -737,16 +737,16 @@ fn validate_dataset_ref(s: String) -> Result<(), String> {
     match DatasetRef::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "DatasetRef should be in form: `dataset.id` or `remote.hostname.dataset.id` or `remote.hostname/username/dataset.id`",
+            "DatasetRef should be in form: `dataset.id` or `repository/dataset.id` or `repository/username/dataset.id`",
         )),
     }
 }
 
-fn validate_remote_id(s: String) -> Result<(), String> {
-    match RemoteID::try_from(&s) {
+fn validate_repository_id(s: String) -> Result<(), String> {
+    match RepositoryID::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "RemoteID can only contain alphanumerics, dashes, and dots",
+            "repositoryID can only contain alphanumerics, dashes, and dots",
         )),
     }
 }

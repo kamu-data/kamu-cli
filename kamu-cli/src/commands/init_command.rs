@@ -26,7 +26,7 @@ impl Command for InitCommand {
         }
 
         fs::create_dir_all(&self.workspace_layout.datasets_dir)?;
-        fs::create_dir_all(&self.workspace_layout.remotes_dir)?;
+        fs::create_dir_all(&self.workspace_layout.repos_dir)?;
         fs::create_dir_all(&self.workspace_layout.run_info_dir)?;
         fs::create_dir_all(&self.workspace_layout.local_volume_dir)?;
 

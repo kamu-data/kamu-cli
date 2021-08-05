@@ -229,7 +229,11 @@ newtype_str!(Username, UsernameBuf, DatasetIDGrammar::match_username);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(RemoteID, RemoteIDBuf, DatasetIDGrammar::match_remote_id);
+newtype_str!(
+    RepositoryID,
+    RepositoryBuf,
+    DatasetIDGrammar::match_repository
+);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -255,23 +259,23 @@ impl DatasetRef {
     pub fn username(&self) -> Option<&Username> {
         let mut split = self.0.rsplit('/');
         split.next();
-        let uname_or_remote = split.next();
-        let maybe_remote = split.next();
-        if maybe_remote.is_some() {
-            uname_or_remote.map(|s| Username::new_unchecked(s))
+        let uname_or_repo = split.next();
+        let maybe_repo = split.next();
+        if maybe_repo.is_some() {
+            uname_or_repo.map(|s| Username::new_unchecked(s))
         } else {
             None
         }
     }
 
-    pub fn remote_id(&self) -> Option<&RemoteID> {
+    pub fn repository(&self) -> Option<&RepositoryID> {
         let mut split = self.0.rsplit('/');
         split.next();
-        let uname_or_remote = split.next();
-        if let Some(remote) = split.next() {
-            Some(RemoteID::new_unchecked(remote))
+        let uname_or_repo = split.next();
+        if let Some(repo) = split.next() {
+            Some(RepositoryID::new_unchecked(repo))
         } else {
-            uname_or_remote.map(|s| RemoteID::new_unchecked(s))
+            uname_or_repo.map(|s| RepositoryID::new_unchecked(s))
         }
     }
 
@@ -288,12 +292,12 @@ impl DatasetRef {
 
 impl DatasetRefBuf {
     pub fn new(
-        remote_id: Option<&RemoteID>,
+        repo: Option<&RepositoryID>,
         username: Option<&Username>,
         local_id: &DatasetID,
     ) -> Self {
         let mut s = String::new();
-        if let Some(r) = remote_id {
+        if let Some(r) = repo {
             s.push_str(r);
             s.push('/');
         }

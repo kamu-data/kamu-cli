@@ -5,18 +5,18 @@ use opendatafabric::{DatasetRef, Sha3_256};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-pub struct RemoteLocalFS {
+pub struct RepositoryLocalFS {
     path: PathBuf,
 }
 
-impl RemoteLocalFS {
+impl RepositoryLocalFS {
     pub fn new(path: PathBuf) -> Self {
         Self { path: path }
     }
 }
 
-impl RemoteClient for RemoteLocalFS {
-    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError> {
+impl RepositoryClient for RepositoryLocalFS {
+    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RepositoryError> {
         let ref_path: PathBuf = [
             self.path.as_ref() as &OsStr,
             OsStr::new(dataset_ref.local_id() as &str),
@@ -27,8 +27,8 @@ impl RemoteClient for RemoteLocalFS {
         .iter()
         .collect();
         if ref_path.exists() {
-            let hash =
-                std::fs::read_to_string(&ref_path).map_err(|e| RemoteError::protocol(e.into()))?;
+            let hash = std::fs::read_to_string(&ref_path)
+                .map_err(|e| RepositoryError::protocol(e.into()))?;
             Ok(Some(Sha3_256::from_str(&hash).expect("Malformed hash")))
         } else {
             Ok(None)
@@ -44,9 +44,9 @@ impl RemoteClient for RemoteLocalFS {
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
-    ) -> Result<(), RemoteError> {
+    ) -> Result<(), RepositoryError> {
         if self.read_ref(dataset_ref)? != expected_head {
-            return Err(RemoteError::UpdatedConcurrently);
+            return Err(RepositoryError::UpdatedConcurrently);
         }
 
         let out_dataset_dir = self.path.join(dataset_ref.local_id());
@@ -94,7 +94,7 @@ impl RemoteClient for RemoteLocalFS {
             )
             .map_err(|e| match e.kind {
                 fs_extra::error::ErrorKind::Io(io_error) => io_error.into(),
-                _ => RemoteError::protocol(e.into()),
+                _ => RepositoryError::protocol(e.into()),
             })?;
         }
 
@@ -108,20 +108,20 @@ impl RemoteClient for RemoteLocalFS {
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
-    ) -> Result<RemoteReadResult, RemoteError> {
+    ) -> Result<RepositoryReadResult, RepositoryError> {
         let in_dataset_dir = self.path.join(dataset_ref.local_id());
         if !in_dataset_dir.exists() {
-            return Err(RemoteError::DoesNotExist);
+            return Err(RepositoryError::DoesNotExist);
         }
 
         let in_meta_dir = in_dataset_dir.join("meta");
         let chain = MetadataChainImpl::new(&in_meta_dir);
 
         if chain.read_ref(&BlockRef::Head) != Some(expected_head) {
-            return Err(RemoteError::UpdatedConcurrently);
+            return Err(RepositoryError::UpdatedConcurrently);
         }
 
-        let mut result = RemoteReadResult {
+        let mut result = RepositoryReadResult {
             blocks: Vec::new(),
             data_files: Vec::new(),
             checkpoint_dir: tmp_dir.join("checkpoint"),
@@ -148,7 +148,7 @@ impl RemoteClient for RemoteLocalFS {
         }
 
         if !found_last_seen_block && last_seen_block.is_some() {
-            return Err(RemoteError::Diverged {
+            return Err(RepositoryError::Diverged {
                 remote_head: expected_head,
                 local_head: last_seen_block.unwrap(),
             });
@@ -175,7 +175,7 @@ impl RemoteClient for RemoteLocalFS {
             )
             .map_err(|e| match e.kind {
                 fs_extra::error::ErrorKind::Io(io_error) => io_error.into(),
-                _ => RemoteError::protocol(e.into()),
+                _ => RepositoryError::protocol(e.into()),
             })?;
         }
 

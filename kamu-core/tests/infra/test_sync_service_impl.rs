@@ -86,7 +86,7 @@ fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
     path
 }
 
-fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
+fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_id = DatasetID::new_unchecked("foo");
     let dataset_id_2 = DatasetID::new_unchecked("bar");
@@ -96,19 +96,19 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let remote_factory = Arc::new(RemoteFactory::new(logger.clone()));
+    let repository_factory = Arc::new(RepositoryFactory::new(logger.clone()));
 
     let sync_svc = SyncServiceImpl::new(
         &workspace_layout,
         metadata_repo.clone(),
-        remote_factory.clone(),
+        repository_factory.clone(),
         logger.clone(),
     );
 
-    // Add remote
-    let remote_id = RemoteID::new_unchecked("remote");
-    let remote_dataset_ref = DatasetRefBuf::new(Some(remote_id), None, dataset_id);
-    metadata_repo.add_remote(&remote_id, remote_url).unwrap();
+    // Add repository
+    let repo_id = RepositoryID::new_unchecked("remote");
+    let remote_dataset_ref = DatasetRefBuf::new(Some(repo_id), None, dataset_id);
+    metadata_repo.add_repository(&repo_id, repo_url).unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
@@ -285,10 +285,10 @@ fn do_test_sync(tmp_workspace_dir: &Path, remote_url: Url) {
 #[test]
 fn test_sync_to_from_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
-    let tmp_remote_dir = tempfile::tempdir().unwrap();
-    let remote_url = Url::from_directory_path(tmp_remote_dir.path()).unwrap();
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), remote_url);
+    do_test_sync(tmp_workspace_dir.path(), repo_url);
 }
 
 #[test]
@@ -300,18 +300,18 @@ fn test_sync_to_from_s3() {
     std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
 
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
-    let tmp_remote_dir = tempfile::tempdir().unwrap();
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
     let bucket = "test-bucket";
-    std::fs::create_dir(tmp_remote_dir.path().join(bucket)).unwrap();
+    std::fs::create_dir(tmp_repo_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_remote_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key);
 
     use std::str::FromStr;
-    let remote_url = Url::from_str(&format!(
+    let repo_url = Url::from_str(&format!(
         "s3+http://{}:{}/{}",
         minio.address, minio.host_port, bucket
     ))
     .unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), remote_url);
+    do_test_sync(tmp_workspace_dir.path(), repo_url);
 }

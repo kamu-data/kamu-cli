@@ -1,17 +1,17 @@
 use super::{Command, Error};
 use kamu::domain::*;
-use opendatafabric::RemoteID;
+use opendatafabric::RepositoryID;
 
 use std::sync::Arc;
 use url::Url;
 
-pub struct RemoteAddCommand {
+pub struct RepositoryAddCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     name: String,
     url: String,
 }
 
-impl RemoteAddCommand {
+impl RepositoryAddCommand {
     pub fn new(metadata_repo: Arc<dyn MetadataRepository>, name: &str, url: &str) -> Self {
         Self {
             metadata_repo: metadata_repo,
@@ -21,7 +21,7 @@ impl RemoteAddCommand {
     }
 }
 
-impl Command for RemoteAddCommand {
+impl Command for RepositoryAddCommand {
     fn run(&mut self) -> Result<(), Error> {
         let url = Url::parse(&self.url).map_err(|e| {
             eprintln!("{}: {}", console::style("Invalid URL").red(), e);
@@ -29,7 +29,7 @@ impl Command for RemoteAddCommand {
         })?;
 
         self.metadata_repo
-            .add_remote(RemoteID::try_from(&self.name).unwrap(), url)?;
+            .add_repository(RepositoryID::try_from(&self.name).unwrap(), url)?;
 
         eprintln!("{}: {}", console::style("Added").green(), &self.name);
         Ok(())

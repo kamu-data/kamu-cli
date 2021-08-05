@@ -79,30 +79,24 @@ fn datasetidbuf_equality() {
 
 #[test]
 fn datasetref_validation() {
-    assert_matches!(DatasetRef::try_from("remote.name/local.id"), Ok(s) if s == "remote.name/local.id");
+    assert_matches!(DatasetRef::try_from("repo.name/local.id"), Ok(s) if s == "repo.name/local.id");
 
-    let dr = DatasetRef::try_from("remote.name/local.id").unwrap();
+    let dr = DatasetRef::try_from("repo.name/local.id").unwrap();
     assert_eq!(dr.local_id(), "local.id");
     assert_eq!(dr.username(), None);
-    assert_matches!(dr.remote_id(), Some(id) if id == "remote.name");
+    assert_matches!(dr.repository(), Some(id) if id == "repo.name");
 
-    assert_matches!(DatasetRef::try_from("remote.name/.invalid"), Err(_));
+    assert_matches!(DatasetRef::try_from("repo.name/.invalid"), Err(_));
     assert_matches!(DatasetRef::try_from(".invalid/local.id"), Err(_));
 
-    assert_matches!(DatasetRef::try_from("remote.name/user-name/local.id"), Ok(s) if s == "remote.name/user-name/local.id");
+    assert_matches!(DatasetRef::try_from("repo.name/user-name/local.id"), Ok(s) if s == "repo.name/user-name/local.id");
 
-    let dr = DatasetRef::try_from("remote.name/user-name/local.id").unwrap();
+    let dr = DatasetRef::try_from("repo.name/user-name/local.id").unwrap();
     assert_eq!(dr.local_id(), "local.id");
     assert_matches!(dr.username(), Some(id) if id == "user-name");
-    assert_matches!(dr.remote_id(), Some(id) if id == "remote.name");
+    assert_matches!(dr.repository(), Some(id) if id == "repo.name");
 
-    assert_matches!(
-        DatasetRef::try_from("remote.name/user-name/.invalid"),
-        Err(_)
-    );
-    assert_matches!(
-        DatasetRef::try_from("remote.name/user.name/local.id"),
-        Err(_)
-    );
+    assert_matches!(DatasetRef::try_from("repo.name/user-name/.invalid"), Err(_));
+    assert_matches!(DatasetRef::try_from("repo.name/user.name/local.id"), Err(_));
     assert_matches!(DatasetRef::try_from(".invalid/user-name/local.id"), Err(_));
 }

@@ -1,8 +1,8 @@
 mod engine;
 pub use engine::*;
 
-mod remote;
-pub use remote::*;
+mod repository;
+pub use repository::*;
 
 pub mod explore;
 pub mod ingest;

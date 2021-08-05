@@ -310,8 +310,9 @@ impl SyncListener for PrettySyncProgress {
     }
 
     fn error(&mut self, _error: &SyncError) {
-        self.curr_progress.finish_with_message(
-            self.spinner_message(0, console::style("Failed to sync dataset to remote").red()),
-        );
+        self.curr_progress.finish_with_message(self.spinner_message(
+            0,
+            console::style("Failed to sync dataset to repository").red(),
+        ));
     }
 }

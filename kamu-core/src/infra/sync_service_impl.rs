@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 pub struct SyncServiceImpl {
     workspace_layout: WorkspaceLayout,
     metadata_repo: Arc<dyn MetadataRepository>,
-    remote_factory: Arc<RemoteFactory>,
+    repository_factory: Arc<RepositoryFactory>,
     _logger: Logger,
 }
 
@@ -20,13 +20,13 @@ impl SyncServiceImpl {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
         metadata_repo: Arc<dyn MetadataRepository>,
-        remote_factory: Arc<RemoteFactory>,
+        repository_factory: Arc<RepositoryFactory>,
         logger: Logger,
     ) -> Self {
         Self {
             workspace_layout: workspace_layout.clone(),
             metadata_repo,
-            remote_factory,
+            repository_factory,
             _logger: logger,
         }
     }
@@ -37,26 +37,26 @@ impl SyncServiceImpl {
         local_dataset_id: &DatasetID,
         _options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let remote_id = remote_dataset_ref.remote_id().unwrap_or_else(|| {
+        let repo_id = remote_dataset_ref.repository().unwrap_or_else(|| {
             panic!(
                 "Non-remote reference passed to sync_from: {}",
                 remote_dataset_ref
             )
         });
 
-        let remote = self
+        let repo = self
             .metadata_repo
-            .get_remote(remote_id)
+            .get_repository(repo_id)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RemoteDoesNotExist {
-                    remote_id: remote_id.to_owned(),
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_id: repo_id.to_owned(),
                 },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
         let client = self
-            .remote_factory
-            .get_remote_client(&remote)
+            .repository_factory
+            .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
         let cl = client.lock().unwrap();
@@ -94,7 +94,7 @@ impl SyncServiceImpl {
         let read_result = cl
             .read(remote_dataset_ref, remote_head, local_head, &tmp_dir)
             .map_err(|e| match e {
-                RemoteError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
+                RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
                     dataset_ref: remote_dataset_ref.to_owned(),
                 },
                 e => e.into(),
@@ -188,26 +188,26 @@ impl SyncServiceImpl {
             Err(e) => return Err(SyncError::InternalError(e.into())),
         };
 
-        let remote_id = remote_dataset_ref.remote_id().unwrap_or_else(|| {
+        let repo_id = remote_dataset_ref.repository().unwrap_or_else(|| {
             panic!(
                 "Non-remote reference passed to sync_to: {}",
                 remote_dataset_ref
             )
         });
 
-        let remote = self
+        let repo = self
             .metadata_repo
-            .get_remote(remote_id)
+            .get_repository(repo_id)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RemoteDoesNotExist {
-                    remote_id: remote_id.to_owned(),
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_id: repo_id.to_owned(),
                 },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
         let client = self
-            .remote_factory
-            .get_remote_client(&remote)
+            .repository_factory
+            .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
         let mut cl = client.lock().unwrap();

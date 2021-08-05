@@ -10,12 +10,12 @@ use thiserror::Error;
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Remote {
+pub struct Repository {
     pub url: Url,
 }
 
-pub trait RemoteClient {
-    fn read_ref(&self, dataset_id: &DatasetRef) -> Result<Option<Sha3_256>, RemoteError>;
+pub trait RepositoryClient {
+    fn read_ref(&self, dataset_id: &DatasetRef) -> Result<Option<Sha3_256>, RepositoryError>;
 
     fn write(
         &mut self,
@@ -25,7 +25,7 @@ pub trait RemoteClient {
         blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
-    ) -> Result<(), RemoteError>;
+    ) -> Result<(), RepositoryError>;
 
     fn read(
         &self,
@@ -33,10 +33,10 @@ pub trait RemoteClient {
         expected_head: Sha3_256,
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
-    ) -> Result<RemoteReadResult, RemoteError>;
+    ) -> Result<RepositoryReadResult, RepositoryError>;
 }
 
-pub struct RemoteReadResult {
+pub struct RepositoryReadResult {
     pub blocks: Vec<Vec<u8>>,
     pub data_files: Vec<PathBuf>,
     pub checkpoint_dir: PathBuf,
@@ -45,7 +45,7 @@ pub struct RemoteReadResult {
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
-pub enum RemoteError {
+pub enum RepositoryError {
     #[error("Dataset does not exist")]
     DoesNotExist,
     #[error("Dataset have diverged")]
@@ -55,7 +55,7 @@ pub enum RemoteError {
     },
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently,
-    #[error("Remote appears to have corrupted data: {message}")]
+    #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
         message: String,
         #[source]
@@ -84,7 +84,7 @@ pub enum RemoteError {
     },
 }
 
-impl RemoteError {
+impl RepositoryError {
     pub fn credentials(e: BoxedError) -> Self {
         Self::CredentialsError {
             source: e,

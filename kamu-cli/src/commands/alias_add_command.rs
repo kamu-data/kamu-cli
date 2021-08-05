@@ -41,33 +41,34 @@ impl Command for AliasAddCommand {
         let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
         let remote_ref = DatasetRefBuf::try_from(self.alias.clone()).unwrap();
 
-        let remote_id = remote_ref.remote_id().ok_or(Error::UsageError {
-            msg: "Alias should contain a remote part".to_owned(),
+        let repo_id = remote_ref.repository().ok_or(Error::UsageError {
+            msg: "Alias should contain a repository part".to_owned(),
         })?;
 
-        self.metadata_repo.get_remote(remote_id)?;
+        self.metadata_repo.get_repository(repo_id)?;
         let mut aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
-
-        let mut count = 0;
 
         if self.pull {
             if aliases.add(remote_ref.clone(), RemoteAliasKind::Pull)? {
-                count += 1;
+                eprintln!(
+                    "{}: {} ({})",
+                    console::style("Added").green(),
+                    remote_ref,
+                    "pull"
+                );
             }
         }
 
         if self.push {
             if aliases.add(remote_ref.clone(), RemoteAliasKind::Push)? {
-                count += 1;
+                eprintln!(
+                    "{}: {} ({})",
+                    console::style("Added").green(),
+                    remote_ref,
+                    "push"
+                );
             }
         }
-
-        eprintln!(
-            "{}",
-            console::style(format!("Added {} alias(es)", count))
-                .green()
-                .bold()
-        );
 
         Ok(())
     }

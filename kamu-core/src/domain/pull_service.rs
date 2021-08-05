@@ -22,7 +22,7 @@ pub trait PullService: Send + Sync {
         sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)>;
 
-    /// A special version of pull that allows to sync dataset from a remote while renaming it
+    /// A special version of pull that can rename dataset when syncing it from a repository
     fn pull_from(
         &self,
         remote_ref: &DatasetRef,

@@ -58,11 +58,11 @@ impl CompleteCommand {
         }
     }
 
-    fn complete_remote(&self, prefix: &str) {
+    fn complete_repository(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for remote_id in repo.get_all_remotes() {
-                if remote_id.starts_with(prefix) {
-                    println!("{}", remote_id);
+            for repo_id in repo.get_all_repositories() {
+                if repo_id.starts_with(prefix) {
+                    println!("{}", repo_id);
                 }
             }
         }
@@ -168,7 +168,7 @@ impl Command for CompleteCommand {
                     if let Some(val_names) = &opt.v.val_names {
                         for (_, name) in val_names.iter() {
                             match *name {
-                                "REMOTE" => self.complete_remote(to_complete),
+                                "REPO" => self.complete_repository(to_complete),
                                 "TIME" => self.complete_timestamp(),
                                 "VAR" => self.complete_env_var(&to_complete),
                                 _ => (),
@@ -191,7 +191,7 @@ impl Command for CompleteCommand {
         for pos in last_cmd.positionals.iter() {
             match pos.1.b.name {
                 "dataset" => self.complete_dataset(to_complete),
-                "remote" => self.complete_remote(to_complete),
+                "repository" => self.complete_repository(to_complete),
                 "alias" => self.complete_alias(to_complete),
                 "manifest" => self.complete_path(to_complete),
                 "cfgkey" => self.complete_config_key(to_complete),

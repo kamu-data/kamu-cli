@@ -36,15 +36,15 @@ pub trait MetadataRepository: Send + Sync {
         dataset_id: &DatasetID,
     ) -> Result<Box<dyn RemoteAliases>, DomainError>;
 
-    // Remotes
+    // Repositories
 
-    fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's>;
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryBuf> + 's>;
 
-    fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError>;
+    fn get_repository(&self, repo_id: &RepositoryID) -> Result<Repository, DomainError>;
 
-    fn add_remote(&self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError>;
+    fn add_repository(&self, repo_id: &RepositoryID, url: Url) -> Result<(), DomainError>;
 
-    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError>;
+    fn delete_repository(&self, repo_id: &RepositoryID) -> Result<(), DomainError>;
 }
 
 pub trait DatasetDependencyVisitor {

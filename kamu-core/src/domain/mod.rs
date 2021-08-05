@@ -23,8 +23,8 @@ pub use pull_service::*;
 mod push_service;
 pub use push_service::*;
 
-mod remote;
-pub use remote::*;
+mod repository;
+pub use repository::*;
 
 mod remote_aliases;
 pub use remote_aliases::*;

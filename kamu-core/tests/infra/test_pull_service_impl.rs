@@ -52,7 +52,7 @@ fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetRefBuf, Vec
 // Adding a remote dataset is a bit of a pain.
 // We cannot add a local dataset and then add a pull alias without adding all of its dependencies too.
 // So instead we're creating a temp workspace with local datasets,
-// exporting those into remote based on temp dir,
+// exporting those into repository based on temp dir,
 // and finally syncing them into the main workspace.
 // TODO: Add simpler way to import remote dataset
 fn create_graph_remote(
@@ -70,19 +70,19 @@ fn create_graph_remote(
     let tmp_sync_service = SyncServiceImpl::new(
         &tmp_workspace,
         tmp_metadata_repo.clone(),
-        Arc::new(RemoteFactory::new(slog::Logger::root(
+        Arc::new(RepositoryFactory::new(slog::Logger::root(
             slog::Discard,
             slog::o!(),
         ))),
         slog::Logger::root(slog::Discard, slog::o!()),
     );
 
-    let tmp_remote_dir = tempfile::tempdir().unwrap();
-    let tmp_remote_id = RemoteID::new_unchecked("tmp");
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let tmp_repo_id = RepositoryID::new_unchecked("tmp");
     tmp_metadata_repo
-        .add_remote(
-            tmp_remote_id,
-            url::Url::from_file_path(tmp_remote_dir.path()).unwrap(),
+        .add_repository(
+            tmp_repo_id,
+            url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
         )
         .unwrap();
 
@@ -90,7 +90,7 @@ fn create_graph_remote(
         tmp_sync_service
             .sync_to(
                 r.as_local().unwrap(),
-                &DatasetRefBuf::new(Some(tmp_remote_id), None, r.as_local().unwrap()),
+                &DatasetRefBuf::new(Some(tmp_repo_id), None, r.as_local().unwrap()),
                 SyncOptions::default(),
                 None,
             )
@@ -100,23 +100,23 @@ fn create_graph_remote(
     let sync_service = SyncServiceImpl::new(
         ws,
         repo.clone(),
-        Arc::new(RemoteFactory::new(slog::Logger::root(
+        Arc::new(RepositoryFactory::new(slog::Logger::root(
             slog::Discard,
             slog::o!(),
         ))),
         slog::Logger::root(slog::Discard, slog::o!()),
     );
 
-    repo.add_remote(
-        tmp_remote_id,
-        url::Url::from_file_path(tmp_remote_dir.path()).unwrap(),
+    repo.add_repository(
+        tmp_repo_id,
+        url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
     )
     .unwrap();
 
     for r in &to_import {
         sync_service
             .sync_from(
-                &DatasetRefBuf::new(Some(tmp_remote_id), None, r.as_local().unwrap()),
+                &DatasetRefBuf::new(Some(tmp_repo_id), None, r.as_local().unwrap()),
                 r.as_local().unwrap(),
                 SyncOptions::default(),
                 None,

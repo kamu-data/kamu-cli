@@ -385,8 +385,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
         )))
     }
 
-    fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
-        let read_dir = std::fs::read_dir(&self.workspace_layout.remotes_dir).unwrap();
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryBuf> + 's> {
+        let read_dir = std::fs::read_dir(&self.workspace_layout.repos_dir).unwrap();
         Box::new(read_dir.map(|i| {
             i.unwrap()
                 .file_name()
@@ -397,50 +397,50 @@ impl MetadataRepository for MetadataRepositoryImpl {
         }))
     }
 
-    fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError> {
-        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
+    fn get_repository(&self, repo_id: &RepositoryID) -> Result<Repository, DomainError> {
+        let file_path = self.workspace_layout.repos_dir.join(repo_id);
 
         if !file_path.exists() {
             return Err(DomainError::does_not_exist(
-                ResourceKind::Remote,
-                remote_id.to_string(),
+                ResourceKind::Repository,
+                repo_id.to_string(),
             ));
         }
 
         let file = std::fs::File::open(&file_path).unwrap_or_else(|e| {
             panic!(
-                "Failed to open the Remote file at {}: {}",
+                "Failed to open the Repository file at {}: {}",
                 file_path.display(),
                 e
             )
         });
 
-        let manifest: Manifest<Remote> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
+        let manifest: Manifest<Repository> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
             panic!(
-                "Failed to deserialize the Remote at {}: {}",
+                "Failed to deserialize the Repository at {}: {}",
                 file_path.display(),
                 e
             )
         });
 
-        assert_eq!(manifest.kind, "Remote");
+        assert_eq!(manifest.kind, "Repository");
         Ok(manifest.content)
     }
 
-    fn add_remote(&self, remote_id: &RemoteID, url: Url) -> Result<(), DomainError> {
-        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
+    fn add_repository(&self, repo_id: &RepositoryID, url: Url) -> Result<(), DomainError> {
+        let file_path = self.workspace_layout.repos_dir.join(repo_id);
 
         if file_path.exists() {
             return Err(DomainError::already_exists(
-                ResourceKind::Remote,
-                remote_id.to_string(),
+                ResourceKind::Repository,
+                repo_id.to_string(),
             ));
         }
 
         let manifest = Manifest {
             api_version: 1,
-            kind: "Remote".to_owned(),
-            content: Remote { url: url },
+            kind: "Repository".to_owned(),
+            content: Repository { url: url },
         };
 
         let file = std::fs::File::create(&file_path).map_err(|e| InfraError::from(e).into())?;
@@ -448,13 +448,13 @@ impl MetadataRepository for MetadataRepositoryImpl {
         Ok(())
     }
 
-    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError> {
-        let file_path = self.workspace_layout.remotes_dir.join(remote_id);
+    fn delete_repository(&self, repo_id: &RepositoryID) -> Result<(), DomainError> {
+        let file_path = self.workspace_layout.repos_dir.join(repo_id);
 
         if !file_path.exists() {
             return Err(DomainError::does_not_exist(
-                ResourceKind::Remote,
-                remote_id.to_string(),
+                ResourceKind::Repository,
+                repo_id.to_string(),
             ));
         }
 
@@ -623,25 +623,25 @@ impl MetadataRepository for MetadataRepositoryNull {
         ))
     }
 
-    fn get_all_remotes<'s>(&'s self) -> Box<dyn Iterator<Item = RemoteIDBuf> + 's> {
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryBuf> + 's> {
         Box::new(std::iter::empty())
     }
 
-    fn get_remote(&self, remote_id: &RemoteID) -> Result<Remote, DomainError> {
+    fn get_repository(&self, repo_id: &RepositoryID) -> Result<Repository, DomainError> {
         Err(DomainError::does_not_exist(
-            ResourceKind::Remote,
-            remote_id.to_string(),
+            ResourceKind::Repository,
+            repo_id.to_string(),
         ))
     }
 
-    fn add_remote(&self, _remote_id: &RemoteID, _url: Url) -> Result<(), DomainError> {
+    fn add_repository(&self, _repo_id: &RepositoryID, _url: Url) -> Result<(), DomainError> {
         Err(DomainError::ReadOnly)
     }
 
-    fn delete_remote(&self, remote_id: &RemoteID) -> Result<(), DomainError> {
+    fn delete_repository(&self, repo_id: &RepositoryID) -> Result<(), DomainError> {
         Err(DomainError::does_not_exist(
-            ResourceKind::Remote,
-            remote_id.to_string(),
+            ResourceKind::Repository,
+            repo_id.to_string(),
         ))
     }
 

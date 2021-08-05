@@ -94,7 +94,7 @@ All datasets can be easily shared with others, creating a decentralized data pip
   - PII and sensitive data
 - **[Exploring Data](docs/exploring_data.md)**
 - **[Sharing data](docs/sharing_data.md)**
-  - **[Supported Remotes](docs/sharing_data.md#remote-types)**
+  - **[Supported Repositories](docs/sharing_data.md#repository-types)**
 - **[Troubleshooting](docs/troubleshooting.md)**
 - **Reference**
   - **[Manifests Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadata-reference)**

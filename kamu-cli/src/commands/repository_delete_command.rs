@@ -1,17 +1,17 @@
 use super::{Command, Error};
 use kamu::domain::*;
-use opendatafabric::RemoteIDBuf;
+use opendatafabric::RepositoryBuf;
 
 use std::{convert::TryFrom, sync::Arc};
 
-pub struct RemoteDeleteCommand {
+pub struct RepositoryDeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     names: Vec<String>,
     all: bool,
     no_confirmation: bool,
 }
 
-impl RemoteDeleteCommand {
+impl RepositoryDeleteCommand {
     pub fn new<I, S>(
         metadata_repo: Arc<dyn MetadataRepository>,
         names: I,
@@ -49,14 +49,14 @@ impl RemoteDeleteCommand {
     }
 }
 
-impl Command for RemoteDeleteCommand {
+impl Command for RepositoryDeleteCommand {
     fn run(&mut self) -> Result<(), Error> {
-        let remote_ids: Vec<RemoteIDBuf> = if self.all {
-            self.metadata_repo.get_all_remotes().collect()
+        let repo_ids: Vec<RepositoryBuf> = if self.all {
+            self.metadata_repo.get_all_repositories().collect()
         } else {
             self.names
                 .iter()
-                .map(|s| RemoteIDBuf::try_from(s.as_str()).unwrap())
+                .map(|s| RepositoryBuf::try_from(s.as_str()).unwrap())
                 .collect()
         };
 
@@ -65,8 +65,8 @@ impl Command for RemoteDeleteCommand {
         } else {
             self.prompt_yes_no(&format!(
                 "{}: {}\nDo you whish to continue? [y/N]: ",
-                console::style("You are about to delete following remote(s)").yellow(),
-                remote_ids
+                console::style("You are about to delete following repository(s)").yellow(),
+                repo_ids
                     .iter()
                     .map(|id| id.as_str())
                     .collect::<Vec<&str>>()
@@ -78,13 +78,13 @@ impl Command for RemoteDeleteCommand {
             return Err(Error::Aborted);
         }
 
-        for id in remote_ids.iter() {
-            self.metadata_repo.delete_remote(id)?;
+        for id in repo_ids.iter() {
+            self.metadata_repo.delete_repository(id)?;
         }
 
         eprintln!(
             "{}",
-            console::style(format!("Deleted {} remote(s)", remote_ids.len()))
+            console::style(format!("Deleted {} repository(s)", repo_ids.len()))
                 .green()
                 .bold()
         );

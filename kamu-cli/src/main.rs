@@ -47,7 +47,7 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<PushServiceImpl>();
     catalog.bind::<dyn PushService, PushServiceImpl>()?;
 
-    catalog.add::<RemoteFactory>();
+    catalog.add::<RepositoryFactory>();
     catalog.add::<EngineFactory>();
 
     Ok(catalog)
@@ -207,19 +207,19 @@ fn main() {
             push_matches.value_of("as"),
             &output_format,
         )),
-        ("remote", Some(remote_matches)) => match remote_matches.subcommand() {
-            ("add", Some(add_matches)) => Box::new(RemoteAddCommand::new(
+        ("repo", Some(repo_matches)) => match repo_matches.subcommand() {
+            ("add", Some(add_matches)) => Box::new(RepositoryAddCommand::new(
                 catalog.get_one().unwrap(),
                 add_matches.value_of("name").unwrap(),
                 add_matches.value_of("url").unwrap(),
             )),
-            ("delete", Some(delete_matches)) => Box::new(RemoteDeleteCommand::new(
+            ("delete", Some(delete_matches)) => Box::new(RepositoryDeleteCommand::new(
                 catalog.get_one().unwrap(),
-                delete_matches.values_of("remote").unwrap_or_default(),
+                delete_matches.values_of("repo").unwrap_or_default(),
                 delete_matches.is_present("all"),
                 delete_matches.is_present("yes"),
             )),
-            ("list", _) => Box::new(RemoteListCommand::new(
+            ("list", _) => Box::new(RepositoryListCommand::new(
                 catalog.get_one().unwrap(),
                 catalog.get_one().unwrap(),
             )),
