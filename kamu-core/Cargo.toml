@@ -42,7 +42,7 @@ rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for glob fetch
 slog = "*"
-rand = "*"
+rand = "^0.8"
 regex = "*"
 indoc = "*"  # Compile-time unindent
 itertools = "*"

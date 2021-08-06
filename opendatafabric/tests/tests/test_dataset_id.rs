@@ -1,5 +1,3 @@
-#![feature(assert_matches)]
-
 use opendatafabric::*;
 
 use std::{assert_matches::assert_matches, convert::TryFrom};

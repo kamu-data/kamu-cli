@@ -52,4 +52,4 @@ url = "*"
 
 
 [dev-dependencies]
-rand = "*"
+rand = "^0.8"

@@ -6,3 +6,4 @@ members = [
     "kamu-cli",
     "tools",
 ]
+resolver = "2"
