@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
       - run: cargo build
-      - run: cargo run config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
-      - run: cargo run init --pull-test-images
+      - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
+      - run: cargo run --bin kamu-cli -- init --pull-test-images
       - run: cargo test --verbose
   test_macos:
     name: Test / MacOS
