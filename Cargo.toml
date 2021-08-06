@@ -4,4 +4,5 @@ members = [
     "kamu-core",
     "kamu-core-test",
     "kamu-cli",
+    "tools",
 ]

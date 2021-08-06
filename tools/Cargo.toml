@@ -1,0 +1,14 @@
+[package]
+name = "tools"
+version = "0.0.0"
+description = "Tools for managing this repo"
+
+[[bin]]
+name = "release"
+path = "src/release.rs"
+
+[dependencies]
+clap = "*"
+toml = "*"
+semver = "*"
+toml_edit = "*"
