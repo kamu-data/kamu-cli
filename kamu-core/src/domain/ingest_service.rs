@@ -1,5 +1,5 @@
 use super::{EngineError, PullImageListener};
-use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
+use opendatafabric::{DatasetID, DatasetIDBuf, FetchStep, Sha3_256};
 
 use std::backtrace::Backtrace;
 use std::path::Path;
@@ -14,6 +14,14 @@ pub trait IngestService: Send + Sync {
     fn ingest(
         &self,
         dataset_id: &DatasetID,
+        options: IngestOptions,
+        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+    ) -> Result<IngestResult, IngestError>;
+
+    fn ingest_from(
+        &self,
+        dataset_id: &DatasetID,
+        fetch: FetchStep,
         options: IngestOptions,
         listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError>;

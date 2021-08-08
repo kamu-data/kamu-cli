@@ -326,7 +326,7 @@ fn test_pull_batching_complex_with_remote() {
 }
 
 #[test]
-fn test_pull_from_remote() {
+fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path());
 
@@ -341,7 +341,7 @@ fn test_pull_from_remote() {
     let res =
         harness
             .pull_svc
-            .pull_from(&r!("myrepo/foo"), &id!("bar"), PullOptions::default(), None);
+            .sync_from(&r!("myrepo/foo"), &id!("bar"), PullOptions::default(), None);
 
     assert_matches!(
         res,
@@ -494,6 +494,16 @@ impl IngestService for TestIngestService {
         _maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!();
+    }
+
+    fn ingest_from(
+        &self,
+        _dataset_id: &DatasetID,
+        _fetch: FetchStep,
+        _options: IngestOptions,
+        _listener: Option<Arc<Mutex<dyn IngestListener>>>,
+    ) -> Result<IngestResult, IngestError> {
+        unimplemented!()
     }
 
     fn ingest_multi(

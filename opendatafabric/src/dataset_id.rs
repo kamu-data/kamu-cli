@@ -310,6 +310,12 @@ impl DatasetRefBuf {
     }
 }
 
+impl From<&DatasetID> for DatasetRefBuf {
+    fn from(id: &DatasetID) -> Self {
+        Self(id.0.to_owned())
+    }
+}
+
 impl From<DatasetIDBuf> for DatasetRefBuf {
     fn from(id: DatasetIDBuf) -> Self {
         Self(id.0)

@@ -102,6 +102,40 @@ impl IngestService for IngestServiceImpl {
             options,
             layout,
             meta_chain,
+            None,
+            listener,
+            self.engine_factory.clone(),
+            logger,
+        );
+
+        ingest_task.ingest()
+    }
+
+    fn ingest_from(
+        &self,
+        dataset_id: &DatasetID,
+        fetch: FetchStep,
+        options: IngestOptions,
+        maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
+    ) -> Result<IngestResult, IngestError> {
+        let null_listener: Arc<Mutex<dyn IngestListener>> =
+            Arc::new(Mutex::new(NullIngestListener {}));
+        let listener = maybe_listener.unwrap_or(null_listener);
+
+        info!(self.logger, "Ingesting single dataset from overriden source"; "dataset" => dataset_id.as_str(), "fetch" => ?fetch);
+
+        let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
+
+        let layout = self.get_dataset_layout(dataset_id);
+
+        let logger = self.logger.new(o!("dataset" => dataset_id.to_string()));
+
+        let mut ingest_task = IngestTask::new(
+            dataset_id,
+            options,
+            layout,
+            meta_chain,
+            Some(fetch),
             listener,
             self.engine_factory.clone(),
             logger,
@@ -150,6 +184,7 @@ impl IngestService for IngestServiceImpl {
                             task_options,
                             layout,
                             meta_chain,
+                            None,
                             listener,
                             engine_factory,
                             logger,
