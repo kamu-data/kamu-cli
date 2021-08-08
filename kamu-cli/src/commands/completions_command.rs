@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 
 const BASH_COMPLETIONS: &str = "
 _kamu_()
@@ -32,7 +32,7 @@ impl Command for CompletionsCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         // TODO: Remove once clap allows to programmatically complete values
         // See: https://github.com/clap-rs/clap/issues/568
         let program = self.app.get_name().to_owned();

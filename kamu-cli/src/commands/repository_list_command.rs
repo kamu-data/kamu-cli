@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::*;
 use kamu::domain::*;
 use opendatafabric::RepositoryBuf;
@@ -22,7 +22,7 @@ impl RepositoryListCommand {
     }
 
     // TODO: support multiple format specifiers
-    fn print_machine_readable(&self) -> Result<(), Error> {
+    fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
         let mut repos: Vec<_> = self.metadata_repo.get_all_repositories().collect();
@@ -38,7 +38,7 @@ impl RepositoryListCommand {
         Ok(())
     }
 
-    fn print_pretty(&self) -> Result<(), Error> {
+    fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
         let mut repos: Vec<RepositoryBuf> = self.metadata_repo.get_all_repositories().collect();
@@ -87,7 +87,7 @@ impl RepositoryListCommand {
 }
 
 impl Command for RepositoryListCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         // TODO: replace with formatters
         match self.output_config.format {
             OutputFormat::Table => self.print_pretty()?,

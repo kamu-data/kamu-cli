@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::{DatasetID, DatasetRefBuf};
 
@@ -31,9 +31,9 @@ impl AliasAddCommand {
 }
 
 impl Command for AliasAddCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         if !self.pull && !self.push {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Specify either --pull or --push or both".to_owned(),
             });
         }
@@ -41,7 +41,7 @@ impl Command for AliasAddCommand {
         let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
         let remote_ref = DatasetRefBuf::try_from(self.alias.clone()).unwrap();
 
-        let repo_id = remote_ref.repository().ok_or(Error::UsageError {
+        let repo_id = remote_ref.repository().ok_or(CLIError::UsageError {
             msg: "Alias should contain a repository part".to_owned(),
         })?;
 

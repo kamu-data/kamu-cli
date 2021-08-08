@@ -1,6 +1,6 @@
 use crate::output::OutputConfig;
 
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -13,14 +13,14 @@ use std::sync::Arc;
 pub struct LogCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     dataset_id: DatasetIDBuf,
-    output_config: OutputConfig,
+    output_config: Arc<OutputConfig>,
 }
 
 impl LogCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         dataset_id: DatasetIDBuf,
-        output_config: OutputConfig,
+        output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
             metadata_repo,
@@ -125,7 +125,7 @@ impl LogCommand {
 }
 
 impl Command for LogCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
 
         if self.output_config.is_tty {

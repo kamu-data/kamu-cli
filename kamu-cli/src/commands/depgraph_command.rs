@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use kamu::infra::DatasetKind;
 
@@ -15,7 +15,7 @@ impl DepgraphCommand {
 }
 
 impl Command for DepgraphCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let mut summaries = self
             .metadata_repo
             .get_all_datasets()

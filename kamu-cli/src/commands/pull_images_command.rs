@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::utils::docker_images;
 
@@ -23,7 +23,7 @@ impl Command for PullImagesCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let mut images = vec![
             docker_images::SPARK,
             docker_images::FLINK,

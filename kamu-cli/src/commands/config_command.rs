@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::config::{ConfigScope, ConfigService};
 
 use std::sync::Arc;
@@ -28,7 +28,7 @@ impl Command for ConfigListCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let result = self.config_svc.list(
             if self.user {
                 ConfigScope::User
@@ -76,7 +76,7 @@ impl Command for ConfigGetCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {
@@ -86,7 +86,7 @@ impl Command for ConfigGetCommand {
         if let Some(value) = self.config_svc.get(&self.key, scope, self.with_defaults) {
             println!("{}", value);
         } else {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: format!("Key {} not found", self.key),
             });
         }
@@ -127,7 +127,7 @@ impl Command for ConfigSetCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let scope = if self.user {
             ConfigScope::User
         } else {

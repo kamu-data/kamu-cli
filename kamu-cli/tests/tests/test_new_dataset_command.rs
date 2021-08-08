@@ -1,12 +1,12 @@
 use kamu::domain::*;
 use kamu::infra::ResourceLoaderImpl;
 use kamu_cli::commands::*;
-use kamu_cli::error::Error;
+use kamu_cli::CLIError;
 
 #[test]
 fn test_ambiguity_is_punished() {
     let mut cmd = NewDatasetCommand::new("foo", false, false, None::<&str>);
-    assert!(matches!(cmd.run(), Err(Error::UsageError { .. })));
+    assert!(matches!(cmd.run(), Err(CLIError::UsageError { .. })));
 }
 
 #[test]

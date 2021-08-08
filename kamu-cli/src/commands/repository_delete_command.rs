@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::RepositoryBuf;
 
@@ -50,7 +50,7 @@ impl RepositoryDeleteCommand {
 }
 
 impl Command for RepositoryDeleteCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let repo_ids: Vec<RepositoryBuf> = if self.all {
             self.metadata_repo.get_all_repositories().collect()
         } else {
@@ -75,7 +75,7 @@ impl Command for RepositoryDeleteCommand {
         };
 
         if !confirmed {
-            return Err(Error::Aborted);
+            return Err(CLIError::Aborted);
         }
 
         for id in repo_ids.iter() {

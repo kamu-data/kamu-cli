@@ -1,6 +1,6 @@
 use crate::config::ConfigService;
 
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 
 use chrono::prelude::*;
@@ -137,7 +137,7 @@ impl Command for CompleteCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let mut args = match shlex::split(&self.input) {
             Some(v) => v,
             _ => return Ok(()),
