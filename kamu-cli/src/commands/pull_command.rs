@@ -2,15 +2,19 @@ use super::{Command, Error};
 use crate::output::OutputConfig;
 use kamu::domain::*;
 use opendatafabric::*;
+use url::Url;
 
 use std::backtrace::BacktraceStatus;
 use std::error::Error as StdError;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
 ///////////////////////////////////////////////////////////////////////////////
+
+type GenericPullResult = Result<Vec<(DatasetRefBuf, Result<PullResult, PullError>)>, Error>;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
@@ -20,6 +24,7 @@ pub struct PullCommand {
     recursive: bool,
     force_uncacheable: bool,
     as_id: Option<String>,
+    fetch: Option<String>,
 }
 
 impl PullCommand {
@@ -31,6 +36,7 @@ impl PullCommand {
         recursive: bool,
         force_uncacheable: bool,
         as_id: Option<&str>,
+        fetch: Option<&str>,
     ) -> Self
     where
         I: Iterator<Item = S>,
@@ -44,15 +50,66 @@ impl PullCommand {
             recursive,
             force_uncacheable,
             as_id: as_id.map(|s| s.to_owned()),
+            fetch: fetch.map(|s| s.to_owned()),
         }
     }
 
-    fn pull_quiet<'a>(
-        &self,
-        mut dataset_refs: impl Iterator<Item = &'a DatasetRef>,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
-        self.pull_svc.pull_multi(
-            &mut dataset_refs,
+    fn sync_from(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+        let as_id = self.as_id.as_ref().unwrap();
+        let local_id = DatasetID::try_from(as_id).unwrap();
+        let remote_ref = DatasetRef::try_from(&self.refs[0]).unwrap();
+
+        let res = self.pull_svc.sync_from(
+            remote_ref,
+            local_id,
+            PullOptions {
+                create_remote_aliases: true,
+                ..PullOptions::default()
+            },
+            listener.and_then(|p| p.lock().unwrap().begin_sync(local_id, remote_ref)),
+        );
+
+        Ok(vec![(remote_ref.into(), res)])
+    }
+
+    fn ingest_from(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+        let dataset_id = DatasetID::try_from(&self.refs[0]).unwrap();
+        let fetch_str = self.fetch.as_ref().unwrap();
+
+        let path = Path::new(fetch_str);
+        let url = if path.is_file() {
+            Url::from_file_path(path.canonicalize().unwrap()).unwrap()
+        } else {
+            Url::parse(fetch_str).map_err(|e| Error::UsageError {
+                msg: format!("Invalid fetch source, should be URL or path: {}", e),
+            })?
+        };
+
+        let fetch_step = FetchStep::Url(FetchStepUrl {
+            url: url.to_string(),
+            event_time: None,
+            cache: None,
+        });
+
+        let res = self.pull_svc.ingest_from(
+            dataset_id,
+            fetch_step,
+            PullOptions {
+                ingest_options: IngestOptions {
+                    force_uncacheable: self.force_uncacheable,
+                    exhaust_sources: true,
+                },
+                ..PullOptions::default()
+            },
+            listener.and_then(|p| p.lock().unwrap().begin_ingest(dataset_id)),
+        );
+
+        Ok(vec![(dataset_id.into(), res)])
+    }
+
+    fn pull_multi(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+        Ok(self.pull_svc.pull_multi(
+            &mut self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap()),
             PullOptions {
                 recursive: self.recursive,
                 all: self.all,
@@ -63,16 +120,17 @@ impl PullCommand {
                 },
                 sync_options: SyncOptions::default(),
             },
-            None,
-            None,
-            None,
-        )
+            listener
+                .clone()
+                .map(|v| v as Arc<Mutex<dyn IngestMultiListener>>),
+            listener
+                .clone()
+                .map(|v| v as Arc<Mutex<dyn TransformMultiListener>>),
+            listener.map(|v| v as Arc<Mutex<dyn SyncMultiListener>>),
+        ))
     }
 
-    fn pull_with_progress<'a>(
-        &self,
-        mut dataset_refs: impl Iterator<Item = &'a DatasetRef>,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
+    fn pull_with_progress(&self) -> GenericPullResult {
         let pull_progress = PrettyPullProgress::new();
         let listener = Arc::new(Mutex::new(pull_progress.clone()));
 
@@ -80,22 +138,7 @@ impl PullCommand {
             pull_progress.draw();
         });
 
-        let results = self.pull_svc.pull_multi(
-            &mut dataset_refs,
-            PullOptions {
-                recursive: self.recursive,
-                all: self.all,
-                create_remote_aliases: true,
-                ingest_options: IngestOptions {
-                    force_uncacheable: self.force_uncacheable,
-                    exhaust_sources: true,
-                },
-                sync_options: SyncOptions::default(),
-            },
-            Some(listener.clone()),
-            Some(listener.clone()),
-            Some(listener.clone()),
-        );
+        let results = self.pull(Some(listener.clone()));
 
         listener.lock().unwrap().finish();
         draw_thread.join().unwrap();
@@ -103,89 +146,37 @@ impl PullCommand {
         results
     }
 
-    fn pull_from_with_progress(
-        &self,
-        remote_ref: &DatasetRef,
-        local_id: &DatasetID,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
-        let mut pull_progress = PrettyPullProgress::new();
-        let pull_progress_2 = pull_progress.clone();
-        let listener = pull_progress.begin_sync(local_id, remote_ref);
-
-        let draw_thread = std::thread::spawn(move || {
-            pull_progress_2.draw();
-        });
-
-        let res = self.pull_svc.pull_from(
-            remote_ref,
-            local_id,
-            PullOptions {
-                create_remote_aliases: true,
-                ..PullOptions::default()
-            },
-            listener,
-        );
-
-        pull_progress.finish();
-        draw_thread.join().unwrap();
-
-        vec![(remote_ref.into(), res)]
-    }
-
-    fn pull_from_quiet(
-        &self,
-        remote_ref: &DatasetRef,
-        local_id: &DatasetID,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
-        let res = self.pull_svc.pull_from(
-            remote_ref,
-            local_id,
-            PullOptions {
-                create_remote_aliases: true,
-                ..PullOptions::default()
-            },
-            None,
-        );
-
-        vec![(remote_ref.into(), res)]
-    }
-
-    fn pull(&self) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
-        let pretty = self.output_config.is_tty && self.output_config.verbosity_level == 0;
-        if let Some(ref as_id) = self.as_id {
-            let local_id = DatasetID::try_from(as_id).unwrap();
-            let remote_ref = DatasetRef::try_from(&self.refs[0]).unwrap();
-            if pretty {
-                self.pull_from_with_progress(remote_ref, local_id)
-            } else {
-                self.pull_from_quiet(remote_ref, local_id)
-            }
+    fn pull(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+        if self.as_id.is_some() {
+            self.sync_from(listener)
+        } else if self.fetch.is_some() {
+            self.ingest_from(listener)
         } else {
-            let dataset_refs = self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap());
-            if pretty {
-                self.pull_with_progress(dataset_refs)
-            } else {
-                self.pull_quiet(dataset_refs)
-            }
+            self.pull_multi(listener)
         }
     }
 }
 
 impl Command for PullCommand {
     fn run(&mut self) -> Result<(), Error> {
-        match (self.recursive, self.all, self.as_id.as_ref()) {
-            (false, false, _) if self.refs.is_empty() => Err(Error::UsageError {
+        match (self.recursive, self.all, &self.as_id, &self.fetch) {
+            (false, false, _, _) if self.refs.is_empty() => Err(Error::UsageError {
                 msg: "Specify a dataset or pass --all".to_owned(),
             }),
-            (false, true, None) if self.refs.is_empty() => Ok(()),
-            (_, false, None) if !self.refs.is_empty() => Ok(()),
-            (false, false, Some(_)) if self.refs.len() == 1 => Ok(()),
+            (false, true, None, None) if self.refs.is_empty() => Ok(()),
+            (_, false, None, None) if !self.refs.is_empty() => Ok(()),
+            (false, false, Some(_), None) if self.refs.len() == 1 => Ok(()),
+            (false, false, None, Some(_)) if self.refs.len() == 1 => Ok(()),
             _ => Err(Error::UsageError {
                 msg: "Invalid combination of arguments".to_owned(),
             }),
         }?;
 
-        let pull_results = self.pull();
+        let pull_results = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
+            self.pull_with_progress()?
+        } else {
+            self.pull(None)?
+        };
 
         let mut updated = 0;
         let mut up_to_date = 0;

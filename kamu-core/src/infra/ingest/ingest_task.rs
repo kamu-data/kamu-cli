@@ -17,6 +17,7 @@ pub struct IngestTask {
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
     source: DatasetSourceRoot,
+    fetch_override: Option<FetchStep>,
     prev_checkpoint: Option<Sha3_256>,
     vocab: DatasetVocabulary,
     listener: Arc<Mutex<dyn IngestListener>>,
@@ -33,6 +34,7 @@ impl IngestTask {
         options: IngestOptions,
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
+        fetch_override: Option<FetchStep>,
         listener: Arc<Mutex<dyn IngestListener>>,
         engine_factory: Arc<EngineFactory>,
         logger: Logger,
@@ -54,6 +56,7 @@ impl IngestTask {
             {
                 prev_checkpoint = Some(block.block_hash)
             }
+
             if vocab.is_none() && block.vocab.is_some() {
                 vocab = block.vocab;
             }
@@ -69,18 +72,19 @@ impl IngestTask {
 
         Self {
             dataset_id: dataset_id.to_owned(),
-            options: options,
-            layout: layout,
+            options,
+            layout,
             meta_chain: RefCell::new(meta_chain),
             source: source.unwrap(),
-            prev_checkpoint: prev_checkpoint,
+            fetch_override,
+            prev_checkpoint,
             vocab: vocab.unwrap_or_default(),
-            listener: listener,
+            listener,
             checkpointing_executor: CheckpointingExecutor::new(),
             fetch_service: FetchService::new(logger.new(o!())),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_factory),
-            logger: logger,
+            logger,
         }
     }
 

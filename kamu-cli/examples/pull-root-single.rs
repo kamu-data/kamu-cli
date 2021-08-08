@@ -17,6 +17,7 @@ fn main() {
         false,
         false,
         None,
+        None,
     );
     cmd.run().unwrap();
 }
@@ -99,12 +100,22 @@ impl PullService for TestPullService {
         )]
     }
 
-    fn pull_from(
+    fn sync_from(
         &self,
         _remote_ref: &DatasetRef,
         _local_id: &DatasetID,
         _options: PullOptions,
         _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<PullResult, PullError> {
+        unimplemented!()
+    }
+
+    fn ingest_from(
+        &self,
+        _dataset_id: &DatasetID,
+        _fetch: FetchStep,
+        _options: PullOptions,
+        _listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()
     }

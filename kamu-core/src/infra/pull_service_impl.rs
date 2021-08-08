@@ -289,7 +289,7 @@ impl PullService for PullServiceImpl {
         results
     }
 
-    fn pull_from(
+    fn sync_from(
         &self,
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
@@ -305,6 +305,20 @@ impl PullService for PullServiceImpl {
                 .get_remote_aliases(local_id)?
                 .add(remote_ref.to_owned(), RemoteAliasKind::Pull)?;
         }
+
+        Self::result_into(res)
+    }
+
+    fn ingest_from(
+        &self,
+        dataset_id: &DatasetID,
+        fetch: FetchStep,
+        options: PullOptions,
+        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+    ) -> Result<PullResult, PullError> {
+        let res = self
+            .ingest_svc
+            .ingest_from(dataset_id, fetch, options.ingest_options, listener);
 
         Self::result_into(res)
     }

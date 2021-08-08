@@ -171,6 +171,7 @@ impl Command for CompleteCommand {
                                 "REPO" => self.complete_repository(to_complete),
                                 "TIME" => self.complete_timestamp(),
                                 "VAR" => self.complete_env_var(&to_complete),
+                                "SRC" => self.complete_path(to_complete),
                                 _ => (),
                             }
                         }

@@ -2,11 +2,12 @@ use super::ingest_service::*;
 use super::sync_service::*;
 use super::transform_service::*;
 use crate::domain::DomainError;
-use opendatafabric::{DatasetID, DatasetRef, DatasetRefBuf, Sha3_256};
 
 use chrono::{DateTime, Utc};
-use std::sync::{Arc, Mutex};
+use opendatafabric::{DatasetID, DatasetRef, DatasetRefBuf, FetchStep, Sha3_256};
 use thiserror::Error;
+
+use std::sync::{Arc, Mutex};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -23,12 +24,21 @@ pub trait PullService: Send + Sync {
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)>;
 
     /// A special version of pull that can rename dataset when syncing it from a repository
-    fn pull_from(
+    fn sync_from(
         &self,
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
         options: PullOptions,
         listener: Option<Arc<Mutex<dyn SyncListener>>>,
+    ) -> Result<PullResult, PullError>;
+
+    /// A special version of pull that allows overriding the fetch source on root datasets (e.g. to pull data from a specific file)
+    fn ingest_from(
+        &self,
+        dataset_id: &DatasetID,
+        fetch: FetchStep,
+        options: PullOptions,
+        listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<PullResult, PullError>;
 
     fn set_watermark(

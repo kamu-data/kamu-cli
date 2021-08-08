@@ -195,6 +195,7 @@ fn main() {
                     submatches.is_present("recursive"),
                     submatches.is_present("force-uncacheable"),
                     submatches.value_of("as"),
+                    submatches.value_of("fetch"),
                 ))
             }
         }

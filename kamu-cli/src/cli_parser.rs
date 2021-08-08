@@ -411,6 +411,11 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                         .validator(validate_dataset_id)
                         .value_name("ID")
                         .help("Local name of a dataset to use when syncing from a repository"),
+                    Arg::with_name("fetch")
+                        .long("fetch")
+                        .takes_value(true)
+                        .value_name("SRC")
+                        .help("Data location (path or URL)"),
                     Arg::with_name("set-watermark")
                         .long("set-watermark")
                         .takes_value(true)
@@ -420,7 +425,11 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Pull is a generic command that lets you refresh data in any existing dataset or add new dataset from a repository. It will act differently depending on the type of dataset it works with. In case of a root dataset it implies ingesting data from an external source. In case of a derivative - processing previously unseen data of its dependencies.
+                    Pull is a multi-functional command that lets you make changes to a local dataset. Depending on the parameters and the types of datasets involved it can be used to:
+                    - Ingest new data into a root dataset from an external source
+                    - Run transformations on a derivative dataset to process previously unseen data
+                    - Pull dataset from a remote repository into your workspace
+                    - Update watermark on a dataset
 
                     ### Examples ###
 
@@ -447,6 +456,10 @@ pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'st
                     Advance the watermark of a dataset:
 
                         kamu pull --set-watermark 2020-01-01 org.example.data
+
+                    Ingest data into the root dataset from file (format should match the original source):
+
+                        kamu pull org.example.data --source path/to/data.csv
                     "
                 )),
             SubCommand::with_name("push")
