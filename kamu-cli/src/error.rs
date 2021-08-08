@@ -2,7 +2,7 @@ use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum CLIError {
     #[error("{msg}")]
     UsageError { msg: String },
     #[error("{0}")]

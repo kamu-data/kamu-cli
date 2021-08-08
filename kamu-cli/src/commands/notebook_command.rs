@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::infra::explore::*;
 use kamu::infra::*;
@@ -9,19 +9,19 @@ use slog::{o, Logger};
 use std::sync::Arc;
 
 pub struct NotebookCommand {
-    workspace_layout: WorkspaceLayout,
-    volume_layout: VolumeLayout,
+    workspace_layout: Arc<WorkspaceLayout>,
+    volume_layout: Arc<VolumeLayout>,
     container_runtime: Arc<DockerClient>,
-    output_config: OutputConfig,
+    output_config: Arc<OutputConfig>,
     env_vars: Vec<(String, Option<String>)>,
     logger: Logger,
 }
 
 impl NotebookCommand {
     pub fn new<Iter, Str>(
-        workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
-        output_config: &OutputConfig,
+        workspace_layout: Arc<WorkspaceLayout>,
+        volume_layout: Arc<VolumeLayout>,
+        output_config: Arc<OutputConfig>,
         container_runtime: Arc<DockerClient>,
         env_vars: Iter,
         logger: Logger,
@@ -31,10 +31,10 @@ impl NotebookCommand {
         Str: AsRef<str>,
     {
         Self {
-            workspace_layout: workspace_layout.clone(),
-            volume_layout: volume_layout.clone(),
+            workspace_layout,
+            volume_layout,
             container_runtime: container_runtime,
-            output_config: output_config.clone(),
+            output_config,
             env_vars: env_vars
                 .into_iter()
                 .map(|elem| {
@@ -54,7 +54,7 @@ impl NotebookCommand {
 }
 
 impl Command for NotebookCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
 
         let environment_vars = self
@@ -64,7 +64,7 @@ impl Command for NotebookCommand {
                 value
                     .clone()
                     .or_else(|| std::env::var(name).ok())
-                    .ok_or_else(|| Error::UsageError {
+                    .ok_or_else(|| CLIError::UsageError {
                         msg: format!("Environment variable {} is not set", name),
                     })
                     .map(|v| (name.to_owned(), v))

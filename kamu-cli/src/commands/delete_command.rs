@@ -1,5 +1,5 @@
 use super::common;
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -37,7 +37,7 @@ impl DeleteCommand {
 }
 
 impl Command for DeleteCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let starting_dataset_ids = self
             .ids
             .iter()
@@ -69,7 +69,7 @@ impl Command for DeleteCommand {
         };
 
         if !confirmed {
-            return Err(Error::Aborted);
+            return Err(CLIError::Aborted);
         }
 
         for id in dataset_ids.iter() {

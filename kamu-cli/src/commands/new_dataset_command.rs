@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 
 use indoc::indoc;
 use std::path::{Path, PathBuf};
@@ -131,7 +131,7 @@ impl Command for NewDatasetCommand {
     }
 
     // TODO: link to documentation
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {
             let mut p = PathBuf::from(&self.id);
             p.set_extension("yaml");
@@ -143,7 +143,7 @@ impl Command for NewDatasetCommand {
         } else if self.is_derivative {
             Self::get_content(&self.id, false)
         } else {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Please specify --root or --derivative".to_owned(),
             });
         };

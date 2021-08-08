@@ -1,11 +1,11 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
 use opendatafabric::*;
 use url::Url;
 
 use std::backtrace::BacktraceStatus;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 // Command
 ///////////////////////////////////////////////////////////////////////////////
 
-type GenericPullResult = Result<Vec<(DatasetRefBuf, Result<PullResult, PullError>)>, Error>;
+type GenericPullResult = Result<Vec<(DatasetRefBuf, Result<PullResult, PullError>)>, CLIError>;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
@@ -80,7 +80,7 @@ impl PullCommand {
         let url = if path.is_file() {
             Url::from_file_path(path.canonicalize().unwrap()).unwrap()
         } else {
-            Url::parse(fetch_str).map_err(|e| Error::UsageError {
+            Url::parse(fetch_str).map_err(|e| CLIError::UsageError {
                 msg: format!("Invalid fetch source, should be URL or path: {}", e),
             })?
         };
@@ -158,16 +158,16 @@ impl PullCommand {
 }
 
 impl Command for PullCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         match (self.recursive, self.all, &self.as_id, &self.fetch) {
-            (false, false, _, _) if self.refs.is_empty() => Err(Error::UsageError {
+            (false, false, _, _) if self.refs.is_empty() => Err(CLIError::UsageError {
                 msg: "Specify a dataset or pass --all".to_owned(),
             }),
             (false, true, None, None) if self.refs.is_empty() => Ok(()),
             (_, false, None, None) if !self.refs.is_empty() => Ok(()),
             (false, false, Some(_), None) if self.refs.len() == 1 => Ok(()),
             (false, false, None, Some(_)) if self.refs.len() == 1 => Ok(()),
-            _ => Err(Error::UsageError {
+            _ => Err(CLIError::UsageError {
                 msg: "Invalid combination of arguments".to_owned(),
             }),
         }?;

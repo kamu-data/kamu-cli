@@ -1,11 +1,11 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
 use opendatafabric::*;
 
 use std::backtrace::BacktraceStatus;
 use std::convert::TryFrom;
-use std::error::Error as StdError;
+use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -20,7 +20,7 @@ pub struct PushCommand {
     all: bool,
     recursive: bool,
     as_ref: Option<String>,
-    output_config: OutputConfig,
+    output_config: Arc<OutputConfig>,
 }
 
 impl PushCommand {
@@ -31,7 +31,7 @@ impl PushCommand {
         all: bool,
         recursive: bool,
         as_ref: Option<S2>,
-        output_config: &OutputConfig,
+        output_config: Arc<OutputConfig>,
     ) -> Self
     where
         I: Iterator<Item = S>,
@@ -45,7 +45,7 @@ impl PushCommand {
             all,
             recursive,
             as_ref: as_ref.map(|s| s.as_ref().to_owned()),
-            output_config: output_config.clone(),
+            output_config,
         }
     }
 
@@ -87,15 +87,15 @@ impl PushCommand {
 }
 
 impl Command for PushCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() == 0 && !self.all {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Specify a dataset or pass --all".to_owned(),
             });
         }
 
         if self.refs.len() > 1 && self.as_ref.is_some() {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Cannot specify multiple datasets with --as alias".to_owned(),
             });
         }
@@ -105,14 +105,14 @@ impl Command for PushCommand {
             let local_id = match DatasetRef::try_from(&self.refs[0]).unwrap().as_local() {
                 Some(local_id) => local_id,
                 None => {
-                    return Err(Error::UsageError {
+                    return Err(CLIError::UsageError {
                         msg: "When using --as dataset has to refer to a local ID".to_owned(),
                     })
                 }
             };
             let remote_ref = DatasetRefBuf::try_from(as_ref.clone()).unwrap();
             if remote_ref.is_local() {
-                return Err(Error::UsageError {
+                return Err(CLIError::UsageError {
                     msg: "When using --as the alias has to be a remote reference".to_owned(),
                 });
             }

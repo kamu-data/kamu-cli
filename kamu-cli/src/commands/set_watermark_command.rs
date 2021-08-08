@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -40,19 +40,19 @@ impl SetWatermarkCommand {
 }
 
 impl Command for SetWatermarkCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Only one dataset can be provided when setting a watermark".to_owned(),
             });
         } else if self.recursive || self.all {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Can't use all or recursive flags when setting a watermark".to_owned(),
             });
         }
 
         let watermark =
-            DateTime::parse_from_rfc3339(&self.watermark).map_err(|_| Error::UsageError {
+            DateTime::parse_from_rfc3339(&self.watermark).map_err(|_| CLIError::UsageError {
                 msg: format!(
                     "Invalid timestamp {} should follow RFC3339 format, e.g. 2020-01-01T12:00:00Z",
                     self.watermark
@@ -68,7 +68,7 @@ impl Command for SetWatermarkCommand {
             .collect();
 
         if !pull_aliases.is_empty() {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: format!(
                     "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
                     pull_aliases.join("\n- ")

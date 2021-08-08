@@ -1,4 +1,4 @@
-pub use super::error::Error;
+pub use super::error::CLIError;
 
 mod common;
 
@@ -79,13 +79,13 @@ pub trait Command {
         true
     }
 
-    fn run(&mut self) -> Result<(), Error>;
+    fn run(&mut self) -> Result<(), CLIError>;
 }
 
 pub struct NoOpCommand;
 
 impl Command for NoOpCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         Ok(())
     }
 }

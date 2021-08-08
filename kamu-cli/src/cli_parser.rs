@@ -69,11 +69,11 @@ fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     ])
 }
 
-pub fn cli(binary_name: &'static str, version: &'static str) -> App<'static, 'static> {
-    App::new(binary_name)
+pub fn cli() -> App<'static, 'static> {
+    App::new(crate::BINARY_NAME)
         .global_settings(&[AppSettings::ColoredHelp])
         .settings(&[AppSettings::SubcommandRequiredElseHelp])
-        .version(version)
+        .version(crate::VERSION)
         .arg(
             Arg::with_name("v")
                 .short("v")

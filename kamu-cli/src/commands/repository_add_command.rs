@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::RepositoryID;
 
@@ -22,10 +22,10 @@ impl RepositoryAddCommand {
 }
 
 impl Command for RepositoryAddCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let url = Url::parse(&self.url).map_err(|e| {
             eprintln!("{}: {}", console::style("Invalid URL").red(), e);
-            Error::Aborted
+            CLIError::Aborted
         })?;
 
         self.metadata_repo

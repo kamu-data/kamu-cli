@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::*;
 use kamu::domain::PullImageListener;
 use kamu::infra::explore::*;
@@ -10,9 +10,9 @@ use slog::{o, Logger};
 use std::sync::Arc;
 
 pub struct SqlServerLivyCommand {
-    workspace_layout: WorkspaceLayout,
-    volume_layout: VolumeLayout,
-    output_config: OutputConfig,
+    workspace_layout: Arc<WorkspaceLayout>,
+    volume_layout: Arc<VolumeLayout>,
+    output_config: Arc<OutputConfig>,
     container_runtime: Arc<DockerClient>,
     logger: Logger,
     address: String,
@@ -21,18 +21,18 @@ pub struct SqlServerLivyCommand {
 
 impl SqlServerLivyCommand {
     pub fn new(
-        workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
-        output_config: &OutputConfig,
+        workspace_layout: Arc<WorkspaceLayout>,
+        volume_layout: Arc<VolumeLayout>,
+        output_config: Arc<OutputConfig>,
         container_runtime: Arc<DockerClient>,
         logger: Logger,
         address: &str,
         port: u16,
     ) -> Self {
         Self {
-            workspace_layout: workspace_layout.clone(),
-            volume_layout: volume_layout.clone(),
-            output_config: output_config.clone(),
+            workspace_layout,
+            volume_layout,
+            output_config,
             container_runtime: container_runtime,
             logger: logger,
             address: address.to_owned(),
@@ -42,7 +42,7 @@ impl SqlServerLivyCommand {
 }
 
 impl Command for SqlServerLivyCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let livy_server = LivyServerImpl::new(self.container_runtime.clone());
 
         let spinner = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {

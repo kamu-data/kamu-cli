@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::{DatasetID, DatasetRef};
 
@@ -34,7 +34,7 @@ impl AliasDeleteCommand {
 }
 
 impl Command for AliasDeleteCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
         let mut aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
 
@@ -58,7 +58,7 @@ impl Command for AliasDeleteCommand {
                 }
             }
         } else {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: "Specify either an alias or --all".to_owned(),
             });
         }

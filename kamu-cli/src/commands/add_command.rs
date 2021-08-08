@@ -1,5 +1,5 @@
 use super::common;
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -83,7 +83,7 @@ impl AddCommand {
 }
 
 impl Command for AddCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let load_results = if !self.recursive {
             self.load_specific()
         } else {
@@ -100,7 +100,7 @@ impl Command for AddCommand {
             for e in errors {
                 eprintln!("{}: {}", console::style(e.dataset_ref).red(), e.source);
             }
-            return Err(Error::Aborted);
+            return Err(CLIError::Aborted);
         }
 
         // Delete existing datasets if we are replacing
@@ -123,7 +123,7 @@ impl Command for AddCommand {
                 ));
 
                 if !confirmed {
-                    return Err(Error::Aborted);
+                    return Err(CLIError::Aborted);
                 }
 
                 for s in already_exist {
@@ -168,9 +168,9 @@ impl Command for AddCommand {
         if num_errors == 0 {
             Ok(())
         } else if num_added > 0 {
-            Err(Error::PartialFailure)
+            Err(CLIError::PartialFailure)
         } else {
-            Err(Error::Aborted)
+            Err(CLIError::Aborted)
         }
     }
 }

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::fmt::Write;
 
-use crate::error::Error;
+use crate::error::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -183,9 +183,9 @@ impl ConfigService {
         return Some(result);
     }
 
-    pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), Error> {
+    pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), CLIError> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(Error::NotInWorkspace);
+            return Err(CLIError::NotInWorkspace);
         }
 
         let mut buffer = String::new();
@@ -203,8 +203,8 @@ impl ConfigService {
         }
         write!(buffer, " {}", value).unwrap();
 
-        let mut delta: CLIConfig =
-            serde_yaml::from_str(&buffer).map_err(|e| Error::UsageError { msg: e.to_string() })?;
+        let mut delta: CLIConfig = serde_yaml::from_str(&buffer)
+            .map_err(|e| CLIError::UsageError { msg: e.to_string() })?;
 
         let current = self.load(scope);
 
@@ -215,14 +215,14 @@ impl ConfigService {
         Ok(())
     }
 
-    pub fn unset(&self, key: &str, scope: ConfigScope) -> Result<(), Error> {
+    pub fn unset(&self, key: &str, scope: ConfigScope) -> Result<(), CLIError> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(Error::NotInWorkspace);
+            return Err(CLIError::NotInWorkspace);
         }
 
         let config_path = self.path_for_scope(scope);
         if !config_path.exists() {
-            return Err(Error::UsageError {
+            return Err(CLIError::UsageError {
                 msg: format!("Key {} not found", key),
             });
         }
@@ -250,7 +250,7 @@ impl ConfigService {
 
             Ok(())
         } else {
-            Err(Error::UsageError {
+            Err(CLIError::UsageError {
                 msg: format!("Key {} not found", key),
             })
         }

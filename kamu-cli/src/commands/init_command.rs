@@ -1,17 +1,15 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use kamu::infra::*;
 
-use std::fs;
+use std::{fs, sync::Arc};
 
 pub struct InitCommand {
-    workspace_layout: WorkspaceLayout,
+    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 impl InitCommand {
-    pub fn new<'a>(workspace_layout: &WorkspaceLayout) -> Self {
-        Self {
-            workspace_layout: workspace_layout.clone(),
-        }
+    pub fn new<'a>(workspace_layout: Arc<WorkspaceLayout>) -> Self {
+        Self { workspace_layout }
     }
 }
 
@@ -20,9 +18,9 @@ impl Command for InitCommand {
         false
     }
 
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.kamu_root_dir.is_dir() {
-            return Err(Error::AlreadyInWorkspace);
+            return Err(CLIError::AlreadyInWorkspace);
         }
 
         fs::create_dir_all(&self.workspace_layout.datasets_dir)?;

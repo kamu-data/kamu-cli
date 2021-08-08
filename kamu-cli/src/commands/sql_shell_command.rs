@@ -1,4 +1,4 @@
-use super::{Command, Error};
+use super::{CLIError, Command};
 use crate::output::*;
 use kamu::infra::explore::*;
 use kamu::infra::*;
@@ -8,9 +8,9 @@ use slog::Logger;
 use std::sync::Arc;
 
 pub struct SqlShellCommand {
-    workspace_layout: WorkspaceLayout,
-    volume_layout: VolumeLayout,
-    output_config: OutputConfig,
+    workspace_layout: Arc<WorkspaceLayout>,
+    volume_layout: Arc<VolumeLayout>,
+    output_config: Arc<OutputConfig>,
     container_runtime: Arc<DockerClient>,
     command: Option<String>,
     url: Option<String>,
@@ -19,18 +19,18 @@ pub struct SqlShellCommand {
 
 impl SqlShellCommand {
     pub fn new(
-        workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
-        output_config: &OutputConfig,
+        workspace_layout: Arc<WorkspaceLayout>,
+        volume_layout: Arc<VolumeLayout>,
+        output_config: Arc<OutputConfig>,
         container_runtime: Arc<DockerClient>,
         command: Option<&str>,
         url: Option<&str>,
         logger: Logger,
     ) -> Self {
         Self {
-            workspace_layout: workspace_layout.clone(),
-            volume_layout: volume_layout.clone(),
-            output_config: output_config.clone(),
+            workspace_layout,
+            volume_layout,
+            output_config,
             container_runtime: container_runtime,
             command: command.map(|v| v.to_owned()),
             url: url.map(|v| v.to_owned()),
@@ -40,7 +40,7 @@ impl SqlShellCommand {
 }
 
 impl Command for SqlShellCommand {
-    fn run(&mut self) -> Result<(), Error> {
+    fn run(&mut self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
 
         let spinner = if self.output_config.verbosity_level == 0 {
