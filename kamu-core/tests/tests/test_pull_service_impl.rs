@@ -4,6 +4,7 @@ use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::prelude::*;
+use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -81,7 +82,7 @@ fn create_graph_in_repository(
 // So instead we're creating a repository based on temp dir and syncing it into the main workspace.
 // TODO: Add simpler way to import remote dataset
 fn create_graph_remote(
-    ws: &WorkspaceLayout,
+    ws: Arc<WorkspaceLayout>,
     repo: Arc<MetadataRepositoryImpl>,
     datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>,
     to_import: Vec<DatasetRefBuf>,
@@ -215,7 +216,7 @@ fn test_pull_batching_complex_with_remote() {
     // C --------/   /
     // D -----------/
     create_graph_remote(
-        &harness.workspace_layout,
+        harness.workspace_layout.clone(),
         harness.metadata_repo.clone(),
         vec![
             (r!("a"), refs![]),
@@ -326,12 +327,38 @@ fn test_pull_batching_complex_with_remote() {
 
 #[test]
 fn test_pull_from_remote() {
-    // Setup remote
-    // metadata
-    // data
-    // checkpoints
+    let tmp_ws_dir = tempfile::tempdir().unwrap();
+    let harness = PullTestHarness::new(tmp_ws_dir.path());
 
-    // Setup workspace
+    harness
+        .metadata_repo
+        .add_repository(
+            RepositoryID::new_unchecked("myrepo"),
+            url::Url::parse("file:///tmp/nowhere").unwrap(),
+        )
+        .unwrap();
+
+    let res =
+        harness
+            .pull_svc
+            .pull_from(&r!("myrepo/foo"), &id!("bar"), PullOptions::default(), None);
+
+    assert_matches!(
+        res,
+        Ok(PullResult::Updated {
+            old_head: None,
+            new_head: _,
+            num_blocks: 1,
+        })
+    );
+
+    let aliases = harness
+        .metadata_repo
+        .get_remote_aliases(&id!("bar"))
+        .unwrap();
+    let pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
+
+    assert_eq!(pull_aliases, vec![DatasetRef::new_unchecked("myrepo/foo")]);
 }
 
 #[test]
@@ -405,7 +432,7 @@ impl PullTestHarness {
         let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
-        let sync_svc = Arc::new(TestSyncService::new(calls.clone()));
+        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), metadata_repo.clone()));
         let pull_svc = PullServiceImpl::new(
             metadata_repo.clone(),
             ingest_svc,
@@ -534,11 +561,15 @@ impl TransformService for TestTransformService {
 
 struct TestSyncService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
+    metadata_repo: Arc<dyn MetadataRepository>,
 }
 
 impl TestSyncService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
-        Self { calls }
+    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, metadata_repo: Arc<dyn MetadataRepository>) -> Self {
+        Self {
+            calls,
+            metadata_repo,
+        }
     }
 }
 
@@ -546,11 +577,22 @@ impl SyncService for TestSyncService {
     fn sync_from(
         &self,
         _remote_dataset_ref: &DatasetRef,
-        _local_dataset_id: &DatasetID,
+        local_dataset_id: &DatasetID,
         _options: SyncOptions,
         _listener: Option<Arc<Mutex<dyn SyncListener>>>,
     ) -> Result<SyncResult, SyncError> {
-        unimplemented!()
+        self.metadata_repo
+            .add_dataset(
+                MetadataFactory::dataset_snapshot()
+                    .id(local_dataset_id)
+                    .build(),
+            )
+            .unwrap();
+        Ok(SyncResult::Updated {
+            old_head: None,
+            new_head: Sha3_256::zero(),
+            num_blocks: 1,
+        })
     }
 
     fn sync_from_multi(

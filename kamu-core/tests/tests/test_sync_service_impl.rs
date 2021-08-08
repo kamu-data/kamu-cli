@@ -99,7 +99,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     let repository_factory = Arc::new(RepositoryFactory::new(logger.clone()));
 
     let sync_svc = SyncServiceImpl::new(
-        &workspace_layout,
+        workspace_layout.clone(),
         metadata_repo.clone(),
         repository_factory.clone(),
         logger.clone(),

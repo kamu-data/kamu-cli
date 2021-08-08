@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub struct SyncServiceImpl {
-    workspace_layout: WorkspaceLayout,
+    workspace_layout: Arc<WorkspaceLayout>,
     metadata_repo: Arc<dyn MetadataRepository>,
     repository_factory: Arc<RepositoryFactory>,
     _logger: Logger,
@@ -18,13 +18,13 @@ pub struct SyncServiceImpl {
 #[component(pub)]
 impl SyncServiceImpl {
     pub fn new(
-        workspace_layout: &WorkspaceLayout,
+        workspace_layout: Arc<WorkspaceLayout>,
         metadata_repo: Arc<dyn MetadataRepository>,
         repository_factory: Arc<RepositoryFactory>,
         logger: Logger,
     ) -> Self {
         Self {
-            workspace_layout: workspace_layout.clone(),
+            workspace_layout,
             metadata_repo,
             repository_factory,
             _logger: logger,
