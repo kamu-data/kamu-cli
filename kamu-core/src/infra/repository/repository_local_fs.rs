@@ -155,12 +155,14 @@ impl RepositoryClient for RepositoryLocalFS {
         }
 
         // TODO: limit the set of files based on metadata
-        for entry in std::fs::read_dir(&in_data_dir)? {
-            let in_path = entry?.path();
-            let out_path =
-                out_data_dir.join(in_path.file_name().expect("Data file without file name"));
-            std::fs::copy(&in_path, &out_path)?;
-            result.data_files.push(out_path);
+        if in_data_dir.exists() {
+            for entry in std::fs::read_dir(&in_data_dir)? {
+                let in_path = entry?.path();
+                let out_path =
+                    out_data_dir.join(in_path.file_name().expect("Data file without file name"));
+                std::fs::copy(&in_path, &out_path)?;
+                result.data_files.push(out_path);
+            }
         }
 
         if in_checkpoint_dir.exists() {

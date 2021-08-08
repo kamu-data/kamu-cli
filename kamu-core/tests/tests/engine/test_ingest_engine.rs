@@ -2,13 +2,14 @@ use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::*;
 
 use parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };
+use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
@@ -89,7 +90,7 @@ fn test_ingest_with_engine() {
     metadata_repo.add_dataset(dataset_snapshot).unwrap();
 
     let res = ingest_svc.ingest(&dataset_id, IngestOptions::default(), None);
-    assert_ok!(res, IngestResult::Updated { .. });
+    assert_matches!(res, Ok(IngestResult::Updated { .. }));
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);
     assert!(dataset_layout.data_dir.exists());

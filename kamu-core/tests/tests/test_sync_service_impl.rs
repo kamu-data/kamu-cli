@@ -1,11 +1,11 @@
 use crate::utils::MinioServer;
 use kamu::domain::*;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::*;
 
-use assert_matches::assert_matches;
 use chrono::prelude::*;
+use std::assert_matches::assert_matches;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;

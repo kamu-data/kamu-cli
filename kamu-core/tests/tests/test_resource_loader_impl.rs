@@ -1,7 +1,7 @@
 use crate::utils::HttpServer;
 use kamu::domain::{ResourceError, ResourceLoader};
 use kamu::infra::ResourceLoaderImpl;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 

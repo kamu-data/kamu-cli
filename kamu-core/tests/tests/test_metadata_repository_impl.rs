@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::*;
 
 #[test]

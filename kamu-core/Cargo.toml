@@ -56,7 +56,5 @@ walkdir = "*"
 users = "*"  # For getting uid:gid
 
 [dev-dependencies]
-kamu-test = { path = "../kamu-core-test" }
-assert_matches = "*"
 filetime = "*"
 parquet = "*"

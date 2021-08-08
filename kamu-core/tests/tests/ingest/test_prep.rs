@@ -1,10 +1,10 @@
 use indoc::indoc;
 use kamu::domain::IngestError;
 use kamu::infra::ingest::*;
-use kamu_test::assert_err;
 use opendatafabric::*;
 
 use chrono::Utc;
+use std::assert_matches::assert_matches;
 use std::io::prelude::*;
 
 #[test]
@@ -115,7 +115,7 @@ fn test_prep_decompress_zip_bad_file() {
     let prep_svc = PrepService::new();
 
     let res = prep_svc.prepare(&prep_steps, Utc::now(), None, &src_path, &target_path);
-    assert_err!(res, IngestError::InternalError { .. });
+    assert_matches!(res, Err(IngestError::InternalError { .. }));
 }
 
 #[test]

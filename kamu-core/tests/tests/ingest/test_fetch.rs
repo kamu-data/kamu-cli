@@ -1,12 +1,13 @@
+use std::assert_matches::assert_matches;
+
 use crate::utils::{FtpServer, HttpServer};
-use indoc::indoc;
-use kamu::domain::*;
-use kamu::infra::ingest::*;
-use kamu_test::*;
-use opendatafabric::*;
 
 use chrono::prelude::*;
 use chrono::Utc;
+use indoc::indoc;
+use kamu::domain::*;
+use kamu::infra::ingest::*;
+use opendatafabric::*;
 use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,10 @@ fn test_fetch_url_file() {
     let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
     // No file to fetch
-    assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), IngestError::NotFound {..});
+    assert_matches!(
+        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        Err(IngestError::NotFound { .. })
+    );
     assert!(!target_path.exists());
 
     std::fs::write(
@@ -83,9 +87,9 @@ fn test_fetch_url_http_unreachable() {
 
     let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
-    assert_err!(
+    assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
-        IngestError::Unreachable {..}
+        Err(IngestError::Unreachable { .. })
     );
     assert!(!target_path.exists());
 }
@@ -106,9 +110,9 @@ fn test_fetch_url_http_not_found() {
 
     let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
-    assert_err!(
+    assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
-        IngestError::NotFound {..}
+        Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
 }
@@ -190,9 +194,9 @@ fn test_fetch_url_http_ok() {
     assert!(target_path.exists());
 
     std::fs::remove_file(&src_path).unwrap();
-    assert_err!(
+    assert_matches!(
         fetch_svc.fetch(&fetch_step, Some(res_touch.checkpoint), &target_path, None),
-        IngestError::NotFound {..}
+        Err(IngestError::NotFound { .. })
     );
 
     assert!(target_path.exists());
@@ -278,7 +282,10 @@ fn test_fetch_files_glob() {
     let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
 
     // No file to fetch
-    assert_err!(fetch_svc.fetch(&fetch_step, None, &target_path, None), IngestError::NotFound {..});
+    assert_matches!(
+        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        Err(IngestError::NotFound { .. })
+    );
     assert!(!target_path.exists());
 
     std::fs::write(

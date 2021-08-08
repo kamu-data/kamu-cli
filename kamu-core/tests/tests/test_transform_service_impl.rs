@@ -1,7 +1,7 @@
 use kamu::domain::*;
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};

@@ -1,6 +1,6 @@
 use kamu::domain::*;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::prelude::*;
@@ -49,11 +49,36 @@ fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetRefBuf, Vec
     }
 }
 
+fn create_graph_in_repository(
+    repo_path: &Path,
+    datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>,
+) {
+    let repo_factory = RepositoryFactoryFS::new(repo_path);
+
+    for (dataset_ref, deps) in &datasets {
+        let ds_builder = repo_factory
+            .new_dataset()
+            .id(dataset_ref.as_local().unwrap());
+
+        if deps.is_empty() {
+            ds_builder.append(
+                MetadataFactory::metadata_block()
+                    .source(MetadataFactory::dataset_source_root().build())
+                    .build(),
+            );
+        } else {
+            ds_builder.append(
+                MetadataFactory::metadata_block()
+                    .source(MetadataFactory::dataset_source_deriv(deps.iter()).build())
+                    .build(),
+            );
+        }
+    }
+}
+
 // Adding a remote dataset is a bit of a pain.
 // We cannot add a local dataset and then add a pull alias without adding all of its dependencies too.
-// So instead we're creating a temp workspace with local datasets,
-// exporting those into repository based on temp dir,
-// and finally syncing them into the main workspace.
+// So instead we're creating a repository based on temp dir and syncing it into the main workspace.
 // TODO: Add simpler way to import remote dataset
 fn create_graph_remote(
     ws: &WorkspaceLayout,
@@ -61,41 +86,16 @@ fn create_graph_remote(
     datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>,
     to_import: Vec<DatasetRefBuf>,
 ) {
-    let tmp_ws_dir = tempfile::tempdir().unwrap();
-    let tmp_workspace = Arc::new(WorkspaceLayout::create(tmp_ws_dir.path()).unwrap());
-    let tmp_metadata_repo = Arc::new(MetadataRepositoryImpl::new(tmp_workspace.clone()));
-
-    create_graph(&tmp_metadata_repo, datasets);
-
-    let tmp_sync_service = SyncServiceImpl::new(
-        &tmp_workspace,
-        tmp_metadata_repo.clone(),
-        Arc::new(RepositoryFactory::new(slog::Logger::root(
-            slog::Discard,
-            slog::o!(),
-        ))),
-        slog::Logger::root(slog::Discard, slog::o!()),
-    );
-
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let tmp_repo_id = RepositoryID::new_unchecked("tmp");
-    tmp_metadata_repo
-        .add_repository(
-            tmp_repo_id,
-            url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
-        )
-        .unwrap();
+    create_graph_in_repository(tmp_repo_dir.path(), datasets);
 
-    for r in &to_import {
-        tmp_sync_service
-            .sync_to(
-                r.as_local().unwrap(),
-                &DatasetRefBuf::new(Some(tmp_repo_id), None, r.as_local().unwrap()),
-                SyncOptions::default(),
-                None,
-            )
-            .unwrap();
-    }
+    let tmp_repo_id = RepositoryID::new_unchecked("tmp");
+
+    repo.add_repository(
+        tmp_repo_id,
+        url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
+    )
+    .unwrap();
 
     let sync_service = SyncServiceImpl::new(
         ws,
@@ -106,12 +106,6 @@ fn create_graph_remote(
         ))),
         slog::Logger::root(slog::Discard, slog::o!()),
     );
-
-    repo.add_repository(
-        tmp_repo_id,
-        url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
-    )
-    .unwrap();
 
     for r in &to_import {
         sync_service
@@ -328,6 +322,16 @@ fn test_pull_batching_complex_with_remote() {
             PullBatch::Transform(refs!("g")),
         ],
     );
+}
+
+#[test]
+fn test_pull_from_remote() {
+    // Setup remote
+    // metadata
+    // data
+    // checkpoints
+
+    // Setup workspace
 }
 
 #[test]

@@ -1,6 +1,8 @@
+use std::assert_matches::assert_matches;
+
 use kamu::domain::*;
 use kamu::infra::*;
-use kamu_test::*;
+use kamu::testing::*;
 
 use chrono::{TimeZone, Utc};
 
@@ -23,7 +25,7 @@ fn test_create_new_chain_error_dir_already_exists() {
     let block = MetadataFactory::metadata_block().build();
 
     let res = MetadataChainImpl::create(tmp_dir.path(), block);
-    assert_err!(res, InfraError::IOError { .. });
+    assert_matches!(res, Err(InfraError::IOError { .. }));
 }
 
 #[test]
