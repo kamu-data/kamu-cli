@@ -53,3 +53,4 @@ url = "*"
 
 [dev-dependencies]
 rand = "^0.8"
+indoc = "*"  # Compile-time unindent

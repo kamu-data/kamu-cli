@@ -244,7 +244,11 @@ impl Command for PullCommand {
                 });
         }
 
-        Ok(())
+        if errors != 0 {
+            Err(CLIError::PartialFailure)
+        } else {
+            Ok(())
+        }
     }
 }
 
