@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.50.1"
+version = "0.51.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"
@@ -11,6 +11,8 @@ repository = "https://github.com/kamu-data/kamu-cli"
 keywords = ["cli", "data", "collaboration", "pipeline", "management", "provenance"]
 categories = ["command-line-utilities"]
 
+[features]
+skip_docker_tests = []
 
 [dependencies]
 opendatafabric = { path = "../opendatafabric" }
@@ -54,3 +56,4 @@ url = "*"
 [dev-dependencies]
 rand = "^0.8"
 indoc = "*"  # Compile-time unindent
+parquet = "*"

@@ -2,10 +2,13 @@ use std::{convert::TryFrom, path::Path};
 
 use indoc::indoc;
 use opendatafabric::*;
+use parquet::record::RowAccessor;
+use url::Url;
 
 use crate::utils::Kamu;
 
 #[test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 fn test_pull_ingest_from_file() {
     let kamu = Kamu::new_workspace_tmp();
 
@@ -13,7 +16,9 @@ fn test_pull_ingest_from_file() {
         id: DatasetIDBuf::try_from("population").unwrap(),
         source: DatasetSource::Root(DatasetSourceRoot {
             fetch: FetchStep::Url(FetchStepUrl {
-                url: "/nowhere".to_owned(),
+                url: Url::from_file_path(&kamu.workspace_path().join("data.csv"))
+                    .unwrap()
+                    .to_string(),
                 event_time: None,
                 cache: None,
             }),
@@ -35,21 +40,68 @@ fn test_pull_ingest_from_file() {
     })
     .unwrap();
 
-    let data_path = kamu.workspace_path().join("data.csv");
-    std::fs::write(
-        &data_path,
-        indoc!(
-            "
+    {
+        let data_path = kamu.workspace_path().join("data.csv");
+        std::fs::write(
+            &data_path,
+            indoc!(
+                "
             2020-01-01,A,1000
             2020-01-01,B,2000
             2020-01-01,C,3000
             "
-        ),
-    )
-    .unwrap();
-
-    kamu.execute(["pull", "population", "--fetch", path(&data_path)])
+            ),
+        )
         .unwrap();
+
+        kamu.execute(["pull", "population"]).unwrap();
+
+        let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
+        assert_eq!(
+            parquet.column_names(),
+            ["system_time", "event_time", "city", "population"]
+        );
+        assert_eq!(
+            parquet.records(|r| (r.get_string(2).unwrap().clone(), r.get_long(3).unwrap())),
+            [
+                ("A".to_owned(), 1000),
+                ("B".to_owned(), 2000),
+                ("C".to_owned(), 3000)
+            ]
+        );
+    }
+
+    {
+        let data_path = kamu.workspace_path().join("data2.csv");
+        std::fs::write(
+            &data_path,
+            indoc!(
+                "
+            2021-01-01,A,1100
+            2021-01-01,B,2100
+            2021-01-01,C,3100
+            "
+            ),
+        )
+        .unwrap();
+
+        kamu.execute(["pull", "population", "--fetch", path(&data_path)])
+            .unwrap();
+
+        let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
+        assert_eq!(
+            parquet.column_names(),
+            ["system_time", "event_time", "city", "population"]
+        );
+        assert_eq!(
+            parquet.records(|r| (r.get_string(2).unwrap().clone(), r.get_long(3).unwrap())),
+            [
+                ("A".to_owned(), 1100),
+                ("B".to_owned(), 2100),
+                ("C".to_owned(), 3100)
+            ]
+        );
+    }
 }
 
 fn path(p: &Path) -> &str {

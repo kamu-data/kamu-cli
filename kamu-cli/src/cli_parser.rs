@@ -457,9 +457,10 @@ pub fn cli() -> App<'static, 'static> {
 
                         kamu pull --set-watermark 2020-01-01 org.example.data
 
-                    Ingest data into the root dataset from file (format should match the original source):
+                    Ingest data into the root dataset from file or URL (format should match one expected by the 'prepare' step):
 
-                        kamu pull org.example.data --source path/to/data.csv
+                        kamu pull org.example.data --fetch path/to/data.csv
+                        kamu pull org.example.data --fetch https://example.com/data.csv
                     "
                 )),
             SubCommand::with_name("push")

@@ -63,23 +63,7 @@ fn test_ingest_with_engine() {
                             .map(|s| s.to_string())
                             .collect(),
                     ),
-                    separator: None,
-                    encoding: None,
-                    quote: None,
-                    escape: None,
-                    comment: None,
-                    enforce_schema: None,
-                    infer_schema: None,
-                    ignore_leading_white_space: None,
-                    ignore_trailing_white_space: None,
-                    null_value: None,
-                    empty_value: None,
-                    nan_value: None,
-                    positive_inf: None,
-                    negative_inf: None,
-                    date_format: None,
-                    timestamp_format: None,
-                    multi_line: None,
+                    ..ReadStepCsv::default()
                 }))
                 .build(),
         )

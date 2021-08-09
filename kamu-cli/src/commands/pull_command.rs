@@ -1,6 +1,7 @@
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
+use kamu::infra::DatasetKind;
 use opendatafabric::*;
 use url::Url;
 
@@ -18,6 +19,7 @@ type GenericPullResult = Result<Vec<(DatasetRefBuf, Result<PullResult, PullError
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
+    metadata_repo: Arc<dyn MetadataRepository>,
     output_config: Arc<OutputConfig>,
     refs: Vec<String>,
     all: bool,
@@ -30,6 +32,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, S>(
         pull_svc: Arc<dyn PullService>,
+        metadata_repo: Arc<dyn MetadataRepository>,
         output_config: Arc<OutputConfig>,
         refs: I,
         all: bool,
@@ -44,6 +47,7 @@ impl PullCommand {
     {
         Self {
             pull_svc,
+            metadata_repo,
             output_config,
             refs: refs.map(|s| s.as_ref().to_owned()).collect(),
             all: all,
@@ -74,8 +78,29 @@ impl PullCommand {
 
     fn ingest_from(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
         let dataset_id = DatasetID::try_from(&self.refs[0]).unwrap();
-        let fetch_str = self.fetch.as_ref().unwrap();
+        let summary = self.metadata_repo.get_summary(dataset_id)?;
+        if summary.kind != DatasetKind::Root {
+            return Err(CLIError::UsageError {
+                msg: "Cannot ingest data into non-root dataset".to_owned(),
+            });
+        }
 
+        let aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        let pull_aliases: Vec<_> = aliases
+            .get_by_kind(RemoteAliasKind::Pull)
+            .map(|r| r.as_str())
+            .collect();
+
+        if !pull_aliases.is_empty() {
+            return Err(CLIError::UsageError {
+                msg: format!(
+                    "Ingesting data into remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
+                    pull_aliases.join("\n- ")
+                ),
+            });
+        }
+
+        let fetch_str = self.fetch.as_ref().unwrap();
         let path = Path::new(fetch_str);
         let url = if path.is_file() {
             Url::from_file_path(path.canonicalize().unwrap()).unwrap()

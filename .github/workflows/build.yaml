@@ -24,13 +24,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
-      - run: cd kamu-core && cargo test --features skip_docker_tests --verbose
-      - run: cd kamu-cli && cargo test --verbose
+      - run: cargo test --verbose --features skip_docker_tests
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
-      - run: cd kamu-core && cargo test --features skip_docker_tests --verbose
-      - run: cd kamu-cli && cargo test --verbose
+      - run: cargo test --verbose --features skip_docker_tests
