@@ -1,4 +1,5 @@
 use kamu::domain::*;
+use kamu::infra::MetadataRepositoryNull;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
@@ -11,6 +12,7 @@ fn main() {
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
+        Arc::new(MetadataRepositoryNull),
         Arc::new(OutputConfig::default()),
         ["a"].iter(),
         false,

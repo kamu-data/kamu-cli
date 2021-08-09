@@ -108,6 +108,7 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                 Box::new(PullCommand::new(
                     catalog.get_one().unwrap(),
                     catalog.get_one().unwrap(),
+                    catalog.get_one().unwrap(),
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),

@@ -29,7 +29,10 @@ sudo ln -s $PWD/target/debug/kamu /usr/bin/kamu
 ```
 
 ## Release Procedure
-1. Create a CHANGELOG entry for the version you are releasing
-2. Tag the latest commit with a version: `git tag vX.Y.Z`
-3. Push the tag and the commit to the origin: `git push origin tag vX.Y.Z`
-4. Github Actions will pick up the new tag and create a new GitHub release from it
+1. While on the feature branch, bump the crates versions using `release` tool, e.g. `cargo run --bin release -- --major / --minor / --patch`
+2. Create a CHANGELOG entry for the new version
+3. Create PR, wait for tests, then merge
+4. Checkout and pull `master`
+5. Tag the latest commit with a new version: `git tag vX.Y.Z`
+6. Push the tag to repo: `git push origin tag vX.Y.Z`
+7. Github Actions will pick up the new tag and create a new GitHub release from it

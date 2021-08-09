@@ -66,8 +66,12 @@ impl IngestTask {
             }
         }
 
-        if source.is_none() {
-            panic!("Failed to find source definition");
+        let source = source.expect("Failed to find source definition");
+
+        if fetch_override.is_some() {
+            if let FetchStep::FilesGlob(_) = source.fetch {
+                panic!("Fetch override use is not supported for glob sources, as globs maintain strict ordering and state")
+            }
         }
 
         Self {
@@ -75,7 +79,7 @@ impl IngestTask {
             options,
             layout,
             meta_chain: RefCell::new(meta_chain),
-            source: source.unwrap(),
+            source,
             fetch_override,
             prev_checkpoint,
             vocab: vocab.unwrap_or_default(),
@@ -171,8 +175,25 @@ impl IngestTask {
                 &checkpoint_path,
                 "FetchCheckpoint",
                 |old_checkpoint: Option<FetchCheckpoint>| {
+                    // Ingesting from overridden source?
+                    if let Some(fetch_override) = &self.fetch_override {
+                        info!(self.logger, "Fetching the overridden source"; "fetch" => ?fetch_override);
+
+                        // TODO: Checkpoint for override may influence future normal runs
+                        // Should we not create one?
+                        return self.fetch_service.fetch(
+                            fetch_override,
+                            None,
+                            &self.layout.cache_dir.join("fetched.bin"),
+                            Some(&mut FetchProgressListenerBridge {
+                                listener: self.listener.clone(),
+                            }),
+                        );
+                    }
+
                     if let Some(ref cp) = old_checkpoint {
                         if !cp.is_cacheable() && !self.options.force_uncacheable {
+                            info!(self.logger, "Skipping fetch of uncacheable source");
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,
                                 checkpoint: old_checkpoint.unwrap(),
@@ -187,6 +208,7 @@ impl IngestTask {
                         if commit_checkpoint.is_none()
                             || commit_checkpoint.unwrap().for_fetched_at != cp.last_fetched
                         {
+                            info!(self.logger, "Skipping fetch to complete previous ingestion");
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,
                                 checkpoint: old_checkpoint.unwrap(),
@@ -194,6 +216,7 @@ impl IngestTask {
                         }
                     }
 
+                    info!(self.logger, "Fetching the data"; "fetch" => ?self.source.fetch);
                     self.fetch_service.fetch(
                         &self.source.fetch,
                         old_checkpoint,

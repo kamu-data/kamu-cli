@@ -859,9 +859,9 @@ dependencies = [
 
 [[package]]
 name = "http-body"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60daa14be0e0786db0f03a9e57cb404c9d756eed2b6c62b9ea98ec5743ec75a9"
+checksum = "399c583b2979440c60be0821a6199eca73bc3c8dcd9d070d75ac726e2c6186e5"
 dependencies = [
  "bytes",
  "http",
@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.50.1"
+version = "0.51.0"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.50.1"
+version = "0.51.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1093,6 +1093,7 @@ dependencies = [
  "minus",
  "num-format",
  "opendatafabric",
+ "parquet",
  "prettytable-rs",
  "rand 0.8.4",
  "read_input",
@@ -1449,7 +1450,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.50.1"
+version = "0.51.0"
 dependencies = [
  "byteorder",
  "chrono",

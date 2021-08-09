@@ -316,6 +316,15 @@ impl PullService for PullServiceImpl {
         options: PullOptions,
         listener: Option<Arc<Mutex<dyn IngestListener>>>,
     ) -> Result<PullResult, PullError> {
+        if !self
+            .metadata_repo
+            .get_remote_aliases(dataset_id)?
+            .is_empty(RemoteAliasKind::Pull)
+        {
+            // TODO: Consider extracting into a watermark-specific error type
+            panic!("Attempting to ingest data into remote dataset");
+        }
+
         let res = self
             .ingest_svc
             .ingest_from(dataset_id, fetch, options.ingest_options, listener);
