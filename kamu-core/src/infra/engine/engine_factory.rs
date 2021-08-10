@@ -12,7 +12,19 @@ use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
-pub struct EngineFactory {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait EngineFactory: Send + Sync {
+    fn get_engine(
+        &self,
+        engine_id: &str,
+        maybe_listener: Option<&mut dyn PullImageListener>,
+    ) -> Result<Arc<Mutex<dyn Engine>>, EngineError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct EngineFactoryImpl {
     spark_engine: Arc<Mutex<SparkEngine>>,
     flink_engine: Arc<Mutex<FlinkEngine>>,
     container_runtime: DockerClient,
@@ -20,7 +32,7 @@ pub struct EngineFactory {
 }
 
 #[component(pub)]
-impl EngineFactory {
+impl EngineFactoryImpl {
     pub fn new(
         workspace_layout: &WorkspaceLayout,
         container_runtime: DockerClient,
@@ -43,8 +55,10 @@ impl EngineFactory {
             known_images: Mutex::new(HashSet::new()),
         }
     }
+}
 
-    pub fn get_engine(
+impl EngineFactory for EngineFactoryImpl {
+    fn get_engine(
         &self,
         engine_id: &str,
         maybe_listener: Option<&mut dyn PullImageListener>,
@@ -83,5 +97,19 @@ impl EngineFactory {
         }
 
         Ok(engine)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct EngineFactoryNull;
+
+impl EngineFactory for EngineFactoryNull {
+    fn get_engine(
+        &self,
+        engine_id: &str,
+        _maybe_listener: Option<&mut dyn PullImageListener>,
+    ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
+        Err(EngineError::not_found(engine_id))
     }
 }

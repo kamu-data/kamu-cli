@@ -11,6 +11,12 @@ pub trait MetadataRepository: Send + Sync {
 
     fn add_dataset(&self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;
 
+    fn add_dataset_from_block(
+        &self,
+        dataset_id: &DatasetID,
+        first_block: MetadataBlock,
+    ) -> Result<Sha3_256, DomainError>;
+
     fn add_datasets(
         &self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,

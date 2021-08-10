@@ -12,14 +12,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub struct ReadService {
-    engine_factory: Arc<EngineFactory>,
+    engine_factory: Arc<dyn EngineFactory>,
 }
 
 impl ReadService {
-    pub fn new(engine_factory: Arc<EngineFactory>) -> Self {
-        Self {
-            engine_factory: engine_factory,
-        }
+    pub fn new(engine_factory: Arc<dyn EngineFactory>) -> Self {
+        Self { engine_factory }
     }
 
     // TODO: Don't use engine for anything but preprocessing
