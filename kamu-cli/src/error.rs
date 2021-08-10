@@ -30,3 +30,9 @@ pub enum CLIError {
         backtrace: Backtrace,
     },
 }
+
+impl CLIError {
+    pub fn usage_error<S: Into<String>>(msg: S) -> Self {
+        Self::UsageError { msg: msg.into() }
+    }
+}

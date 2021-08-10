@@ -134,17 +134,20 @@ impl MetadataChain for MetadataChainImpl {
         }
     }
 
-    fn iter_blocks_ref(&self, r: &BlockRef) -> Box<dyn Iterator<Item = MetadataBlock>> {
-        let hash = self
-            .read_ref(r)
-            .unwrap_or_else(|| panic!("Ref {:?} does not exist", r));
-
-        Box::new(MetadataBlockIter {
-            reader: BlockReader {
-                blocks_dir: self.meta_path.join("blocks"),
-            },
-            next_hash: Some(hash),
-        })
+    fn iter_blocks_starting(
+        &self,
+        block_hash: &Sha3_256,
+    ) -> Option<Box<dyn Iterator<Item = MetadataBlock>>> {
+        if !self.block_path(block_hash).exists() {
+            None
+        } else {
+            Some(Box::new(MetadataBlockIter {
+                reader: BlockReader {
+                    blocks_dir: self.meta_path.join("blocks"),
+                },
+                next_hash: Some(*block_hash),
+            }))
+        }
     }
 
     fn append_ref(&mut self, r: &BlockRef, block: MetadataBlock) -> Sha3_256 {

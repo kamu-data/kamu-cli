@@ -735,6 +735,41 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
             ),
+            SubCommand::with_name("verify")
+                .about("Verifies the validity of derivative data")
+                .args(&[
+                    Arg::with_name("recursive")
+                        .short("r")
+                        .long("recursive")
+                        .help("Verify the entire transformation chain starting with root datasets"),
+                    Arg::with_name("dataset")
+                        .multiple(true)
+                        .index(1)
+                        .validator(validate_dataset_id)
+                        .help("Dataset ID(s)"),
+                ])
+                .after_help(indoc::indoc!(
+                    r"
+                    Validity of derivative data is determined by:
+                    - Trustworthiness of the source data that went into it
+                    - Soundness of the derivative transformation chain that shaped it
+                    - Guaranteeing that derivative data was in fact produced by declared transformations
+
+                    For the first two, you can inspect the dataset lineage and identify which root datasets you are getting data from to assess publishers' reputability, and audit all derivative transformations to ensure they are sound and non-malicious.
+
+                    This command can help you with the last stage. It uses the history of transformations stored in metadata to repeat all transformations locally and compare the hashes of data to ones originally recorded, thus ensuring that data you downloaded was actually produced by applying all declared transformations to the source data.
+
+                    ### Examples ###
+
+                    Verify the data in a dataset starting from its immediate inputs:
+
+                        kamu verify com.example.deriv
+
+                    Verify the entire transformation chain starting with root datasets:
+
+                        kamu pull --recursive com.example.deriv
+                    "
+                )),
         ])
 }
 

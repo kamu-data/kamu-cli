@@ -203,6 +203,12 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
             }
             _ => unimplemented!(),
         },
+        ("verify", Some(submatches)) => Box::new(VerifyCommand::new(
+            catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
+            submatches.values_of("dataset").unwrap_or_default(),
+            submatches.is_present("recursive"),
+        )),
         _ => unimplemented!(),
     }
 }
