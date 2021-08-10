@@ -72,6 +72,12 @@ pub struct ExecuteQueryRequest {
     pub out_data_path: PathBuf,
 }
 
+impl ExecuteQueryRequest {
+    pub fn is_empty(&self) -> bool {
+        self.input_slices.values().all(|s| s.is_empty())
+    }
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -89,6 +95,12 @@ pub struct InputDataSlice {
     // TODO: Replace with just DDL schema
     pub schema_file: PathBuf,
     pub explicit_watermarks: Vec<Watermark>,
+}
+
+impl InputDataSlice {
+    pub fn is_empty(&self) -> bool {
+        self.data_paths.is_empty() && self.explicit_watermarks.is_empty()
+    }
 }
 
 #[skip_serializing_none]

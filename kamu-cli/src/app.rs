@@ -27,6 +27,12 @@ pub fn run(
     local_volume_layout: VolumeLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
+    // Cleanup run info dir
+    if workspace_layout.run_info_dir.exists() {
+        std::fs::remove_dir_all(&workspace_layout.run_info_dir).unwrap();
+        std::fs::create_dir(&workspace_layout.run_info_dir).unwrap();
+    }
+
     let mut catalog = configure_catalog().unwrap();
     catalog.add_value(workspace_layout.clone());
     catalog.add_value(local_volume_layout.clone());
@@ -39,12 +45,6 @@ pub fn run(
     catalog.add_factory(move || logger_moved.new(o!()));
 
     load_config(&mut catalog);
-
-    // Cleanup run info dir
-    if workspace_layout.run_info_dir.exists() {
-        std::fs::remove_dir_all(&workspace_layout.run_info_dir).unwrap();
-        std::fs::create_dir(&workspace_layout.run_info_dir).unwrap();
-    }
 
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches);
 
@@ -87,7 +87,9 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.bind::<dyn PushService, PushServiceImpl>()?;
 
     catalog.add::<RepositoryFactory>();
-    catalog.add::<EngineFactory>();
+
+    catalog.add::<EngineFactoryImpl>();
+    catalog.bind::<dyn EngineFactory, EngineFactoryImpl>()?;
 
     Ok(catalog)
 }

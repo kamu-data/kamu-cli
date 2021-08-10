@@ -229,28 +229,6 @@ impl MetadataRepository for MetadataRepositoryImpl {
     }
 
     fn add_dataset(&self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError> {
-        let dataset_metadata_dir = self.get_dataset_metadata_dir(&snapshot.id);
-
-        if dataset_metadata_dir.exists() {
-            return Err(DomainError::already_exists(
-                ResourceKind::Dataset,
-                String::from(&snapshot.id as &str),
-            ));
-        }
-
-        if let DatasetSource::Derivative(ref src) = snapshot.source {
-            for input_id in src.inputs.iter() {
-                if !self.dataset_exists(input_id) {
-                    return Err(DomainError::missing_reference(
-                        ResourceKind::Dataset,
-                        String::from(&snapshot.id as &str),
-                        ResourceKind::Dataset,
-                        String::from(input_id as &str),
-                    ));
-                }
-            }
-        };
-
         let first_block = MetadataBlock {
             block_hash: Sha3_256::zero(),
             prev_block_hash: None,
@@ -260,6 +238,39 @@ impl MetadataRepository for MetadataRepositoryImpl {
             output_slice: None,
             output_watermark: None,
             input_slices: None,
+        };
+
+        self.add_dataset_from_block(&snapshot.id, first_block)
+    }
+
+    fn add_dataset_from_block(
+        &self,
+        dataset_id: &DatasetID,
+        first_block: MetadataBlock,
+    ) -> Result<Sha3_256, DomainError> {
+        assert!(first_block.prev_block_hash.is_none());
+        assert!(first_block.source.is_some());
+
+        let dataset_metadata_dir = self.get_dataset_metadata_dir(dataset_id);
+
+        if dataset_metadata_dir.exists() {
+            return Err(DomainError::already_exists(
+                ResourceKind::Dataset,
+                dataset_id.to_string(),
+            ));
+        }
+
+        if let Some(DatasetSource::Derivative(ref src)) = first_block.source {
+            for input_id in src.inputs.iter() {
+                if !self.dataset_exists(input_id) {
+                    return Err(DomainError::missing_reference(
+                        ResourceKind::Dataset,
+                        dataset_id.to_string(),
+                        ResourceKind::Dataset,
+                        input_id.to_string(),
+                    ));
+                }
+            }
         };
 
         let (_chain, block_hash) =
@@ -604,6 +615,14 @@ impl MetadataRepository for MetadataRepositoryNull {
             ResourceKind::Dataset,
             dataset_id.as_str().to_owned(),
         ))
+    }
+
+    fn add_dataset_from_block(
+        &self,
+        _dataset_id: &DatasetID,
+        _first_block: MetadataBlock,
+    ) -> Result<Sha3_256, DomainError> {
+        Err(DomainError::ReadOnly)
     }
 
     fn get_metadata_chain(

@@ -29,10 +29,19 @@ pub trait TransformService: Send + Sync {
         dataset_id: &DatasetID,
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
         options: VerificationOptions,
-        listener: Option<Arc<Mutex<dyn TransformListener>>>,
+        listener: Option<Arc<dyn VerificationListener>>,
+    ) -> Result<VerificationResult, VerificationError>;
+
+    fn verify_multi(
+        &self,
+        datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        options: VerificationOptions,
+        listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// DTOs
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -48,9 +57,19 @@ pub enum TransformResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum VerificationResult {
-    Valid,
+pub struct VerificationRequest<'a> {
+    pub dataset_id: &'a DatasetID,
+    pub block_range: (Option<Sha3_256>, Option<Sha3_256>),
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub enum VerificationResult {
+    Valid { blocks_verified: usize },
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct VerificationOptions;
@@ -62,7 +81,7 @@ impl Default for VerificationOptions {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Listener
+// Listeners
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformListener: Send {
@@ -78,6 +97,8 @@ pub trait TransformListener: Send {
 pub struct NullTransformListener;
 impl TransformListener for NullTransformListener {}
 
+///////////////////////////////////////////////////////////////////////////////
+
 pub trait TransformMultiListener {
     fn begin_transform(
         &mut self,
@@ -89,6 +110,47 @@ pub trait TransformMultiListener {
 
 pub struct NullTransformMultiListener;
 impl TransformMultiListener for NullTransformMultiListener {}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub enum VerificationPhase {
+    HashData,
+    ReplayTransform,
+    BlockValid,
+}
+
+pub trait VerificationListener {
+    fn begin(&self, _num_blocks: usize) {}
+    fn on_phase(
+        &self,
+        _block: &Sha3_256,
+        _block_index: usize,
+        _num_blocks: usize,
+        _phase: VerificationPhase,
+    ) {
+    }
+    fn success(&self, _result: &VerificationResult) {}
+    fn error(&self, _error: &VerificationError) {}
+
+    // TODO: Add this to enable pull image listening once Mutexes are removed from listeners
+    // fn get_transform_listener(&mut self) -> Option<&mut dyn TransformListener> {
+    //     None
+    // }
+}
+
+pub struct NullVerificationListener;
+impl VerificationListener for NullVerificationListener {}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait VerificationMultiListener {
+    fn begin_verify(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn VerificationListener>> {
+        None
+    }
+}
+
+pub struct NullVerificationMultiListener;
+impl VerificationMultiListener for NullVerificationMultiListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Errors
@@ -125,21 +187,44 @@ pub enum VerificationError {
     NotDerivative,
     #[error("Block {0} not found")]
     NoSuchBlock(Sha3_256),
-    #[error("Invalid data: {0}")]
-    Invalid(VerificationErrorInvalid),
+    #[error("Data doesn't match metadata: {0}")]
+    DataDoesNotMatchMetadata(DataDoesNotMatchMetadata),
+    #[error("Data is not reproducible: {0}")]
+    DataNotReproducible(DataNotReproducible),
     #[error("Tranform error: {0}")]
     TransformError(#[from] TransformError),
     #[error("Domain error: {0}")]
     DomainError(#[from] DomainError),
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
-pub struct VerificationErrorInvalid {
+pub struct DataDoesNotMatchMetadata {
+    pub block_hash: Sha3_256,
+    pub expected_hash: String,
+    pub actual_hash: String,
+}
+
+impl Display for DataDoesNotMatchMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Data hash for block {} is expected to be {} but actual {}",
+            self.block_hash, self.expected_hash, self.actual_hash
+        )
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct DataNotReproducible {
     pub expected_block: MetadataBlock,
     pub actual_block: MetadataBlock,
 }
 
-impl Display for VerificationErrorInvalid {
+impl Display for DataNotReproducible {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

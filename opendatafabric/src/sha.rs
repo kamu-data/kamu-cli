@@ -48,7 +48,7 @@ impl Sha3_256 {
     }
 
     pub fn short(&self) -> Sha3_256Short {
-        Sha3_256Short(self, 8)
+        Sha3_256Short::new(self)
     }
 }
 
@@ -116,6 +116,18 @@ impl<'de> Deserialize<'de> for Sha3_256 {
 
 #[derive(Clone, Copy)]
 pub struct Sha3_256Short<'a>(&'a Sha3_256, usize);
+
+impl<'a> Sha3_256Short<'a> {
+    const DEFAULT_LENGTH: usize = 8;
+
+    pub fn new(hash: &'a Sha3_256) -> Self {
+        Self::new_with_length(hash, Self::DEFAULT_LENGTH)
+    }
+
+    pub fn new_with_length(hash: &'a Sha3_256, len: usize) -> Self {
+        Self(hash, len)
+    }
+}
 
 impl fmt::Display for Sha3_256Short<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

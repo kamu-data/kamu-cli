@@ -569,9 +569,18 @@ impl TransformService for TestTransformService {
     fn verify(
         &self,
         _dataset_id: &DatasetID,
-        _blocks_range: (Option<Sha3_256>, Option<Sha3_256>),
+        _block_range: (Option<Sha3_256>, Option<Sha3_256>),
         _options: VerificationOptions,
-        _listener: Option<Arc<Mutex<dyn TransformListener>>>,
+        _listener: Option<Arc<dyn VerificationListener>>,
+    ) -> Result<VerificationResult, VerificationError> {
+        unimplemented!()
+    }
+
+    fn verify_multi(
+        &self,
+        _datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        _options: VerificationOptions,
+        _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         unimplemented!()
     }

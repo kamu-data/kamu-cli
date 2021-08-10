@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
     metadata_repo: Arc<dyn MetadataRepository>,
-    engine_factory: Arc<EngineFactory>,
+    engine_factory: Arc<dyn EngineFactory>,
     logger: Logger,
 }
 
@@ -19,7 +19,7 @@ impl IngestServiceImpl {
     pub fn new(
         volume_layout: &VolumeLayout,
         metadata_repo: Arc<dyn MetadataRepository>,
-        engine_factory: Arc<EngineFactory>,
+        engine_factory: Arc<dyn EngineFactory>,
         logger: Logger,
     ) -> Self {
         Self {

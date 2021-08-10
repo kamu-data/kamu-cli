@@ -84,7 +84,7 @@ impl Command for SetWatermarkCommand {
             Ok(PullResult::Updated { new_head, .. }) => {
                 eprintln!(
                     "{}",
-                    console::style(format!("Committed new block {}", new_head)).green()
+                    console::style(format!("Committed new block {}", new_head.short())).green()
                 );
                 Ok(())
             }

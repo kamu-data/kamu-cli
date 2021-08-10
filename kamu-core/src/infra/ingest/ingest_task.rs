@@ -36,7 +36,7 @@ impl IngestTask {
         meta_chain: Box<dyn MetadataChain>,
         fetch_override: Option<FetchStep>,
         listener: Arc<Mutex<dyn IngestListener>>,
-        engine_factory: Arc<EngineFactory>,
+        engine_factory: Arc<dyn EngineFactory>,
         logger: Logger,
     ) -> Self {
         // TODO: PERF: This is expensive and could be cached

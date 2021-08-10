@@ -21,7 +21,7 @@ fn test_transform_with_engine_spark() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_factory = Arc::new(EngineFactory::new(
+    let engine_factory = Arc::new(EngineFactoryImpl::new(
         &workspace_layout,
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
@@ -219,7 +219,7 @@ fn test_transform_with_engine_flink() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_factory = Arc::new(EngineFactory::new(
+    let engine_factory = Arc::new(EngineFactoryImpl::new(
         &workspace_layout,
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
