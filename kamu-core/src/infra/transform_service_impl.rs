@@ -3,8 +3,11 @@ use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
+use slog::debug;
 use slog::{info, o, Logger};
 use std::collections::BTreeMap;
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub struct TransformServiceImpl {
@@ -32,21 +35,14 @@ impl TransformServiceImpl {
 
     // Note: Can be called from multiple threads
     fn do_transform(
-        request: ExecuteQueryRequest,
-        meta_chain: Box<dyn MetadataChain>,
-        dataset_layout: DatasetLayout,
-        listener: Arc<Mutex<dyn TransformListener>>,
         engine_factory: Arc<EngineFactory>,
+        request: ExecuteQueryRequest,
+        commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
+        listener: Arc<Mutex<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         listener.lock().unwrap().begin();
 
-        match Self::do_transform_inner(
-            request,
-            meta_chain,
-            dataset_layout,
-            engine_factory,
-            listener.clone(),
-        ) {
+        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone()) {
             Ok(res) => {
                 listener.lock().unwrap().success(&res);
                 Ok(res)
@@ -60,14 +56,12 @@ impl TransformServiceImpl {
 
     // Note: Can be called from multiple threads
     fn do_transform_inner(
-        request: ExecuteQueryRequest,
-        mut meta_chain: Box<dyn MetadataChain>,
-        dataset_layout: DatasetLayout,
         engine_factory: Arc<EngineFactory>,
+        request: ExecuteQueryRequest,
+        commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<Mutex<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        let prev_hash = meta_chain.read_ref(&BlockRef::Head);
-        let new_checkpoint_dir = request.new_checkpoint_dir.clone();
+        let new_checkpoint_path = request.new_checkpoint_dir.clone();
         let out_data_path = request.out_data_path.clone();
 
         let engine = engine_factory.get_engine(
@@ -96,31 +90,52 @@ impl TransformServiceImpl {
             }
         }
 
+        let result = commit_fn(result.block, &out_data_path, &new_checkpoint_path)?;
+
+        // Commit should clean up
+        assert!(!out_data_path.exists());
+        assert!(!new_checkpoint_path.exists());
+
+        Ok(result)
+    }
+
+    fn commit_transofm(
+        mut meta_chain: Box<dyn MetadataChain>,
+        dataset_layout: DatasetLayout,
+        prev_block_hash: Sha3_256,
+        new_block: MetadataBlock,
+        new_data_path: &Path,
+        new_checkpoint_path: &Path,
+    ) -> Result<TransformResult, TransformError> {
         let new_block = MetadataBlock {
-            prev_block_hash: prev_hash,
-            ..result.block
+            prev_block_hash: Some(prev_block_hash),
+            ..new_block
         };
-        let block_hash = meta_chain.append(new_block);
+
+        let has_data = new_block.output_slice.is_some();
+        let new_block_hash = meta_chain.append(new_block);
 
         // TODO: Data should be moved before writing block file
-        if out_data_path.exists() {
+        if has_data {
             std::fs::rename(
-                &out_data_path,
-                dataset_layout.data_dir.join(block_hash.to_string()),
+                &new_data_path,
+                dataset_layout.data_dir.join(new_block_hash.to_string()),
             )
             .map_err(|e| TransformError::internal(e))?;
         }
 
         // TODO: Checkpoint should be moved before writing block file
         std::fs::rename(
-            &new_checkpoint_dir,
-            dataset_layout.checkpoints_dir.join(block_hash.to_string()),
+            &new_checkpoint_path,
+            dataset_layout
+                .checkpoints_dir
+                .join(new_block_hash.to_string()),
         )
         .map_err(|e| TransformError::internal(e))?;
 
         Ok(TransformResult::Updated {
-            old_head: prev_hash.unwrap(),
-            new_head: block_hash,
+            old_head: prev_block_hash,
+            new_head: new_block_hash,
             num_blocks: 1,
         })
     }
@@ -194,10 +209,10 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        // TODO: Verify assumption that only blocks with output_slice or output_watermark have checkpoints
+        // TODO: Verify assumption that `input_slices` is a reliable indicator of a checkpoint presence
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter(|b| b.output_slice.is_some() || b.output_watermark.is_some())
+            .filter(|b| b.input_slices.is_some())
             .map(|b| b.block_hash)
             .next();
 
@@ -311,18 +326,12 @@ impl TransformServiceImpl {
         let empty = !blocks_unprocessed.iter().any(|b| b.output_slice.is_some())
             && explicit_watermarks.is_empty();
 
-        let schema_file = if !data_paths.is_empty() {
-            data_paths.get(0).unwrap().clone()
-        } else {
-            // TODO: Migrate to providing schema directly
-            // TODO: Will not work with schema evolution
-            let first_file = std::fs::read_dir(&dataset_layout.data_dir)
-                .unwrap()
-                .next()
-                .unwrap()
-                .unwrap();
-            first_file.path()
-        };
+        // TODO: Migrate to providing schema directly
+        // TODO: Will not work with schema evolution
+        let schema_file = data_paths
+            .first()
+            .map(|p| p.clone())
+            .unwrap_or_else(|| self.get_schema_file_fallback(dataset_layout));
 
         info!(logger, "Computed input slice";
             "iv_unprocessed" => ?iv_unprocessed,
@@ -351,6 +360,240 @@ impl TransformServiceImpl {
         let vocab = chain.iter_blocks().filter_map(|b| b.vocab).next();
         Ok(vocab.unwrap_or_default())
     }
+
+    // TODO: Migrate to providing schema directly
+    fn get_schema_file_fallback(&self, dataset_layout: &DatasetLayout) -> PathBuf {
+        std::fs::read_dir(&dataset_layout.data_dir)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path()
+    }
+
+    fn get_verification_plan(
+        &self,
+        dataset_id: &DatasetID,
+        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+    ) -> Result<Vec<VerificationStep>, VerificationError> {
+        fn as_deriv_source(block: &MetadataBlock) -> Option<&DatasetSourceDerivative> {
+            match &block.source {
+                Some(DatasetSource::Derivative(s)) => Some(s),
+                _ => None,
+            }
+        }
+
+        let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
+
+        let start_block = block_range.0;
+        let end_block = block_range
+            .1
+            .unwrap_or_else(|| metadata_chain.read_ref(&BlockRef::Head).unwrap());
+
+        let mut source = None;
+        let mut prev_checkpoint = None;
+        let mut vocab = None;
+        let mut blocks = Vec::new();
+        let mut finished_range = false;
+
+        for block in metadata_chain
+            .iter_blocks_starting(&end_block)
+            .ok_or(VerificationError::NoSuchBlock(end_block))?
+        {
+            if let Some(src) = as_deriv_source(&block) {
+                if block.prev_block_hash.is_some() {
+                    // TODO: Support dataset evolution
+                    unimplemented!("Verifying datasets with evolving queries is not yet supported")
+                }
+
+                source = Some(src.clone());
+            }
+
+            if let Some(vc) = &block.vocab {
+                vocab = Some(vc.clone())
+            }
+
+            let block_hash = block.block_hash;
+
+            // TODO: Assuming `input_slices` is a reliable indicator of a transform block and a checkpoint presence
+            if block.input_slices.is_some() {
+                if !finished_range {
+                    blocks.push(block);
+                } else if prev_checkpoint.is_none() {
+                    prev_checkpoint = Some(block_hash);
+                }
+            }
+
+            if Some(block_hash) == start_block {
+                finished_range = true;
+            }
+        }
+
+        let source = source.ok_or(VerificationError::NotDerivative)?;
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+
+        let mut dataset_vocabs = source
+            .inputs
+            .iter()
+            .map(|id| -> Result<_, DomainError> { Ok((id.to_owned(), self.get_vocab(id)?)) })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        dataset_vocabs.insert(dataset_id.to_owned(), vocab.unwrap_or_default());
+
+        let mut plan: Vec<_> = blocks
+            .into_iter()
+            .rev()
+            .map(|block| VerificationStep {
+                request: ExecuteQueryRequest {
+                    dataset_id: dataset_id.to_owned(),
+                    source: source.clone(),
+                    dataset_vocabs: dataset_vocabs.clone(),
+                    input_slices: std::iter::zip(
+                        source.inputs.iter(),
+                        block.input_slices.as_ref().unwrap().iter(),
+                    )
+                    .map(|(id, slice)| {
+                        (
+                            id.to_owned(),
+                            InputDataSlice {
+                                interval: slice.interval,
+                                data_paths: Vec::new(), // Filled out below
+                                schema_file: PathBuf::new(), // Filled out below
+                                explicit_watermarks: Vec::new(), // Filled out below
+                            },
+                        )
+                    })
+                    .collect(),
+                    prev_checkpoint_dir: None, // Filled out below
+                    new_checkpoint_dir: dataset_layout.checkpoints_dir.join(".pending"),
+                    out_data_path: dataset_layout.data_dir.join(".pending"),
+                },
+                expected: block,
+            })
+            .collect();
+
+        // Populate prev checkpoints
+        for i in 1..plan.len() {
+            plan[i].request.prev_checkpoint_dir = Some(
+                dataset_layout
+                    .checkpoints_dir
+                    .join(plan[i - 1].expected.block_hash.to_string()),
+            )
+        }
+        if !plan.is_empty() {
+            plan[0].request.prev_checkpoint_dir =
+                prev_checkpoint.map(|h| dataset_layout.checkpoints_dir.join(h.to_string()));
+        }
+
+        // Populate input slices
+        // TODO: Assuming source never changes
+        // This is the rough part - we walk backwards through input datasets' metadata chains and
+        // include blocks into corresponding steps based on the time interval ranges.
+        // Think of this as a interval-based merge join X_X
+        for input_id in source.inputs.iter() {
+            let input_chain = self.metadata_repo.get_metadata_chain(input_id)?;
+            let input_layout = DatasetLayout::new(&self.volume_layout, &input_id);
+
+            let mut step_iter = plan.iter_mut().rev();
+            let mut input_blocks_iter = input_chain
+                .iter_blocks()
+                .filter(|b| b.output_slice.is_some() || b.output_watermark.is_some());
+
+            let mut curr_step = step_iter.next();
+            let mut curr_input_block = input_blocks_iter.next();
+
+            while curr_step.is_some() && curr_input_block.is_some() {
+                let step = curr_step.as_mut().unwrap();
+                let input_block = curr_input_block.as_ref().unwrap();
+                let slice = step.request.input_slices.get_mut(input_id).unwrap();
+
+                // Interval can only be (), or (lower, upper]
+                if slice.interval.is_empty() {
+                    curr_step = step_iter.next();
+                    continue;
+                }
+
+                // Input block is older than step block - continue to next input block
+                if slice
+                    .interval
+                    .left_complement()
+                    .contains_point(&input_block.system_time)
+                {
+                    curr_input_block = input_blocks_iter.next();
+                    continue;
+                }
+
+                // Input block is younger than step block - continue to next step
+                if slice
+                    .interval
+                    .right_complement()
+                    .contains_point(&input_block.system_time)
+                {
+                    curr_step = step_iter.next();
+                    continue;
+                }
+
+                // Bingo! Include block inputs into the step
+                assert!(slice.interval.contains_point(&input_block.system_time));
+
+                if let Some(event_time) = input_block.output_watermark {
+                    slice.explicit_watermarks.push(Watermark {
+                        system_time: input_block.system_time,
+                        event_time,
+                    });
+                }
+
+                if input_block.output_slice.is_some() {
+                    slice.data_paths.push(
+                        input_layout
+                            .data_dir
+                            .join(input_block.block_hash.to_string()),
+                    )
+                }
+
+                curr_input_block = input_blocks_iter.next();
+            }
+        }
+
+        // Post-process input slices
+        for step in plan.iter_mut() {
+            for (input_id, slice) in step.request.input_slices.iter_mut() {
+                slice.data_paths.reverse();
+                slice.explicit_watermarks.reverse();
+                // TODO: Migrate to providing schema directly
+                slice.schema_file =
+                    slice
+                        .data_paths
+                        .first()
+                        .map(|p| p.clone())
+                        .unwrap_or_else(|| {
+                            self.get_schema_file_fallback(&DatasetLayout::new(
+                                &self.volume_layout,
+                                input_id,
+                            ))
+                        });
+            }
+        }
+
+        Ok(plan)
+    }
+
+    fn check_blocks_equivalent(
+        expected_block: &MetadataBlock,
+        actual_block: &MetadataBlock,
+    ) -> bool {
+        // TODO: Moving from time intervals to offsets will avoid the need for this
+        let expected_output_slice = expected_block.output_slice.clone().map(|s| DataSlice {
+            interval: TimeInterval::empty(),
+            ..s
+        });
+        let actual_output_slice = actual_block.output_slice.clone().map(|s| DataSlice {
+            interval: TimeInterval::empty(),
+            ..s
+        });
+        expected_block.input_slices == actual_block.input_slices
+            && expected_output_slice == actual_output_slice
+            && expected_block.output_watermark == actual_block.output_watermark
+    }
 }
 
 impl TransformService for TransformServiceImpl {
@@ -372,13 +615,22 @@ impl TransformService for TransformServiceImpl {
             let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
 
             let meta_chain = self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+            let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
 
             Self::do_transform(
-                request,
-                meta_chain,
-                dataset_layout,
-                listener,
                 self.engine_factory.clone(),
+                request,
+                move |new_block, new_data_path, new_checkpoint_path| {
+                    Self::commit_transofm(
+                        meta_chain,
+                        dataset_layout,
+                        head,
+                        new_block,
+                        new_data_path,
+                        new_checkpoint_path,
+                    )
+                },
+                listener,
             )
         } else {
             Ok(TransformResult::UpToDate)
@@ -427,22 +679,28 @@ impl TransformService for TransformServiceImpl {
                         .begin_transform(&dataset_id)
                         .unwrap_or(null_listener);
 
-                    let meta_chain = self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
-
-                    let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
-
                     let engine_factory = self.engine_factory.clone();
+
+                    let meta_chain = self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+                    let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
+                    let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
+                    let commit_fn =
+                        move |new_block, new_data_path: &Path, new_checkpoint_path: &Path| {
+                            Self::commit_transofm(
+                                meta_chain,
+                                dataset_layout,
+                                head,
+                                new_block,
+                                new_data_path,
+                                new_checkpoint_path,
+                            )
+                        };
 
                     let thread_handle = std::thread::Builder::new()
                         .name("transform_multi".to_owned())
                         .spawn(move || {
-                            let res = Self::do_transform(
-                                request,
-                                meta_chain,
-                                dataset_layout,
-                                listener,
-                                engine_factory,
-                            );
+                            let res =
+                                Self::do_transform(engine_factory, request, commit_fn, listener);
                             (dataset_id, res)
                         })
                         .unwrap();
@@ -456,4 +714,75 @@ impl TransformService for TransformServiceImpl {
 
         results
     }
+
+    fn verify(
+        &self,
+        dataset_id: &DatasetID,
+        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        _options: VerificationOptions,
+        maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
+    ) -> Result<VerificationResult, VerificationError> {
+        info!(self.logger, "Verifying dataset"; "dataset_id" => dataset_id.as_str(), "block_range" => ?block_range);
+
+        let null_listener = Arc::new(Mutex::new(NullTransformListener {}));
+        let listener = maybe_listener.unwrap_or(null_listener);
+
+        let verification_plan = self.get_verification_plan(dataset_id, block_range)?;
+
+        for step in verification_plan {
+            let request = step.request;
+            let expected_block = step.expected;
+            let mut actual_block = None;
+
+            info!(self.logger, "Verifying block"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+
+            Self::do_transform(
+                self.engine_factory.clone(),
+                request,
+                |new_block, new_data_path, new_checkpoint_path| {
+                    // Cleanup not needed outputs
+                    if new_block.output_slice.is_some() {
+                        std::fs::remove_file(new_data_path)
+                            .map_err(|e| TransformError::internal(e))?;
+                    }
+                    std::fs::remove_dir_all(new_checkpoint_path)
+                        .map_err(|e| TransformError::internal(e))?;
+
+                    // All we care about is the new block
+                    actual_block = Some(new_block);
+
+                    Ok(TransformResult::Updated {
+                        old_head: expected_block.prev_block_hash.unwrap(),
+                        new_head: expected_block.block_hash,
+                        num_blocks: 1,
+                    })
+                },
+                listener.clone(),
+            )?;
+
+            let actual_block = actual_block.unwrap();
+            debug!(self.logger, "Comparing results"; "expected" => ?expected_block, "actual" => ?actual_block);
+
+            if !Self::check_blocks_equivalent(&expected_block, &actual_block) {
+                info!(self.logger, "Block invalid"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+
+                return Err(VerificationError::Invalid(VerificationErrorInvalid {
+                    expected_block,
+                    actual_block,
+                }));
+            }
+
+            info!(self.logger, "Block valid"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+        }
+
+        Ok(VerificationResult::Valid)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+struct VerificationStep {
+    request: ExecuteQueryRequest,
+    expected: MetadataBlock,
 }

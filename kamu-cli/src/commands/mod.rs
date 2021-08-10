@@ -74,6 +74,9 @@ pub use sql_server_livy_command::*;
 mod sql_shell_command;
 pub use sql_shell_command::*;
 
+mod verify_command;
+pub use verify_command::*;
+
 pub trait Command {
     fn needs_workspace(&self) -> bool {
         true

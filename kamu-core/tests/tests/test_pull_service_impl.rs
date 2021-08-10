@@ -565,6 +565,16 @@ impl TransformService for TestTransformService {
         ));
         results
     }
+
+    fn verify(
+        &self,
+        _dataset_id: &DatasetID,
+        _blocks_range: (Option<Sha3_256>, Option<Sha3_256>),
+        _options: VerificationOptions,
+        _listener: Option<Arc<Mutex<dyn TransformListener>>>,
+    ) -> Result<VerificationResult, VerificationError> {
+        unimplemented!()
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
