@@ -165,10 +165,22 @@ impl MetadataChain for MetadataChainImpl {
 
         assert!(
             last_block.system_time < block.system_time,
-            "New block's system_time is less than the previous block's: {} < {}",
+            "New block's system_time must be greater than the previous block's: {} <= {}",
             block.system_time,
             last_block.system_time,
         );
+
+        match (
+            &block.source,
+            &block.vocab,
+            &block.input_slices,
+            &block.output_slice,
+            &block.output_watermark,
+        ) {
+            (None, None, None, None, None) => panic!("Block cannot be empty: {:?}", block),
+            (_, _, Some(_), None, None) => panic!("Block has an input but no outputs: {:?}", block),
+            _ => (),
+        }
 
         let hash = self.write_block(&block).unwrap();
         self.write_ref(r, &hash).unwrap();
