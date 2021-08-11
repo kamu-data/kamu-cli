@@ -88,6 +88,12 @@ impl TransformServiceImpl {
                 ))
                 .into());
             }
+        } else if out_data_path.exists() {
+            return Err(EngineError::ContractError(ContractError::new(
+                "Engine wrote data file while the ouput slice is empty",
+                Vec::new(),
+            ))
+            .into());
         }
 
         let result = commit_fn(result.block, &out_data_path, &new_checkpoint_path)?;

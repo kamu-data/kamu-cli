@@ -334,7 +334,7 @@ impl IngestTask {
                     // and watermark differences to see if commit should be skipped
                     if new_block.output_slice.is_none() {
                         let prev_watermark = self.meta_chain.borrow().iter_blocks().filter_map(|b| b.output_watermark).next();
-                        if new_block.output_watermark == prev_watermark {
+                        if new_block.output_watermark.is_none() || new_block.output_watermark == prev_watermark {
                             info!(self.logger, "Skipping commit of new block as it neither has new data or watermark");
                             return Ok(ExecutionResult {
                                 was_up_to_date: false,  // The checkpoint is not up-to-date but dataset is
