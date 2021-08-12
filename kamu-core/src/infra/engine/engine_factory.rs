@@ -18,7 +18,7 @@ pub trait EngineFactory: Send + Sync {
     fn get_engine(
         &self,
         engine_id: &str,
-        maybe_listener: Option<&dyn PullImageListener>,
+        maybe_listener: Option<Arc<dyn PullImageListener>>,
     ) -> Result<Arc<Mutex<dyn Engine>>, EngineError>;
 }
 
@@ -61,7 +61,7 @@ impl EngineFactory for EngineFactoryImpl {
     fn get_engine(
         &self,
         engine_id: &str,
-        maybe_listener: Option<&dyn PullImageListener>,
+        maybe_listener: Option<Arc<dyn PullImageListener>>,
     ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
         let (engine, image) = match engine_id {
             "spark" => Ok((
@@ -79,8 +79,7 @@ impl EngineFactory for EngineFactoryImpl {
 
         if !known_images.contains(image) {
             if !self.container_runtime.has_image(image) {
-                let null_listener = NullPullImageListener;
-                let listener = maybe_listener.unwrap_or(&null_listener);
+                let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPullImageListener));
 
                 listener.begin(image);
 
@@ -108,7 +107,7 @@ impl EngineFactory for EngineFactoryNull {
     fn get_engine(
         &self,
         engine_id: &str,
-        _maybe_listener: Option<&dyn PullImageListener>,
+        _maybe_listener: Option<Arc<dyn PullImageListener>>,
     ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
         Err(EngineError::not_found(engine_id))
     }

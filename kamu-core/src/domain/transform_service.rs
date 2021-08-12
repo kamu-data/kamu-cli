@@ -89,7 +89,7 @@ pub trait TransformListener: Send + Sync {
     fn success(&self, _result: &TransformResult) {}
     fn error(&self, _error: &TransformError) {}
 
-    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None
     }
 }
@@ -110,6 +110,7 @@ impl TransformMultiListener for NullTransformMultiListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerificationPhase {
     HashData,
     ReplayTransform,
@@ -129,10 +130,9 @@ pub trait VerificationListener {
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
 
-    // TODO: Add this to enable pull image listening once Mutexes are removed from listeners
-    // fn get_transform_listener(&mut self) -> Option<&mut dyn TransformListener> {
-    //     None
-    // }
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {
+        None
+    }
 }
 
 pub struct NullVerificationListener;

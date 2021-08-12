@@ -88,7 +88,7 @@ pub trait IngestListener: Send + Sync {
     fn success(&self, _result: &IngestResult) {}
     fn error(&self, _error: &IngestError) {}
 
-    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None
     }
 }

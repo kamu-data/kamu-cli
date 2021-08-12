@@ -68,7 +68,7 @@ impl TransformServiceImpl {
             match request.source.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
-            listener.get_pull_image_listener(),
+            listener.clone().get_pull_image_listener(),
         )?;
 
         let result = engine.lock().unwrap().transform(request)?;
@@ -806,7 +806,10 @@ impl TransformService for TransformServiceImpl {
                         num_blocks: 1,
                     })
                 },
-                Arc::new(NullTransformListener),
+                listener
+                    .clone()
+                    .get_transform_listener()
+                    .unwrap_or_else(|| Arc::new(NullTransformListener)),
             )?;
 
             let actual_block = actual_block.unwrap();
