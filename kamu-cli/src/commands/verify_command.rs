@@ -4,7 +4,7 @@ use std::{
     error::Error,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
 
@@ -217,6 +217,14 @@ struct VerificationProgress {
     dataset_id: DatasetIDBuf,
     _multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
+    state: Mutex<VerificationState>,
+}
+
+struct VerificationState {
+    block: Sha3_256,
+    block_index: usize,
+    num_blocks: usize,
+    phase: VerificationPhase,
 }
 
 impl VerificationProgress {
@@ -225,6 +233,12 @@ impl VerificationProgress {
             dataset_id: dataset_id.to_owned(),
             curr_progress: multi_progress.add(Self::new_spinner("Initializing")),
             _multi_progress: multi_progress,
+            state: Mutex::new(VerificationState {
+                block: Sha3_256::zero(),
+                block_index: 0,
+                num_blocks: 0,
+                phase: VerificationPhase::HashData,
+            }),
         }
     }
 
@@ -262,6 +276,20 @@ impl VerificationProgress {
             console::style(dataset).dim(),
         )
     }
+
+    fn save_state(
+        &self,
+        block: &Sha3_256,
+        block_index: usize,
+        num_blocks: usize,
+        phase: VerificationPhase,
+    ) {
+        let mut s = self.state.lock().unwrap();
+        s.block = *block;
+        s.block_index = block_index;
+        s.num_blocks = num_blocks;
+        s.phase = phase;
+    }
 }
 
 impl VerificationListener for VerificationProgress {
@@ -281,6 +309,7 @@ impl VerificationListener for VerificationProgress {
         num_blocks: usize,
         phase: VerificationPhase,
     ) {
+        self.save_state(block, block_index, num_blocks, phase);
         match phase {
             VerificationPhase::HashData => self.curr_progress.set_message(self.spinner_message(
                 block_index,
@@ -334,5 +363,37 @@ impl VerificationListener for VerificationProgress {
             console::style(msg).red(),
             None,
         ));
+    }
+
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {
+        Some(self)
+    }
+}
+
+impl TransformListener for VerificationProgress {
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        Some(self)
+    }
+}
+
+impl PullImageListener for VerificationProgress {
+    fn begin(&self, image: &str) {
+        let s = self.state.lock().unwrap();
+        self.curr_progress.set_message(self.spinner_message(
+            s.block_index,
+            s.num_blocks,
+            format!("Pulling engine image {}", image),
+            Some(&s.block),
+        ))
+    }
+
+    fn success(&self) {
+        let s = self.state.lock().unwrap();
+        self.curr_progress.set_message(self.spinner_message(
+            s.block_index,
+            s.num_blocks,
+            "Replaying transformation",
+            Some(&s.block),
+        ))
     }
 }

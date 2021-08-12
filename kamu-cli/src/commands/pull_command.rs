@@ -529,7 +529,7 @@ impl IngestListener for PrettyIngestProgress {
             ));
     }
 
-    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         Some(self)
     }
 }
@@ -621,7 +621,7 @@ impl TransformListener for PrettyTransformProgress {
             ));
     }
 
-    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         Some(self)
     }
 }
