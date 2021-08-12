@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use opendatafabric::{DatasetID, DatasetRef, DatasetRefBuf, FetchStep, Sha3_256};
 use thiserror::Error;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -18,9 +18,9 @@ pub trait PullService: Send + Sync {
         &self,
         dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         options: PullOptions,
-        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
-        transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-        sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)>;
 
     /// A special version of pull that can rename dataset when syncing it from a repository
@@ -29,7 +29,7 @@ pub trait PullService: Send + Sync {
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
         options: PullOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError>;
 
     /// A special version of pull that allows overriding the fetch source on root datasets (e.g. to pull data from a specific file)
@@ -38,7 +38,7 @@ pub trait PullService: Send + Sync {
         dataset_id: &DatasetID,
         fetch: FetchStep,
         options: PullOptions,
-        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError>;
 
     fn set_watermark(

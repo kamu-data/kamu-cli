@@ -8,7 +8,7 @@ use slog::{info, o, Logger};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct TransformServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
@@ -38,17 +38,17 @@ impl TransformServiceImpl {
         engine_factory: Arc<dyn EngineFactory>,
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
-        listener: Arc<Mutex<dyn TransformListener>>,
+        listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        listener.lock().unwrap().begin();
+        listener.begin();
 
         match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone()) {
             Ok(res) => {
-                listener.lock().unwrap().success(&res);
+                listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
-                listener.lock().unwrap().error(&err);
+                listener.error(&err);
                 Err(err)
             }
         }
@@ -59,7 +59,7 @@ impl TransformServiceImpl {
         engine_factory: Arc<dyn EngineFactory>,
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
-        listener: Arc<Mutex<dyn TransformListener>>,
+        listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
         let new_checkpoint_path = request.new_checkpoint_dir.clone();
         let out_data_path = request.out_data_path.clone();
@@ -68,7 +68,7 @@ impl TransformServiceImpl {
             match request.source.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
-            listener.lock().unwrap().get_pull_image_listener(),
+            listener.get_pull_image_listener(),
         )?;
 
         let result = engine.lock().unwrap().transform(request)?;
@@ -593,7 +593,6 @@ impl TransformServiceImpl {
             }
         }
 
-        debug!(logger, "Final verification plan"; "plan" => ?plan);
         Ok(plan)
     }
 
@@ -620,9 +619,9 @@ impl TransformService for TransformServiceImpl {
     fn transform(
         &self,
         dataset_id: &DatasetID,
-        maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        let null_listener = Arc::new(Mutex::new(NullTransformListener {}));
+        let null_listener = Arc::new(NullTransformListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
         info!(self.logger, "Transforming single dataset"; "dataset" => dataset_id.as_str());
@@ -662,9 +661,9 @@ impl TransformService for TransformServiceImpl {
     fn transform_multi(
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        maybe_multi_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
+        maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
-        let null_multi_listener = Arc::new(Mutex::new(NullTransformMultiListener {}));
+        let null_multi_listener = Arc::new(NullTransformMultiListener {});
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
         let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
@@ -693,11 +692,9 @@ impl TransformService for TransformServiceImpl {
                     None
                 }
                 Some(request) => {
-                    let null_listener = Arc::new(Mutex::new(NullTransformListener {}));
+                    let null_listener = Arc::new(NullTransformListener {});
 
                     let listener = multi_listener
-                        .lock()
-                        .unwrap()
                         .begin_transform(&dataset_id)
                         .unwrap_or(null_listener);
 
@@ -809,7 +806,7 @@ impl TransformService for TransformServiceImpl {
                         num_blocks: 1,
                     })
                 },
-                Arc::new(Mutex::new(NullTransformListener)),
+                Arc::new(NullTransformListener),
             )?;
 
             let actual_block = actual_block.unwrap();

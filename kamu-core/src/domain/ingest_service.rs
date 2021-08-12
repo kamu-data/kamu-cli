@@ -3,7 +3,7 @@ use opendatafabric::{DatasetID, DatasetIDBuf, FetchStep, Sha3_256};
 
 use std::backtrace::Backtrace;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@ pub trait IngestService: Send + Sync {
         &self,
         dataset_id: &DatasetID,
         options: IngestOptions,
-        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_from(
@@ -23,14 +23,14 @@ pub trait IngestService: Send + Sync {
         dataset_id: &DatasetID,
         fetch: FetchStep,
         options: IngestOptions,
-        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_multi(
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: IngestOptions,
-        listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
 }
 
@@ -81,14 +81,14 @@ pub enum IngestStage {
     Commit,
 }
 
-pub trait IngestListener: Send {
-    fn begin(&mut self) {}
-    fn on_stage_progress(&mut self, _stage: IngestStage, _n: u64, _out_of: u64) {}
+pub trait IngestListener: Send + Sync {
+    fn begin(&self) {}
+    fn on_stage_progress(&self, _stage: IngestStage, _n: u64, _out_of: u64) {}
 
-    fn success(&mut self, _result: &IngestResult) {}
-    fn error(&mut self, _error: &IngestError) {}
+    fn success(&self, _result: &IngestResult) {}
+    fn error(&self, _error: &IngestError) {}
 
-    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
         None
     }
 }
@@ -97,7 +97,7 @@ pub struct NullIngestListener;
 impl IngestListener for NullIngestListener {}
 
 pub trait IngestMultiListener {
-    fn begin_ingest(&mut self, _dataset_id: &DatasetID) -> Option<Arc<Mutex<dyn IngestListener>>> {
+    fn begin_ingest(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn IngestListener>> {
         None
     }
 }

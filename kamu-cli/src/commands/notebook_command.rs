@@ -1,8 +1,9 @@
+use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::infra::explore::*;
+use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
-use kamu::{domain::PullImageListener, infra::utils::docker_client::DockerClient};
 
 use console::style as s;
 use slog::{o, Logger};
@@ -72,8 +73,8 @@ impl Command for NotebookCommand {
             .collect::<Result<Vec<_>, _>>()?;
 
         let spinner = if self.output_config.verbosity_level == 0 {
-            let mut pull_progress = PullImageProgress { progress_bar: None };
-            notebook_server.ensure_images(&mut pull_progress);
+            let pull_progress = PullImageProgress::new("container");
+            notebook_server.ensure_images(&pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
             s.set_style(
@@ -107,24 +108,5 @@ impl Command for NotebookCommand {
             self.logger.new(o!()),
         )?;
         Ok(())
-    }
-}
-
-struct PullImageProgress {
-    #[allow(dead_code)]
-    progress_bar: Option<indicatif::ProgressBar>,
-}
-
-impl PullImageListener for PullImageProgress {
-    fn begin(&mut self, image: &str) {
-        let s = indicatif::ProgressBar::new_spinner();
-        s.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
-        s.set_message(format!("Pulling container image {}", image));
-        s.enable_steady_tick(100);
-        self.progress_bar = Some(s);
-    }
-
-    fn success(&mut self) {
-        self.progress_bar = None;
     }
 }

@@ -2,7 +2,7 @@ use super::sync_service::*;
 use crate::domain::DomainError;
 use opendatafabric::{DatasetIDBuf, DatasetRef, DatasetRefBuf, Sha3_256};
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,7 +14,7 @@ pub trait PushService: Send + Sync {
         &self,
         dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         options: PushOptions,
-        sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(PushInfo, Result<PushResult, PushError>)>;
 }
 

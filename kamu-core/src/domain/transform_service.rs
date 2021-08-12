@@ -3,7 +3,7 @@ use opendatafabric::{DatasetID, DatasetIDBuf, MetadataBlock, Sha3_256};
 
 use std::backtrace::Backtrace;
 use std::fmt::Display;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::usize;
 use thiserror::Error;
 
@@ -15,13 +15,13 @@ pub trait TransformService: Send + Sync {
     fn transform(
         &self,
         dataset_id: &DatasetID,
-        listener: Option<Arc<Mutex<dyn TransformListener>>>,
+        listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
     fn transform_multi(
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
+        listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)>;
 
     fn verify(
@@ -84,12 +84,12 @@ impl Default for VerificationOptions {
 // Listeners
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait TransformListener: Send {
-    fn begin(&mut self) {}
-    fn success(&mut self, _result: &TransformResult) {}
-    fn error(&mut self, _error: &TransformError) {}
+pub trait TransformListener: Send + Sync {
+    fn begin(&self) {}
+    fn success(&self, _result: &TransformResult) {}
+    fn error(&self, _error: &TransformError) {}
 
-    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
         None
     }
 }
@@ -100,10 +100,7 @@ impl TransformListener for NullTransformListener {}
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformMultiListener {
-    fn begin_transform(
-        &mut self,
-        _dataset_id: &DatasetID,
-    ) -> Option<Arc<Mutex<dyn TransformListener>>> {
+    fn begin_transform(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn TransformListener>> {
         None
     }
 }

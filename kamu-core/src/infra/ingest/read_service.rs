@@ -9,7 +9,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct ReadService {
     engine_factory: Arc<dyn EngineFactory>,
@@ -32,11 +32,11 @@ impl ReadService {
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
-        listener: Arc<Mutex<dyn IngestListener>>,
+        listener: Arc<dyn IngestListener>,
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
         let engine = self
             .engine_factory
-            .get_engine("spark", listener.lock().unwrap().get_pull_image_listener())?;
+            .get_engine("spark", listener.get_pull_image_listener())?;
 
         let out_data_path = dataset_layout.data_dir.join(".pending");
         let new_checkpoint_dir = dataset_layout.checkpoints_dir.join(".pending");

@@ -142,9 +142,9 @@ impl DockerClient {
             .success()
     }
 
-    pub fn ensure_image(&self, image: &str, maybe_listener: Option<&mut dyn PullImageListener>) {
-        let mut null_listener = NullPullImageListener;
-        let listener = maybe_listener.unwrap_or(&mut null_listener);
+    pub fn ensure_image(&self, image: &str, maybe_listener: Option<&dyn PullImageListener>) {
+        let null_listener = NullPullImageListener;
+        let listener = maybe_listener.unwrap_or(&null_listener);
 
         if !self.has_image(image) {
             listener.begin(image);

@@ -491,7 +491,7 @@ impl IngestService for TestIngestService {
         &self,
         _dataset_id: &DatasetID,
         _ingest_options: IngestOptions,
-        _maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        _maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!();
     }
@@ -501,7 +501,7 @@ impl IngestService for TestIngestService {
         _dataset_id: &DatasetID,
         _fetch: FetchStep,
         _options: IngestOptions,
-        _listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        _listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!()
     }
@@ -510,7 +510,7 @@ impl IngestService for TestIngestService {
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         _ingest_options: IngestOptions,
-        _maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        _maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
         let results = ids
@@ -545,7 +545,7 @@ impl TransformService for TestTransformService {
     fn transform(
         &self,
         _dataset_id: &DatasetID,
-        _maybe_listener: Option<Arc<Mutex<dyn TransformListener>>>,
+        _maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         unimplemented!();
     }
@@ -553,7 +553,7 @@ impl TransformService for TestTransformService {
     fn transform_multi(
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
-        _maybe_multi_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
+        _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
         let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
         let results = ids
@@ -608,7 +608,7 @@ impl SyncService for TestSyncService {
         _remote_dataset_ref: &DatasetRef,
         local_dataset_id: &DatasetID,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         self.metadata_repo
             .add_dataset(
@@ -628,7 +628,7 @@ impl SyncService for TestSyncService {
         &self,
         datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        _listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)> {
         let mut call = Vec::new();
         let mut results = Vec::new();
@@ -645,7 +645,7 @@ impl SyncService for TestSyncService {
         _local_dataset_id: &DatasetID,
         _remote_dataset_ref: &DatasetRef,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!()
     }
@@ -654,7 +654,7 @@ impl SyncService for TestSyncService {
         &self,
         _datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
         _options: SyncOptions,
-        _listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        _listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
         unimplemented!()
     }
