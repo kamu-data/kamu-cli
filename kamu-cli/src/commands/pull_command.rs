@@ -9,7 +9,8 @@ use std::backtrace::BacktraceStatus;
 use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -58,7 +59,7 @@ impl PullCommand {
         }
     }
 
-    fn sync_from(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+    fn sync_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         let as_id = self.as_id.as_ref().unwrap();
         let local_id = DatasetID::try_from(as_id).unwrap();
         let remote_ref = DatasetRef::try_from(&self.refs[0]).unwrap();
@@ -70,13 +71,13 @@ impl PullCommand {
                 create_remote_aliases: true,
                 ..PullOptions::default()
             },
-            listener.and_then(|p| p.lock().unwrap().begin_sync(local_id, remote_ref)),
+            listener.and_then(|p| p.begin_sync(local_id, remote_ref)),
         );
 
         Ok(vec![(remote_ref.into(), res)])
     }
 
-    fn ingest_from(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+    fn ingest_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         let dataset_id = DatasetID::try_from(&self.refs[0]).unwrap();
         let summary = self.metadata_repo.get_summary(dataset_id)?;
         if summary.kind != DatasetKind::Root {
@@ -126,13 +127,13 @@ impl PullCommand {
                 },
                 ..PullOptions::default()
             },
-            listener.and_then(|p| p.lock().unwrap().begin_ingest(dataset_id)),
+            listener.and_then(|p| p.begin_ingest(dataset_id)),
         );
 
         Ok(vec![(dataset_id.into(), res)])
     }
 
-    fn pull_multi(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+    fn pull_multi(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         Ok(self.pull_svc.pull_multi(
             &mut self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap()),
             PullOptions {
@@ -145,19 +146,17 @@ impl PullCommand {
                 },
                 sync_options: SyncOptions::default(),
             },
+            listener.clone().map(|v| v as Arc<dyn IngestMultiListener>),
             listener
                 .clone()
-                .map(|v| v as Arc<Mutex<dyn IngestMultiListener>>),
-            listener
-                .clone()
-                .map(|v| v as Arc<Mutex<dyn TransformMultiListener>>),
-            listener.map(|v| v as Arc<Mutex<dyn SyncMultiListener>>),
+                .map(|v| v as Arc<dyn TransformMultiListener>),
+            listener.map(|v| v as Arc<dyn SyncMultiListener>),
         ))
     }
 
     fn pull_with_progress(&self) -> GenericPullResult {
         let pull_progress = PrettyPullProgress::new();
-        let listener = Arc::new(Mutex::new(pull_progress.clone()));
+        let listener = Arc::new(pull_progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
             pull_progress.draw();
@@ -165,13 +164,13 @@ impl PullCommand {
 
         let results = self.pull(Some(listener.clone()));
 
-        listener.lock().unwrap().finish();
+        listener.finish();
         draw_thread.join().unwrap();
 
         results
     }
 
-    fn pull(&self, listener: Option<Arc<Mutex<PrettyPullProgress>>>) -> GenericPullResult {
+    fn pull(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         if self.as_id.is_some() {
             self.sync_from(listener)
         } else if self.fetch.is_some() {
@@ -311,37 +310,34 @@ impl PrettyPullProgress {
 }
 
 impl IngestMultiListener for PrettyPullProgress {
-    fn begin_ingest(&mut self, dataset_id: &DatasetID) -> Option<Arc<Mutex<dyn IngestListener>>> {
-        Some(Arc::new(Mutex::new(PrettyIngestProgress::new(
+    fn begin_ingest(&self, dataset_id: &DatasetID) -> Option<Arc<dyn IngestListener>> {
+        Some(Arc::new(PrettyIngestProgress::new(
             dataset_id,
             self.multi_progress.clone(),
-        ))))
+        )))
     }
 }
 
 impl TransformMultiListener for PrettyPullProgress {
-    fn begin_transform(
-        &mut self,
-        dataset_id: &DatasetID,
-    ) -> Option<Arc<Mutex<dyn TransformListener>>> {
-        Some(Arc::new(Mutex::new(PrettyTransformProgress::new(
+    fn begin_transform(&self, dataset_id: &DatasetID) -> Option<Arc<dyn TransformListener>> {
+        Some(Arc::new(PrettyTransformProgress::new(
             dataset_id,
             self.multi_progress.clone(),
-        ))))
+        )))
     }
 }
 
 impl SyncMultiListener for PrettyPullProgress {
     fn begin_sync(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_ref: &DatasetRef,
-    ) -> Option<Arc<Mutex<dyn SyncListener>>> {
-        Some(Arc::new(Mutex::new(PrettySyncProgress::new(
+    ) -> Option<Arc<dyn SyncListener>> {
+        Some(Arc::new(PrettySyncProgress::new(
             local_dataset_id.to_owned(),
             remote_dataset_ref.to_owned(),
             self.multi_progress.clone(),
-        ))))
+        )))
     }
 }
 
@@ -355,8 +351,12 @@ enum ProgressStyle {
 
 struct PrettyIngestProgress {
     dataset_id: DatasetIDBuf,
-    stage: IngestStage,
     multi_progress: Arc<indicatif::MultiProgress>,
+    state: Mutex<PrettyIngestProgressState>,
+}
+
+struct PrettyIngestProgressState {
+    stage: IngestStage,
     curr_progress: indicatif::ProgressBar,
     curr_progress_style: ProgressStyle,
 }
@@ -365,13 +365,15 @@ impl PrettyIngestProgress {
     fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
             dataset_id: dataset_id.to_owned(),
-            stage: IngestStage::CheckCache,
-            curr_progress_style: ProgressStyle::Spinner,
-            curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
-                dataset_id,
-                0,
-                "Checking for updates",
-            ))),
+            state: Mutex::new(PrettyIngestProgressState {
+                stage: IngestStage::CheckCache,
+                curr_progress_style: ProgressStyle::Spinner,
+                curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
+                    dataset_id,
+                    0,
+                    "Checking for updates",
+                ))),
+            }),
             multi_progress: multi_progress,
         }
     }
@@ -437,15 +439,16 @@ impl PrettyIngestProgress {
 }
 
 impl IngestListener for PrettyIngestProgress {
-    fn on_stage_progress(&mut self, stage: IngestStage, n: u64, out_of: u64) {
-        self.stage = stage;
+    fn on_stage_progress(&self, stage: IngestStage, n: u64, out_of: u64) {
+        let mut state = self.state.lock().unwrap();
+        state.stage = stage;
 
-        if self.curr_progress.is_finished()
-            || self.curr_progress_style != self.style_for_stage(stage)
+        if state.curr_progress.is_finished()
+            || state.curr_progress_style != self.style_for_stage(stage)
         {
-            self.curr_progress.finish();
-            self.curr_progress_style = self.style_for_stage(stage);
-            self.curr_progress = match self.curr_progress_style {
+            state.curr_progress.finish();
+            state.curr_progress_style = self.style_for_stage(stage);
+            state.curr_progress = match state.curr_progress_style {
                 ProgressStyle::Spinner => self
                     .multi_progress
                     .add(Self::new_spinner(&self.message_for_stage(stage))),
@@ -457,18 +460,22 @@ impl IngestListener for PrettyIngestProgress {
                 )),
             }
         } else {
-            self.curr_progress
+            state
+                .curr_progress
                 .set_message(self.message_for_stage(stage));
-            if self.curr_progress_style == ProgressStyle::Bar {
-                self.curr_progress.set_position(n)
+            if state.curr_progress_style == ProgressStyle::Bar {
+                state.curr_progress.set_position(n)
             }
         }
     }
 
-    fn success(&mut self, result: &IngestResult) {
+    fn success(&self, result: &IngestResult) {
+        let mut state = self.state.lock().unwrap();
+
         match result {
             IngestResult::UpToDate { uncacheable } => {
-                self.curr_progress
+                state
+                    .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_id,
                         IngestStage::Commit as u32,
@@ -491,15 +498,17 @@ impl IngestListener for PrettyIngestProgress {
                 uncacheable,
             } => {
                 if *uncacheable {
-                    self.curr_progress
+                    state
+                        .curr_progress
                         .finish_with_message(Self::spinner_message(
                             &self.dataset_id,
                             IngestStage::Commit as u32,
                             console::style("Data source is uncacheable").yellow(),
                         ));
-                    self.curr_progress = self.multi_progress.add(Self::new_spinner(""));
+                    state.curr_progress = self.multi_progress.add(Self::new_spinner(""));
                 };
-                self.curr_progress
+                state
+                    .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_id,
                         IngestStage::Commit as u32,
@@ -509,33 +518,38 @@ impl IngestListener for PrettyIngestProgress {
         };
     }
 
-    fn error(&mut self, _error: &IngestError) {
-        self.curr_progress
+    fn error(&self, _error: &IngestError) {
+        let state = self.state.lock().unwrap();
+        state
+            .curr_progress
             .finish_with_message(Self::spinner_message(
                 &self.dataset_id,
-                self.stage as u32,
+                state.stage as u32,
                 console::style("Failed to update root dataset").red(),
             ));
     }
 
-    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
         Some(self)
     }
 }
 
 impl PullImageListener for PrettyIngestProgress {
-    fn begin(&mut self, image: &str) {
+    fn begin(&self, image: &str) {
+        let state = self.state.lock().unwrap();
+
         // This currently happens during the Read stage
-        self.curr_progress.set_message(Self::spinner_message(
+        state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_id,
             IngestStage::Read as u32,
             format!("Pulling engine image {}", image),
         ));
     }
 
-    fn success(&mut self) {
-        self.curr_progress.finish();
-        self.on_stage_progress(self.stage, 0, 0);
+    fn success(&self) {
+        let state = self.state.lock().unwrap();
+        state.curr_progress.finish();
+        self.on_stage_progress(state.stage, 0, 0);
     }
 }
 
@@ -544,17 +558,15 @@ impl PullImageListener for PrettyIngestProgress {
 struct PrettyTransformProgress {
     dataset_id: DatasetIDBuf,
     multi_progress: Arc<indicatif::MultiProgress>,
-    curr_progress: indicatif::ProgressBar,
+    curr_progress: Mutex<indicatif::ProgressBar>,
 }
 
 impl PrettyTransformProgress {
     fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
             dataset_id: dataset_id.to_owned(),
-            curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
-                dataset_id,
-                0,
-                "Applying derivative transformations",
+            curr_progress: Mutex::new(multi_progress.add(Self::new_spinner(
+                &Self::spinner_message(dataset_id, 0, "Applying derivative transformations"),
             ))),
             multi_progress: multi_progress,
         }
@@ -581,7 +593,7 @@ impl PrettyTransformProgress {
 }
 
 impl TransformListener for PrettyTransformProgress {
-    fn success(&mut self, result: &TransformResult) {
+    fn success(&self, result: &TransformResult) {
         let msg = match result {
             TransformResult::UpToDate => {
                 console::style("Dataset is up-to-date".to_owned()).yellow()
@@ -593,11 +605,15 @@ impl TransformListener for PrettyTransformProgress {
             } => console::style(format!("Committed new block {}", new_head.short())).green(),
         };
         self.curr_progress
+            .lock()
+            .unwrap()
             .finish_with_message(Self::spinner_message(&self.dataset_id, 0, msg));
     }
 
-    fn error(&mut self, _error: &TransformError) {
+    fn error(&self, _error: &TransformError) {
         self.curr_progress
+            .lock()
+            .unwrap()
             .finish_with_message(Self::spinner_message(
                 &self.dataset_id,
                 0,
@@ -605,23 +621,27 @@ impl TransformListener for PrettyTransformProgress {
             ));
     }
 
-    fn get_pull_image_listener(&mut self) -> Option<&mut dyn PullImageListener> {
+    fn get_pull_image_listener(&self) -> Option<&dyn PullImageListener> {
         Some(self)
     }
 }
 
 impl PullImageListener for PrettyTransformProgress {
-    fn begin(&mut self, image: &str) {
-        self.curr_progress.set_message(Self::spinner_message(
-            &self.dataset_id,
-            0,
-            format!("Pulling engine image {}", image),
-        ));
+    fn begin(&self, image: &str) {
+        self.curr_progress
+            .lock()
+            .unwrap()
+            .set_message(Self::spinner_message(
+                &self.dataset_id,
+                0,
+                format!("Pulling engine image {}", image),
+            ));
     }
 
-    fn success(&mut self) {
-        self.curr_progress.finish();
-        self.curr_progress = self
+    fn success(&self) {
+        let mut curr_progress = self.curr_progress.lock().unwrap();
+        curr_progress.finish();
+        *curr_progress = self
             .multi_progress
             .add(Self::new_spinner(&Self::spinner_message(
                 &self.dataset_id,
@@ -678,7 +698,7 @@ impl PrettySyncProgress {
 }
 
 impl SyncListener for PrettySyncProgress {
-    fn success(&mut self, result: &SyncResult) {
+    fn success(&self, result: &SyncResult) {
         let msg = match result {
             SyncResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
@@ -696,7 +716,7 @@ impl SyncListener for PrettySyncProgress {
             .finish_with_message(self.spinner_message(0, msg));
     }
 
-    fn error(&mut self, _error: &SyncError) {
+    fn error(&self, _error: &SyncError) {
         self.curr_progress.finish_with_message(
             self.spinner_message(0, console::style("Failed to sync remote dataset").red()),
         );

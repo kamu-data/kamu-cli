@@ -19,7 +19,7 @@ impl NotebookServerImpl {
         Self { container_runtime }
     }
 
-    pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
+    pub fn ensure_images(&self, listener: &dyn PullImageListener) {
         self.container_runtime
             .ensure_image(docker_images::LIVY, Some(listener));
         self.container_runtime

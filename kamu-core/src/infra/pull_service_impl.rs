@@ -6,7 +6,7 @@ use dill::*;
 use slog::{info, Logger};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct PullServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
@@ -194,9 +194,9 @@ impl PullService for PullServiceImpl {
         &self,
         dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         options: PullOptions,
-        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
-        transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-        sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         // Starting refs can contain:
         // - DatasetIDs of local datasets (Root and Derivative)
@@ -294,7 +294,7 @@ impl PullService for PullServiceImpl {
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
         options: PullOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError> {
         let res = self
             .sync_svc
@@ -314,7 +314,7 @@ impl PullService for PullServiceImpl {
         dataset_id: &DatasetID,
         fetch: FetchStep,
         options: PullOptions,
-        listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError> {
         if !self
             .metadata_repo

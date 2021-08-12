@@ -7,7 +7,7 @@ use std::backtrace::BacktraceStatus;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -63,7 +63,7 @@ impl PushCommand {
 
     fn push_with_progress(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
         let progress = PrettyPushProgress::new();
-        let listener = Arc::new(Mutex::new(progress.clone()));
+        let listener = Arc::new(progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
@@ -79,7 +79,7 @@ impl PushCommand {
             Some(listener.clone()),
         );
 
-        listener.lock().unwrap().finish();
+        listener.finish();
         draw_thread.join().unwrap();
 
         results
@@ -232,15 +232,15 @@ impl PrettyPushProgress {
 
 impl SyncMultiListener for PrettyPushProgress {
     fn begin_sync(
-        &mut self,
+        &self,
         local_dataset_id: &DatasetID,
         remote_dataset_ref: &DatasetRef,
-    ) -> Option<Arc<Mutex<dyn SyncListener>>> {
-        Some(Arc::new(Mutex::new(PrettySyncProgress::new(
+    ) -> Option<Arc<dyn SyncListener>> {
+        Some(Arc::new(PrettySyncProgress::new(
             local_dataset_id.to_owned(),
             remote_dataset_ref.to_owned(),
             self.multi_progress.clone(),
-        ))))
+        )))
     }
 }
 
@@ -291,7 +291,7 @@ impl PrettySyncProgress {
 }
 
 impl SyncListener for PrettySyncProgress {
-    fn success(&mut self, result: &SyncResult) {
+    fn success(&self, result: &SyncResult) {
         let msg = match result {
             SyncResult::UpToDate => console::style("Remote is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
@@ -309,7 +309,7 @@ impl SyncListener for PrettySyncProgress {
             .finish_with_message(self.spinner_message(0, msg));
     }
 
-    fn error(&mut self, _error: &SyncError) {
+    fn error(&self, _error: &SyncError) {
         self.curr_progress.finish_with_message(self.spinner_message(
             0,
             console::style("Failed to sync dataset to repository").red(),

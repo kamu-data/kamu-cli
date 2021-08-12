@@ -5,6 +5,7 @@ pub enum BlockRef {
     Head,
 }
 
+// TODO: Error handling
 // TODO: Separate mutable and immutable traits
 // See: https://github.com/rust-lang/rfcs/issues/2035
 pub trait MetadataChain: Send {

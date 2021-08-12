@@ -6,7 +6,7 @@ use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 fn main() {
     let pull_svc = Arc::new(TestPullService {});
@@ -38,19 +38,14 @@ impl PullService for TestPullService {
         &self,
         _dataset_ids_iter: &mut dyn Iterator<Item = &DatasetRef>,
         _options: PullOptions,
-        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
-        _transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-        _sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        _transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        _sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         let id = DatasetRefBuf::try_from("org.geonames.cities").unwrap();
 
         let multi_listener = ingest_listener.unwrap();
-        let single_listener = multi_listener
-            .lock()
-            .unwrap()
-            .begin_ingest(id.local_id())
-            .unwrap();
-        let mut listener = single_listener.lock().unwrap();
+        let listener = multi_listener.begin_ingest(id.local_id()).unwrap();
 
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
 
@@ -107,7 +102,7 @@ impl PullService for TestPullService {
         _remote_ref: &DatasetRef,
         _local_id: &DatasetID,
         _options: PullOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()
     }
@@ -117,7 +112,7 @@ impl PullService for TestPullService {
         _dataset_id: &DatasetID,
         _fetch: FetchStep,
         _options: PullOptions,
-        _listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        _listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()
     }

@@ -1,7 +1,7 @@
 use super::RepositoryError;
 use opendatafabric::{DatasetID, DatasetIDBuf, DatasetRef, DatasetRefBuf, RepositoryBuf, Sha3_256};
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -14,14 +14,14 @@ pub trait SyncService: Send + Sync {
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
     fn sync_from_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)>;
 
     fn sync_to(
@@ -29,14 +29,14 @@ pub trait SyncService: Send + Sync {
         local_id: &DatasetID,
         remote_ref: &DatasetRef,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
     fn sync_to_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)>;
 }
 
@@ -64,9 +64,9 @@ pub enum SyncResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait SyncListener: Send {
-    fn begin(&mut self) {}
-    fn success(&mut self, _result: &SyncResult) {}
-    fn error(&mut self, _error: &SyncError) {}
+    fn begin(&self) {}
+    fn success(&self, _result: &SyncResult) {}
+    fn error(&self, _error: &SyncError) {}
 }
 
 pub struct NullSyncListener;
@@ -74,10 +74,10 @@ impl SyncListener for NullSyncListener {}
 
 pub trait SyncMultiListener {
     fn begin_sync(
-        &mut self,
+        &self,
         _local_id: &DatasetID,
         _remote_ref: &DatasetRef,
-    ) -> Option<Arc<Mutex<dyn SyncListener>>> {
+    ) -> Option<Arc<dyn SyncListener>> {
         None
     }
 }

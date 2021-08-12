@@ -17,8 +17,8 @@ pub trait Engine {
 }
 
 pub trait PullImageListener {
-    fn begin(&mut self, _image: &str) {}
-    fn success(&mut self) {}
+    fn begin(&self, _image: &str) {}
+    fn success(&self) {}
 }
 
 pub struct NullPullImageListener;

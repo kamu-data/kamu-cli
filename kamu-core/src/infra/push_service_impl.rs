@@ -3,7 +3,7 @@ use opendatafabric::*;
 
 use dill::*;
 use slog::Logger;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct PushServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
@@ -104,7 +104,7 @@ impl PushService for PushServiceImpl {
         &self,
         dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         options: PushOptions,
-        sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
         if options.recursive {
             unimplemented!("Recursive push is not yet supported")

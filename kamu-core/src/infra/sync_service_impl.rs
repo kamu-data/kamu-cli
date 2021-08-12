@@ -6,7 +6,7 @@ use opendatafabric::*;
 use dill::*;
 use slog::Logger;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct SyncServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
@@ -287,19 +287,18 @@ impl SyncService for SyncServiceImpl {
         remote_ref: &DatasetRef,
         local_id: &DatasetID,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        let lst = listener.unwrap_or(Arc::new(Mutex::new(NullSyncListener)));
-        {
-            lst.lock().unwrap().begin();
-        }
+        let listener = listener.unwrap_or(Arc::new(NullSyncListener));
+        listener.begin();
+
         match self.do_sync_from(remote_ref, local_id, options) {
             Ok(result) => {
-                lst.lock().unwrap().success(&result);
+                listener.success(&result);
                 Ok(result)
             }
             Err(err) => {
-                lst.lock().unwrap().error(&err);
+                listener.error(&err);
                 Err(err)
             }
         }
@@ -310,20 +309,20 @@ impl SyncService for SyncServiceImpl {
         &self,
         datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)> {
         let mut results = Vec::new();
 
         for (remote_dataset_ref, local_dataset_id) in datasets {
-            let lst = if let Some(ref l) = listener {
-                l.lock()
-                    .unwrap()
-                    .begin_sync(local_dataset_id, remote_dataset_ref)
-            } else {
-                None
-            };
+            let res = self.sync_from(
+                remote_dataset_ref,
+                local_dataset_id,
+                options.clone(),
+                listener
+                    .as_ref()
+                    .and_then(|l| l.begin_sync(local_dataset_id, remote_dataset_ref)),
+            );
 
-            let res = self.sync_from(remote_dataset_ref, local_dataset_id, options.clone(), lst);
             results.push((
                 (remote_dataset_ref.to_owned(), local_dataset_id.to_owned()),
                 res,
@@ -338,19 +337,18 @@ impl SyncService for SyncServiceImpl {
         local_id: &DatasetID,
         remote_ref: &DatasetRef,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        let lst = listener.unwrap_or(Arc::new(Mutex::new(NullSyncListener)));
-        {
-            lst.lock().unwrap().begin();
-        }
+        let listener = listener.unwrap_or(Arc::new(NullSyncListener));
+        listener.begin();
+
         match self.do_sync_to(local_id, remote_ref, options) {
             Ok(result) => {
-                lst.lock().unwrap().success(&result);
+                listener.success(&result);
                 Ok(result)
             }
             Err(err) => {
-                lst.lock().unwrap().error(&err);
+                listener.error(&err);
                 Err(err)
             }
         }
@@ -361,20 +359,20 @@ impl SyncService for SyncServiceImpl {
         &self,
         datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
         options: SyncOptions,
-        listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
         let mut results = Vec::new();
 
         for (local_dataset_id, remote_dataset_ref) in datasets {
-            let lst = if let Some(ref l) = listener {
-                l.lock()
-                    .unwrap()
-                    .begin_sync(local_dataset_id, remote_dataset_ref)
-            } else {
-                None
-            };
+            let res = self.sync_to(
+                local_dataset_id,
+                remote_dataset_ref,
+                options.clone(),
+                listener
+                    .as_ref()
+                    .and_then(|l| l.begin_sync(local_dataset_id, remote_dataset_ref)),
+            );
 
-            let res = self.sync_to(local_dataset_id, remote_dataset_ref, options.clone(), lst);
             results.push((
                 (local_dataset_id.to_owned(), remote_dataset_ref.to_owned()),
                 res,

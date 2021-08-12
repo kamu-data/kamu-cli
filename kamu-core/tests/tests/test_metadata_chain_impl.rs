@@ -35,6 +35,7 @@ fn test_append_and_iter_blocks() {
 
     let mut block1 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
+        .source(MetadataFactory::dataset_source_root().build())
         .build();
     let (mut chain, block1_hash) = MetadataChainImpl::create(&chain_dir, block1.clone()).unwrap();
     block1.block_hash = block1_hash;
@@ -42,12 +43,14 @@ fn test_append_and_iter_blocks() {
     let mut block2 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
         .prev(&block1.block_hash)
+        .output_watermark(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
         .build();
     block2.block_hash = chain.append(block2.clone());
 
     let mut block3 = MetadataFactory::metadata_block()
         .system_time(Utc.ymd(2000, 1, 3).and_hms(12, 0, 0))
         .prev(&block2.block_hash)
+        .output_watermark(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
         .build();
     block3.block_hash = chain.append(block3.clone());
 

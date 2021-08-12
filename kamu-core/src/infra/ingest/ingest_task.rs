@@ -9,7 +9,7 @@ use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use slog::{info, o, Logger};
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct IngestTask {
     dataset_id: DatasetIDBuf,
@@ -20,7 +20,7 @@ pub struct IngestTask {
     fetch_override: Option<FetchStep>,
     prev_checkpoint: Option<Sha3_256>,
     vocab: DatasetVocabulary,
-    listener: Arc<Mutex<dyn IngestListener>>,
+    listener: Arc<dyn IngestListener>,
     checkpointing_executor: CheckpointingExecutor,
     fetch_service: FetchService,
     prep_service: PrepService,
@@ -35,7 +35,7 @@ impl IngestTask {
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
         fetch_override: Option<FetchStep>,
-        listener: Arc<Mutex<dyn IngestListener>>,
+        listener: Arc<dyn IngestListener>,
         engine_factory: Arc<dyn EngineFactory>,
         logger: Logger,
     ) -> Self {
@@ -93,15 +93,15 @@ impl IngestTask {
     }
 
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
-        self.listener.lock().unwrap().begin();
+        self.listener.begin();
 
         match self.ingest_inner() {
             Ok(res) => {
-                self.listener.lock().unwrap().success(&res);
+                self.listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
-                self.listener.lock().unwrap().error(&err);
+                self.listener.error(&err);
                 Err(err)
             }
         }
@@ -110,8 +110,6 @@ impl IngestTask {
     // Note: Can be called from multiple threads
     pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
         self.listener
-            .lock()
-            .unwrap()
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
 
         let prev_hash = self.meta_chain.borrow().read_ref(&BlockRef::Head).unwrap();
@@ -121,26 +119,18 @@ impl IngestTask {
         let cacheable = fetch_result.checkpoint.is_cacheable();
         let source_event_time = fetch_result.checkpoint.source_event_time.clone();
 
-        self.listener
-            .lock()
-            .unwrap()
-            .on_stage_progress(IngestStage::Prepare, 0, 1);
+        self.listener.on_stage_progress(IngestStage::Prepare, 0, 1);
 
         let prepare_result = self.maybe_prepare(fetch_result.clone())?;
 
-        self.listener
-            .lock()
-            .unwrap()
-            .on_stage_progress(IngestStage::Read, 0, 1);
+        self.listener.on_stage_progress(IngestStage::Read, 0, 1);
 
         let read_result = self.maybe_read(prepare_result, source_event_time)?;
 
-        {
-            let mut l = self.listener.lock().unwrap();
-            l.on_stage_progress(IngestStage::Preprocess, 0, 1);
-            l.on_stage_progress(IngestStage::Merge, 0, 1);
-            l.on_stage_progress(IngestStage::Commit, 0, 1);
-        }
+        self.listener
+            .on_stage_progress(IngestStage::Preprocess, 0, 1);
+        self.listener.on_stage_progress(IngestStage::Merge, 0, 1);
+        self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
         let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash)?;
 
@@ -381,12 +371,12 @@ impl IngestTask {
 }
 
 struct FetchProgressListenerBridge {
-    listener: Arc<Mutex<dyn IngestListener>>,
+    listener: Arc<dyn IngestListener>,
 }
 
 impl FetchProgressListener for FetchProgressListenerBridge {
     fn on_progress(&mut self, progress: &FetchProgress) {
-        self.listener.lock().unwrap().on_stage_progress(
+        self.listener.on_stage_progress(
             IngestStage::Fetch,
             progress.fetched_bytes,
             progress.total_bytes,

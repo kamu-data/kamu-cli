@@ -6,7 +6,7 @@ use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 fn main() {
     let pull_svc = Arc::new(TestPullService {});
@@ -36,7 +36,7 @@ pub struct TestPullService;
 impl TestPullService {
     fn ingest(
         id: DatasetRefBuf,
-        l: Arc<Mutex<dyn IngestListener>>,
+        listener: Arc<dyn IngestListener>,
     ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
         let sleep_rand = |min: u64, max: u64| {
@@ -44,8 +44,6 @@ impl TestPullService {
             let t = ((d * rand::random::<f32>()) as u64) + min;
             std::thread::sleep(std::time::Duration::from_millis(t));
         };
-
-        let mut listener = l.lock().unwrap();
 
         listener.begin();
 
@@ -102,10 +100,8 @@ impl TestPullService {
 
     fn transform(
         id: DatasetRefBuf,
-        l: Arc<Mutex<dyn TransformListener>>,
+        listener: Arc<dyn TransformListener>,
     ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
-        let mut listener = l.lock().unwrap();
-
         listener.begin();
 
         std::thread::sleep(std::time::Duration::from_millis(2000));
@@ -134,9 +130,9 @@ impl PullService for TestPullService {
         &self,
         _dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
         _options: PullOptions,
-        ingest_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
-        transform_listener: Option<Arc<Mutex<dyn TransformMultiListener>>>,
-        _sync_listener: Option<Arc<Mutex<dyn SyncMultiListener>>>,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        _sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
         let in_l = ingest_listener.unwrap();
         let tr_l = transform_listener.unwrap();
@@ -149,7 +145,7 @@ impl PullService for TestPullService {
         .iter()
         .map(|s| DatasetRefBuf::try_from(*s).unwrap())
         .map(|id| {
-            let listener = in_l.lock().unwrap().begin_ingest(id.local_id()).unwrap();
+            let listener = in_l.begin_ingest(id.local_id()).unwrap();
             std::thread::spawn(move || Self::ingest(id, listener))
         })
         .collect();
@@ -164,7 +160,7 @@ impl PullService for TestPullService {
                 .iter()
                 .map(|s| DatasetRefBuf::try_from(*s).unwrap())
                 .map(|id| {
-                    let listener = tr_l.lock().unwrap().begin_transform(id.local_id()).unwrap();
+                    let listener = tr_l.begin_transform(id.local_id()).unwrap();
                     std::thread::spawn(move || Self::transform(id, listener))
                 })
                 .collect();
@@ -179,7 +175,7 @@ impl PullService for TestPullService {
         _remote_ref: &DatasetRef,
         _local_id: &DatasetID,
         _options: PullOptions,
-        _listener: Option<Arc<Mutex<dyn SyncListener>>>,
+        _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()
     }
@@ -189,7 +185,7 @@ impl PullService for TestPullService {
         _dataset_id: &DatasetID,
         _fetch: FetchStep,
         _options: PullOptions,
-        _listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        _listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()
     }

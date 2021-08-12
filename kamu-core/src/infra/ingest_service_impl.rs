@@ -5,7 +5,7 @@ use dill::*;
 use opendatafabric::*;
 
 use slog::{info, o, Logger};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
@@ -83,10 +83,9 @@ impl IngestService for IngestServiceImpl {
         &self,
         dataset_id: &DatasetID,
         options: IngestOptions,
-        maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let null_listener: Arc<Mutex<dyn IngestListener>> =
-            Arc::new(Mutex::new(NullIngestListener {}));
+        let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
         info!(self.logger, "Ingesting single dataset"; "dataset" => dataset_id.as_str());
@@ -116,10 +115,9 @@ impl IngestService for IngestServiceImpl {
         dataset_id: &DatasetID,
         fetch: FetchStep,
         options: IngestOptions,
-        maybe_listener: Option<Arc<Mutex<dyn IngestListener>>>,
+        maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let null_listener: Arc<Mutex<dyn IngestListener>> =
-            Arc::new(Mutex::new(NullIngestListener {}));
+        let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
         info!(self.logger, "Ingesting single dataset from overriden source"; "dataset" => dataset_id.as_str(), "fetch" => ?fetch);
@@ -148,10 +146,10 @@ impl IngestService for IngestServiceImpl {
         &self,
         dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
         options: IngestOptions,
-        maybe_multi_listener: Option<Arc<Mutex<dyn IngestMultiListener>>>,
+        maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
-        let null_multi_listener: Arc<Mutex<dyn IngestMultiListener>> =
-            Arc::new(Mutex::new(NullIngestMultiListener {}));
+        let null_multi_listener: Arc<dyn IngestMultiListener> =
+            Arc::new(NullIngestMultiListener {});
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
         let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
@@ -165,12 +163,8 @@ impl IngestService for IngestServiceImpl {
                 let engine_factory = self.engine_factory.clone();
                 let task_options = options.clone();
 
-                let null_listener = Arc::new(Mutex::new(NullIngestListener {}));
-                let listener = multi_listener
-                    .lock()
-                    .unwrap()
-                    .begin_ingest(&id)
-                    .unwrap_or(null_listener);
+                let null_listener = Arc::new(NullIngestListener {});
+                let listener = multi_listener.begin_ingest(&id).unwrap_or(null_listener);
 
                 let logger = self.logger.new(o!("dataset" => id.to_string()));
 
