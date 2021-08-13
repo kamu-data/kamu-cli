@@ -755,9 +755,11 @@ pub fn cli() -> App<'static, 'static> {
                     - Soundness of the derivative transformation chain that shaped it
                     - Guaranteeing that derivative data was in fact produced by declared transformations
 
-                    For the first two, you can inspect the dataset lineage and identify which root datasets you are getting data from to assess publishers' reputability, and audit all derivative transformations to ensure they are sound and non-malicious.
+                    For the first two, you can inspect the dataset lineage so see which root datasets the data is coming from and whether their publishers are credible. Then you can audit all derivative transformations to ensure they are sound and non-malicious.
 
-                    This command can help you with the last stage. It uses the history of transformations stored in metadata to repeat all transformations locally and compare the hashes of data to ones originally recorded, thus ensuring that data you downloaded was actually produced by applying all declared transformations to the source data.
+                    This command can help you with the last stage. It uses the history of transformations stored in metadata to first compare the hashes of data with ones stored in metadata (i.e. verify that data corresponds to metadata). Then it repeats all declared transformations locally to ensure that what's declared in metadata actually produces the presented result.
+
+                    The combination of the above steps can give you a high certainty that the data you're using is trustworthy.
 
                     ### Examples ###
 
@@ -765,7 +767,7 @@ pub fn cli() -> App<'static, 'static> {
 
                         kamu verify com.example.deriv
 
-                    Verify the entire transformation chain starting with root datasets:
+                    Verify the entire transformation chain starting with root datasets (may download a lot of data):
 
                         kamu pull --recursive com.example.deriv
                     "

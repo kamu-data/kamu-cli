@@ -66,7 +66,6 @@ All datasets can be easily shared with others, creating a decentralized data pip
 - **[Ingesting Data](docs/ingest.md)**
   - **[Merge Strategies](docs/merge_strategies.md)**
   - **[Ingestion Examples](docs/ingest_examples.md)**
-- **Exporting Data**
 - **Transforming Data**
   - Transformation model
   - Supported Engines
@@ -76,6 +75,11 @@ All datasets can be easily shared with others, creating a decentralized data pip
   - Stream-to-Stream Joins
   - Watermarks
   - Geo-Spatial Data
+- **[Exploring Data](docs/exploring_data.md)**
+- **[Sharing data](docs/sharing_data.md)**
+  - **[Supported Repositories](docs/sharing_data.md#repository-types)**
+  - **[Verifying Validity of Data](docs/sharing_data.md#validity-of-data)**
+- **Exporting Data**
 - **Dataset Evolution**
   - Schema Evolution
     - Adding / deprecating columns
@@ -92,12 +96,9 @@ All datasets can be easily shared with others, creating a decentralized data pip
   - Bad data upon ingestion
   - Bad data in upstream datasets
   - PII and sensitive data
-- **[Exploring Data](docs/exploring_data.md)**
-- **[Sharing data](docs/sharing_data.md)**
-  - **[Supported Repositories](docs/sharing_data.md#repository-types)**
 - **[Troubleshooting](docs/troubleshooting.md)**
 - **Reference**
-  - **[Manifests Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadata-reference)**
+  - **[Manifest and Metadata Schemas](https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadata-reference)**
 - **Contributing**
   - Contribution Guidelines
   - **[Developer Guide](docs/developer_guide.md)**
