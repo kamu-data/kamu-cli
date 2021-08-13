@@ -26,9 +26,16 @@ See also:
 Linux is our primary target environment. We don't have packages for various Linux flavors yet, but since the tool is just a simple binary it's very easy to get started:
 - Install `docker` using your distro's package manager (alternatively try [podman](#experimental-using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
-- Download the latest version of `kamu` from the GitHub release page
-- Unpack and, `chown +x` it
+- Download the latest version of `kamu` from the GitHub [release page](https://github.com/kamu-data/kamu-cli/releases/latest)
+- Unpack and, `chmod +x` it
+  ```
+  tar -zxvf kamu-cli-x86_64-unknown-linux-gnu.tar.gz
+  chmod +x kamu-cli-x86_64-unknown-linux-gnu/kamu
+  ```
 - Link it into your preferred location on your `PATH`
+  ```
+  cp kamu /usr/local/bin
+  ```
 - Use `kamu init --pull-images` to pre-load all Docker images
 
 See also:
@@ -53,8 +60,8 @@ See also:
 - Install Ubuntu distro from Microsoft Store
 - Install `docker` (alternatively try [podman](#experimental-using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
-- Download the latest version of `kamu` from the GitHub release page (note that you should download Linux release)
-- Unpack and, `chown +x` it
+- Download the latest version of `kamu` from the GitHub [release page](https://github.com/kamu-data/kamu-cli/releases/latest) (note that you should download Linux release)
+- Unpack and, `chmod +x` it
 - Link it into your preferred location on your `PATH`
 
 See also:
