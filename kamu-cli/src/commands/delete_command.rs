@@ -45,6 +45,10 @@ impl Command for DeleteCommand {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
+        if starting_dataset_ids.is_empty() && !self.all {
+            return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
+        }
+
         let dataset_ids = if self.all {
             unimplemented!("Recursive deletion is not yet supported")
         } else if self.recursive {

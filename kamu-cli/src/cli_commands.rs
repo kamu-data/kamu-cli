@@ -135,7 +135,7 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
             )),
             ("delete", Some(delete_matches)) => Box::new(RepositoryDeleteCommand::new(
                 catalog.get_one().unwrap(),
-                delete_matches.values_of("repo").unwrap_or_default(),
+                delete_matches.values_of("repository").unwrap_or_default(),
                 delete_matches.is_present("all"),
                 delete_matches.is_present("yes"),
             )),

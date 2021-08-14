@@ -563,7 +563,7 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("all")
                                 .short("a")
                                 .long("all")
-                                .help("Delete all known repository"),
+                                .help("Delete all known repositories"),
                             Arg::with_name("repository")
                                 .multiple(true)
                                 .index(1)

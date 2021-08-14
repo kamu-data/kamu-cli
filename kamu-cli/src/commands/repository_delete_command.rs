@@ -60,6 +60,12 @@ impl Command for RepositoryDeleteCommand {
                 .collect()
         };
 
+        if repo_ids.is_empty() {
+            return Err(CLIError::usage_error(
+                "Specify a repository or use --all flag",
+            ));
+        }
+
         let confirmed = if self.no_confirmation {
             true
         } else {
