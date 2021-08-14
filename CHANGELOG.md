@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.53.0] - 2021-08-13
 ### Fixed
 - Upgrading Spark engine with a workaround for upstream bug in Shapefile import
+- Engine image pulling status freezes
 
 ## [0.52.0] - 2021-08-13
 ### Added

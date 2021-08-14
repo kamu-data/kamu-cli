@@ -242,6 +242,8 @@ impl IngestTask {
 
                     let null_steps = Vec::new();
                     let prep_steps = self.source.prepare.as_ref().unwrap_or(&null_steps);
+
+                    info!(self.logger, "Preparing the data"; "fetch" => ?prep_steps);
                     self.prep_service.prepare(
                         prep_steps,
                         fetch_result.checkpoint.last_fetched,
@@ -275,6 +277,7 @@ impl IngestTask {
                         }
                     }
 
+                    info!(self.logger, "Reading the data");
                     self.read_service.read(
                         &self.dataset_id,
                         &self.layout,

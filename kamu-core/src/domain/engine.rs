@@ -117,13 +117,9 @@ pub struct Watermark {
 
 #[derive(Debug, Error)]
 pub enum EngineError {
-    #[error("Engine {id} was not found")]
-    NotFound { id: String, backtrace: Backtrace },
-    #[error("{source}")]
-    IOError {
-        #[from]
-        source: std::io::Error,
-        #[backtrace]
+    #[error("Engine image not found: {image_name}")]
+    ImageNotFound {
+        image_name: String,
         backtrace: Backtrace,
     },
     #[error("Process error: {0}")]
@@ -154,9 +150,9 @@ pub struct ContractError {
 }
 
 impl EngineError {
-    pub fn not_found(id: &str) -> Self {
-        EngineError::NotFound {
-            id: id.to_owned(),
+    pub fn image_not_found(image_name: &str) -> Self {
+        EngineError::ImageNotFound {
+            image_name: image_name.to_owned(),
             backtrace: Backtrace::capture(),
         }
     }
@@ -166,6 +162,12 @@ impl EngineError {
             source: e.into(),
             backtrace: Backtrace::capture(),
         }
+    }
+}
+
+impl From<std::io::Error> for EngineError {
+    fn from(e: std::io::Error) -> Self {
+        Self::internal(e)
     }
 }
 

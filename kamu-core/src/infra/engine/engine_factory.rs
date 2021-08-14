@@ -7,7 +7,7 @@ use super::engine_flink::*;
 use super::engine_spark::*;
 
 use dill::*;
-use slog::{o, Logger};
+use slog::{error, info, o, Logger};
 use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -29,6 +29,7 @@ pub struct EngineFactoryImpl {
     flink_engine: Arc<Mutex<FlinkEngine>>,
     container_runtime: DockerClient,
     known_images: Mutex<HashSet<String>>,
+    logger: Logger,
 }
 
 #[component(pub)]
@@ -53,6 +54,7 @@ impl EngineFactoryImpl {
             ))),
             container_runtime: container_runtime,
             known_images: Mutex::new(HashSet::new()),
+            logger,
         }
     }
 }
@@ -72,27 +74,41 @@ impl EngineFactory for EngineFactoryImpl {
                 self.flink_engine.clone() as Arc<Mutex<dyn Engine>>,
                 docker_images::FLINK,
             )),
-            _ => Err(EngineError::not_found(engine_id)),
+            _ => Err(EngineError::image_not_found(engine_id)),
         }?;
 
-        let mut known_images = self.known_images.lock().unwrap();
+        let pull_image = {
+            let mut known_images = self.known_images.lock().unwrap();
+            if known_images.contains(image) {
+                false
+            } else if self.container_runtime.has_image(image) {
+                known_images.insert(image.to_owned());
+                false
+            } else {
+                true
+            }
+        };
 
-        if !known_images.contains(image) {
-            if !self.container_runtime.has_image(image) {
-                let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPullImageListener));
+        if pull_image {
+            info!(self.logger, "Pulling engine image"; "engine" => engine_id, "image_name" => image);
+            let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPullImageListener));
+            listener.begin(image);
 
-                listener.begin(image);
-
-                // TODO: Return better errors
-                self.container_runtime
+            // TODO: Return better errors
+            self.container_runtime
                     .pull_cmd(image)
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
-                    .status()?;
+                    .status()?
+                    .exit_ok()
+                    .map_err(|e| {
+                        error!(self.logger, "Failed to pull engine image"; "engine" => engine_id, "image_name" => image, "error" => ?e);
+                        EngineError::image_not_found(image)
+                    })?;
 
-                listener.success();
-            }
-            known_images.insert(image.to_owned());
+            info!(self.logger, "Successfully pulled engine image"; "engine" => engine_id, "image_name" => image);
+            listener.success();
+            self.known_images.lock().unwrap().insert(image.to_owned());
         }
 
         Ok(engine)
@@ -109,6 +125,6 @@ impl EngineFactory for EngineFactoryNull {
         engine_id: &str,
         _maybe_listener: Option<Arc<dyn PullImageListener>>,
     ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
-        Err(EngineError::not_found(engine_id))
+        Err(EngineError::image_not_found(engine_id))
     }
 }

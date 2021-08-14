@@ -547,9 +547,13 @@ impl PullImageListener for PrettyIngestProgress {
     }
 
     fn success(&self) {
-        let state = self.state.lock().unwrap();
-        state.curr_progress.finish();
-        self.on_stage_progress(state.stage, 0, 0);
+        // Careful not to deadlock
+        let stage = {
+            let state = self.state.lock().unwrap();
+            state.curr_progress.finish();
+            state.stage
+        };
+        self.on_stage_progress(stage, 0, 0);
     }
 }
 
