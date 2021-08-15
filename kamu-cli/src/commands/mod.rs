@@ -26,11 +26,11 @@ pub use config_command::*;
 mod delete_command;
 pub use delete_command::*;
 
-mod depgraph_command;
-pub use depgraph_command::*;
-
 mod list_command;
 pub use list_command::*;
+
+mod lineage_command;
+pub use lineage_command::*;
 
 mod log_command;
 pub use log_command::*;

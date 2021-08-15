@@ -47,7 +47,7 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                 set_matches.value_of("cfgkey").unwrap().to_owned(),
                 set_matches.value_of("value").map(|s| s.to_owned()),
             )),
-            _ => unimplemented!(),
+            _ => panic!("Command interpretation failed"),
         },
         ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one().unwrap(),
@@ -65,14 +65,20 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                 Box::new(InitCommand::new(catalog.get_one().unwrap()))
             }
         }
-        ("list", Some(submatches)) => match submatches.subcommand() {
-            ("", _) => Box::new(ListCommand::new(
+        ("inspect", Some(submatches)) => match submatches.subcommand() {
+            ("lineage", Some(lin_matches)) => Box::new(LineageCommand::new(
                 catalog.get_one().unwrap(),
+                lin_matches.values_of("dataset").unwrap_or_default(),
+                lin_matches.is_present("all"),
+                lin_matches.value_of("output-format"),
                 catalog.get_one().unwrap(),
             )),
-            ("depgraph", _) => Box::new(DepgraphCommand::new(catalog.get_one().unwrap())),
-            _ => unimplemented!(),
+            _ => panic!("Command interpretation failed"),
         },
+        ("list", Some(_submatches)) => Box::new(ListCommand::new(
+            catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
+        )),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             catalog.get_one().unwrap(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
@@ -164,9 +170,9 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                     catalog.get_one().unwrap(),
                     list_matches.value_of("dataset").map(|s| s.to_owned()),
                 )),
-                _ => unimplemented!(),
+                _ => panic!("Command interpretation failed"),
             },
-            _ => unimplemented!(),
+            _ => panic!("Command interpretation failed"),
         },
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new(
@@ -201,7 +207,7 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                     ))
                 }
             }
-            _ => unimplemented!(),
+            _ => panic!("Command interpretation failed"),
         },
         ("verify", Some(submatches)) => Box::new(VerifyCommand::new(
             catalog.get_one().unwrap(),
@@ -209,6 +215,6 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("recursive"),
         )),
-        _ => unimplemented!(),
+        _ => panic!("Command interpretation failed"),
     }
 }

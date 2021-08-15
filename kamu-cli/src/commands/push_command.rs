@@ -122,7 +122,10 @@ impl Command for PushCommand {
                 .add(remote_ref, RemoteAliasKind::Push)?;
         }
 
-        let push_results = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
+        let push_results = if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
             self.push_with_progress()
         } else {
             self.push_quiet()

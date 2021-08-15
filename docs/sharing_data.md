@@ -94,10 +94,14 @@ Based on the above, here are the steps needed to ensure a dataset is trustworthy
 Example:
 
 ```bash
-# TODO: Include lineage inspection commands
+# Inspect the dependency graph of a dataset to find all root sources
+kamu inspect lineage ca.vancouver.opendata.weather.aggregated-daily
+
+# Inspect the transformations applied with every derivative dataset
+kamu log ca.vancouver.opendata.weather.aggregated-daily
 
 # Recursively verify the entire transformation chain starting from root datasets
-kamu verify --recursive ca.vancouver.opendata.weather.all-stations-averaged
+kamu verify --recursive ca.vancouver.opendata.weather.aggregated-daily
 ```
 
 For every derivative dataset the `kamu verify` command does two things:

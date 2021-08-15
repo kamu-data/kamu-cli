@@ -100,12 +100,14 @@ impl Command for VerifyCommand {
             ));
         }
 
-        let verification_results =
-            if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
-                self.verify_with_progress()?
-            } else {
-                self.verify(None)?
-            };
+        let verification_results = if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
+            self.verify_with_progress()?
+        } else {
+            self.verify(None)?
+        };
 
         let mut valid = 0;
         let mut errors = 0;

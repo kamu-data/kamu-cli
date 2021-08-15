@@ -74,12 +74,16 @@ pub fn cli() -> App<'static, 'static> {
         .global_settings(&[AppSettings::ColoredHelp])
         .settings(&[AppSettings::SubcommandRequiredElseHelp])
         .version(crate::VERSION)
-        .arg(
-            Arg::with_name("v")
+        .args(&[
+            Arg::with_name("verbose")
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity (repeat for more)"),
-        )
+            Arg::with_name("quiet")
+                .long("quiet")
+                .short("q")
+                .help("Suppress all non-essential output"),
+        ])
         .after_help(indoc::indoc!(
             r"
             To get help around individual commands use:
@@ -291,21 +295,53 @@ pub fn cli() -> App<'static, 'static> {
                         .kamu.local - a local data volume where all raw data is stored
                     "
                 )),
-            tabular_output_params(SubCommand::with_name("list")
-                .about("List all datasets in the workspace")
-                .subcommand(
-                    SubCommand::with_name("depgraph")
-                    .about("Outputs the dependency graph of datasets")
+            SubCommand::with_name("inspect")
+                .about("Group of commands for exploring dataset metadata")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommands(vec![
+                    SubCommand::with_name("lineage")
+                    .about("Shows the dependency tree of a dataset")
+                    .args(&[
+                        Arg::with_name("all")
+                            .short("a")
+                            .long("all")
+                            .help("Inspect all datasets in the workspace"),
+                        Arg::with_name("output-format")
+                            .long("output-format")
+                            .short("o")
+                            .takes_value(true)
+                            .value_name("FMT")
+                            .possible_values(&[
+                                "dot", "csv",
+                            ]),
+                        Arg::with_name("dataset")
+                            .multiple(true)
+                            .index(1)
+                            .validator(validate_dataset_id)
+                            .help("ID of the dataset"),
+                    ])
                     .after_help(indoc::indoc!(
                         r"
-                        The output is in graphviz (dot) format.
+                        Presents dataset-level lineage that includes current and past dependencies.
 
-                        If you have graphviz installed you can visualize the graph by running:
+                        ### Examples ###
 
-                            kamu list depgraph | dot -Tpng > depgraph.png
+                        Show lineage of a single dataset:
+
+                            kamu inspect lineage my.dataset
+
+                        Output lineage graph of all datasets in the workspace in GraphViz (DOT) format:
+
+                            kamu inspect lineage --all -o dot
+                        
+                        Render the above graph into a png image (needs graphviz installed):
+
+                            kamu inspect lineage --all -o dot | dot -Tpng > depgraph.png
                         "
                     )),
-                )
+                ]),
+            tabular_output_params(SubCommand::with_name("list")
+                .about("List all datasets in the workspace")
                 .after_help(indoc::indoc!(
                     r"
                     ### Examples ###

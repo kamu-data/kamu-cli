@@ -45,7 +45,7 @@ impl Command for SqlServerCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
 
-        let spinner = if self.output_config.verbosity_level == 0 {
+        let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let mut pull_progress = PullImageProgress::new("engine");
             sql_shell.ensure_images(&mut pull_progress);
 

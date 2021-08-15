@@ -24,3 +24,4 @@
 
 ## Merging Data
 
+See **[Merge Strategies](docs/merge_strategies.md)** for detailed description of the merge phase.

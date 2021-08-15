@@ -196,7 +196,10 @@ impl Command for PullCommand {
             }),
         }?;
 
-        let pull_results = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
+        let pull_results = if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
             self.pull_with_progress()?
         } else {
             self.pull(None)?

@@ -186,10 +186,12 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
 fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
-    let verbosity_level = matches.occurrences_of("v") as u8;
+    let verbosity_level = matches.occurrences_of("verbose") as u8;
     if verbosity_level > 0 {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
+
+    let quiet = matches.is_present("quiet");
 
     let format_str = get_output_format_recursive(matches);
 
@@ -197,8 +199,7 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
         Some("csv") => OutputFormat::Csv,
         Some("json") => OutputFormat::Json,
         Some("table") => OutputFormat::Table,
-        Some(f) => unimplemented!("Unrecognized format: {:?}", f),
-        None => {
+        None | Some(_) => {
             if is_tty {
                 OutputFormat::Table
             } else {
@@ -208,6 +209,7 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
     };
 
     OutputConfig {
+        quiet,
         verbosity_level: verbosity_level,
         is_tty: is_tty,
         format: format,

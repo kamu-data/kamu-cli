@@ -72,7 +72,7 @@ impl Command for NotebookCommand {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let spinner = if self.output_config.verbosity_level == 0 {
+        let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let pull_progress = PullImageProgress::new("container");
             notebook_server.ensure_images(&pull_progress);
 

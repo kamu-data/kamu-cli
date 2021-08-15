@@ -45,7 +45,10 @@ impl Command for SqlServerLivyCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let livy_server = LivyServerImpl::new(self.container_runtime.clone());
 
-        let spinner = if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
+        let spinner = if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
             let mut pull_progress = PullImageProgress::new("engine");
             livy_server.ensure_images(&mut pull_progress);
 

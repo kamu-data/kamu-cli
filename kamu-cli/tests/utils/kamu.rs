@@ -85,7 +85,7 @@ impl Kamu {
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
     {
-        let mut full_cmd = vec![OsStr::new("kamu").to_owned(), OsStr::new("-v").to_owned()];
+        let mut full_cmd = vec![OsStr::new("kamu").to_owned(), OsStr::new("-q").to_owned()];
         full_cmd.extend(cmd.into_iter().map(|i| i.as_ref().to_owned()));
 
         let app = kamu_cli::cli();
