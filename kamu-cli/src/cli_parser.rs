@@ -357,23 +357,53 @@ pub fn cli() -> App<'static, 'static> {
                 ))
             ),
             SubCommand::with_name("log")
-                .about("Show dataset's metadata history")
-                .arg(
+                .about("Shows dataset metadata history")
+                .args(&[
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
                         .validator(validate_dataset_id)
                         .help("ID of the dataset"),
-                )
+                    Arg::with_name("output-format")
+                        .long("output-format")
+                        .short("o")
+                        .takes_value(true)
+                        .value_name("FMT")
+                        .possible_values(&[
+                            "yaml",
+                        ]),
+                    Arg::with_name("filter")
+                        .long("filter")
+                        .short("f")
+                        .takes_value(true)
+                        .value_name("FLT")
+                        .validator(validate_log_filter),
+                ])
                 .after_help(indoc::indoc!(
                     r"
-                    A log of a dataset is the contents of its metadata - a historical record of everything that ever influenced how data in the dataset currently looks like.
+                    Metadata of a dataset contains historical record of everything that ever influenced how data currently looks like.
 
                     This includes events such as:
                     - Data ingestion / transformation
                     - Change of query
                     - Change of schema
                     - Change of source URL or other ingestion steps in a root dataset
+
+                    Use this command to explore how dataset evolved over time.
+
+                    ### Examples ###
+
+                    Show brief summaries of individual metadata blocks:
+
+                        kamu log org.example.data
+
+                    Show detailed content of all blocks:
+
+                        kamu log -o yaml org.example.data
+
+                    Using a filter to inspect blocks containing query changes of a derivative dataset:
+
+                        kamu log -o yaml --filter source org.example.data
                     "
                 )),
             SubCommand::with_name("new")
@@ -833,7 +863,22 @@ fn validate_repository_id(s: String) -> Result<(), String> {
     match RepositoryID::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "repositoryID can only contain alphanumerics, dashes, and dots",
+            "RepositoryID can only contain alphanumerics, dashes, and dots",
         )),
     }
+}
+
+fn validate_log_filter(s: String) -> Result<(), String> {
+    let items: Vec<_> = s.split(',').collect();
+    for item in items {
+        match item {
+            "source" => Ok(()),
+            "watermark" => Ok(()),
+            "data" => Ok(()),
+            _ => Err(format!(
+                "Filter should be a comma-separated list of values like: source,data,watermark"
+            )),
+        }?;
+    }
+    Ok(())
 }

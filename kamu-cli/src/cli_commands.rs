@@ -82,6 +82,8 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             catalog.get_one().unwrap(),
             value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+            submatches.value_of("output-format"),
+            submatches.value_of("filter"),
             catalog.get_one().unwrap(),
         )),
         ("new", Some(submatches)) => Box::new(NewDatasetCommand::new(

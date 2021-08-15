@@ -6,6 +6,9 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use console::style;
+use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
+use opendatafabric::MetadataBlock;
 use std::fmt::Display;
 use std::io::Write;
 use std::sync::Arc;
@@ -13,6 +16,8 @@ use std::sync::Arc;
 pub struct LogCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     dataset_id: DatasetIDBuf,
+    outout_format: Option<String>,
+    filter: Option<String>,
     output_config: Arc<OutputConfig>,
 }
 
@@ -20,51 +25,107 @@ impl LogCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         dataset_id: DatasetIDBuf,
+        outout_format: Option<&str>,
+        filter: Option<&str>,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
             metadata_repo,
             dataset_id,
+            outout_format: outout_format.map(|s| s.to_owned()),
+            filter: filter.map(|s| s.to_owned()),
             output_config,
         }
     }
 
+    fn filter_block(&self, block: &MetadataBlock) -> bool {
+        // Keep in sync with CLI parser
+        // TODO: replace with bitfield enum
+        match &self.filter {
+            None => true,
+            Some(f) if f.contains("source") && block.source.is_some() => true,
+            Some(f) if f.contains("watermark") && block.output_watermark.is_some() => true,
+            Some(f) if f.contains("data") && block.output_slice.is_some() => true,
+            _ => false,
+        }
+    }
+}
+
+impl Command for LogCommand {
+    fn run(&mut self) -> Result<(), CLIError> {
+        let mut renderer: Box<dyn MetadataRenderer> = match (
+            self.outout_format.as_ref().map(|s| s.as_str()),
+            self.output_config.is_tty,
+        ) {
+            (None, true) => Box::new(PagedAsciiRenderer::new()),
+            (None, false) => Box::new(AsciiRenderer::new()),
+            (Some("yaml"), true) => Box::new(PagedYamlRenderer::new()),
+            (Some("yaml"), false) => Box::new(YamlRenderer::new()),
+            _ => panic!("Unexpected output format combination"),
+        };
+
+        let mut blocks = self
+            .metadata_repo
+            .get_metadata_chain(&self.dataset_id)?
+            .iter_blocks()
+            .filter(|b| self.filter_block(b));
+
+        renderer.show(&self.dataset_id, &mut blocks)?;
+
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+trait MetadataRenderer {
+    fn show(
+        &mut self,
+        dataset_id: &DatasetID,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), CLIError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct AsciiRenderer;
+
+impl AsciiRenderer {
+    fn new() -> Self {
+        Self
+    }
+
     fn render_blocks(
-        &self,
         output: &mut impl Write,
-        blocks: impl Iterator<Item = MetadataBlock>,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
     ) -> Result<(), std::io::Error> {
         for block in blocks {
-            self.render_block(output, &block)?;
+            Self::render_block(output, &block)?;
             writeln!(output)?;
         }
         Ok(())
     }
 
-    fn render_block(
-        &self,
-        output: &mut impl Write,
-        block: &MetadataBlock,
-    ) -> Result<(), std::io::Error> {
-        self.render_header(output, block)?;
-        self.render_property(
+    fn render_block(output: &mut impl Write, block: &MetadataBlock) -> Result<(), std::io::Error> {
+        Self::render_header(output, block)?;
+        Self::render_property(
             output,
-            "Date",
+            "SystemTime",
             &block
                 .system_time
                 .to_rfc3339_opts(SecondsFormat::AutoSi, true),
         )?;
 
         if let Some(ref s) = block.output_slice {
-            self.render_property(output, "Output.Records", &s.num_records)?;
-            self.render_property(output, "Output.Interval", &s.interval)?;
+            Self::render_property(output, "Output.Records", &s.num_records)?;
+            Self::render_property(output, "Output.Interval", &s.interval)?;
             if !s.hash.is_empty() {
-                self.render_property(output, "Output.Hash", &s.hash)?;
+                Self::render_property(output, "Output.Hash", &s.hash)?;
             }
         }
 
         if let Some(ref wm) = block.output_watermark {
-            self.render_property(
+            Self::render_property(
                 output,
                 "Output.Watermark",
                 &wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
@@ -73,10 +134,10 @@ impl LogCommand {
 
         if let Some(ref slices) = block.input_slices {
             for (i, ref s) in slices.iter().enumerate() {
-                self.render_property(output, &format!("Input[{}].Records", i), &s.num_records)?;
-                self.render_property(output, &format!("Input[{}].Interval", i), &s.interval)?;
+                Self::render_property(output, &format!("Input[{}].Records", i), &s.num_records)?;
+                Self::render_property(output, &format!("Input[{}].Interval", i), &s.interval)?;
                 if !s.hash.is_empty() {
-                    self.render_property(output, &format!("Input[{}].Hash", i), &s.hash)?;
+                    Self::render_property(output, &format!("Input[{}].Hash", i), &s.hash)?;
                 }
             }
         }
@@ -84,10 +145,10 @@ impl LogCommand {
         if let Some(ref source) = block.source {
             match source {
                 DatasetSource::Root { .. } => {
-                    self.render_property(output, "Source", &"<Root source updated>")?
+                    Self::render_property(output, "Source", &"<Root source updated>")?
                 }
                 DatasetSource::Derivative { .. } => {
-                    self.render_property(output, "Source", &"<Derivative source updated>")?
+                    Self::render_property(output, "Source", &"<Derivative source updated>")?
                 }
             }
         }
@@ -95,11 +156,7 @@ impl LogCommand {
         Ok(())
     }
 
-    fn render_header(
-        &self,
-        output: &mut impl Write,
-        block: &MetadataBlock,
-    ) -> Result<(), std::io::Error> {
+    fn render_header(output: &mut impl Write, block: &MetadataBlock) -> Result<(), std::io::Error> {
         writeln!(
             output,
             "{} {}",
@@ -109,7 +166,6 @@ impl LogCommand {
     }
 
     fn render_property<T: Display>(
-        &self,
         output: &mut impl Write,
         name: &str,
         value: &T,
@@ -124,23 +180,39 @@ impl LogCommand {
     }
 }
 
-impl Command for LogCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
-        let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
+impl MetadataRenderer for AsciiRenderer {
+    fn show(
+        &mut self,
+        _dataset_id: &DatasetID,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), CLIError> {
+        Self::render_blocks(&mut std::io::stdout(), blocks)?;
+        Ok(())
+    }
+}
 
-        if self.output_config.is_tty {
-            let mut pager = minus::Pager::new().unwrap();
-            pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-            pager.set_prompt(self.dataset_id.clone());
+/////////////////////////////////////////////////////////////////////////////////////////
 
-            self.render_blocks(&mut WritePager(&mut pager), chain.iter_blocks())
-                .unwrap();
-            minus::page_all(pager).unwrap();
-        } else {
-            self.render_blocks(&mut std::io::stdout(), chain.iter_blocks())
-                .unwrap();
-        }
+struct PagedAsciiRenderer;
 
+impl PagedAsciiRenderer {
+    fn new() -> Self {
+        Self
+    }
+}
+
+impl MetadataRenderer for PagedAsciiRenderer {
+    fn show(
+        &mut self,
+        dataset_id: &DatasetID,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), CLIError> {
+        let mut pager = minus::Pager::new().unwrap();
+        pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
+        pager.set_prompt(dataset_id.to_string());
+
+        AsciiRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
+        minus::page_all(pager).unwrap();
         Ok(())
     }
 }
@@ -156,6 +228,71 @@ impl<'a> Write for WritePager<'a> {
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct YamlRenderer;
+
+impl YamlRenderer {
+    fn new() -> Self {
+        Self
+    }
+
+    fn render_blocks(
+        output: &mut impl Write,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), std::io::Error> {
+        for block in blocks {
+            Self::render_block(output, block)?;
+        }
+        Ok(())
+    }
+
+    fn render_block(output: &mut impl Write, block: MetadataBlock) -> Result<(), std::io::Error> {
+        let buf = YamlMetadataBlockSerializer
+            .write_manifest_unchecked(&block)
+            .unwrap();
+
+        writeln!(output, "{}", std::str::from_utf8(&buf).unwrap())
+    }
+}
+
+impl MetadataRenderer for YamlRenderer {
+    fn show(
+        &mut self,
+        _dataset_id: &DatasetID,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), CLIError> {
+        Self::render_blocks(&mut std::io::stdout(), blocks)?;
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct PagedYamlRenderer;
+
+impl PagedYamlRenderer {
+    fn new() -> Self {
+        Self
+    }
+}
+
+impl MetadataRenderer for PagedYamlRenderer {
+    fn show(
+        &mut self,
+        dataset_id: &DatasetID,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(), CLIError> {
+        let mut pager = minus::Pager::new().unwrap();
+        pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
+        pager.set_prompt(dataset_id.to_string());
+
+        YamlRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
+        minus::page_all(pager).unwrap();
         Ok(())
     }
 }
