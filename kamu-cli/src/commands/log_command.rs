@@ -55,7 +55,7 @@ impl Command for LogCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let mut renderer: Box<dyn MetadataRenderer> = match (
             self.outout_format.as_ref().map(|s| s.as_str()),
-            self.output_config.is_tty,
+            self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
             (None, true) => Box::new(PagedAsciiRenderer::new()),
             (None, false) => Box::new(AsciiRenderer::new()),
@@ -218,7 +218,7 @@ impl MetadataRenderer for PagedAsciiRenderer {
 }
 
 // TODO: Figure out how to use std::fmt::Write with std::io::stdout()
-struct WritePager<'a>(&'a mut minus::Pager);
+pub struct WritePager<'a>(pub &'a mut minus::Pager);
 
 impl<'a> Write for WritePager<'a> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {

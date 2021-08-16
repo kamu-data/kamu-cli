@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.55.0] - 2021-08-15
 ### Added
+- New `kamu inspect query` command for derivative transform audit
 - `kamu log` now supports Yaml output and filtering
 
 ## [0.54.0] - 2021-08-15

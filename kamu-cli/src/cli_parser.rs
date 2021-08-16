@@ -300,45 +300,59 @@ pub fn cli() -> App<'static, 'static> {
                 .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommands(vec![
                     SubCommand::with_name("lineage")
-                    .about("Shows the dependency tree of a dataset")
-                    .args(&[
-                        Arg::with_name("all")
-                            .short("a")
-                            .long("all")
-                            .help("Inspect all datasets in the workspace"),
-                        Arg::with_name("output-format")
-                            .long("output-format")
-                            .short("o")
-                            .takes_value(true)
-                            .value_name("FMT")
-                            .possible_values(&[
-                                "dot", "csv",
-                            ]),
-                        Arg::with_name("dataset")
-                            .multiple(true)
-                            .index(1)
-                            .validator(validate_dataset_id)
-                            .help("ID of the dataset"),
-                    ])
-                    .after_help(indoc::indoc!(
-                        r"
-                        Presents dataset-level lineage that includes current and past dependencies.
+                        .about("Shows the dependency tree of a dataset")
+                        .args(&[
+                            Arg::with_name("all")
+                                .short("a")
+                                .long("all")
+                                .help("Inspect all datasets in the workspace"),
+                            Arg::with_name("output-format")
+                                .long("output-format")
+                                .short("o")
+                                .takes_value(true)
+                                .value_name("FMT")
+                                .possible_values(&[
+                                    "dot", "csv",
+                                ]),
+                            Arg::with_name("dataset")
+                                .multiple(true)
+                                .index(1)
+                                .validator(validate_dataset_id)
+                                .help("ID of the dataset"),
+                        ])
+                        .after_help(indoc::indoc!(
+                            r"
+                            Presents dataset-level lineage that includes current and past dependencies.
 
-                        ### Examples ###
+                            ### Examples ###
 
-                        Show lineage of a single dataset:
+                            Show lineage of a single dataset:
 
-                            kamu inspect lineage my.dataset
+                                kamu inspect lineage my.dataset
 
-                        Output lineage graph of all datasets in the workspace in GraphViz (DOT) format:
+                            Output lineage graph of all datasets in the workspace in GraphViz (DOT) format:
 
-                            kamu inspect lineage --all -o dot
-                        
-                        Render the above graph into a png image (needs graphviz installed):
+                                kamu inspect lineage --all -o dot
+                            
+                            Render the above graph into a png image (needs graphviz installed):
 
-                            kamu inspect lineage --all -o dot | dot -Tpng > depgraph.png
-                        "
-                    )),
+                                kamu inspect lineage --all -o dot | dot -Tpng > depgraph.png
+                            "
+                        )),
+                    SubCommand::with_name("query")
+                        .about("Shows the transformations used by a derivative dataset")
+                        .args(&[
+                            Arg::with_name("dataset")
+                                .required(true)
+                                .index(1)
+                                .validator(validate_dataset_id)
+                                .help("ID of the dataset"),
+                        ])
+                        .after_help(indoc::indoc!(
+                            r"
+                            This command allows you to audit the transformations performed by a derivative dataset and their evolution. Such audit is an important step in validating the trustworthiness of data (see `kamu verify` command).
+                            "
+                        )),
                 ]),
             tabular_output_params(SubCommand::with_name("list")
                 .about("List all datasets in the workspace")

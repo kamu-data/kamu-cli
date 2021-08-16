@@ -97,10 +97,11 @@ Example:
 # Inspect the dependency graph of a dataset to find all root sources
 kamu inspect lineage ca.vancouver.opendata.weather.aggregated-daily
 
-# Inspect the transformations applied with every derivative dataset
-kamu log ca.vancouver.opendata.weather.aggregated-daily
+# Inspect the transformations applied
+# Repeat this for every derivative dataset in the dependency graph
+kamu inspect query ca.vancouver.opendata.weather.aggregated-daily
 
-# Recursively verify the entire transformation chain starting from root datasets
+# Verify the data matches the declared metadata and transformations
 kamu verify --recursive ca.vancouver.opendata.weather.aggregated-daily
 ```
 

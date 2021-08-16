@@ -73,6 +73,11 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
                 lin_matches.value_of("output-format"),
                 catalog.get_one().unwrap(),
             )),
+            ("query", Some(query_matches)) => Box::new(InspectQueryCommand::new(
+                catalog.get_one().unwrap(),
+                value_t_or_exit!(query_matches.value_of("dataset"), DatasetIDBuf),
+                catalog.get_one().unwrap(),
+            )),
             _ => panic!("Command interpretation failed"),
         },
         ("list", Some(_submatches)) => Box::new(ListCommand::new(

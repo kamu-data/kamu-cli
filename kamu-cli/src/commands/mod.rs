@@ -26,6 +26,12 @@ pub use config_command::*;
 mod delete_command;
 pub use delete_command::*;
 
+mod init_command;
+pub use init_command::*;
+
+mod inspect_query_command;
+pub use inspect_query_command::*;
+
 mod list_command;
 pub use list_command::*;
 
@@ -34,9 +40,6 @@ pub use lineage_command::*;
 
 mod log_command;
 pub use log_command::*;
-
-mod init_command;
-pub use init_command::*;
 
 mod new_dataset_command;
 pub use new_dataset_command::*;
