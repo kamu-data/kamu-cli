@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.56.0"
+version = "0.57.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 license = "MPL-2.0"
@@ -51,6 +51,7 @@ slog-term = "*"
 tempfile = "*"
 thiserror = "*"  # Structured error derivations
 url = "*"
+urlencoding = "*"
 
 
 [dev-dependencies]

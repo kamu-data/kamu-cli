@@ -164,19 +164,26 @@ impl Command for CompleteCommand {
         if prev.starts_with("--") {
             for opt in last_cmd.opts.iter() {
                 let full_name = format!("--{}", opt.s.long.unwrap());
-                if full_name == *prev {
+                if full_name == *prev && opt.b.is_set(clap::ArgSettings::TakesValue) {
                     if let Some(val_names) = &opt.v.val_names {
                         for (_, name) in val_names.iter() {
                             match *name {
                                 "REPO" => self.complete_repository(to_complete),
                                 "TIME" => self.complete_timestamp(),
-                                "VAR" => self.complete_env_var(&to_complete),
+                                "VAR" => self.complete_env_var(to_complete),
                                 "SRC" => self.complete_path(to_complete),
                                 _ => (),
                             }
                         }
-                        return Ok(());
                     }
+                    if let Some(possible_vals) = &opt.v.possible_vals {
+                        for pval in possible_vals {
+                            if pval.starts_with(to_complete) {
+                                println!("{}", pval);
+                            }
+                        }
+                    }
+                    return Ok(());
                 }
             }
         }

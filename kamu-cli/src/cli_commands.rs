@@ -68,8 +68,9 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
         ("inspect", Some(submatches)) => match submatches.subcommand() {
             ("lineage", Some(lin_matches)) => Box::new(LineageCommand::new(
                 catalog.get_one().unwrap(),
+                catalog.get_one().unwrap(),
                 lin_matches.values_of("dataset").unwrap_or_default(),
-                lin_matches.is_present("all"),
+                lin_matches.is_present("browse"),
                 lin_matches.value_of("output-format"),
                 catalog.get_one().unwrap(),
             )),

@@ -302,18 +302,19 @@ pub fn cli() -> App<'static, 'static> {
                     SubCommand::with_name("lineage")
                         .about("Shows the dependency tree of a dataset")
                         .args(&[
-                            Arg::with_name("all")
-                                .short("a")
-                                .long("all")
-                                .help("Inspect all datasets in the workspace"),
                             Arg::with_name("output-format")
                                 .long("output-format")
                                 .short("o")
                                 .takes_value(true)
                                 .value_name("FMT")
                                 .possible_values(&[
-                                    "dot", "csv",
-                                ]),
+                                    "shell", "dot", "csv", "html"
+                                ])
+                                .help("Format of an output"),
+                            Arg::with_name("browse")
+                                .long("browse")
+                                .short("b")
+                                .help("Produce HTML and open it in a browser"),
                             Arg::with_name("dataset")
                                 .multiple(true)
                                 .index(1)
@@ -330,13 +331,13 @@ pub fn cli() -> App<'static, 'static> {
 
                                 kamu inspect lineage my.dataset
 
-                            Output lineage graph of all datasets in the workspace in GraphViz (DOT) format:
+                            Show lineage graph of all datasets in a browser:
 
-                                kamu inspect lineage --all -o dot
+                                kamu inspect lineage -b
                             
-                            Render the above graph into a png image (needs graphviz installed):
+                            Render the lineage graph into a png image (needs graphviz installed):
 
-                                kamu inspect lineage --all -o dot | dot -Tpng > depgraph.png
+                                kamu inspect lineage -o dot | dot -Tpng > depgraph.png
                             "
                         )),
                     SubCommand::with_name("query")
