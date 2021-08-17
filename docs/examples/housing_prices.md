@@ -81,7 +81,7 @@ Now you can open the `heatmap.ipynb` and run through it executing each step. The
 CREATE OR REPLACE TEMP VIEW lot_tax AS (
   SELECT
       t.*,
-      l.*
+      l.geometry
   FROM lots as l
   JOIN tax as t
   ON l.tax_coord = t.land_coordinate
@@ -97,13 +97,13 @@ It then pulls the result from Spark into the notebook itself using this query:
 ```sql
 %%sql -o df -n 100000
 SELECT
-    tax_coord,
-    ST_AsText(geometry) as geometry,
+    land_coordinate,
+    ST_AsGeoJSON(geometry) as geometry,
     current_land_value + current_improvement_value as current_total_value
 FROM lot_tax
 ```
 
-The `-n 100000` parameter here overrides the default limit on the dataframe size, while `ST_AsText(geometry)` also converts the internal binary `geometry` type into the WKT (Well Known Text) textual format. We later use custom-written `df_to_geojson` to convert WKT into `GeoJson` understood by the `mapboxgl` library. Once `Apache Sedona` supports direct conversion to GeoJson these steps can be significantly simplified.
+The `-n 100000` parameter here overrides the default limit on the dataframe size, while `ST_AsGeoJSON(geometry)` also converts the internal binary `geometry` type into the GeoJson format. We later use custom-written `df_to_geojson` to combine individual geometries into `GeoJson`'s `FeatureCollection` objectm understood by the `mapboxgl` library.
 
 We can then use the resulting GeoJson data and render the heatmap using the [mapboxgl-jupyter](https://github.com/mapbox/mapboxgl-jupyter) library which comes pre-installed with `kamu`'s notebook server image.
 

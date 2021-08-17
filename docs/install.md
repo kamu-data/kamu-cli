@@ -104,7 +104,7 @@ We take your security very seriously. Unfortunately the execution model of `dock
 
 On our side we are taking following measures to gain your trust:
 * `kamu` and all of its components are open-source and available for review
-* All of our `docker` images are based on reputable source images and are [available for review](https://github.com/kamu-data/kamu-images)
+* All of our `docker` images are based on reputable source images and are available for review [[1]](https://github.com/kamu-data/kamu-cli) [[2]](https://github.com/kamu-data/kamu-engine-spark) [[3]](https://github.com/kamu-data/kamu-engine-flink)
 * When `kamu` starts `docker` containers it limits the scope of volumes it's mounting to a minimum. You can review the volume mounts by running `kamu` with `-v` flag or using `docker ps`.
 
 To avoid all these issues please check out the experimental [`podman` support](#experimental-using-podman-instead-of-docker) - this container runtime operates in daemon-less and root-less mode, so it's fully compliant with the standard Unix permission model.

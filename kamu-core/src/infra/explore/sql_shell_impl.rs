@@ -46,69 +46,82 @@ impl SqlShellImpl {
         signal_hook::flag::register(libc::SIGINT, exit.clone())?;
         signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
-        let mut volume_map = vec![(cwd, PathBuf::from("/opt/spark/kamu_shell"))];
+        let mut volume_map = vec![(cwd, PathBuf::from("/opt/bitnami/spark/kamu_shell"))];
         if volume_layout.data_dir.exists() {
             volume_map.push((
                 volume_layout.data_dir.clone(),
-                PathBuf::from("/opt/spark/kamu_data"),
+                PathBuf::from("/opt/bitnami/spark/kamu_data"),
             ));
         }
         volume_map.append(&mut extra_volume_map);
 
-        let args = DockerRunArgs {
-            image: docker_images::SPARK.to_owned(),
-            container_name: Some("kamu-spark".to_owned()),
-            user: Some("root".to_owned()),
-            volume_map,
-            args: vec![String::from("sleep"), String::from("999999")],
-            ..DockerRunArgs::default()
+        // Start Spark container in the idle loop
+        let spark = {
+            let args = DockerRunArgs {
+                image: docker_images::SPARK.to_owned(),
+                container_name: Some("kamu-spark".to_owned()),
+                user: Some("root".to_owned()),
+                volume_map,
+                ..DockerRunArgs::default()
+            };
+
+            let args = if let Some(p) = port {
+                DockerRunArgs {
+                    network: Some("host".to_owned()),
+                    expose_port_map_addr: vec![(
+                        address.unwrap_or("127.0.0.1").to_owned(),
+                        p,
+                        10000,
+                    )],
+                    ..args
+                }
+            } else {
+                DockerRunArgs {
+                    expose_ports: vec![10000],
+                    ..args
+                }
+            };
+
+            let mut cmd = self
+                .container_runtime
+                .run_shell_cmd(args, &["sleep".to_owned(), "999999".to_owned()]);
+
+            info!(logger, "Starting Spark container"; "command" => ?cmd, "stdout" => ?spark_stdout_path, "stderr" => ?spark_stderr_path);
+
+            cmd.stdin(Stdio::null())
+                .stdout(Stdio::from(File::create(&spark_stdout_path)?))
+                .stderr(Stdio::from(File::create(&spark_stderr_path)?))
+                .spawn()?
         };
-
-        let args = if let Some(p) = port {
-            DockerRunArgs {
-                network: Some("host".to_owned()),
-                expose_port_map_addr: vec![(address.unwrap_or("127.0.0.1").to_owned(), p, 10000)],
-                ..args
-            }
-        } else {
-            DockerRunArgs {
-                expose_ports: vec![10000],
-                ..args
-            }
-        };
-
-        let mut cmd = self.container_runtime.run_cmd(args);
-
-        info!(logger, "Starting Spark container"; "command" => ?cmd, "stdout" => ?spark_stdout_path, "stderr" => ?spark_stderr_path);
-
-        let spark = cmd
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(File::create(&spark_stdout_path)?))
-            .stderr(Stdio::from(File::create(&spark_stderr_path)?))
-            .spawn()?;
 
         info!(logger, "Waiting for container");
         self.container_runtime
             .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
             .expect("Container did not start");
 
-        info!(logger, "Starting Thrift Server");
-        self.container_runtime
-            .exec_shell_cmd(
+        // Start Thrift Server process inside Spark container
+        {
+            let mut cmd = self.container_runtime.exec_shell_cmd(
                 ExecArgs {
                     tty: false,
                     interactive: false,
-                    work_dir: Some(PathBuf::from("/opt/spark")),
+                    work_dir: Some(PathBuf::from("/opt/bitnami/spark")),
                     ..ExecArgs::default()
                 },
                 "kamu-spark",
                 &["sbin/start-thriftserver.sh"],
-            )
-            .stdin(Stdio::null())
-            .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
-            .stderr(Stdio::from(File::create(&thrift_stderr_path)?))
-            .spawn()?
-            .wait()?;
+            );
+
+            info!(logger, "Starting Thrift Server"; "command" => ?cmd);
+
+            cmd.stdin(Stdio::null())
+                .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
+                .stderr(Stdio::from(File::create(&thrift_stderr_path)?))
+                .spawn()?
+                .wait()?
+                .exit_ok()
+                .expect("Thrift server start script returned non-zero code");
+        }
 
         let host_port = if let Some(p) = port {
             p
@@ -145,8 +158,9 @@ impl SqlShellImpl {
             network: Some("host".to_owned()),
             tty: true,
             interactive: true,
+            entry_point: Some("bash".to_owned()),
             args: vec![
-                String::from("/opt/spark/bin/beeline"),
+                String::from("/opt/bitnami/spark/bin/beeline"),
                 String::from("-u"),
                 url,
                 String::from("--color=true"),
@@ -188,7 +202,10 @@ impl SqlShellImpl {
         let mut spark = self.run_server(
             workspace_layout,
             volume_layout,
-            vec![(init_script_path, PathBuf::from("/opt/spark/shell_init.sql"))],
+            vec![(
+                init_script_path,
+                PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
+            )],
             logger.clone(),
             None,
             None,
@@ -206,7 +223,7 @@ impl SqlShellImpl {
                     ExecArgs {
                         tty: true,
                         interactive: true,
-                        work_dir: Some(PathBuf::from("/opt/spark/kamu_shell")),
+                        work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
                     },
                     "kamu-spark",
                     &[

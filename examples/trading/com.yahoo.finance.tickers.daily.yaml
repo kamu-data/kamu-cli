@@ -12,7 +12,7 @@ content:
       header: true
       schema:
       - "`Date` TIMESTAMP"
-      - "`Symbol` VARCHAR(10)"
+      - "`Symbol` STRING"
       - "`Adj Close` DECIMAL(18,4)"
       - "`Close` DECIMAL(18,4)"
       - "`High` DECIMAL(18,4)"

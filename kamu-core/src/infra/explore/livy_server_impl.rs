@@ -46,13 +46,14 @@ impl LivyServerImpl {
         let mut livy_cmd = self.container_runtime.run_cmd(DockerRunArgs {
             image: docker_images::LIVY.to_owned(),
             container_name: Some("kamu-livy".to_owned()),
-            args: vec!["livy".to_owned()],
+            entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
             user: Some("root".to_owned()),
             expose_port_map_addr: vec![(addr.to_owned(), host_port, LIVY_PORT)],
+            work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
             volume_map: if volume_layout.data_dir.exists() {
                 vec![(
                     volume_layout.data_dir.clone(),
-                    PathBuf::from("/opt/spark/work-dir"),
+                    PathBuf::from("/opt/bitnami/spark/work-dir"),
                 )]
             } else {
                 vec![]

@@ -64,9 +64,9 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
 name = "arrow"
-version = "5.1.0"
+version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddf189dff0c7e0f40588fc25adbe5bb6837b82fc61bb7cadf5d76de030f710bb"
+checksum = "31ef7f4383e52f2da72da147040148a385b7cbf9ec0fc45cd3e2f369a9d442fe"
 dependencies = [
  "bitflags",
  "chrono",
@@ -121,9 +121,9 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bitflags"
-version = "1.3.1"
+version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da1976d75adbe5fbc88130ecd119529cf1cc6a93ae1546d8696ee66f0d21af1"
+checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "blake2b_simd"
@@ -1016,9 +1016,9 @@ checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 
 [[package]]
 name = "jobserver"
-version = "0.1.23"
+version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5ca711fd837261e14ec9e674f092cbb931d3fa1482b017ae59328ddc6f3212b"
+checksum = "af25a77299a7f711a01975c35a6a424eb6862092cc2d6c72c4ed6cbc56dfc1fa"
 dependencies = [
  "libc",
 ]
@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.55.0"
+version = "0.56.0"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.55.0"
+version = "0.56.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1450,7 +1450,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.55.0"
+version = "0.56.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -1530,9 +1530,9 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "5.1.0"
+version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db54d10313f64ea22e1fe0332864abefb19aa1c322bfbc67999ff743aebf868d"
+checksum = "e29eb4b97c8b1d573437e71a9b6f4e8c7c8fab7da62fed3acc6361e3f1fa574c"
 dependencies = [
  "arrow",
  "base64",
@@ -1745,9 +1745,9 @@ dependencies = [
 
 [[package]]
 name = "read_input"
-version = "0.8.4"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b57518cc6538a2eb7dce826e24fa51d0b7cf8e744ee10c7f56259cdec40050e5"
+checksum = "2f178674da3d005db760b30d6735a989d692da37b86337daec6f2e311223d608"
 
 [[package]]
 name = "redox_syscall"

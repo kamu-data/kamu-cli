@@ -64,16 +64,17 @@ impl NotebookServerImpl {
             container_name: Some("kamu-livy".to_owned()),
             hostname: Some("kamu-livy".to_owned()),
             network: Some(network_name.to_owned()),
-            args: vec!["livy".to_owned()],
             user: Some("root".to_owned()),
+            work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
             volume_map: if volume_layout.data_dir.exists() {
                 vec![(
                     volume_layout.data_dir.clone(),
-                    PathBuf::from("/opt/spark/work-dir"),
+                    PathBuf::from("/opt/bitnami/spark/work-dir"),
                 )]
             } else {
                 vec![]
             },
+            entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
             ..DockerRunArgs::default()
         });
 

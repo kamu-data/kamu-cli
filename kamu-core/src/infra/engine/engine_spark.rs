@@ -113,11 +113,9 @@ impl SparkEngine {
             },
             &[
                 format!(
-                    "/opt/spark/bin/spark-submit \
+                    "/opt/bitnami/spark/bin/spark-submit \
                         --master=local[4] \
                         --driver-memory=2g \
-                        --conf spark.jars.ivy=/tmp/.ivy \
-                        --conf spark.sql.warehouse.dir=/opt/spark-warehouse \
                         --class={} \
                         /opt/engine/bin/engine.spark.jar",
                     app_class,
