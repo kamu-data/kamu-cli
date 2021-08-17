@@ -750,6 +750,35 @@ pub fn cli() -> App<'static, 'static> {
                         kamu repo add example-repo s3://bucket.my-company.example
                     "
                 )),
+                tabular_output_params(SubCommand::with_name("search")
+                .about("Searches for datasets in the registered repositories")
+                .args(&[
+                    Arg::with_name("query")
+                        .index(1)
+                        .value_name("QUERY")
+                        .help("Search terms"),
+                    Arg::with_name("repo")
+                        .long("repo")
+                        .multiple(true)
+                        .value_name("REPO")
+                        .help("Search terms"),
+                ])
+                .after_help(indoc::indoc!(
+                    r"
+                    Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by DatasetID.
+
+                    ### Examples ###
+
+                    Search all repositories:
+
+                        kamu search covid19
+
+                    Search only specific repositories:
+
+                        kamu search covid19 --repo kamu --repo statcan.gc.ca
+                    "
+                ))
+            ),
             tabular_output_params(SubCommand::with_name("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(

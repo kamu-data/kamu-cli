@@ -32,6 +32,9 @@ pub use remote_aliases::*;
 mod resource_loader;
 pub use resource_loader::*;
 
+mod search_service;
+pub use search_service::*;
+
 mod sync_service;
 pub use sync_service::*;
 

@@ -1,5 +1,6 @@
 use clap::value_t_or_exit;
 use opendatafabric::DatasetIDBuf;
+use opendatafabric::RepositoryID;
 use slog::Logger;
 
 use crate::app::in_workspace;
@@ -182,6 +183,15 @@ pub fn get_command(catalog: &dill::Catalog, matches: clap::ArgMatches) -> Box<dy
             },
             _ => panic!("Command interpretation failed"),
         },
+        ("search", Some(submatches)) => Box::new(SearchCommand::new(
+            catalog.get_one().unwrap(),
+            catalog.get_one().unwrap(),
+            submatches.value_of("query"),
+            submatches
+                .values_of("repo")
+                .unwrap_or_default()
+                .map(|r| RepositoryID::try_from(r).unwrap()),
+        )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new(
                 catalog.get_one().unwrap(),

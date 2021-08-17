@@ -77,6 +77,9 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<TransformServiceImpl>();
     catalog.bind::<dyn TransformService, TransformServiceImpl>()?;
 
+    catalog.add::<SearchServiceImpl>();
+    catalog.bind::<dyn SearchService, SearchServiceImpl>()?;
+
     catalog.add::<SyncServiceImpl>();
     catalog.bind::<dyn SyncService, SyncServiceImpl>()?;
 

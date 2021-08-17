@@ -1,7 +1,9 @@
 use crate::domain::*;
 use crate::infra::*;
+use opendatafabric::DatasetRefBuf;
 use opendatafabric::{DatasetRef, Sha3_256};
 
+use std::convert::TryFrom;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -182,5 +184,11 @@ impl RepositoryClient for RepositoryLocalFS {
         }
 
         Ok(result)
+    }
+
+    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
+        Ok(RepositorySearchResult {
+            datasets: vec![DatasetRefBuf::try_from("fs").unwrap()],
+        })
     }
 }

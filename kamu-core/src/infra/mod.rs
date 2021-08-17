@@ -55,6 +55,9 @@ pub use push_service_impl::*;
 mod resource_loader_impl;
 pub use resource_loader_impl::*;
 
+mod search_service_impl;
+pub use search_service_impl::*;
+
 mod sync_service_impl;
 pub use sync_service_impl::*;
 

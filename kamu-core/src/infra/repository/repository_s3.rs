@@ -1,6 +1,6 @@
 use crate::domain::*;
 use opendatafabric::serde::yaml::*;
-use opendatafabric::{DatasetRef, Sha3_256};
+use opendatafabric::{DatasetRef, DatasetRefBuf, Sha3_256};
 
 use bytes::BytesMut;
 use futures::TryStreamExt;
@@ -8,6 +8,7 @@ use rusoto_core::{Region, RusotoError};
 use rusoto_s3::*;
 use slog::{info, Logger};
 use std::cell::RefCell;
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -517,6 +518,12 @@ impl RepositoryClient for RepositoryS3 {
             last_seen_block,
             tmp_dir,
         ))
+    }
+
+    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
+        Ok(RepositorySearchResult {
+            datasets: vec![DatasetRefBuf::try_from("s3").unwrap()],
+        })
     }
 }
 

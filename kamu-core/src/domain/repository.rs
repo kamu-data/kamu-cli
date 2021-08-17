@@ -1,4 +1,4 @@
-use opendatafabric::{DatasetRef, Sha3_256};
+use opendatafabric::{DatasetRef, DatasetRefBuf, Sha3_256};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -34,12 +34,18 @@ pub trait RepositoryClient {
         last_seen_block: Option<Sha3_256>,
         tmp_dir: &Path,
     ) -> Result<RepositoryReadResult, RepositoryError>;
+
+    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError>;
 }
 
 pub struct RepositoryReadResult {
     pub blocks: Vec<Vec<u8>>,
     pub data_files: Vec<PathBuf>,
     pub checkpoint_dir: PathBuf,
+}
+
+pub struct RepositorySearchResult {
+    pub datasets: Vec<DatasetRefBuf>,
 }
 
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;

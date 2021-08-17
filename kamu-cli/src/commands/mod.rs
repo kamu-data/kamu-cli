@@ -65,6 +65,9 @@ pub use repository_delete_command::*;
 mod repository_list_command;
 pub use repository_list_command::*;
 
+mod search_command;
+pub use search_command::*;
+
 mod set_watermark_command;
 pub use set_watermark_command::*;
 
