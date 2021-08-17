@@ -184,6 +184,8 @@ macro_rules! newtype_str {
                 write!(f, "Invalid {}: {}", stringify!($ref_type), self.value)
             }
         }
+
+        impl std::error::Error for InvalidValue<$ref_type> {}
     };
 }
 
@@ -365,7 +367,7 @@ impl<'de> serde::de::Visitor<'de> for DatasetRefBufSerdeVisitor {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct InvalidValue<T: ?Sized> {
-    value: String,
+    pub value: String,
     _ph: PhantomData<T>,
 }
 

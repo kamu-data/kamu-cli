@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1451,7 +1451,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.57.0"
+version = "0.58.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -1483,9 +1483,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.65"
+version = "0.9.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a7907e3bfa08bb85105209cdfcb6c63d109f8f6c1ed6ca318fff5c1853fbc1d"
+checksum = "1996d2d305e561b70d1ee0c53f1542833f4e1ac6ce9a6708b6ff2738ca67dc82"
 dependencies = [
  "autocfg",
  "cc",
@@ -2531,9 +2531,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9ff14f98b1a4b289c6248a023c1c2fa1491062964e9fed67ab29c4e4da4a052"
+checksum = "2ca517f43f0fb96e0c3072ed5c275fe5eece87e8cb52f4a77b69226d3b1c9df8"
 dependencies = [
  "lazy_static",
 ]

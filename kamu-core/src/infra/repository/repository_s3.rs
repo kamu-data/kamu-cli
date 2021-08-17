@@ -147,19 +147,19 @@ impl RepositoryS3 {
                 ))
                 .await?
                 .ok_or_else(|| {
-                    RepositoryError::corrupted(
-                        format!("Block {} is missing", current_hash.unwrap()),
-                        None,
-                    )
+                    RepositoryError::corrupted(format!(
+                        "Block {} is missing",
+                        current_hash.unwrap()
+                    ))
                 })?;
 
             // TODO: Avoid double-parsing
             let block = YamlMetadataBlockDeserializer
                 .read_manifest(&buf)
                 .map_err(|e| {
-                    RepositoryError::corrupted(
+                    RepositoryError::corrupted_from(
                         "Cannot deserialize metadata block".to_owned(),
-                        Some(e.into()),
+                        e,
                     )
                 })?;
 
@@ -273,6 +273,12 @@ impl RepositoryS3 {
             })
             .await?;
 
+        // TODO: Support iteration
+        assert!(
+            !list_objects.is_truncated.unwrap_or(false),
+            "Cannot handle truncated response"
+        );
+
         if list_objects.key_count.unwrap_or_default() > 0 {
             for obj in list_objects.contents.expect("Response with no body") {
                 let key = obj.key.unwrap();
@@ -357,10 +363,10 @@ impl RepositoryS3 {
                 return if if_exists == IfExists::Skip {
                     Ok(())
                 } else {
-                    Err(RepositoryError::corrupted(
-                        format!("Key {} already exists", key),
-                        None,
-                    ))
+                    Err(RepositoryError::corrupted(format!(
+                        "Key {} already exists",
+                        key
+                    )))
                 };
             }
         }
@@ -408,10 +414,10 @@ impl RepositoryS3 {
                 return if if_exists == IfExists::Skip {
                     Ok(())
                 } else {
-                    Err(RepositoryError::corrupted(
-                        format!("Key {} already exists", key),
-                        None,
-                    ))
+                    Err(RepositoryError::corrupted(format!(
+                        "Key {} already exists",
+                        key
+                    )))
                 };
             }
         }
@@ -476,6 +482,53 @@ impl RepositoryS3 {
             Err(_) => Ok(false), // return Err(e.into()),
         }
     }
+
+    async fn search_async(
+        &self,
+        query: Option<&str>,
+    ) -> Result<RepositorySearchResult, RepositoryError> {
+        let query = query.unwrap_or_default();
+
+        let list_objects_resp = self
+            .s3
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: self.bucket.clone(),
+                delimiter: Some("/".to_owned()),
+                ..ListObjectsV2Request::default()
+            })
+            .await?;
+
+        // TODO: Support iteration
+        assert!(
+            !list_objects_resp.is_truncated.unwrap_or(false),
+            "Cannot handle truncated response"
+        );
+
+        let mut datasets = Vec::new();
+
+        for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
+            let mut prefix = prefix.prefix.unwrap();
+            while prefix.ends_with('/') {
+                prefix.pop();
+            }
+
+            let id = DatasetRefBuf::try_from(prefix).map_err(|e| {
+                RepositoryError::corrupted_from(
+                    format!(
+                        "Repository contains directory {} which is not a valid DatasetID",
+                        e.value
+                    ),
+                    e,
+                )
+            })?;
+
+            if query.is_empty() || id.contains(query) {
+                datasets.push(id);
+            }
+        }
+
+        Ok(RepositorySearchResult { datasets })
+    }
 }
 
 impl RepositoryClient for RepositoryS3 {
@@ -521,9 +574,7 @@ impl RepositoryClient for RepositoryS3 {
     }
 
     fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
-        Ok(RepositorySearchResult {
-            datasets: vec![DatasetRefBuf::try_from("s3").unwrap()],
-        })
+        self.runtime.borrow_mut().block_on(self.search_async(query))
     }
 }
 

@@ -2,6 +2,7 @@
 
 - [Repository Types](#repository-types)
 - [Configuring Repositories](#configuring-repositories)
+- [Searching for Data](#searching-for-data)
 - [Pulling Data](#pulling-data)
 - [Pushing Data](#pushing-data)
 - [Validity of Data](#validity-of-data)
@@ -32,6 +33,20 @@ kamu repo add acme s3://kamu.acme.com
 This will create a repository with an alias `acme` pointing to the `kamu.acme.com` S3 bucket.
 
 This repo will now be visible in `kamu repo list`.
+
+
+## Searching for Data
+To look for datasets in the repos use:
+
+```bash
+# Searching with empty query lists (certain number of) datasets in all repos
+kamu search
+
+# You can specify the search term and specific repo to look in
+kamu search covid19 --repo acme
+```
+
+Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by DatasetID.
 
 
 ## Pulling Data
@@ -70,6 +85,7 @@ kamu push orders
 ```
 
 This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen. It also detects any type of history collisions, so you will never overwrite someone else's changes.
+
 
 ## Validity of Data
 With `kamu` sharing data becomes very easy, but with that problem out of the way you will soon start wondering "How can I trust the data I downloaded from someon else?". Let's first define what validity or trustworthiness of data means.

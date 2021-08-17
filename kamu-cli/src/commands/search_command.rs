@@ -40,15 +40,31 @@ impl SearchCommand {
         let mut table = Table::new();
         table.set_format(self.get_table_format());
 
-        table.set_titles(row![bc->"ID"]);
+        table.set_titles(
+            row![bc->"ID", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
+        );
 
         for id in &search_result.datasets {
-            table.add_row(Row::new(vec![Cell::new(id)]));
+            table.add_row(Row::new(vec![
+                Cell::new(id),
+                Cell::new("-"),
+                Cell::new("-"),
+                Cell::new("-"),
+                Cell::new("-"),
+                Cell::new("-"),
+            ]));
         }
 
         // Header doesn't render when there are no data rows in the table
         if search_result.datasets.is_empty() {
-            table.add_row(Row::new(vec![Cell::new("")]));
+            table.add_row(Row::new(vec![
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+                Cell::new(""),
+            ]));
         }
 
         table.printstd();

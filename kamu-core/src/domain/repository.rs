@@ -105,10 +105,20 @@ impl RepositoryError {
         }
     }
 
-    pub fn corrupted(message: String, source: Option<BoxedError>) -> Self {
+    pub fn corrupted(message: String) -> Self {
         Self::Corrupted {
             message: message,
-            source: source,
+            source: None,
+        }
+    }
+
+    pub fn corrupted_from<E: std::error::Error + Send + Sync + 'static>(
+        message: String,
+        source: E,
+    ) -> Self {
+        Self::Corrupted {
+            message: message,
+            source: Some(source.into()),
         }
     }
 }
