@@ -5,6 +5,7 @@ use std::error::Error;
 
 use console::style;
 use kamu::infra::VolumeLayout;
+use kamu_cli::CLIError;
 
 fn main() {
     let workspace_layout = kamu_cli::find_workspace();
@@ -22,8 +23,19 @@ fn main() {
     }
 }
 
-fn display_error(err: kamu_cli::CLIError) {
-    eprintln!("{}: {}", style("Error").red().bold(), err);
+fn display_error(err: CLIError) {
+    match err {
+        CLIError::CriticalFailure { .. } => {
+            eprintln!("{}: {}", style("Critical Error").red().bold(), err);
+            eprintln!(
+                "Help us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+            );
+        }
+        _ => {
+            eprintln!("{}: {}", style("Error").red().bold(), err);
+        }
+    }
+
     if let Some(bt) = err.backtrace() {
         if bt.status() == BacktraceStatus::Captured {
             eprintln!("\nBacktrace:\n{}", style(bt).dim().bold());

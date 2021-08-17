@@ -46,10 +46,10 @@ pub fn run(
 
     load_config(&mut catalog);
 
-    let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches);
+    let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
 
     if command.needs_workspace() && !in_workspace(catalog.get_one().unwrap()) {
-        Err(CLIError::NotInWorkspace)
+        Err(CLIError::usage_error_from(NotInWorkspace))
     } else {
         command.run()
     }

@@ -42,22 +42,21 @@ impl SetWatermarkCommand {
 impl Command for SetWatermarkCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
-            return Err(CLIError::UsageError {
-                msg: "Only one dataset can be provided when setting a watermark".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Only one dataset can be provided when setting a watermark",
+            ));
         } else if self.recursive || self.all {
-            return Err(CLIError::UsageError {
-                msg: "Can't use all or recursive flags when setting a watermark".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Can't use --all or --recursive flags when setting a watermark",
+            ));
         }
 
-        let watermark =
-            DateTime::parse_from_rfc3339(&self.watermark).map_err(|_| CLIError::UsageError {
-                msg: format!(
-                    "Invalid timestamp {} should follow RFC3339 format, e.g. 2020-01-01T12:00:00Z",
-                    self.watermark
-                ),
-            })?;
+        let watermark = DateTime::parse_from_rfc3339(&self.watermark).map_err(|_| {
+            CLIError::usage_error(format!(
+                "Invalid timestamp {} should follow RFC3339 format, e.g. 2020-01-01T12:00:00Z",
+                self.watermark
+            ))
+        })?;
 
         let dataset_id = DatasetRef::try_from(&self.refs[0]).unwrap().local_id();
 
@@ -68,12 +67,11 @@ impl Command for SetWatermarkCommand {
             .collect();
 
         if !pull_aliases.is_empty() {
-            return Err(CLIError::UsageError {
-                msg: format!(
+            return Err(CLIError::usage_error(format!(
                     "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
                     pull_aliases.join("\n- ")
-                ),
-            });
+                ))
+            );
         }
 
         match self.pull_svc.set_watermark(dataset_id, watermark.into()) {

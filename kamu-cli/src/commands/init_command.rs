@@ -1,3 +1,5 @@
+use crate::AlreadyInWorkspace;
+
 use super::{CLIError, Command};
 use kamu::infra::*;
 
@@ -20,7 +22,7 @@ impl Command for InitCommand {
 
     fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.kamu_root_dir.is_dir() {
-            return Err(CLIError::AlreadyInWorkspace);
+            return Err(CLIError::usage_error_from(AlreadyInWorkspace));
         }
 
         fs::create_dir_all(&self.workspace_layout.datasets_dir)?;

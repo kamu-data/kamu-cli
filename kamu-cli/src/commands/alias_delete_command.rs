@@ -58,9 +58,7 @@ impl Command for AliasDeleteCommand {
                 }
             }
         } else {
-            return Err(CLIError::UsageError {
-                msg: "Specify either an alias or --all".to_owned(),
-            });
+            return Err(CLIError::usage_error("Specify either an alias or --all"));
         }
 
         eprintln!(

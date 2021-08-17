@@ -86,9 +86,7 @@ impl Command for ConfigGetCommand {
         if let Some(value) = self.config_svc.get(&self.key, scope, self.with_defaults) {
             println!("{}", value);
         } else {
-            return Err(CLIError::UsageError {
-                msg: format!("Key {} not found", self.key),
-            });
+            return Err(CLIError::usage_error(format!("Key {} not found", self.key)));
         }
 
         Ok(())

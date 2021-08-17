@@ -33,17 +33,17 @@ impl AliasAddCommand {
 impl Command for AliasAddCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         if !self.pull && !self.push {
-            return Err(CLIError::UsageError {
-                msg: "Specify either --pull or --push or both".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Specify either --pull or --push or both",
+            ));
         }
 
         let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
         let remote_ref = DatasetRefBuf::try_from(self.alias.clone()).unwrap();
 
-        let repo_id = remote_ref.repository().ok_or(CLIError::UsageError {
-            msg: "Alias should contain a repository part".to_owned(),
-        })?;
+        let repo_id = remote_ref.repository().ok_or(CLIError::usage_error(
+            "Alias should contain a repository part",
+        ))?;
 
         self.metadata_repo.get_repository(repo_id)?;
         let mut aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;

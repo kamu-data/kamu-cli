@@ -12,6 +12,7 @@ use serde_with::skip_serializing_none;
 use std::fmt::Write;
 
 use crate::error::CLIError;
+use crate::NotInWorkspace;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -185,7 +186,7 @@ impl ConfigService {
 
     pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), CLIError> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(CLIError::NotInWorkspace);
+            return Err(CLIError::usage_error_from(NotInWorkspace));
         }
 
         let mut buffer = String::new();
@@ -203,8 +204,8 @@ impl ConfigService {
         }
         write!(buffer, " {}", value).unwrap();
 
-        let mut delta: CLIConfig = serde_yaml::from_str(&buffer)
-            .map_err(|e| CLIError::UsageError { msg: e.to_string() })?;
+        let mut delta: CLIConfig =
+            serde_yaml::from_str(&buffer).map_err(|e| CLIError::usage_error(e.to_string()))?;
 
         let current = self.load(scope);
 
@@ -217,14 +218,12 @@ impl ConfigService {
 
     pub fn unset(&self, key: &str, scope: ConfigScope) -> Result<(), CLIError> {
         if scope == ConfigScope::Workspace && !self.workspace_kamu_dir.exists() {
-            return Err(CLIError::NotInWorkspace);
+            return Err(CLIError::usage_error_from(NotInWorkspace));
         }
 
         let config_path = self.path_for_scope(scope);
         if !config_path.exists() {
-            return Err(CLIError::UsageError {
-                msg: format!("Key {} not found", key),
-            });
+            return Err(CLIError::usage_error(format!("Key {} not found", key)));
         }
 
         let config = self.load_from(&config_path);
@@ -250,9 +249,7 @@ impl ConfigService {
 
             Ok(())
         } else {
-            Err(CLIError::UsageError {
-                msg: format!("Key {} not found", key),
-            })
+            Err(CLIError::usage_error(format!("Key {} not found", key)))
         }
     }
 

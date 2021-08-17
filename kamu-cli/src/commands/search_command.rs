@@ -97,7 +97,7 @@ impl Command for SearchCommand {
                     repository_ids: self.repository_ids.clone(),
                 },
             )
-            .unwrap(); // TODO: error handling (also DI errors) ??????????????????????????????????????
+            .map_err(|e| CLIError::failure(e))?;
 
         // TODO: replace with formatters
         match self.output_config.format {

@@ -81,9 +81,9 @@ impl PullCommand {
         let dataset_id = DatasetID::try_from(&self.refs[0]).unwrap();
         let summary = self.metadata_repo.get_summary(dataset_id)?;
         if summary.kind != DatasetKind::Root {
-            return Err(CLIError::UsageError {
-                msg: "Cannot ingest data into non-root dataset".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Cannot ingest data into non-root dataset",
+            ));
         }
 
         let aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
@@ -93,12 +93,11 @@ impl PullCommand {
             .collect();
 
         if !pull_aliases.is_empty() {
-            return Err(CLIError::UsageError {
-                msg: format!(
+            return Err(CLIError::usage_error(format!(
                     "Ingesting data into remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
                     pull_aliases.join("\n- ")
-                ),
-            });
+                )
+            ));
         }
 
         let fetch_str = self.fetch.as_ref().unwrap();
@@ -106,8 +105,11 @@ impl PullCommand {
         let url = if path.is_file() {
             Url::from_file_path(path.canonicalize().unwrap()).unwrap()
         } else {
-            Url::parse(fetch_str).map_err(|e| CLIError::UsageError {
-                msg: format!("Invalid fetch source, should be URL or path: {}", e),
+            Url::parse(fetch_str).map_err(|e| {
+                CLIError::usage_error(format!(
+                    "Invalid fetch source, should be URL or path: {}",
+                    e
+                ))
             })?
         };
 
@@ -184,16 +186,16 @@ impl PullCommand {
 impl Command for PullCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         match (self.recursive, self.all, &self.as_id, &self.fetch) {
-            (false, false, _, _) if self.refs.is_empty() => Err(CLIError::UsageError {
-                msg: "Specify a dataset or pass --all".to_owned(),
-            }),
+            (false, false, _, _) if self.refs.is_empty() => {
+                Err(CLIError::usage_error("Specify a dataset or pass --all"))
+            }
             (false, true, None, None) if self.refs.is_empty() => Ok(()),
             (_, false, None, None) if !self.refs.is_empty() => Ok(()),
             (false, false, Some(_), None) if self.refs.len() == 1 => Ok(()),
             (false, false, None, Some(_)) if self.refs.len() == 1 => Ok(()),
-            _ => Err(CLIError::UsageError {
-                msg: "Invalid combination of arguments".to_owned(),
-            }),
+            _ => Err(CLIError::usage_error(
+                "Invalid combination of arguments".to_owned(),
+            )),
         }?;
 
         let pull_results = if self.output_config.is_tty

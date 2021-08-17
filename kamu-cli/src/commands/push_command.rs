@@ -89,15 +89,13 @@ impl PushCommand {
 impl Command for PushCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() == 0 && !self.all {
-            return Err(CLIError::UsageError {
-                msg: "Specify a dataset or pass --all".to_owned(),
-            });
+            return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
 
         if self.refs.len() > 1 && self.as_ref.is_some() {
-            return Err(CLIError::UsageError {
-                msg: "Cannot specify multiple datasets with --as alias".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Cannot specify multiple datasets with --as alias",
+            ));
         }
 
         // If --as alias is used - add it to push aliases
@@ -105,16 +103,16 @@ impl Command for PushCommand {
             let local_id = match DatasetRef::try_from(&self.refs[0]).unwrap().as_local() {
                 Some(local_id) => local_id,
                 None => {
-                    return Err(CLIError::UsageError {
-                        msg: "When using --as dataset has to refer to a local ID".to_owned(),
-                    })
+                    return Err(CLIError::usage_error(
+                        "When using --as dataset has to refer to a local ID",
+                    ))
                 }
             };
             let remote_ref = DatasetRefBuf::try_from(as_ref.clone()).unwrap();
             if remote_ref.is_local() {
-                return Err(CLIError::UsageError {
-                    msg: "When using --as the alias has to be a remote reference".to_owned(),
-                });
+                return Err(CLIError::usage_error(
+                    "When using --as the alias has to be a remote reference",
+                ));
             }
 
             self.metadata_repo

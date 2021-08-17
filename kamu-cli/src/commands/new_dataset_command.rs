@@ -143,9 +143,9 @@ impl Command for NewDatasetCommand {
         } else if self.is_derivative {
             Self::get_content(&self.id, false)
         } else {
-            return Err(CLIError::UsageError {
-                msg: "Please specify --root or --derivative".to_owned(),
-            });
+            return Err(CLIError::usage_error(
+                "Please specify --root or --derivative",
+            ));
         };
 
         let mut file = OpenOptions::new()

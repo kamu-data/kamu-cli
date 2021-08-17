@@ -65,8 +65,8 @@ impl Command for NotebookCommand {
                 value
                     .clone()
                     .or_else(|| std::env::var(name).ok())
-                    .ok_or_else(|| CLIError::UsageError {
-                        msg: format!("Environment variable {} is not set", name),
+                    .ok_or_else(|| {
+                        CLIError::usage_error(format!("Environment variable {} is not set", name))
                     })
                     .map(|v| (name.to_owned(), v))
             })
