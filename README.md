@@ -48,6 +48,7 @@ All datasets can be easily shared with others, creating a decentralized data pip
 
 - [Kamu Blog: Introducing Open Data Fabric](https://www.kamu.dev/blog/introducing-odf/) - a casual introduction.
 - [Kamu 101 - First Steps](http://www.youtube.com/watch?v=UpT2tvf3r0Y) - a video overview of key features.
+- [Open Data Fabric for Research Data Management](https://www.youtube.com/watch?v=Ivh-YDDmRf8) - talk about motivation and system's design.
 - [Open Data Fabric protocol specification](https://github.com/kamu-data/open-data-fabric) - technical overview and many gory details.
 - [Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark) - technical talk from **Data+AI Summit 2020**
 

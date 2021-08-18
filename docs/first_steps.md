@@ -212,6 +212,6 @@ Now that we have the data in Jupyter - we can use any of your favorite tools and
 
 ![kamu notebook 005](./first_steps_files/notebook-005.png)
 
-You can find this as well as many other notebooks in [kamu-repo-contrib](https://github.com/kamu-data/kamu-repo-contrib) repo.
+You can find this as well as many other notebooks in [kamu-contrib](https://github.com/kamu-data/kamu-contrib) repo.
 
 Don't get distracted by the pretty notebooks however - the true power of `kamu` lies in how it manages data, letting you to reliably track it, transform it, and share results with your peers in an easily reproducible an verifiable way. So make sure to check out our other tutorials!
