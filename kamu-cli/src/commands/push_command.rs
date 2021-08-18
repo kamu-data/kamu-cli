@@ -99,7 +99,7 @@ impl Command for PushCommand {
         }
 
         // If --as alias is used - add it to push aliases
-        if let Some(ref as_ref) = self.as_ref {
+        let alias_added = if let Some(ref as_ref) = self.as_ref {
             let local_id = match DatasetRef::try_from(&self.refs[0]).unwrap().as_local() {
                 Some(local_id) => local_id,
                 None => {
@@ -117,8 +117,10 @@ impl Command for PushCommand {
 
             self.metadata_repo
                 .get_remote_aliases(local_id)?
-                .add(remote_ref, RemoteAliasKind::Push)?;
-        }
+                .add(remote_ref, RemoteAliasKind::Push)?
+        } else {
+            false
+        };
 
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
@@ -141,6 +143,18 @@ impl Command for PushCommand {
                 },
                 Err(_) => errors += 1,
             }
+        }
+
+        if alias_added && errors != 0 {
+            // This is a bit ugly, but we don't want alias to stay unless first push is successful
+            let local_id = DatasetRef::try_from(&self.refs[0])
+                .unwrap()
+                .as_local()
+                .unwrap();
+            let remote_ref = DatasetRef::try_from(self.as_ref.as_ref().unwrap()).unwrap();
+            self.metadata_repo
+                .get_remote_aliases(local_id)?
+                .delete(remote_ref, RemoteAliasKind::Push)?;
         }
 
         if updated != 0 {
