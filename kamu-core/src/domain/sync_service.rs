@@ -38,6 +38,11 @@ pub trait SyncService: Send + Sync {
         options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)>;
+
+    /// Deletes a dataset from a remote repository.
+    ///
+    /// Note: Some repos may not permit this operation.
+    fn delete(&self, remote_ref: &DatasetRef) -> Result<(), SyncError>;
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +113,8 @@ pub enum SyncError {
         //uncommon_blocks_in_local: usize,
         //uncommon_blocks_in_remote: usize,
     },
+    #[error("Repository does not allow this operation")]
+    NotAllowed,
     #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
         message: String,
@@ -129,6 +136,7 @@ pub enum SyncError {
 impl From<RepositoryError> for SyncError {
     fn from(e: RepositoryError) -> Self {
         match e {
+            RepositoryError::NotAllowed => SyncError::NotAllowed,
             RepositoryError::Diverged {
                 local_head,
                 remote_head,

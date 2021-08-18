@@ -187,6 +187,17 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(result)
     }
 
+    fn delete(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
+        let dataset_dir = self.path.join(dataset_ref.local_id());
+        if !dataset_dir.exists() {
+            return Err(RepositoryError::DoesNotExist);
+        }
+
+        std::fs::remove_dir_all(dataset_dir)?;
+
+        Ok(())
+    }
+
     fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
         let query = query.unwrap_or_default();
         let mut datasets = Vec::new();

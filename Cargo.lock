@@ -1034,7 +1034,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.58.1"
+version = "0.59.0"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.58.1"
+version = "0.59.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1221,9 +1221,9 @@ dependencies = [
 
 [[package]]
 name = "memchr"
-version = "2.4.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
+checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
 
 [[package]]
 name = "merge"
@@ -1259,9 +1259,9 @@ dependencies = [
 
 [[package]]
 name = "minus"
-version = "4.0.0"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea18ca3712972f936f0ab3c2dcce81dc3ba49f08aa3f17b2224ec34e018d1298"
+checksum = "c9d72a6f2a38c88beb09c432ac2c2072a995e59ee432bf9d7813fbd3a5669a0d"
 dependencies = [
  "crossterm",
  "regex",
@@ -1451,7 +1451,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.58.1"
+version = "0.59.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -2122,9 +2122,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.17"
+version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15654ed4ab61726bf918a39cb8d98a2e2995b002387807fa6ba58fdf7f59bb23"
+checksum = "039ba818c784248423789eec090aab9fb566c7b94d6ebbfa1814a9fd52c8afb2"
 dependencies = [
  "dtoa",
  "linked-hash-map",

@@ -483,6 +483,12 @@ impl RepositoryS3 {
         }
     }
 
+    async fn delete_async(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
+        self.delete_objects(format!("{}/", dataset_ref.local_id()))
+            .await?;
+        Ok(())
+    }
+
     async fn search_async(
         &self,
         query: Option<&str>,
@@ -571,6 +577,12 @@ impl RepositoryClient for RepositoryS3 {
             last_seen_block,
             tmp_dir,
         ))
+    }
+
+    fn delete(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
+        self.runtime
+            .borrow_mut()
+            .block_on(self.delete_async(dataset_ref))
     }
 
     fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {

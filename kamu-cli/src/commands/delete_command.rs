@@ -3,49 +3,44 @@ use super::{CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 pub struct DeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    ids: Vec<String>,
+    sync_svc: Arc<dyn SyncService>,
+    ids: Vec<DatasetRefBuf>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
 }
 
 impl DeleteCommand {
-    pub fn new<I, S>(
+    pub fn new<I, ID>(
         metadata_repo: Arc<dyn MetadataRepository>,
+        sync_svc: Arc<dyn SyncService>,
         ids: I,
         all: bool,
         recursive: bool,
         no_confirmation: bool,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
+        I: IntoIterator<Item = ID>,
+        ID: Into<DatasetRefBuf>,
     {
         Self {
-            metadata_repo: metadata_repo,
-            ids: ids.map(|s| s.as_ref().to_owned()).collect(),
-            all: all,
-            recursive: recursive,
-            no_confirmation: no_confirmation,
+            metadata_repo,
+            sync_svc,
+            ids: ids.into_iter().map(|s| s.into()).collect(),
+            all,
+            recursive,
+            no_confirmation,
         }
     }
 }
 
 impl Command for DeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let starting_dataset_ids = self
-            .ids
-            .iter()
-            .map(|s| DatasetIDBuf::try_from(s as &str))
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-
-        if starting_dataset_ids.is_empty() && !self.all {
+        if self.ids.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
@@ -54,7 +49,7 @@ impl Command for DeleteCommand {
         } else if self.recursive {
             unimplemented!("Recursive deletion is not yet supported")
         } else {
-            starting_dataset_ids
+            self.ids.clone()
         };
 
         let confirmed = if self.no_confirmation {
@@ -77,7 +72,10 @@ impl Command for DeleteCommand {
         }
 
         for id in dataset_ids.iter() {
-            self.metadata_repo.delete_dataset(&id)?;
+            match id.as_local() {
+                Some(local_id) => self.metadata_repo.delete_dataset(local_id)?,
+                None => self.sync_svc.delete(id).map_err(|e| CLIError::failure(e))?,
+            }
         }
 
         eprintln!(

@@ -379,4 +379,29 @@ impl SyncService for SyncServiceImpl {
 
         results
     }
+
+    fn delete(&self, remote_ref: &DatasetRef) -> Result<(), SyncError> {
+        let repo_id = remote_ref
+            .repository()
+            .unwrap_or_else(|| panic!("Non-remote reference passed to delete: {}", remote_ref));
+
+        let repo = self
+            .metadata_repo
+            .get_repository(repo_id)
+            .map_err(|e| match e {
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_id: repo_id.to_owned(),
+                },
+                _ => SyncError::InternalError(e.into()),
+            })?;
+
+        let client = self
+            .repository_factory
+            .get_repository_client(&repo)
+            .map_err(|e| SyncError::InternalError(e.into()))?;
+
+        client.lock().unwrap().delete(remote_ref)?;
+
+        Ok(())
+    }
 }

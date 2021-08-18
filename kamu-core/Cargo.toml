@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.58.1"
+version = "0.59.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 

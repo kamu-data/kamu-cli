@@ -1,6 +1,7 @@
+use std::convert::TryFrom;
+
 use clap::value_t_or_exit;
-use opendatafabric::DatasetIDBuf;
-use opendatafabric::RepositoryID;
+use opendatafabric::{DatasetIDBuf, DatasetRefBuf, RepositoryID};
 use slog::Logger;
 
 use crate::app::in_workspace;
@@ -56,7 +57,11 @@ pub fn get_command(
         },
         ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
-            submatches.values_of("dataset").unwrap_or_default(),
+            catalog.get_one()?,
+            submatches
+                .values_of("dataset")
+                .unwrap_or_default()
+                .map(|s| DatasetRefBuf::try_from(s).unwrap()),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
             submatches.is_present("yes"),
