@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.58.1] - 2021-08-17
+### Fixed
+- Upgraded Spark engine brings better error handling for invalid event times
+
 ## [0.58.0] - 2021-08-17
 ### Added
 - New `kamu search` command allows listing and searching for datasets in remote repositories
