@@ -54,10 +54,12 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub enum RepositoryError {
     #[error("Dataset does not exist")]
     DoesNotExist,
-    #[error("Dataset have diverged")]
+    #[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged")]
     Diverged {
-        remote_head: Sha3_256,
         local_head: Sha3_256,
+        remote_head: Sha3_256,
+        //uncommon_blocks_in_local: usize,
+        //uncommon_blocks_in_remote: usize,
     },
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently,

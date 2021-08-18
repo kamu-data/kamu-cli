@@ -212,9 +212,7 @@ impl SyncServiceImpl {
 
         let mut cl = client.lock().unwrap();
 
-        let remote_head = cl
-            .read_ref(remote_dataset_ref)
-            .map_err(|e| SyncError::InternalError(e.into()))?;
+        let remote_head = cl.read_ref(remote_dataset_ref)?;
 
         let local_head = chain.read_ref(&BlockRef::Head).unwrap();
 

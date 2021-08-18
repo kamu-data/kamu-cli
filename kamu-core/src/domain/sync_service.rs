@@ -99,10 +99,14 @@ pub enum SyncError {
     RemoteDatasetDoesNotExist { dataset_ref: DatasetRefBuf },
     #[error("Repository {repo_id} does not exist")]
     RepositoryDoesNotExist { repo_id: RepositoryBuf },
+    // TODO: Report divergence type (e.g. remote is ahead of local)
+    //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
     #[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged")]
     DatasetsDiverged {
         local_head: Sha3_256,
         remote_head: Sha3_256,
+        //uncommon_blocks_in_local: usize,
+        //uncommon_blocks_in_remote: usize,
     },
     #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
@@ -126,11 +130,11 @@ impl From<RepositoryError> for SyncError {
     fn from(e: RepositoryError) -> Self {
         match e {
             RepositoryError::Diverged {
-                remote_head,
                 local_head,
+                remote_head,
             } => SyncError::DatasetsDiverged {
-                remote_head: remote_head,
-                local_head: local_head,
+                local_head,
+                remote_head,
             },
             RepositoryError::Corrupted {
                 ref message,

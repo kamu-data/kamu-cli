@@ -584,7 +584,7 @@ pub fn cli() -> App<'static, 'static> {
                         kamu push org.example.data
                     "
                 )),
-            SubCommand::with_name("reset")
+            /*SubCommand::with_name("reset")
                 .about("Revert the dataset back to the specified state")
                 .args(&[
                     Arg::with_name("dataset")
@@ -607,7 +607,7 @@ pub fn cli() -> App<'static, 'static> {
 
                     Keep in mind that blocks that were already pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back.
                     "
-                )),
+                )),*/
             SubCommand::with_name("repo")
                 .about("Manage set of tracked repositories")
                 .setting(AppSettings::SubcommandRequiredElseHelp)

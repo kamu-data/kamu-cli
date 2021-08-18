@@ -30,7 +30,9 @@ impl RepositoryClient for RepositoryLocalFS {
         if ref_path.exists() {
             let hash = std::fs::read_to_string(&ref_path)
                 .map_err(|e| RepositoryError::protocol(e.into()))?;
-            Ok(Some(Sha3_256::from_str(&hash).expect("Malformed hash")))
+            Ok(Some(
+                Sha3_256::from_str(hash.trim()).expect("Malformed hash"),
+            ))
         } else {
             Ok(None)
         }

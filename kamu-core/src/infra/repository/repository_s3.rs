@@ -45,9 +45,9 @@ impl RepositoryS3 {
             .read_object_buf(format!("{}/meta/refs/head", dataset_ref.local_id()))
             .await?
         {
+            let s = std::str::from_utf8(&body).expect("Non-utf8 string in ref");
             Ok(Some(
-                Sha3_256::from_str(std::str::from_utf8(&body).unwrap())
-                    .map_err(|e| RepositoryError::protocol(e.into()))?,
+                Sha3_256::from_str(s.trim()).map_err(|e| RepositoryError::protocol(e.into()))?,
             ))
         } else {
             Ok(None)

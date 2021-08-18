@@ -121,7 +121,7 @@ impl MetadataChain for MetadataChainImpl {
         } else {
             let s = std::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("Failed to read ref at {}: {}", path.display(), e));
-            Some(Sha3_256::from_str(&s).unwrap())
+            Some(Sha3_256::from_str(s.trim()).unwrap())
         }
     }
 
