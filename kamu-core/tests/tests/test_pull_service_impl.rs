@@ -658,4 +658,8 @@ impl SyncService for TestSyncService {
     ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
         unimplemented!()
     }
+
+    fn delete(&self, _remote_ref: &DatasetRef) -> Result<(), SyncError> {
+        unimplemented!()
+    }
 }
