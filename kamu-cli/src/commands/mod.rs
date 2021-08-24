@@ -80,6 +80,9 @@ pub use sql_server_livy_command::*;
 mod sql_shell_command;
 pub use sql_shell_command::*;
 
+mod tail_command;
+pub use tail_command::*;
+
 mod verify_command;
 pub use verify_command::*;
 

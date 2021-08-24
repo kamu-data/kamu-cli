@@ -861,6 +861,30 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
             ),
+            tabular_output_params(SubCommand::with_name("tail")
+                .about("Displays a sample of most recent records in a dataset")
+                .args(&[
+                    Arg::with_name("dataset")
+                        .required(true)
+                        .index(1)
+                        .validator(validate_dataset_id)
+                        .help("ID of the dataset"),
+                    Arg::with_name("num-records")
+                        .long("num-records")
+                        .short("n")
+                        .takes_value(true)
+                        .default_value("10")
+                        .value_name("NUM")
+                        .help("Number of records to display"),
+                ])
+                .after_help(indoc::indoc!(
+                    r#"
+                    This command is simply a shortcut for:
+
+                        kamu sql --engine datafusion --command 'SELECT * FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}'
+                    "#
+                ))
+            ),
             SubCommand::with_name("verify")
                 .about("Verifies the validity of derivative data")
                 .args(&[

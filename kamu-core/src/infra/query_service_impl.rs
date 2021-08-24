@@ -195,11 +195,19 @@ impl SchemaProvider for KamuSchema {
     }
 
     fn table_names(&self) -> Vec<String> {
-        self.metadata_repo
-            .get_all_datasets()
-            .filter(|id| self.has_data(id))
-            .map(|id| id.into())
-            .collect()
+        if self.options.datasets.is_empty() {
+            self.metadata_repo
+                .get_all_datasets()
+                .filter(|id| self.has_data(id))
+                .map(|id| id.into())
+                .collect()
+        } else {
+            self.options
+                .datasets
+                .iter()
+                .map(|d| d.dataset_id.to_string())
+                .collect()
+        }
     }
 
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {

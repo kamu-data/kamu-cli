@@ -237,6 +237,13 @@ pub fn get_command(
             }
             _ => return Err(CommandInterpretationFailed.into()),
         },
+        ("tail", Some(submatches)) => Box::new(TailCommand::new(
+            catalog.get_one()?,
+            catalog.get_one()?,
+            value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+            value_t_or_exit!(submatches.value_of("num-records"), u64),
+            catalog.get_one()?,
+        )),
         ("verify", Some(submatches)) => Box::new(VerifyCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
