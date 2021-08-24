@@ -40,8 +40,10 @@ rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 
 # Utils
 cfg-if = "*"  # Conditional compilation
+datafusion = "*"  # Reading data + SQL
 glob = "*"  # Used for glob fetch
 slog = "*"
+sqlparser = "*"  # Extractind info from datafusion queries
 rand = "^0.8"
 regex = "*"
 indoc = "*"  # Compile-time unindent

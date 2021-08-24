@@ -1,6 +1,7 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::*;
+use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::explore::*;
 use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
@@ -9,39 +10,43 @@ use slog::Logger;
 use std::sync::Arc;
 
 pub struct SqlShellCommand {
+    query_svc: Arc<dyn QueryService>,
     workspace_layout: Arc<WorkspaceLayout>,
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<DockerClient>,
     command: Option<String>,
     url: Option<String>,
+    engine: Option<String>,
     logger: Logger,
 }
 
 impl SqlShellCommand {
     pub fn new(
+        query_svc: Arc<dyn QueryService>,
         workspace_layout: Arc<WorkspaceLayout>,
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<DockerClient>,
         command: Option<&str>,
         url: Option<&str>,
+        engine: Option<&str>,
         logger: Logger,
     ) -> Self {
         Self {
+            query_svc,
             workspace_layout,
             volume_layout,
             output_config,
             container_runtime: container_runtime,
             command: command.map(|v| v.to_owned()),
             url: url.map(|v| v.to_owned()),
+            engine: engine.map(|v| v.to_owned()),
             logger: logger,
         }
     }
-}
 
-impl Command for SqlShellCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    fn run_spark_shell(&self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
 
         let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
@@ -78,5 +83,38 @@ impl Command for SqlShellCommand {
         )?;
 
         Ok(())
+    }
+
+    fn run_datafusion_command(&self) -> Result<(), CLIError> {
+        use datafusion::arrow::util::pretty::print_batches;
+
+        let df = self
+            .query_svc
+            .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
+            .map_err(|e| CLIError::failure(e))?;
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let records = runtime
+            .block_on(df.collect())
+            .map_err(|e| CLIError::failure(e))?;
+
+        print_batches(&records).unwrap();
+
+        Ok(())
+    }
+}
+
+impl Command for SqlShellCommand {
+    fn run(&mut self) -> Result<(), CLIError> {
+        match (
+            self.engine.as_ref().map(|s| s.as_str()),
+            &self.command,
+            &self.url,
+        ) {
+            (Some("datafusion"), Some(_), None) => self.run_datafusion_command(),
+            (Some("datafusion"), _, _) => Err(CLIError::usage_error("DataFusion engine currently doesn't have a shell and only supports single command execution")),
+            (Some("spark") | None, _, _) => self.run_spark_shell(),
+            _ => unreachable!(),
+        }
     }
 }

@@ -206,8 +206,10 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
+                catalog.get_one()?,
                 submatches.value_of("command"),
                 submatches.value_of("url"),
+                submatches.value_of("engine"),
                 catalog.get_one::<Logger>().unwrap().as_ref().clone(),
             )),
             ("server", Some(server_matches)) => {

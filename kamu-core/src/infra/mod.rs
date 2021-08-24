@@ -52,6 +52,9 @@ pub use pull_service_impl::*;
 mod push_service_impl;
 pub use push_service_impl::*;
 
+mod query_service_impl;
+pub use query_service_impl::*;
+
 mod resource_loader_impl;
 pub use resource_loader_impl::*;
 

@@ -826,6 +826,12 @@ pub fn cli() -> App<'static, 'static> {
                         .takes_value(true)
                         .value_name("FILE")
                         .help("SQL script file to execute"),
+                    Arg::with_name("engine")
+                        .long("engine")
+                        .takes_value(true)
+                        .possible_values(&["spark", "datafusion"])
+                        .value_name("ENG")
+                        .help("Engine type to use for this SQL session"),
                 ])
                 .after_help(indoc::indoc!(
                     r"

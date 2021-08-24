@@ -1,4 +1,5 @@
 #![feature(backtrace)]
+#![feature(box_patterns)]
 #![feature(exit_status_error)]
 
 pub mod app;

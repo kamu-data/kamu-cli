@@ -23,6 +23,9 @@ pub use pull_service::*;
 mod push_service;
 pub use push_service::*;
 
+mod query_service;
+pub use query_service::*;
+
 mod repository;
 pub use repository::*;
 
