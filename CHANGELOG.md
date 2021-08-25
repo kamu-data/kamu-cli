@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2021-08-24
+### Added
+- New `kamu tail` command allows to inspect last few records in a dataset
+- The `kamu sql` command now supports experimental [DataFusion](https://github.com/apache/arrow-datafusion) engine that can execute SQL queries extremely fast. It doesn't have a shell yet so can only be used in `--command` mode but we will be expanding its use in future.
+
 ## [0.59.0] - 2021-08-18
 ### Added
 - Ability to delete datasets in remote repositories via `kamu delete` command

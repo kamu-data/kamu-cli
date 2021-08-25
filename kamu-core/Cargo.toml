@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.59.0"
+version = "0.60.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2018"
 
@@ -43,7 +43,6 @@ cfg-if = "*"  # Conditional compilation
 datafusion = "*"  # Reading data + SQL
 glob = "*"  # Used for glob fetch
 slog = "*"
-sqlparser = "*"  # Extractind info from datafusion queries
 rand = "^0.8"
 regex = "*"
 indoc = "*"  # Compile-time unindent
