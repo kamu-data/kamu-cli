@@ -1,5 +1,5 @@
 use super::{CLIError, Command};
-use crate::output::*;
+use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
 use opendatafabric::*;
 
@@ -38,7 +38,7 @@ impl SearchCommand {
         search_result.datasets.sort();
 
         let mut table = Table::new();
-        table.set_format(self.get_table_format());
+        table.set_format(TableWriter::get_table_format());
 
         table.set_titles(
             row![bc->"ID", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
@@ -68,25 +68,6 @@ impl SearchCommand {
         }
 
         table.printstd();
-    }
-
-    fn get_table_format(&self) -> prettytable::format::TableFormat {
-        use prettytable::format::*;
-
-        FormatBuilder::new()
-            .column_separator('│')
-            .borders('│')
-            .separators(&[LinePosition::Top], LineSeparator::new('─', '┬', '┌', '┐'))
-            .separators(
-                &[LinePosition::Title],
-                LineSeparator::new('─', '┼', '├', '┤'),
-            )
-            .separators(
-                &[LinePosition::Bottom],
-                LineSeparator::new('─', '┴', '└', '┘'),
-            )
-            .padding(1, 1)
-            .build()
     }
 
     fn print_csv(&self, mut search_result: SearchResult) {

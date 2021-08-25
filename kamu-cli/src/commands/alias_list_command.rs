@@ -1,5 +1,5 @@
 use super::{CLIError, Command};
-use crate::output::*;
+use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
 use opendatafabric::DatasetIDBuf;
 
@@ -64,7 +64,7 @@ impl AliasListCommand {
 
         let mut items = 0;
         let mut table = Table::new();
-        table.set_format(self.get_table_format());
+        table.set_format(TableWriter::get_table_format());
 
         table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
 
@@ -101,25 +101,6 @@ impl AliasListCommand {
 
         table.printstd();
         Ok(())
-    }
-
-    fn get_table_format(&self) -> prettytable::format::TableFormat {
-        use prettytable::format::*;
-
-        FormatBuilder::new()
-            .column_separator('│')
-            .borders('│')
-            .separators(&[LinePosition::Top], LineSeparator::new('─', '┬', '┌', '┐'))
-            .separators(
-                &[LinePosition::Title],
-                LineSeparator::new('─', '┼', '├', '┤'),
-            )
-            .separators(
-                &[LinePosition::Bottom],
-                LineSeparator::new('─', '┴', '└', '┘'),
-            )
-            .padding(1, 1)
-            .build()
     }
 }
 
