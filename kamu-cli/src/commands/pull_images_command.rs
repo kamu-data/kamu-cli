@@ -7,13 +7,19 @@ use kamu::infra::utils::docker_images;
 pub struct PullImagesCommand {
     container_runtime: Arc<DockerClient>,
     pull_test_deps: bool,
+    list_only: bool,
 }
 
 impl PullImagesCommand {
-    pub fn new<'a>(container_runtime: Arc<DockerClient>, pull_test_deps: bool) -> Self {
+    pub fn new<'a>(
+        container_runtime: Arc<DockerClient>,
+        pull_test_deps: bool,
+        list_only: bool,
+    ) -> Self {
         Self {
             container_runtime,
             pull_test_deps,
+            list_only,
         }
     }
 }
@@ -38,13 +44,19 @@ impl Command for PullImagesCommand {
             ])
         }
 
-        for img in images.iter() {
-            eprintln!("{}: {}", console::style("Pulling image").bold(), img);
-            self.container_runtime
-                .pull_cmd(img)
-                .status()?
-                .exit_ok()
-                .map_err(|e| CLIError::failure(e))?;
+        if self.list_only {
+            for img in images {
+                println!("{}", img);
+            }
+        } else {
+            for img in images {
+                eprintln!("{}: {}", console::style("Pulling image").bold(), img);
+                self.container_runtime
+                    .pull_cmd(img)
+                    .status()?
+                    .exit_ok()
+                    .map_err(|e| CLIError::failure(e))?;
+            }
         }
 
         Ok(())

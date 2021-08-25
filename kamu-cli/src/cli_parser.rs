@@ -291,8 +291,12 @@ pub fn cli() -> App<'static, 'static> {
                         .help("Only pull container images and exit"),
                     Arg::with_name("pull-test-images")
                         .long("pull-test-images")
-                        .help("Only pull test-related container images and exit")
-                        .hidden(true),
+                        .hidden(true)
+                        .help("Only pull test-related container images and exit"),
+                    Arg::with_name("list-only")
+                        .long("list-only")
+                        .hidden(true)
+                        .help("List image names instead of pulling")
                 ])
                 .after_help(indoc::indoc!(
                     r"

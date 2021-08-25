@@ -67,10 +67,12 @@ pub fn get_command(
             submatches.is_present("yes"),
         )),
         ("init", Some(submatches)) => {
-            if submatches.is_present("pull-images") {
-                Box::new(PullImagesCommand::new(catalog.get_one()?, false))
-            } else if submatches.is_present("pull-test-images") {
-                Box::new(PullImagesCommand::new(catalog.get_one()?, true))
+            if submatches.is_present("pull-images") || submatches.is_present("pull-test-images") {
+                Box::new(PullImagesCommand::new(
+                    catalog.get_one()?,
+                    submatches.is_present("pull-test-images"),
+                    submatches.is_present("list-only"),
+                ))
             } else {
                 Box::new(InitCommand::new(catalog.get_one()?))
             }
