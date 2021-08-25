@@ -1,3 +1,7 @@
+use datafusion::parquet::{
+    file::reader::{FileReader, SerializedFileReader},
+    schema::types::Type,
+};
 use datafusion::{
     arrow::datatypes::Schema,
     catalog::{catalog::CatalogProvider, schema::SchemaProvider},
@@ -66,6 +70,22 @@ impl QueryService for QueryServiceImpl {
         );
 
         Ok(ctx.sql(statement)?)
+    }
+
+    fn get_schema(&self, dataset_id: &DatasetID) -> Result<Type, QueryError> {
+        let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+
+        let last_data_file = metadata_chain
+            .iter_blocks()
+            .filter(|b| b.output_slice.is_some())
+            .map(|b| dataset_layout.data_dir.join(b.block_hash.to_string()))
+            .next()
+            .expect("Obtaining schema from datasets with no data is not yet supported");
+
+        let file = std::fs::File::open(&last_data_file)?;
+        let reader = SerializedFileReader::new(file).map_err(|e| QueryError::internal(e))?;
+        Ok(reader.metadata().file_metadata().schema().clone())
     }
 }
 

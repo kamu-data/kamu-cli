@@ -32,6 +32,9 @@ pub use init_command::*;
 mod inspect_query_command;
 pub use inspect_query_command::*;
 
+mod inspect_schema_command;
+pub use inspect_schema_command::*;
+
 mod list_command;
 pub use list_command::*;
 

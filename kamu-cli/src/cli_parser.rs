@@ -333,7 +333,7 @@ pub fn cli() -> App<'static, 'static> {
                         ])
                         .after_help(indoc::indoc!(
                             r"
-                            Presents dataset-level lineage that includes current and past dependencies.
+                            Presents the dataset-level lineage that includes current and past dependencies.
 
                             ### Examples ###
 
@@ -362,6 +362,39 @@ pub fn cli() -> App<'static, 'static> {
                         .after_help(indoc::indoc!(
                             r"
                             This command allows you to audit the transformations performed by a derivative dataset and their evolution. Such audit is an important step in validating the trustworthiness of data (see `kamu verify` command).
+                            "
+                        )),
+                    SubCommand::with_name("schema")
+                        .about("Shows the dataset schema")
+                        .args(&[
+                            Arg::with_name("dataset")
+                                .required(true)
+                                .index(1)
+                                .validator(validate_dataset_id)
+                                .help("ID of the dataset"),
+                            Arg::with_name("output-format")
+                                .long("output-format")
+                                .short("o")
+                                .takes_value(true)
+                                .value_name("FMT")
+                                .possible_values(&[
+                                    "ddl", "parquet"
+                                ])
+                                .help("Format of an output"),
+                        ])
+                        .after_help(indoc::indoc!(
+                            r"
+                            Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
+
+                            ### Examples ###
+
+                            Show logical schema of a dataset in the DDL format:
+
+                                kamu inspect schema my.dataset
+
+                            Show physical schema of the underlying Parquet files:
+
+                                kamu inspect schema my.dataset -o parquet
                             "
                         )),
                 ]),

@@ -89,6 +89,11 @@ pub fn get_command(
                 value_t_or_exit!(query_matches.value_of("dataset"), DatasetIDBuf),
                 catalog.get_one()?,
             )),
+            ("schema", Some(schema_matches)) => Box::new(InspectSchemaCommand::new(
+                catalog.get_one()?,
+                value_t_or_exit!(schema_matches.value_of("dataset"), DatasetIDBuf),
+                schema_matches.value_of("output-format"),
+            )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
         ("list", Some(_submatches)) => {

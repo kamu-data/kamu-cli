@@ -1,8 +1,11 @@
 use datafusion::error::DataFusionError;
+use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
-use opendatafabric::DatasetIDBuf;
+use opendatafabric::{DatasetID, DatasetIDBuf};
 use std::sync::Arc;
 use thiserror::Error;
+
+use super::DomainError;
 
 pub trait QueryService: Send + Sync {
     fn sql_statement(
@@ -10,7 +13,11 @@ pub trait QueryService: Send + Sync {
         statement: &str,
         options: QueryOptions,
     ) -> Result<Arc<dyn DataFrame>, QueryError>;
+
+    fn get_schema(&self, dataset_id: &DatasetID) -> Result<Type, QueryError>;
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Default)]
 pub struct QueryOptions {
@@ -25,16 +32,30 @@ pub struct DatasetQueryOptions {
     pub limit: Option<u64>,
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Errors
+///////////////////////////////////////////////////////////////////////////////
+
+type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
 #[derive(Debug, Error)]
 pub enum QueryError {
+    #[error("Domain error: {0}")]
+    DomainError(#[from] DomainError),
     #[error("{0}")]
     DataFusionError(#[from] DataFusionError),
     #[error("{0}")]
-    Unimplemented(String),
+    InternalError(#[source] BoxedError),
 }
 
 impl QueryError {
-    pub fn unimplemented(message: impl Into<String>) -> Self {
-        Self::Unimplemented(message.into())
+    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::InternalError(e.into())
+    }
+}
+
+impl From<std::io::Error> for QueryError {
+    fn from(e: std::io::Error) -> Self {
+        Self::internal(e)
     }
 }
