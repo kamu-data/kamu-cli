@@ -92,8 +92,6 @@ impl SqlShellCommand {
     }
 
     fn run_datafusion_command(&self) -> Result<(), CLIError> {
-        use datafusion::arrow::util::pretty::print_batches;
-
         let df = self
             .query_svc
             .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
@@ -104,7 +102,9 @@ impl SqlShellCommand {
             .block_on(df.collect())
             .map_err(|e| CLIError::failure(e))?;
 
-        print_batches(&records).unwrap();
+        let mut writer = self.output_config.get_records_writer();
+        writer.write_batches(&records)?;
+        writer.finish()?;
 
         Ok(())
     }

@@ -9,7 +9,7 @@ pub struct OutputConfig {
 }
 
 impl OutputConfig {
-    pub fn get_writer(&self) -> Box<dyn RecordsWriter> {
+    pub fn get_records_writer(&self) -> Box<dyn RecordsWriter> {
         match self.format {
             OutputFormat::Csv => Box::new(
                 CsvWriterBuilder::new()
