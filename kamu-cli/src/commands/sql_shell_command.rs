@@ -70,6 +70,12 @@ impl SqlShellCommand {
             match self.output_config.format {
                 OutputFormat::Csv => Some("csv"),
                 OutputFormat::Json => Some("json"),
+                OutputFormat::JsonLD => {
+                    unimplemented!("Line-delimited Json is not yet supported by this command")
+                }
+                OutputFormat::JsonSoA => {
+                    unimplemented!("SoA Json is not yet supported by this command")
+                }
                 OutputFormat::Table => Some("table"),
             },
             self.url.clone(),

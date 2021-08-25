@@ -14,7 +14,7 @@ fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
                 // "tsv",
                 // "xmlattrs",
                 // "xmlelements",
-                "json",
+                "json", "json-ld", "json-soa",
             ])
             .help("Format to display the results in"),
         /*Arg::with_name("no-color")

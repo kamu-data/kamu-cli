@@ -1,16 +1,17 @@
+use std::sync::Arc;
+
 use super::{CLIError, Command};
 use crate::output::*;
 use kamu::domain::{DatasetQueryOptions, MetadataRepository, QueryOptions, QueryService};
 
 use opendatafabric::DatasetIDBuf;
-use std::sync::Arc;
 
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
     metadata_repo: Arc<dyn MetadataRepository>,
     dataset_id: DatasetIDBuf,
     num_records: u64,
-    //output_cfg: Arc<OutputConfig>,
+    output_cfg: Arc<OutputConfig>,
 }
 
 impl TailCommand {
@@ -19,14 +20,14 @@ impl TailCommand {
         metadata_repo: Arc<dyn MetadataRepository>,
         dataset_id: DatasetIDBuf,
         num_records: u64,
-        _output_cfg: Arc<OutputConfig>,
+        output_cfg: Arc<OutputConfig>,
     ) -> Self {
         Self {
             query_svc,
             metadata_repo,
             dataset_id,
             num_records,
-            //output_cfg,
+            output_cfg,
         }
     }
 }
@@ -62,13 +63,13 @@ impl Command for TailCommand {
             .map_err(|e| CLIError::failure(e))?;
 
         let runtime = tokio::runtime::Runtime::new().unwrap();
-        let records = runtime
+        let record_batches = runtime
             .block_on(df.collect())
             .map_err(|e| CLIError::failure(e))?;
 
-        use datafusion::arrow::util::pretty::print_batches;
-        print_batches(&records).unwrap();
-
+        let mut writer = self.output_cfg.get_writer();
+        writer.write_batches(&record_batches)?;
+        writer.finish()?;
         Ok(())
     }
 }

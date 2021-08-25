@@ -204,6 +204,8 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
         Some("json") => OutputFormat::Json,
+        Some("json-ld") => OutputFormat::JsonLD,
+        Some("json-soa") => OutputFormat::JsonSoA,
         Some("table") => OutputFormat::Table,
         None | Some(_) => {
             if is_tty {
