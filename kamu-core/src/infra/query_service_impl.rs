@@ -47,6 +47,37 @@ impl QueryServiceImpl {
 }
 
 impl QueryService for QueryServiceImpl {
+    fn tail(
+        &self,
+        dataset_id: &DatasetID,
+        num_records: u64,
+    ) -> Result<Arc<dyn DataFrame>, QueryError> {
+        let vocab = self
+            .metadata_repo
+            .get_metadata_chain(dataset_id)?
+            .iter_blocks()
+            .filter_map(|b| b.vocab)
+            .next()
+            .unwrap_or_default();
+
+        let query = format!(
+            r#"SELECT * FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}"#,
+            dataset = dataset_id,
+            event_time_col = vocab.event_time_column.unwrap_or("event_time".to_owned()),
+            num_records = num_records
+        );
+
+        self.sql_statement(
+            &query,
+            QueryOptions {
+                datasets: vec![DatasetQueryOptions {
+                    dataset_id: dataset_id.to_owned(),
+                    limit: Some(num_records),
+                }],
+            },
+        )
+    }
+
     fn sql_statement(
         &self,
         statement: &str,

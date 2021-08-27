@@ -8,6 +8,14 @@ use thiserror::Error;
 use super::DomainError;
 
 pub trait QueryService: Send + Sync {
+    /// Returns the specified number of the latest records in the dataset
+    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
+    fn tail(
+        &self,
+        dataset_id: &DatasetID,
+        num_records: u64,
+    ) -> Result<Arc<dyn DataFrame>, QueryError>;
+
     fn sql_statement(
         &self,
         statement: &str,
