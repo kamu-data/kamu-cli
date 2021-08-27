@@ -1,3 +1,5 @@
+use kamu::infra::utils::records_writers::RecordsWriter;
+
 use super::records_writers::*;
 
 #[derive(Debug, Clone)]

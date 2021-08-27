@@ -1,0 +1,70 @@
+use std::sync::Arc;
+
+use datafusion::parquet::basic::Type as PhysicalType;
+use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition};
+use datafusion::parquet::schema::types::Type;
+use kamu::infra::utils::schema_utils::write_schema_parquet_json;
+
+#[test]
+fn test_write_schema_parquet_json_group() {
+    let f1 = Type::primitive_type_builder("f1", PhysicalType::INT32)
+        .with_repetition(Repetition::REQUIRED)
+        .with_converted_type(ConvertedType::INT_32)
+        .with_id(0)
+        .build();
+    let f2 = Type::primitive_type_builder("f2", PhysicalType::BYTE_ARRAY)
+        .with_converted_type(ConvertedType::UTF8)
+        .with_id(1)
+        .build();
+    let f3 = Type::primitive_type_builder("f3", PhysicalType::BYTE_ARRAY)
+        .with_logical_type(Some(LogicalType::STRING(Default::default())))
+        .with_id(1)
+        .build();
+    let f4 = Type::primitive_type_builder("f4", PhysicalType::FIXED_LEN_BYTE_ARRAY)
+        .with_repetition(Repetition::REPEATED)
+        .with_converted_type(ConvertedType::INTERVAL)
+        .with_length(12)
+        .with_id(2)
+        .build();
+    let f5 = Type::primitive_type_builder("f5", PhysicalType::FIXED_LEN_BYTE_ARRAY)
+        .with_length(9)
+        .with_converted_type(ConvertedType::DECIMAL)
+        .with_precision(19)
+        .with_scale(4)
+        .build();
+    let mut struct_fields = Vec::new();
+    struct_fields.push(Arc::new(f1.unwrap()));
+    struct_fields.push(Arc::new(f2.unwrap()));
+    struct_fields.push(Arc::new(f3.unwrap()));
+    let field = Type::group_type_builder("field")
+        .with_repetition(Repetition::OPTIONAL)
+        .with_fields(&mut struct_fields)
+        .with_id(1)
+        .build()
+        .unwrap();
+    let mut fields = Vec::new();
+    fields.push(Arc::new(field));
+    fields.push(Arc::new(f4.unwrap()));
+    fields.push(Arc::new(f5.unwrap()));
+    let message = Type::group_type_builder("schema")
+        .with_fields(&mut fields)
+        .with_id(2)
+        .build()
+        .unwrap();
+
+    let mut buf = Vec::new();
+    write_schema_parquet_json(&mut buf, &message).unwrap();
+    let actual = String::from_utf8(buf).unwrap();
+
+    let expected = indoc::indoc!(
+        r#"{"name": "schema", "type": "struct", "fields": [
+        {"name": "field", "type": "struct", "repetition": "OPTIONAL", "fields": [
+        {"name": "f1", "repetition": "REQUIRED", "type": "INT32", "logicalType": "INT_32"}, 
+        {"name": "f2", "repetition": "OPTIONAL", "type": "BYTE_ARRAY", "logicalType": "UTF8"}, 
+        {"name": "f3", "repetition": "OPTIONAL", "type": "BYTE_ARRAY", "logicalType": "STRING"}]}, 
+        {"name": "f4", "repetition": "REPEATED", "type": "FIXED_LEN_BYTE_ARRAY(12)", "logicalType": "INTERVAL"}, 
+        {"name": "f5", "repetition": "OPTIONAL", "type": "FIXED_LEN_BYTE_ARRAY(9)", "logicalType": "DECIMAL(19,4)"}]}"#
+    ).replace('\n', "");
+
+    assert_eq!(actual, expected);
+}

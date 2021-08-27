@@ -83,8 +83,9 @@ impl InspectSchemaCommand {
         }
     }
 
-    fn print_schema_parquet(&self, schema: &Type) {
-        datafusion::parquet::schema::printer::print_schema(&mut std::io::stdout(), &schema);
+    fn print_schema_parquet(&self, schema: &Type) -> Result<(), CLIError> {
+        kamu::infra::utils::schema_utils::write_schema_parquet(&mut std::io::stdout(), schema)?;
+        Ok(())
     }
 }
 
@@ -101,7 +102,7 @@ impl Command for InspectSchemaCommand {
 
         match self.output_format.as_ref().map(|s| s.as_str()) {
             None | Some("ddl") => self.print_schema_ddl(&schema),
-            Some("parquet") => self.print_schema_parquet(&schema),
+            Some("parquet") => self.print_schema_parquet(&schema)?,
             _ => unreachable!(),
         }
 
