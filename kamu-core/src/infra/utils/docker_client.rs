@@ -392,7 +392,10 @@ impl DockerClient {
     ) -> Result<u16, TimeoutError> {
         let start = Instant::now();
         loop {
-            let res = self.get_host_port(container_name, container_port);
+            let res = self
+                .wait_for_container(container_name, Duration::ZERO)
+                .ok()
+                .and_then(|_| self.get_host_port(container_name, container_port));
             if let Some(hp) = res {
                 break Ok(hp);
             } else if start.elapsed() >= timeout {

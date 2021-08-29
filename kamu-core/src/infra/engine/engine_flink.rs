@@ -106,20 +106,38 @@ impl FlinkEngine {
     }
 
     fn submit(&self, run_info: &RunInfo) -> Result<(), EngineError> {
-        let network_name = format!("kamu-flink-{}", &run_info.run_id);
-        let _network = self.container_runtime.create_network(&network_name);
+        // TODO: For podman-in-docker scenarios we cannot use `network` and `hostname` parameter
+        // perhaps in future we can hide the difference in ContainerRuntime itself
+        let is_localns = self.container_runtime.config.network_ns == NetworkNamespaceType::Host;
+
+        let (network_name, _network) = if !is_localns {
+            let network_name = format!("kamu-flink-{}", &run_info.run_id);
+            let network = self.container_runtime.create_network(&network_name);
+            (Some(network_name), Some(network))
+        } else {
+            (None, None)
+        };
 
         let job_manager = Container::new(
             self.container_runtime.clone(),
             DockerRunArgs {
                 image: self.image.clone(),
-                network: Some(network_name.clone()),
+                network: network_name.clone(),
                 container_name: Some("jobmanager".to_owned()),
-                hostname: Some("jobmanager".to_owned()),
+                hostname: if !is_localns {
+                    Some("jobmanager".to_owned())
+                } else {
+                    None
+                },
                 args: vec!["jobmanager".to_owned()],
                 environment_vars: vec![(
                     "JOB_MANAGER_RPC_ADDRESS".to_owned(),
-                    "jobmanager".to_owned(),
+                    if !is_localns {
+                        "jobmanager"
+                    } else {
+                        "localhost"
+                    }
+                    .to_owned(),
                 )],
                 expose_ports: vec![6123, 8081],
                 volume_map: vec![
@@ -140,13 +158,22 @@ impl FlinkEngine {
             self.container_runtime.clone(),
             DockerRunArgs {
                 image: self.image.clone(),
-                network: Some(network_name.clone()),
+                network: network_name.clone(),
                 container_name: Some("taskmanager".to_owned()),
-                hostname: Some("taskmanager".to_owned()),
+                hostname: if !is_localns {
+                    Some("taskmanager".to_owned())
+                } else {
+                    None
+                },
                 args: vec!["taskmanager".to_owned()],
                 environment_vars: vec![(
                     "JOB_MANAGER_RPC_ADDRESS".to_owned(),
-                    "jobmanager".to_owned(),
+                    if !is_localns {
+                        "jobmanager"
+                    } else {
+                        "localhost"
+                    }
+                    .to_owned(),
                 )],
                 expose_ports: vec![6121, 6122],
                 volume_map: vec![(
