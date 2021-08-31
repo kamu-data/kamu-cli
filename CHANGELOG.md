@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.2] - 2021-08-30
+### Fixed
+- Adding few workarounds around bugs in Arrow / DataFusion related to working with DECIMAL and TIMESTAMP types.
+
 ## [0.62.1] - 2021-08-28
 ### Fixed
 - Allowing Flink engine to run under host network namespace, for the "podman-in-docker" scenario

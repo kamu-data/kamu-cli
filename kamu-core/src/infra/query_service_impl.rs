@@ -1,4 +1,5 @@
 use datafusion::parquet::{
+    basic::LogicalType,
     file::reader::{FileReader, SerializedFileReader},
     schema::types::Type,
 };
@@ -44,6 +45,20 @@ impl QueryServiceImpl {
             logger,
         }
     }
+
+    // Unfortunately there are some deficiencies in datafusion/arrow that we have to work around in this nasty way
+    fn catch_panic<F: FnOnce() -> R + std::panic::UnwindSafe, R>(
+        f: F,
+    ) -> Result<R, Box<dyn std::any::Any + Send + 'static>> {
+        let old_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| ()));
+
+        // TODO: This is necessary because datafusion currently panics on schemas with nesting
+        let res = std::panic::catch_unwind(f);
+
+        std::panic::set_hook(old_hook);
+        res
+    }
 }
 
 impl QueryService for QueryServiceImpl {
@@ -60,12 +75,56 @@ impl QueryService for QueryServiceImpl {
             .next()
             .unwrap_or_default();
 
-        let query = format!(
-            r#"SELECT * FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}"#,
-            dataset = dataset_id,
-            event_time_col = vocab.event_time_column.unwrap_or("event_time".to_owned()),
-            num_records = num_records
-        );
+        // TODO: This is a workaround for Arrow not supporting any operations on Decimals yet
+        // See: https://github.com/apache/arrow-rs/issues/272
+        let mut has_decimal = false;
+
+        // TODO: This is a workaround for Arrow not handling timestamps with explicit timezones.
+        // We basically have to re-cast all timestamp fields into timestamps after querying.
+        // See:
+        // - https://github.com/apache/arrow-datafusion/issues/959
+        // - https://github.com/apache/arrow-rs/issues/393
+        let schema = self.get_schema(dataset_id)?;
+        let fields: Vec<String> = match schema {
+            Type::GroupType { fields, .. } => fields
+                .iter()
+                .map(|f| match f.as_ref() {
+                    pt @ Type::PrimitiveType { .. } => {
+                        if let Some(LogicalType::TIMESTAMP(ts)) = pt.get_basic_info().logical_type()
+                        {
+                            if ts.is_adjusted_to_u_t_c {
+                                return format!(
+                                    "CAST(\"{name}\" as TIMESTAMP) as \"{name}\"",
+                                    name = pt.get_basic_info().name()
+                                );
+                            }
+                        } else if pt.get_precision() > 0 {
+                            has_decimal = true;
+                        }
+                        format!("\"{}\"", pt.get_basic_info().name())
+                    }
+                    Type::GroupType { basic_info, .. } => format!("\"{}\"", basic_info.name()),
+                })
+                .collect(),
+            Type::PrimitiveType { .. } => unreachable!(),
+        };
+
+        let query = if !has_decimal {
+            format!(
+                r#"SELECT {fields} FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}"#,
+                fields = fields.join(", "),
+                dataset = dataset_id,
+                event_time_col = vocab.event_time_column.unwrap_or("event_time".to_owned()),
+                num_records = num_records
+            )
+        } else {
+            format!(
+                r#"SELECT {fields} FROM "{dataset}" DESC LIMIT {num_records}"#,
+                fields = fields.join(", "),
+                dataset = dataset_id,
+                num_records = num_records
+            )
+        };
 
         self.sql_statement(
             &query,
@@ -194,16 +253,10 @@ impl KamuSchema {
             return false;
         }
 
-        let old_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| ()));
-
-        // TODO: This is necessary because datafusion currently panics on schemas with nesting
-        let ok = std::panic::catch_unwind(|| DatasetTable::try_new(files).is_ok())
+        // TODO: DataFusion currently panics on schemas with nesting
+        QueryServiceImpl::catch_panic(|| DatasetTable::try_new(files).is_ok())
             .ok()
-            .unwrap_or(false);
-
-        std::panic::set_hook(old_hook);
-        ok
+            .unwrap_or(false)
     }
 
     fn collect_data_files(&self, dataset_id: &DatasetID, limit: Option<u64>) -> Vec<PathBuf> {
