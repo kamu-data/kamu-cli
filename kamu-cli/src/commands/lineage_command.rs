@@ -3,6 +3,8 @@ use crate::OutputConfig;
 use super::{CLIError, Command};
 use kamu::domain::*;
 use kamu::infra::DatasetKind;
+use kamu::infra::DotStyle;
+use kamu::infra::DotVisitor;
 use kamu::infra::WorkspaceLayout;
 use opendatafabric::DatasetID;
 use opendatafabric::DatasetIDBuf;
@@ -10,12 +12,12 @@ use opendatafabric::DatasetIDBuf;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt::Write;
-use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct LineageCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
+    provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     ids: Vec<DatasetIDBuf>,
     browse: bool,
@@ -26,6 +28,7 @@ pub struct LineageCommand {
 impl LineageCommand {
     pub fn new<I, S>(
         metadata_repo: Arc<dyn MetadataRepository>,
+        provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         ids: I,
         browse: bool,
@@ -38,6 +41,7 @@ impl LineageCommand {
     {
         Self {
             metadata_repo,
+            provenance_svc,
             workspace_layout,
             ids: ids
                 .into_iter()
@@ -49,7 +53,7 @@ impl LineageCommand {
         }
     }
 
-    fn get_visitor(&self) -> Box<dyn DependencyVisitor> {
+    fn get_visitor(&self) -> Box<dyn LineageVisitor> {
         if self.output_format.is_none() {
             return if self.output_config.is_tty {
                 if self.browse {
@@ -75,53 +79,6 @@ impl LineageCommand {
             _ => unimplemented!(),
         }
     }
-
-    fn visit_dependencies(
-        &self,
-        mut visitor: Box<dyn DependencyVisitor>,
-        dataset_ids: Vec<DatasetIDBuf>,
-    ) -> Result<(), CLIError> {
-        visitor.begin();
-        for id in &dataset_ids {
-            self.visit_dependencies_rec(id, visitor.as_mut())?;
-        }
-        visitor.done();
-        Ok(())
-    }
-
-    fn visit_dependencies_rec(
-        &self,
-        id: &DatasetID,
-        visitor: &mut dyn DependencyVisitor,
-    ) -> Result<(), CLIError> {
-        let summary = match self.metadata_repo.get_summary(id) {
-            Ok(s) => Some(s),
-            Err(DomainError::DoesNotExist { .. }) => None,
-            Err(e) => return Err(e.into()),
-        };
-
-        let info = summary
-            .as_ref()
-            .map(|s| NodeInfo::Local {
-                kind: s.kind,
-                dependencies: &s.dependencies,
-            })
-            .unwrap_or_else(|| NodeInfo::Remote);
-
-        if !visitor.enter(id, &info) {
-            return Ok(());
-        }
-
-        if let Some(s) = &summary {
-            for dep_id in &s.dependencies {
-                self.visit_dependencies_rec(dep_id, visitor)?;
-            }
-        }
-
-        visitor.exit(id, &info);
-
-        Ok(())
-    }
 }
 
 // TODO: Support temporality and evolution
@@ -135,125 +92,16 @@ impl Command for LineageCommand {
 
         dataset_ids.sort();
 
-        let visitor = self.get_visitor();
-        self.visit_dependencies(visitor, dataset_ids)?;
+        let mut visitor = self.get_visitor();
+        visitor.begin();
+        for dataset_id in dataset_ids {
+            self.provenance_svc
+                .get_dataset_lineage(&dataset_id, visitor.as_mut(), LineageOptions {})
+                .map_err(|e| CLIError::failure(e))?;
+        }
+        visitor.done();
 
         Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-enum NodeInfo<'a> {
-    Local {
-        kind: DatasetKind,
-        dependencies: &'a [DatasetIDBuf],
-    },
-    Remote,
-}
-
-trait DependencyVisitor {
-    fn begin(&mut self);
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool;
-    fn exit(&mut self, id: &DatasetID, info: &NodeInfo<'_>);
-    fn done(&mut self);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// DOT
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct DotVisitor<W: Write, S: DotStyle = DefaultStyle> {
-    visited: HashSet<DatasetIDBuf>,
-    writer: W,
-    _style: PhantomData<S>,
-}
-
-impl<W: Write> DotVisitor<W> {
-    fn new(writer: W) -> Self {
-        Self {
-            visited: HashSet::new(),
-            writer,
-            _style: PhantomData,
-        }
-    }
-}
-
-impl<W: Write, S: DotStyle> DotVisitor<W, S> {
-    fn new_with_style(writer: W) -> Self {
-        Self {
-            visited: HashSet::new(),
-            writer,
-            _style: PhantomData,
-        }
-    }
-
-    fn unwrap(self) -> W {
-        self.writer
-    }
-}
-
-impl<W: Write, S: DotStyle> DependencyVisitor for DotVisitor<W, S> {
-    fn begin(&mut self) {
-        writeln!(self.writer, "digraph datasets {{\nrankdir = LR;").unwrap();
-    }
-
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        if !self.visited.insert(id.to_owned()) {
-            return false;
-        }
-
-        match info {
-            &NodeInfo::Local { kind, .. } => match kind {
-                DatasetKind::Root => {
-                    writeln!(self.writer, "\"{}\" [{}];", id, S::root_style())
-                }
-                DatasetKind::Derivative => {
-                    writeln!(self.writer, "\"{}\" [{}];", id, S::derivative_style())
-                }
-            },
-            &NodeInfo::Remote => {
-                writeln!(self.writer, "\"{}\" [{}];", id, S::remote_style())
-            }
-        }
-        .unwrap();
-
-        if let &NodeInfo::Local { dependencies, .. } = info {
-            for dep in dependencies {
-                writeln!(self.writer, "\"{}\" -> \"{}\";", dep, id).unwrap();
-            }
-        }
-
-        true
-    }
-
-    fn exit(&mut self, _id: &DatasetID, _info: &NodeInfo<'_>) {}
-
-    fn done(&mut self) {
-        writeln!(self.writer, "}}").unwrap();
-    }
-}
-
-trait DotStyle {
-    fn root_style() -> String;
-    fn derivative_style() -> String;
-    fn remote_style() -> String;
-}
-
-struct DefaultStyle;
-
-impl DotStyle for DefaultStyle {
-    fn root_style() -> String {
-        format!("style=filled, fillcolor=darkolivegreen1")
-    }
-
-    fn derivative_style() -> String {
-        format!("style=filled, fillcolor=lightblue")
-    }
-
-    fn remote_style() -> String {
-        format!("style=filled, fillcolor=gray")
     }
 }
 
@@ -271,7 +119,7 @@ impl ShellVisitor {
     }
 }
 
-impl DependencyVisitor for ShellVisitor {
+impl LineageVisitor for ShellVisitor {
     fn begin(&mut self) {}
 
     fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
@@ -364,7 +212,7 @@ impl CsvVisitor {
     }
 }
 
-impl DependencyVisitor for CsvVisitor {
+impl LineageVisitor for CsvVisitor {
     fn begin(&mut self) {
         println!("id,available,depends_on");
     }
@@ -532,7 +380,7 @@ impl<W: Write> HtmlVisitor<W> {
     );
 }
 
-impl<W: Write> DependencyVisitor for HtmlVisitor<W> {
+impl<W: Write> LineageVisitor for HtmlVisitor<W> {
     fn begin(&mut self) {
         self.dot_visitor.begin()
     }
@@ -591,7 +439,7 @@ impl HtmlBrowseVisitor {
     }
 }
 
-impl DependencyVisitor for HtmlBrowseVisitor {
+impl LineageVisitor for HtmlBrowseVisitor {
     fn begin(&mut self) {
         self.html_visitor.begin()
     }

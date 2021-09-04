@@ -89,6 +89,9 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<PushServiceImpl>();
     catalog.bind::<dyn PushService, PushServiceImpl>()?;
 
+    catalog.add::<ProvenanceServiceImpl>();
+    catalog.bind::<dyn ProvenanceService, ProvenanceServiceImpl>()?;
+
     catalog.add::<QueryServiceImpl>();
     catalog.bind::<dyn QueryService, QueryServiceImpl>()?;
 

@@ -81,6 +81,7 @@ pub fn get_command(
             ("lineage", Some(lin_matches)) => Box::new(LineageCommand::new(
                 catalog.get_one()?,
                 catalog.get_one()?,
+                catalog.get_one()?,
                 lin_matches.values_of("dataset").unwrap_or_default(),
                 lin_matches.is_present("browse"),
                 lin_matches.value_of("output-format"),

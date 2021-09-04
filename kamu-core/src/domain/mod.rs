@@ -17,6 +17,9 @@ pub use metadata_chain::*;
 mod metadata_repository;
 pub use metadata_repository::*;
 
+mod provenance_service;
+pub use provenance_service::*;
+
 mod pull_service;
 pub use pull_service::*;
 
