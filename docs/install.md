@@ -8,7 +8,7 @@
   - [Windows (using Docker Desktop)](#windows-using-docker-desktop)
 - [Installing shell completions](#installing-shell-completions)
 - [A Note on Security](#a-note-on-security)
-- [Experimental: Using Podman instead of Docker](#experimental-using-podman-instead-of-docker)
+- [Using Podman instead of Docker](#using-podman-instead-of-docker)
 
 
 ## General Information
@@ -16,15 +16,17 @@
 
 It relies on `docker` container-based virtualization to run such heavyweight frameworks like Spark, Flink, and Jupyter in isolated environments without needing you to install thousands of libraries and bloating your beloved laptop with their dependencies.
 
+The tool comes with very good shell completions - make sure to configure them!
+
 See also:
-- [Experimental: Using Podman instead of Docker](#experimental-using-podman-instead-of-docker)
+- [Using Podman instead of Docker](#using-podman-instead-of-docker)
 
 
 ## Supported Platforms
 
 ### Linux
 Linux is our primary target environment. We don't have packages for various Linux flavors yet, but since the tool is just a simple binary it's very easy to get started:
-- Install `docker` using your distro's package manager (alternatively try [podman](#experimental-using-podman-instead-of-docker))
+- Install `docker` using your distro's package manager (alternatively try [podman](#using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
 - Download the latest version of `kamu` from the GitHub [release page](https://github.com/kamu-data/kamu-cli/releases/latest)
 - Unpack and, `chmod +x` it
@@ -32,7 +34,7 @@ Linux is our primary target environment. We don't have packages for various Linu
   tar -zxvf kamu-cli-x86_64-unknown-linux-gnu.tar.gz
   chmod +x kamu-cli-x86_64-unknown-linux-gnu/kamu
   ```
-- Link it into your preferred location on your `PATH`
+- Link it or copy it into your preferred location on your `$PATH`, we recommend:
   ```
   cp kamu /usr/local/bin
   ```
@@ -42,23 +44,23 @@ See also:
 <!-- no toc -->
 - [Installing shell completions](#installing-shell-completions)
 - [A Note on Security](#a-note-on-security)
-- [Experimental: Using Podman instead of Docker](#experimental-using-podman-instead-of-docker)
+- [Using Podman instead of Docker](#using-podman-instead-of-docker)
 
 ### MacOS X
 Installing on MacOS X is very similar to Linux with following differences:
 - Install [Docker for Mac](https://docs.docker.com/docker-for-mac/install/)
-- `kamu` uses your system temp directory to store temporary files. This directory is not mounted into Docker's VM by default so you may need to use `VitualBox` to mount this directory into VM under the same path as on your host.
-- Also consider allocating more CPUs and memory to the Docker VM.
+- Consider allocating more CPUs and memory to the Docker VM in the settings
+- If you want to run `kamu` outside of your user home directory - you may need to add additional mounts to the Docker VM. For example if your workspace is in `/opt/myworkspace` you'll need to mount it under the same name into the VM in Docker settings.
 
 See also:
 <!-- no toc -->
 - [Installing shell completions](#installing-shell-completions)
-- [Experimental: Using Podman instead of Docker](#experimental-using-podman-instead-of-docker)
+- [Using Podman instead of Docker](#using-podman-instead-of-docker)
 
 ### Windows (using WSL 2)
 - Install WSL following [these steps](https://docs.microsoft.com/en-us/windows/wsl/install-win10)
 - Install Ubuntu distro from Microsoft Store
-- Install `docker` (alternatively try [podman](#experimental-using-podman-instead-of-docker))
+- Install `docker` (alternatively try [podman](#using-podman-instead-of-docker))
   - Make sure you can launch containers without `sudo` by following [official documentation](https://docs.docker.com/engine/install/linux-postinstall/)
 - Download the latest version of `kamu` from the GitHub [release page](https://github.com/kamu-data/kamu-cli/releases/latest) (note that you should download Linux release)
 - Unpack and, `chmod +x` it
@@ -67,9 +69,11 @@ See also:
 See also:
 <!-- no toc -->
 - [Installing shell completions](#installing-shell-completions)
-- [Experimental: Using Podman instead of Docker](#experimental-using-podman-instead-of-docker)
+- [Using Podman instead of Docker](#using-podman-instead-of-docker)
 
 ### Windows (using Docker Desktop)
+> The native Windows binary is still experimental, so in most cases it's better to use the WSL
+
 * Install and run [Docker Desktop](https://docs.docker.com/docker-for-windows/install/).
   * It's a good idea to give the Docker's VM more CPU and RAM - you can do so in `VirtualBox`.
 * Make sure that you can run `docker ps` successfully.
@@ -107,11 +111,11 @@ On our side we are taking following measures to gain your trust:
 * All of our `docker` images are based on reputable source images and are available for review [[1]](https://github.com/kamu-data/kamu-cli) [[2]](https://github.com/kamu-data/kamu-engine-spark) [[3]](https://github.com/kamu-data/kamu-engine-flink)
 * When `kamu` starts `docker` containers it limits the scope of volumes it's mounting to a minimum. You can review the volume mounts by running `kamu` with `-v` flag or using `docker ps`.
 
-To avoid all these issues please check out the experimental [`podman` support](#experimental-using-podman-instead-of-docker) - this container runtime operates in daemon-less and root-less mode, so it's fully compliant with the standard Unix permission model.
+To avoid all these issues please consider using [`podman`](#using-podman-instead-of-docker) - this container runtime operates in daemon-less and root-less mode, so it's fully compliant with the standard Unix permission model.
 
 
-## Experimental: Using Podman instead of Docker 
-We added an experimental support for [`podman`](https://podman.io/) - an alternative container runtime that fixes the shortcomings of `docker` [related to security](#a-note-on-security). We highly recommend you to give it a try, as we are planning to make it a default runtime in the near future.
+## Using Podman instead of Docker 
+[`podman`](https://podman.io/) is an alternative container runtime that fixes the shortcomings of `docker` [related to security](#a-note-on-security). We highly recommend you to give it a try, as we are planning to make it a default runtime in the near future.
 
 In order to instruct `kamu` to use `podman` run:
 

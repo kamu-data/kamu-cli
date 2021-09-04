@@ -332,13 +332,16 @@ impl Engine for FlinkEngine {
             .map(char::from)
             .collect();
 
-        let in_out_dir = tempfile::Builder::new()
-            .prefix("kamu-transform-")
-            .tempdir()?;
+        let in_out_dir = self
+            .workspace_layout
+            .run_info_dir
+            .join(format!("transform-{}", &run_id));
+
+        std::fs::create_dir_all(&in_out_dir)?;
 
         let run_info = RunInfo::new(
             run_id,
-            in_out_dir.path().to_owned(),
+            in_out_dir.to_owned(),
             request.prev_checkpoint_dir.clone(),
             &self.workspace_layout.run_info_dir,
         );

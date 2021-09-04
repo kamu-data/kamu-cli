@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0] - 2021-09-03
+### Fixed
+- Data exchange with the engines not uses `.kamu/run` directory, so on systems that run Docker in VMs (Linux, Windows) it's no longer necessary to add extra mounts for the temp directories
+
 ## [0.62.2] - 2021-08-30
 ### Fixed
-- Adding few workarounds around bugs in Arrow / DataFusion related to working with DECIMAL and TIMESTAMP types.
+- Adding few workarounds around bugs in Arrow / DataFusion related to working with DECIMAL and TIMESTAMP types
 
 ## [0.62.1] - 2021-08-28
 ### Fixed

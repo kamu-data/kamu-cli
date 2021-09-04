@@ -21,15 +21,21 @@ struct RunInfo {
 }
 
 impl RunInfo {
-    fn new(in_out_dir: &Path, workspace_layout: &WorkspaceLayout) -> Self {
+    fn new(workspace_layout: &WorkspaceLayout, operation: &str) -> Self {
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(10)
             .map(char::from)
             .collect();
 
+        let in_out_dir = workspace_layout
+            .run_info_dir
+            .join(format!("{}-{}", operation, &run_id));
+
+        std::fs::create_dir_all(&in_out_dir).expect("Failed to create in-out directory");
+
         Self {
-            in_out_dir: in_out_dir.to_owned(),
+            in_out_dir: in_out_dir,
             stdout_path: workspace_layout
                 .run_info_dir
                 .join(format!("spark-{}.out.txt", run_id)),
@@ -194,8 +200,7 @@ impl SparkEngine {
 
 impl Engine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        let in_out_dir = tempfile::Builder::new().prefix("kamu-ingest-").tempdir()?;
-        let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
+        let run_info = RunInfo::new(&self.workspace_layout, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
@@ -219,11 +224,7 @@ impl Engine for SparkEngine {
     }
 
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
-        let in_out_dir = tempfile::Builder::new()
-            .prefix("kamu-transform-")
-            .tempdir()?;
-
-        let run_info = RunInfo::new(in_out_dir.path(), &self.workspace_layout);
+        let run_info = RunInfo::new(&self.workspace_layout, "transform");
 
         let input_slices_adj = request
             .input_slices
