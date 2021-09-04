@@ -7,8 +7,14 @@ description = "Tools for managing this repo"
 name = "release"
 path = "src/release.rs"
 
+[[bin]]
+name = "create-test-workspace"
+path = "src/create_test_workspace.rs"
+
 [dependencies]
 clap = "*"
+yaml-rust = "*"
 toml = "*"
-semver = "*"
 toml_edit = "*"
+semver = "*"
+url = "*"
