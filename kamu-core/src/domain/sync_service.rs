@@ -152,7 +152,7 @@ impl From<RepositoryError> for SyncError {
                 source: Box::new(e),
             },
             RepositoryError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
-            RepositoryError::ProtocolError { .. } => SyncError::CredentialsError(Box::new(e)),
+            RepositoryError::ProtocolError { .. } => SyncError::ProtocolError(Box::new(e)),
             RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
                 dataset_ref: DatasetRefBuf::new_unchecked("unknown/unknown"),
             },
