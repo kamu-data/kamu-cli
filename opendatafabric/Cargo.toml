@@ -1,8 +1,10 @@
+cargo-features = ["edition2021"]
+
 [package]
 name = "opendatafabric"
 version = "0.63.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 # Domain
