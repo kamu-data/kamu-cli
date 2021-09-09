@@ -7,6 +7,30 @@ use super::{DatasetIDBuf, Sha3_256, TimeInterval};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataSlice {
+    pub hash: Sha3_256,
+    pub interval: TimeInterval,
+    pub num_records: i64,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetSnapshot
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DatasetSnapshot {
+    pub id: DatasetIDBuf,
+    pub source: DatasetSource,
+    pub vocab: Option<DatasetVocabulary>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,59 +68,52 @@ pub struct DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// SourceCaching
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
+// EventTimeSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum SourceCaching {
-    Forever,
+pub enum EventTimeSource {
+    FromMetadata,
+    FromPath(EventTimeSourceFromPath),
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct EventTimeSourceFromPath {
+    pub pattern: String,
+    pub timestamp_format: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TemporalTable
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+// FetchStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct TemporalTable {
-    pub id: String,
-    pub primary_key: Vec<String>,
+pub enum FetchStep {
+    Url(FetchStepUrl),
+    FilesGlob(FetchStepFilesGlob),
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DatasetSnapshot
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
-////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DatasetSnapshot {
-    pub id: DatasetIDBuf,
-    pub source: DatasetSource,
-    pub vocab: Option<DatasetVocabulary>,
+pub struct FetchStepUrl {
+    pub url: String,
+    pub event_time: Option<EventTimeSource>,
+    pub cache: Option<SourceCaching>,
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DataSlice {
-    pub hash: Sha3_256,
-    pub interval: TimeInterval,
-    pub num_records: i64,
+pub struct FetchStepFilesGlob {
+    pub path: String,
+    pub event_time: Option<EventTimeSource>,
+    pub cache: Option<SourceCaching>,
+    pub order: Option<SourceOrdering>,
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// SqlQueryStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct SqlQueryStep {
-    pub alias: Option<String>,
-    pub query: String,
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SourceOrdering {
+    ByEventTime,
+    ByName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,6 +158,34 @@ pub struct MetadataBlock {
     pub input_slices: Option<Vec<DataSlice>>,
     pub source: Option<DatasetSource>,
     pub vocab: Option<DatasetVocabulary>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PrepStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum PrepStep {
+    Decompress(PrepStepDecompress),
+    Pipe(PrepStepPipe),
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct PrepStepDecompress {
+    pub format: CompressionFormat,
+    pub sub_path: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct PrepStepPipe {
+    pub command: Vec<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum CompressionFormat {
+    Gzip,
+    Zip,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -201,6 +246,38 @@ pub struct ReadStepEsriShapefile {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SourceCaching
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum SourceCaching {
+    Forever,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SqlQueryStep {
+    pub alias: Option<String>,
+    pub query: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TemporalTable {
+    pub id: String,
+    pub primary_key: Vec<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Transform
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -217,81 +294,4 @@ pub struct TransformSql {
     pub query: Option<String>,
     pub queries: Option<Vec<SqlQueryStep>>,
     pub temporal_tables: Option<Vec<TemporalTable>>,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// FetchStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum FetchStep {
-    Url(FetchStepUrl),
-    FilesGlob(FetchStepFilesGlob),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct FetchStepUrl {
-    pub url: String,
-    pub event_time: Option<EventTimeSource>,
-    pub cache: Option<SourceCaching>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct FetchStepFilesGlob {
-    pub path: String,
-    pub event_time: Option<EventTimeSource>,
-    pub cache: Option<SourceCaching>,
-    pub order: Option<SourceOrdering>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum SourceOrdering {
-    ByEventTime,
-    ByName,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PrepStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum PrepStep {
-    Decompress(PrepStepDecompress),
-    Pipe(PrepStepPipe),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PrepStepDecompress {
-    pub format: CompressionFormat,
-    pub sub_path: Option<String>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PrepStepPipe {
-    pub command: Vec<String>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum CompressionFormat {
-    Gzip,
-    Zip,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// EventTimeSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum EventTimeSource {
-    FromMetadata,
-    FromPath(EventTimeSourceFromPath),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct EventTimeSourceFromPath {
-    pub pattern: String,
-    pub timestamp_format: Option<String>,
 }

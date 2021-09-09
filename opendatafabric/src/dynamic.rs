@@ -7,6 +7,72 @@ use super::{CompressionFormat, DatasetID, Sha3_256, SourceOrdering, TimeInterval
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait DataSlice {
+    fn hash(&self) -> &Sha3_256;
+    fn interval(&self) -> TimeInterval;
+    fn num_records(&self) -> i64;
+}
+
+impl DataSlice for super::DataSlice {
+    fn hash(&self) -> &Sha3_256 {
+        &self.hash
+    }
+    fn interval(&self) -> TimeInterval {
+        self.interval
+    }
+    fn num_records(&self) -> i64 {
+        self.num_records
+    }
+}
+
+impl Into<super::DataSlice> for &dyn DataSlice {
+    fn into(self) -> super::DataSlice {
+        super::DataSlice {
+            hash: *self.hash(),
+            interval: self.interval(),
+            num_records: self.num_records(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetSnapshot
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait DatasetSnapshot {
+    fn id(&self) -> &DatasetID;
+    fn source(&self) -> DatasetSource;
+    fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
+}
+
+impl DatasetSnapshot for super::DatasetSnapshot {
+    fn id(&self) -> &DatasetID {
+        self.id.as_ref()
+    }
+    fn source(&self) -> DatasetSource {
+        (&self.source).into()
+    }
+    fn vocab(&self) -> Option<&dyn DatasetVocabulary> {
+        self.vocab.as_ref().map(|v| -> &dyn DatasetVocabulary { v })
+    }
+}
+
+impl Into<super::DatasetSnapshot> for &dyn DatasetSnapshot {
+    fn into(self) -> super::DatasetSnapshot {
+        super::DatasetSnapshot {
+            id: self.id().to_owned(),
+            source: self.source().into(),
+            vocab: self.vocab().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -132,150 +198,147 @@ impl Into<super::DatasetVocabulary> for &dyn DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// SourceCaching
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
+// EventTimeSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-pub enum SourceCaching<'a> {
-    Forever,
-    _Phantom(std::marker::PhantomData<&'a ()>),
+pub enum EventTimeSource<'a> {
+    FromMetadata,
+    FromPath(&'a dyn EventTimeSourceFromPath),
 }
 
-impl<'a> From<&'a super::SourceCaching> for SourceCaching<'a> {
-    fn from(other: &'a super::SourceCaching) -> Self {
+impl<'a> From<&'a super::EventTimeSource> for EventTimeSource<'a> {
+    fn from(other: &'a super::EventTimeSource) -> Self {
         match other {
-            super::SourceCaching::Forever => SourceCaching::Forever,
+            super::EventTimeSource::FromMetadata => EventTimeSource::FromMetadata,
+            super::EventTimeSource::FromPath(v) => EventTimeSource::FromPath(v),
         }
     }
 }
 
-impl Into<super::SourceCaching> for SourceCaching<'_> {
-    fn into(self) -> super::SourceCaching {
+impl Into<super::EventTimeSource> for EventTimeSource<'_> {
+    fn into(self) -> super::EventTimeSource {
         match self {
-            SourceCaching::Forever => super::SourceCaching::Forever,
-            SourceCaching::_Phantom(_) => panic!(),
+            EventTimeSource::FromMetadata => super::EventTimeSource::FromMetadata,
+            EventTimeSource::FromPath(v) => super::EventTimeSource::FromPath(v.into()),
+        }
+    }
+}
+
+pub trait EventTimeSourceFromPath {
+    fn pattern(&self) -> &str;
+    fn timestamp_format(&self) -> Option<&str>;
+}
+
+impl EventTimeSourceFromPath for super::EventTimeSourceFromPath {
+    fn pattern(&self) -> &str {
+        self.pattern.as_ref()
+    }
+    fn timestamp_format(&self) -> Option<&str> {
+        self.timestamp_format
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
+    fn into(self) -> super::EventTimeSourceFromPath {
+        super::EventTimeSourceFromPath {
+            pattern: self.pattern().to_owned(),
+            timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TemporalTable
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+// FetchStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait TemporalTable {
-    fn id(&self) -> &str;
-    fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_>;
+pub enum FetchStep<'a> {
+    Url(&'a dyn FetchStepUrl),
+    FilesGlob(&'a dyn FetchStepFilesGlob),
 }
 
-impl TemporalTable for super::TemporalTable {
-    fn id(&self) -> &str {
-        self.id.as_ref()
-    }
-    fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(self.primary_key.iter().map(|i| -> &str { i.as_ref() }))
-    }
-}
-
-impl Into<super::TemporalTable> for &dyn TemporalTable {
-    fn into(self) -> super::TemporalTable {
-        super::TemporalTable {
-            id: self.id().to_owned(),
-            primary_key: self.primary_key().map(|i| i.to_owned()).collect(),
+impl<'a> From<&'a super::FetchStep> for FetchStep<'a> {
+    fn from(other: &'a super::FetchStep) -> Self {
+        match other {
+            super::FetchStep::Url(v) => FetchStep::Url(v),
+            super::FetchStep::FilesGlob(v) => FetchStep::FilesGlob(v),
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DatasetSnapshot
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait DatasetSnapshot {
-    fn id(&self) -> &DatasetID;
-    fn source(&self) -> DatasetSource;
-    fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
-}
-
-impl DatasetSnapshot for super::DatasetSnapshot {
-    fn id(&self) -> &DatasetID {
-        self.id.as_ref()
-    }
-    fn source(&self) -> DatasetSource {
-        (&self.source).into()
-    }
-    fn vocab(&self) -> Option<&dyn DatasetVocabulary> {
-        self.vocab.as_ref().map(|v| -> &dyn DatasetVocabulary { v })
-    }
-}
-
-impl Into<super::DatasetSnapshot> for &dyn DatasetSnapshot {
-    fn into(self) -> super::DatasetSnapshot {
-        super::DatasetSnapshot {
-            id: self.id().to_owned(),
-            source: self.source().into(),
-            vocab: self.vocab().map(|v| v.into()),
+impl Into<super::FetchStep> for FetchStep<'_> {
+    fn into(self) -> super::FetchStep {
+        match self {
+            FetchStep::Url(v) => super::FetchStep::Url(v.into()),
+            FetchStep::FilesGlob(v) => super::FetchStep::FilesGlob(v.into()),
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait DataSlice {
-    fn hash(&self) -> &Sha3_256;
-    fn interval(&self) -> TimeInterval;
-    fn num_records(&self) -> i64;
+pub trait FetchStepUrl {
+    fn url(&self) -> &str;
+    fn event_time(&self) -> Option<EventTimeSource>;
+    fn cache(&self) -> Option<SourceCaching>;
 }
 
-impl DataSlice for super::DataSlice {
-    fn hash(&self) -> &Sha3_256 {
-        &self.hash
+pub trait FetchStepFilesGlob {
+    fn path(&self) -> &str;
+    fn event_time(&self) -> Option<EventTimeSource>;
+    fn cache(&self) -> Option<SourceCaching>;
+    fn order(&self) -> Option<SourceOrdering>;
+}
+
+impl FetchStepUrl for super::FetchStepUrl {
+    fn url(&self) -> &str {
+        self.url.as_ref()
     }
-    fn interval(&self) -> TimeInterval {
-        self.interval
+    fn event_time(&self) -> Option<EventTimeSource> {
+        self.event_time
+            .as_ref()
+            .map(|v| -> EventTimeSource { v.into() })
     }
-    fn num_records(&self) -> i64 {
-        self.num_records
+    fn cache(&self) -> Option<SourceCaching> {
+        self.cache.as_ref().map(|v| -> SourceCaching { v.into() })
     }
 }
 
-impl Into<super::DataSlice> for &dyn DataSlice {
-    fn into(self) -> super::DataSlice {
-        super::DataSlice {
-            hash: *self.hash(),
-            interval: self.interval(),
-            num_records: self.num_records(),
+impl FetchStepFilesGlob for super::FetchStepFilesGlob {
+    fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+    fn event_time(&self) -> Option<EventTimeSource> {
+        self.event_time
+            .as_ref()
+            .map(|v| -> EventTimeSource { v.into() })
+    }
+    fn cache(&self) -> Option<SourceCaching> {
+        self.cache.as_ref().map(|v| -> SourceCaching { v.into() })
+    }
+    fn order(&self) -> Option<SourceOrdering> {
+        self.order.as_ref().map(|v| -> SourceOrdering { *v })
+    }
+}
+
+impl Into<super::FetchStepUrl> for &dyn FetchStepUrl {
+    fn into(self) -> super::FetchStepUrl {
+        super::FetchStepUrl {
+            url: self.url().to_owned(),
+            event_time: self.event_time().map(|v| v.into()),
+            cache: self.cache().map(|v| v.into()),
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// SqlQueryStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait SqlQueryStep {
-    fn alias(&self) -> Option<&str>;
-    fn query(&self) -> &str;
-}
-
-impl SqlQueryStep for super::SqlQueryStep {
-    fn alias(&self) -> Option<&str> {
-        self.alias.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn query(&self) -> &str {
-        self.query.as_ref()
-    }
-}
-
-impl Into<super::SqlQueryStep> for &dyn SqlQueryStep {
-    fn into(self) -> super::SqlQueryStep {
-        super::SqlQueryStep {
-            alias: self.alias().map(|v| v.to_owned()),
-            query: self.query().to_owned(),
+impl Into<super::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
+    fn into(self) -> super::FetchStepFilesGlob {
+        super::FetchStepFilesGlob {
+            path: self.path().to_owned(),
+            event_time: self.event_time().map(|v| v.into()),
+            cache: self.cache().map(|v| v.into()),
+            order: self.order().map(|v| v.into()),
         }
     }
 }
@@ -440,6 +503,75 @@ impl Into<super::MetadataBlock> for &dyn MetadataBlock {
             input_slices: self.input_slices().map(|v| v.map(|i| i.into()).collect()),
             source: self.source().map(|v| v.into()),
             vocab: self.vocab().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PrepStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum PrepStep<'a> {
+    Decompress(&'a dyn PrepStepDecompress),
+    Pipe(&'a dyn PrepStepPipe),
+}
+
+impl<'a> From<&'a super::PrepStep> for PrepStep<'a> {
+    fn from(other: &'a super::PrepStep) -> Self {
+        match other {
+            super::PrepStep::Decompress(v) => PrepStep::Decompress(v),
+            super::PrepStep::Pipe(v) => PrepStep::Pipe(v),
+        }
+    }
+}
+
+impl Into<super::PrepStep> for PrepStep<'_> {
+    fn into(self) -> super::PrepStep {
+        match self {
+            PrepStep::Decompress(v) => super::PrepStep::Decompress(v.into()),
+            PrepStep::Pipe(v) => super::PrepStep::Pipe(v.into()),
+        }
+    }
+}
+
+pub trait PrepStepDecompress {
+    fn format(&self) -> CompressionFormat;
+    fn sub_path(&self) -> Option<&str>;
+}
+
+pub trait PrepStepPipe {
+    fn command(&self) -> Box<dyn Iterator<Item = &str> + '_>;
+}
+
+impl PrepStepDecompress for super::PrepStepDecompress {
+    fn format(&self) -> CompressionFormat {
+        self.format
+    }
+    fn sub_path(&self) -> Option<&str> {
+        self.sub_path.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl PrepStepPipe for super::PrepStepPipe {
+    fn command(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.command.iter().map(|i| -> &str { i.as_ref() }))
+    }
+}
+
+impl Into<super::PrepStepDecompress> for &dyn PrepStepDecompress {
+    fn into(self) -> super::PrepStepDecompress {
+        super::PrepStepDecompress {
+            format: self.format().into(),
+            sub_path: self.sub_path().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
+    fn into(self) -> super::PrepStepPipe {
+        super::PrepStepPipe {
+            command: self.command().map(|i| i.to_owned()).collect(),
         }
     }
 }
@@ -695,6 +827,89 @@ impl Into<super::ReadStepEsriShapefile> for &dyn ReadStepEsriShapefile {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SourceCaching
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcecaching-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum SourceCaching<'a> {
+    Forever,
+    _Phantom(std::marker::PhantomData<&'a ()>),
+}
+
+impl<'a> From<&'a super::SourceCaching> for SourceCaching<'a> {
+    fn from(other: &'a super::SourceCaching) -> Self {
+        match other {
+            super::SourceCaching::Forever => SourceCaching::Forever,
+        }
+    }
+}
+
+impl Into<super::SourceCaching> for SourceCaching<'_> {
+    fn into(self) -> super::SourceCaching {
+        match self {
+            SourceCaching::Forever => super::SourceCaching::Forever,
+            SourceCaching::_Phantom(_) => panic!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SqlQueryStep {
+    fn alias(&self) -> Option<&str>;
+    fn query(&self) -> &str;
+}
+
+impl SqlQueryStep for super::SqlQueryStep {
+    fn alias(&self) -> Option<&str> {
+        self.alias.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn query(&self) -> &str {
+        self.query.as_ref()
+    }
+}
+
+impl Into<super::SqlQueryStep> for &dyn SqlQueryStep {
+    fn into(self) -> super::SqlQueryStep {
+        super::SqlQueryStep {
+            alias: self.alias().map(|v| v.to_owned()),
+            query: self.query().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait TemporalTable {
+    fn id(&self) -> &str;
+    fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_>;
+}
+
+impl TemporalTable for super::TemporalTable {
+    fn id(&self) -> &str {
+        self.id.as_ref()
+    }
+    fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.primary_key.iter().map(|i| -> &str { i.as_ref() }))
+    }
+}
+
+impl Into<super::TemporalTable> for &dyn TemporalTable {
+    fn into(self) -> super::TemporalTable {
+        super::TemporalTable {
+            id: self.id().to_owned(),
+            primary_key: self.primary_key().map(|i| i.to_owned()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Transform
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -763,221 +978,6 @@ impl Into<super::TransformSql> for &dyn TransformSql {
             temporal_tables: self
                 .temporal_tables()
                 .map(|v| v.map(|i| i.into()).collect()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// FetchStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub enum FetchStep<'a> {
-    Url(&'a dyn FetchStepUrl),
-    FilesGlob(&'a dyn FetchStepFilesGlob),
-}
-
-impl<'a> From<&'a super::FetchStep> for FetchStep<'a> {
-    fn from(other: &'a super::FetchStep) -> Self {
-        match other {
-            super::FetchStep::Url(v) => FetchStep::Url(v),
-            super::FetchStep::FilesGlob(v) => FetchStep::FilesGlob(v),
-        }
-    }
-}
-
-impl Into<super::FetchStep> for FetchStep<'_> {
-    fn into(self) -> super::FetchStep {
-        match self {
-            FetchStep::Url(v) => super::FetchStep::Url(v.into()),
-            FetchStep::FilesGlob(v) => super::FetchStep::FilesGlob(v.into()),
-        }
-    }
-}
-
-pub trait FetchStepUrl {
-    fn url(&self) -> &str;
-    fn event_time(&self) -> Option<EventTimeSource>;
-    fn cache(&self) -> Option<SourceCaching>;
-}
-
-pub trait FetchStepFilesGlob {
-    fn path(&self) -> &str;
-    fn event_time(&self) -> Option<EventTimeSource>;
-    fn cache(&self) -> Option<SourceCaching>;
-    fn order(&self) -> Option<SourceOrdering>;
-}
-
-impl FetchStepUrl for super::FetchStepUrl {
-    fn url(&self) -> &str {
-        self.url.as_ref()
-    }
-    fn event_time(&self) -> Option<EventTimeSource> {
-        self.event_time
-            .as_ref()
-            .map(|v| -> EventTimeSource { v.into() })
-    }
-    fn cache(&self) -> Option<SourceCaching> {
-        self.cache.as_ref().map(|v| -> SourceCaching { v.into() })
-    }
-}
-
-impl FetchStepFilesGlob for super::FetchStepFilesGlob {
-    fn path(&self) -> &str {
-        self.path.as_ref()
-    }
-    fn event_time(&self) -> Option<EventTimeSource> {
-        self.event_time
-            .as_ref()
-            .map(|v| -> EventTimeSource { v.into() })
-    }
-    fn cache(&self) -> Option<SourceCaching> {
-        self.cache.as_ref().map(|v| -> SourceCaching { v.into() })
-    }
-    fn order(&self) -> Option<SourceOrdering> {
-        self.order.as_ref().map(|v| -> SourceOrdering { *v })
-    }
-}
-
-impl Into<super::FetchStepUrl> for &dyn FetchStepUrl {
-    fn into(self) -> super::FetchStepUrl {
-        super::FetchStepUrl {
-            url: self.url().to_owned(),
-            event_time: self.event_time().map(|v| v.into()),
-            cache: self.cache().map(|v| v.into()),
-        }
-    }
-}
-
-impl Into<super::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
-    fn into(self) -> super::FetchStepFilesGlob {
-        super::FetchStepFilesGlob {
-            path: self.path().to_owned(),
-            event_time: self.event_time().map(|v| v.into()),
-            cache: self.cache().map(|v| v.into()),
-            order: self.order().map(|v| v.into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// PrepStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#prepstep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub enum PrepStep<'a> {
-    Decompress(&'a dyn PrepStepDecompress),
-    Pipe(&'a dyn PrepStepPipe),
-}
-
-impl<'a> From<&'a super::PrepStep> for PrepStep<'a> {
-    fn from(other: &'a super::PrepStep) -> Self {
-        match other {
-            super::PrepStep::Decompress(v) => PrepStep::Decompress(v),
-            super::PrepStep::Pipe(v) => PrepStep::Pipe(v),
-        }
-    }
-}
-
-impl Into<super::PrepStep> for PrepStep<'_> {
-    fn into(self) -> super::PrepStep {
-        match self {
-            PrepStep::Decompress(v) => super::PrepStep::Decompress(v.into()),
-            PrepStep::Pipe(v) => super::PrepStep::Pipe(v.into()),
-        }
-    }
-}
-
-pub trait PrepStepDecompress {
-    fn format(&self) -> CompressionFormat;
-    fn sub_path(&self) -> Option<&str>;
-}
-
-pub trait PrepStepPipe {
-    fn command(&self) -> Box<dyn Iterator<Item = &str> + '_>;
-}
-
-impl PrepStepDecompress for super::PrepStepDecompress {
-    fn format(&self) -> CompressionFormat {
-        self.format
-    }
-    fn sub_path(&self) -> Option<&str> {
-        self.sub_path.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-}
-
-impl PrepStepPipe for super::PrepStepPipe {
-    fn command(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(self.command.iter().map(|i| -> &str { i.as_ref() }))
-    }
-}
-
-impl Into<super::PrepStepDecompress> for &dyn PrepStepDecompress {
-    fn into(self) -> super::PrepStepDecompress {
-        super::PrepStepDecompress {
-            format: self.format().into(),
-            sub_path: self.sub_path().map(|v| v.to_owned()),
-        }
-    }
-}
-
-impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
-    fn into(self) -> super::PrepStepPipe {
-        super::PrepStepPipe {
-            command: self.command().map(|i| i.to_owned()).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// EventTimeSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub enum EventTimeSource<'a> {
-    FromMetadata,
-    FromPath(&'a dyn EventTimeSourceFromPath),
-}
-
-impl<'a> From<&'a super::EventTimeSource> for EventTimeSource<'a> {
-    fn from(other: &'a super::EventTimeSource) -> Self {
-        match other {
-            super::EventTimeSource::FromMetadata => EventTimeSource::FromMetadata,
-            super::EventTimeSource::FromPath(v) => EventTimeSource::FromPath(v),
-        }
-    }
-}
-
-impl Into<super::EventTimeSource> for EventTimeSource<'_> {
-    fn into(self) -> super::EventTimeSource {
-        match self {
-            EventTimeSource::FromMetadata => super::EventTimeSource::FromMetadata,
-            EventTimeSource::FromPath(v) => super::EventTimeSource::FromPath(v.into()),
-        }
-    }
-}
-
-pub trait EventTimeSourceFromPath {
-    fn pattern(&self) -> &str;
-    fn timestamp_format(&self) -> Option<&str>;
-}
-
-impl EventTimeSourceFromPath for super::EventTimeSourceFromPath {
-    fn pattern(&self) -> &str {
-        self.pattern.as_ref()
-    }
-    fn timestamp_format(&self) -> Option<&str> {
-        self.timestamp_format
-            .as_ref()
-            .map(|v| -> &str { v.as_ref() })
-    }
-}
-
-impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
-    fn into(self) -> super::EventTimeSourceFromPath {
-        super::EventTimeSourceFromPath {
-            pattern: self.pattern().to_owned(),
-            timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
         }
     }
 }
