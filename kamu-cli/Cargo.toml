@@ -1,5 +1,3 @@
-cargo-features = ["edition2021"]
-
 [package]
 name = "kamu-cli"
 version = "0.63.0"
