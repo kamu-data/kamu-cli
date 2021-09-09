@@ -1,5 +1,15 @@
 # Status
 
+## Open Data Fabric
+
+| Feature           |  ODF  | Kamu  |
+| ----------------- | :---: | :---: |
+| Source evolution  |   V   |   X   |
+| Schema evolution  |   V   |   X   |
+| Query migrations  |   V   |   X   |
+| Engine versioning |   V   |   X   |
+| Engine migrations |   V   |   X   |
+
 ## Schema
 
 | Feature      | Coordinator | Spark | Flink | DataFusion |
