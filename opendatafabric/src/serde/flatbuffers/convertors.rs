@@ -3,6 +3,7 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
+#![allow(unused_variables)]
 use super::odf_generated as fb;
 mod odf {
     pub use crate::dataset_id::*;
@@ -13,7 +14,6 @@ mod odf {
 use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
 use chrono::prelude::*;
 use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
 
 pub trait FlatbuffersSerializable<'fb> {
     type OffsetT;
@@ -59,7 +59,7 @@ impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
                 .hash()
                 .map(|v| odf::Sha3_256::new(v.try_into().unwrap()))
                 .unwrap(),
-            interval: fb_to_interval(proxy.interval().unwrap()),
+            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
             num_records: proxy.num_records(),
         }
     }
@@ -93,7 +93,10 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetSnapshot<'fb>> for odf::DatasetSn
                 .id()
                 .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
                 .unwrap(),
-            source: odf::DatasetSource::deserialize(proxy.source().unwrap(), proxy.source_type()),
+            source: proxy
+                .source()
+                .map(|v| odf::DatasetSource::deserialize(v, proxy.source_type()))
+                .unwrap(),
             vocab: proxy
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v)),
@@ -180,17 +183,26 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetSourceRoot {
 impl<'fb> FlatbuffersDeserializable<fb::DatasetSourceRoot<'fb>> for odf::DatasetSourceRoot {
     fn deserialize(proxy: fb::DatasetSourceRoot<'fb>) -> Self {
         odf::DatasetSourceRoot {
-            fetch: odf::FetchStep::deserialize(proxy.fetch().unwrap(), proxy.fetch_type()),
+            fetch: proxy
+                .fetch()
+                .map(|v| odf::FetchStep::deserialize(v, proxy.fetch_type()))
+                .unwrap(),
             prepare: proxy.prepare().map(|v| {
                 v.iter()
                     .map(|i| odf::PrepStep::deserialize(i.value().unwrap(), i.value_type()))
                     .collect()
             }),
-            read: odf::ReadStep::deserialize(proxy.read().unwrap(), proxy.read_type()),
+            read: proxy
+                .read()
+                .map(|v| odf::ReadStep::deserialize(v, proxy.read_type()))
+                .unwrap(),
             preprocess: proxy
                 .preprocess()
-                .map(|tbl| odf::Transform::deserialize(tbl, proxy.preprocess_type())),
-            merge: odf::MergeStrategy::deserialize(proxy.merge().unwrap(), proxy.merge_type()),
+                .map(|v| odf::Transform::deserialize(v, proxy.preprocess_type())),
+            merge: proxy
+                .merge()
+                .map(|v| odf::MergeStrategy::deserialize(v, proxy.merge_type()))
+                .unwrap(),
         }
     }
 }
@@ -221,14 +233,14 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetSourceDerivative<'fb>>
                 .inputs()
                 .map(|v| {
                     v.iter()
-                        .map(|i| odf::DatasetIDBuf::from_str(i).unwrap())
+                        .map(|i| odf::DatasetIDBuf::try_from(i).unwrap())
                         .collect()
                 })
                 .unwrap(),
-            transform: odf::Transform::deserialize(
-                proxy.transform().unwrap(),
-                proxy.transform_type(),
-            ),
+            transform: proxy
+                .transform()
+                .map(|v| odf::Transform::deserialize(v, proxy.transform_type()))
+                .unwrap(),
         }
     }
 }
@@ -418,12 +430,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepFilesGlob {
             builder.add_cache_type(e);
             builder.add_cache(off)
         });
-        self.order.map(|v| {
-            builder.add_order(match v {
-                odf::SourceOrdering::ByEventTime => fb::SourceOrdering::ByEventTime,
-                odf::SourceOrdering::ByName => fb::SourceOrdering::ByName,
-            })
-        });
+        self.order.map(|v| builder.add_order(v.into()));
         builder.finish()
     }
 }
@@ -434,15 +441,30 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepFilesGlob<'fb>> for odf::FetchS
             path: proxy.path().map(|v| v.to_owned()).unwrap(),
             event_time: proxy
                 .event_time()
-                .map(|tbl| odf::EventTimeSource::deserialize(tbl, proxy.event_time_type())),
+                .map(|v| odf::EventTimeSource::deserialize(v, proxy.event_time_type())),
             cache: proxy
                 .cache()
-                .map(|tbl| odf::SourceCaching::deserialize(tbl, proxy.cache_type())),
-            order: proxy.order().map(|v| match v {
-                fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
-                fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
-                _ => panic!("Invalid enum value: {}", v.0),
-            }),
+                .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
+            order: proxy.order().map(|v| v.into()),
+        }
+    }
+}
+
+impl From<odf::SourceOrdering> for fb::SourceOrdering {
+    fn from(v: odf::SourceOrdering) -> Self {
+        match v {
+            odf::SourceOrdering::ByEventTime => fb::SourceOrdering::ByEventTime,
+            odf::SourceOrdering::ByName => fb::SourceOrdering::ByName,
+        }
+    }
+}
+
+impl Into<odf::SourceOrdering> for fb::SourceOrdering {
+    fn into(self) -> odf::SourceOrdering {
+        match self {
+            fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
+            fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
@@ -598,7 +620,6 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
         builder.add_system_time(&datetime_to_fb(&self.system_time));
         output_slice_offset.map(|off| builder.add_output_slice(off));
         self.output_watermark
-            .as_ref()
             .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
         input_slices_offset.map(|off| builder.add_input_slices(off));
         source_offset.map(|(e, off)| {
@@ -628,7 +649,7 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
                 .map(|v| v.iter().map(|i| odf::DataSlice::deserialize(i)).collect()),
             source: proxy
                 .source()
-                .map(|tbl| odf::DatasetSource::deserialize(tbl, proxy.source_type())),
+                .map(|v| odf::DatasetSource::deserialize(v, proxy.source_type())),
             vocab: proxy
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v)),
@@ -680,10 +701,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::PrepStepDecompress {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let sub_path_offset = self.sub_path.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::PrepStepDecompressBuilder::new(fb);
-        builder.add_format(match self.format {
-            odf::CompressionFormat::Gzip => fb::CompressionFormat::Gzip,
-            odf::CompressionFormat::Zip => fb::CompressionFormat::Zip,
-        });
+        builder.add_format(self.format.into());
         sub_path_offset.map(|off| builder.add_sub_path(off));
         builder.finish()
     }
@@ -692,11 +710,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::PrepStepDecompress {
 impl<'fb> FlatbuffersDeserializable<fb::PrepStepDecompress<'fb>> for odf::PrepStepDecompress {
     fn deserialize(proxy: fb::PrepStepDecompress<'fb>) -> Self {
         odf::PrepStepDecompress {
-            format: match proxy.format() {
-                fb::CompressionFormat::Gzip => odf::CompressionFormat::Gzip,
-                fb::CompressionFormat::Zip => odf::CompressionFormat::Zip,
-                _ => panic!("Invalid enum value: {}", proxy.format().0),
-            },
+            format: proxy.format().into(),
             sub_path: proxy.sub_path().map(|v| v.to_owned()),
         }
     }
@@ -723,6 +737,25 @@ impl<'fb> FlatbuffersDeserializable<fb::PrepStepPipe<'fb>> for odf::PrepStepPipe
                 .command()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect())
                 .unwrap(),
+        }
+    }
+}
+
+impl From<odf::CompressionFormat> for fb::CompressionFormat {
+    fn from(v: odf::CompressionFormat) -> Self {
+        match v {
+            odf::CompressionFormat::Gzip => fb::CompressionFormat::Gzip,
+            odf::CompressionFormat::Zip => fb::CompressionFormat::Zip,
+        }
+    }
+}
+
+impl Into<odf::CompressionFormat> for fb::CompressionFormat {
+    fn into(self) -> odf::CompressionFormat {
+        match self {
+            fb::CompressionFormat::Gzip => odf::CompressionFormat::Gzip,
+            fb::CompressionFormat::Zip => odf::CompressionFormat::Zip,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
@@ -960,7 +993,7 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::SourceCaching> for odf::SourceCac
 }
 
 impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::SourceCaching> for odf::SourceCaching {
-    fn deserialize(_table: flatbuffers::Table<'fb>, t: fb::SourceCaching) -> Self {
+    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::SourceCaching) -> Self {
         match t {
             fb::SourceCaching::SourceCachingForever => odf::SourceCaching::Forever,
             _ => panic!("Invalid enum value: {}", t.0),

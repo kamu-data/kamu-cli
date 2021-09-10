@@ -5,10 +5,10 @@
 
 use super::formats::{datetime_rfc3339, datetime_rfc3339_opt};
 use crate::*;
-use ::chrono::{DateTime, Utc};
 use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
-use ::serde_with::serde_as;
-use ::serde_with::skip_serializing_none;
+use chrono::{DateTime, Utc};
+use serde_with::serde_as;
+use serde_with::skip_serializing_none;
 
 ////////////////////////////////////////////////////////////////////////////////
 
