@@ -3,6 +3,7 @@ name = "kamu"
 version = "0.64.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
+license-file = "../LICENSE.txt"
 
 [features]
 skip_docker_tests = []

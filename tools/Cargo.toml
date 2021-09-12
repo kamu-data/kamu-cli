@@ -15,6 +15,7 @@ path = "src/create_test_workspace.rs"
 [dependencies]
 clap = "*"
 chrono = "*"
+glob = "*"
 regex = "*"
 semver = "*"
 toml = "*"
