@@ -579,15 +579,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dirs"
-version = "3.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30baa043103c9d0c2a57cf537cc2f35623889dc0d405e6c3cccfadbc81c71309"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -595,17 +586,6 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03d86534ed367a67548dc68113a0f5db55432fdfbb6e6f9d77704397d95d5780"
-dependencies = [
- "libc",
- "redox_users 0.4.0",
- "winapi",
 ]
 
 [[package]]
@@ -1079,7 +1059,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -1121,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "chrono",
  "chrono-humanize",
@@ -1129,7 +1109,7 @@ dependencies = [
  "console",
  "datafusion",
  "dill",
- "dirs 3.0.2",
+ "dirs",
  "glob",
  "humansize",
  "indicatif",
@@ -1499,7 +1479,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.63.0"
+version = "0.64.0"
 dependencies = [
  "byteorder",
  "chrono",
@@ -2185,9 +2165,9 @@ dependencies = [
 
 [[package]]
 name = "serde_yaml"
-version = "0.8.20"
+version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad104641f3c958dab30eb3010e834c2622d1f3f4c530fef1dee20ad9485f3c09"
+checksum = "d8c608a35705a5d3cdc9fbe403147647ff34b921f8e833e49306df898f9b20af"
 dependencies = [
  "dtoa",
  "indexmap",
@@ -2197,9 +2177,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.9.7"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e36fa7752016a6c4483706d634fd82c48860dd2df17a0cfaaebc714f23b2dd"
+checksum = "b69f9a4c9740d74c5baa3fd2e547f9525fa8088a8a958e0ca2409a514e33f5fa"
 dependencies = [
  "block-buffer",
  "cfg-if",
@@ -2380,7 +2360,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd106a334b7657c10b7c540a0106114feadeb4dc314513e97df481d5d966f42"
 dependencies = [
  "byteorder",
- "dirs 1.0.5",
+ "dirs",
  "winapi",
 ]
 
@@ -2589,7 +2569,10 @@ dependencies = [
 name = "tools"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "clap",
+ "indoc",
+ "regex",
  "semver",
  "toml",
  "toml_edit",

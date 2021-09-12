@@ -2,6 +2,7 @@
 name = "tools"
 version = "0.0.0"
 description = "Tools for managing this repo"
+edition = "2021"
 
 [[bin]]
 name = "release"
@@ -13,8 +14,13 @@ path = "src/create_test_workspace.rs"
 
 [dependencies]
 clap = "*"
-yaml-rust = "*"
+chrono = "*"
+regex = "*"
+semver = "*"
 toml = "*"
 toml_edit = "*"
-semver = "*"
 url = "*"
+yaml-rust = "*"
+
+[dev-dependencies]
+indoc = "*"

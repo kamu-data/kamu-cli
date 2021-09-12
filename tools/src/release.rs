@@ -3,7 +3,11 @@ extern crate toml_edit;
 
 use std::path::{Path, PathBuf};
 
+use chrono::{Datelike, NaiveDate};
+use regex::Captures;
 use semver::Version;
+
+const CHANGE_DATE_YEARS: i32 = 4;
 
 fn main() {
     let matches = clap::App::new("release")
@@ -28,12 +32,12 @@ fn main() {
         Version {
             minor: current_version.minor + 1,
             patch: 0,
-            ..current_version
+            ..current_version.clone()
         }
     } else if matches.is_present("next-patch") {
         Version {
             patch: current_version.patch + 1,
-            ..current_version
+            ..current_version.clone()
         }
     } else {
         panic!("Specivy a --version or --minor flag");
@@ -45,6 +49,8 @@ fn main() {
         eprintln!("Bumping version in: {}", cr.name);
         set_version(&cr.cargo_toml_path, &new_version);
     }
+
+    update_license(&Path::new("LICENSE.txt"), &current_version, &new_version);
 }
 
 fn get_all_crates() -> Vec<Crate> {
@@ -91,8 +97,142 @@ fn set_version(cargo_toml_path: &Path, version: &Version) {
     std::fs::write(cargo_toml_path, doc.to_string()).expect("Failed to write to Cargo.toml");
 }
 
+fn update_license(license_path: &Path, current_version: &Version, new_version: &Version) {
+    let text = std::fs::read_to_string(license_path).expect("Could not read the license file");
+    let new_text = update_license_text(
+        &text,
+        current_version,
+        new_version,
+        &chrono::Utc::now().naive_utc().date(),
+    );
+    std::fs::write(license_path, new_text).expect("Failed to write to license file");
+}
+
+fn update_license_text<'t>(
+    text: &'t str,
+    current_version: &Version,
+    new_version: &Version,
+    current_date: &NaiveDate,
+) -> String {
+    let significant_version =
+        new_version.major != current_version.major || new_version.minor != current_version.minor;
+
+    eprintln!("Updating license version: {}", new_version);
+    let re = regex::Regex::new(r"(Licensed Work:[ ]+Kamu CLI Version )(\d+\.\d+\.\d+)").unwrap();
+    let text = re.replace(text, |c: &Captures| format!("{}{}", &c[1], new_version));
+
+    if significant_version {
+        let change_date = add_years(current_date, CHANGE_DATE_YEARS);
+        let re = regex::Regex::new(r"(Change Date:[ ]+)(\d+-\d+-\d+)").unwrap();
+
+        eprintln!("Updating license change date: {}", change_date);
+        re.replace(&text, |c: &Captures| format!("{}{}", &c[1], change_date))
+    } else {
+        text
+    }
+    .to_string()
+}
+
+fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(d.year() + years, d.month(), d.day()).unwrap_or_else(|| {
+        *d + (NaiveDate::from_ymd(d.year() + years, 1, 1) - NaiveDate::from_ymd(d.year(), 1, 1))
+    })
+}
+
 #[derive(Debug, Clone)]
 struct Crate {
     name: String,
     cargo_toml_path: PathBuf,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Tests
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use chrono::NaiveDate;
+    use semver::Version;
+
+    use crate::update_license_text;
+
+    #[test]
+    fn test_update_license_patch() {
+        // During patch release the Change Date stays the same
+
+        let orig_text = indoc::indoc!(
+            r#"
+            ...
+            Licensor:                  Kamu Data, Inc.
+            Licensed Work:             Kamu CLI Version 0.63.0
+            ...
+            Change Date:               2025-01-01
+            Change License:            Apache License, Version 2.0
+            ...
+            "#
+        );
+
+        let new_text = update_license_text(
+            orig_text,
+            &Version::new(0, 63, 0),
+            &Version::new(0, 63, 1),
+            &NaiveDate::from_str("2021-09-01").unwrap(),
+        );
+
+        assert_eq!(
+            new_text,
+            indoc::indoc!(
+                r#"
+                ...
+                Licensor:                  Kamu Data, Inc.
+                Licensed Work:             Kamu CLI Version 0.63.1
+                ...
+                Change Date:               2025-01-01
+                Change License:            Apache License, Version 2.0
+                ...
+                "#
+            )
+        )
+    }
+
+    #[test]
+    fn test_update_license_minor() {
+        // During patch release the Change Date stays the same
+
+        let orig_text = indoc::indoc!(
+            r#"
+            ...
+            Licensor:                  Kamu Data, Inc.
+            Licensed Work:             Kamu CLI Version 0.63.0
+            ...
+            Change Date:               2025-01-01
+            Change License:            Apache License, Version 2.0
+            ...
+            "#
+        );
+
+        let new_text = update_license_text(
+            orig_text,
+            &Version::new(0, 63, 0),
+            &Version::new(0, 64, 0),
+            &NaiveDate::from_str("2021-09-01").unwrap(),
+        );
+
+        assert_eq!(
+            new_text,
+            indoc::indoc!(
+                r#"
+                ...
+                Licensor:                  Kamu Data, Inc.
+                Licensed Work:             Kamu CLI Version 0.64.0
+                ...
+                Change Date:               2025-09-01
+                Change License:            Apache License, Version 2.0
+                ...
+                "#
+            )
+        )
+    }
 }
