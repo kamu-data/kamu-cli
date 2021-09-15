@@ -1,12 +1,3 @@
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is auto-generated from Open Data Fabric Schemas
 // See: http://opendatafabric.org/
@@ -202,6 +193,69 @@ pub struct EventTimeSourceFromPathDef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryRequest")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryRequestDef {
+    pub dataset_id: DatasetIDBuf,
+    #[serde_as(as = "TransformDef")]
+    pub transform: Transform,
+    #[serde_as(as = "Vec<QueryInputDef>")]
+    pub inputs: Vec<QueryInput>,
+}
+
+implement_serde_as!(
+    ExecuteQueryRequest,
+    ExecuteQueryRequestDef,
+    "ExecuteQueryRequestDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryResponse")]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+pub enum ExecuteQueryResponseDef {
+    #[serde(rename_all = "camelCase")]
+    Progress,
+    #[serde(rename_all = "camelCase")]
+    Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
+    #[serde(rename_all = "camelCase")]
+    Error,
+}
+
+implement_serde_as!(
+    ExecuteQueryResponse,
+    ExecuteQueryResponseDef,
+    "ExecuteQueryResponseDef"
+);
+implement_serde_as!(
+    ExecuteQueryResponseSuccess,
+    ExecuteQueryResponseSuccessDef,
+    "ExecuteQueryResponseSuccessDef"
+);
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryResponseSuccess")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryResponseSuccessDef {
+    #[serde_as(as = "MetadataBlockDef")]
+    pub metadata_block: MetadataBlock,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FetchStep
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -267,6 +321,25 @@ pub enum SourceOrderingDef {
 }
 
 implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// InputDataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "InputDataSlice")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct InputDataSliceDef {
+    pub interval: TimeInterval,
+    pub schema_file: String,
+    #[serde_as(as = "Vec<WatermarkDef>")]
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+implement_serde_as!(InputDataSlice, InputDataSliceDef, "InputDataSliceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
@@ -411,6 +484,26 @@ implement_serde_as!(
     CompressionFormatDef,
     "CompressionFormatDef"
 );
+
+////////////////////////////////////////////////////////////////////////////////
+// QueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "QueryInput")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct QueryInputDef {
+    pub dataset_id: DatasetIDBuf,
+    #[serde_as(as = "InputDataSliceDef")]
+    pub slice: InputDataSlice,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+}
+
+implement_serde_as!(QueryInput, QueryInputDef, "QueryInputDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // ReadStep
@@ -589,3 +682,22 @@ pub struct TransformSqlDef {
     #[serde(default)]
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "Watermark")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WatermarkDef {
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+    #[serde(with = "datetime_rfc3339")]
+    pub event_time: DateTime<Utc>,
+}
+
+implement_serde_as!(Watermark, WatermarkDef, "WatermarkDef");

@@ -1,12 +1,3 @@
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is auto-generated from Open Data Fabric Schemas
 // See: http://opendatafabric.org/
@@ -349,6 +340,119 @@ impl<'fb> FlatbuffersDeserializable<fb::EventTimeSourceFromPath<'fb>>
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
+    type OffsetT = WIPOffset<fb::ExecuteQueryRequest<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let dataset_id_offset = { fb.create_string(&self.dataset_id) };
+        let transform_offset = { self.transform.serialize(fb) };
+        let inputs_offset = {
+            let offsets: Vec<_> = self.inputs.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::ExecuteQueryRequestBuilder::new(fb);
+        builder.add_dataset_id(dataset_id_offset);
+        builder.add_transform_type(transform_offset.0);
+        builder.add_transform(transform_offset.1);
+        builder.add_inputs(inputs_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::ExecuteQueryRequest {
+    fn deserialize(proxy: fb::ExecuteQueryRequest<'fb>) -> Self {
+        odf::ExecuteQueryRequest {
+            dataset_id: proxy
+                .dataset_id()
+                .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
+                .unwrap(),
+            transform: proxy
+                .transform()
+                .map(|v| odf::Transform::deserialize(v, proxy.transform_type()))
+                .unwrap(),
+            inputs: proxy
+                .inputs()
+                .map(|v| v.iter().map(|i| odf::QueryInput::deserialize(i)).collect())
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ExecuteQueryResponse> for odf::ExecuteQueryResponse {
+    fn serialize(
+        &self,
+        fb: &mut FlatBufferBuilder<'fb>,
+    ) -> (fb::ExecuteQueryResponse, WIPOffset<UnionWIPOffset>) {
+        match self {
+            odf::ExecuteQueryResponse::Progress => (
+                fb::ExecuteQueryResponse::ExecuteQueryResponseProgress,
+                empty_table(fb).as_union_value(),
+            ),
+            odf::ExecuteQueryResponse::Success(v) => (
+                fb::ExecuteQueryResponse::ExecuteQueryResponseSuccess,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::ExecuteQueryResponse::Error => (
+                fb::ExecuteQueryResponse::ExecuteQueryResponseError,
+                empty_table(fb).as_union_value(),
+            ),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ExecuteQueryResponse>
+    for odf::ExecuteQueryResponse
+{
+    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::ExecuteQueryResponse) -> Self {
+        match t {
+            fb::ExecuteQueryResponse::ExecuteQueryResponseProgress => {
+                odf::ExecuteQueryResponse::Progress
+            }
+            fb::ExecuteQueryResponse::ExecuteQueryResponseSuccess => {
+                odf::ExecuteQueryResponse::Success(odf::ExecuteQueryResponseSuccess::deserialize(
+                    fb::ExecuteQueryResponseSuccess::init_from_table(table),
+                ))
+            }
+            fb::ExecuteQueryResponse::ExecuteQueryResponseError => odf::ExecuteQueryResponse::Error,
+            _ => panic!("Invalid enum value: {}", t.0),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseSuccess {
+    type OffsetT = WIPOffset<fb::ExecuteQueryResponseSuccess<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let metadata_block_offset = { self.metadata_block.serialize(fb) };
+        let mut builder = fb::ExecuteQueryResponseSuccessBuilder::new(fb);
+        builder.add_metadata_block(metadata_block_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseSuccess<'fb>>
+    for odf::ExecuteQueryResponseSuccess
+{
+    fn deserialize(proxy: fb::ExecuteQueryResponseSuccess<'fb>) -> Self {
+        odf::ExecuteQueryResponseSuccess {
+            metadata_block: proxy
+                .metadata_block()
+                .map(|v| odf::MetadataBlock::deserialize(v))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FetchStep
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -474,6 +578,45 @@ impl Into<odf::SourceOrdering> for fb::SourceOrdering {
             fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
             fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
             _ => panic!("Invalid enum value: {}", self.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputDataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::InputDataSlice {
+    type OffsetT = WIPOffset<fb::InputDataSlice<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let schema_file_offset = { fb.create_string(&self.schema_file) };
+        let explicit_watermarks_offset = {
+            let offsets: Vec<_> = self
+                .explicit_watermarks
+                .iter()
+                .map(|i| i.serialize(fb))
+                .collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::InputDataSliceBuilder::new(fb);
+        builder.add_interval(&interval_to_fb(&self.interval));
+        builder.add_schema_file(schema_file_offset);
+        builder.add_explicit_watermarks(explicit_watermarks_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::InputDataSlice<'fb>> for odf::InputDataSlice {
+    fn deserialize(proxy: fb::InputDataSlice<'fb>) -> Self {
+        odf::InputDataSlice {
+            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
+            schema_file: proxy.schema_file().map(|v| v.to_owned()).unwrap(),
+            explicit_watermarks: proxy
+                .explicit_watermarks()
+                .map(|v| v.iter().map(|i| odf::Watermark::deserialize(i)).collect())
+                .unwrap(),
         }
     }
 }
@@ -765,6 +908,45 @@ impl Into<odf::CompressionFormat> for fb::CompressionFormat {
             fb::CompressionFormat::Gzip => odf::CompressionFormat::Gzip,
             fb::CompressionFormat::Zip => odf::CompressionFormat::Zip,
             _ => panic!("Invalid enum value: {}", self.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// QueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::QueryInput {
+    type OffsetT = WIPOffset<fb::QueryInput<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let dataset_id_offset = { fb.create_string(&self.dataset_id) };
+        let slice_offset = { self.slice.serialize(fb) };
+        let vocab_offset = { self.vocab.serialize(fb) };
+        let mut builder = fb::QueryInputBuilder::new(fb);
+        builder.add_dataset_id(dataset_id_offset);
+        builder.add_slice(slice_offset);
+        builder.add_vocab(vocab_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::QueryInput<'fb>> for odf::QueryInput {
+    fn deserialize(proxy: fb::QueryInput<'fb>) -> Self {
+        odf::QueryInput {
+            dataset_id: proxy
+                .dataset_id()
+                .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
+                .unwrap(),
+            slice: proxy
+                .slice()
+                .map(|v| odf::InputDataSlice::deserialize(v))
+                .unwrap(),
+            vocab: proxy
+                .vocab()
+                .map(|v| odf::DatasetVocabulary::deserialize(v))
+                .unwrap(),
         }
     }
 }
@@ -1145,6 +1327,31 @@ impl<'fb> FlatbuffersDeserializable<fb::TransformSql<'fb>> for odf::TransformSql
                     .map(|i| odf::TemporalTable::deserialize(i))
                     .collect()
             }),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::Watermark {
+    type OffsetT = WIPOffset<fb::Watermark<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::WatermarkBuilder::new(fb);
+        builder.add_system_time(&datetime_to_fb(&self.system_time));
+        builder.add_event_time(&datetime_to_fb(&self.event_time));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::Watermark<'fb>> for odf::Watermark {
+    fn deserialize(proxy: fb::Watermark<'fb>) -> Self {
+        odf::Watermark {
+            system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
+            event_time: proxy.event_time().map(|v| fb_to_datetime(v)).unwrap(),
         }
     }
 }

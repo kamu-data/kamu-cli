@@ -1,12 +1,3 @@
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is auto-generated from Open Data Fabric Schemas
 // See: http://opendatafabric.org/
@@ -260,6 +251,88 @@ impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID;
+    fn transform(&self) -> Transform;
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_>;
+}
+
+impl ExecuteQueryRequest for super::ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID {
+        self.dataset_id.as_ref()
+    }
+    fn transform(&self) -> Transform {
+        (&self.transform).into()
+    }
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_> {
+        Box::new(self.inputs.iter().map(|i| -> &dyn QueryInput { i }))
+    }
+}
+
+impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
+    fn into(self) -> super::ExecuteQueryRequest {
+        super::ExecuteQueryRequest {
+            dataset_id: self.dataset_id().to_owned(),
+            transform: self.transform().into(),
+            inputs: self.inputs().map(|i| i.into()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum ExecuteQueryResponse<'a> {
+    Progress,
+    Success(&'a dyn ExecuteQueryResponseSuccess),
+    Error,
+}
+
+impl<'a> From<&'a super::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
+    fn from(other: &'a super::ExecuteQueryResponse) -> Self {
+        match other {
+            super::ExecuteQueryResponse::Progress => ExecuteQueryResponse::Progress,
+            super::ExecuteQueryResponse::Success(v) => ExecuteQueryResponse::Success(v),
+            super::ExecuteQueryResponse::Error => ExecuteQueryResponse::Error,
+        }
+    }
+}
+
+impl Into<super::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
+    fn into(self) -> super::ExecuteQueryResponse {
+        match self {
+            ExecuteQueryResponse::Progress => super::ExecuteQueryResponse::Progress,
+            ExecuteQueryResponse::Success(v) => super::ExecuteQueryResponse::Success(v.into()),
+            ExecuteQueryResponse::Error => super::ExecuteQueryResponse::Error,
+        }
+    }
+}
+
+pub trait ExecuteQueryResponseSuccess {
+    fn metadata_block(&self) -> &dyn MetadataBlock;
+}
+
+impl ExecuteQueryResponseSuccess for super::ExecuteQueryResponseSuccess {
+    fn metadata_block(&self) -> &dyn MetadataBlock {
+        &self.metadata_block
+    }
+}
+
+impl Into<super::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSuccess {
+    fn into(self) -> super::ExecuteQueryResponseSuccess {
+        super::ExecuteQueryResponseSuccess {
+            metadata_block: self.metadata_block().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FetchStep
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -348,6 +421,43 @@ impl Into<super::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
             event_time: self.event_time().map(|v| v.into()),
             cache: self.cache().map(|v| v.into()),
             order: self.order().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputDataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait InputDataSlice {
+    fn interval(&self) -> TimeInterval;
+    fn schema_file(&self) -> &str;
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
+}
+
+impl InputDataSlice for super::InputDataSlice {
+    fn interval(&self) -> TimeInterval {
+        self.interval
+    }
+    fn schema_file(&self) -> &str {
+        self.schema_file.as_ref()
+    }
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
+        Box::new(
+            self.explicit_watermarks
+                .iter()
+                .map(|i| -> &dyn Watermark { i }),
+        )
+    }
+}
+
+impl Into<super::InputDataSlice> for &dyn InputDataSlice {
+    fn into(self) -> super::InputDataSlice {
+        super::InputDataSlice {
+            interval: self.interval(),
+            schema_file: self.schema_file().to_owned(),
+            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
         }
     }
 }
@@ -581,6 +691,39 @@ impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
     fn into(self) -> super::PrepStepPipe {
         super::PrepStepPipe {
             command: self.command().map(|i| i.to_owned()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// QueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait QueryInput {
+    fn dataset_id(&self) -> &DatasetID;
+    fn slice(&self) -> &dyn InputDataSlice;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+}
+
+impl QueryInput for super::QueryInput {
+    fn dataset_id(&self) -> &DatasetID {
+        self.dataset_id.as_ref()
+    }
+    fn slice(&self) -> &dyn InputDataSlice {
+        &self.slice
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
+    }
+}
+
+impl Into<super::QueryInput> for &dyn QueryInput {
+    fn into(self) -> super::QueryInput {
+        super::QueryInput {
+            dataset_id: self.dataset_id().to_owned(),
+            slice: self.slice().into(),
+            vocab: self.vocab().into(),
         }
     }
 }
@@ -987,6 +1130,34 @@ impl Into<super::TransformSql> for &dyn TransformSql {
             temporal_tables: self
                 .temporal_tables()
                 .map(|v| v.map(|i| i.into()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait Watermark {
+    fn system_time(&self) -> DateTime<Utc>;
+    fn event_time(&self) -> DateTime<Utc>;
+}
+
+impl Watermark for super::Watermark {
+    fn system_time(&self) -> DateTime<Utc> {
+        self.system_time
+    }
+    fn event_time(&self) -> DateTime<Utc> {
+        self.event_time
+    }
+}
+
+impl Into<super::Watermark> for &dyn Watermark {
+    fn into(self) -> super::Watermark {
+        super::Watermark {
+            system_time: self.system_time(),
+            event_time: self.event_time(),
         }
     }
 }

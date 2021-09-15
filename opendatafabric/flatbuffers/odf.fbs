@@ -286,6 +286,49 @@ table DatasetSnapshot {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table Watermark {
+  system_time: Timestamp;
+  event_time: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputDataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table InputDataSlice {
+  interval: TimeInterval;
+  schema_file: string;
+  explicit_watermarks: [Watermark];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// QueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table QueryInput {
+  dataset_id: string;
+  slice: InputDataSlice;
+  vocab: DatasetVocabulary;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table ExecuteQueryRequest {
+  dataset_id: string;
+  transform: Transform;
+  inputs: [QueryInput];
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MetadataBlock
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -299,5 +342,26 @@ table MetadataBlock {
   input_slices: [DataSlice];
   source: DatasetSource;
   vocab: DatasetVocabulary;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table ExecuteQueryResponseProgress {
+}
+
+table ExecuteQueryResponseSuccess {
+  metadata_block: MetadataBlock;
+}
+
+table ExecuteQueryResponseError {
+}
+
+union ExecuteQueryResponse {
+  ExecuteQueryResponseProgress,
+  ExecuteQueryResponseSuccess,
+  ExecuteQueryResponseError,
 }
 
