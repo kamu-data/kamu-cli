@@ -9,7 +9,10 @@
 
 use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
 use opendatafabric::serde::yaml::generated::*;
-use opendatafabric::*;
+use opendatafabric::{
+    DatasetIDBuf, DatasetSourceDerivative, DatasetSourceRoot, DatasetVocabulary, MetadataBlock,
+    TimeInterval, Watermark,
+};
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::serde_as;
@@ -96,6 +99,7 @@ pub struct ExecuteQueryResponse {
 }
 
 #[skip_serializing_none]
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InputDataSlice {
@@ -103,6 +107,7 @@ pub struct InputDataSlice {
     pub data_paths: Vec<PathBuf>,
     // TODO: Replace with just DDL schema
     pub schema_file: PathBuf,
+    #[serde_as(as = "Vec<WatermarkDef>")]
     pub explicit_watermarks: Vec<Watermark>,
 }
 
@@ -110,14 +115,6 @@ impl InputDataSlice {
     pub fn is_empty(&self) -> bool {
         self.data_paths.is_empty() && self.explicit_watermarks.is_empty()
     }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Watermark {
-    pub system_time: DateTime<Utc>,
-    pub event_time: DateTime<Utc>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

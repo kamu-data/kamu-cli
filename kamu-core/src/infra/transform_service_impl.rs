@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use crate::domain::{ExecuteQueryRequest, InputDataSlice};
 use crate::infra::*;
 use opendatafabric::*;
 

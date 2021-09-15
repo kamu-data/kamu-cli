@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
+use kamu::domain::{ExecuteQueryRequest, InputDataSlice};
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
