@@ -13,6 +13,7 @@ use crate::infra::utils::docker_images;
 use crate::infra::*;
 
 use super::engine_flink::*;
+use super::engine_odf::*;
 use super::engine_spark::*;
 
 use dill::*;
@@ -35,6 +36,7 @@ pub trait EngineFactory: Send + Sync {
 
 pub struct EngineFactoryImpl {
     spark_engine: Arc<Mutex<SparkEngine>>,
+    odf_engine: Arc<Mutex<ODFEngine>>,
     flink_engine: Arc<Mutex<FlinkEngine>>,
     container_runtime: DockerClient,
     known_images: Mutex<HashSet<String>>,
@@ -44,7 +46,7 @@ pub struct EngineFactoryImpl {
 #[component(pub)]
 impl EngineFactoryImpl {
     pub fn new(
-        workspace_layout: &WorkspaceLayout,
+        workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: DockerClient,
         logger: Logger,
     ) -> Self {
@@ -52,13 +54,19 @@ impl EngineFactoryImpl {
             spark_engine: Arc::new(Mutex::new(SparkEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
-                workspace_layout,
+                workspace_layout.as_ref(),
+                logger.new(o!("engine" => "spark")),
+            ))),
+            odf_engine: Arc::new(Mutex::new(ODFEngine::new(
+                container_runtime.clone(),
+                docker_images::SPARK,
+                workspace_layout.clone(),
                 logger.new(o!("engine" => "spark")),
             ))),
             flink_engine: Arc::new(Mutex::new(FlinkEngine::new(
                 container_runtime.clone(),
                 docker_images::FLINK,
-                workspace_layout,
+                workspace_layout.as_ref(),
                 logger.new(o!("engine" => "flink")),
             ))),
             container_runtime: container_runtime,
@@ -77,6 +85,10 @@ impl EngineFactory for EngineFactoryImpl {
         let (engine, image) = match engine_id {
             "spark" => Ok((
                 self.spark_engine.clone() as Arc<Mutex<dyn Engine>>,
+                docker_images::SPARK,
+            )),
+            "odf" => Ok((
+                self.odf_engine.clone() as Arc<Mutex<dyn Engine>>,
                 docker_images::SPARK,
             )),
             "flink" => Ok((

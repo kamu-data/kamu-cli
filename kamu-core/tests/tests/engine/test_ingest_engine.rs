@@ -33,7 +33,7 @@ fn test_ingest_with_engine() {
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
 
     let engine_factory = Arc::new(EngineFactoryImpl::new(
-        &workspace_layout,
+        workspace_layout.clone(),
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));

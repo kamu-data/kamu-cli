@@ -31,7 +31,7 @@ fn test_transform_with_engine_spark() {
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactoryImpl::new(
-        &workspace_layout,
+        workspace_layout.clone(),
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));
@@ -121,7 +121,7 @@ fn test_transform_with_engine_spark() {
             MetadataFactory::dataset_source_deriv([&root_id].iter())
                 .transform(
                     MetadataFactory::transform()
-                        .engine("spark")
+                        .engine("odf")
                         .query(
                             "SELECT event_time, city, population * 10 as population_x10 FROM root",
                         )
@@ -229,7 +229,7 @@ fn test_transform_with_engine_flink() {
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactoryImpl::new(
-        &workspace_layout,
+        workspace_layout.clone(),
         DockerClient::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));
