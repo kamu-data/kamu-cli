@@ -208,30 +208,6 @@ impl SparkEngine {
 }
 
 impl Engine for SparkEngine {
-    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        let run_info = RunInfo::new(&self.workspace_layout, "ingest");
-
-        // Remove data_dir if it exists but empty as it will confuse Spark
-        let _ = std::fs::remove_dir(&request.data_dir);
-
-        let request_adj = IngestRequest {
-            ingest_path: self.to_container_path(&request.ingest_path),
-            prev_checkpoint_dir: request
-                .prev_checkpoint_dir
-                .map(|p| self.to_container_path(&p)),
-            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
-            data_dir: self.to_container_path(&request.data_dir),
-            out_data_path: self.to_container_path(&request.out_data_path),
-            ..request
-        };
-
-        self.write_request(&run_info, request_adj, "IngestRequest")?;
-
-        self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
-
-        self.read_response(&run_info, "IngestResult")
-    }
-
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "transform");
 
@@ -269,5 +245,31 @@ impl Engine for SparkEngine {
         self.submit("dev.kamu.engine.spark.transform.TransformApp", &run_info)?;
 
         self.read_response(&run_info, "ExecuteQueryResult")
+    }
+}
+
+impl IngestEngine for SparkEngine {
+    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
+        let run_info = RunInfo::new(&self.workspace_layout, "ingest");
+
+        // Remove data_dir if it exists but empty as it will confuse Spark
+        let _ = std::fs::remove_dir(&request.data_dir);
+
+        let request_adj = IngestRequest {
+            ingest_path: self.to_container_path(&request.ingest_path),
+            prev_checkpoint_dir: request
+                .prev_checkpoint_dir
+                .map(|p| self.to_container_path(&p)),
+            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            data_dir: self.to_container_path(&request.data_dir),
+            out_data_path: self.to_container_path(&request.out_data_path),
+            ..request
+        };
+
+        self.write_request(&run_info, request_adj, "IngestRequest")?;
+
+        self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
+
+        self.read_response(&run_info, "IngestResult")
     }
 }
