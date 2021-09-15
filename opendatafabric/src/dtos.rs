@@ -1,12 +1,3 @@
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is auto-generated from Open Data Fabric Schemas
 // See: http://opendatafabric.org/
@@ -94,6 +85,35 @@ pub struct EventTimeSourceFromPath {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryRequest {
+    pub dataset_id: DatasetIDBuf,
+    pub transform: Transform,
+    pub inputs: Vec<QueryInput>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ExecuteQueryResponse {
+    Progress,
+    Success(ExecuteQueryResponseSuccess),
+    Error,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryResponseSuccess {
+    pub metadata_block: MetadataBlock,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // FetchStep
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,6 +143,18 @@ pub struct FetchStepFilesGlob {
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputDataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct InputDataSlice {
+    pub interval: TimeInterval,
+    pub schema_file: String,
+    pub explicit_watermarks: Vec<Watermark>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -195,6 +227,18 @@ pub struct PrepStepPipe {
 pub enum CompressionFormat {
     Gzip,
     Zip,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// QueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct QueryInput {
+    pub dataset_id: DatasetIDBuf,
+    pub slice: InputDataSlice,
+    pub vocab: DatasetVocabulary,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -303,4 +347,15 @@ pub struct TransformSql {
     pub query: Option<String>,
     pub queries: Option<Vec<SqlQueryStep>>,
     pub temporal_tables: Option<Vec<TemporalTable>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Watermark {
+    pub system_time: DateTime<Utc>,
+    pub event_time: DateTime<Utc>,
 }
