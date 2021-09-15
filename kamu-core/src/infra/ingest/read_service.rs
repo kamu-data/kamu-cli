@@ -45,7 +45,7 @@ impl ReadService {
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
         let engine = self
             .engine_factory
-            .get_engine("spark", listener.get_pull_image_listener())?;
+            .get_ingest_engine(listener.get_pull_image_listener())?;
 
         let out_data_path = dataset_layout.data_dir.join(".pending");
         let new_checkpoint_dir = dataset_layout.checkpoints_dir.join(".pending");

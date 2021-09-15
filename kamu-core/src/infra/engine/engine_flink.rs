@@ -330,10 +330,6 @@ impl FlinkEngine {
 }
 
 impl Engine for FlinkEngine {
-    fn ingest(&self, _request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        unimplemented!();
-    }
-
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)

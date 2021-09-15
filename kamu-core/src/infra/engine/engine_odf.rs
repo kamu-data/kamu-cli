@@ -39,10 +39,6 @@ impl ODFEngine {
 }
 
 impl Engine for ODFEngine {
-    fn ingest(&self, _request: IngestRequest) -> Result<IngestResponse, EngineError> {
-        unimplemented!()
-    }
-
     fn transform(
         &self,
         mut request: ExecuteQueryRequest,

@@ -24,8 +24,12 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 pub trait Engine {
-    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
     fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError>;
+}
+
+// TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
+pub trait IngestEngine {
+    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
 }
 
 pub trait PullImageListener {
