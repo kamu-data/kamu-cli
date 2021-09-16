@@ -19,6 +19,14 @@ serde = { version = "*", features = ["derive"] }
 serde_with = "*"
 serde_yaml = "*"
 
+# gRPC
+tonic = "*"
+prost = "*"
+
 # Utils
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
+
+
+[build-dependencies]
+tonic-build = "*"
