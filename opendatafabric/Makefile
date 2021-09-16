@@ -3,7 +3,7 @@ RUSTFMT=rustfmt --edition 2018
 
 .PHONY: codegen
 codegen:
-	python $(ODF_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_DIR)/schemas > flatbuffers/odf.fbs
+	python $(ODF_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_DIR)/schemas > schemas/odf.fbs
 	flatc -o src/serde/flatbuffers --rust --gen-onefile flatbuffers/odf.fbs
 	$(RUSTFMT) src/serde/flatbuffers/odf_generated.rs
 

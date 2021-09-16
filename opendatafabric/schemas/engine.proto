@@ -1,0 +1,18 @@
+syntax = "proto3";
+package engine;
+
+// TODO: Migrate to gRPC + flatbuffers once supported
+// See: https://github.com/google/flatbuffers/issues/4919
+
+service Engine {
+    // Performs the next iteration of the transformation
+    rpc ExecuteQuery (ExecuteQueryRequest) returns (ExecuteQueryResponse);
+}
+
+message ExecuteQueryRequest {
+    bytes flatbuffer = 1;
+}
+
+message ExecuteQueryResponse {
+    bytes flatbuffer = 1;
+}

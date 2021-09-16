@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use odf::engine::EngineClient;
 use opendatafabric as odf;
 use rand::Rng;
 use slog::{info, Logger};
@@ -60,7 +61,7 @@ impl ODFEngine {
             ..DockerRunArgs::default()
         });
 
-        info!(self.logger, "Starting engine"; "command" => ?cmd, "image" => &self.image);
+        info!(self.logger, "Starting engine"; "command" => ?cmd, "image" => &self.image, "id" => &container_name);
 
         let _engine_process = OwnedProcess(
             cmd.stdout(Stdio::inherit()) //std::process::Stdio::from(stdout_file))
@@ -69,9 +70,22 @@ impl ODFEngine {
                 .map_err(|e| EngineError::internal(e))?,
         );
 
-        let _adapter_host_port = self
+        let adapter_host_port = self
             .container_runtime
             .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
+            .map_err(|e| EngineError::internal(e))?;
+
+        info!(self.logger, "Engine running"; "id" => &container_name);
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let mut client = rt
+            .block_on(EngineClient::connect(
+                &self.container_runtime.get_docker_addr(),
+                adapter_host_port,
+            ))
+            .map_err(|e| EngineError::internal(e))?;
+
+        rt.block_on(client.say_hello())
             .map_err(|e| EngineError::internal(e))?;
 
         // TODO: chown
