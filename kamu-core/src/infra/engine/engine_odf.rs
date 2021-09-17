@@ -1,5 +1,4 @@
 use std::{
-    ops::{Deref, DerefMut},
     path::{Path, PathBuf},
     process::{Child, Stdio},
     sync::Arc,
@@ -7,10 +6,13 @@ use std::{
 };
 
 use container_runtime::{ContainerRuntime, RunArgs};
-use odf::engine::EngineClient;
+use odf::{
+    engine::EngineClient,
+    serde::{flatbuffers::FlatbuffersEngineProtocol, EngineProtocolSerializer},
+};
 use opendatafabric as odf;
 use rand::Rng;
-use slog::{info, Logger};
+use slog::{info, warn, Logger};
 
 use crate::domain::*;
 use crate::infra::WorkspaceLayout;
@@ -23,9 +25,6 @@ pub struct ODFEngine {
 }
 
 impl ODFEngine {
-    const ADAPTER_PORT: u16 = 2884;
-    const START_TIMEOUT: Duration = Duration::from_secs(30);
-
     pub fn new(
         container_runtime: ContainerRuntime,
         image: &str,
@@ -40,50 +39,23 @@ impl ODFEngine {
         }
     }
 
-    fn transform2(
+    async fn transform2(
         &self,
         run_info: RunInfo,
-        _request: odf::ExecuteQueryRequest,
+        request: odf::ExecuteQueryRequest,
     ) -> Result<odf::ExecuteQueryResponseSuccess, EngineError> {
-        let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
-        let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
+        let engine_container = EngineContainer::new(
+            self.container_runtime.clone(),
+            &self.image,
+            &run_info.run_id,
+            self.logger.clone(),
+        )?;
 
-        let container_name = format!("kamu-engine-{}", run_info.run_id);
+        let mut client = engine_container.connect_client().await?;
 
-        let mut cmd = self.container_runtime.run_cmd(RunArgs {
-            image: self.image.clone(),
-            container_name: Some(container_name.clone()),
-            //volume_map: volume_map,
-            user: Some("root".to_owned()),
-            expose_ports: vec![Self::ADAPTER_PORT],
-            ..RunArgs::default()
-        });
-
-        info!(self.logger, "Starting engine"; "command" => ?cmd, "image" => &self.image, "id" => &container_name);
-
-        let _engine_process = OwnedProcess(
-            cmd.stdout(Stdio::inherit()) //std::process::Stdio::from(stdout_file))
-                .stderr(Stdio::inherit()) //std::process::Stdio::from(stderr_file))
-                .spawn()
-                .map_err(|e| EngineError::internal(e))?,
-        );
-
-        let adapter_host_port = self
-            .container_runtime
-            .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
-            .map_err(|e| EngineError::internal(e))?;
-
-        info!(self.logger, "Engine running"; "id" => &container_name);
-
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let mut client = rt
-            .block_on(EngineClient::connect(
-                &self.container_runtime.get_runtime_host_addr(),
-                adapter_host_port,
-            ))
-            .map_err(|e| EngineError::internal(e))?;
-
-        rt.block_on(client.execute_query())
+        client
+            .execute_query(request)
+            .await
             .map_err(|e| EngineError::internal(e))?;
 
         // TODO: chown
@@ -119,7 +91,8 @@ impl Engine for ODFEngine {
 
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
 
-        let response = self.transform2(run_info, request)?;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let response = rt.block_on(self.transform2(run_info, request))?;
 
         Ok(ExecuteQueryResponse {
             block: response.metadata_block,
@@ -156,42 +129,96 @@ impl RunInfo {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct OwnedProcess(Child);
+struct EngineContainer {
+    container_runtime: ContainerRuntime,
+    container_name: String,
+    adapter_host_port: u16,
+    engine_process: Child,
+    logger: Logger,
+}
 
-impl OwnedProcess {
+impl EngineContainer {
+    const ADAPTER_PORT: u16 = 2884;
+    const START_TIMEOUT: Duration = Duration::from_secs(30);
+    const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
+
+    pub fn new(
+        container_runtime: ContainerRuntime,
+        image: &str,
+        run_id: &str,
+        logger: Logger,
+    ) -> Result<Self, EngineError> {
+        //let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
+        //let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
+
+        let container_name = format!("kamu-engine-{}", run_id);
+
+        let mut cmd = container_runtime.run_cmd(RunArgs {
+            image: image.to_owned(),
+            container_name: Some(container_name.clone()),
+            //volume_map: volume_map,
+            user: Some("root".to_owned()),
+            expose_ports: vec![Self::ADAPTER_PORT],
+            ..RunArgs::default()
+        });
+
+        info!(logger, "Starting engine"; "command" => ?cmd, "image" => image, "id" => &container_name);
+
+        let engine_process = cmd
+            .stdout(Stdio::inherit()) //std::process::Stdio::from(stdout_file))
+            .stderr(Stdio::inherit()) //std::process::Stdio::from(stderr_file))
+            .spawn()
+            .map_err(|e| EngineError::internal(e))?;
+
+        let adapter_host_port = container_runtime
+            .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
+            .map_err(|e| EngineError::internal(e))?;
+
+        info!(logger, "Engine running"; "id" => &container_name);
+
+        Ok(Self {
+            container_runtime,
+            container_name,
+            adapter_host_port,
+            engine_process,
+            logger,
+        })
+    }
+
+    pub async fn connect_client(&self) -> Result<EngineClient, EngineError> {
+        Ok(EngineClient::connect(
+            &self.container_runtime.get_runtime_host_addr(),
+            self.adapter_host_port,
+        )
+        .await
+        .map_err(|e| EngineError::internal(e))?)
+    }
+
     pub fn has_exited(&mut self) -> Result<bool, std::io::Error> {
-        Ok(self.0.try_wait()?.map(|_| true).unwrap_or(false))
+        Ok(self
+            .engine_process
+            .try_wait()?
+            .map(|_| true)
+            .unwrap_or(false))
     }
 }
 
-impl Deref for OwnedProcess {
-    type Target = Child;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for OwnedProcess {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Drop for OwnedProcess {
+impl Drop for EngineContainer {
     fn drop(&mut self) {
+        info!(self.logger, "Shutting down engine"; "id" => &self.container_name);
         unsafe {
-            libc::kill(self.0.id() as i32, libc::SIGTERM);
+            libc::kill(self.engine_process.id() as i32, libc::SIGTERM);
         }
 
-        let start = chrono::Utc::now();
-
-        while (chrono::Utc::now() - start).num_seconds() < 3 {
+        let start = std::time::Instant::now();
+        while (std::time::Instant::now() - start) < Self::SHUTDOWN_TIMEOUT {
             if self.has_exited().unwrap_or(true) {
                 return;
             }
             std::thread::sleep(Duration::from_millis(100));
         }
 
-        let _ = self.0.kill();
+        warn!(self.logger, "Engine did not shutdown gracefully, killing"; "id" => &self.container_name);
+        let _ = self.engine_process.kill();
     }
 }
