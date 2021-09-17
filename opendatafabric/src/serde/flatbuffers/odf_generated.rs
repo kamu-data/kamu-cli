@@ -7142,3 +7142,208 @@ impl std::fmt::Debug for ExecuteQueryResponseError<'_> {
         ds.finish()
     }
 }
+pub enum ExecuteQueryResponseRootOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ExecuteQueryResponseRoot<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseRoot<'a> {
+    type Inner = ExecuteQueryResponseRoot<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> ExecuteQueryResponseRoot<'a> {
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ExecuteQueryResponseRoot { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args ExecuteQueryResponseRootArgs,
+    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseRoot<'bldr>> {
+        let mut builder = ExecuteQueryResponseRootBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        builder.add_value_type(args.value_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn value_type(&self) -> ExecuteQueryResponse {
+        self._tab
+            .get::<ExecuteQueryResponse>(
+                ExecuteQueryResponseRoot::VT_VALUE_TYPE,
+                Some(ExecuteQueryResponse::NONE),
+            )
+            .unwrap()
+    }
+    #[inline]
+    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                ExecuteQueryResponseRoot::VT_VALUE,
+                None,
+            )
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_execute_query_response_progress(
+        &self,
+    ) -> Option<ExecuteQueryResponseProgress<'a>> {
+        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseProgress {
+            self.value()
+                .map(ExecuteQueryResponseProgress::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_execute_query_response_success(
+        &self,
+    ) -> Option<ExecuteQueryResponseSuccess<'a>> {
+        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseSuccess {
+            self.value()
+                .map(ExecuteQueryResponseSuccess::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_execute_query_response_error(&self) -> Option<ExecuteQueryResponseError<'a>> {
+        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseError {
+            self.value().map(ExecuteQueryResponseError::init_from_table)
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ExecuteQueryResponseRoot<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+     .visit_union::<ExecuteQueryResponse, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
+        match key {
+          ExecuteQueryResponse::ExecuteQueryResponseProgress => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseProgress>>("ExecuteQueryResponse::ExecuteQueryResponseProgress", pos),
+          ExecuteQueryResponse::ExecuteQueryResponseSuccess => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseSuccess>>("ExecuteQueryResponse::ExecuteQueryResponseSuccess", pos),
+          ExecuteQueryResponse::ExecuteQueryResponseError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseError>>("ExecuteQueryResponse::ExecuteQueryResponseError", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
+        Ok(())
+    }
+}
+pub struct ExecuteQueryResponseRootArgs {
+    pub value_type: ExecuteQueryResponse,
+    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for ExecuteQueryResponseRootArgs {
+    #[inline]
+    fn default() -> Self {
+        ExecuteQueryResponseRootArgs {
+            value_type: ExecuteQueryResponse::NONE,
+            value: None,
+        }
+    }
+}
+pub struct ExecuteQueryResponseRootBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ExecuteQueryResponseRootBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_value_type(&mut self, value_type: ExecuteQueryResponse) {
+        self.fbb_.push_slot::<ExecuteQueryResponse>(
+            ExecuteQueryResponseRoot::VT_VALUE_TYPE,
+            value_type,
+            ExecuteQueryResponse::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryResponseRoot::VT_VALUE,
+            value,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> ExecuteQueryResponseRootBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        ExecuteQueryResponseRootBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseRoot<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for ExecuteQueryResponseRoot<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("ExecuteQueryResponseRoot");
+        ds.field("value_type", &self.value_type());
+        match self.value_type() {
+            ExecuteQueryResponse::ExecuteQueryResponseProgress => {
+                if let Some(x) = self.value_as_execute_query_response_progress() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            ExecuteQueryResponse::ExecuteQueryResponseSuccess => {
+                if let Some(x) = self.value_as_execute_query_response_success() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            ExecuteQueryResponse::ExecuteQueryResponseError => {
+                if let Some(x) = self.value_as_execute_query_response_error() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value", &x)
+            }
+        };
+        ds.finish()
+    }
+}

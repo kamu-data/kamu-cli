@@ -8,15 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use super::convertors::*;
+use super::odf_generated as fbgen;
 pub use crate::serde::{Buffer, Error, MetadataBlockDeserializer, MetadataBlockSerializer};
-use crate::{MetadataBlock, Sha3_256};
+use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
+use crate::{ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock, Sha3_256};
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 use std::convert::TryInto;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
-// FlatbuffersSerializer
+// FlatbuffersMetadataBlockSerializer
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct FlatbuffersMetadataBlockSerializer;
@@ -117,8 +119,7 @@ impl FlatbuffersMetadataBlockDeserializer {
     }
 
     fn validate_hash_buffer_position(data: &[u8]) -> Result<(), Error> {
-        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(data)
-            .map_err(|e| Error::serde(e))?;
+        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(data).map_err(|e| Error::serde(e))?;
 
         let block_hash = proxy.block_hash().unwrap();
 
@@ -174,8 +175,7 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
 
         Self::validate_block_hash(tail)?;
 
-        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(tail)
-            .map_err(|e| Error::serde(e))?;
+        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(tail).map_err(|e| Error::serde(e))?;
 
         Ok(MetadataBlock::deserialize(proxy))
     }
@@ -187,10 +187,59 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
         assert_eq!(version, 1);
         assert_eq!(kind, "MetadataBlock");
 
-        let proxy = flatbuffers::root::<super::odf_generated::MetadataBlock>(tail)
-            .map_err(|e| Error::serde(e))?;
+        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(tail).map_err(|e| Error::serde(e))?;
 
         Ok(MetadataBlock::deserialize(proxy))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// FlatbuffersEngineProtocol
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct FlatbuffersEngineProtocol;
+
+impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
+    fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error> {
+        let mut fb = flatbuffers::FlatBufferBuilder::new();
+        let offset = inst.serialize(&mut fb);
+        fb.finish(offset, None);
+        let (buf, head) = fb.collapse();
+        Ok(Buffer::new(head, buf.len(), buf))
+    }
+
+    fn write_execute_query_response(
+        &self,
+        inst: &ExecuteQueryResponse,
+    ) -> Result<Buffer<u8>, Error> {
+        let mut fb = flatbuffers::FlatBufferBuilder::new();
+        let (typ, offset) = inst.serialize(&mut fb);
+        let mut builder = fbgen::ExecuteQueryResponseRootBuilder::new(&mut fb);
+        builder.add_value_type(typ);
+        builder.add_value(offset);
+        builder.finish();
+        fb.finish(offset, None);
+        let (buf, head) = fb.collapse();
+        Ok(Buffer::new(head, buf.len(), buf))
+    }
+}
+
+impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
+    fn read_execute_query_request(&self, data: &[u8]) -> Result<ExecuteQueryRequest, Error> {
+        let proxy =
+            flatbuffers::root::<fbgen::ExecuteQueryRequest>(data).map_err(|e| Error::serde(e))?;
+
+        Ok(ExecuteQueryRequest::deserialize(proxy))
+    }
+
+    fn read_execute_query_response(&self, data: &[u8]) -> Result<ExecuteQueryResponse, Error> {
+        let proxy = flatbuffers::root::<super::odf_generated::ExecuteQueryResponseRoot>(data)
+            .map_err(|e| Error::serde(e))?;
+
+        Ok(ExecuteQueryResponse::deserialize(
+            proxy.value().unwrap(),
+            proxy.value_type(),
+        ))
     }
 }
 

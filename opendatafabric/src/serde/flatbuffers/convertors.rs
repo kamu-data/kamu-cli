@@ -24,11 +24,11 @@ pub trait FlatbuffersDeserializable<T> {
     fn deserialize(fb: T) -> Self;
 }
 
-trait FlatbuffersEnumSerializable<'fb, E> {
+pub trait FlatbuffersEnumSerializable<'fb, E> {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> (E, WIPOffset<UnionWIPOffset>);
 }
 
-trait FlatbuffersEnumDeserializable<'fb, E> {
+pub trait FlatbuffersEnumDeserializable<'fb, E> {
     fn deserialize(table: Table<'fb>, t: E) -> Self
     where
         Self: Sized;
