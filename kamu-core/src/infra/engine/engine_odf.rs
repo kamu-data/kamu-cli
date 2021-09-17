@@ -85,7 +85,7 @@ impl ODFEngine {
             ))
             .map_err(|e| EngineError::internal(e))?;
 
-        rt.block_on(client.say_hello())
+        rt.block_on(client.execute_query())
             .map_err(|e| EngineError::internal(e))?;
 
         // TODO: chown

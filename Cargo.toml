@@ -4,5 +4,6 @@ members = [
     "kamu-core",
     "kamu-cli",
     "tools",
+    "utils/container-runtime",
 ]
 resolver = "2"

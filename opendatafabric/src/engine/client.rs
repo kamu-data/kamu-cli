@@ -12,7 +12,7 @@ impl EngineClient {
         Ok(Self { client })
     }
 
-    pub async fn say_hello(&mut self) -> Result<(), tonic::Status> {
+    pub async fn execute_query(&mut self) -> Result<(), tonic::Status> {
         let request = tonic::Request::new(ExecuteQueryRequestGRPC {
             flatbuffer: Vec::new(),
         });
