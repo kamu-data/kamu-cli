@@ -6,19 +6,17 @@ use std::{
     time::Duration,
 };
 
+use container_runtime::{ContainerRuntime, RunArgs};
 use odf::engine::EngineClient;
 use opendatafabric as odf;
 use rand::Rng;
 use slog::{info, Logger};
 
 use crate::domain::*;
-use crate::infra::{
-    utils::docker_client::{DockerClient, DockerRunArgs},
-    WorkspaceLayout,
-};
+use crate::infra::WorkspaceLayout;
 
 pub struct ODFEngine {
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     image: String,
     workspace_layout: Arc<WorkspaceLayout>,
     logger: Logger,
@@ -29,7 +27,7 @@ impl ODFEngine {
     const START_TIMEOUT: Duration = Duration::from_secs(30);
 
     pub fn new(
-        container_runtime: DockerClient,
+        container_runtime: ContainerRuntime,
         image: &str,
         workspace_layout: Arc<WorkspaceLayout>,
         logger: Logger,
@@ -52,13 +50,13 @@ impl ODFEngine {
 
         let container_name = format!("kamu-engine-{}", run_info.run_id);
 
-        let mut cmd = self.container_runtime.run_cmd(DockerRunArgs {
+        let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
             container_name: Some(container_name.clone()),
             //volume_map: volume_map,
             user: Some("root".to_owned()),
             expose_ports: vec![Self::ADAPTER_PORT],
-            ..DockerRunArgs::default()
+            ..RunArgs::default()
         });
 
         info!(self.logger, "Starting engine"; "command" => ?cmd, "image" => &self.image, "id" => &container_name);
@@ -80,7 +78,7 @@ impl ODFEngine {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let mut client = rt
             .block_on(EngineClient::connect(
-                &self.container_runtime.get_docker_addr(),
+                &self.container_runtime.get_runtime_host_addr(),
                 adapter_host_port,
             ))
             .map_err(|e| EngineError::internal(e))?;

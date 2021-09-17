@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
@@ -34,7 +34,7 @@ fn test_ingest_with_engine() {
 
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
-        DockerClient::default(),
+        ContainerRuntime::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));
 

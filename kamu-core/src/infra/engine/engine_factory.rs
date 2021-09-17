@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use crate::infra::utils::docker_client::DockerClient;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
 
@@ -16,6 +15,7 @@ use super::engine_flink::*;
 use super::engine_odf::*;
 use super::engine_spark::*;
 
+use container_runtime::ContainerRuntime;
 use dill::*;
 use slog::{error, info, o, Logger};
 use std::collections::HashSet;
@@ -43,7 +43,7 @@ pub struct EngineFactoryImpl {
     spark_ingest_engine: Arc<Mutex<SparkEngine>>,
     spark_engine: Arc<Mutex<ODFEngine>>,
     flink_engine: Arc<Mutex<FlinkEngine>>,
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     known_images: Mutex<HashSet<String>>,
     logger: Logger,
 }
@@ -52,7 +52,7 @@ pub struct EngineFactoryImpl {
 impl EngineFactoryImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
-        container_runtime: DockerClient,
+        container_runtime: ContainerRuntime,
         logger: Logger,
     ) -> Self {
         Self {

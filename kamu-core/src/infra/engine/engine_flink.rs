@@ -8,9 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
+use container_runtime::ContainerRuntime;
+use container_runtime::ContainerRuntimeType;
+use container_runtime::ExecArgs;
+use container_runtime::NetworkNamespaceType;
+use container_runtime::RunArgs;
 use rand::Rng;
 use slog::{info, o, Logger};
 use std::fs::File;
@@ -19,7 +23,7 @@ use std::process::{Child, Stdio};
 use std::time::Duration;
 
 pub struct FlinkEngine {
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     image: String,
     workspace_layout: WorkspaceLayout,
     logger: Logger,
@@ -82,7 +86,7 @@ impl RunInfo {
 
 impl FlinkEngine {
     pub fn new(
-        container_runtime: DockerClient,
+        container_runtime: ContainerRuntime,
         image: &str,
         workspace_layout: &WorkspaceLayout,
         logger: Logger,
@@ -129,7 +133,7 @@ impl FlinkEngine {
 
         let job_manager = Container::new(
             self.container_runtime.clone(),
-            DockerRunArgs {
+            RunArgs {
                 image: self.image.clone(),
                 network: network_name.clone(),
                 container_name: Some("jobmanager".to_owned()),
@@ -156,7 +160,7 @@ impl FlinkEngine {
                         self.volume_dir_in_container(),
                     ),
                 ],
-                ..DockerRunArgs::default()
+                ..RunArgs::default()
             },
             &run_info.job_manager_stdout_path,
             &run_info.job_manager_stderr_path,
@@ -165,7 +169,7 @@ impl FlinkEngine {
 
         let _task_manager = Container::new(
             self.container_runtime.clone(),
-            DockerRunArgs {
+            RunArgs {
                 image: self.image.clone(),
                 network: network_name.clone(),
                 container_name: Some("taskmanager".to_owned()),
@@ -189,7 +193,7 @@ impl FlinkEngine {
                     self.workspace_layout.local_volume_dir.clone(),
                     self.volume_dir_in_container(),
                 )],
-                ..DockerRunArgs::default()
+                ..RunArgs::default()
             },
             &run_info.task_manager_stdout_path,
             &run_info.task_manager_stderr_path,
@@ -389,7 +393,7 @@ impl Engine for FlinkEngine {
 }
 
 struct Container {
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     name: String,
     child: Child,
     logger: Logger,
@@ -397,8 +401,8 @@ struct Container {
 
 impl Container {
     fn new(
-        container_runtime: DockerClient,
-        args: DockerRunArgs,
+        container_runtime: ContainerRuntime,
+        args: RunArgs,
         stdout_path: &Path,
         stderr_path: &Path,
         logger: Logger,

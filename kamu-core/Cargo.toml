@@ -12,6 +12,7 @@ skip_docker_tests = []
 opendatafabric = { path = "../opendatafabric" }
 dill = { version = "~0.2.0" }
 # dill = { path = "../../dill" }
+container-runtime = { path = "../utils/container-runtime" }
 
 # Domain
 chrono = { version = "*", features = ["serde"] }
