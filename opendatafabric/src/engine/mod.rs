@@ -1,4 +1,4 @@
 mod client;
 pub use client::*;
 
-mod generated;
+pub mod generated;
