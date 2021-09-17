@@ -1148,6 +1148,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "chrono",
+ "container-runtime",
  "curl",
  "curl-sys",
  "datafusion",

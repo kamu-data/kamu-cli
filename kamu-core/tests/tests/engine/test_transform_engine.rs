@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
@@ -32,7 +32,7 @@ fn test_transform_with_engine_spark() {
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
-        DockerClient::default(),
+        ContainerRuntime::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));
 
@@ -230,7 +230,7 @@ fn test_transform_with_engine_flink() {
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
-        DockerClient::default(),
+        ContainerRuntime::default(),
         slog::Logger::root(slog::Discard, slog::o!()),
     ));
 

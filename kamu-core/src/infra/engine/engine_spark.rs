@@ -8,16 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use crate::infra::utils::docker_client::*;
 use crate::infra::*;
 
+use container_runtime::ContainerRuntime;
+use container_runtime::ContainerRuntimeType;
+use container_runtime::RunArgs;
 use rand::Rng;
 use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
 pub struct SparkEngine {
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     image: String,
     workspace_layout: WorkspaceLayout,
     logger: Logger,
@@ -57,7 +59,7 @@ impl RunInfo {
 
 impl SparkEngine {
     pub fn new(
-        container_runtime: DockerClient,
+        container_runtime: ContainerRuntime,
         image: &str,
         workspace_layout: &WorkspaceLayout,
         logger: Logger,
@@ -120,11 +122,11 @@ impl SparkEngine {
         };
 
         let mut cmd = self.container_runtime.run_shell_cmd(
-            DockerRunArgs {
+            RunArgs {
                 image: self.image.clone(),
                 volume_map: volume_map,
                 user: Some("root".to_owned()),
-                ..DockerRunArgs::default()
+                ..RunArgs::default()
             },
             &[
                 format!(
