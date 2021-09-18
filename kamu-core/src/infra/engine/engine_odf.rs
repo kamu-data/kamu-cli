@@ -6,10 +6,7 @@ use std::{
 };
 
 use container_runtime::{ContainerRuntime, RunArgs};
-use odf::{
-    engine::EngineClient,
-    serde::{flatbuffers::FlatbuffersEngineProtocol, EngineProtocolSerializer},
-};
+use odf::engine::EngineClient;
 use opendatafabric as odf;
 use rand::Rng;
 use slog::{info, warn, Logger};
@@ -194,17 +191,21 @@ impl EngineContainer {
         .map_err(|e| EngineError::internal(e))?)
     }
 
-    pub fn has_exited(&mut self) -> Result<bool, std::io::Error> {
-        Ok(self
-            .engine_process
-            .try_wait()?
-            .map(|_| true)
-            .unwrap_or(false))
+    pub fn has_exited(&mut self) -> bool {
+        match self.engine_process.try_wait() {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(_) => true,
+        }
     }
 }
 
 impl Drop for EngineContainer {
     fn drop(&mut self) {
+        if self.has_exited() {
+            return;
+        }
+
         info!(self.logger, "Shutting down engine"; "id" => &self.container_name);
         unsafe {
             libc::kill(self.engine_process.id() as i32, libc::SIGTERM);
@@ -212,7 +213,7 @@ impl Drop for EngineContainer {
 
         let start = std::time::Instant::now();
         while (std::time::Instant::now() - start) < Self::SHUTDOWN_TIMEOUT {
-            if self.has_exited().unwrap_or(true) {
+            if self.has_exited() {
                 return;
             }
             std::thread::sleep(Duration::from_millis(100));

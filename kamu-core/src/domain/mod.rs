@@ -55,3 +55,6 @@ pub use sync_service::*;
 
 mod transform_service;
 pub use transform_service::*;
+
+// Re-exports
+pub use container_runtime::{NullPullImageListener, PullImageListener};

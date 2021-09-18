@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::utils::docker_client::*;
+use container_runtime::{ContainerRuntime, RunArgs};
 use kamu::infra::utils::docker_images;
 
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ use std::time::Duration;
 
 // TODO: Consider replacing with in-process server for speed
 pub struct HttpServer {
-    container_runtime: DockerClient,
+    container_runtime: ContainerRuntime,
     pub container_name: String,
     pub address: String,
     pub host_port: u16,
@@ -26,7 +26,7 @@ impl HttpServer {
     pub fn new(server_dir: &Path) -> Self {
         use rand::Rng;
 
-        let container_runtime = DockerClient::default();
+        let container_runtime = ContainerRuntime::default();
 
         let mut server_name = "kamu-test-http-".to_owned();
         server_name.extend(
@@ -48,7 +48,7 @@ impl HttpServer {
         );
 
         let process = container_runtime
-            .run_cmd(DockerRunArgs {
+            .run_cmd(RunArgs {
                 image: docker_images::HTTPD.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![server_port],
@@ -56,7 +56,7 @@ impl HttpServer {
                     server_dir.to_owned(),
                     PathBuf::from("/usr/local/apache2/htdocs"),
                 )],
-                ..DockerRunArgs::default()
+                ..RunArgs::default()
             })
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -71,7 +71,7 @@ impl HttpServer {
             .wait_for_socket(host_port, Duration::from_secs(20))
             .unwrap();
 
-        let address = container_runtime.get_docker_addr();
+        let address = container_runtime.get_runtime_host_addr();
 
         Self {
             container_runtime,

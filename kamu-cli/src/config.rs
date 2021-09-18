@@ -10,7 +10,7 @@
 use core::panic;
 use std::path::{Path, PathBuf};
 
-use kamu::infra::utils::docker_client::{ContainerRuntimeType, NetworkNamespaceType};
+use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use kamu::infra::Manifest;
 use kamu::infra::WorkspaceLayout;
 

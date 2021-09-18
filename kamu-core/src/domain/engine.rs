@@ -32,14 +32,6 @@ pub trait IngestEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
 }
 
-pub trait PullImageListener {
-    fn begin(&self, _image: &str) {}
-    fn success(&self) {}
-}
-
-pub struct NullPullImageListener;
-impl PullImageListener for NullPullImageListener {}
-
 ///////////////////////////////////////////////////////////////////////////////
 // Request / Response DTOs
 ///////////////////////////////////////////////////////////////////////////////

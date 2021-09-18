@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::PullImageListener;
-use crate::infra::utils::docker_client::*;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
 
+use container_runtime::{ContainerHandle, ContainerRuntime, PullImageListener, RunArgs};
 use slog::{info, Logger};
 use std::fs::File;
 use std::path::PathBuf;
@@ -21,11 +20,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub struct LivyServerImpl {
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 impl LivyServerImpl {
-    pub fn new(container_runtime: Arc<DockerClient>) -> Self {
+    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
         Self { container_runtime }
     }
 
@@ -52,7 +51,7 @@ impl LivyServerImpl {
         let livy_stdout_path = workspace_layout.run_info_dir.join("livy.out.txt");
         let livy_stderr_path = workspace_layout.run_info_dir.join("livy.err.txt");
 
-        let mut livy_cmd = self.container_runtime.run_cmd(DockerRunArgs {
+        let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
             image: docker_images::LIVY.to_owned(),
             container_name: Some("kamu-livy".to_owned()),
             entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
@@ -67,7 +66,7 @@ impl LivyServerImpl {
             } else {
                 vec![]
             },
-            ..DockerRunArgs::default()
+            ..RunArgs::default()
         });
 
         info!(logger, "Starting Livy container"; "command" => ?livy_cmd);
@@ -85,7 +84,7 @@ impl LivyServerImpl {
             })
             .spawn()?;
 
-        let _drop_livy = DropContainer::new(self.container_runtime.clone(), "kamu-livy");
+        let _drop_livy = ContainerHandle::new(self.container_runtime.clone(), "kamu-livy");
 
         self.container_runtime
             .wait_for_socket(host_port, Duration::from_secs(60))

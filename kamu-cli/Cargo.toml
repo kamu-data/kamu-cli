@@ -15,6 +15,7 @@ categories = ["command-line-utilities"]
 skip_docker_tests = []
 
 [dependencies]
+container-runtime = { path = "../utils/container-runtime" }
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 dill = { version = "~0.2.0" }

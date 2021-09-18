@@ -10,18 +10,18 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use kamu::infra::utils::docker_client::DockerClient;
+use container_runtime::ContainerRuntime;
 use kamu::infra::utils::docker_images;
 
 pub struct PullImagesCommand {
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
     pull_test_deps: bool,
     list_only: bool,
 }
 
 impl PullImagesCommand {
     pub fn new<'a>(
-        container_runtime: Arc<DockerClient>,
+        container_runtime: Arc<ContainerRuntime>,
         pull_test_deps: bool,
         list_only: bool,
     ) -> Self {

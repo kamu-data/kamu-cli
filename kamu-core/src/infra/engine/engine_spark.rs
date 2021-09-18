@@ -10,9 +10,7 @@
 use crate::domain::*;
 use crate::infra::*;
 
-use container_runtime::ContainerRuntime;
-use container_runtime::ContainerRuntimeType;
-use container_runtime::RunArgs;
+use container_runtime::*;
 use rand::Rng;
 use slog::{info, Logger};
 use std::fs::File;

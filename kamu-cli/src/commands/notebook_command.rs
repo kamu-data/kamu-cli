@@ -10,8 +10,8 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
+use container_runtime::ContainerRuntime;
 use kamu::infra::explore::*;
-use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 
 use console::style as s;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     volume_layout: Arc<VolumeLayout>,
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
     output_config: Arc<OutputConfig>,
     env_vars: Vec<(String, Option<String>)>,
     logger: Logger,
@@ -32,7 +32,7 @@ impl NotebookCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
-        container_runtime: Arc<DockerClient>,
+        container_runtime: Arc<ContainerRuntime>,
         env_vars: Iter,
         logger: Logger,
     ) -> Self
