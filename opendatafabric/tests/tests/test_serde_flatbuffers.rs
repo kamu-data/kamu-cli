@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::serde::flatbuffers::*;
+use opendatafabric::serde::{flatbuffers::*, EngineProtocolDeserializer, EngineProtocolSerializer};
 use opendatafabric::*;
 
 use chrono::prelude::*;
@@ -203,4 +203,25 @@ fn deserializer_rejects_incorrect_hashes() {
         FlatbuffersMetadataBlockDeserializer.read_manifest(&buf),
         Err(opendatafabric::serde::Error::InvalidHash { .. })
     ));
+}
+
+#[test]
+fn serde_execute_query_response() {
+    let examples = [
+        ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
+            metadata_block: MetadataBlock { ..get_block_root() },
+        }),
+        ExecuteQueryResponse::Error,
+        ExecuteQueryResponse::Progress,
+    ];
+
+    for expected in examples {
+        let buf = FlatbuffersEngineProtocol
+            .write_execute_query_response(&expected)
+            .unwrap();
+        let actual = FlatbuffersEngineProtocol
+            .read_execute_query_response(&buf)
+            .unwrap();
+        assert_eq!(actual, expected);
+    }
 }

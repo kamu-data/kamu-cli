@@ -81,7 +81,7 @@ impl<T> std::ops::Deref for Buffer<T> {
 
 impl<T> std::convert::AsRef<[T]> for Buffer<T> {
     fn as_ref(&self) -> &[T] {
-        &self.buf
+        &self.buf[self.head..self.tail]
     }
 }
 
