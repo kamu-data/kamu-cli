@@ -6,7 +6,7 @@ package engine;
 
 service Engine {
     // Performs the next iteration of the transformation
-    rpc ExecuteQuery (ExecuteQueryRequest) returns (ExecuteQueryResponse);
+    rpc ExecuteQuery (ExecuteQueryRequest) returns (stream ExecuteQueryResponse);
 }
 
 message ExecuteQueryRequest {

@@ -28,15 +28,15 @@ impl EngineClient {
             flatbuffer: fb.collapse_vec(),
         });
 
-        let response_grpc = self.client.execute_query(request_grpc).await?;
+        let mut stream = self.client.execute_query(request_grpc).await?.into_inner();
 
-        println!("RESPONSE={:?}", response_grpc);
+        while let Some(response_grpc) = stream.message().await? {
+            let response = FlatbuffersEngineProtocol
+                .read_execute_query_response(&response_grpc.flatbuffer)
+                .unwrap();
 
-        let response = FlatbuffersEngineProtocol
-            .read_execute_query_response(&response_grpc.get_ref().flatbuffer)
-            .unwrap();
-
-        println!("RESPONSE={:?}", response);
+            println!("RESPONSE={:?}", response);
+        }
 
         Ok(())
     }
