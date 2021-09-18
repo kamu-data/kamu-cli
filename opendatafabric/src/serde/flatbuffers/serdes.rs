@@ -213,11 +213,13 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
         inst: &ExecuteQueryResponse,
     ) -> Result<Buffer<u8>, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
-        let (typ, offset) = inst.serialize(&mut fb);
-        let mut builder = fbgen::ExecuteQueryResponseRootBuilder::new(&mut fb);
-        builder.add_value_type(typ);
-        builder.add_value(offset);
-        builder.finish();
+        let offset = {
+            let (typ, offset) = inst.serialize(&mut fb);
+            let mut builder = fbgen::ExecuteQueryResponseRootBuilder::new(&mut fb);
+            builder.add_value_type(typ);
+            builder.add_value(offset);
+            builder.finish()
+        };
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
         Ok(Buffer::new(head, buf.len(), buf))
