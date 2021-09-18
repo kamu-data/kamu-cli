@@ -10,9 +10,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
-use kamu::infra::utils::docker_client::*;
 use kamu::infra::*;
 use slog::Drain;
 use slog::{info, FnValue};
@@ -72,7 +72,7 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     let mut catalog = Catalog::new();
 
     catalog.add::<ConfigService>();
-    catalog.add::<DockerClient>();
+    catalog.add::<ContainerRuntime>();
 
     catalog.add::<MetadataRepositoryImpl>();
     catalog.bind::<dyn MetadataRepository, MetadataRepositoryImpl>()?;

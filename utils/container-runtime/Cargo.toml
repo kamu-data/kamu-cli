@@ -9,6 +9,7 @@ license-file = "../../LICENSE.txt"
 skip_docker_tests = []
 
 [dependencies]
+dill = { version = "~0.2.0" }
 regex = "*"
 serde = { version = "*", features = ["derive"] }
 thiserror = "*"

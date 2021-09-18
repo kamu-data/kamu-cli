@@ -10,9 +10,9 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::*;
+use container_runtime::ContainerRuntime;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::explore::*;
-use kamu::infra::utils::docker_client::DockerClient;
 use kamu::infra::*;
 
 use slog::Logger;
@@ -23,7 +23,7 @@ pub struct SqlShellCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
     command: Option<String>,
     url: Option<String>,
     engine: Option<String>,
@@ -36,7 +36,7 @@ impl SqlShellCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
-        container_runtime: Arc<DockerClient>,
+        container_runtime: Arc<ContainerRuntime>,
         command: Option<&str>,
         url: Option<&str>,
         engine: Option<&str>,
@@ -47,7 +47,7 @@ impl SqlShellCommand {
             workspace_layout,
             volume_layout,
             output_config,
-            container_runtime: container_runtime,
+            container_runtime,
             command: command.map(|v| v.to_owned()),
             url: url.map(|v| v.to_owned()),
             engine: engine.map(|v| v.to_owned()),

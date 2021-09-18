@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::PullImageListener;
-use crate::infra::utils::docker_client::*;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
 
+use container_runtime::{
+    ContainerHandle, ContainerRuntime, ContainerRuntimeType, PullImageListener, RunArgs,
+};
 use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -20,11 +21,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub struct NotebookServerImpl {
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 impl NotebookServerImpl {
-    pub fn new(container_runtime: Arc<DockerClient>) -> Self {
+    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
         Self { container_runtime }
     }
 
@@ -68,7 +69,7 @@ impl NotebookServerImpl {
         let jupyter_stdout_path = workspace_layout.run_info_dir.join("jupyter.out.txt");
         let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
 
-        let mut livy_cmd = self.container_runtime.run_cmd(DockerRunArgs {
+        let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
             image: docker_images::LIVY.to_owned(),
             container_name: Some("kamu-livy".to_owned()),
             hostname: Some("kamu-livy".to_owned()),
@@ -84,7 +85,7 @@ impl NotebookServerImpl {
                 vec![]
             },
             entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
-            ..DockerRunArgs::default()
+            ..RunArgs::default()
         });
 
         info!(logger, "Starting Livy container"; "command" => ?livy_cmd);
@@ -101,9 +102,9 @@ impl NotebookServerImpl {
                 Stdio::from(File::create(&livy_stderr_path)?)
             })
             .spawn()?;
-        let _drop_livy = DropContainer::new(self.container_runtime.clone(), "kamu-livy");
+        let _drop_livy = ContainerHandle::new(self.container_runtime.clone(), "kamu-livy");
 
-        let mut jupyter_cmd = self.container_runtime.run_cmd(DockerRunArgs {
+        let mut jupyter_cmd = self.container_runtime.run_cmd(RunArgs {
             image: docker_images::JUPYTER.to_owned(),
             container_name: Some("kamu-jupyter".to_owned()),
             network: Some(network_name.to_owned()),
@@ -112,7 +113,7 @@ impl NotebookServerImpl {
             expose_ports: vec![80],
             volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
             environment_vars: environment_vars,
-            ..DockerRunArgs::default()
+            ..RunArgs::default()
         });
 
         info!(logger, "Starting Jupyter container"; "command" => ?jupyter_cmd);
@@ -125,9 +126,9 @@ impl NotebookServerImpl {
             })
             .stderr(Stdio::piped())
             .spawn()?;
-        let _drop_jupyter = DropContainer::new(self.container_runtime.clone(), "kamu-jupyter");
+        let _drop_jupyter = ContainerHandle::new(self.container_runtime.clone(), "kamu-jupyter");
 
-        let docker_host = self.container_runtime.get_docker_addr();
+        let docker_host = self.container_runtime.get_runtime_host_addr();
         let jupyter_port = self
             .container_runtime
             .wait_for_host_port("kamu-jupyter", 80, std::time::Duration::from_secs(5))
@@ -173,12 +174,12 @@ impl NotebookServerImpl {
                 if #[cfg(unix)] {
                     self.container_runtime
                         .run_shell_cmd(
-                            DockerRunArgs {
+                            RunArgs {
                                 image: docker_images::JUPYTER.to_owned(),
                                 user: Some("root".to_owned()),
                                 container_name: Some("kamu-jupyter".to_owned()),
                                 volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
-                                ..DockerRunArgs::default()
+                                ..RunArgs::default()
                             },
                             &[format!(
                                 "chown -R {}:{} {}",

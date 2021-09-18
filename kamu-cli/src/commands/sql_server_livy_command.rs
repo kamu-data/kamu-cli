@@ -10,8 +10,8 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::*;
+use container_runtime::ContainerRuntime;
 use kamu::infra::explore::*;
-use kamu::infra::utils::docker_client::*;
 use kamu::infra::*;
 
 use console::style as s;
@@ -22,7 +22,7 @@ pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
     logger: Logger,
     address: String,
     port: u16,
@@ -33,7 +33,7 @@ impl SqlServerLivyCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
-        container_runtime: Arc<DockerClient>,
+        container_runtime: Arc<ContainerRuntime>,
         logger: Logger,
         address: &str,
         port: u16,
@@ -42,7 +42,7 @@ impl SqlServerLivyCommand {
             workspace_layout,
             volume_layout,
             output_config,
-            container_runtime: container_runtime,
+            container_runtime,
             logger: logger,
             address: address.to_owned(),
             port: port,

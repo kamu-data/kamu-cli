@@ -10,8 +10,8 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::output::*;
+use container_runtime::{ContainerHandle, ContainerRuntime};
 use kamu::infra::explore::*;
-use kamu::infra::utils::docker_client::*;
 use kamu::infra::*;
 
 use console::style as s;
@@ -22,7 +22,7 @@ pub struct SqlServerCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
     logger: Logger,
     address: String,
     port: u16,
@@ -33,7 +33,7 @@ impl SqlServerCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
-        container_runtime: Arc<DockerClient>,
+        container_runtime: Arc<ContainerRuntime>,
         logger: Logger,
         address: &str,
         port: u16,
@@ -42,7 +42,7 @@ impl SqlServerCommand {
             workspace_layout,
             volume_layout,
             output_config,
-            container_runtime: container_runtime,
+            container_runtime,
             logger: logger,
             address: address.to_owned(),
             port: port,
@@ -79,7 +79,7 @@ impl Command for SqlServerCommand {
         )?;
 
         // TODO: Move into a container whapper type
-        let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
+        let _drop_spark = ContainerHandle::new(self.container_runtime.clone(), "kamu-spark");
 
         if let Some(s) = spinner {
             s.finish_and_clear();

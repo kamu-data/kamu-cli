@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{EngineError, PullImageListener};
+use super::EngineError;
+use container_runtime::PullImageListener;
 use opendatafabric::{DatasetID, DatasetIDBuf, FetchStep, Sha3_256};
 
 use std::backtrace::Backtrace;

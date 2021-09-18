@@ -15,7 +15,7 @@ use super::engine_flink::*;
 use super::engine_odf::*;
 use super::engine_spark::*;
 
-use container_runtime::ContainerRuntime;
+use container_runtime::{ContainerRuntime, NullPullImageListener, PullImageListener};
 use dill::*;
 use slog::{error, info, o, Logger};
 use std::collections::HashSet;

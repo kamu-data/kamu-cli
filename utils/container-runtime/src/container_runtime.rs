@@ -3,6 +3,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use dill::*;
 use serde::{Deserialize, Serialize};
 use std::backtrace::Backtrace;
 use thiserror::Error;
@@ -73,6 +74,14 @@ impl Default for ExecArgs {
     }
 }
 
+pub trait PullImageListener {
+    fn begin(&self, _image: &str) {}
+    fn success(&self) {}
+}
+
+pub struct NullPullImageListener;
+impl PullImageListener for NullPullImageListener {}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +131,7 @@ pub struct ContainerRuntime {
     pub config: ContainerRuntimeConfig,
 }
 
+#[component(pub)]
 impl ContainerRuntime {
     pub fn new(config: ContainerRuntimeConfig) -> Self {
         Self { config }
@@ -152,6 +162,27 @@ impl ContainerRuntime {
         cmd.arg("pull");
         cmd.arg(image);
         cmd
+    }
+
+    pub fn ensure_image(&self, image: &str, maybe_listener: Option<&dyn PullImageListener>) {
+        let null_listener = NullPullImageListener;
+        let listener = maybe_listener.unwrap_or(&null_listener);
+
+        if !self.has_image(image) {
+            listener.begin(image);
+
+            // TODO: Handle pull errors gracefully
+            self.pull_cmd(image)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .expect("Failed to start pull process")
+                .exit_ok()
+                .expect("Failed to pull image");
+
+            listener.success();
+        }
     }
 
     pub fn run_cmd(&self, args: RunArgs) -> Command {

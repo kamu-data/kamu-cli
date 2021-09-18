@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::PullImageListener;
-use crate::infra::utils::docker_client::*;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
 
+use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
 use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -20,12 +19,12 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 pub struct SqlShellImpl {
-    container_runtime: Arc<DockerClient>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
-    pub fn new(container_runtime: Arc<DockerClient>) -> Self {
+    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
         Self { container_runtime }
     }
 
@@ -66,16 +65,16 @@ impl SqlShellImpl {
 
         // Start Spark container in the idle loop
         let spark = {
-            let args = DockerRunArgs {
+            let args = RunArgs {
                 image: docker_images::SPARK.to_owned(),
                 container_name: Some("kamu-spark".to_owned()),
                 user: Some("root".to_owned()),
                 volume_map,
-                ..DockerRunArgs::default()
+                ..RunArgs::default()
             };
 
             let args = if let Some(p) = port {
-                DockerRunArgs {
+                RunArgs {
                     network: Some("host".to_owned()),
                     expose_port_map_addr: vec![(
                         address.unwrap_or("127.0.0.1").to_owned(),
@@ -85,7 +84,7 @@ impl SqlShellImpl {
                     ..args
                 }
             } else {
-                DockerRunArgs {
+                RunArgs {
                     expose_ports: vec![10000],
                     ..args
                 }
@@ -160,7 +159,7 @@ impl SqlShellImpl {
     {
         info!(logger, "Starting SQL shell");
 
-        let mut cmd = self.container_runtime.run_cmd(DockerRunArgs {
+        let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: docker_images::SPARK.to_owned(),
             container_name: Some("kamu-spark-shell".to_owned()),
             user: Some("root".to_owned()),
@@ -182,7 +181,7 @@ impl SqlShellImpl {
                     None => "".to_owned(),
                 },
             ],
-            ..DockerRunArgs::default()
+            ..RunArgs::default()
         });
 
         cmd.spawn()?.wait()?;
@@ -221,7 +220,7 @@ impl SqlShellImpl {
         )?;
 
         {
-            let _drop_spark = DropContainer::new(self.container_runtime.clone(), "kamu-spark");
+            let _drop_spark = ContainerHandle::new(self.container_runtime.clone(), "kamu-spark");
 
             started_clb();
             info!(logger, "Starting SQL shell");
