@@ -15,4 +15,4 @@ pub const JUPYTER: &str = "docker.io/kamudata/jupyter:0.1.0";
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";
 pub const FTP: &str = "docker.io/bogem/ftp";
-pub const MINIO: &str = "docker.io/minio/minio";
+pub const MINIO: &str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
