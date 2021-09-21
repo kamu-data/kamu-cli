@@ -401,9 +401,9 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ExecuteQueryResponse> for odf::Ex
                 fb::ExecuteQueryResponse::ExecuteQueryResponseSuccess,
                 v.serialize(fb).as_union_value(),
             ),
-            odf::ExecuteQueryResponse::Error => (
+            odf::ExecuteQueryResponse::Error(v) => (
                 fb::ExecuteQueryResponse::ExecuteQueryResponseError,
-                empty_table(fb).as_union_value(),
+                v.serialize(fb).as_union_value(),
             ),
         }
     }
@@ -422,7 +422,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ExecuteQueryResponse>
                     fb::ExecuteQueryResponseSuccess::init_from_table(table),
                 ))
             }
-            fb::ExecuteQueryResponse::ExecuteQueryResponseError => odf::ExecuteQueryResponse::Error,
+            fb::ExecuteQueryResponse::ExecuteQueryResponseError => {
+                odf::ExecuteQueryResponse::Error(odf::ExecuteQueryResponseError::deserialize(
+                    fb::ExecuteQueryResponseError::init_from_table(table),
+                ))
+            }
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -448,6 +452,30 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseSuccess<'fb>>
                 .metadata_block()
                 .map(|v| odf::MetadataBlock::deserialize(v))
                 .unwrap(),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseError {
+    type OffsetT = WIPOffset<fb::ExecuteQueryResponseError<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let message_offset = { fb.create_string(&self.message) };
+        let details_offset = self.details.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::ExecuteQueryResponseErrorBuilder::new(fb);
+        builder.add_message(message_offset);
+        details_offset.map(|off| builder.add_details(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseError<'fb>>
+    for odf::ExecuteQueryResponseError
+{
+    fn deserialize(proxy: fb::ExecuteQueryResponseError<'fb>) -> Self {
+        odf::ExecuteQueryResponseError {
+            message: proxy.message().map(|v| v.to_owned()).unwrap(),
+            details: proxy.details().map(|v| v.to_owned()),
         }
     }
 }
@@ -578,45 +606,6 @@ impl Into<odf::SourceOrdering> for fb::SourceOrdering {
             fb::SourceOrdering::ByEventTime => odf::SourceOrdering::ByEventTime,
             fb::SourceOrdering::ByName => odf::SourceOrdering::ByName,
             _ => panic!("Invalid enum value: {}", self.0),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// InputDataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::InputDataSlice {
-    type OffsetT = WIPOffset<fb::InputDataSlice<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let schema_file_offset = { fb.create_string(&self.schema_file) };
-        let explicit_watermarks_offset = {
-            let offsets: Vec<_> = self
-                .explicit_watermarks
-                .iter()
-                .map(|i| i.serialize(fb))
-                .collect();
-            fb.create_vector(&offsets)
-        };
-        let mut builder = fb::InputDataSliceBuilder::new(fb);
-        builder.add_interval(&interval_to_fb(&self.interval));
-        builder.add_schema_file(schema_file_offset);
-        builder.add_explicit_watermarks(explicit_watermarks_offset);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::InputDataSlice<'fb>> for odf::InputDataSlice {
-    fn deserialize(proxy: fb::InputDataSlice<'fb>) -> Self {
-        odf::InputDataSlice {
-            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
-            schema_file: proxy.schema_file().map(|v| v.to_owned()).unwrap(),
-            explicit_watermarks: proxy
-                .explicit_watermarks()
-                .map(|v| v.iter().map(|i| odf::Watermark::deserialize(i)).collect())
-                .unwrap(),
         }
     }
 }
@@ -922,12 +911,31 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::QueryInput {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let dataset_id_offset = { fb.create_string(&self.dataset_id) };
-        let slice_offset = { self.slice.serialize(fb) };
         let vocab_offset = { self.vocab.serialize(fb) };
+        let data_paths_offset = {
+            let offsets: Vec<_> = self
+                .data_paths
+                .iter()
+                .map(|i| fb.create_string(&i))
+                .collect();
+            fb.create_vector(&offsets)
+        };
+        let schema_file_offset = { fb.create_string(&self.schema_file) };
+        let explicit_watermarks_offset = {
+            let offsets: Vec<_> = self
+                .explicit_watermarks
+                .iter()
+                .map(|i| i.serialize(fb))
+                .collect();
+            fb.create_vector(&offsets)
+        };
         let mut builder = fb::QueryInputBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
-        builder.add_slice(slice_offset);
         builder.add_vocab(vocab_offset);
+        builder.add_interval(&interval_to_fb(&self.interval));
+        builder.add_data_paths(data_paths_offset);
+        builder.add_schema_file(schema_file_offset);
+        builder.add_explicit_watermarks(explicit_watermarks_offset);
         builder.finish()
     }
 }
@@ -939,13 +947,19 @@ impl<'fb> FlatbuffersDeserializable<fb::QueryInput<'fb>> for odf::QueryInput {
                 .dataset_id()
                 .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
                 .unwrap(),
-            slice: proxy
-                .slice()
-                .map(|v| odf::InputDataSlice::deserialize(v))
-                .unwrap(),
             vocab: proxy
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v))
+                .unwrap(),
+            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
+            data_paths: proxy
+                .data_paths()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect())
+                .unwrap(),
+            schema_file: proxy.schema_file().map(|v| v.to_owned()).unwrap(),
+            explicit_watermarks: proxy
+                .explicit_watermarks()
+                .map(|v| v.iter().map(|i| odf::Watermark::deserialize(i)).collect())
                 .unwrap(),
         }
     }

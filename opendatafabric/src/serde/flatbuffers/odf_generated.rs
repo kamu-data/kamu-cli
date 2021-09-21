@@ -5992,165 +5992,6 @@ impl std::fmt::Debug for Watermark<'_> {
         ds.finish()
     }
 }
-pub enum InputDataSliceOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct InputDataSlice<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for InputDataSlice<'a> {
-    type Inner = InputDataSlice<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> InputDataSlice<'a> {
-    pub const VT_INTERVAL: flatbuffers::VOffsetT = 4;
-    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 6;
-    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 8;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        InputDataSlice { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args InputDataSliceArgs<'args>,
-    ) -> flatbuffers::WIPOffset<InputDataSlice<'bldr>> {
-        let mut builder = InputDataSliceBuilder::new(_fbb);
-        if let Some(x) = args.explicit_watermarks {
-            builder.add_explicit_watermarks(x);
-        }
-        if let Some(x) = args.schema_file {
-            builder.add_schema_file(x);
-        }
-        if let Some(x) = args.interval {
-            builder.add_interval(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn interval(&self) -> Option<&'a TimeInterval> {
-        self._tab
-            .get::<TimeInterval>(InputDataSlice::VT_INTERVAL, None)
-    }
-    #[inline]
-    pub fn schema_file(&self) -> Option<&'a str> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<&str>>(InputDataSlice::VT_SCHEMA_FILE, None)
-    }
-    #[inline]
-    pub fn explicit_watermarks(
-        &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>> {
-        self._tab.get::<flatbuffers::ForwardsUOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark>>,
-        >>(InputDataSlice::VT_EXPLICIT_WATERMARKS, None)
-    }
-}
-
-impl flatbuffers::Verifiable for InputDataSlice<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<TimeInterval>("interval", Self::VT_INTERVAL, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "schema_file",
-                Self::VT_SCHEMA_FILE,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Watermark>>,
-            >>("explicit_watermarks", Self::VT_EXPLICIT_WATERMARKS, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct InputDataSliceArgs<'a> {
-    pub interval: Option<&'a TimeInterval>,
-    pub schema_file: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub explicit_watermarks: Option<
-        flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>,
-        >,
-    >,
-}
-impl<'a> Default for InputDataSliceArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        InputDataSliceArgs {
-            interval: None,
-            schema_file: None,
-            explicit_watermarks: None,
-        }
-    }
-}
-pub struct InputDataSliceBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> InputDataSliceBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_interval(&mut self, interval: &TimeInterval) {
-        self.fbb_
-            .push_slot_always::<&TimeInterval>(InputDataSlice::VT_INTERVAL, interval);
-    }
-    #[inline]
-    pub fn add_schema_file(&mut self, schema_file: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            InputDataSlice::VT_SCHEMA_FILE,
-            schema_file,
-        );
-    }
-    #[inline]
-    pub fn add_explicit_watermarks(
-        &mut self,
-        explicit_watermarks: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Watermark<'b>>>,
-        >,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            InputDataSlice::VT_EXPLICIT_WATERMARKS,
-            explicit_watermarks,
-        );
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InputDataSliceBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        InputDataSliceBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<InputDataSlice<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for InputDataSlice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("InputDataSlice");
-        ds.field("interval", &self.interval());
-        ds.field("schema_file", &self.schema_file());
-        ds.field("explicit_watermarks", &self.explicit_watermarks());
-        ds.finish()
-    }
-}
 pub enum QueryInputOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -6172,8 +6013,11 @@ impl<'a> flatbuffers::Follow<'a> for QueryInput<'a> {
 
 impl<'a> QueryInput<'a> {
     pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_SLICE: flatbuffers::VOffsetT = 6;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 8;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 6;
+    pub const VT_INTERVAL: flatbuffers::VOffsetT = 8;
+    pub const VT_DATA_PATHS: flatbuffers::VOffsetT = 10;
+    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 12;
+    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 14;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -6185,11 +6029,20 @@ impl<'a> QueryInput<'a> {
         args: &'args QueryInputArgs<'args>,
     ) -> flatbuffers::WIPOffset<QueryInput<'bldr>> {
         let mut builder = QueryInputBuilder::new(_fbb);
+        if let Some(x) = args.explicit_watermarks {
+            builder.add_explicit_watermarks(x);
+        }
+        if let Some(x) = args.schema_file {
+            builder.add_schema_file(x);
+        }
+        if let Some(x) = args.data_paths {
+            builder.add_data_paths(x);
+        }
+        if let Some(x) = args.interval {
+            builder.add_interval(x);
+        }
         if let Some(x) = args.vocab {
             builder.add_vocab(x);
-        }
-        if let Some(x) = args.slice {
-            builder.add_slice(x);
         }
         if let Some(x) = args.dataset_id {
             builder.add_dataset_id(x);
@@ -6203,14 +6056,34 @@ impl<'a> QueryInput<'a> {
             .get::<flatbuffers::ForwardsUOffset<&str>>(QueryInput::VT_DATASET_ID, None)
     }
     #[inline]
-    pub fn slice(&self) -> Option<InputDataSlice<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<InputDataSlice>>(QueryInput::VT_SLICE, None)
-    }
-    #[inline]
     pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(QueryInput::VT_VOCAB, None)
+    }
+    #[inline]
+    pub fn interval(&self) -> Option<&'a TimeInterval> {
+        self._tab.get::<TimeInterval>(QueryInput::VT_INTERVAL, None)
+    }
+    #[inline]
+    pub fn data_paths(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+        >>(QueryInput::VT_DATA_PATHS, None)
+    }
+    #[inline]
+    pub fn schema_file(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(QueryInput::VT_SCHEMA_FILE, None)
+    }
+    #[inline]
+    pub fn explicit_watermarks(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark>>,
+        >>(QueryInput::VT_EXPLICIT_WATERMARKS, None)
     }
 }
 
@@ -6227,32 +6100,51 @@ impl flatbuffers::Verifiable for QueryInput<'_> {
                 Self::VT_DATASET_ID,
                 false,
             )?
-            .visit_field::<flatbuffers::ForwardsUOffset<InputDataSlice>>(
-                "slice",
-                Self::VT_SLICE,
-                false,
-            )?
             .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
                 "vocab",
                 Self::VT_VOCAB,
                 false,
             )?
+            .visit_field::<TimeInterval>("interval", Self::VT_INTERVAL, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("data_paths", Self::VT_DATA_PATHS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "schema_file",
+                Self::VT_SCHEMA_FILE,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Watermark>>,
+            >>("explicit_watermarks", Self::VT_EXPLICIT_WATERMARKS, false)?
             .finish();
         Ok(())
     }
 }
 pub struct QueryInputArgs<'a> {
     pub dataset_id: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub slice: Option<flatbuffers::WIPOffset<InputDataSlice<'a>>>,
     pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
+    pub interval: Option<&'a TimeInterval>,
+    pub data_paths: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub schema_file: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub explicit_watermarks: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>,
+        >,
+    >,
 }
 impl<'a> Default for QueryInputArgs<'a> {
     #[inline]
     fn default() -> Self {
         QueryInputArgs {
             dataset_id: None,
-            slice: None,
             vocab: None,
+            interval: None,
+            data_paths: None,
+            schema_file: None,
+            explicit_watermarks: None,
         }
     }
 }
@@ -6267,20 +6159,44 @@ impl<'a: 'b, 'b> QueryInputBuilder<'a, 'b> {
             .push_slot_always::<flatbuffers::WIPOffset<_>>(QueryInput::VT_DATASET_ID, dataset_id);
     }
     #[inline]
-    pub fn add_slice(&mut self, slice: flatbuffers::WIPOffset<InputDataSlice<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<InputDataSlice>>(
-                QueryInput::VT_SLICE,
-                slice,
-            );
-    }
-    #[inline]
     pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
                 QueryInput::VT_VOCAB,
                 vocab,
             );
+    }
+    #[inline]
+    pub fn add_interval(&mut self, interval: &TimeInterval) {
+        self.fbb_
+            .push_slot_always::<&TimeInterval>(QueryInput::VT_INTERVAL, interval);
+    }
+    #[inline]
+    pub fn add_data_paths(
+        &mut self,
+        data_paths: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(QueryInput::VT_DATA_PATHS, data_paths);
+    }
+    #[inline]
+    pub fn add_schema_file(&mut self, schema_file: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(QueryInput::VT_SCHEMA_FILE, schema_file);
+    }
+    #[inline]
+    pub fn add_explicit_watermarks(
+        &mut self,
+        explicit_watermarks: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Watermark<'b>>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            QueryInput::VT_EXPLICIT_WATERMARKS,
+            explicit_watermarks,
+        );
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> QueryInputBuilder<'a, 'b> {
@@ -6301,8 +6217,11 @@ impl std::fmt::Debug for QueryInput<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("QueryInput");
         ds.field("dataset_id", &self.dataset_id());
-        ds.field("slice", &self.slice());
         ds.field("vocab", &self.vocab());
+        ds.field("interval", &self.interval());
+        ds.field("data_paths", &self.data_paths());
+        ds.field("schema_file", &self.schema_file());
+        ds.field("explicit_watermarks", &self.explicit_watermarks());
         ds.finish()
     }
 }
@@ -7082,6 +7001,9 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseError<'a> {
 }
 
 impl<'a> ExecuteQueryResponseError<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+    pub const VT_DETAILS: flatbuffers::VOffsetT = 6;
+
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
         ExecuteQueryResponseError { _tab: table }
@@ -7089,10 +7011,27 @@ impl<'a> ExecuteQueryResponseError<'a> {
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        _args: &'args ExecuteQueryResponseErrorArgs,
+        args: &'args ExecuteQueryResponseErrorArgs<'args>,
     ) -> flatbuffers::WIPOffset<ExecuteQueryResponseError<'bldr>> {
         let mut builder = ExecuteQueryResponseErrorBuilder::new(_fbb);
+        if let Some(x) = args.details {
+            builder.add_details(x);
+        }
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
         builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryResponseError::VT_MESSAGE, None)
+    }
+    #[inline]
+    pub fn details(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryResponseError::VT_DETAILS, None)
     }
 }
 
@@ -7103,15 +7042,24 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseError<'_> {
         pos: usize,
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?.finish();
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("details", Self::VT_DETAILS, false)?
+            .finish();
         Ok(())
     }
 }
-pub struct ExecuteQueryResponseErrorArgs {}
-impl<'a> Default for ExecuteQueryResponseErrorArgs {
+pub struct ExecuteQueryResponseErrorArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub details: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ExecuteQueryResponseErrorArgs<'a> {
     #[inline]
     fn default() -> Self {
-        ExecuteQueryResponseErrorArgs {}
+        ExecuteQueryResponseErrorArgs {
+            message: None,
+            details: None,
+        }
     }
 }
 pub struct ExecuteQueryResponseErrorBuilder<'a: 'b, 'b> {
@@ -7119,6 +7067,20 @@ pub struct ExecuteQueryResponseErrorBuilder<'a: 'b, 'b> {
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b> ExecuteQueryResponseErrorBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryResponseError::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn add_details(&mut self, details: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryResponseError::VT_DETAILS,
+            details,
+        );
+    }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
@@ -7139,6 +7101,8 @@ impl<'a: 'b, 'b> ExecuteQueryResponseErrorBuilder<'a, 'b> {
 impl std::fmt::Debug for ExecuteQueryResponseError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryResponseError");
+        ds.field("message", &self.message());
+        ds.field("details", &self.details());
         ds.finish()
     }
 }

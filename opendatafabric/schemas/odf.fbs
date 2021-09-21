@@ -296,25 +296,17 @@ table Watermark {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// InputDataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table InputDataSlice {
-  interval: TimeInterval;
-  schema_file: string;
-  explicit_watermarks: [Watermark];
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // QueryInput
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 table QueryInput {
   dataset_id: string;
-  slice: InputDataSlice;
   vocab: DatasetVocabulary;
+  interval: TimeInterval;
+  data_paths: [string];
+  schema_file: string;
+  explicit_watermarks: [Watermark];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -357,6 +349,8 @@ table ExecuteQueryResponseSuccess {
 }
 
 table ExecuteQueryResponseError {
+  message: string;
+  details: string;
 }
 
 union ExecuteQueryResponse {

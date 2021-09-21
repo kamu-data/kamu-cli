@@ -291,7 +291,7 @@ impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
 pub enum ExecuteQueryResponse<'a> {
     Progress,
     Success(&'a dyn ExecuteQueryResponseSuccess),
-    Error,
+    Error(&'a dyn ExecuteQueryResponseError),
 }
 
 impl<'a> From<&'a super::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
@@ -299,7 +299,7 @@ impl<'a> From<&'a super::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
         match other {
             super::ExecuteQueryResponse::Progress => ExecuteQueryResponse::Progress,
             super::ExecuteQueryResponse::Success(v) => ExecuteQueryResponse::Success(v),
-            super::ExecuteQueryResponse::Error => ExecuteQueryResponse::Error,
+            super::ExecuteQueryResponse::Error(v) => ExecuteQueryResponse::Error(v),
         }
     }
 }
@@ -309,7 +309,7 @@ impl Into<super::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
         match self {
             ExecuteQueryResponse::Progress => super::ExecuteQueryResponse::Progress,
             ExecuteQueryResponse::Success(v) => super::ExecuteQueryResponse::Success(v.into()),
-            ExecuteQueryResponse::Error => super::ExecuteQueryResponse::Error,
+            ExecuteQueryResponse::Error(v) => super::ExecuteQueryResponse::Error(v.into()),
         }
     }
 }
@@ -318,9 +318,23 @@ pub trait ExecuteQueryResponseSuccess {
     fn metadata_block(&self) -> &dyn MetadataBlock;
 }
 
+pub trait ExecuteQueryResponseError {
+    fn message(&self) -> &str;
+    fn details(&self) -> Option<&str>;
+}
+
 impl ExecuteQueryResponseSuccess for super::ExecuteQueryResponseSuccess {
     fn metadata_block(&self) -> &dyn MetadataBlock {
         &self.metadata_block
+    }
+}
+
+impl ExecuteQueryResponseError for super::ExecuteQueryResponseError {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+    fn details(&self) -> Option<&str> {
+        self.details.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
@@ -328,6 +342,15 @@ impl Into<super::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSucce
     fn into(self) -> super::ExecuteQueryResponseSuccess {
         super::ExecuteQueryResponseSuccess {
             metadata_block: self.metadata_block().into(),
+        }
+    }
+}
+
+impl Into<super::ExecuteQueryResponseError> for &dyn ExecuteQueryResponseError {
+    fn into(self) -> super::ExecuteQueryResponseError {
+        super::ExecuteQueryResponseError {
+            message: self.message().to_owned(),
+            details: self.details().map(|v| v.to_owned()),
         }
     }
 }
@@ -421,43 +444,6 @@ impl Into<super::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
             event_time: self.event_time().map(|v| v.into()),
             cache: self.cache().map(|v| v.into()),
             order: self.order().map(|v| v.into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// InputDataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait InputDataSlice {
-    fn interval(&self) -> TimeInterval;
-    fn schema_file(&self) -> &str;
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
-}
-
-impl InputDataSlice for super::InputDataSlice {
-    fn interval(&self) -> TimeInterval {
-        self.interval
-    }
-    fn schema_file(&self) -> &str {
-        self.schema_file.as_ref()
-    }
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
-        Box::new(
-            self.explicit_watermarks
-                .iter()
-                .map(|i| -> &dyn Watermark { i }),
-        )
-    }
-}
-
-impl Into<super::InputDataSlice> for &dyn InputDataSlice {
-    fn into(self) -> super::InputDataSlice {
-        super::InputDataSlice {
-            interval: self.interval(),
-            schema_file: self.schema_file().to_owned(),
-            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
         }
     }
 }
@@ -702,19 +688,35 @@ impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
 
 pub trait QueryInput {
     fn dataset_id(&self) -> &DatasetID;
-    fn slice(&self) -> &dyn InputDataSlice;
     fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn interval(&self) -> TimeInterval;
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &str> + '_>;
+    fn schema_file(&self) -> &str;
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
 }
 
 impl QueryInput for super::QueryInput {
     fn dataset_id(&self) -> &DatasetID {
         self.dataset_id.as_ref()
     }
-    fn slice(&self) -> &dyn InputDataSlice {
-        &self.slice
-    }
     fn vocab(&self) -> &dyn DatasetVocabulary {
         &self.vocab
+    }
+    fn interval(&self) -> TimeInterval {
+        self.interval
+    }
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+        Box::new(self.data_paths.iter().map(|i| -> &str { i.as_ref() }))
+    }
+    fn schema_file(&self) -> &str {
+        self.schema_file.as_ref()
+    }
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
+        Box::new(
+            self.explicit_watermarks
+                .iter()
+                .map(|i| -> &dyn Watermark { i }),
+        )
     }
 }
 
@@ -722,8 +724,11 @@ impl Into<super::QueryInput> for &dyn QueryInput {
     fn into(self) -> super::QueryInput {
         super::QueryInput {
             dataset_id: self.dataset_id().to_owned(),
-            slice: self.slice().into(),
             vocab: self.vocab().into(),
+            interval: self.interval(),
+            data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
+            schema_file: self.schema_file().to_owned(),
+            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
         }
     }
 }

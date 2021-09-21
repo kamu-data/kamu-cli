@@ -71,11 +71,14 @@ impl Engine for ODFEngine {
             let vocab = request.dataset_vocabs.remove(&input_id).unwrap();
             inputs.push(odf::QueryInput {
                 dataset_id: input_id,
-                slice: odf::InputDataSlice {
-                    interval: slice.interval,
-                    schema_file: slice.schema_file.to_string_lossy().to_string(),
-                    explicit_watermarks: slice.explicit_watermarks,
-                },
+                interval: slice.interval,
+                data_paths: slice
+                    .data_paths
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+                schema_file: slice.schema_file.to_string_lossy().to_string(),
+                explicit_watermarks: slice.explicit_watermarks,
                 vocab: vocab,
             });
         }
