@@ -105,12 +105,18 @@ pub struct ExecuteQueryRequest {
 pub enum ExecuteQueryResponse {
     Progress,
     Success(ExecuteQueryResponseSuccess),
-    Error,
+    Error(ExecuteQueryResponseError),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
     pub metadata_block: MetadataBlock,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryResponseError {
+    pub message: String,
+    pub details: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -143,18 +149,6 @@ pub struct FetchStepFilesGlob {
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// InputDataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct InputDataSlice {
-    pub interval: TimeInterval,
-    pub schema_file: String,
-    pub explicit_watermarks: Vec<Watermark>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -237,8 +231,11 @@ pub enum CompressionFormat {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct QueryInput {
     pub dataset_id: DatasetIDBuf,
-    pub slice: InputDataSlice,
     pub vocab: DatasetVocabulary,
+    pub interval: TimeInterval,
+    pub data_paths: Vec<String>,
+    pub schema_file: String,
+    pub explicit_watermarks: Vec<Watermark>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

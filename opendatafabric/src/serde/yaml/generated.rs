@@ -231,7 +231,7 @@ pub enum ExecuteQueryResponseDef {
     #[serde(rename_all = "camelCase")]
     Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
     #[serde(rename_all = "camelCase")]
-    Error,
+    Error(#[serde_as(as = "ExecuteQueryResponseErrorDef")] ExecuteQueryResponseError),
 }
 
 implement_serde_as!(
@@ -244,6 +244,11 @@ implement_serde_as!(
     ExecuteQueryResponseSuccessDef,
     "ExecuteQueryResponseSuccessDef"
 );
+implement_serde_as!(
+    ExecuteQueryResponseError,
+    ExecuteQueryResponseErrorDef,
+    "ExecuteQueryResponseErrorDef"
+);
 
 #[serde_as]
 #[skip_serializing_none]
@@ -253,6 +258,16 @@ implement_serde_as!(
 pub struct ExecuteQueryResponseSuccessDef {
     #[serde_as(as = "MetadataBlockDef")]
     pub metadata_block: MetadataBlock,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryResponseError")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryResponseErrorDef {
+    pub message: String,
+    pub details: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -321,25 +336,6 @@ pub enum SourceOrderingDef {
 }
 
 implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
-
-////////////////////////////////////////////////////////////////////////////////
-// InputDataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputdataslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "InputDataSlice")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct InputDataSliceDef {
-    pub interval: TimeInterval,
-    pub schema_file: String,
-    #[serde_as(as = "Vec<WatermarkDef>")]
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-implement_serde_as!(InputDataSlice, InputDataSliceDef, "InputDataSliceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
@@ -497,10 +493,13 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct QueryInputDef {
     pub dataset_id: DatasetIDBuf,
-    #[serde_as(as = "InputDataSliceDef")]
-    pub slice: InputDataSlice,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
+    pub interval: TimeInterval,
+    pub data_paths: Vec<String>,
+    pub schema_file: String,
+    #[serde_as(as = "Vec<WatermarkDef>")]
+    pub explicit_watermarks: Vec<Watermark>,
 }
 
 implement_serde_as!(QueryInput, QueryInputDef, "QueryInputDef");
