@@ -174,6 +174,10 @@ impl EngineContainer {
             .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
             .map_err(|e| EngineError::internal(e))?;
 
+        container_runtime
+            .wait_for_socket(adapter_host_port, Self::START_TIMEOUT)
+            .map_err(|e| EngineError::internal(e))?;
+
         info!(logger, "Engine running"; "id" => &container_name);
 
         Ok(Self {
