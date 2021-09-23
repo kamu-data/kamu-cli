@@ -83,10 +83,22 @@ impl Engine for ODFEngine {
             });
         }
 
+        let vocab = request
+            .dataset_vocabs
+            .get(&request.dataset_id)
+            .unwrap()
+            .clone();
+
         let request = odf::ExecuteQueryRequest {
             dataset_id: request.dataset_id,
             transform: request.source.transform,
-            inputs: inputs,
+            vocab,
+            prev_checkpoint_dir: request
+                .prev_checkpoint_dir
+                .map(|p| p.to_string_lossy().to_string()),
+            new_checkpoint_dir: request.new_checkpoint_dir.to_string_lossy().to_string(),
+            out_data_path: request.out_data_path.to_string_lossy().to_string(),
+            inputs,
         };
 
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);

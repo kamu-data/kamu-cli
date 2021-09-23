@@ -203,11 +203,17 @@ pub struct EventTimeSourceFromPathDef {
 #[serde(remote = "ExecuteQueryRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryRequestDef {
+    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
     #[serde_as(as = "TransformDef")]
     pub transform: Transform,
     #[serde_as(as = "Vec<QueryInputDef>")]
     pub inputs: Vec<QueryInput>,
+    pub prev_checkpoint_dir: Option<String>,
+    pub new_checkpoint_dir: String,
+    pub out_data_path: String,
 }
 
 implement_serde_as!(
@@ -492,6 +498,7 @@ implement_serde_as!(
 #[serde(remote = "QueryInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct QueryInputDef {
+    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,

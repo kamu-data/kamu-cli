@@ -6246,9 +6246,13 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryRequest<'a> {
 
 impl<'a> ExecuteQueryRequest<'a> {
     pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 6;
-    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 8;
-    pub const VT_INPUTS: flatbuffers::VOffsetT = 10;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 6;
+    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 8;
+    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 10;
+    pub const VT_INPUTS: flatbuffers::VOffsetT = 12;
+    pub const VT_PREV_CHECKPOINT_DIR: flatbuffers::VOffsetT = 14;
+    pub const VT_NEW_CHECKPOINT_DIR: flatbuffers::VOffsetT = 16;
+    pub const VT_OUT_DATA_PATH: flatbuffers::VOffsetT = 18;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -6260,11 +6264,23 @@ impl<'a> ExecuteQueryRequest<'a> {
         args: &'args ExecuteQueryRequestArgs<'args>,
     ) -> flatbuffers::WIPOffset<ExecuteQueryRequest<'bldr>> {
         let mut builder = ExecuteQueryRequestBuilder::new(_fbb);
+        if let Some(x) = args.out_data_path {
+            builder.add_out_data_path(x);
+        }
+        if let Some(x) = args.new_checkpoint_dir {
+            builder.add_new_checkpoint_dir(x);
+        }
+        if let Some(x) = args.prev_checkpoint_dir {
+            builder.add_prev_checkpoint_dir(x);
+        }
         if let Some(x) = args.inputs {
             builder.add_inputs(x);
         }
         if let Some(x) = args.transform {
             builder.add_transform(x);
+        }
+        if let Some(x) = args.vocab {
+            builder.add_vocab(x);
         }
         if let Some(x) = args.dataset_id {
             builder.add_dataset_id(x);
@@ -6277,6 +6293,14 @@ impl<'a> ExecuteQueryRequest<'a> {
     pub fn dataset_id(&self) -> Option<&'a str> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryRequest::VT_DATASET_ID, None)
+    }
+    #[inline]
+    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                ExecuteQueryRequest::VT_VOCAB,
+                None,
+            )
     }
     #[inline]
     pub fn transform_type(&self) -> Transform {
@@ -6304,6 +6328,25 @@ impl<'a> ExecuteQueryRequest<'a> {
         >>(ExecuteQueryRequest::VT_INPUTS, None)
     }
     #[inline]
+    pub fn prev_checkpoint_dir(&self) -> Option<&'a str> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+            ExecuteQueryRequest::VT_PREV_CHECKPOINT_DIR,
+            None,
+        )
+    }
+    #[inline]
+    pub fn new_checkpoint_dir(&self) -> Option<&'a str> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+            ExecuteQueryRequest::VT_NEW_CHECKPOINT_DIR,
+            None,
+        )
+    }
+    #[inline]
+    pub fn out_data_path(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryRequest::VT_OUT_DATA_PATH, None)
+    }
+    #[inline]
     #[allow(non_snake_case)]
     pub fn transform_as_transform_sql(&self) -> Option<TransformSql<'a>> {
         if self.transform_type() == Transform::TransformSql {
@@ -6327,6 +6370,11 @@ impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
                 Self::VT_DATASET_ID,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                "vocab",
+                Self::VT_VOCAB,
+                false,
+            )?
             .visit_union::<Transform, _>(
                 "transform_type",
                 Self::VT_TRANSFORM_TYPE,
@@ -6345,12 +6393,28 @@ impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<QueryInput>>,
             >>("inputs", Self::VT_INPUTS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "prev_checkpoint_dir",
+                Self::VT_PREV_CHECKPOINT_DIR,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "new_checkpoint_dir",
+                Self::VT_NEW_CHECKPOINT_DIR,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "out_data_path",
+                Self::VT_OUT_DATA_PATH,
+                false,
+            )?
             .finish();
         Ok(())
     }
 }
 pub struct ExecuteQueryRequestArgs<'a> {
     pub dataset_id: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
     pub transform_type: Transform,
     pub transform: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
     pub inputs: Option<
@@ -6358,15 +6422,22 @@ pub struct ExecuteQueryRequestArgs<'a> {
             flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<QueryInput<'a>>>,
         >,
     >,
+    pub prev_checkpoint_dir: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub new_checkpoint_dir: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub out_data_path: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for ExecuteQueryRequestArgs<'a> {
     #[inline]
     fn default() -> Self {
         ExecuteQueryRequestArgs {
             dataset_id: None,
+            vocab: None,
             transform_type: Transform::NONE,
             transform: None,
             inputs: None,
+            prev_checkpoint_dir: None,
+            new_checkpoint_dir: None,
+            out_data_path: None,
         }
     }
 }
@@ -6381,6 +6452,14 @@ impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
             ExecuteQueryRequest::VT_DATASET_ID,
             dataset_id,
         );
+    }
+    #[inline]
+    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
+                ExecuteQueryRequest::VT_VOCAB,
+                vocab,
+            );
     }
     #[inline]
     pub fn add_transform_type(&mut self, transform_type: Transform) {
@@ -6411,6 +6490,30 @@ impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
             .push_slot_always::<flatbuffers::WIPOffset<_>>(ExecuteQueryRequest::VT_INPUTS, inputs);
     }
     #[inline]
+    pub fn add_prev_checkpoint_dir(
+        &mut self,
+        prev_checkpoint_dir: flatbuffers::WIPOffset<&'b str>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryRequest::VT_PREV_CHECKPOINT_DIR,
+            prev_checkpoint_dir,
+        );
+    }
+    #[inline]
+    pub fn add_new_checkpoint_dir(&mut self, new_checkpoint_dir: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryRequest::VT_NEW_CHECKPOINT_DIR,
+            new_checkpoint_dir,
+        );
+    }
+    #[inline]
+    pub fn add_out_data_path(&mut self, out_data_path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryRequest::VT_OUT_DATA_PATH,
+            out_data_path,
+        );
+    }
+    #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     ) -> ExecuteQueryRequestBuilder<'a, 'b> {
@@ -6431,6 +6534,7 @@ impl std::fmt::Debug for ExecuteQueryRequest<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryRequest");
         ds.field("dataset_id", &self.dataset_id());
+        ds.field("vocab", &self.vocab());
         ds.field("transform_type", &self.transform_type());
         match self.transform_type() {
             Transform::TransformSql => {
@@ -6449,6 +6553,9 @@ impl std::fmt::Debug for ExecuteQueryRequest<'_> {
             }
         };
         ds.field("inputs", &self.inputs());
+        ds.field("prev_checkpoint_dir", &self.prev_checkpoint_dir());
+        ds.field("new_checkpoint_dir", &self.new_checkpoint_dir());
+        ds.field("out_data_path", &self.out_data_path());
         ds.finish()
     }
 }
