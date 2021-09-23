@@ -349,16 +349,27 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let dataset_id_offset = { fb.create_string(&self.dataset_id) };
+        let vocab_offset = { self.vocab.serialize(fb) };
         let transform_offset = { self.transform.serialize(fb) };
         let inputs_offset = {
             let offsets: Vec<_> = self.inputs.iter().map(|i| i.serialize(fb)).collect();
             fb.create_vector(&offsets)
         };
+        let prev_checkpoint_dir_offset = self
+            .prev_checkpoint_dir
+            .as_ref()
+            .map(|v| fb.create_string(&v));
+        let new_checkpoint_dir_offset = { fb.create_string(&self.new_checkpoint_dir) };
+        let out_data_path_offset = { fb.create_string(&self.out_data_path) };
         let mut builder = fb::ExecuteQueryRequestBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
+        builder.add_vocab(vocab_offset);
         builder.add_transform_type(transform_offset.0);
         builder.add_transform(transform_offset.1);
         builder.add_inputs(inputs_offset);
+        prev_checkpoint_dir_offset.map(|off| builder.add_prev_checkpoint_dir(off));
+        builder.add_new_checkpoint_dir(new_checkpoint_dir_offset);
+        builder.add_out_data_path(out_data_path_offset);
         builder.finish()
     }
 }
@@ -370,6 +381,10 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
                 .dataset_id()
                 .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
                 .unwrap(),
+            vocab: proxy
+                .vocab()
+                .map(|v| odf::DatasetVocabulary::deserialize(v))
+                .unwrap(),
             transform: proxy
                 .transform()
                 .map(|v| odf::Transform::deserialize(v, proxy.transform_type()))
@@ -378,6 +393,9 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
                 .inputs()
                 .map(|v| v.iter().map(|i| odf::QueryInput::deserialize(i)).collect())
                 .unwrap(),
+            prev_checkpoint_dir: proxy.prev_checkpoint_dir().map(|v| v.to_owned()),
+            new_checkpoint_dir: proxy.new_checkpoint_dir().map(|v| v.to_owned()).unwrap(),
+            out_data_path: proxy.out_data_path().map(|v| v.to_owned()).unwrap(),
         }
     }
 }

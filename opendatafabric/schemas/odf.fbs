@@ -316,8 +316,12 @@ table QueryInput {
 
 table ExecuteQueryRequest {
   dataset_id: string;
+  vocab: DatasetVocabulary;
   transform: Transform;
   inputs: [QueryInput];
+  prev_checkpoint_dir: string;
+  new_checkpoint_dir: string;
+  out_data_path: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

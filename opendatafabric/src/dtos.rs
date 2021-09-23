@@ -92,8 +92,12 @@ pub struct EventTimeSourceFromPath {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
     pub dataset_id: DatasetIDBuf,
+    pub vocab: DatasetVocabulary,
     pub transform: Transform,
     pub inputs: Vec<QueryInput>,
+    pub prev_checkpoint_dir: Option<String>,
+    pub new_checkpoint_dir: String,
+    pub out_data_path: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

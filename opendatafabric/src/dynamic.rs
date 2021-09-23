@@ -257,13 +257,20 @@ impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 
 pub trait ExecuteQueryRequest {
     fn dataset_id(&self) -> &DatasetID;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
     fn transform(&self) -> Transform;
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_>;
+    fn prev_checkpoint_dir(&self) -> Option<&str>;
+    fn new_checkpoint_dir(&self) -> &str;
+    fn out_data_path(&self) -> &str;
 }
 
 impl ExecuteQueryRequest for super::ExecuteQueryRequest {
     fn dataset_id(&self) -> &DatasetID {
         self.dataset_id.as_ref()
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
     }
     fn transform(&self) -> Transform {
         (&self.transform).into()
@@ -271,14 +278,29 @@ impl ExecuteQueryRequest for super::ExecuteQueryRequest {
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_> {
         Box::new(self.inputs.iter().map(|i| -> &dyn QueryInput { i }))
     }
+    fn prev_checkpoint_dir(&self) -> Option<&str> {
+        self.prev_checkpoint_dir
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
+    fn new_checkpoint_dir(&self) -> &str {
+        self.new_checkpoint_dir.as_ref()
+    }
+    fn out_data_path(&self) -> &str {
+        self.out_data_path.as_ref()
+    }
 }
 
 impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
     fn into(self) -> super::ExecuteQueryRequest {
         super::ExecuteQueryRequest {
             dataset_id: self.dataset_id().to_owned(),
+            vocab: self.vocab().into(),
             transform: self.transform().into(),
             inputs: self.inputs().map(|i| i.into()).collect(),
+            prev_checkpoint_dir: self.prev_checkpoint_dir().map(|v| v.to_owned()),
+            new_checkpoint_dir: self.new_checkpoint_dir().to_owned(),
+            out_data_path: self.out_data_path().to_owned(),
         }
     }
 }
