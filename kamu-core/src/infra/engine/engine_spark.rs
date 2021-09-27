@@ -15,11 +15,12 @@ use rand::Rng;
 use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
     image: String,
-    workspace_layout: WorkspaceLayout,
+    workspace_layout: Arc<WorkspaceLayout>,
     logger: Logger,
 }
 
@@ -59,13 +60,13 @@ impl SparkEngine {
     pub fn new(
         container_runtime: ContainerRuntime,
         image: &str,
-        workspace_layout: &WorkspaceLayout,
+        workspace_layout: Arc<WorkspaceLayout>,
         logger: Logger,
     ) -> Self {
         Self {
             container_runtime: container_runtime,
             image: image.to_owned(),
-            workspace_layout: workspace_layout.clone(),
+            workspace_layout,
             logger: logger,
         }
     }

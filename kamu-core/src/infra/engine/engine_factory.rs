@@ -59,7 +59,7 @@ impl EngineFactoryImpl {
             spark_ingest_engine: Arc::new(Mutex::new(SparkEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
-                workspace_layout.as_ref(),
+                workspace_layout.clone(),
                 logger.new(o!("engine" => "spark-ingest")),
             ))),
             spark_engine: Arc::new(Mutex::new(ODFEngine::new(

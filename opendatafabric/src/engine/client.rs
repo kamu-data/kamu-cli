@@ -1,9 +1,14 @@
 use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
-use crate::ExecuteQueryRequest;
+use crate::{
+    ExecuteQueryRequest, ExecuteQueryResponse, ExecuteQueryResponseError,
+    ExecuteQueryResponseSuccess,
+};
 
 use super::generated::engine_client::EngineClient as EngineClientGRPC;
 use super::generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
+
+use thiserror::Error;
 
 pub struct EngineClient {
     client: EngineClientGRPC<tonic::transport::Channel>,
@@ -19,7 +24,7 @@ impl EngineClient {
     pub async fn execute_query(
         &mut self,
         request: ExecuteQueryRequest,
-    ) -> Result<(), tonic::Status> {
+    ) -> Result<ExecuteQueryResponseSuccess, ExecuteQueryError> {
         let fb = FlatbuffersEngineProtocol
             .write_execute_query_request(&request)
             .unwrap();
@@ -35,9 +40,29 @@ impl EngineClient {
                 .read_execute_query_response(&response_grpc.flatbuffer)
                 .unwrap();
 
-            println!("RESPONSE={:?}", response);
+            match response {
+                ExecuteQueryResponse::Progress => (),
+                ExecuteQueryResponse::Success(success) => return Ok(success),
+                ExecuteQueryResponse::Error(error) => return Err(error.into()),
+            }
         }
 
-        Ok(())
+        unreachable!("Engine did not transmit Success or Error message in the response stream")
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ExecuteQueryError {
+    #[error("Engine error: {0}")]
+    ErrorResponse(ExecuteQueryResponseError),
+    #[error("Rpc error: {0}")]
+    RpcError(#[from] tonic::Status),
+}
+
+impl From<ExecuteQueryResponseError> for ExecuteQueryError {
+    fn from(error: ExecuteQueryResponseError) -> Self {
+        Self::ErrorResponse(error)
     }
 }
