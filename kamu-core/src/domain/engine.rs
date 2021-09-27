@@ -124,6 +124,8 @@ pub enum EngineError {
         image_name: String,
         backtrace: Backtrace,
     },
+    #[error("Invalid query: {message}")]
+    InvalidQuery { message: String },
     #[error("Process error: {0}")]
     ProcessError(#[from] ProcessError),
     #[error("Contract error: {0}")]

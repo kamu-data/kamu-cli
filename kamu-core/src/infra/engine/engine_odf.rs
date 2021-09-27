@@ -6,7 +6,7 @@ use std::{
 };
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
-use odf::engine::EngineClient;
+use odf::engine::{EngineClient, ExecuteQueryError};
 use opendatafabric as odf;
 use rand::Rng;
 use slog::{info, warn, Logger};
@@ -70,7 +70,7 @@ impl ODFEngine {
             }
         }
 
-        response.map_err(|e| EngineError::internal(e))
+        response.map_err(|e| e.into())
     }
 
     fn to_container_path(&self, host_path: &Path) -> String {
@@ -288,5 +288,17 @@ impl Drop for EngineContainer {
 
         warn!(self.logger, "Engine did not shutdown gracefully, killing"; "id" => &self.container_name);
         let _ = self.engine_process.kill();
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl From<ExecuteQueryError> for EngineError {
+    fn from(e: ExecuteQueryError) -> Self {
+        match e {
+            ExecuteQueryError::InvalidQuery(e) => EngineError::InvalidQuery { message: e.message },
+            e @ ExecuteQueryError::InternalError(_) => EngineError::internal(e),
+            e @ ExecuteQueryError::RpcError(_) => EngineError::internal(e),
+        }
     }
 }
