@@ -14,6 +14,7 @@ mod odf {
 use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
 use chrono::prelude::*;
 use std::convert::{TryFrom, TryInto};
+use std::path::PathBuf;
 
 pub trait FlatbuffersSerializable<'fb> {
     type OffsetT;
@@ -358,9 +359,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
         let prev_checkpoint_dir_offset = self
             .prev_checkpoint_dir
             .as_ref()
-            .map(|v| fb.create_string(&v));
-        let new_checkpoint_dir_offset = { fb.create_string(&self.new_checkpoint_dir) };
-        let out_data_path_offset = { fb.create_string(&self.out_data_path) };
+            .map(|v| fb.create_string(v.to_str().unwrap()));
+        let new_checkpoint_dir_offset =
+            { fb.create_string(self.new_checkpoint_dir.to_str().unwrap()) };
+        let out_data_path_offset = { fb.create_string(self.out_data_path.to_str().unwrap()) };
         let mut builder = fb::ExecuteQueryRequestBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
         builder.add_vocab(vocab_offset);
@@ -393,9 +395,12 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
                 .inputs()
                 .map(|v| v.iter().map(|i| odf::QueryInput::deserialize(i)).collect())
                 .unwrap(),
-            prev_checkpoint_dir: proxy.prev_checkpoint_dir().map(|v| v.to_owned()),
-            new_checkpoint_dir: proxy.new_checkpoint_dir().map(|v| v.to_owned()).unwrap(),
-            out_data_path: proxy.out_data_path().map(|v| v.to_owned()).unwrap(),
+            prev_checkpoint_dir: proxy.prev_checkpoint_dir().map(|v| PathBuf::from(v)),
+            new_checkpoint_dir: proxy
+                .new_checkpoint_dir()
+                .map(|v| PathBuf::from(v))
+                .unwrap(),
+            out_data_path: proxy.out_data_path().map(|v| PathBuf::from(v)).unwrap(),
         }
     }
 }
@@ -968,11 +973,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::QueryInput {
             let offsets: Vec<_> = self
                 .data_paths
                 .iter()
-                .map(|i| fb.create_string(&i))
+                .map(|i| fb.create_string(i.to_str().unwrap()))
                 .collect();
             fb.create_vector(&offsets)
         };
-        let schema_file_offset = { fb.create_string(&self.schema_file) };
+        let schema_file_offset = { fb.create_string(self.schema_file.to_str().unwrap()) };
         let explicit_watermarks_offset = {
             let offsets: Vec<_> = self
                 .explicit_watermarks
@@ -1006,9 +1011,9 @@ impl<'fb> FlatbuffersDeserializable<fb::QueryInput<'fb>> for odf::QueryInput {
             interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
             data_paths: proxy
                 .data_paths()
-                .map(|v| v.iter().map(|i| i.to_owned()).collect())
+                .map(|v| v.iter().map(|i| PathBuf::from(i)).collect())
                 .unwrap(),
-            schema_file: proxy.schema_file().map(|v| v.to_owned()).unwrap(),
+            schema_file: proxy.schema_file().map(|v| PathBuf::from(v)).unwrap(),
             explicit_watermarks: proxy
                 .explicit_watermarks()
                 .map(|v| v.iter().map(|i| odf::Watermark::deserialize(i)).collect())

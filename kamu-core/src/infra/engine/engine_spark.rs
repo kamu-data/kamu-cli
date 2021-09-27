@@ -208,36 +208,32 @@ impl SparkEngine {
     }
 }
 
-impl Engine for SparkEngine {
-    fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
+/*impl Engine for SparkEngine {
+    fn transform(
+        &self,
+        request: ExecuteQueryRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "transform");
 
-        let input_slices_adj = request
-            .input_slices
-            .into_iter()
-            .map(|(id, slice)| {
-                (
-                    id,
-                    InputDataSlice {
-                        data_paths: slice
-                            .data_paths
-                            .iter()
-                            .map(|p| self.to_container_path(p))
-                            .collect(),
-                        schema_file: self.to_container_path(&slice.schema_file),
-                        ..slice
-                    },
-                )
-            })
-            .collect();
-
         let request_adj = ExecuteQueryRequest {
-            input_slices: input_slices_adj,
             prev_checkpoint_dir: request
                 .prev_checkpoint_dir
                 .map(|p| self.to_container_path(&p)),
             new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
+            inputs: request
+                .inputs
+                .into_iter()
+                .map(|input| QueryInput {
+                    data_paths: input
+                        .data_paths
+                        .into_iter()
+                        .map(|p| self.to_container_path(&p))
+                        .collect(),
+                    schema_file: self.to_container_path(&input.schema_file),
+                    ..input
+                })
+                .collect(),
             ..request
         };
 
@@ -247,7 +243,7 @@ impl Engine for SparkEngine {
 
         self.read_response(&run_info, "ExecuteQueryResult")
     }
-}
+}*/
 
 impl IngestEngine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {

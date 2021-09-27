@@ -3,6 +3,8 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
+use std::path::PathBuf;
+
 use super::{DatasetIDBuf, Sha3_256, TimeInterval};
 use chrono::{DateTime, Utc};
 
@@ -95,9 +97,9 @@ pub struct ExecuteQueryRequest {
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
     pub inputs: Vec<QueryInput>,
-    pub prev_checkpoint_dir: Option<String>,
-    pub new_checkpoint_dir: String,
-    pub out_data_path: String,
+    pub prev_checkpoint_dir: Option<PathBuf>,
+    pub new_checkpoint_dir: PathBuf,
+    pub out_data_path: PathBuf,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -243,8 +245,8 @@ pub struct QueryInput {
     pub dataset_id: DatasetIDBuf,
     pub vocab: DatasetVocabulary,
     pub interval: TimeInterval,
-    pub data_paths: Vec<String>,
-    pub schema_file: String,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
     pub explicit_watermarks: Vec<Watermark>,
 }
 
