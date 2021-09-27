@@ -352,15 +352,20 @@ table ExecuteQueryResponseSuccess {
   metadata_block: MetadataBlock;
 }
 
-table ExecuteQueryResponseError {
+table ExecuteQueryResponseInvalidQuery {
   message: string;
-  details: string;
+}
+
+table ExecuteQueryResponseInternalError {
+  message: string;
+  backtrace: string;
 }
 
 union ExecuteQueryResponse {
   ExecuteQueryResponseProgress,
   ExecuteQueryResponseSuccess,
-  ExecuteQueryResponseError,
+  ExecuteQueryResponseInvalidQuery,
+  ExecuteQueryResponseInternalError,
 }
 
 table ExecuteQueryResponseRoot {

@@ -1,8 +1,8 @@
 use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
 use crate::{
-    ExecuteQueryRequest, ExecuteQueryResponse, ExecuteQueryResponseError,
-    ExecuteQueryResponseSuccess,
+    ExecuteQueryRequest, ExecuteQueryResponse, ExecuteQueryResponseInternalError,
+    ExecuteQueryResponseInvalidQuery, ExecuteQueryResponseSuccess,
 };
 
 use super::generated::engine_client::EngineClient as EngineClientGRPC;
@@ -43,7 +43,8 @@ impl EngineClient {
             match response {
                 ExecuteQueryResponse::Progress => (),
                 ExecuteQueryResponse::Success(success) => return Ok(success),
-                ExecuteQueryResponse::Error(error) => return Err(error.into()),
+                ExecuteQueryResponse::InvalidQuery(error) => return Err(error.into()),
+                ExecuteQueryResponse::InternalError(error) => return Err(error.into()),
             }
         }
 
@@ -55,14 +56,22 @@ impl EngineClient {
 
 #[derive(Debug, Error)]
 pub enum ExecuteQueryError {
-    #[error("Engine error: {0}")]
-    ErrorResponse(ExecuteQueryResponseError),
+    #[error("Invalid query: {0}")]
+    InvalidQuery(ExecuteQueryResponseInvalidQuery),
+    #[error("Internal error: {0}")]
+    InternalError(ExecuteQueryResponseInternalError),
     #[error("Rpc error: {0}")]
     RpcError(#[from] tonic::Status),
 }
 
-impl From<ExecuteQueryResponseError> for ExecuteQueryError {
-    fn from(error: ExecuteQueryResponseError) -> Self {
-        Self::ErrorResponse(error)
+impl From<ExecuteQueryResponseInvalidQuery> for ExecuteQueryError {
+    fn from(error: ExecuteQueryResponseInvalidQuery) -> Self {
+        Self::InvalidQuery(error)
+    }
+}
+
+impl From<ExecuteQueryResponseInternalError> for ExecuteQueryError {
+    fn from(error: ExecuteQueryResponseInternalError) -> Self {
+        Self::InternalError(error)
     }
 }

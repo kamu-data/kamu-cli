@@ -109,7 +109,8 @@ pub struct ExecuteQueryRequest {
 pub enum ExecuteQueryResponse {
     Progress,
     Success(ExecuteQueryResponseSuccess),
-    Error(ExecuteQueryResponseError),
+    InvalidQuery(ExecuteQueryResponseInvalidQuery),
+    InternalError(ExecuteQueryResponseInternalError),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -118,9 +119,14 @@ pub struct ExecuteQueryResponseSuccess {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryResponseError {
+pub struct ExecuteQueryResponseInvalidQuery {
     pub message: String,
-    pub details: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryResponseInternalError {
+    pub message: String,
+    pub backtrace: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

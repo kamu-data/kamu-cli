@@ -1145,17 +1145,18 @@ pub const ENUM_MIN_EXECUTE_QUERY_RESPONSE: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_EXECUTE_QUERY_RESPONSE: u8 = 3;
+pub const ENUM_MAX_EXECUTE_QUERY_RESPONSE: u8 = 4;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_EXECUTE_QUERY_RESPONSE: [ExecuteQueryResponse; 4] = [
+pub const ENUM_VALUES_EXECUTE_QUERY_RESPONSE: [ExecuteQueryResponse; 5] = [
     ExecuteQueryResponse::NONE,
     ExecuteQueryResponse::ExecuteQueryResponseProgress,
     ExecuteQueryResponse::ExecuteQueryResponseSuccess,
-    ExecuteQueryResponse::ExecuteQueryResponseError,
+    ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery,
+    ExecuteQueryResponse::ExecuteQueryResponseInternalError,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -1166,15 +1167,17 @@ impl ExecuteQueryResponse {
     pub const NONE: Self = Self(0);
     pub const ExecuteQueryResponseProgress: Self = Self(1);
     pub const ExecuteQueryResponseSuccess: Self = Self(2);
-    pub const ExecuteQueryResponseError: Self = Self(3);
+    pub const ExecuteQueryResponseInvalidQuery: Self = Self(3);
+    pub const ExecuteQueryResponseInternalError: Self = Self(4);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 3;
+    pub const ENUM_MAX: u8 = 4;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::ExecuteQueryResponseProgress,
         Self::ExecuteQueryResponseSuccess,
-        Self::ExecuteQueryResponseError,
+        Self::ExecuteQueryResponseInvalidQuery,
+        Self::ExecuteQueryResponseInternalError,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -1182,7 +1185,8 @@ impl ExecuteQueryResponse {
             Self::NONE => Some("NONE"),
             Self::ExecuteQueryResponseProgress => Some("ExecuteQueryResponseProgress"),
             Self::ExecuteQueryResponseSuccess => Some("ExecuteQueryResponseSuccess"),
-            Self::ExecuteQueryResponseError => Some("ExecuteQueryResponseError"),
+            Self::ExecuteQueryResponseInvalidQuery => Some("ExecuteQueryResponseInvalidQuery"),
+            Self::ExecuteQueryResponseInternalError => Some("ExecuteQueryResponseInternalError"),
             _ => None,
         }
     }
@@ -7090,15 +7094,15 @@ impl std::fmt::Debug for ExecuteQueryResponseSuccess<'_> {
         ds.finish()
     }
 }
-pub enum ExecuteQueryResponseErrorOffset {}
+pub enum ExecuteQueryResponseInvalidQueryOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
-pub struct ExecuteQueryResponseError<'a> {
+pub struct ExecuteQueryResponseInvalidQuery<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseError<'a> {
-    type Inner = ExecuteQueryResponseError<'a>;
+impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseInvalidQuery<'a> {
+    type Inner = ExecuteQueryResponseInvalidQuery<'a>;
     #[inline]
     fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -7107,22 +7111,125 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseError<'a> {
     }
 }
 
-impl<'a> ExecuteQueryResponseError<'a> {
+impl<'a> ExecuteQueryResponseInvalidQuery<'a> {
     pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
-    pub const VT_DETAILS: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseError { _tab: table }
+        ExecuteQueryResponseInvalidQuery { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryResponseErrorArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseError<'bldr>> {
-        let mut builder = ExecuteQueryResponseErrorBuilder::new(_fbb);
-        if let Some(x) = args.details {
-            builder.add_details(x);
+        args: &'args ExecuteQueryResponseInvalidQueryArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseInvalidQuery<'bldr>> {
+        let mut builder = ExecuteQueryResponseInvalidQueryBuilder::new(_fbb);
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+            ExecuteQueryResponseInvalidQuery::VT_MESSAGE,
+            None,
+        )
+    }
+}
+
+impl flatbuffers::Verifiable for ExecuteQueryResponseInvalidQuery<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ExecuteQueryResponseInvalidQueryArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ExecuteQueryResponseInvalidQueryArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ExecuteQueryResponseInvalidQueryArgs { message: None }
+    }
+}
+pub struct ExecuteQueryResponseInvalidQueryBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ExecuteQueryResponseInvalidQueryBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryResponseInvalidQuery::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> ExecuteQueryResponseInvalidQueryBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        ExecuteQueryResponseInvalidQueryBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseInvalidQuery<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for ExecuteQueryResponseInvalidQuery<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("ExecuteQueryResponseInvalidQuery");
+        ds.field("message", &self.message());
+        ds.finish()
+    }
+}
+pub enum ExecuteQueryResponseInternalErrorOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ExecuteQueryResponseInternalError<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseInternalError<'a> {
+    type Inner = ExecuteQueryResponseInternalError<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> ExecuteQueryResponseInternalError<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+    pub const VT_BACKTRACE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ExecuteQueryResponseInternalError { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args ExecuteQueryResponseInternalErrorArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseInternalError<'bldr>> {
+        let mut builder = ExecuteQueryResponseInternalErrorBuilder::new(_fbb);
+        if let Some(x) = args.backtrace {
+            builder.add_backtrace(x);
         }
         if let Some(x) = args.message {
             builder.add_message(x);
@@ -7132,17 +7239,21 @@ impl<'a> ExecuteQueryResponseError<'a> {
 
     #[inline]
     pub fn message(&self) -> Option<&'a str> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryResponseError::VT_MESSAGE, None)
+        self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+            ExecuteQueryResponseInternalError::VT_MESSAGE,
+            None,
+        )
     }
     #[inline]
-    pub fn details(&self) -> Option<&'a str> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryResponseError::VT_DETAILS, None)
+    pub fn backtrace(&self) -> Option<&'a str> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+            ExecuteQueryResponseInternalError::VT_BACKTRACE,
+            None,
+        )
     }
 }
 
-impl flatbuffers::Verifiable for ExecuteQueryResponseError<'_> {
+impl flatbuffers::Verifiable for ExecuteQueryResponseInternalError<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -7151,65 +7262,69 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseError<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("details", Self::VT_DETAILS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "backtrace",
+                Self::VT_BACKTRACE,
+                false,
+            )?
             .finish();
         Ok(())
     }
 }
-pub struct ExecuteQueryResponseErrorArgs<'a> {
+pub struct ExecuteQueryResponseInternalErrorArgs<'a> {
     pub message: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub details: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub backtrace: Option<flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for ExecuteQueryResponseErrorArgs<'a> {
+impl<'a> Default for ExecuteQueryResponseInternalErrorArgs<'a> {
     #[inline]
     fn default() -> Self {
-        ExecuteQueryResponseErrorArgs {
+        ExecuteQueryResponseInternalErrorArgs {
             message: None,
-            details: None,
+            backtrace: None,
         }
     }
 }
-pub struct ExecuteQueryResponseErrorBuilder<'a: 'b, 'b> {
+pub struct ExecuteQueryResponseInternalErrorBuilder<'a: 'b, 'b> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ExecuteQueryResponseErrorBuilder<'a, 'b> {
+impl<'a: 'b, 'b> ExecuteQueryResponseInternalErrorBuilder<'a, 'b> {
     #[inline]
     pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseError::VT_MESSAGE,
+            ExecuteQueryResponseInternalError::VT_MESSAGE,
             message,
         );
     }
     #[inline]
-    pub fn add_details(&mut self, details: flatbuffers::WIPOffset<&'b str>) {
+    pub fn add_backtrace(&mut self, backtrace: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseError::VT_DETAILS,
-            details,
+            ExecuteQueryResponseInternalError::VT_BACKTRACE,
+            backtrace,
         );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseErrorBuilder<'a, 'b> {
+    ) -> ExecuteQueryResponseInternalErrorBuilder<'a, 'b> {
         let start = _fbb.start_table();
-        ExecuteQueryResponseErrorBuilder {
+        ExecuteQueryResponseInternalErrorBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseError<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseInternalError<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl std::fmt::Debug for ExecuteQueryResponseError<'_> {
+impl std::fmt::Debug for ExecuteQueryResponseInternalError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseError");
+        let mut ds = f.debug_struct("ExecuteQueryResponseInternalError");
         ds.field("message", &self.message());
-        ds.field("details", &self.details());
+        ds.field("backtrace", &self.backtrace());
         ds.finish()
     }
 }
@@ -7296,9 +7411,25 @@ impl<'a> ExecuteQueryResponseRoot<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_execute_query_response_error(&self) -> Option<ExecuteQueryResponseError<'a>> {
-        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseError {
-            self.value().map(ExecuteQueryResponseError::init_from_table)
+    pub fn value_as_execute_query_response_invalid_query(
+        &self,
+    ) -> Option<ExecuteQueryResponseInvalidQuery<'a>> {
+        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery {
+            self.value()
+                .map(ExecuteQueryResponseInvalidQuery::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_execute_query_response_internal_error(
+        &self,
+    ) -> Option<ExecuteQueryResponseInternalError<'a>> {
+        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseInternalError {
+            self.value()
+                .map(ExecuteQueryResponseInternalError::init_from_table)
         } else {
             None
         }
@@ -7317,7 +7448,8 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseRoot<'_> {
         match key {
           ExecuteQueryResponse::ExecuteQueryResponseProgress => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseProgress>>("ExecuteQueryResponse::ExecuteQueryResponseProgress", pos),
           ExecuteQueryResponse::ExecuteQueryResponseSuccess => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseSuccess>>("ExecuteQueryResponse::ExecuteQueryResponseSuccess", pos),
-          ExecuteQueryResponse::ExecuteQueryResponseError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseError>>("ExecuteQueryResponse::ExecuteQueryResponseError", pos),
+          ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseInvalidQuery>>("ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery", pos),
+          ExecuteQueryResponse::ExecuteQueryResponseInternalError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseInternalError>>("ExecuteQueryResponse::ExecuteQueryResponseInternalError", pos),
           _ => Ok(()),
         }
      })?
@@ -7400,8 +7532,18 @@ impl std::fmt::Debug for ExecuteQueryResponseRoot<'_> {
                     )
                 }
             }
-            ExecuteQueryResponse::ExecuteQueryResponseError => {
-                if let Some(x) = self.value_as_execute_query_response_error() {
+            ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => {
+                if let Some(x) = self.value_as_execute_query_response_invalid_query() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            ExecuteQueryResponse::ExecuteQueryResponseInternalError => {
+                if let Some(x) = self.value_as_execute_query_response_internal_error() {
                     ds.field("value", &x)
                 } else {
                     ds.field(

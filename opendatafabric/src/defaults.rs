@@ -9,7 +9,7 @@
 
 use std::fmt::Display;
 
-use crate::{ExecuteQueryResponseError, ReadStepCsv};
+use crate::{ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv};
 
 use super::DatasetVocabulary;
 
@@ -48,8 +48,18 @@ impl Default for ReadStepCsv {
     }
 }
 
-impl Display for ExecuteQueryResponseError {
+impl Display for ExecuteQueryResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
+    }
+}
+
+impl Display for ExecuteQueryResponseInternalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.message)?;
+        if let Some(bt) = &self.backtrace {
+            write!(f, "\n\n--- Backtrace ---\n{}", bt)?;
+        }
+        Ok(())
     }
 }
