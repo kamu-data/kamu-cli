@@ -313,7 +313,8 @@ impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
 pub enum ExecuteQueryResponse<'a> {
     Progress,
     Success(&'a dyn ExecuteQueryResponseSuccess),
-    Error(&'a dyn ExecuteQueryResponseError),
+    InvalidQuery(&'a dyn ExecuteQueryResponseInvalidQuery),
+    InternalError(&'a dyn ExecuteQueryResponseInternalError),
 }
 
 impl<'a> From<&'a super::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
@@ -321,7 +322,8 @@ impl<'a> From<&'a super::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
         match other {
             super::ExecuteQueryResponse::Progress => ExecuteQueryResponse::Progress,
             super::ExecuteQueryResponse::Success(v) => ExecuteQueryResponse::Success(v),
-            super::ExecuteQueryResponse::Error(v) => ExecuteQueryResponse::Error(v),
+            super::ExecuteQueryResponse::InvalidQuery(v) => ExecuteQueryResponse::InvalidQuery(v),
+            super::ExecuteQueryResponse::InternalError(v) => ExecuteQueryResponse::InternalError(v),
         }
     }
 }
@@ -331,7 +333,12 @@ impl Into<super::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
         match self {
             ExecuteQueryResponse::Progress => super::ExecuteQueryResponse::Progress,
             ExecuteQueryResponse::Success(v) => super::ExecuteQueryResponse::Success(v.into()),
-            ExecuteQueryResponse::Error(v) => super::ExecuteQueryResponse::Error(v.into()),
+            ExecuteQueryResponse::InvalidQuery(v) => {
+                super::ExecuteQueryResponse::InvalidQuery(v.into())
+            }
+            ExecuteQueryResponse::InternalError(v) => {
+                super::ExecuteQueryResponse::InternalError(v.into())
+            }
         }
     }
 }
@@ -340,9 +347,13 @@ pub trait ExecuteQueryResponseSuccess {
     fn metadata_block(&self) -> &dyn MetadataBlock;
 }
 
-pub trait ExecuteQueryResponseError {
+pub trait ExecuteQueryResponseInvalidQuery {
     fn message(&self) -> &str;
-    fn details(&self) -> Option<&str>;
+}
+
+pub trait ExecuteQueryResponseInternalError {
+    fn message(&self) -> &str;
+    fn backtrace(&self) -> Option<&str>;
 }
 
 impl ExecuteQueryResponseSuccess for super::ExecuteQueryResponseSuccess {
@@ -351,12 +362,18 @@ impl ExecuteQueryResponseSuccess for super::ExecuteQueryResponseSuccess {
     }
 }
 
-impl ExecuteQueryResponseError for super::ExecuteQueryResponseError {
+impl ExecuteQueryResponseInvalidQuery for super::ExecuteQueryResponseInvalidQuery {
     fn message(&self) -> &str {
         self.message.as_ref()
     }
-    fn details(&self) -> Option<&str> {
-        self.details.as_ref().map(|v| -> &str { v.as_ref() })
+}
+
+impl ExecuteQueryResponseInternalError for super::ExecuteQueryResponseInternalError {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+    fn backtrace(&self) -> Option<&str> {
+        self.backtrace.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
@@ -368,11 +385,19 @@ impl Into<super::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSucce
     }
 }
 
-impl Into<super::ExecuteQueryResponseError> for &dyn ExecuteQueryResponseError {
-    fn into(self) -> super::ExecuteQueryResponseError {
-        super::ExecuteQueryResponseError {
+impl Into<super::ExecuteQueryResponseInvalidQuery> for &dyn ExecuteQueryResponseInvalidQuery {
+    fn into(self) -> super::ExecuteQueryResponseInvalidQuery {
+        super::ExecuteQueryResponseInvalidQuery {
             message: self.message().to_owned(),
-            details: self.details().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl Into<super::ExecuteQueryResponseInternalError> for &dyn ExecuteQueryResponseInternalError {
+    fn into(self) -> super::ExecuteQueryResponseInternalError {
+        super::ExecuteQueryResponseInternalError {
+            message: self.message().to_owned(),
+            backtrace: self.backtrace().map(|v| v.to_owned()),
         }
     }
 }

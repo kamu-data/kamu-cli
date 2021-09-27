@@ -211,9 +211,12 @@ fn serde_execute_query_response() {
         ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
             metadata_block: MetadataBlock { ..get_block_root() },
         }),
-        ExecuteQueryResponse::Error(ExecuteQueryResponseError {
+        ExecuteQueryResponse::InvalidQuery(ExecuteQueryResponseInvalidQuery {
             message: "boop".to_owned(),
-            details: Some("woop".to_owned()),
+        }),
+        ExecuteQueryResponse::InternalError(ExecuteQueryResponseInternalError {
+            message: "boop".to_owned(),
+            backtrace: Some("woop".to_owned()),
         }),
         ExecuteQueryResponse::Progress,
     ];

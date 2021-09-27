@@ -237,7 +237,13 @@ pub enum ExecuteQueryResponseDef {
     #[serde(rename_all = "camelCase")]
     Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
     #[serde(rename_all = "camelCase")]
-    Error(#[serde_as(as = "ExecuteQueryResponseErrorDef")] ExecuteQueryResponseError),
+    InvalidQuery(
+        #[serde_as(as = "ExecuteQueryResponseInvalidQueryDef")] ExecuteQueryResponseInvalidQuery,
+    ),
+    #[serde(rename_all = "camelCase")]
+    InternalError(
+        #[serde_as(as = "ExecuteQueryResponseInternalErrorDef")] ExecuteQueryResponseInternalError,
+    ),
 }
 
 implement_serde_as!(
@@ -251,9 +257,14 @@ implement_serde_as!(
     "ExecuteQueryResponseSuccessDef"
 );
 implement_serde_as!(
-    ExecuteQueryResponseError,
-    ExecuteQueryResponseErrorDef,
-    "ExecuteQueryResponseErrorDef"
+    ExecuteQueryResponseInvalidQuery,
+    ExecuteQueryResponseInvalidQueryDef,
+    "ExecuteQueryResponseInvalidQueryDef"
+);
+implement_serde_as!(
+    ExecuteQueryResponseInternalError,
+    ExecuteQueryResponseInternalErrorDef,
+    "ExecuteQueryResponseInternalErrorDef"
 );
 
 #[serde_as]
@@ -269,11 +280,20 @@ pub struct ExecuteQueryResponseSuccessDef {
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponseError")]
+#[serde(remote = "ExecuteQueryResponseInvalidQuery")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponseErrorDef {
+pub struct ExecuteQueryResponseInvalidQueryDef {
     pub message: String,
-    pub details: Option<String>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryResponseInternalError")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryResponseInternalErrorDef {
+    pub message: String,
+    pub backtrace: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -419,8 +419,12 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ExecuteQueryResponse> for odf::Ex
                 fb::ExecuteQueryResponse::ExecuteQueryResponseSuccess,
                 v.serialize(fb).as_union_value(),
             ),
-            odf::ExecuteQueryResponse::Error(v) => (
-                fb::ExecuteQueryResponse::ExecuteQueryResponseError,
+            odf::ExecuteQueryResponse::InvalidQuery(v) => (
+                fb::ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::ExecuteQueryResponse::InternalError(v) => (
+                fb::ExecuteQueryResponse::ExecuteQueryResponseInternalError,
                 v.serialize(fb).as_union_value(),
             ),
         }
@@ -440,10 +444,19 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ExecuteQueryResponse>
                     fb::ExecuteQueryResponseSuccess::init_from_table(table),
                 ))
             }
-            fb::ExecuteQueryResponse::ExecuteQueryResponseError => {
-                odf::ExecuteQueryResponse::Error(odf::ExecuteQueryResponseError::deserialize(
-                    fb::ExecuteQueryResponseError::init_from_table(table),
-                ))
+            fb::ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => {
+                odf::ExecuteQueryResponse::InvalidQuery(
+                    odf::ExecuteQueryResponseInvalidQuery::deserialize(
+                        fb::ExecuteQueryResponseInvalidQuery::init_from_table(table),
+                    ),
+                )
+            }
+            fb::ExecuteQueryResponse::ExecuteQueryResponseInternalError => {
+                odf::ExecuteQueryResponse::InternalError(
+                    odf::ExecuteQueryResponseInternalError::deserialize(
+                        fb::ExecuteQueryResponseInternalError::init_from_table(table),
+                    ),
+                )
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -474,26 +487,47 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseSuccess<'fb>>
     }
 }
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseError {
-    type OffsetT = WIPOffset<fb::ExecuteQueryResponseError<'fb>>;
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseInvalidQuery {
+    type OffsetT = WIPOffset<fb::ExecuteQueryResponseInvalidQuery<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let message_offset = { fb.create_string(&self.message) };
-        let details_offset = self.details.as_ref().map(|v| fb.create_string(&v));
-        let mut builder = fb::ExecuteQueryResponseErrorBuilder::new(fb);
+        let mut builder = fb::ExecuteQueryResponseInvalidQueryBuilder::new(fb);
         builder.add_message(message_offset);
-        details_offset.map(|off| builder.add_details(off));
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseError<'fb>>
-    for odf::ExecuteQueryResponseError
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseInvalidQuery<'fb>>
+    for odf::ExecuteQueryResponseInvalidQuery
 {
-    fn deserialize(proxy: fb::ExecuteQueryResponseError<'fb>) -> Self {
-        odf::ExecuteQueryResponseError {
+    fn deserialize(proxy: fb::ExecuteQueryResponseInvalidQuery<'fb>) -> Self {
+        odf::ExecuteQueryResponseInvalidQuery {
             message: proxy.message().map(|v| v.to_owned()).unwrap(),
-            details: proxy.details().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseInternalError {
+    type OffsetT = WIPOffset<fb::ExecuteQueryResponseInternalError<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let message_offset = { fb.create_string(&self.message) };
+        let backtrace_offset = self.backtrace.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::ExecuteQueryResponseInternalErrorBuilder::new(fb);
+        builder.add_message(message_offset);
+        backtrace_offset.map(|off| builder.add_backtrace(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseInternalError<'fb>>
+    for odf::ExecuteQueryResponseInternalError
+{
+    fn deserialize(proxy: fb::ExecuteQueryResponseInternalError<'fb>) -> Self {
+        odf::ExecuteQueryResponseInternalError {
+            message: proxy.message().map(|v| v.to_owned()).unwrap(),
+            backtrace: proxy.backtrace().map(|v| v.to_owned()),
         }
     }
 }
