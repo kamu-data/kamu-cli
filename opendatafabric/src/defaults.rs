@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ReadStepCsv;
+use std::fmt::Display;
+
+use crate::{ExecuteQueryResponseError, ReadStepCsv};
 
 use super::DatasetVocabulary;
 
@@ -43,5 +45,11 @@ impl Default for ReadStepCsv {
             timestamp_format: None,
             multi_line: None,
         }
+    }
+}
+
+impl Display for ExecuteQueryResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.message)
     }
 }

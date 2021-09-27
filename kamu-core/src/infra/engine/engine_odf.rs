@@ -1,11 +1,11 @@
 use std::{
     path::{Path, PathBuf},
-    process::{Child, Stdio},
+    process::Child,
     sync::Arc,
     time::Duration,
 };
 
-use container_runtime::{ContainerRuntime, RunArgs};
+use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
 use odf::engine::EngineClient;
 use opendatafabric as odf;
 use rand::Rng;
@@ -22,6 +22,8 @@ pub struct ODFEngine {
 }
 
 impl ODFEngine {
+    const CT_VOLUME_DIR: &'static str = "/opt/engine/volume";
+
     pub fn new(
         container_runtime: ContainerRuntime,
         image: &str,
@@ -44,19 +46,62 @@ impl ODFEngine {
         let engine_container = EngineContainer::new(
             self.container_runtime.clone(),
             &self.image,
-            &run_info.run_id,
+            &run_info,
+            vec![(
+                self.workspace_layout.local_volume_dir.clone(),
+                PathBuf::from(Self::CT_VOLUME_DIR),
+            )],
             self.logger.clone(),
         )?;
 
         let mut client = engine_container.connect_client().await?;
+        let response = client.execute_query(request).await;
 
-        client
-            .execute_query(request)
-            .await
-            .map_err(|e| EngineError::internal(e))?;
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
+                    self.container_runtime.exec_shell_cmd(ExecArgs::default(), &engine_container.container_name, &[format!(
+                        "chown -R {}:{} {}",
+                        users::get_current_uid(),
+                        users::get_current_gid(),
+                        Self::CT_VOLUME_DIR
+                    )]).status()?;
+                }
+            }
+        }
 
-        // TODO: chown
-        unimplemented!()
+        response.map_err(|e| EngineError::internal(e))
+    }
+
+    fn to_container_path(&self, host_path: &Path) -> String {
+        let host_path = Self::canonicalize_via_parent(host_path).unwrap();
+        let volume_path = self
+            .workspace_layout
+            .local_volume_dir
+            .canonicalize()
+            .unwrap();
+        let volume_rel_path = host_path.strip_prefix(volume_path).unwrap();
+
+        let mut container_path = Self::CT_VOLUME_DIR.to_owned();
+        container_path.push('/');
+        container_path.push_str(&volume_rel_path.to_string_lossy());
+        container_path
+    }
+
+    fn canonicalize_via_parent(path: &Path) -> Result<PathBuf, std::io::Error> {
+        match path.canonicalize() {
+            Ok(p) => Ok(p),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(parent) = path.parent() {
+                    let mut cp = Self::canonicalize_via_parent(parent)?;
+                    cp.push(path.file_name().unwrap());
+                    Ok(cp)
+                } else {
+                    Err(e)
+                }
+            }
+            e @ _ => e,
+        }
     }
 }
 
@@ -66,18 +111,20 @@ impl Engine for ODFEngine {
         mut request: ExecuteQueryRequest,
     ) -> Result<ExecuteQueryResponse, EngineError> {
         let mut inputs = Vec::new();
+
         for input_id in request.source.inputs {
             let slice = request.input_slices.remove(&input_id).unwrap();
             let vocab = request.dataset_vocabs.remove(&input_id).unwrap();
+
             inputs.push(odf::QueryInput {
                 dataset_id: input_id,
                 interval: slice.interval,
                 data_paths: slice
                     .data_paths
                     .into_iter()
-                    .map(|p| p.to_string_lossy().to_string())
+                    .map(|p| self.to_container_path(&p))
                     .collect(),
-                schema_file: slice.schema_file.to_string_lossy().to_string(),
+                schema_file: self.to_container_path(&slice.schema_file),
                 explicit_watermarks: slice.explicit_watermarks,
                 vocab: vocab,
             });
@@ -95,9 +142,9 @@ impl Engine for ODFEngine {
             vocab,
             prev_checkpoint_dir: request
                 .prev_checkpoint_dir
-                .map(|p| p.to_string_lossy().to_string()),
-            new_checkpoint_dir: request.new_checkpoint_dir.to_string_lossy().to_string(),
-            out_data_path: request.out_data_path.to_string_lossy().to_string(),
+                .map(|p| self.to_container_path(&p)),
+            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            out_data_path: self.to_container_path(&request.out_data_path),
             inputs,
         };
 
@@ -157,18 +204,19 @@ impl EngineContainer {
     pub fn new(
         container_runtime: ContainerRuntime,
         image: &str,
-        run_id: &str,
+        run_info: &RunInfo,
+        volume_map: Vec<(PathBuf, PathBuf)>,
         logger: Logger,
     ) -> Result<Self, EngineError> {
-        //let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
-        //let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
+        let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
+        let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
 
-        let container_name = format!("kamu-engine-{}", run_id);
+        let container_name = format!("kamu-engine-{}", &run_info.run_id);
 
         let mut cmd = container_runtime.run_cmd(RunArgs {
             image: image.to_owned(),
             container_name: Some(container_name.clone()),
-            //volume_map: volume_map,
+            volume_map: volume_map,
             user: Some("root".to_owned()),
             expose_ports: vec![Self::ADAPTER_PORT],
             ..RunArgs::default()
@@ -177,8 +225,8 @@ impl EngineContainer {
         info!(logger, "Starting engine"; "command" => ?cmd, "image" => image, "id" => &container_name);
 
         let engine_process = cmd
-            .stdout(Stdio::inherit()) //std::process::Stdio::from(stdout_file))
-            .stderr(Stdio::inherit()) //std::process::Stdio::from(stderr_file))
+            .stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
+            .stderr(std::process::Stdio::from(stderr_file)) // Stdio::inherit()
             .spawn()
             .map_err(|e| EngineError::internal(e))?;
 
