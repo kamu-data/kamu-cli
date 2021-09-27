@@ -3,6 +3,8 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
+use std::path::Path;
+
 use super::{CompressionFormat, DatasetID, Sha3_256, SourceOrdering, TimeInterval};
 use chrono::{DateTime, Utc};
 
@@ -260,9 +262,9 @@ pub trait ExecuteQueryRequest {
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn transform(&self) -> Transform;
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_>;
-    fn prev_checkpoint_dir(&self) -> Option<&str>;
-    fn new_checkpoint_dir(&self) -> &str;
-    fn out_data_path(&self) -> &str;
+    fn prev_checkpoint_dir(&self) -> Option<&Path>;
+    fn new_checkpoint_dir(&self) -> &Path;
+    fn out_data_path(&self) -> &Path;
 }
 
 impl ExecuteQueryRequest for super::ExecuteQueryRequest {
@@ -278,15 +280,15 @@ impl ExecuteQueryRequest for super::ExecuteQueryRequest {
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_> {
         Box::new(self.inputs.iter().map(|i| -> &dyn QueryInput { i }))
     }
-    fn prev_checkpoint_dir(&self) -> Option<&str> {
+    fn prev_checkpoint_dir(&self) -> Option<&Path> {
         self.prev_checkpoint_dir
             .as_ref()
-            .map(|v| -> &str { v.as_ref() })
+            .map(|v| -> &Path { v.as_ref() })
     }
-    fn new_checkpoint_dir(&self) -> &str {
+    fn new_checkpoint_dir(&self) -> &Path {
         self.new_checkpoint_dir.as_ref()
     }
-    fn out_data_path(&self) -> &str {
+    fn out_data_path(&self) -> &Path {
         self.out_data_path.as_ref()
     }
 }
@@ -737,8 +739,8 @@ pub trait QueryInput {
     fn dataset_id(&self) -> &DatasetID;
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn interval(&self) -> TimeInterval;
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &str> + '_>;
-    fn schema_file(&self) -> &str;
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
+    fn schema_file(&self) -> &Path;
     fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
 }
 
@@ -752,10 +754,10 @@ impl QueryInput for super::QueryInput {
     fn interval(&self) -> TimeInterval {
         self.interval
     }
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &str> + '_> {
-        Box::new(self.data_paths.iter().map(|i| -> &str { i.as_ref() }))
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
+        Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
     }
-    fn schema_file(&self) -> &str {
+    fn schema_file(&self) -> &Path {
         self.schema_file.as_ref()
     }
     fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {

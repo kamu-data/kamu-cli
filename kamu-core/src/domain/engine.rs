@@ -10,21 +10,22 @@
 use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::{
-    DatasetIDBuf, DatasetSourceDerivative, DatasetSourceRoot, DatasetVocabulary, MetadataBlock,
-    TimeInterval, Watermark,
+    DatasetIDBuf, DatasetSourceRoot, DatasetVocabulary, ExecuteQueryRequest,
+    ExecuteQueryResponseSuccess, MetadataBlock,
 };
 
 use ::serde::{Deserialize, Serialize};
-use ::serde_with::serde_as;
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::backtrace::Backtrace;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use thiserror::Error;
 
 pub trait Engine {
-    fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError>;
+    fn transform(
+        &self,
+        request: ExecuteQueryRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
@@ -61,56 +62,6 @@ pub struct IngestRequest {
 pub struct IngestResponse {
     #[serde(with = "MetadataBlockDef")]
     pub block: MetadataBlock,
-}
-
-#[skip_serializing_none]
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryRequest {
-    #[serde(rename = "datasetID")]
-    pub dataset_id: DatasetIDBuf,
-    #[serde(with = "DatasetSourceDerivativeDef")]
-    pub source: DatasetSourceDerivative,
-    #[serde_as(as = "BTreeMap<_, DatasetVocabularyDef>")]
-    pub dataset_vocabs: BTreeMap<DatasetIDBuf, DatasetVocabulary>,
-    pub input_slices: BTreeMap<DatasetIDBuf, InputDataSlice>,
-    pub prev_checkpoint_dir: Option<PathBuf>,
-    pub new_checkpoint_dir: PathBuf,
-    pub out_data_path: PathBuf,
-}
-
-impl ExecuteQueryRequest {
-    pub fn is_empty(&self) -> bool {
-        self.input_slices.values().all(|s| s.is_empty())
-    }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponse {
-    #[serde(with = "MetadataBlockDef")]
-    pub block: MetadataBlock,
-}
-
-#[skip_serializing_none]
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct InputDataSlice {
-    pub interval: TimeInterval,
-    pub data_paths: Vec<PathBuf>,
-    // TODO: Replace with just DDL schema
-    pub schema_file: PathBuf,
-    #[serde_as(as = "Vec<WatermarkDef>")]
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-impl InputDataSlice {
-    pub fn is_empty(&self) -> bool {
-        self.data_paths.is_empty() && self.explicit_watermarks.is_empty()
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

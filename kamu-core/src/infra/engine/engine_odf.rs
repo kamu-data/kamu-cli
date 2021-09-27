@@ -6,7 +6,10 @@ use std::{
 };
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
-use odf::engine::{EngineClient, ExecuteQueryError};
+use odf::{
+    engine::{EngineClient, ExecuteQueryError},
+    ExecuteQueryRequest, ExecuteQueryResponseSuccess, QueryInput,
+};
 use opendatafabric as odf;
 use rand::Rng;
 use slog::{info, warn, Logger};
@@ -73,7 +76,7 @@ impl ODFEngine {
         response.map_err(|e| e.into())
     }
 
-    fn to_container_path(&self, host_path: &Path) -> String {
+    fn to_container_path(&self, host_path: &Path) -> PathBuf {
         let host_path = Self::canonicalize_via_parent(host_path).unwrap();
         let volume_path = self
             .workspace_layout
@@ -85,7 +88,7 @@ impl ODFEngine {
         let mut container_path = Self::CT_VOLUME_DIR.to_owned();
         container_path.push('/');
         container_path.push_str(&volume_rel_path.to_string_lossy());
-        container_path
+        PathBuf::from(container_path)
     }
 
     fn canonicalize_via_parent(path: &Path) -> Result<PathBuf, std::io::Error> {
@@ -108,54 +111,35 @@ impl ODFEngine {
 impl Engine for ODFEngine {
     fn transform(
         &self,
-        mut request: ExecuteQueryRequest,
-    ) -> Result<ExecuteQueryResponse, EngineError> {
-        let mut inputs = Vec::new();
-
-        for input_id in request.source.inputs {
-            let slice = request.input_slices.remove(&input_id).unwrap();
-            let vocab = request.dataset_vocabs.remove(&input_id).unwrap();
-
-            inputs.push(odf::QueryInput {
-                dataset_id: input_id,
-                interval: slice.interval,
-                data_paths: slice
-                    .data_paths
-                    .into_iter()
-                    .map(|p| self.to_container_path(&p))
-                    .collect(),
-                schema_file: self.to_container_path(&slice.schema_file),
-                explicit_watermarks: slice.explicit_watermarks,
-                vocab: vocab,
-            });
-        }
-
-        let vocab = request
-            .dataset_vocabs
-            .get(&request.dataset_id)
-            .unwrap()
-            .clone();
-
-        let request = odf::ExecuteQueryRequest {
-            dataset_id: request.dataset_id,
-            transform: request.source.transform,
-            vocab,
+        request: ExecuteQueryRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
+        let request_adj = ExecuteQueryRequest {
             prev_checkpoint_dir: request
                 .prev_checkpoint_dir
                 .map(|p| self.to_container_path(&p)),
             new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
-            inputs,
+            inputs: request
+                .inputs
+                .into_iter()
+                .map(|input| QueryInput {
+                    data_paths: input
+                        .data_paths
+                        .into_iter()
+                        .map(|p| self.to_container_path(&p))
+                        .collect(),
+                    schema_file: self.to_container_path(&input.schema_file),
+                    ..input
+                })
+                .collect(),
+            ..request
         };
 
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let response = rt.block_on(self.transform2(run_info, request))?;
-
-        Ok(ExecuteQueryResponse {
-            block: response.metadata_block,
-        })
+        let response = rt.block_on(self.transform2(run_info, request_adj))?;
+        Ok(response)
     }
 }
 

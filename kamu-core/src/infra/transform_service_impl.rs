@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use crate::domain::{ExecuteQueryRequest, InputDataSlice};
 use crate::infra::*;
 use opendatafabric::*;
 
@@ -71,11 +70,11 @@ impl TransformServiceImpl {
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        let new_checkpoint_path = request.new_checkpoint_dir.clone();
-        let out_data_path = request.out_data_path.clone();
+        let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
+        let out_data_path = PathBuf::from(&request.out_data_path);
 
         let engine = engine_factory.get_engine(
-            match request.source.transform {
+            match request.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
             listener.clone().get_pull_image_listener(),
@@ -83,7 +82,7 @@ impl TransformServiceImpl {
 
         let result = engine.lock().unwrap().transform(request)?;
 
-        if let Some(ref slice) = result.block.output_slice {
+        if let Some(ref slice) = result.metadata_block.output_slice {
             if slice.num_records == 0 {
                 return Err(EngineError::ContractError(ContractError::new(
                     "Engine returned an output slice with zero records",
@@ -106,7 +105,7 @@ impl TransformServiceImpl {
             .into());
         }
 
-        let result = commit_fn(result.block, &out_data_path, &new_checkpoint_path)?;
+        let result = commit_fn(result.metadata_block, &out_data_path, &new_checkpoint_path)?;
 
         // Commit should clean up
         assert!(!out_data_path.exists());
@@ -176,7 +175,13 @@ impl TransformServiceImpl {
         // TODO: limit traversal depth
         let mut sources: Vec<_> = output_chain
             .iter_blocks()
-            .filter_map(|b| b.source)
+            .filter_map(|b| match b.source {
+                Some(DatasetSource::Derivative(t)) => Some(t),
+                Some(DatasetSource::Root(_)) => {
+                    panic!("Transform called on non-derivative dataset {}", dataset_id)
+                }
+                None => None,
+            })
             .collect();
 
         // TODO: source could've changed several times
@@ -184,10 +189,7 @@ impl TransformServiceImpl {
             unimplemented!("Transform evolution is not yet supported");
         }
 
-        let source = match sources.pop().unwrap() {
-            DatasetSource::Derivative(src) => src,
-            _ => panic!("Transform called on non-derivative dataset {}", dataset_id),
-        };
+        let source = sources.pop().unwrap();
 
         if source
             .inputs
@@ -201,26 +203,24 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        let input_slices: BTreeMap<_, _> = source
+        let inputs: Vec<_> = source
             .inputs
             .iter()
             .enumerate()
             .map(|(index, input_id)| {
                 let input_layout = DatasetLayout::new(&self.volume_layout, input_id);
 
-                let slice = self.get_input_slice(
+                self.get_input_slice(
                     index,
                     input_id,
                     &input_layout,
                     output_chain.as_ref(),
                     logger.new(o!("input_dataset" => input_id.as_str().to_owned())),
-                )?;
-
-                Ok((input_id.clone(), slice))
+                )
             })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
 
-        if input_slices.values().all(|s| s.is_empty()) {
+        if inputs.iter().all(|s| s.is_empty()) {
             return Ok(None);
         }
 
@@ -230,17 +230,6 @@ impl TransformServiceImpl {
             .filter(|b| b.input_slices.is_some())
             .map(|b| b.block_hash)
             .next();
-
-        let mut vocabs = source
-            .inputs
-            .iter()
-            .map(|input_id| {
-                self.get_vocab(input_id)
-                    .map(|vocab| (input_id.clone(), vocab))
-            })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
-
-        vocabs.insert(dataset_id.to_owned(), self.get_vocab(dataset_id)?);
 
         let output_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
         let out_data_path = output_layout.data_dir.join(".pending");
@@ -259,13 +248,13 @@ impl TransformServiceImpl {
 
         Ok(Some(ExecuteQueryRequest {
             dataset_id: dataset_id.to_owned(),
+            vocab: self.get_vocab(dataset_id)?,
+            transform: source.transform,
+            inputs,
             prev_checkpoint_dir: prev_checkpoint
                 .map(|hash| output_layout.checkpoints_dir.join(hash.to_string())),
-            new_checkpoint_dir: new_checkpoint_dir.clone(),
-            source: source,
-            dataset_vocabs: vocabs,
-            input_slices: input_slices,
-            out_data_path: out_data_path,
+            new_checkpoint_dir,
+            out_data_path,
         }))
     }
 
@@ -286,7 +275,7 @@ impl TransformServiceImpl {
         dataset_layout: &DatasetLayout,
         output_chain: &dyn MetadataChain,
         logger: Logger,
-    ) -> Result<InputDataSlice, DomainError> {
+    ) -> Result<QueryInput, DomainError> {
         // Determine processed data range
         // Result is either: () or (inf, upper] or (lower, upper]
         let iv_processed = output_chain
@@ -345,22 +334,24 @@ impl TransformServiceImpl {
             .map(|p| p.clone())
             .unwrap_or_else(|| self.get_schema_file_fallback(dataset_layout));
 
-        let slice = InputDataSlice {
+        let input = QueryInput {
+            dataset_id: dataset_id.to_owned(),
+            vocab: self.get_vocab(dataset_id)?,
             interval: iv_to_process,
             data_paths: data_paths,
             schema_file: schema_file,
             explicit_watermarks: explicit_watermarks,
         };
 
-        info!(logger, "Computed input slice";
-            "slice" => ?slice,
-            "empty" => slice.is_empty(),
+        info!(logger, "Computed query input";
+            "input" => ?input,
+            "empty" => input.is_empty(),
             "iv_unprocessed" => ?iv_unprocessed,
             "iv_available" => ?iv_available,
             "unprocessed_blocks" => blocks_unprocessed.len(),
         );
 
-        Ok(slice)
+        Ok(input)
     }
 
     // TODO: Avoid iterating through output chain multiple times
@@ -444,12 +435,11 @@ impl TransformServiceImpl {
         let source = source.ok_or(VerificationError::NotDerivative)?;
         let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
 
-        let mut dataset_vocabs = source
+        let dataset_vocabs = source
             .inputs
             .iter()
             .map(|id| -> Result<_, DomainError> { Ok((id.to_owned(), self.get_vocab(id)?)) })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
-        dataset_vocabs.insert(dataset_id.to_owned(), vocab.unwrap_or_default());
 
         let mut plan: Vec<_> = blocks
             .into_iter()
@@ -457,22 +447,21 @@ impl TransformServiceImpl {
             .map(|block| VerificationStep {
                 request: ExecuteQueryRequest {
                     dataset_id: dataset_id.to_owned(),
-                    source: source.clone(),
-                    dataset_vocabs: dataset_vocabs.clone(),
-                    input_slices: std::iter::zip(
+                    transform: source.transform.clone(),
+                    vocab: vocab.clone().unwrap_or_default(),
+                    inputs: std::iter::zip(
                         source.inputs.iter(),
                         block.input_slices.as_ref().unwrap().iter(),
                     )
                     .map(|(id, slice)| {
-                        (
-                            id.to_owned(),
-                            InputDataSlice {
-                                interval: slice.interval,
-                                data_paths: Vec::new(), // Filled out below
-                                schema_file: PathBuf::new(), // Filled out below
-                                explicit_watermarks: Vec::new(), // Filled out below
-                            },
-                        )
+                        QueryInput {
+                            dataset_id: id.clone(),
+                            vocab: dataset_vocabs.get(id).unwrap().clone(),
+                            interval: slice.interval,
+                            data_paths: Vec::new(),      // Filled out below
+                            schema_file: PathBuf::new(), // Filled out below
+                            explicit_watermarks: Vec::new(), // Filled out below
+                        }
                     })
                     .collect(),
                     prev_checkpoint_dir: None, // Filled out below
@@ -516,7 +505,13 @@ impl TransformServiceImpl {
             while curr_step.is_some() && curr_input_block.is_some() {
                 let step = curr_step.as_mut().unwrap();
                 let input_block = curr_input_block.as_ref().unwrap();
-                let slice = step.request.input_slices.get_mut(input_id).unwrap();
+                let slice = step
+                    .request
+                    .inputs
+                    .iter_mut()
+                    .filter(|i| i.dataset_id == *input_id)
+                    .next()
+                    .unwrap();
 
                 debug!(logger, "Considering blocks";
                     "input_id" => input_id.as_str(),
@@ -578,7 +573,7 @@ impl TransformServiceImpl {
 
         // Post-process input slices
         for step in plan.iter_mut() {
-            for (input_id, slice) in step.request.input_slices.iter_mut() {
+            for slice in step.request.inputs.iter_mut() {
                 slice.data_paths.reverse();
                 slice.explicit_watermarks.reverse();
                 // TODO: Migrate to providing schema directly
@@ -590,7 +585,7 @@ impl TransformServiceImpl {
                         .unwrap_or_else(|| {
                             self.get_schema_file_fallback(&DatasetLayout::new(
                                 &self.volume_layout,
-                                input_id,
+                                &slice.dataset_id,
                             ))
                         });
             }

@@ -9,7 +9,10 @@
 
 use std::fmt::Display;
 
-use crate::{ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv};
+use crate::{
+    ExecuteQueryRequest, ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery,
+    QueryInput, ReadStepCsv,
+};
 
 use super::DatasetVocabulary;
 
@@ -45,6 +48,18 @@ impl Default for ReadStepCsv {
             timestamp_format: None,
             multi_line: None,
         }
+    }
+}
+
+impl QueryInput {
+    pub fn is_empty(&self) -> bool {
+        self.data_paths.is_empty() && self.explicit_watermarks.is_empty()
+    }
+}
+
+impl ExecuteQueryRequest {
+    pub fn is_empty(&self) -> bool {
+        self.inputs.iter().all(|s| s.is_empty())
     }
 }
 

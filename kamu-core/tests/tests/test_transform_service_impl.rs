@@ -8,26 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
-use kamu::domain::{ExecuteQueryRequest, InputDataSlice};
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};
 use std::sync::Arc;
-
-macro_rules! map(
-    { } => { ::std::collections::BTreeMap::new() };
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::std::collections::BTreeMap::new();
-            $(
-                m.insert($key, $value);
-            )+
-            m
-        }
-     };
-);
 
 fn new_root(metadata_repo: &MetadataRepositoryImpl, id_str: &'static str) -> &'static DatasetID {
     let id = DatasetID::new_unchecked(id_str);
@@ -97,9 +83,11 @@ fn test_get_next_operation() {
 
     assert!(matches!(
         transform_svc.get_next_operation(bar).unwrap(),
-        Some(ExecuteQueryRequest { source, input_slices, .. })
-        if source == bar_source &&
-        input_slices == map! { foo.to_owned() => InputDataSlice {
+        Some(ExecuteQueryRequest { transform, inputs, .. })
+        if transform == bar_source.transform &&
+        inputs == vec![QueryInput {
+            dataset_id: foo.to_owned(),
+            vocab: DatasetVocabulary::default(),
             interval: TimeInterval::unbounded_closed_right(foo_block.system_time),
             data_paths: vec![foo_layout.data_dir.join(foo_block.block_hash.to_string())],
             schema_file: foo_layout.data_dir.join(foo_block.block_hash.to_string()),
@@ -107,7 +95,7 @@ fn test_get_next_operation() {
                 system_time: foo_block.system_time,
                 event_time: Utc.ymd(2020, 1, 1).and_hms(10, 0, 0),
             }],
-        }}
+        }]
     ));
 }
 
@@ -296,10 +284,10 @@ fn test_get_verification_plan_one_to_one() {
             .unwrap()
     );
 
-    assert_eq!(plan[0].request.input_slices, deriv_req_t2.input_slices);
+    assert_eq!(plan[0].request.inputs, deriv_req_t2.inputs);
     assert_eq!(plan[0].request, deriv_req_t2);
-    assert_eq!(plan[1].request.input_slices, deriv_req_t4.input_slices);
+    assert_eq!(plan[1].request.inputs, deriv_req_t4.inputs);
     assert_eq!(plan[1].request, deriv_req_t4);
-    assert_eq!(plan[2].request.input_slices, deriv_req_t6.input_slices);
+    assert_eq!(plan[2].request.inputs, deriv_req_t6.inputs);
     assert_eq!(plan[2].request, deriv_req_t6);
 }

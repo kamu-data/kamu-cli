@@ -9,6 +9,7 @@ use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use chrono::{DateTime, Utc};
 use serde_with::serde_as;
 use serde_with::skip_serializing_none;
+use std::path::PathBuf;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -211,9 +212,9 @@ pub struct ExecuteQueryRequestDef {
     pub transform: Transform,
     #[serde_as(as = "Vec<QueryInputDef>")]
     pub inputs: Vec<QueryInput>,
-    pub prev_checkpoint_dir: Option<String>,
-    pub new_checkpoint_dir: String,
-    pub out_data_path: String,
+    pub prev_checkpoint_dir: Option<PathBuf>,
+    pub new_checkpoint_dir: PathBuf,
+    pub out_data_path: PathBuf,
 }
 
 implement_serde_as!(
@@ -523,8 +524,8 @@ pub struct QueryInputDef {
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
     pub interval: TimeInterval,
-    pub data_paths: Vec<String>,
-    pub schema_file: String,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
     #[serde_as(as = "Vec<WatermarkDef>")]
     pub explicit_watermarks: Vec<Watermark>,
 }

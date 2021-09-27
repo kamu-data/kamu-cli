@@ -11,6 +11,13 @@ use crate::domain::*;
 use crate::infra::*;
 
 use container_runtime::*;
+use opendatafabric::serde::yaml::YamlEngineProtocol;
+use opendatafabric::serde::EngineProtocolDeserializer;
+use opendatafabric::serde::EngineProtocolSerializer;
+use opendatafabric::ExecuteQueryRequest;
+use opendatafabric::ExecuteQueryResponse;
+use opendatafabric::ExecuteQueryResponseSuccess;
+use opendatafabric::QueryInput;
 use rand::Rng;
 use slog::{info, o, Logger};
 use std::fs::File;
@@ -279,36 +286,27 @@ impl FlinkEngine {
         Ok(savepoints.pop().unwrap())
     }
 
-    fn write_request<T>(
+    fn write_request(
         &self,
         run_info: &RunInfo,
-        request: T,
-        resource_name: &str,
-    ) -> Result<(), EngineError>
-    where
-        T: ::serde::ser::Serialize + std::fmt::Debug,
-    {
+        request: ExecuteQueryRequest,
+    ) -> Result<(), EngineError> {
         let path = run_info.in_out_dir.join("request.yaml");
 
-        let manifest = Manifest {
-            api_version: 1,
-            kind: resource_name.to_owned(),
-            content: request,
-        };
-        info!(self.logger, "Writing request"; "request" => ?manifest, "path" => ?path);
+        let data = YamlEngineProtocol
+            .write_execute_query_request(&request)
+            .map_err(|e| EngineError::internal(e))?;
 
-        let file = File::create(&path)?;
-        serde_yaml::to_writer(file, &manifest).map_err(|e| EngineError::internal(e))?;
-
+        info!(self.logger, "Writing request"; "request" => ?request, "path" => ?path);
+        std::fs::write(&path, &data)?;
         Ok(())
     }
 
-    fn read_response<T>(&self, run_info: &RunInfo, resource_name: &str) -> Result<T, EngineError>
-    where
-        T: ::serde::de::DeserializeOwned + std::fmt::Debug,
-    {
+    fn read_response(
+        &self,
+        run_info: &RunInfo,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let path = run_info.in_out_dir.join("result.yaml");
-
         if !path.exists() {
             return Err(ContractError::new(
                 "Engine did not write a response file",
@@ -317,20 +315,29 @@ impl FlinkEngine {
             .into());
         }
 
-        let file = File::open(path)?;
+        let data = std::fs::read_to_string(&path)?;
 
-        let manifest: Manifest<T> =
-            serde_yaml::from_reader(file).map_err(|e| EngineError::internal(e))?;
+        let response = YamlEngineProtocol
+            .read_execute_query_response(data.as_bytes())
+            .map_err(|e| EngineError::internal(e))?;
 
-        info!(self.logger, "Read response"; "response" => ?manifest);
-        assert_eq!(manifest.kind, resource_name);
+        info!(self.logger, "Read response"; "response" => ?response);
 
-        Ok(manifest.content)
+        // TODO: These will be removed when Flink is switched to use ODF adapter
+        match response {
+            ExecuteQueryResponse::Progress => unimplemented!(),
+            ExecuteQueryResponse::Success(resp) => Ok(resp),
+            ExecuteQueryResponse::InvalidQuery(_) => unimplemented!(),
+            ExecuteQueryResponse::InternalError(_) => unimplemented!(),
+        }
     }
 }
 
 impl Engine for FlinkEngine {
-    fn transform(&self, request: ExecuteQueryRequest) -> Result<ExecuteQueryResponse, EngineError> {
+    fn transform(
+        &self,
+        request: ExecuteQueryRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(10)
@@ -351,40 +358,33 @@ impl Engine for FlinkEngine {
             &self.workspace_layout.run_info_dir,
         );
 
-        let input_slices_adj = request
-            .input_slices
-            .into_iter()
-            .map(|(id, slice)| {
-                (
-                    id,
-                    InputDataSlice {
-                        data_paths: slice
-                            .data_paths
-                            .iter()
-                            .map(|p| self.to_container_path(p))
-                            .collect(),
-                        schema_file: self.to_container_path(&slice.schema_file),
-                        ..slice
-                    },
-                )
-            })
-            .collect();
-
         let request_adj = ExecuteQueryRequest {
-            input_slices: input_slices_adj,
             prev_checkpoint_dir: request
                 .prev_checkpoint_dir
                 .map(|p| self.to_container_path(&p)),
             new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
+            inputs: request
+                .inputs
+                .into_iter()
+                .map(|input| QueryInput {
+                    data_paths: input
+                        .data_paths
+                        .into_iter()
+                        .map(|p| self.to_container_path(&p))
+                        .collect(),
+                    schema_file: self.to_container_path(&input.schema_file),
+                    ..input
+                })
+                .collect(),
             ..request
         };
 
-        self.write_request(&run_info, request_adj, "ExecuteQueryRequest")?;
+        self.write_request(&run_info, request_adj)?;
 
         self.submit(&run_info)?;
 
-        self.read_response(&run_info, "ExecuteQueryResult")
+        self.read_response(&run_info)
     }
 }
 
