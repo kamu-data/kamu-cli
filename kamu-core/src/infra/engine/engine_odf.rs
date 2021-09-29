@@ -50,7 +50,7 @@ impl ODFEngine {
         }
     }
 
-    async fn transform2(
+    async fn transform_impl(
         &self,
         run_info: RunInfo,
         request: odf::ExecuteQueryRequest,
@@ -155,7 +155,7 @@ impl Engine for ODFEngine {
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let response = rt.block_on(self.transform2(run_info, request_adj))?;
+        let response = rt.block_on(self.transform_impl(run_info, request_adj))?;
         Ok(response)
     }
 }
