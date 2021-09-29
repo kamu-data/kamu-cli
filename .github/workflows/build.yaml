@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+        with:
+          components: rustfmt
       - run: cargo build
       - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
       - run: cargo run --bin kamu-cli -- init --pull-test-images
@@ -24,6 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+        with:
+          components: rustfmt
       - run: cargo test --verbose --features skip_docker_tests
   test_windows:
     name: Test / Windows
@@ -31,4 +35,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+        with:
+          components: rustfmt
       - run: cargo test --verbose --features skip_docker_tests
