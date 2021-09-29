@@ -23,6 +23,7 @@ hex = "*"
 serde = { version = "*", features = ["derive"] }
 serde_with = "*"
 serde_yaml = "*"
+json = "*"
 
 # Ingest
 flate2 = "*"  # GZip decoder

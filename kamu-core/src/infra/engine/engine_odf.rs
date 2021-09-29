@@ -164,6 +164,7 @@ impl Engine for ODFEngine {
 
 struct RunInfo {
     run_id: String,
+    logs_dir: PathBuf,
     stdout_path: PathBuf,
     stderr_path: PathBuf,
 }
@@ -176,18 +177,66 @@ impl RunInfo {
             .map(char::from)
             .collect();
 
-        let stdout_path = logs_dir.join(format!("engine-{}.out.txt", &run_id));
-        let stderr_path = logs_dir.join(format!("engine-{}.err.txt", &run_id));
+        let stdout_path = logs_dir.join(format!("engine-{}.stdout.txt", &run_id));
+        let stderr_path = logs_dir.join(format!("engine-{}.stderr.txt", &run_id));
 
         Self {
             run_id,
+            logs_dir: logs_dir.to_owned(),
             stdout_path,
             stderr_path,
         }
     }
 
     pub fn log_files(&self) -> Vec<PathBuf> {
-        vec![self.stdout_path.clone(), self.stderr_path.clone()]
+        let mut logs = self.demux_logs().unwrap_or(Vec::new());
+        logs.push(self.stdout_path.clone());
+        logs.push(self.stderr_path.clone());
+        logs
+    }
+
+    // ODF adapters log in bunyan format (JSON per line)
+    // To make logs more readable we parse the logs to demultiplex
+    // logs from multiple processes into different files
+    fn demux_logs(&self) -> Result<Vec<PathBuf>, std::io::Error> {
+        use std::collections::BTreeMap;
+        use std::fs::File;
+        use std::io::{BufRead, Write};
+
+        let mut demuxed: BTreeMap<String, (PathBuf, File)> = BTreeMap::new();
+        let file = File::open(&self.stdout_path)?;
+        let reader = std::io::BufReader::new(file);
+        for line in reader.lines() {
+            let line = line?;
+            let obj = json::parse(&line).unwrap_or(json::Null);
+            let process = &obj["process"];
+            let stream = &obj["stream"];
+            if process.is_null() || !process.is_string() || stream.is_null() || !stream.is_string()
+            {
+                continue;
+            }
+
+            let filename =
+                self.demuxed_filename(process.as_str().unwrap(), stream.as_str().unwrap());
+
+            let file = match demuxed.get_mut(&filename) {
+                Some((_, f)) => f,
+                None => {
+                    let path = self.logs_dir.join(&filename);
+                    let f = File::create(&path)?;
+                    demuxed.insert(filename.clone(), (path, f));
+                    &mut demuxed.get_mut(&filename).unwrap().1
+                }
+            };
+
+            writeln!(file, "{}", obj["msg"].as_str().unwrap_or_default())?;
+        }
+
+        Ok(demuxed.into_values().map(|(path, _)| path).collect())
+    }
+
+    fn demuxed_filename(&self, process: &str, stream: &str) -> String {
+        format!("engine-{}-{}.{}.txt", &self.run_id, process, stream)
     }
 }
 
