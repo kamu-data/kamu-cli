@@ -98,7 +98,21 @@ impl SparkEngine {
         PathBuf::from(unix_path)
     }
 
-    fn submit(&self, app_class: &str, run_info: &RunInfo) -> Result<(), EngineError> {
+    fn ingest_impl(
+        &self,
+        run_info: RunInfo,
+        request: IngestRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
+        let request_path = run_info.in_out_dir.join("request.yaml");
+        let response_path = run_info.in_out_dir.join("response.yaml");
+
+        {
+            info!(self.logger, "Writing request"; "request" => ?request, "path" => ?request_path);
+            let file = File::create(&request_path)?;
+            serde_yaml::to_writer(file, &request)
+                .map_err(|e| EngineError::internal(e, Vec::new()))?;
+        }
+
         let volume_map = vec![
             (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
             (
@@ -136,14 +150,14 @@ impl SparkEngine {
                 ..RunArgs::default()
             },
             &[
-                format!(
+                indoc::indoc!(
                     "/opt/bitnami/spark/bin/spark-submit \
-                        --master=local[4] \
-                        --driver-memory=2g \
-                        --class={} \
-                        /opt/engine/bin/engine.spark.jar",
-                    app_class,
-                ),
+                    --master=local[4] \
+                    --driver-memory=2g \
+                    --class=dev.kamu.engine.spark.ingest.IngestApp \
+                    /opt/engine/bin/engine.spark.jar"
+                )
+                .to_owned(),
                 chown,
             ],
         );
@@ -156,55 +170,35 @@ impl SparkEngine {
             .status()
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-        match status.code() {
-            Some(code) if code == 0 => Ok(()),
-            _ => Err(EngineError::process_error(
+        if response_path.exists() {
+            let data = std::fs::read_to_string(&response_path)?;
+            let response = YamlEngineProtocol
+                .read_execute_query_response(data.as_bytes())
+                .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+
+            info!(self.logger, "Read response"; "response" => ?response);
+
+            match response {
+                ExecuteQueryResponse::Progress => unreachable!(),
+                ExecuteQueryResponse::Success(s) => Ok(s),
+                ExecuteQueryResponse::InvalidQuery(e) => {
+                    Err(EngineError::invalid_query(e.message, run_info.log_files()))
+                }
+                ExecuteQueryResponse::InternalError(e) => Err(EngineError::internal(
+                    ExecuteQueryError::from(e),
+                    run_info.log_files(),
+                )),
+            }
+        } else if !status.success() {
+            Err(EngineError::process_error(
                 status.code(),
                 run_info.log_files(),
-            )),
-        }
-    }
-
-    fn write_request(&self, run_info: &RunInfo, request: IngestRequest) -> Result<(), EngineError> {
-        let path = run_info.in_out_dir.join("request.yaml");
-        info!(self.logger, "Writing request"; "request" => ?request, "path" => ?path);
-
-        let file = File::create(&path)?;
-        serde_yaml::to_writer(file, &request).map_err(|e| EngineError::internal(e, Vec::new()))?;
-
-        Ok(())
-    }
-
-    fn read_response(
-        &self,
-        run_info: &RunInfo,
-    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
-        let path = run_info.in_out_dir.join("response.yaml");
-
-        if !path.exists() {
-            return Err(EngineError::contract_error(
+            ))
+        } else {
+            Err(EngineError::contract_error(
                 "Engine did not write a response file",
                 run_info.log_files(),
-            ));
-        }
-
-        let data = std::fs::read_to_string(path)?;
-        let response = YamlEngineProtocol
-            .read_execute_query_response(data.as_bytes())
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
-
-        info!(self.logger, "Read response"; "response" => ?response);
-
-        match response {
-            ExecuteQueryResponse::Progress => unreachable!(),
-            ExecuteQueryResponse::Success(s) => Ok(s),
-            ExecuteQueryResponse::InvalidQuery(e) => {
-                Err(EngineError::invalid_query(e.message, run_info.log_files()))
-            }
-            ExecuteQueryResponse::InternalError(e) => Err(EngineError::internal(
-                ExecuteQueryError::from(e),
-                run_info.log_files(),
-            )),
+            ))
         }
     }
 }
@@ -227,10 +221,6 @@ impl IngestEngine for SparkEngine {
             ..request
         };
 
-        self.write_request(&run_info, request_adj)?;
-
-        self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
-
-        self.read_response(&run_info)
+        self.ingest_impl(run_info, request_adj)
     }
 }
