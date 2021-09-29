@@ -329,19 +329,25 @@ impl Drop for EngineContainer {
         }
 
         info!(self.logger, "Shutting down engine"; "id" => &self.container_name);
-        unsafe {
-            libc::kill(self.engine_process.id() as i32, libc::SIGTERM);
-        }
 
-        let start = std::time::Instant::now();
-        while (std::time::Instant::now() - start) < Self::SHUTDOWN_TIMEOUT {
-            if self.has_exited() {
-                return;
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                unsafe {
+                    libc::kill(self.engine_process.id() as i32, libc::SIGTERM);
+                }
+
+                let start = std::time::Instant::now();
+                while (std::time::Instant::now() - start) < Self::SHUTDOWN_TIMEOUT {
+                    if self.has_exited() {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+
+                warn!(self.logger, "Engine did not shutdown gracefully, killing"; "id" => &self.container_name);
             }
-            std::thread::sleep(Duration::from_millis(100));
         }
 
-        warn!(self.logger, "Engine did not shutdown gracefully, killing"; "id" => &self.container_name);
         let _ = self.engine_process.kill();
     }
 }
@@ -363,9 +369,15 @@ impl KillOnDrop {
 
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
-        if let Some(child) = self.0.take() {
-            unsafe {
-                libc::kill(child.id() as i32, libc::SIGTERM);
+        cfg_if::cfg_if! {
+            if #[cfg(unix)] {
+                if let Some(child) = self.0.take() {
+                    unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
+                }
+            } else {
+                if let Some(mut child) = self.0.take() {
+                    let _ = child.kill();
+                }
             }
         }
     }
