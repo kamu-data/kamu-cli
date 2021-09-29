@@ -21,7 +21,7 @@ use std::backtrace::Backtrace;
 use std::path::PathBuf;
 use thiserror::Error;
 
-pub trait Engine {
+pub trait Engine: Sync + Send {
     fn transform(
         &self,
         request: ExecuteQueryRequest,
@@ -29,7 +29,7 @@ pub trait Engine {
 }
 
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
-pub trait IngestEngine {
+pub trait IngestEngine: Sync + Send {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
 }
 
@@ -70,74 +70,64 @@ pub struct IngestResponse {
 
 #[derive(Debug, Error)]
 pub enum EngineError {
-    #[error("Engine image not found: {image_name}")]
-    ImageNotFound {
-        image_name: String,
-        backtrace: Backtrace,
-    },
-    #[error("Invalid query: {message}")]
-    InvalidQuery { message: String },
-    #[error("Process error: {0}")]
+    #[error("{0}")]
+    ImageNotFound(#[from] ImageNotFoundError),
+    #[error("{0}")]
+    InvalidQuery(#[from] InvalidQueryError),
+    #[error("{0}")]
     ProcessError(#[from] ProcessError),
-    #[error("Contract error: {0}")]
+    #[error("{0}")]
     ContractError(#[from] ContractError),
-    #[error("Internal error: {source}")]
-    InternalError {
-        #[from]
-        source: Box<dyn std::error::Error + Send + Sync>,
-        #[backtrace]
-        backtrace: Backtrace,
-    },
+    #[error("{0}")]
+    InternalError(#[from] InternalEngineError),
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Image not found: {image_name}")]
+pub struct ImageNotFoundError {
+    pub image_name: String,
+    pub backtrace: Backtrace,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub struct InvalidQueryError {
+    pub message: String,
+    pub log_files: Vec<PathBuf>,
+    pub backtrace: Backtrace,
+}
+
+impl std::fmt::Display for InvalidQueryError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Invalid query: {}", self.message)?;
+
+        if self.log_files.len() != 0 {
+            write!(f, "\nSee log files for details:\n")?;
+            for path in self.log_files.iter() {
+                write!(f, "- {}\n", path.display())?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub struct ProcessError {
-    exit_code: Option<i32>,
-    log_files: Vec<PathBuf>,
-    backtrace: Backtrace,
-}
-
-#[derive(Debug, Error)]
-pub struct ContractError {
-    reason: String,
-    log_files: Vec<PathBuf>,
-    backtrace: Backtrace,
-}
-
-impl EngineError {
-    pub fn image_not_found(image_name: &str) -> Self {
-        EngineError::ImageNotFound {
-            image_name: image_name.to_owned(),
-            backtrace: Backtrace::capture(),
-        }
-    }
-
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        EngineError::InternalError {
-            source: e.into(),
-            backtrace: Backtrace::capture(),
-        }
-    }
-}
-
-impl From<std::io::Error> for EngineError {
-    fn from(e: std::io::Error) -> Self {
-        Self::internal(e)
-    }
-}
-
-impl ProcessError {
-    pub fn new(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
-        Self {
-            exit_code: exit_code,
-            log_files: log_files,
-            backtrace: Backtrace::capture(),
-        }
-    }
+    pub exit_code: Option<i32>,
+    pub log_files: Vec<PathBuf>,
+    pub backtrace: Backtrace,
 }
 
 impl std::fmt::Display for ProcessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Process error: ")?;
+
         match self.exit_code {
             Some(c) => write!(f, "Process exited with code {}", c)?,
             None => write!(f, "Process terminated by a signal")?,
@@ -154,19 +144,18 @@ impl std::fmt::Display for ProcessError {
     }
 }
 
-impl ContractError {
-    pub fn new(reason: &str, log_files: Vec<PathBuf>) -> Self {
-        Self {
-            reason: reason.to_owned(),
-            log_files: log_files,
-            backtrace: Backtrace::capture(),
-        }
-    }
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub struct ContractError {
+    pub reason: String,
+    pub log_files: Vec<PathBuf>,
+    pub backtrace: Backtrace,
 }
 
 impl std::fmt::Display for ContractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.reason)?;
+        write!(f, "Contract error: {}", self.reason)?;
 
         if self.log_files.len() != 0 {
             write!(f, ", see log files for details:\n")?;
@@ -176,5 +165,95 @@ impl std::fmt::Display for ContractError {
         }
 
         Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub struct InternalEngineError {
+    #[source]
+    pub source: Box<dyn std::error::Error + Send + Sync>,
+    pub log_files: Vec<PathBuf>,
+    #[backtrace]
+    pub backtrace: Backtrace,
+}
+
+impl std::fmt::Display for InternalEngineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Internal error: {}", self.source)?;
+
+        if self.log_files.len() != 0 {
+            write!(f, "\nSee log files for details:\n")?;
+            for path in self.log_files.iter() {
+                write!(f, "- {}\n", path.display())?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl EngineError {
+    pub fn image_not_found(image_name: &str) -> Self {
+        EngineError::ImageNotFound(ImageNotFoundError {
+            image_name: image_name.to_owned(),
+            backtrace: Backtrace::capture(),
+        })
+    }
+
+    pub fn invalid_query(message: impl Into<String>, log_files: Vec<PathBuf>) -> Self {
+        EngineError::InvalidQuery(InvalidQueryError {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+            log_files: Self::normalize_logs(log_files),
+        })
+    }
+
+    pub fn process_error(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
+        Self::ProcessError(ProcessError {
+            exit_code,
+            backtrace: Backtrace::capture(),
+            log_files: Self::normalize_logs(log_files),
+        })
+    }
+
+    pub fn contract_error(reason: &str, log_files: Vec<PathBuf>) -> Self {
+        Self::ContractError(ContractError {
+            reason: reason.to_owned(),
+            backtrace: Backtrace::capture(),
+            log_files: Self::normalize_logs(log_files),
+        })
+    }
+
+    pub fn internal<E>(e: E, log_files: Vec<PathBuf>) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        EngineError::InternalError(InternalEngineError {
+            source: e.into(),
+            backtrace: Backtrace::capture(),
+            log_files: Self::normalize_logs(log_files),
+        })
+    }
+
+    fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
+        let cwd = std::env::current_dir().unwrap_or_default();
+        log_files
+            .into_iter()
+            .filter(|p| match std::fs::metadata(p) {
+                Ok(m) => m.len() > 0,
+                Err(_) => true,
+            })
+            .map(|p| pathdiff::diff_paths(&p, &cwd).unwrap_or(p))
+            .collect()
+    }
+}
+
+impl From<std::io::Error> for EngineError {
+    fn from(e: std::io::Error) -> Self {
+        Self::internal(e, Vec::new())
     }
 }

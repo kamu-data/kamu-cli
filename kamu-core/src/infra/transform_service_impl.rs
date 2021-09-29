@@ -84,24 +84,24 @@ impl TransformServiceImpl {
 
         if let Some(ref slice) = result.metadata_block.output_slice {
             if slice.num_records == 0 {
-                return Err(EngineError::ContractError(ContractError::new(
+                return Err(EngineError::contract_error(
                     "Engine returned an output slice with zero records",
                     Vec::new(),
-                ))
+                )
                 .into());
             }
             if !out_data_path.exists() {
-                return Err(EngineError::ContractError(ContractError::new(
+                return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
                     Vec::new(),
-                ))
+                )
                 .into());
             }
         } else if out_data_path.exists() {
-            return Err(EngineError::ContractError(ContractError::new(
+            return Err(EngineError::contract_error(
                 "Engine wrote data file while the ouput slice is empty",
                 Vec::new(),
-            ))
+            )
             .into());
         }
 

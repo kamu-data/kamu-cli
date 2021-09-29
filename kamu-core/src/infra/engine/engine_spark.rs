@@ -54,6 +54,10 @@ impl RunInfo {
                 .join(format!("spark-{}.err.txt", run_id)),
         }
     }
+
+    pub fn log_files(&self) -> Vec<PathBuf> {
+        vec![self.stdout_path.clone(), self.stderr_path.clone()]
+    }
 }
 
 impl SparkEngine {
@@ -146,15 +150,14 @@ impl SparkEngine {
             .stdout(std::process::Stdio::from(stdout_file))
             .stderr(std::process::Stdio::from(stderr_file))
             .status()
-            .map_err(|e| EngineError::internal(e))?;
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         match status.code() {
             Some(code) if code == 0 => Ok(()),
-            _ => Err(ProcessError::new(
+            _ => Err(EngineError::process_error(
                 status.code(),
-                vec![run_info.stdout_path.clone(), run_info.stderr_path.clone()],
-            )
-            .into()),
+                run_info.log_files(),
+            )),
         }
     }
 
@@ -177,7 +180,7 @@ impl SparkEngine {
         info!(self.logger, "Writing request"; "request" => ?manifest, "path" => ?path);
 
         let file = File::create(&path)?;
-        serde_yaml::to_writer(file, &manifest).map_err(|e| EngineError::internal(e))?;
+        serde_yaml::to_writer(file, &manifest).map_err(|e| EngineError::internal(e, Vec::new()))?;
 
         Ok(())
     }
@@ -189,17 +192,16 @@ impl SparkEngine {
         let path = run_info.in_out_dir.join("result.yaml");
 
         if !path.exists() {
-            return Err(ContractError::new(
+            return Err(EngineError::contract_error(
                 "Engine did not write a response file",
-                vec![run_info.stdout_path.clone(), run_info.stderr_path.clone()],
-            )
-            .into());
+                run_info.log_files(),
+            ));
         }
 
         let file = File::open(path)?;
 
-        let manifest: Manifest<T> =
-            serde_yaml::from_reader(file).map_err(|e| EngineError::internal(e))?;
+        let manifest: Manifest<T> = serde_yaml::from_reader(file)
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         info!(self.logger, "Read response"; "response" => ?manifest);
         assert_eq!(manifest.kind, resource_name);
@@ -207,43 +209,6 @@ impl SparkEngine {
         Ok(manifest.content)
     }
 }
-
-/*impl Engine for SparkEngine {
-    fn transform(
-        &self,
-        request: ExecuteQueryRequest,
-    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
-        let run_info = RunInfo::new(&self.workspace_layout, "transform");
-
-        let request_adj = ExecuteQueryRequest {
-            prev_checkpoint_dir: request
-                .prev_checkpoint_dir
-                .map(|p| self.to_container_path(&p)),
-            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
-            out_data_path: self.to_container_path(&request.out_data_path),
-            inputs: request
-                .inputs
-                .into_iter()
-                .map(|input| QueryInput {
-                    data_paths: input
-                        .data_paths
-                        .into_iter()
-                        .map(|p| self.to_container_path(&p))
-                        .collect(),
-                    schema_file: self.to_container_path(&input.schema_file),
-                    ..input
-                })
-                .collect(),
-            ..request
-        };
-
-        self.write_request(&run_info, request_adj, "ExecuteQueryRequest")?;
-
-        self.submit("dev.kamu.engine.spark.transform.TransformApp", &run_info)?;
-
-        self.read_response(&run_info, "ExecuteQueryResult")
-    }
-}*/
 
 impl IngestEngine for SparkEngine {
     fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {

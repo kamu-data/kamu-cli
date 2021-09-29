@@ -11,7 +11,6 @@ use crate::domain::*;
 use crate::infra::utils::docker_images;
 use crate::infra::*;
 
-use super::engine_flink::*;
 use super::engine_odf::*;
 use super::engine_spark::*;
 
@@ -40,9 +39,9 @@ pub trait EngineFactory: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct EngineFactoryImpl {
-    spark_ingest_engine: Arc<Mutex<SparkEngine>>,
-    spark_engine: Arc<Mutex<ODFEngine>>,
-    flink_engine: Arc<Mutex<FlinkEngine>>,
+    spark_ingest_engine: Arc<Mutex<dyn IngestEngine>>,
+    spark_engine: Arc<Mutex<dyn Engine>>,
+    flink_engine: Arc<Mutex<dyn Engine>>,
     container_runtime: ContainerRuntime,
     known_images: Mutex<HashSet<String>>,
     logger: Logger,
@@ -68,10 +67,10 @@ impl EngineFactoryImpl {
                 workspace_layout.clone(),
                 logger.new(o!("engine" => "spark")),
             ))),
-            flink_engine: Arc::new(Mutex::new(FlinkEngine::new(
+            flink_engine: Arc::new(Mutex::new(ODFEngine::new(
                 container_runtime.clone(),
                 docker_images::FLINK,
-                workspace_layout.as_ref(),
+                workspace_layout.clone(),
                 logger.new(o!("engine" => "flink")),
             ))),
             container_runtime: container_runtime,
