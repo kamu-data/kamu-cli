@@ -74,7 +74,7 @@ impl ReadService {
 
         let response = engine.lock().unwrap().ingest(request)?;
 
-        if let Some(ref slice) = response.block.output_slice {
+        if let Some(ref slice) = response.metadata_block.output_slice {
             if slice.num_records == 0 {
                 return Err(EngineError::contract_error(
                     "Engine returned an output slice with zero records",
@@ -96,7 +96,7 @@ impl ReadService {
             checkpoint: ReadCheckpoint {
                 last_read: Utc::now(),
                 for_prepared_at: for_prepared_at,
-                last_block: response.block,
+                last_block: response.metadata_block,
                 new_checkpoint_dir: new_checkpoint_dir,
                 out_data_path: out_data_path,
             },

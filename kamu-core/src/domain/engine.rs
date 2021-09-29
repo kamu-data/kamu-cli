@@ -11,7 +11,7 @@ use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::{
     DatasetIDBuf, DatasetSourceRoot, DatasetVocabulary, ExecuteQueryRequest,
-    ExecuteQueryResponseSuccess, MetadataBlock,
+    ExecuteQueryResponseSuccess,
 };
 
 use ::serde::{Deserialize, Serialize};
@@ -30,7 +30,7 @@ pub trait Engine: Sync + Send {
 
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
 pub trait IngestEngine: Sync + Send {
-    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
+    fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,14 +54,6 @@ pub struct IngestRequest {
     pub new_checkpoint_dir: PathBuf,
     pub data_dir: PathBuf,
     pub out_data_path: PathBuf,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct IngestResponse {
-    #[serde(with = "MetadataBlockDef")]
-    pub block: MetadataBlock,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

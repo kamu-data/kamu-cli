@@ -11,6 +11,10 @@ use crate::domain::*;
 use crate::infra::*;
 
 use container_runtime::*;
+use opendatafabric::engine::ExecuteQueryError;
+use opendatafabric::serde::yaml::YamlEngineProtocol;
+use opendatafabric::serde::EngineProtocolDeserializer;
+use opendatafabric::{ExecuteQueryResponse, ExecuteQueryResponseSuccess};
 use rand::Rng;
 use slog::{info, Logger};
 use std::fs::File;
@@ -161,35 +165,21 @@ impl SparkEngine {
         }
     }
 
-    fn write_request<T>(
-        &self,
-        run_info: &RunInfo,
-        request: T,
-        resource_name: &str,
-    ) -> Result<(), EngineError>
-    where
-        T: ::serde::ser::Serialize + std::fmt::Debug,
-    {
+    fn write_request(&self, run_info: &RunInfo, request: IngestRequest) -> Result<(), EngineError> {
         let path = run_info.in_out_dir.join("request.yaml");
-
-        let manifest = Manifest {
-            api_version: 1,
-            kind: resource_name.to_owned(),
-            content: request,
-        };
-        info!(self.logger, "Writing request"; "request" => ?manifest, "path" => ?path);
+        info!(self.logger, "Writing request"; "request" => ?request, "path" => ?path);
 
         let file = File::create(&path)?;
-        serde_yaml::to_writer(file, &manifest).map_err(|e| EngineError::internal(e, Vec::new()))?;
+        serde_yaml::to_writer(file, &request).map_err(|e| EngineError::internal(e, Vec::new()))?;
 
         Ok(())
     }
 
-    fn read_response<T>(&self, run_info: &RunInfo, resource_name: &str) -> Result<T, EngineError>
-    where
-        T: ::serde::de::DeserializeOwned + std::fmt::Debug,
-    {
-        let path = run_info.in_out_dir.join("result.yaml");
+    fn read_response(
+        &self,
+        run_info: &RunInfo,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
+        let path = run_info.in_out_dir.join("response.yaml");
 
         if !path.exists() {
             return Err(EngineError::contract_error(
@@ -198,20 +188,29 @@ impl SparkEngine {
             ));
         }
 
-        let file = File::open(path)?;
-
-        let manifest: Manifest<T> = serde_yaml::from_reader(file)
+        let data = std::fs::read_to_string(path)?;
+        let response = YamlEngineProtocol
+            .read_execute_query_response(data.as_bytes())
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-        info!(self.logger, "Read response"; "response" => ?manifest);
-        assert_eq!(manifest.kind, resource_name);
+        info!(self.logger, "Read response"; "response" => ?response);
 
-        Ok(manifest.content)
+        match response {
+            ExecuteQueryResponse::Progress => unreachable!(),
+            ExecuteQueryResponse::Success(s) => Ok(s),
+            ExecuteQueryResponse::InvalidQuery(e) => {
+                Err(EngineError::invalid_query(e.message, run_info.log_files()))
+            }
+            ExecuteQueryResponse::InternalError(e) => Err(EngineError::internal(
+                ExecuteQueryError::from(e),
+                run_info.log_files(),
+            )),
+        }
     }
 }
 
 impl IngestEngine for SparkEngine {
-    fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
+    fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
@@ -228,10 +227,10 @@ impl IngestEngine for SparkEngine {
             ..request
         };
 
-        self.write_request(&run_info, request_adj, "IngestRequest")?;
+        self.write_request(&run_info, request_adj)?;
 
         self.submit("dev.kamu.engine.spark.ingest.IngestApp", &run_info)?;
 
-        self.read_response(&run_info, "IngestResult")
+        self.read_response(&run_info)
     }
 }
