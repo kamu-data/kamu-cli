@@ -1,3 +1,12 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use std::{
     path::{Path, PathBuf},
     process::Child,
@@ -57,7 +66,7 @@ impl ODFEngine {
             self.logger.clone(),
         )?;
 
-        let mut client = engine_container.connect_client().await?;
+        let mut client = engine_container.connect_client(&run_info).await?;
         let response = client.execute_query(request).await;
 
         cfg_if::cfg_if! {
@@ -73,7 +82,15 @@ impl ODFEngine {
             }
         }
 
-        response.map_err(|e| e.into())
+        response.map_err(|e| match e {
+            ExecuteQueryError::InvalidQuery(e) => {
+                EngineError::invalid_query(e.message, run_info.log_files())
+            }
+            e @ ExecuteQueryError::InternalError(_) => {
+                EngineError::internal(e, run_info.log_files())
+            }
+            e @ ExecuteQueryError::RpcError(_) => EngineError::internal(e, run_info.log_files()),
+        })
     }
 
     fn to_container_path(&self, host_path: &Path) -> PathBuf {
@@ -168,6 +185,10 @@ impl RunInfo {
             stderr_path,
         }
     }
+
+    pub fn log_files(&self) -> Vec<PathBuf> {
+        vec![self.stdout_path.clone(), self.stderr_path.clone()]
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -208,19 +229,20 @@ impl EngineContainer {
 
         info!(logger, "Starting engine"; "command" => ?cmd, "image" => image, "id" => &container_name);
 
-        let engine_process = cmd
-            .stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
-            .stderr(std::process::Stdio::from(stderr_file)) // Stdio::inherit()
-            .spawn()
-            .map_err(|e| EngineError::internal(e))?;
+        let engine_process = KillOnDrop::new(
+            cmd.stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
+                .stderr(std::process::Stdio::from(stderr_file)) // Stdio::inherit()
+                .spawn()
+                .map_err(|e| EngineError::internal(e, run_info.log_files()))?,
+        );
 
         let adapter_host_port = container_runtime
             .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
-            .map_err(|e| EngineError::internal(e))?;
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         container_runtime
             .wait_for_socket(adapter_host_port, Self::START_TIMEOUT)
-            .map_err(|e| EngineError::internal(e))?;
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         info!(logger, "Engine running"; "id" => &container_name);
 
@@ -228,18 +250,18 @@ impl EngineContainer {
             container_runtime,
             container_name,
             adapter_host_port,
-            engine_process,
+            engine_process: engine_process.unwrap(),
             logger,
         })
     }
 
-    pub async fn connect_client(&self) -> Result<EngineClient, EngineError> {
+    pub async fn connect_client(&self, run_info: &RunInfo) -> Result<EngineClient, EngineError> {
         Ok(EngineClient::connect(
             &self.container_runtime.get_runtime_host_addr(),
             self.adapter_host_port,
         )
         .await
-        .map_err(|e| EngineError::internal(e))?)
+        .map_err(|e| EngineError::internal(e, run_info.log_files()))?)
     }
 
     pub fn has_exited(&mut self) -> bool {
@@ -277,12 +299,25 @@ impl Drop for EngineContainer {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl From<ExecuteQueryError> for EngineError {
-    fn from(e: ExecuteQueryError) -> Self {
-        match e {
-            ExecuteQueryError::InvalidQuery(e) => EngineError::InvalidQuery { message: e.message },
-            e @ ExecuteQueryError::InternalError(_) => EngineError::internal(e),
-            e @ ExecuteQueryError::RpcError(_) => EngineError::internal(e),
+// TODO: Improve reliability and move this into ContainerRuntime
+struct KillOnDrop(Option<Child>);
+
+impl KillOnDrop {
+    fn new(child: Child) -> Self {
+        Self(Some(child))
+    }
+
+    fn unwrap(mut self) -> Child {
+        self.0.take().unwrap()
+    }
+}
+
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.take() {
+            unsafe {
+                libc::kill(child.id() as i32, libc::SIGTERM);
+            }
         }
     }
 }
