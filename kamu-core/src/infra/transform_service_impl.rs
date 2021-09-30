@@ -48,10 +48,12 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
+        logger: Logger,
     ) -> Result<TransformResult, TransformError> {
         listener.begin();
 
-        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone()) {
+        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone(), logger)
+        {
             Ok(res) => {
                 listener.success(&res);
                 Ok(res)
@@ -69,7 +71,10 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
+        logger: Logger,
     ) -> Result<TransformResult, TransformError> {
+        info!(logger, "Performing transform"; "request" => ?request);
+
         let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
         let out_data_path = PathBuf::from(&request.out_data_path);
 
@@ -657,6 +662,7 @@ impl TransformService for TransformServiceImpl {
                     )
                 },
                 listener,
+                self.logger.clone(),
             )
         } else {
             Ok(TransformResult::UpToDate)
@@ -727,11 +733,18 @@ impl TransformService for TransformServiceImpl {
                         }
                     };
 
+                    let logger = self.logger.clone();
+
                     let thread_handle = std::thread::Builder::new()
                         .name("transform_multi".to_owned())
                         .spawn(move || {
-                            let res =
-                                Self::do_transform(engine_factory, request, commit_fn, listener);
+                            let res = Self::do_transform(
+                                engine_factory,
+                                request,
+                                commit_fn,
+                                listener,
+                                logger,
+                            );
                             (dataset_id, res)
                         })
                         .unwrap();
@@ -790,10 +803,15 @@ impl TransformService for TransformServiceImpl {
                 VerificationPhase::ReplayTransform,
             );
 
+            let transform_listener = listener
+                .clone()
+                .get_transform_listener()
+                .unwrap_or_else(|| Arc::new(NullTransformListener));
+
             Self::do_transform(
                 self.engine_factory.clone(),
                 request,
-                |new_block, new_data_path, new_checkpoint_path| {
+                |new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
                     // Cleanup not needed outputs
                     if new_block.output_slice.is_some() {
                         std::fs::remove_file(new_data_path)
@@ -811,10 +829,8 @@ impl TransformService for TransformServiceImpl {
                         num_blocks: 1,
                     })
                 },
-                listener
-                    .clone()
-                    .get_transform_listener()
-                    .unwrap_or_else(|| Arc::new(NullTransformListener)),
+                transform_listener,
+                self.logger.clone(),
             )?;
 
             let actual_block = actual_block.unwrap();

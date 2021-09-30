@@ -67,7 +67,14 @@ impl ODFEngine {
         )?;
 
         let mut client = engine_container.connect_client(&run_info).await?;
+
+        info!(self.logger, "Performing engine operation";
+            "id" => &engine_container.container_name, "operation" => "execute_query", "request" => ?request);
+
         let response = client.execute_query(request).await;
+
+        info!(self.logger, "Operation response";
+            "id" => &engine_container.container_name, "operation" => "execute_query", "response" => ?response);
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
