@@ -203,8 +203,7 @@ impl SqlShellImpl {
         S2: AsRef<str>,
         StartedClb: FnOnce() + Send + 'static,
     {
-        let tempdir = tempfile::tempdir()?;
-        let init_script_path = tempdir.path().join("init.sql");
+        let init_script_path = workspace_layout.run_info_dir.join("shell_init.sql");
         std::fs::write(&init_script_path, Self::prepare_shell_init(volume_layout)?)?;
 
         let mut spark = self.run_server(
