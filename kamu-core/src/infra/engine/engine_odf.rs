@@ -21,7 +21,7 @@ use odf::{
 };
 use opendatafabric as odf;
 use rand::Rng;
-use slog::{info, warn, Logger};
+use tracing::{info, info_span, warn};
 
 use crate::domain::*;
 use crate::infra::WorkspaceLayout;
@@ -30,7 +30,6 @@ pub struct ODFEngine {
     container_runtime: ContainerRuntime,
     image: String,
     workspace_layout: Arc<WorkspaceLayout>,
-    logger: Logger,
 }
 
 impl ODFEngine {
@@ -40,13 +39,11 @@ impl ODFEngine {
         container_runtime: ContainerRuntime,
         image: &str,
         workspace_layout: Arc<WorkspaceLayout>,
-        logger: Logger,
     ) -> Self {
         Self {
             container_runtime,
             image: image.to_owned(),
             workspace_layout,
-            logger,
         }
     }
 
@@ -63,18 +60,22 @@ impl ODFEngine {
                 self.workspace_layout.local_volume_dir.clone(),
                 PathBuf::from(Self::CT_VOLUME_DIR),
             )],
-            self.logger.clone(),
         )?;
 
         let mut client = engine_container.connect_client(&run_info).await?;
 
-        info!(self.logger, "Performing engine operation";
-            "id" => &engine_container.container_name, "operation" => "execute_query", "request" => ?request);
+        let span = info_span!(
+            "Performing engine operation",
+            id = engine_container.container_name.as_str(),
+            image = self.image.as_str(),
+            operation = "execute_query",
+            request = ?request,
+        );
+        let _span_guard = span.enter();
 
         let response = client.execute_query(request).await;
 
-        info!(self.logger, "Operation response";
-            "id" => &engine_container.container_name, "operation" => "execute_query", "response" => ?response);
+        info!(id = engine_container.container_name.as_str(), response = ?response, "Operation response");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
@@ -254,7 +255,6 @@ struct EngineContainer {
     container_name: String,
     adapter_host_port: u16,
     engine_process: Child,
-    logger: Logger,
 }
 
 impl EngineContainer {
@@ -267,7 +267,6 @@ impl EngineContainer {
         image: &str,
         run_info: &RunInfo,
         volume_map: Vec<(PathBuf, PathBuf)>,
-        logger: Logger,
     ) -> Result<Self, EngineError> {
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
         let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
@@ -283,7 +282,7 @@ impl EngineContainer {
             ..RunArgs::default()
         });
 
-        info!(logger, "Starting engine"; "command" => ?cmd, "image" => image, "id" => &container_name);
+        info!(command = ?cmd, image = image, id = container_name.as_str(), "Starting engine");
 
         let engine_process = KillOnDrop::new(
             cmd.stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
@@ -300,14 +299,13 @@ impl EngineContainer {
             .wait_for_socket(adapter_host_port, Self::START_TIMEOUT)
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-        info!(logger, "Engine running"; "id" => &container_name);
+        info!(id = container_name.as_str(), "Engine running");
 
         Ok(Self {
             container_runtime,
             container_name,
             adapter_host_port,
             engine_process: engine_process.unwrap(),
-            logger,
         })
     }
 
@@ -335,7 +333,7 @@ impl Drop for EngineContainer {
             return;
         }
 
-        info!(self.logger, "Shutting down engine"; "id" => &self.container_name);
+        info!(id = self.container_name.as_str(), "Shutting down engine");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
@@ -351,7 +349,7 @@ impl Drop for EngineContainer {
                     std::thread::sleep(Duration::from_millis(100));
                 }
 
-                warn!(self.logger, "Engine did not shutdown gracefully, killing"; "id" => &self.container_name);
+                warn!(id = self.container_name.as_str(), "Engine did not shutdown gracefully, killing");
             }
         }
 

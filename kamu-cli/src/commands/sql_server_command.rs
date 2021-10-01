@@ -15,7 +15,6 @@ use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
-use slog::Logger;
 use std::sync::Arc;
 
 pub struct SqlServerCommand {
@@ -23,7 +22,6 @@ pub struct SqlServerCommand {
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    logger: Logger,
     address: String,
     port: u16,
 }
@@ -34,7 +32,6 @@ impl SqlServerCommand {
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        logger: Logger,
         address: &str,
         port: u16,
     ) -> Self {
@@ -43,7 +40,6 @@ impl SqlServerCommand {
             volume_layout,
             output_config,
             container_runtime,
-            logger: logger,
             address: address.to_owned(),
             port: port,
         }
@@ -73,7 +69,6 @@ impl Command for SqlServerCommand {
             &self.workspace_layout,
             &self.volume_layout,
             Vec::new(),
-            self.logger.clone(),
             Some(&self.address),
             Some(self.port),
         )?;

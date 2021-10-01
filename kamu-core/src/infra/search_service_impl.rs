@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use dill::*;
 use opendatafabric::{DatasetRefBuf, RepositoryID};
-use slog::{info, Logger};
+use tracing::info;
 
 use crate::domain::{
     DomainError, MetadataRepository, SearchError, SearchOptions, SearchResult, SearchService,
@@ -22,7 +22,6 @@ use super::RepositoryFactory;
 pub struct SearchServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     repo_factory: Arc<RepositoryFactory>,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -30,12 +29,10 @@ impl SearchServiceImpl {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         repo_factory: Arc<RepositoryFactory>,
-        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo,
             repo_factory,
-            logger,
         }
     }
 
@@ -54,8 +51,7 @@ impl SearchServiceImpl {
                 e @ _ => SearchError::InternalError(e.into()),
             })?;
 
-        info!(self.logger, "Searching remote repository"; 
-                "repo_id" => repo_id.as_str(), "repo_url" => ?repo.url, "query" => ?query);
+        info!(repo_id = repo_id.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 
         let repo_client = self
             .repo_factory

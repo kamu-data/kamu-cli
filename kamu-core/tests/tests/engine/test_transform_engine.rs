@@ -33,21 +33,18 @@ fn test_transform_with_engine_spark() {
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
-        slog::Logger::root(slog::Discard, slog::o!()),
     ));
 
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -231,21 +228,18 @@ fn test_transform_with_engine_flink() {
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
-        slog::Logger::root(slog::Discard, slog::o!()),
     ));
 
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
         engine_factory.clone(),
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
         engine_factory.clone(),
         &volume_layout,
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     ///////////////////////////////////////////////////////////////////////////

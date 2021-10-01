@@ -12,15 +12,14 @@ use crate::domain::*;
 use crate::infra::*;
 use dill::*;
 use opendatafabric::*;
+use tracing::info;
 
-use slog::{info, o, Logger};
 use std::sync::Arc;
 
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
     metadata_repo: Arc<dyn MetadataRepository>,
     engine_factory: Arc<dyn EngineFactory>,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -29,13 +28,11 @@ impl IngestServiceImpl {
         volume_layout: &VolumeLayout,
         metadata_repo: Arc<dyn MetadataRepository>,
         engine_factory: Arc<dyn EngineFactory>,
-        logger: Logger,
     ) -> Self {
         Self {
             volume_layout: volume_layout.clone(),
             metadata_repo,
             engine_factory,
-            logger,
         }
     }
 
@@ -97,13 +94,11 @@ impl IngestService for IngestServiceImpl {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(self.logger, "Ingesting single dataset"; "dataset" => dataset_id.as_str());
+        info!(dataset = dataset_id.as_str(), "Ingesting single dataset");
 
         let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
 
         let layout = self.get_dataset_layout(dataset_id);
-
-        let logger = self.logger.new(o!("dataset" => dataset_id.to_string()));
 
         let mut ingest_task = IngestTask::new(
             dataset_id,
@@ -113,7 +108,6 @@ impl IngestService for IngestServiceImpl {
             None,
             listener,
             self.engine_factory.clone(),
-            logger,
         );
 
         ingest_task.ingest()
@@ -129,13 +123,11 @@ impl IngestService for IngestServiceImpl {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(self.logger, "Ingesting single dataset from overriden source"; "dataset" => dataset_id.as_str(), "fetch" => ?fetch);
+        info!(dataset = dataset_id.as_str(), fetch = ?fetch, "Ingesting single dataset from overriden source");
 
         let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
 
         let layout = self.get_dataset_layout(dataset_id);
-
-        let logger = self.logger.new(o!("dataset" => dataset_id.to_string()));
 
         let mut ingest_task = IngestTask::new(
             dataset_id,
@@ -145,7 +137,6 @@ impl IngestService for IngestServiceImpl {
             Some(fetch),
             listener,
             self.engine_factory.clone(),
-            logger,
         );
 
         ingest_task.ingest()
@@ -162,7 +153,7 @@ impl IngestService for IngestServiceImpl {
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
         let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
-        info!(self.logger, "Ingesting multiple datasets"; "datasets" => ?dataset_ids_owned);
+        info!(datasets = ?dataset_ids_owned, "Ingesting multiple datasets");
 
         let thread_handles: Vec<_> = dataset_ids_owned
             .into_iter()
@@ -174,8 +165,6 @@ impl IngestService for IngestServiceImpl {
 
                 let null_listener = Arc::new(NullIngestListener {});
                 let listener = multi_listener.begin_ingest(&id).unwrap_or(null_listener);
-
-                let logger = self.logger.new(o!("dataset" => id.to_string()));
 
                 std::thread::Builder::new()
                     .name("ingest_multi".to_owned())
@@ -190,7 +179,6 @@ impl IngestService for IngestServiceImpl {
                             None,
                             listener,
                             engine_factory,
-                            logger,
                         );
 
                         let mut combined_result = None;

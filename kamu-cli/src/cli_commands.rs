@@ -11,7 +11,6 @@ use std::convert::TryFrom;
 
 use clap::value_t_or_exit;
 use opendatafabric::{DatasetIDBuf, DatasetRefBuf, RepositoryID};
-use slog::Logger;
 
 use crate::app::in_workspace;
 use crate::commands::*;
@@ -130,7 +129,6 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             submatches.values_of("env").unwrap_or_default(),
-            catalog.get_one::<Logger>().unwrap().as_ref().clone(),
         )),
         ("pull", Some(submatches)) => {
             if submatches.is_present("set-watermark") {
@@ -227,7 +225,6 @@ pub fn get_command(
                 submatches.value_of("command"),
                 submatches.value_of("url"),
                 submatches.value_of("engine"),
-                catalog.get_one::<Logger>().unwrap().as_ref().clone(),
             )),
             ("server", Some(server_matches)) => {
                 if !server_matches.is_present("livy") {
@@ -236,7 +233,6 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        catalog.get_one::<Logger>().unwrap().as_ref().clone(),
                         server_matches.value_of("address").unwrap(),
                         value_t_or_exit!(server_matches.value_of("port"), u16),
                     ))
@@ -246,7 +242,6 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        catalog.get_one::<Logger>().unwrap().as_ref().clone(),
                         server_matches.value_of("address").unwrap(),
                         value_t_or_exit!(server_matches.value_of("port"), u16),
                     ))

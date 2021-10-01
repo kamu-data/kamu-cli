@@ -15,7 +15,6 @@ use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::explore::*;
 use kamu::infra::*;
 
-use slog::Logger;
 use std::sync::Arc;
 
 pub struct SqlShellCommand {
@@ -27,7 +26,6 @@ pub struct SqlShellCommand {
     command: Option<String>,
     url: Option<String>,
     engine: Option<String>,
-    logger: Logger,
 }
 
 impl SqlShellCommand {
@@ -40,7 +38,6 @@ impl SqlShellCommand {
         command: Option<&str>,
         url: Option<&str>,
         engine: Option<&str>,
-        logger: Logger,
     ) -> Self {
         Self {
             query_svc,
@@ -51,7 +48,6 @@ impl SqlShellCommand {
             command: command.map(|v| v.to_owned()),
             url: url.map(|v| v.to_owned()),
             engine: engine.map(|v| v.to_owned()),
-            logger: logger,
         }
     }
 
@@ -89,7 +85,6 @@ impl SqlShellCommand {
             },
             self.url.clone(),
             self.command.as_ref(),
-            self.logger.clone(),
             || {
                 if let Some(s) = spinner {
                     s.finish_and_clear()

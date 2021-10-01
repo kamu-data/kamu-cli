@@ -12,17 +12,16 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use dill::*;
-use slog::{info, Logger};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::info;
 
 pub struct PullServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -32,14 +31,12 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
-        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo,
             ingest_svc,
             transform_svc,
             sync_svc,
-            logger,
         }
     }
 
@@ -221,7 +218,7 @@ impl PullService for PullServiceImpl {
                 .collect()
         };
 
-        info!(self.logger, "Performing pull_multi"; "starting_dataset_refs" => ?starting_dataset_refs);
+        info!(starting_dataset_refs = ?starting_dataset_refs, "Performing pull_multi");
 
         let mut pull_plan =
             match self.collect_pull_graph(starting_dataset_refs.iter().map(|r| r.as_ref())) {

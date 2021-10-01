@@ -24,22 +24,16 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let repo = RepositoryID::new_unchecked("repo");
     let remote_dataset_ref = DatasetRefBuf::new_unchecked("repo/bar");
 
-    let logger = slog::Logger::root(slog::Discard, slog::o!());
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let repository_factory = Arc::new(RepositoryFactory::new(logger.clone()));
+    let repository_factory = Arc::new(RepositoryFactory::new());
     let sync_svc = SyncServiceImpl::new(
         workspace_layout.clone(),
         metadata_repo.clone(),
         repository_factory.clone(),
-        logger.clone(),
     );
 
-    let search_svc = SearchServiceImpl::new(
-        metadata_repo.clone(),
-        repository_factory.clone(),
-        logger.clone(),
-    );
+    let search_svc = SearchServiceImpl::new(metadata_repo.clone(), repository_factory.clone());
 
     // Add repository
     metadata_repo.add_repository(repo, repo_url).unwrap();

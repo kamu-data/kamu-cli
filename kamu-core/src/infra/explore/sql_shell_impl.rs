@@ -11,12 +11,12 @@ use crate::infra::utils::docker_images;
 use crate::infra::*;
 
 use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
-use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use tracing::info;
 
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -38,7 +38,6 @@ impl SqlShellImpl {
         workspace_layout: &WorkspaceLayout,
         volume_layout: &VolumeLayout,
         mut extra_volume_map: Vec<(PathBuf, PathBuf)>,
-        logger: Logger,
         address: Option<&str>,
         port: Option<u16>,
     ) -> Result<std::process::Child, std::io::Error> {
@@ -94,7 +93,7 @@ impl SqlShellImpl {
                 .container_runtime
                 .run_shell_cmd(args, &["sleep".to_owned(), "999999".to_owned()]);
 
-            info!(logger, "Starting Spark container"; "command" => ?cmd, "stdout" => ?spark_stdout_path, "stderr" => ?spark_stderr_path);
+            info!(command = ?cmd, stdout = ?spark_stdout_path, stderr = ?spark_stderr_path, "Starting Spark container");
 
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::from(File::create(&spark_stdout_path)?))
@@ -102,7 +101,7 @@ impl SqlShellImpl {
                 .spawn()?
         };
 
-        info!(logger, "Waiting for container");
+        info!("Waiting for container");
         self.container_runtime
             .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
             .expect("Container did not start");
@@ -120,7 +119,7 @@ impl SqlShellImpl {
                 &["sbin/start-thriftserver.sh"],
             );
 
-            info!(logger, "Starting Thrift Server"; "command" => ?cmd);
+            info!(command = ?cmd, "Starting Thrift Server");
 
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
@@ -150,14 +149,13 @@ impl SqlShellImpl {
         &self,
         output_format: Option<S1>,
         command: Option<S2>,
-        logger: Logger,
         url: String,
     ) -> Result<(), std::io::Error>
     where
         S1: AsRef<str>,
         S2: AsRef<str>,
     {
-        info!(logger, "Starting SQL shell");
+        info!("Starting SQL shell");
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: docker_images::SPARK.to_owned(),
@@ -195,7 +193,6 @@ impl SqlShellImpl {
         volume_layout: &VolumeLayout,
         output_format: Option<S1>,
         command: Option<S2>,
-        logger: Logger,
         started_clb: StartedClb,
     ) -> Result<(), std::io::Error>
     where
@@ -213,7 +210,6 @@ impl SqlShellImpl {
                 init_script_path,
                 PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
             )],
-            logger.clone(),
             None,
             None,
         )?;
@@ -222,7 +218,7 @@ impl SqlShellImpl {
             let _drop_spark = ContainerHandle::new(self.container_runtime.clone(), "kamu-spark");
 
             started_clb();
-            info!(logger, "Starting SQL shell");
+            info!("Starting SQL shell");
 
             // Relying on shell to send signal to child processes
             let mut beeline_cmd = self.container_runtime
@@ -246,7 +242,7 @@ impl SqlShellImpl {
                     ],
                 );
 
-            info!(logger, "Running beeline"; "command" => ?beeline_cmd);
+            info!(command = ?beeline_cmd, "Running beeline");
             beeline_cmd.spawn()?.wait()?;
         }
 
@@ -262,7 +258,6 @@ impl SqlShellImpl {
         output_format: Option<S1>,
         url: Option<String>,
         command: Option<S2>,
-        logger: Logger,
         started_clb: StartedClb,
     ) -> Result<(), std::io::Error>
     where
@@ -272,14 +267,13 @@ impl SqlShellImpl {
     {
         if let Some(url) = url {
             started_clb();
-            self.run_shell(output_format, command, logger, url)
+            self.run_shell(output_format, command, url)
         } else {
             self.run_two_in_one(
                 workspace_layout,
                 volume_layout,
                 output_format,
                 command,
-                logger,
                 started_clb,
             )
         }

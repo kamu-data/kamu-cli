@@ -100,18 +100,16 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_id = DatasetID::new_unchecked("foo");
     let dataset_id_2 = DatasetID::new_unchecked("bar");
 
-    let logger = slog::Logger::root(slog::Discard, slog::o!());
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let repository_factory = Arc::new(RepositoryFactory::new(logger.clone()));
+    let repository_factory = Arc::new(RepositoryFactory::new());
 
     let sync_svc = SyncServiceImpl::new(
         workspace_layout.clone(),
         metadata_repo.clone(),
         repository_factory.clone(),
-        logger.clone(),
     );
 
     // Add repository

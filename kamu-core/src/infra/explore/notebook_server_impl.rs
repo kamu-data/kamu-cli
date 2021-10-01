@@ -13,12 +13,12 @@ use crate::infra::*;
 use container_runtime::{
     ContainerHandle, ContainerRuntime, ContainerRuntimeType, PullImageListener, RunArgs,
 };
-use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tracing::info;
 
 pub struct NotebookServerImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -44,7 +44,6 @@ impl NotebookServerImpl {
         inherit_stdio: bool,
         on_started: StartedClb,
         on_shutdown: ShutdownClb,
-        logger: Logger,
     ) -> Result<(), std::io::Error>
     where
         StartedClb: FnOnce(&str) + Send + 'static,
@@ -88,7 +87,7 @@ impl NotebookServerImpl {
             ..RunArgs::default()
         });
 
-        info!(logger, "Starting Livy container"; "command" => ?livy_cmd);
+        info!(command = ?livy_cmd, "Starting Livy container");
 
         let mut livy = livy_cmd
             .stdout(if inherit_stdio {
@@ -116,7 +115,7 @@ impl NotebookServerImpl {
             ..RunArgs::default()
         });
 
-        info!(logger, "Starting Jupyter container"; "command" => ?jupyter_cmd);
+        info!(command = ?jupyter_cmd, "Starting Jupyter container");
 
         let mut jupyter = jupyter_cmd
             .stdout(if inherit_stdio {

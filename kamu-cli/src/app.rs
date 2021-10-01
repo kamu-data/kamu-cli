@@ -14,9 +14,7 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
 use kamu::infra::*;
-use slog::Drain;
-use slog::{info, FnValue};
-use slog::{o, Logger};
+use tracing::info;
 
 use crate::cli_commands;
 use crate::commands::Command;
@@ -28,6 +26,9 @@ use crate::output::*;
 
 pub const BINARY_NAME: &str = "kamu";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+const DEFAULT_LOGGING_CONFIG: &str = "info";
+const VERBOSE_LOGGING_CONFIG: &str = "debug";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,9 +50,8 @@ pub fn run(
     let output_format = configure_output_format(&matches);
     catalog.add_value(output_format.clone());
 
-    let logger = configure_logging(&output_format, &workspace_layout);
-    let logger_moved = logger.clone();
-    catalog.add_factory(move || logger_moved.new(o!()));
+    let _guard = configure_logging(&output_format, &workspace_layout);
+    info!(version = VERSION, args = ?std::env::args().collect::<Vec<_>>(), "Initializing kamu-cli");
 
     load_config(&mut catalog);
 
@@ -120,6 +120,8 @@ fn load_config(catalog: &mut Catalog) {
     let config_svc = catalog.get_one::<ConfigService>().unwrap();
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
+    info!(config = ?config, "Loaded configuration");
+
     catalog.add_value(ContainerRuntimeConfig {
         runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
         network_ns: config.engine.as_ref().unwrap().network_ns.unwrap(),
@@ -158,16 +160,43 @@ pub(crate) fn in_workspace(workspace_layout: Arc<WorkspaceLayout>) -> bool {
 // Logging
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceLayout) -> Logger {
-    let raw_logger = if output_config.verbosity_level > 0 {
-        // Log into stderr for verbose output
-        let decorator = slog_term::PlainSyncDecorator::new(std::io::stderr());
-        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-        let drain = slog_async::Async::new(drain).build().fuse();
-        Logger::root(drain, o!())
+fn configure_logging(
+    output_config: &OutputConfig,
+    workspace_layout: &WorkspaceLayout,
+) -> Option<tracing_appender::non_blocking::WorkerGuard> {
+    use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
+    use tracing_log::LogTracer;
+    use tracing_subscriber::fmt::format::FmtSpan;
+    use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
+
+    // Logging may be already initialized when running under tests
+    if tracing::dispatcher::has_been_set() {
+        return None;
+    }
+
+    // Use configuration from RUST_LOG env var if provided
+    let env_filter = match EnvFilter::try_from_default_env() {
+        Ok(filter) => filter,
+        Err(_) => match output_config.verbosity_level {
+            0 | 1 => EnvFilter::new(DEFAULT_LOGGING_CONFIG.to_owned()),
+            _ => EnvFilter::new(VERBOSE_LOGGING_CONFIG.to_owned()),
+        },
+    };
+
+    if output_config.verbosity_level > 0 {
+        // Log to STDERR
+        tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
+            .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+            .with_thread_names(true)
+            .with_writer(std::io::stderr)
+            .init();
+
+        None
     } else if workspace_layout.run_info_dir.exists() {
-        // Log to file if workspace exists
+        // Log to file with Bunyan JSON formatter
         let log_path = workspace_layout.run_info_dir.join("kamu.log");
+
         let file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
@@ -177,24 +206,24 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
                 panic!("Failed to create log file at {}: {}", log_path.display(), e)
             });
 
-        let decorator = slog_term::PlainSyncDecorator::new(file);
-        let drain = slog_term::CompactFormat::new(decorator).build().fuse();
-        let drain = slog_async::Async::new(drain).build().fuse();
-        Logger::root(drain, o!())
+        let (appender, guard) = tracing_appender::non_blocking(file);
+
+        let formatting_layer = BunyanFormattingLayer::new(BINARY_NAME.to_owned(), appender);
+        let subscriber = tracing_subscriber::registry()
+            .with(env_filter)
+            .with(JsonStorageLayer)
+            .with(formatting_layer);
+
+        // Redirect all standard logging to tracing events
+        LogTracer::init().expect("Failed to set LogTracer");
+
+        tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+
+        Some(guard)
     } else {
-        // Discard otherwise
-        let drain = slog::Discard.fuse();
-        Logger::root(drain, o!())
-    };
-
-    let logger = raw_logger.new(o!("version" => VERSION));
-
-    info!(logger, "Initializing"; "args" => FnValue(|_| {
-         let v: Vec<_> = std::env::args().collect();
-         format!("{:?}", v)
-    }), "workspace" => ?workspace_layout);
-
-    logger
+        // Discard logs
+        None
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

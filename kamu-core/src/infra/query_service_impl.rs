@@ -26,8 +26,8 @@ use datafusion::{
 };
 use dill::*;
 use opendatafabric::DatasetID;
-use slog::{info, Logger};
 use std::{path::PathBuf, sync::Arc};
+use tracing::info_span;
 
 use crate::domain::{
     DatasetQueryOptions, MetadataRepository, QueryError, QueryOptions, QueryService,
@@ -38,7 +38,6 @@ use super::{DatasetLayout, VolumeLayout};
 pub struct QueryServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     volume_layout: Arc<VolumeLayout>,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -46,12 +45,10 @@ impl QueryServiceImpl {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         volume_layout: Arc<VolumeLayout>,
-        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo,
             volume_layout,
-            logger,
         }
     }
 
@@ -151,7 +148,8 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
-        info!(self.logger, "Executing SQL query"; "statement" => statement);
+        let span = info_span!("Executing SQL query", statement = statement);
+        let _span_guard = span.enter();
 
         let cfg = ExecutionConfig::new()
             .with_information_schema(true)

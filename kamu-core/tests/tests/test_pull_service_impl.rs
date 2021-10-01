@@ -107,15 +107,7 @@ fn create_graph_remote(
     )
     .unwrap();
 
-    let sync_service = SyncServiceImpl::new(
-        ws,
-        repo.clone(),
-        Arc::new(RepositoryFactory::new(slog::Logger::root(
-            slog::Discard,
-            slog::o!(),
-        ))),
-        slog::Logger::root(slog::Discard, slog::o!()),
-    );
+    let sync_service = SyncServiceImpl::new(ws, repo.clone(), Arc::new(RepositoryFactory::new()));
 
     for r in &to_import {
         sync_service
@@ -442,13 +434,8 @@ impl PullTestHarness {
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), metadata_repo.clone()));
-        let pull_svc = PullServiceImpl::new(
-            metadata_repo.clone(),
-            ingest_svc,
-            transform_svc,
-            sync_svc,
-            slog::Logger::root(slog::Discard, slog::o!()),
-        );
+        let pull_svc =
+            PullServiceImpl::new(metadata_repo.clone(), ingest_svc, transform_svc, sync_svc);
 
         Self {
             calls,

@@ -68,7 +68,6 @@ fn test_get_next_operation() {
         metadata_repo.clone(),
         Arc::new(EngineFactoryNull),
         &volume_layout,
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     let foo = new_root(&metadata_repo, "foo");
@@ -109,7 +108,6 @@ fn test_get_verification_plan_one_to_one() {
         metadata_repo.clone(),
         Arc::new(EngineFactoryNull),
         &volume_layout,
-        slog::Logger::root(slog::Discard, slog::o!()),
     );
 
     // Create root dataset

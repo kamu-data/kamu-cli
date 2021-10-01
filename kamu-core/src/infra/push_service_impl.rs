@@ -11,26 +11,19 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use dill::*;
-use slog::Logger;
 use std::sync::Arc;
 
 pub struct PushServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     sync_svc: Arc<dyn SyncService>,
-    _logger: Logger,
 }
 
 #[component(pub)]
 impl PushServiceImpl {
-    pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
-        sync_svc: Arc<dyn SyncService>,
-        logger: Logger,
-    ) -> Self {
+    pub fn new(metadata_repo: Arc<dyn MetadataRepository>, sync_svc: Arc<dyn SyncService>) -> Self {
         Self {
             metadata_repo,
             sync_svc,
-            _logger: logger,
         }
     }
 

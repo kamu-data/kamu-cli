@@ -13,20 +13,18 @@ use super::repository_local_fs::*;
 use super::repository_s3::*;
 
 use dill::*;
-use slog::{info, o, Logger};
 use std::backtrace::Backtrace;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+use tracing::info;
 use url::Url;
 
-pub struct RepositoryFactory {
-    logger: Logger,
-}
+pub struct RepositoryFactory {}
 
 #[component(pub)]
 impl RepositoryFactory {
-    pub fn new(logger: Logger) -> Self {
-        Self { logger: logger }
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn get_repository_client(
@@ -69,12 +67,8 @@ impl RepositoryFactory {
             };
 
         let bucket = bucket.trim_start_matches("/").to_owned();
-        info!(self.logger, "Creating S3 client"; "endpoint" => &endpoint, "bucket" => &bucket);
-        Ok(Arc::new(Mutex::new(RepositoryS3::new(
-            endpoint,
-            bucket,
-            self.logger.new(o!("repo" => "s3")),
-        ))))
+        info!(endpoint = ?endpoint, bucket = bucket.as_str(), "Creating S3 client");
+        Ok(Arc::new(Mutex::new(RepositoryS3::new(endpoint, bucket))))
     }
 }
 

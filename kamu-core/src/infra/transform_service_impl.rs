@@ -12,18 +12,18 @@ use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
-use slog::debug;
-use slog::{info, o, Logger};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing::debug;
+use tracing::info;
+use tracing::info_span;
 
 pub struct TransformServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     engine_factory: Arc<dyn EngineFactory>,
     volume_layout: VolumeLayout,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -32,13 +32,11 @@ impl TransformServiceImpl {
         metadata_repo: Arc<dyn MetadataRepository>,
         engine_factory: Arc<dyn EngineFactory>,
         volume_layout: &VolumeLayout,
-        logger: Logger,
     ) -> Self {
         Self {
             metadata_repo,
             engine_factory,
             volume_layout: volume_layout.clone(),
-            logger: logger,
         }
     }
 
@@ -48,12 +46,10 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
-        logger: Logger,
     ) -> Result<TransformResult, TransformError> {
         listener.begin();
 
-        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone(), logger)
-        {
+        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone()) {
             Ok(res) => {
                 listener.success(&res);
                 Ok(res)
@@ -71,9 +67,13 @@ impl TransformServiceImpl {
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
-        logger: Logger,
     ) -> Result<TransformResult, TransformError> {
-        info!(logger, "Performing transform"; "request" => ?request);
+        let span = info_span!(
+            "Performing transform",
+            output_dataset = request.dataset_id.as_str()
+        );
+        let _span_guard = span.enter();
+        info!(request = ?request, "Tranform request");
 
         let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
         let out_data_path = PathBuf::from(&request.out_data_path);
@@ -127,7 +127,6 @@ impl TransformServiceImpl {
         new_block: MetadataBlock,
         new_data_path: &Path,
         new_checkpoint_path: &Path,
-        logger: Logger,
     ) -> Result<TransformResult, TransformError> {
         let new_block = MetadataBlock {
             prev_block_hash: Some(prev_block_hash),
@@ -155,7 +154,7 @@ impl TransformServiceImpl {
         )
         .map_err(|e| TransformError::internal(e))?;
 
-        info!(logger, "Committed new block"; "output_dataset" => dataset_id.as_str(), "new_head" => new_block_hash.to_string());
+        info!(output_dataset = dataset_id.as_str(), new_head = ?new_block_hash, "Committed new block");
 
         Ok(TransformResult::Updated {
             old_head: prev_block_hash,
@@ -169,11 +168,11 @@ impl TransformServiceImpl {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Option<ExecuteQueryRequest>, DomainError> {
-        let logger = self
-            .logger
-            .new(o!("output_dataset" => dataset_id.as_str().to_owned()));
-
-        info!(logger, "Evaluating next transform operation");
+        let span = info_span!(
+            "Evaluating next transform operation",
+            output_dataset = dataset_id.as_str()
+        );
+        let _span_guard = span.enter();
 
         let output_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
@@ -201,10 +200,7 @@ impl TransformServiceImpl {
             .iter()
             .any(|id| self.is_never_pulled(id).unwrap())
         {
-            info!(
-                logger,
-                "Not processing because one of the inputs was never pulled"
-            );
+            info!("Not processing because one of the inputs was never pulled");
             return Ok(None);
         }
 
@@ -215,13 +211,7 @@ impl TransformServiceImpl {
             .map(|(index, input_id)| {
                 let input_layout = DatasetLayout::new(&self.volume_layout, input_id);
 
-                self.get_input_slice(
-                    index,
-                    input_id,
-                    &input_layout,
-                    output_chain.as_ref(),
-                    logger.new(o!("input_dataset" => input_id.as_str().to_owned())),
-                )
+                self.get_input_slice(index, input_id, &input_layout, output_chain.as_ref())
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -279,7 +269,6 @@ impl TransformServiceImpl {
         dataset_id: &DatasetID,
         dataset_layout: &DatasetLayout,
         output_chain: &dyn MetadataChain,
-        logger: Logger,
     ) -> Result<QueryInput, DomainError> {
         // Determine processed data range
         // Result is either: () or (inf, upper] or (lower, upper]
@@ -348,12 +337,14 @@ impl TransformServiceImpl {
             explicit_watermarks: explicit_watermarks,
         };
 
-        info!(logger, "Computed query input";
-            "input" => ?input,
-            "empty" => input.is_empty(),
-            "iv_unprocessed" => ?iv_unprocessed,
-            "iv_available" => ?iv_available,
-            "unprocessed_blocks" => blocks_unprocessed.len(),
+        info!(
+            input_dataset = dataset_id.as_str(),
+            input = ?input,
+            empty = input.is_empty(),
+            iv_unprocessed = ?iv_unprocessed,
+            iv_available = ?iv_available,
+            unprocessed_blocks = blocks_unprocessed.len(),
+            "Computed query input"
         );
 
         Ok(input)
@@ -388,9 +379,12 @@ impl TransformServiceImpl {
             }
         }
 
-        let logger = self
-            .logger
-            .new(o!("output_dataset" => dataset_id.as_str().to_owned()));
+        let span = info_span!(
+            "Preparing verification plan",
+            output_dataset = dataset_id.as_str()
+        );
+        let _span_guard = span.enter();
+
         let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
         let start_block = block_range.0;
@@ -518,10 +512,12 @@ impl TransformServiceImpl {
                     .next()
                     .unwrap();
 
-                debug!(logger, "Considering blocks";
-                    "input_id" => input_id.as_str(),
-                    "output_block" => step.expected.block_hash.to_string(),
-                    "input_block" => input_block.block_hash.to_string());
+                debug!(
+                    input_id = input_id.as_str(),
+                    output_block = ?step.expected.block_hash,
+                    input_block = ?input_block.block_hash,
+                    "Considering blocks"
+                );
 
                 // Interval can only be (), or (lower, upper]
                 if slice.interval.is_empty() {
@@ -552,10 +548,12 @@ impl TransformServiceImpl {
                 // Bingo! Include block inputs into the step
                 assert!(slice.interval.contains_point(&input_block.system_time));
 
-                debug!(logger, "Associating input block";
-                    "input_id" => input_id.as_str(),
-                    "output_block" => step.expected.block_hash.to_string(),
-                    "input_block" => input_block.block_hash.to_string());
+                debug!(
+                    input_id = input_id.as_str(),
+                    output_block = ?step.expected.block_hash,
+                    input_block = ?input_block.block_hash,
+                    "Associating input block"
+                );
 
                 if let Some(event_time) = input_block.output_watermark {
                     slice.explicit_watermarks.push(Watermark {
@@ -634,7 +632,10 @@ impl TransformService for TransformServiceImpl {
         let null_listener = Arc::new(NullTransformListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(self.logger, "Transforming single dataset"; "dataset" => dataset_id.as_str());
+        info!(
+            dataset_id = dataset_id.as_str(),
+            "Transforming a single dataset"
+        );
 
         // TODO: There might be more operations to do
         if let Some(request) = self
@@ -658,11 +659,9 @@ impl TransformService for TransformServiceImpl {
                         new_block,
                         new_data_path,
                         new_checkpoint_path,
-                        self.logger.clone(),
                     )
                 },
                 listener,
-                self.logger.clone(),
             )
         } else {
             Ok(TransformResult::UpToDate)
@@ -678,7 +677,7 @@ impl TransformService for TransformServiceImpl {
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
         let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
-        info!(self.logger, "Transforming multiple datasets"; "datasets" => ?dataset_ids_owned);
+        info!(dataset_ids = ?dataset_ids_owned, "Transforming multiple datasets");
 
         // TODO: handle errors without crashing
         let requests: Vec<_> = dataset_ids_owned
@@ -717,7 +716,6 @@ impl TransformService for TransformServiceImpl {
                         let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
                         let dataset_id = dataset_id.clone();
                         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
-                        let logger = self.logger.clone();
 
                         move |new_block, new_data_path: &Path, new_checkpoint_path: &Path| {
                             Self::commit_transform(
@@ -728,23 +726,15 @@ impl TransformService for TransformServiceImpl {
                                 new_block,
                                 new_data_path,
                                 new_checkpoint_path,
-                                logger,
                             )
                         }
                     };
 
-                    let logger = self.logger.clone();
-
                     let thread_handle = std::thread::Builder::new()
                         .name("transform_multi".to_owned())
                         .spawn(move || {
-                            let res = Self::do_transform(
-                                engine_factory,
-                                request,
-                                commit_fn,
-                                listener,
-                                logger,
-                            );
+                            let res =
+                                Self::do_transform(engine_factory, request, commit_fn, listener);
                             (dataset_id, res)
                         })
                         .unwrap();
@@ -766,7 +756,8 @@ impl TransformService for TransformServiceImpl {
         _options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        info!(self.logger, "Verifying dataset"; "dataset_id" => dataset_id.as_str(), "block_range" => ?block_range);
+        let span = info_span!("Verifying dataset", dataset_id = dataset_id.as_str(), block_range = ?block_range);
+        let _span_guard = span.enter();
 
         let null_listener = Arc::new(NullVerificationListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
@@ -780,7 +771,10 @@ impl TransformService for TransformServiceImpl {
             let expected_block = step.expected;
             let mut actual_block = None;
 
-            info!(self.logger, "Verifying block"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+            info!(
+                block_hash = ?expected_block.block_hash,
+                "Verifying block"
+            );
 
             listener.on_phase(
                 &expected_block.block_hash,
@@ -830,14 +824,13 @@ impl TransformService for TransformServiceImpl {
                     })
                 },
                 transform_listener,
-                self.logger.clone(),
             )?;
 
             let actual_block = actual_block.unwrap();
-            debug!(self.logger, "Comparing results"; "expected" => ?expected_block, "actual" => ?actual_block);
+            debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
 
             if !Self::check_blocks_equivalent(&expected_block, &actual_block) {
-                info!(self.logger, "Block invalid"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+                info!(block_hash = ?expected_block.block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
                     expected_block,
@@ -847,7 +840,7 @@ impl TransformService for TransformServiceImpl {
                 return Err(err);
             }
 
-            info!(self.logger, "Block valid"; "dataset_id" => dataset_id.as_str(), "block_hash" => expected_block.block_hash.to_string());
+            info!(block_hash = ?expected_block.block_hash, "Block valid");
             listener.on_phase(
                 &expected_block.block_hash,
                 step_index,

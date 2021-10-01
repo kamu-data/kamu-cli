@@ -16,16 +16,15 @@ use opendatafabric::serde::yaml::YamlEngineProtocol;
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::{ExecuteQueryResponse, ExecuteQueryResponseSuccess};
 use rand::Rng;
-use slog::{info, Logger};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tracing::info;
 
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
     image: String,
     workspace_layout: Arc<WorkspaceLayout>,
-    logger: Logger,
 }
 
 struct RunInfo {
@@ -69,13 +68,11 @@ impl SparkEngine {
         container_runtime: ContainerRuntime,
         image: &str,
         workspace_layout: Arc<WorkspaceLayout>,
-        logger: Logger,
     ) -> Self {
         Self {
             container_runtime: container_runtime,
             image: image.to_owned(),
             workspace_layout,
-            logger: logger,
         }
     }
 
@@ -107,7 +104,7 @@ impl SparkEngine {
         let response_path = run_info.in_out_dir.join("response.yaml");
 
         {
-            info!(self.logger, "Writing request"; "request" => ?request, "path" => ?request_path);
+            info!(request = ?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request)
                 .map_err(|e| EngineError::internal(e, Vec::new()))?;
@@ -162,7 +159,7 @@ impl SparkEngine {
             ],
         );
 
-        info!(self.logger, "Running Spark job"; "command" => ?cmd);
+        info!(command = ?cmd, "Running Spark job");
 
         let status = cmd
             .stdout(std::process::Stdio::from(stdout_file))
@@ -176,7 +173,7 @@ impl SparkEngine {
                 .read_execute_query_response(data.as_bytes())
                 .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-            info!(self.logger, "Read response"; "response" => ?response);
+            info!(response = ?response, "Read response");
 
             match response {
                 ExecuteQueryResponse::Progress => unreachable!(),

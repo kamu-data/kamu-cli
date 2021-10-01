@@ -16,10 +16,11 @@ use super::engine_spark::*;
 
 use container_runtime::{ContainerRuntime, NullPullImageListener, PullImageListener};
 use dill::*;
-use slog::{error, info, o, Logger};
 use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
+use tracing::info_span;
+use tracing::{error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +45,6 @@ pub struct EngineFactoryImpl {
     flink_engine: Arc<Mutex<dyn Engine>>,
     container_runtime: ContainerRuntime,
     known_images: Mutex<HashSet<String>>,
-    logger: Logger,
 }
 
 #[component(pub)]
@@ -52,30 +52,25 @@ impl EngineFactoryImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
-        logger: Logger,
     ) -> Self {
         Self {
             spark_ingest_engine: Arc::new(Mutex::new(SparkEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
                 workspace_layout.clone(),
-                logger.new(o!("engine" => "spark-ingest")),
             ))),
             spark_engine: Arc::new(Mutex::new(ODFEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
                 workspace_layout.clone(),
-                logger.new(o!("engine" => "spark")),
             ))),
             flink_engine: Arc::new(Mutex::new(ODFEngine::new(
                 container_runtime.clone(),
                 docker_images::FLINK,
                 workspace_layout.clone(),
-                logger.new(o!("engine" => "flink")),
             ))),
             container_runtime: container_runtime,
             known_images: Mutex::new(HashSet::new()),
-            logger,
         }
     }
 
@@ -97,23 +92,25 @@ impl EngineFactoryImpl {
         };
 
         if pull_image {
-            info!(self.logger, "Pulling engine image"; "image_name" => image);
+            let span = info_span!("Pulling engine image", image_name = image);
+            let _span_guard = span.enter();
+
             let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPullImageListener));
             listener.begin(image);
 
             // TODO: Return better errors
             self.container_runtime
-                    .pull_cmd(image)
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()?
-                    .exit_ok()
-                    .map_err(|e| {
-                        error!(self.logger, "Failed to pull engine image"; "image_name" => image, "error" => ?e);
-                        EngineError::image_not_found(image)
-                    })?;
+                .pull_cmd(image)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?
+                .exit_ok()
+                .map_err(|e| {
+                    error!(image_name = image, error = ?e, "Failed to pull engine image");
+                    EngineError::image_not_found(image)
+                })?;
 
-            info!(self.logger, "Successfully pulled engine image"; "image_name" => image);
+            info!(image_name = image, "Successfully pulled engine image");
             listener.success();
             self.known_images.lock().unwrap().insert(image.to_owned());
         }

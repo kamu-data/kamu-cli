@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.65.2"
+version = "0.66.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -39,6 +39,13 @@ serde = { version = "*", features = ["derive"] }
 serde_with = "*"
 serde_yaml = "*"
 
+# Tracing / logging / telemetry
+tracing = "*"
+tracing-appender = "*"
+tracing-subscriber = "*"
+tracing-log = "*"
+tracing-bunyan-formatter = "*"
+
 # Utils
 chrono = "*"
 glob = "*"  # Used for path completions
@@ -47,9 +54,6 @@ dirs = "*"
 indoc = "*"
 itertools = "*"
 shlex = "*"  # Parsing partial input for custom completions
-slog = "*"  # Logging
-slog-async = "*"
-slog-term = "*"
 tokio = { version = "*", features = [] }
 tempfile = "*"
 thiserror = "*"  # Structured error derivations
@@ -61,3 +65,5 @@ urlencoding = "*"
 rand = "^0.8"
 indoc = "*"  # Compile-time unindent
 parquet = "*"
+env_logger = "*"
+test-env-log = { version = "*", features = ["trace"] }

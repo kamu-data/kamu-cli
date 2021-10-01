@@ -35,14 +35,12 @@ fn test_ingest_with_engine() {
     let engine_factory = Arc::new(EngineFactoryImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
-        slog::Logger::root(slog::Discard, slog::o!()),
     ));
 
     let ingest_svc = Arc::new(IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
         engine_factory,
-        slog::Logger::root(slog::Discard, slog::o!()),
     ));
 
     let src_path = tempdir.path().join("data.csv");

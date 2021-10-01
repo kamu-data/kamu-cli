@@ -15,7 +15,6 @@ use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
-use slog::{o, Logger};
 use std::sync::Arc;
 
 pub struct NotebookCommand {
@@ -24,7 +23,6 @@ pub struct NotebookCommand {
     container_runtime: Arc<ContainerRuntime>,
     output_config: Arc<OutputConfig>,
     env_vars: Vec<(String, Option<String>)>,
-    logger: Logger,
 }
 
 impl NotebookCommand {
@@ -34,7 +32,6 @@ impl NotebookCommand {
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         env_vars: Iter,
-        logger: Logger,
     ) -> Self
     where
         Iter: IntoIterator<Item = Str>,
@@ -58,7 +55,6 @@ impl NotebookCommand {
                     }
                 })
                 .collect(),
-            logger: logger,
         }
     }
 }
@@ -114,7 +110,6 @@ impl Command for NotebookCommand {
                 let _ = webbrowser::open(url);
             },
             || eprintln!("{}", s("Shutting down").yellow()),
-            self.logger.new(o!()),
         )?;
         Ok(())
     }

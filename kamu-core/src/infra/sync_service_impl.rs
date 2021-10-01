@@ -13,7 +13,6 @@ use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use dill::*;
-use slog::Logger;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -21,7 +20,6 @@ pub struct SyncServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
     metadata_repo: Arc<dyn MetadataRepository>,
     repository_factory: Arc<RepositoryFactory>,
-    _logger: Logger,
 }
 
 #[component(pub)]
@@ -30,13 +28,11 @@ impl SyncServiceImpl {
         workspace_layout: Arc<WorkspaceLayout>,
         metadata_repo: Arc<dyn MetadataRepository>,
         repository_factory: Arc<RepositoryFactory>,
-        logger: Logger,
     ) -> Self {
         Self {
             workspace_layout,
             metadata_repo,
             repository_factory,
-            _logger: logger,
         }
     }
 

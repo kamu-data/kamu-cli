@@ -36,7 +36,7 @@ fn test_fetch_url_file() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
 
     // No file to fetch
     assert_matches!(
@@ -94,7 +94,7 @@ fn test_fetch_url_http_unreachable() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
@@ -117,7 +117,7 @@ fn test_fetch_url_http_not_found() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None),
@@ -154,7 +154,7 @@ fn test_fetch_url_http_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
     let mut listener = TestListener::new();
 
     let res = fetch_svc
@@ -243,7 +243,7 @@ fn test_fetch_url_ftp_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
     let mut listener = TestListener::new();
 
     let res = fetch_svc
@@ -288,7 +288,7 @@ fn test_fetch_files_glob() {
         order: None,
     });
 
-    let fetch_svc = FetchService::new(slog::Logger::root(slog::Discard, slog::o!()));
+    let fetch_svc = FetchService::new();
 
     // No file to fetch
     assert_matches!(

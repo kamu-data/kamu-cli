@@ -15,19 +15,17 @@ use opendatafabric::*;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
-use slog::{info, Logger};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+use tracing::info;
 use url::Url;
 
-pub struct FetchService {
-    logger: Logger,
-}
+pub struct FetchService {}
 
 impl FetchService {
-    pub fn new(logger: Logger) -> Self {
-        Self { logger: logger }
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn fetch(
@@ -128,7 +126,7 @@ impl FetchService {
 
         matched_files.sort_by(|a, b| b.0.cmp(&a.0));
 
-        info!(self.logger, "Matched the glob pattern"; "pattern" => &fglob.path, "last_filename" => &last_filename, "matches" => ?matched_files);
+        info!(pattern = fglob.path.as_str(), last_filename = ?last_filename, matches = ?matched_files, "Matched the glob pattern");
 
         if matched_files.is_empty() {
             return if let Some(cp) = old_checkpoint {
@@ -183,7 +181,7 @@ impl FetchService {
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         use fs_extra::file::*;
 
-        info!(self.logger, "Ingesting file"; "path" => ?path);
+        info!(path = ?path, "Ingesting file");
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => IngestError::not_found(path, Some(e.into())),

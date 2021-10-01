@@ -15,22 +15,21 @@ use bytes::BytesMut;
 use futures::TryStreamExt;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::*;
-use slog::{info, Logger};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use tracing::{info, info_span};
 
 pub struct RepositoryS3 {
     s3: S3Client,
     bucket: String,
     runtime: RefCell<tokio::runtime::Runtime>,
-    logger: Logger,
 }
 
 impl RepositoryS3 {
-    pub fn new(endpoint: Option<String>, bucket: String, logger: Logger) -> Self {
+    pub fn new(endpoint: Option<String>, bucket: String) -> Self {
         let region = match endpoint {
             None => Region::default(),
             Some(endpoint) => Region::Custom {
@@ -42,7 +41,6 @@ impl RepositoryS3 {
             s3: S3Client::new(region),
             bucket: bucket,
             runtime: RefCell::new(tokio::runtime::Runtime::new().unwrap()),
-            logger: logger,
         }
     }
 
@@ -202,12 +200,12 @@ impl RepositoryS3 {
     }
 
     async fn read_object_buf(&self, key: String) -> Result<Option<Vec<u8>>, RepositoryError> {
-        info!(
-            self.logger,
-            "Reading object";
-            "key" => &key,
-            "bucket" => &self.bucket,
+        let span = info_span!(
+            "Reading object",
+            key = key.as_str(),
+            bucket = self.bucket.as_str(),
         );
+        let _span_guard = span.enter();
 
         let resp = match self
             .s3
@@ -231,13 +229,13 @@ impl RepositoryS3 {
     }
 
     async fn read_object_to_file(&self, key: String, path: &Path) -> Result<(), RepositoryError> {
-        info!(
-            self.logger,
-            "Reading object to file";
-            "key" => &key,
-            "bucket" => &self.bucket,
-            "file" => ?path,
+        let span = info_span!(
+            "Reading object to file",
+            key = key.as_str(),
+            bucket = self.bucket.as_str(),
+            file = ?path,
         );
+        let _span_guard = span.enter();
 
         let mut file = tokio::fs::File::create(path).await?;
 
@@ -262,13 +260,13 @@ impl RepositoryS3 {
         key_prefix: String,
         out_dir: &Path,
     ) -> Result<Vec<PathBuf>, RepositoryError> {
-        info!(
-            self.logger,
-            "Reading objects into directory";
-            "key_prefix" => &key_prefix,
-            "bucket" => &self.bucket,
-            "directory" => ?out_dir,
+        let span = info_span!(
+            "Reading objects into directory",
+            key_prefix = key_prefix.as_str(),
+            bucket = self.bucket.as_str(),
+            directory = ?out_dir,
         );
+        let _span_guard = span.enter();
 
         let mut files = Vec::new();
         std::fs::create_dir_all(out_dir)?;
@@ -304,12 +302,12 @@ impl RepositoryS3 {
     }
 
     async fn delete_objects(&self, key_prefix: String) -> Result<(), RepositoryError> {
-        info!(
-            self.logger,
-            "Deleting objects";
-            "key_prefix" => &key_prefix,
-            "bucket" => &self.bucket,
+        let span = info_span!(
+            "Deleting objects",
+            key_prefix = key_prefix.as_str(),
+            bucket = self.bucket.as_str(),
         );
+        let _span_guard = span.enter();
 
         let list_objects = self
             .s3
@@ -352,21 +350,20 @@ impl RepositoryS3 {
         file_path: &Path,
         if_exists: IfExists,
     ) -> Result<(), RepositoryError> {
-        info!(
-            self.logger,
-            "Uploading object from file";
-            "key" => &key,
-            "bucket" => &self.bucket,
-            "file" => ?file_path,
+        let span = info_span!(
+            "Uploading object from file",
+            key = key.as_str(),
+            bucket = self.bucket.as_str(),
+            file = ?file_path,
         );
+        let _span_guard = span.enter();
 
         if if_exists != IfExists::Overwrite {
             if self.check_object_exists(key.clone()).await? {
                 info!(
-                    self.logger,
-                    "Object already exists";
-                    "key" => &key,
-                    "bucket" => &self.bucket,
+                    key = key.as_str(),
+                    bucket = self.bucket.as_str(),
+                    "Object already exists"
                 );
 
                 return if if_exists == IfExists::Skip {
@@ -404,20 +401,19 @@ impl RepositoryS3 {
         buf: Vec<u8>,
         if_exists: IfExists,
     ) -> Result<(), RepositoryError> {
-        info!(
-            self.logger,
-            "Uploading object data";
-            "key" => &key,
-            "bucket" => &self.bucket,
+        let span = info_span!(
+            "Uploading object data",
+            key = key.as_str(),
+            bucket = self.bucket.as_str(),
         );
+        let _span_guard = span.enter();
 
         if if_exists != IfExists::Overwrite {
             if self.check_object_exists(key.clone()).await? {
                 info!(
-                    self.logger,
-                    "Object already exists";
-                    "key" => &key,
-                    "bucket" => &self.bucket,
+                    key = key.as_str(),
+                    bucket = self.bucket.as_str(),
+                    "Object already exists"
                 );
 
                 return if if_exists == IfExists::Skip {
@@ -451,13 +447,13 @@ impl RepositoryS3 {
         key_prefix: String,
         if_exists: IfExists,
     ) -> Result<(), RepositoryError> {
-        info!(
-            self.logger,
-            "Uploading objects from directory";
-            "key_prefix" => &key_prefix,
-            "bucket" => &self.bucket,
-            "dir" => ?dir,
+        let span = info_span!(
+            "Uploading objects from directory",
+            key_prefix = key_prefix.as_str(),
+            bucket = self.bucket.as_str(),
+            dir = ?dir,
         );
+        let _span_guard = span.enter();
 
         for entry in walkdir::WalkDir::new(dir) {
             let entry = entry.unwrap();

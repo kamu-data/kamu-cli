@@ -16,9 +16,10 @@ use opendatafabric::*;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use slog::{info, o, Logger};
 use std::cell::RefCell;
 use std::sync::Arc;
+use tracing::info;
+use tracing::info_span;
 
 pub struct IngestTask {
     dataset_id: DatasetIDBuf,
@@ -34,7 +35,6 @@ pub struct IngestTask {
     fetch_service: FetchService,
     prep_service: PrepService,
     read_service: ReadService,
-    logger: Logger,
 }
 
 impl IngestTask {
@@ -46,7 +46,6 @@ impl IngestTask {
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_factory: Arc<dyn EngineFactory>,
-        logger: Logger,
     ) -> Self {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
@@ -94,14 +93,17 @@ impl IngestTask {
             vocab: vocab.unwrap_or_default(),
             listener,
             checkpointing_executor: CheckpointingExecutor::new(),
-            fetch_service: FetchService::new(logger.new(o!())),
+            fetch_service: FetchService::new(),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_factory),
-            logger,
         }
     }
 
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
+        let span = info_span!("Ingesting data", dataset_id = self.dataset_id.as_str());
+        let _span_guard = span.enter();
+        info!(source = ?self.source, prev_checkpoint = ?self.prev_checkpoint, vocab = ?self.vocab, "Ingest details");
+
         self.listener.begin();
 
         match self.ingest_inner() {
@@ -176,7 +178,7 @@ impl IngestTask {
                 |old_checkpoint: Option<FetchCheckpoint>| {
                     // Ingesting from overridden source?
                     if let Some(fetch_override) = &self.fetch_override {
-                        info!(self.logger, "Fetching the overridden source"; "fetch" => ?fetch_override);
+                        info!(fetch = ?fetch_override, "Fetching the overridden source");
 
                         // TODO: Checkpoint for override may influence future normal runs
                         // Should we not create one?
@@ -192,7 +194,7 @@ impl IngestTask {
 
                     if let Some(ref cp) = old_checkpoint {
                         if !cp.is_cacheable() && !self.options.force_uncacheable {
-                            info!(self.logger, "Skipping fetch of uncacheable source");
+                            info!("Skipping fetch of uncacheable source");
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,
                                 checkpoint: old_checkpoint.unwrap(),
@@ -207,7 +209,7 @@ impl IngestTask {
                         if commit_checkpoint.is_none()
                             || commit_checkpoint.unwrap().for_fetched_at != cp.last_fetched
                         {
-                            info!(self.logger, "Skipping fetch to complete previous ingestion");
+                            info!("Skipping fetch to complete previous ingestion");
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,
                                 checkpoint: old_checkpoint.unwrap(),
@@ -215,7 +217,9 @@ impl IngestTask {
                         }
                     }
 
-                    info!(self.logger, "Fetching the data"; "fetch" => ?self.source.fetch);
+                    let span = info_span!("Fetching the data");
+                    let _span_guard = span.enter();
+
                     self.fetch_service.fetch(
                         &self.source.fetch,
                         old_checkpoint,
@@ -252,7 +256,9 @@ impl IngestTask {
                     let null_steps = Vec::new();
                     let prep_steps = self.source.prepare.as_ref().unwrap_or(&null_steps);
 
-                    info!(self.logger, "Preparing the data"; "fetch" => ?prep_steps);
+                    let span = info_span!("Preparing the data");
+                    let _span_guard = span.enter();
+
                     self.prep_service.prepare(
                         prep_steps,
                         fetch_result.checkpoint.last_fetched,
@@ -286,7 +292,9 @@ impl IngestTask {
                         }
                     }
 
-                    info!(self.logger, "Reading the data");
+                    let span = info_span!("Reading the data");
+                    let _span_guard = span.enter();
+
                     self.read_service.read(
                         &self.dataset_id,
                         &self.layout,
@@ -337,7 +345,7 @@ impl IngestTask {
                     if new_block.output_slice.is_none() {
                         let prev_watermark = self.meta_chain.borrow().iter_blocks().filter_map(|b| b.output_watermark).next();
                         if new_block.output_watermark.is_none() || new_block.output_watermark == prev_watermark {
-                            info!(self.logger, "Skipping commit of new block as it neither has new data or watermark");
+                            info!("Skipping commit of new block as it neither has new data or watermark");
                             return Ok(ExecutionResult {
                                 was_up_to_date: false,  // The checkpoint is not up-to-date but dataset is
                                 checkpoint: CommitCheckpoint {
@@ -351,7 +359,7 @@ impl IngestTask {
                     }
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
-                    info!(self.logger, "Committed new block"; "new_head" => new_head.to_string());
+                    info!(new_head = ?new_head, "Committed new block");
 
                     // TODO: Data should be moved before writing block file
                     std::fs::rename(

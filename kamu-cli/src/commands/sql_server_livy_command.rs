@@ -15,7 +15,6 @@ use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
-use slog::{o, Logger};
 use std::sync::Arc;
 
 pub struct SqlServerLivyCommand {
@@ -23,7 +22,6 @@ pub struct SqlServerLivyCommand {
     volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    logger: Logger,
     address: String,
     port: u16,
 }
@@ -34,7 +32,6 @@ impl SqlServerLivyCommand {
         volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        logger: Logger,
         address: &str,
         port: u16,
     ) -> Self {
@@ -43,9 +40,8 @@ impl SqlServerLivyCommand {
             volume_layout,
             output_config,
             container_runtime,
-            logger: logger,
             address: address.to_owned(),
-            port: port,
+            port,
         }
     }
 }
@@ -91,7 +87,6 @@ impl Command for SqlServerLivyCommand {
                 );
                 eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
             },
-            self.logger.new(o!()),
         )?;
         Ok(())
     }
