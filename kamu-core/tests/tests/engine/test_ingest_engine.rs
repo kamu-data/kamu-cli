@@ -32,7 +32,8 @@ fn test_ingest_with_engine() {
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
 
-    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
+        EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));

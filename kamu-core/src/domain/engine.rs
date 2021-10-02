@@ -19,6 +19,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::backtrace::Backtrace;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
@@ -44,20 +45,24 @@ pub trait IngestEngine: Send + Sync {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait EngineProvisioner: Send + Sync {
-    fn provision_ingest_engine(
-        &self,
-        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineError>;
-
     fn provision_engine(
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<EngineHandle, EngineError>;
-}
 
-pub type IngestEngineHandle = Arc<dyn IngestEngine>;
-pub type EngineHandle = Arc<dyn Engine>;
+    /// Do not use directly - called automatically by [EngineHandle]
+    fn release_engine(&self, engine: &dyn Engine);
+
+    /// TODO: Will be removed
+    fn provision_ingest_engine(
+        &self,
+        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<IngestEngineHandle, EngineError>;
+
+    /// Do not use directly - called automatically by [IngestEngineHandle]
+    fn release_ingest_engine(&self, engine: &dyn IngestEngine);
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Request / Response DTOs
@@ -289,5 +294,70 @@ impl EngineError {
 impl From<std::io::Error> for EngineError {
     fn from(e: std::io::Error) -> Self {
         Self::internal(e, Vec::new())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// EngineHandle
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct EngineHandle<'a> {
+    provisioner: &'a dyn EngineProvisioner,
+    engine: Arc<dyn Engine>,
+}
+
+impl<'a> EngineHandle<'a> {
+    pub(crate) fn new(provisioner: &'a dyn EngineProvisioner, engine: Arc<dyn Engine>) -> Self {
+        Self {
+            provisioner,
+            engine,
+        }
+    }
+}
+
+impl<'a> Deref for EngineHandle<'a> {
+    type Target = dyn Engine;
+
+    fn deref(&self) -> &Self::Target {
+        self.engine.as_ref()
+    }
+}
+
+impl<'a> Drop for EngineHandle<'a> {
+    fn drop(&mut self) {
+        self.provisioner.release_engine(self.engine.as_ref());
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct IngestEngineHandle<'a> {
+    provisioner: &'a dyn EngineProvisioner,
+    engine: Arc<dyn IngestEngine>,
+}
+
+impl<'a> IngestEngineHandle<'a> {
+    pub(crate) fn new(
+        provisioner: &'a dyn EngineProvisioner,
+        engine: Arc<dyn IngestEngine>,
+    ) -> Self {
+        Self {
+            provisioner,
+            engine,
+        }
+    }
+}
+
+impl<'a> Deref for IngestEngineHandle<'a> {
+    type Target = dyn IngestEngine;
+
+    fn deref(&self) -> &Self::Target {
+        self.engine.as_ref()
+    }
+}
+
+impl<'a> Drop for IngestEngineHandle<'a> {
+    fn drop(&mut self) {
+        self.provisioner.release_ingest_engine(self.engine.as_ref());
     }
 }

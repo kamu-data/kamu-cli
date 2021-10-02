@@ -42,6 +42,16 @@ impl CLIConfig {
     pub fn new() -> Self {
         Self { engine: None }
     }
+
+    // TODO: Remove this workaround
+    // Returns config with all values set to non-None
+    // This is used to walk the key tree where values that default to None would
+    // otherwise be omitted
+    fn sample() -> Self {
+        Self {
+            engine: Some(EngineConfig::sample()),
+        }
+    }
 }
 
 impl Default for CLIConfig {
@@ -58,15 +68,27 @@ impl Default for CLIConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EngineConfig {
+    /// Maximum number of engine operations that can be performed concurrently
+    pub max_concurrency: Option<u32>,
+    /// Type of the runtime to use when running the data processing engines
     pub runtime: Option<ContainerRuntimeType>,
+    /// Type of the networking namespace (relevant when running in container environments)
     pub network_ns: Option<NetworkNamespaceType>,
 }
 
 impl EngineConfig {
     pub fn new() -> Self {
         Self {
+            max_concurrency: None,
             runtime: None,
             network_ns: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self {
+            max_concurrency: Some(0),
+            ..Self::default()
         }
     }
 }
@@ -74,6 +96,7 @@ impl EngineConfig {
 impl Default for EngineConfig {
     fn default() -> Self {
         Self {
+            max_concurrency: None,
             runtime: Some(ContainerRuntimeType::Docker),
             network_ns: Some(NetworkNamespaceType::Private),
         }
@@ -293,7 +316,7 @@ impl ConfigService {
 
     pub fn all_keys(&self) -> Vec<String> {
         let mut result = Vec::new();
-        let full_config = CLIConfig::default();
+        let full_config = CLIConfig::sample();
         let raw_config = self.to_raw(full_config);
         self.visit_keys_recursive("", &raw_config, &mut |key| result.push(key));
         result

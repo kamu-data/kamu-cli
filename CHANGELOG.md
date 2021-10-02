@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.67.0] - 2021-10-02
+### Added
+- Engine provisioning now support concurrency limit (via `engine.maxConcurrency` config option)
+### Fixed
+- When running in host networking mode (e.g. in container) the engine concurrency will be set to `1` to prevent engine instances from interfering with one another
+
 ## [0.66.0] - 2021-10-01
 ### Changed
 - Major logging system improvements (switched from `slog` to `tracing`)

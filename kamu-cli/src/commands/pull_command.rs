@@ -563,13 +563,7 @@ impl EngineProvisioningListener for PrettyIngestProgress {
     }
 
     fn success(&self) {
-        // Careful not to deadlock
-        let stage = {
-            let state = self.state.lock().unwrap();
-            state.curr_progress.finish();
-            state.stage
-        };
-        self.on_stage_progress(stage, 0, 0);
+        self.on_stage_progress(IngestStage::Read, 0, 0);
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
@@ -688,15 +682,12 @@ impl EngineProvisioningListener for PrettyTransformProgress {
     }
 
     fn success(&self) {
-        let mut curr_progress = self.curr_progress.lock().unwrap();
-        curr_progress.finish();
-        *curr_progress = self
-            .multi_progress
-            .add(Self::new_spinner(&Self::spinner_message(
-                &self.dataset_id,
-                0,
-                "Applying derivative transformations",
-            )));
+        let curr_progress = self.curr_progress.lock().unwrap();
+        curr_progress.set_message(Self::spinner_message(
+            &self.dataset_id,
+            0,
+            "Applying derivative transformations",
+        ));
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {

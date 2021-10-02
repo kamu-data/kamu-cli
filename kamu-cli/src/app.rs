@@ -106,8 +106,8 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
 
     catalog.add::<RepositoryFactory>();
 
-    catalog.add::<EngineProvisionerImpl>();
-    catalog.bind::<dyn EngineProvisioner, EngineProvisionerNull>()?;
+    catalog.add::<EngineProvisionerLocal>();
+    catalog.bind::<dyn EngineProvisioner, EngineProvisionerLocal>()?;
 
     Ok(catalog)
 }
@@ -122,9 +122,15 @@ fn load_config(catalog: &mut Catalog) {
 
     info!(config = ?config, "Loaded configuration");
 
+    let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
+
     catalog.add_value(ContainerRuntimeConfig {
         runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
-        network_ns: config.engine.as_ref().unwrap().network_ns.unwrap(),
+        network_ns,
+    });
+
+    catalog.add_value(EngineProvisionerLocalConfig {
+        max_concurrency: config.engine.as_ref().unwrap().max_concurrency,
     });
 }
 

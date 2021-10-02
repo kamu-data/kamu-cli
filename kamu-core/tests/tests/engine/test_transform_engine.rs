@@ -30,7 +30,8 @@ fn test_transform_with_engine_spark() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
+        EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));
@@ -225,7 +226,8 @@ fn test_transform_with_engine_flink() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
+        EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));

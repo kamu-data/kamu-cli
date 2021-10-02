@@ -14,31 +14,43 @@ use crate::infra::*;
 use super::engine_odf::*;
 use super::engine_spark::*;
 
+use container_runtime::NetworkNamespaceType;
 use container_runtime::{ContainerRuntime, NullPullImageListener};
 use dill::*;
 use std::collections::HashSet;
 use std::process::Stdio;
+use std::sync::Condvar;
 use std::sync::{Arc, Mutex};
 use tracing::info_span;
+use tracing::warn;
 use tracing::{error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EngineProvisionerImpl {
+pub struct EngineProvisionerLocal {
+    config: EngineProvisionerLocalConfig,
     spark_ingest_engine: Arc<dyn IngestEngine>,
     spark_engine: Arc<dyn Engine>,
     flink_engine: Arc<dyn Engine>,
     container_runtime: ContainerRuntime,
-    known_images: Mutex<HashSet<String>>,
+    state: Mutex<State>,
+    condvar: Condvar,
+}
+
+struct State {
+    outstanding_handles: u32,
+    known_images: HashSet<String>,
 }
 
 #[component(pub)]
-impl EngineProvisionerImpl {
+impl EngineProvisionerLocal {
     pub fn new(
+        config: EngineProvisionerLocalConfig,
         workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
     ) -> Self {
         Self {
+            config,
             spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
@@ -55,7 +67,11 @@ impl EngineProvisionerImpl {
                 workspace_layout.clone(),
             )),
             container_runtime: container_runtime,
-            known_images: Mutex::new(HashSet::new()),
+            state: Mutex::new(State {
+                outstanding_handles: 0,
+                known_images: HashSet::new(),
+            }),
+            condvar: Condvar::new(),
         }
     }
 
@@ -65,11 +81,11 @@ impl EngineProvisionerImpl {
         listener: Arc<dyn EngineProvisioningListener>,
     ) -> Result<(), EngineError> {
         let pull_image = {
-            let mut known_images = self.known_images.lock().unwrap();
-            if known_images.contains(image) {
+            let mut state = self.state.lock().unwrap();
+            if state.known_images.contains(image) {
                 false
             } else if self.container_runtime.has_image(image) {
-                known_images.insert(image.to_owned());
+                state.known_images.insert(image.to_owned());
                 false
             } else {
                 true
@@ -99,14 +115,51 @@ impl EngineProvisionerImpl {
 
             info!(image_name = image, "Successfully pulled engine image");
             image_listener.success();
-            self.known_images.lock().unwrap().insert(image.to_owned());
+
+            {
+                let mut state = self.state.lock().unwrap();
+                state.known_images.insert(image.to_owned());
+            }
         }
 
         Ok(())
     }
+
+    fn wait_for_max_concurrency(&self) {
+        let mut state = self.state.lock().unwrap();
+        let mut max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
+
+        while state.outstanding_handles == max_concurrency {
+            info!(
+                "Reached maximum concurrency of {} - waiting for an engine to be released",
+                max_concurrency
+            );
+            state = self.condvar.wait(state).unwrap();
+            max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
+        }
+
+        state.outstanding_handles += 1;
+    }
+
+    fn get_dynamic_max_concurrency(&self, outstanding_handles: u32) -> u32 {
+        match (
+            self.config.max_concurrency,
+            self.container_runtime.config.network_ns,
+        ) {
+            (None | Some(0), NetworkNamespaceType::Host) => 1,
+            // TODO: Use available memory to deretmine the optimal limit
+            (None | Some(0), NetworkNamespaceType::Private) => outstanding_handles + 1,
+            (Some(1), _) => 1,
+            (Some(multi), NetworkNamespaceType::Private) => multi,
+            (Some(multi), NetworkNamespaceType::Host) => {
+                warn!("Ingoring specified engine max concurrency of {} since running in the Host networking mode", multi);
+                1
+            }
+        }
+    }
 }
 
-impl EngineProvisioner for EngineProvisionerImpl {
+impl EngineProvisioner for EngineProvisionerLocal {
     fn provision_ingest_engine(
         &self,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
@@ -115,9 +168,13 @@ impl EngineProvisioner for EngineProvisionerImpl {
         self.ensure_image(docker_images::SPARK, listener.clone())?;
 
         listener.begin("spark-ingest");
-
+        self.wait_for_max_concurrency();
         listener.success();
-        Ok(self.spark_ingest_engine.clone())
+
+        Ok(IngestEngineHandle::new(
+            self,
+            self.spark_ingest_engine.clone(),
+        ))
     }
 
     fn provision_engine(
@@ -142,12 +199,53 @@ impl EngineProvisioner for EngineProvisionerImpl {
         self.ensure_image(image, listener.clone())?;
 
         listener.begin(engine_id);
-
+        self.wait_for_max_concurrency();
         listener.success();
-        Ok(engine)
+
+        Ok(EngineHandle::new(self, engine))
+    }
+
+    fn release_engine(&self, engine: &dyn Engine) {
+        info!("Releasing the engine {:p}", engine);
+
+        {
+            let mut state = self.state.lock().unwrap();
+            state.outstanding_handles -= 1;
+            self.condvar.notify_one();
+        }
+    }
+
+    fn release_ingest_engine(&self, engine: &dyn IngestEngine) {
+        info!("Releasing the engine {:p}", engine);
+
+        {
+            let mut state = self.state.lock().unwrap();
+            state.outstanding_handles -= 1;
+            self.condvar.notify_one();
+        }
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+// Config
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct EngineProvisionerLocalConfig {
+    /// Maximum number of engine handles given out any single time
+    pub max_concurrency: Option<u32>,
+}
+
+impl Default for EngineProvisionerLocalConfig {
+    fn default() -> Self {
+        Self {
+            max_concurrency: None,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Null Object
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct EngineProvisionerNull;
@@ -167,4 +265,7 @@ impl EngineProvisioner for EngineProvisionerNull {
     ) -> Result<IngestEngineHandle, EngineError> {
         Err(EngineError::image_not_found("spark-ingest"))
     }
+
+    fn release_engine(&self, _engine: &dyn Engine) {}
+    fn release_ingest_engine(&self, _engine: &dyn IngestEngine) {}
 }
