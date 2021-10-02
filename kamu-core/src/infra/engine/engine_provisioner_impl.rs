@@ -14,7 +14,7 @@ use crate::infra::*;
 use super::engine_odf::*;
 use super::engine_spark::*;
 
-use container_runtime::{ContainerRuntime, NullPullImageListener, PullImageListener};
+use container_runtime::{ContainerRuntime, NullPullImageListener};
 use dill::*;
 use std::collections::HashSet;
 use std::process::Stdio;
@@ -24,51 +24,36 @@ use tracing::{error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait EngineFactory: Send + Sync {
-    fn get_ingest_engine(
-        &self,
-        maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn IngestEngine>>, EngineError>;
-
-    fn get_engine(
-        &self,
-        engine_id: &str,
-        maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn Engine>>, EngineError>;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct EngineFactoryImpl {
-    spark_ingest_engine: Arc<Mutex<dyn IngestEngine>>,
-    spark_engine: Arc<Mutex<dyn Engine>>,
-    flink_engine: Arc<Mutex<dyn Engine>>,
+pub struct EngineProvisionerImpl {
+    spark_ingest_engine: Arc<dyn IngestEngine>,
+    spark_engine: Arc<dyn Engine>,
+    flink_engine: Arc<dyn Engine>,
     container_runtime: ContainerRuntime,
     known_images: Mutex<HashSet<String>>,
 }
 
 #[component(pub)]
-impl EngineFactoryImpl {
+impl EngineProvisionerImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
     ) -> Self {
         Self {
-            spark_ingest_engine: Arc::new(Mutex::new(SparkEngine::new(
+            spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
                 workspace_layout.clone(),
-            ))),
-            spark_engine: Arc::new(Mutex::new(ODFEngine::new(
+            )),
+            spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 docker_images::SPARK,
                 workspace_layout.clone(),
-            ))),
-            flink_engine: Arc::new(Mutex::new(ODFEngine::new(
+            )),
+            flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 docker_images::FLINK,
                 workspace_layout.clone(),
-            ))),
+            )),
             container_runtime: container_runtime,
             known_images: Mutex::new(HashSet::new()),
         }
@@ -77,7 +62,7 @@ impl EngineFactoryImpl {
     fn ensure_image(
         &self,
         image: &str,
-        maybe_listener: Option<Arc<dyn PullImageListener>>,
+        listener: Arc<dyn EngineProvisioningListener>,
     ) -> Result<(), EngineError> {
         let pull_image = {
             let mut known_images = self.known_images.lock().unwrap();
@@ -95,8 +80,10 @@ impl EngineFactoryImpl {
             let span = info_span!("Pulling engine image", image_name = image);
             let _span_guard = span.enter();
 
-            let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullPullImageListener));
-            listener.begin(image);
+            let image_listener = listener
+                .get_pull_image_listener()
+                .unwrap_or_else(|| Arc::new(NullPullImageListener));
+            image_listener.begin(image);
 
             // TODO: Return better errors
             self.container_runtime
@@ -111,7 +98,7 @@ impl EngineFactoryImpl {
                 })?;
 
             info!(image_name = image, "Successfully pulled engine image");
-            listener.success();
+            image_listener.success();
             self.known_images.lock().unwrap().insert(image.to_owned());
         }
 
@@ -119,55 +106,65 @@ impl EngineFactoryImpl {
     }
 }
 
-impl EngineFactory for EngineFactoryImpl {
-    fn get_ingest_engine(
+impl EngineProvisioner for EngineProvisionerImpl {
+    fn provision_ingest_engine(
         &self,
-        maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn IngestEngine>>, EngineError> {
-        self.ensure_image(docker_images::SPARK, maybe_listener)?;
+        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<IngestEngineHandle, EngineError> {
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
+        self.ensure_image(docker_images::SPARK, listener.clone())?;
+
+        listener.begin("spark-ingest");
+
+        listener.success();
         Ok(self.spark_ingest_engine.clone())
     }
 
-    fn get_engine(
+    fn provision_engine(
         &self,
         engine_id: &str,
-        maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
+        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<EngineHandle, EngineError> {
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
+
         let (engine, image) = match engine_id {
             "spark" => Ok((
-                self.spark_engine.clone() as Arc<Mutex<dyn Engine>>,
+                self.spark_engine.clone() as Arc<dyn Engine>,
                 docker_images::SPARK,
             )),
             "flink" => Ok((
-                self.flink_engine.clone() as Arc<Mutex<dyn Engine>>,
+                self.flink_engine.clone() as Arc<dyn Engine>,
                 docker_images::FLINK,
             )),
             _ => Err(EngineError::image_not_found(engine_id)),
         }?;
 
-        self.ensure_image(image, maybe_listener)?;
+        self.ensure_image(image, listener.clone())?;
 
+        listener.begin(engine_id);
+
+        listener.success();
         Ok(engine)
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct EngineFactoryNull;
+pub struct EngineProvisionerNull;
 
-impl EngineFactory for EngineFactoryNull {
-    fn get_engine(
+impl EngineProvisioner for EngineProvisionerNull {
+    fn provision_engine(
         &self,
         engine_id: &str,
-        _maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn Engine>>, EngineError> {
+        _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<EngineHandle, EngineError> {
         Err(EngineError::image_not_found(engine_id))
     }
 
-    fn get_ingest_engine(
+    fn provision_ingest_engine(
         &self,
-        _maybe_listener: Option<Arc<dyn PullImageListener>>,
-    ) -> Result<Arc<Mutex<dyn IngestEngine>>, EngineError> {
+        _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<IngestEngineHandle, EngineError> {
         Err(EngineError::image_not_found("spark-ingest"))
     }
 }

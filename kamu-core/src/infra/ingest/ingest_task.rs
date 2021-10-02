@@ -45,7 +45,7 @@ impl IngestTask {
         meta_chain: Box<dyn MetadataChain>,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
-        engine_factory: Arc<dyn EngineFactory>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
@@ -95,7 +95,7 @@ impl IngestTask {
             checkpointing_executor: CheckpointingExecutor::new(),
             fetch_service: FetchService::new(),
             prep_service: PrepService::new(),
-            read_service: ReadService::new(engine_factory),
+            read_service: ReadService::new(engine_provisioner),
         }
     }
 

@@ -22,7 +22,7 @@ use tracing::info_span;
 
 pub struct TransformServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
-    engine_factory: Arc<dyn EngineFactory>,
+    engine_provisioner: Arc<dyn EngineProvisioner>,
     volume_layout: VolumeLayout,
 }
 
@@ -30,26 +30,26 @@ pub struct TransformServiceImpl {
 impl TransformServiceImpl {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
-        engine_factory: Arc<dyn EngineFactory>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
         volume_layout: &VolumeLayout,
     ) -> Self {
         Self {
             metadata_repo,
-            engine_factory,
+            engine_provisioner,
             volume_layout: volume_layout.clone(),
         }
     }
 
     // Note: Can be called from multiple threads
     fn do_transform(
-        engine_factory: Arc<dyn EngineFactory>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
         listener.begin();
 
-        match Self::do_transform_inner(engine_factory, request, commit_fn, listener.clone()) {
+        match Self::do_transform_inner(engine_provisioner, request, commit_fn, listener.clone()) {
             Ok(res) => {
                 listener.success(&res);
                 Ok(res)
@@ -63,7 +63,7 @@ impl TransformServiceImpl {
 
     // Note: Can be called from multiple threads
     fn do_transform_inner(
-        engine_factory: Arc<dyn EngineFactory>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
         request: ExecuteQueryRequest,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
@@ -78,14 +78,14 @@ impl TransformServiceImpl {
         let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
         let out_data_path = PathBuf::from(&request.out_data_path);
 
-        let engine = engine_factory.get_engine(
+        let engine = engine_provisioner.provision_engine(
             match request.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
-            listener.clone().get_pull_image_listener(),
+            listener.clone().get_engine_provisioning_listener(),
         )?;
 
-        let result = engine.lock().unwrap().transform(request)?;
+        let result = engine.transform(request)?;
 
         if let Some(ref slice) = result.metadata_block.output_slice {
             if slice.num_records == 0 {
@@ -648,7 +648,7 @@ impl TransformService for TransformServiceImpl {
             let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
 
             Self::do_transform(
-                self.engine_factory.clone(),
+                self.engine_provisioner.clone(),
                 request,
                 move |new_block, new_data_path, new_checkpoint_path| {
                     Self::commit_transform(
@@ -708,7 +708,7 @@ impl TransformService for TransformServiceImpl {
                         .begin_transform(&dataset_id)
                         .unwrap_or(null_listener);
 
-                    let engine_factory = self.engine_factory.clone();
+                    let engine_provisioner = self.engine_provisioner.clone();
 
                     let commit_fn = {
                         let meta_chain =
@@ -733,8 +733,12 @@ impl TransformService for TransformServiceImpl {
                     let thread_handle = std::thread::Builder::new()
                         .name("transform_multi".to_owned())
                         .spawn(move || {
-                            let res =
-                                Self::do_transform(engine_factory, request, commit_fn, listener);
+                            let res = Self::do_transform(
+                                engine_provisioner,
+                                request,
+                                commit_fn,
+                                listener,
+                            );
                             (dataset_id, res)
                         })
                         .unwrap();
@@ -803,7 +807,7 @@ impl TransformService for TransformServiceImpl {
                 .unwrap_or_else(|| Arc::new(NullTransformListener));
 
             Self::do_transform(
-                self.engine_factory.clone(),
+                self.engine_provisioner.clone(),
                 request,
                 |new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
                     // Cleanup not needed outputs

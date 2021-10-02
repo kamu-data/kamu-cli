@@ -543,6 +543,35 @@ impl IngestListener for PrettyIngestProgress {
             ));
     }
 
+    fn get_engine_provisioning_listener(
+        self: Arc<Self>,
+    ) -> Option<Arc<dyn EngineProvisioningListener>> {
+        Some(self)
+    }
+}
+
+impl EngineProvisioningListener for PrettyIngestProgress {
+    fn begin(&self, engine_id: &str) {
+        let state = self.state.lock().unwrap();
+
+        // This currently happens during the Read stage
+        state.curr_progress.set_message(Self::spinner_message(
+            &self.dataset_id,
+            IngestStage::Read as u32,
+            format!("Waiting for engine {}", engine_id),
+        ));
+    }
+
+    fn success(&self) {
+        // Careful not to deadlock
+        let stage = {
+            let state = self.state.lock().unwrap();
+            state.curr_progress.finish();
+            state.stage
+        };
+        self.on_stage_progress(stage, 0, 0);
+    }
+
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         Some(self)
     }
@@ -637,6 +666,37 @@ impl TransformListener for PrettyTransformProgress {
                 0,
                 console::style("Failed to update derivative dataset").red(),
             ));
+    }
+
+    fn get_engine_provisioning_listener(
+        self: Arc<Self>,
+    ) -> Option<Arc<dyn EngineProvisioningListener>> {
+        Some(self)
+    }
+}
+
+impl EngineProvisioningListener for PrettyTransformProgress {
+    fn begin(&self, engine_id: &str) {
+        self.curr_progress
+            .lock()
+            .unwrap()
+            .set_message(Self::spinner_message(
+                &self.dataset_id,
+                0,
+                format!("Waiting for engine {}", engine_id),
+            ));
+    }
+
+    fn success(&self) {
+        let mut curr_progress = self.curr_progress.lock().unwrap();
+        curr_progress.finish();
+        *curr_progress = self
+            .multi_progress
+            .add(Self::new_spinner(&Self::spinner_message(
+                &self.dataset_id,
+                0,
+                "Applying derivative transformations",
+            )));
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {

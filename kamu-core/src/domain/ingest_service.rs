@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::EngineError;
-use container_runtime::PullImageListener;
+use super::{EngineError, EngineProvisioningListener};
 use opendatafabric::{DatasetID, DatasetIDBuf, FetchStep, Sha3_256};
 
 use std::backtrace::Backtrace;
@@ -98,7 +97,9 @@ pub trait IngestListener: Send + Sync {
     fn success(&self, _result: &IngestResult) {}
     fn error(&self, _error: &IngestError) {}
 
-    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+    fn get_engine_provisioning_listener(
+        self: Arc<Self>,
+    ) -> Option<Arc<dyn EngineProvisioningListener>> {
         None
     }
 }

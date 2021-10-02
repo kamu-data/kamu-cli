@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use container_runtime::PullImageListener;
 use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::{
@@ -19,9 +20,14 @@ use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::backtrace::Backtrace;
 use std::path::PathBuf;
+use std::sync::Arc;
 use thiserror::Error;
 
-pub trait Engine: Sync + Send {
+///////////////////////////////////////////////////////////////////////////////
+// Engine
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait Engine: Send + Sync {
     fn transform(
         &self,
         request: ExecuteQueryRequest,
@@ -29,9 +35,29 @@ pub trait Engine: Sync + Send {
 }
 
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
-pub trait IngestEngine: Sync + Send {
+pub trait IngestEngine: Send + Sync {
     fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// EngineProvisioner
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait EngineProvisioner: Send + Sync {
+    fn provision_ingest_engine(
+        &self,
+        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<IngestEngineHandle, EngineError>;
+
+    fn provision_engine(
+        &self,
+        engine_id: &str,
+        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+    ) -> Result<EngineHandle, EngineError>;
+}
+
+pub type IngestEngineHandle = Arc<dyn IngestEngine>;
+pub type EngineHandle = Arc<dyn Engine>;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Request / Response DTOs
@@ -55,6 +81,22 @@ pub struct IngestRequest {
     pub data_dir: PathBuf,
     pub out_data_path: PathBuf,
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Listener
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait EngineProvisioningListener: Send + Sync {
+    fn begin(&self, _engine_id: &str) {}
+    fn success(&self) {}
+
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        None
+    }
+}
+
+pub struct NullEngineProvisioningListener;
+impl EngineProvisioningListener for NullEngineProvisioningListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Errors

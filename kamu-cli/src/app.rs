@@ -106,8 +106,8 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
 
     catalog.add::<RepositoryFactory>();
 
-    catalog.add::<EngineFactoryImpl>();
-    catalog.bind::<dyn EngineFactory, EngineFactoryImpl>()?;
+    catalog.add::<EngineProvisionerImpl>();
+    catalog.bind::<dyn EngineProvisioner, EngineProvisionerNull>()?;
 
     Ok(catalog)
 }

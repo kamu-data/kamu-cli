@@ -21,12 +21,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub struct ReadService {
-    engine_factory: Arc<dyn EngineFactory>,
+    engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
 impl ReadService {
-    pub fn new(engine_factory: Arc<dyn EngineFactory>) -> Self {
-        Self { engine_factory }
+    pub fn new(engine_provisioner: Arc<dyn EngineProvisioner>) -> Self {
+        Self { engine_provisioner }
     }
 
     // TODO: Don't use engine for anything but preprocessing
@@ -44,8 +44,8 @@ impl ReadService {
         listener: Arc<dyn IngestListener>,
     ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
         let engine = self
-            .engine_factory
-            .get_ingest_engine(listener.get_pull_image_listener())?;
+            .engine_provisioner
+            .provision_ingest_engine(listener.get_engine_provisioning_listener())?;
 
         let out_data_path = dataset_layout.data_dir.join(".pending");
         let new_checkpoint_dir = dataset_layout.checkpoints_dir.join(".pending");
@@ -72,7 +72,7 @@ impl ReadService {
             out_data_path: out_data_path.clone(),
         };
 
-        let response = engine.lock().unwrap().ingest(request)?;
+        let response = engine.ingest(request)?;
 
         if let Some(ref slice) = response.metadata_block.output_slice {
             if slice.num_records == 0 {

@@ -66,7 +66,7 @@ fn test_get_next_operation() {
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
-        Arc::new(EngineFactoryNull),
+        Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
 
@@ -106,7 +106,7 @@ fn test_get_verification_plan_one_to_one() {
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
-        Arc::new(EngineFactoryNull),
+        Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
 

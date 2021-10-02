@@ -19,7 +19,7 @@ use std::sync::Arc;
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
     metadata_repo: Arc<dyn MetadataRepository>,
-    engine_factory: Arc<dyn EngineFactory>,
+    engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
 #[component(pub)]
@@ -27,12 +27,12 @@ impl IngestServiceImpl {
     pub fn new(
         volume_layout: &VolumeLayout,
         metadata_repo: Arc<dyn MetadataRepository>,
-        engine_factory: Arc<dyn EngineFactory>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
             volume_layout: volume_layout.clone(),
             metadata_repo,
-            engine_factory,
+            engine_provisioner,
         }
     }
 
@@ -107,7 +107,7 @@ impl IngestService for IngestServiceImpl {
             meta_chain,
             None,
             listener,
-            self.engine_factory.clone(),
+            self.engine_provisioner.clone(),
         );
 
         ingest_task.ingest()
@@ -136,7 +136,7 @@ impl IngestService for IngestServiceImpl {
             meta_chain,
             Some(fetch),
             listener,
-            self.engine_factory.clone(),
+            self.engine_provisioner.clone(),
         );
 
         ingest_task.ingest()
@@ -160,7 +160,7 @@ impl IngestService for IngestServiceImpl {
             .map(|id| {
                 let layout = self.get_dataset_layout(&id);
                 let meta_chain = self.metadata_repo.get_metadata_chain(&id).unwrap();
-                let engine_factory = self.engine_factory.clone();
+                let engine_provisioner = self.engine_provisioner.clone();
                 let task_options = options.clone();
 
                 let null_listener = Arc::new(NullIngestListener {});
@@ -178,7 +178,7 @@ impl IngestService for IngestServiceImpl {
                             meta_chain,
                             None,
                             listener,
-                            engine_factory,
+                            engine_provisioner,
                         );
 
                         let mut combined_result = None;

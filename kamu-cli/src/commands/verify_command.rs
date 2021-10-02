@@ -382,6 +382,34 @@ impl VerificationListener for VerificationProgress {
 }
 
 impl TransformListener for VerificationProgress {
+    fn get_engine_provisioning_listener(
+        self: Arc<Self>,
+    ) -> Option<Arc<dyn EngineProvisioningListener>> {
+        Some(self)
+    }
+}
+
+impl EngineProvisioningListener for VerificationProgress {
+    fn begin(&self, engine_id: &str) {
+        let s = self.state.lock().unwrap();
+        self.curr_progress.set_message(self.spinner_message(
+            s.block_index,
+            s.num_blocks,
+            format!("Waiting for engine {}", engine_id),
+            Some(&s.block),
+        ))
+    }
+
+    fn success(&self) {
+        let s = self.state.lock().unwrap();
+        self.curr_progress.set_message(self.spinner_message(
+            s.block_index,
+            s.num_blocks,
+            "Replaying transformation",
+            Some(&s.block),
+        ))
+    }
+
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         Some(self)
     }

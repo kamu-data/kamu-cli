@@ -30,7 +30,7 @@ fn test_transform_with_engine_spark() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_factory = Arc::new(EngineFactoryImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));
@@ -38,12 +38,12 @@ fn test_transform_with_engine_spark() {
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
-        engine_factory.clone(),
+        engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
-        engine_factory.clone(),
+        engine_provisioner.clone(),
         &volume_layout,
     );
 
@@ -225,7 +225,7 @@ fn test_transform_with_engine_flink() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
-    let engine_factory = Arc::new(EngineFactoryImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));
@@ -233,12 +233,12 @@ fn test_transform_with_engine_flink() {
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
-        engine_factory.clone(),
+        engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         metadata_repo.clone(),
-        engine_factory.clone(),
+        engine_provisioner.clone(),
         &volume_layout,
     );
 

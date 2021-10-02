@@ -32,7 +32,7 @@ fn test_ingest_with_engine() {
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
 
-    let engine_factory = Arc::new(EngineFactoryImpl::new(
+    let engine_provisioner = Arc::new(EngineProvisionerImpl::new(
         workspace_layout.clone(),
         ContainerRuntime::default(),
     ));
@@ -40,7 +40,7 @@ fn test_ingest_with_engine() {
     let ingest_svc = Arc::new(IngestServiceImpl::new(
         &volume_layout,
         metadata_repo.clone(),
-        engine_factory,
+        engine_provisioner,
     ));
 
     let src_path = tempdir.path().join("data.csv");
