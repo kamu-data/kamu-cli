@@ -180,16 +180,25 @@ impl IngestTask {
                     if let Some(fetch_override) = &self.fetch_override {
                         info!(fetch = ?fetch_override, "Fetching the overridden source");
 
-                        // TODO: Checkpoint for override may influence future normal runs
-                        // Should we not create one?
-                        return self.fetch_service.fetch(
-                            fetch_override,
-                            None,
-                            &self.layout.cache_dir.join("fetched.bin"),
-                            Some(&mut FetchProgressListenerBridge {
-                                listener: self.listener.clone(),
-                            }),
-                        );
+                        return self
+                            .fetch_service
+                            .fetch(
+                                fetch_override,
+                                None,
+                                &self.layout.cache_dir.join("fetched.bin"),
+                                Some(&mut FetchProgressListenerBridge {
+                                    listener: self.listener.clone(),
+                                }),
+                            )
+                            .map(|r| ExecutionResult {
+                                // Cache data for overridden source may influence future normal runs, so we filter it
+                                checkpoint: FetchCheckpoint {
+                                    last_modified: None,
+                                    etag: None,
+                                    ..r.checkpoint
+                                },
+                                ..r
+                            });
                     }
 
                     if let Some(ref cp) = old_checkpoint {
