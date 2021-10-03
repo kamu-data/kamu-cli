@@ -1,6 +1,6 @@
 FROM ubuntu:focal
 
-ARG KAMU_VERSION=0.62.2
+ARG KAMU_VERSION
 
 
 # Podman
