@@ -16,7 +16,7 @@ This tutorial is also available in a video form:
 
 This tutorial will give you a high-level tour of `kamu` and show you how it works through examples.
 
-We assume that you have already followed the [installation steps](./install.md) and have `kamu` tool ready.
+We assume that you have already followed the [installation steps](./install.md) and have `kamu` tool ready. We also recommend you to set up shell completions - they make `kamu` a lot more fun to use. 
 
 Throughout this tutorial we will be using the [Zip Code Boundaries](https://data.cityofnewyork.us/Business/Zip-Code-Boundaries/i8iw-xf4u) dataset, which can be found on [New York Open Data Portal](http://opendata.cityofnewyork.us/).
 

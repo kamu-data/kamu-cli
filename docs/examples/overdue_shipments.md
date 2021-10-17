@@ -50,7 +50,7 @@ $ kamu add com.acme.orders.yaml com.acme.shipments.yaml
 $ kamu pull --all
 ```
 
-You can verify the result using the SQL shell:
+You can verify the result using `tail` command or the SQL shell:
 
 ```sql
 $ kamu sql

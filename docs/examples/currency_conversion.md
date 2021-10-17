@@ -45,7 +45,7 @@ $ kamu add ca.bankofcanada.exchange-rates.daily.yaml my.trading.transactions.yam
 $ kamu pull --all
 ```
 
-You can verify the result using the SQL shell:
+You can verify the result using `tail` command or the SQL shell:
 
 ```sql
 $ kamu sql
