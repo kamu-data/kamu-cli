@@ -8,6 +8,7 @@
 
 [![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 [![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
+[![Chat](https://shields.io/discord/898726370199359498)](https://discord.gg/nU6TXRQNXC)
 
 </p>
 </div>
@@ -77,7 +78,7 @@ All datasets can be easily shared with others, creating a decentralized peer-to-
 
 ## Community
 
-Stop by and say "Hi" in our [Discord Server](https://discord.gg/aSpVjWwu) - we're always happy to chat about data.
+Stop by and say "Hi" in our [Discord Server](https://discord.gg/nU6TXRQNXC) - we're always happy to chat about data.
 
 If you like what we're doing - support us by starring the repo.
 
@@ -94,7 +95,7 @@ If you'd like to contribute [start here](docs/contributing.md).
 [Examples]: docs/examples/index.md
 [Documentation]: docs/index.md
 [FAQ]: docs/faq.md
-[Chat]: https://discord.gg/aSpVjWwu
+[Chat]: https://discord.gg/nU6TXRQNXC
 [Contributing]: docs/contributing.md
 [License]: LICENSE.txt
 [Website]: https://www.kamu.dev
