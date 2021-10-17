@@ -12,6 +12,9 @@
 </p>
 </div>
 
+## Get Started
+
+Watch [this introductory video](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk) to see `kamu` in action. Then follow the "getting started" section of our [documentation] to install the tool and try it yourself.
 
 ## About
 
@@ -24,8 +27,6 @@ In short it can be described as:
 * A supply chain for structured data
 * Blockchain for data
 * Or even Kubernetes for data :)
-
-> Watch [this introductory video](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk) to see it in action.
 
 Following the **"data as code"** philosophy it lets you build arbitrarily complex data pipelines. First, you define where to get data from and how to ingest it, and the tool will **keep datasets always up-to-date**. You can then **create derivative datasets** by joining or transforming other data - you write an **SQL query** and the tool will take care of updating derivative data as input datasets get new data. 
 
@@ -73,6 +74,14 @@ All datasets can be easily shared with others, creating a decentralized peer-to-
   ![SQL Shell](docs/first_steps_files/sql.gif)
   ![Jupyter](docs/first_steps_files/notebook-005.png)
 
+
+## Community
+
+Stop by and say "Hi" in our [Discord Server](https://discord.gg/aSpVjWwu) - we're always happy to chat about data.
+
+If you like what we're doing - support us by starring the repo.
+
+If you'd like to contribute [start here](docs/contributing.md).
 
 ---
 
