@@ -2,13 +2,14 @@
 
 This tutorial is also available in a video form:
 
-[![Kamu 101 - First Steps](http://img.youtube.com/vi/UpT2tvf3r0Y/0.jpg)](http://www.youtube.com/watch?v=UpT2tvf3r0Y "Kamu 101 - First Steps")
+[![Kamu 101 - Basics](http://img.youtube.com/vi/oUTiWW6W78A/0.jpg)](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk "Kamu 101 - Basics")
 
 - [Using the help command](#using-the-help-command)
 - [Getting data in](#getting-data-in)
   - [Initializing the workspace](#initializing-the-workspace)
   - [Adding a dataset](#adding-a-dataset)
 - [Exploring data](#exploring-data)
+  - [Tail command](#tail-command)
   - [SQL shell](#sql-shell)
   - [Notebooks](#notebooks)
 
@@ -104,8 +105,17 @@ $ kamu log us.cityofnewyork.data.zipcode-boundaries
 ## Exploring data
 
 Since you might not have worked with this dataset before you'd want to explore it first. For this `kamu` provides two tools:
+* `tail` command
 * SQL shell
 * Jupyter Notebooks integration
+
+### Tail command
+
+To quickly preview few last events of any dataset use `tail` command:
+
+```bash
+$ kamu tail us.cityofnewyork.data.zipcode-boundaries
+```
 
 ### SQL shell
 SQL is the _lingua franca_ of the data science and `kamu` uses it extensively. So naturally it provides you a simple way to run ad-hoc queries on data.
@@ -117,7 +127,7 @@ Following comand will drop you into the SQL shell:
 $ kamu sql
 ```
 
-Under the hood it starts [Apache Spark](https://spark.apache.org/), so all of its powerful SQL engine is now available to you.
+Under the hood it starts [Apache Spark](https://spark.apache.org/), so its [powerful SQL](https://spark.apache.org/docs/latest/sql-ref.html) engine is now available to you.
 
 All datasets in your workspace should be available to you as tables:
 

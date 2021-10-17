@@ -88,6 +88,9 @@ This command will analyze the state of the dataset at the repository and will on
 
 
 ## Validity of Data
+
+> This topic is also covered in detail in [Kamu 101: Trust & Collaboration](https://www.youtube.com/watch?v=hN_vpHYmwi0&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk&index=2) explainer video
+
 With `kamu` sharing data becomes very easy, but with that problem out of the way you will soon start wondering "How can I trust the data I downloaded from someon else?". Let's first define what validity or trustworthiness of data means.
 
 ### Validity of Root Data

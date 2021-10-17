@@ -1,37 +1,47 @@
-# Status
+# Status <!-- omit in toc -->
 
-## Open Data Fabric
+- [Project Status Disclaimer](#project-status-disclaimer)
+- [Feature Coverage](#feature-coverage)
+- [Stability](#stability)
 
-| Feature           |  ODF  | Kamu  |
-| ----------------- | :---: | :---: |
-| Source evolution  |   V   |   X   |
-| Schema evolution  |   V   |   X   |
-| Query migrations  |   V   |   X   |
-| Engine versioning |   V   |   X   |
-| Engine migrations |   V   |   X   |
+## Project Status Disclaimer
+`kamu` is an **alpha quality** software. Our main goal currently is to demonstrate the potential of the [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) protocol and its transformative properties to the community and the industry and validate our ideas.
 
-## Schema
+Naturally, we don't recommend using `kamu` for any critical tasks - it's definitely **not prod-ready**. We are, however absolutely delighted to use `kamu` for our personal data analytics needs and small projects, and hoping you will enjoy it too.
 
-| Feature      | Coordinator | Spark | Flink | DataFusion |
-| ------------ | :---------: | :---: | :---: | :--------: |
-| Basic types  |      V      |   V   |   V   |     V      |
-| Decimal type |      V      |   V   |  V*   |    X**     |
-| Nested types |      X      |   V   |   X   |     X      |
-| GIS types    |      X      |   V   |   X   |     X      |
+If you do - simply make sure to **maintain your source data separately** and don't rely on `kamu` for data storage. This way any time a new version comes out that breaks some compatibility you can simply delete your kamu workspace and re-create it from scratch in a matter of seconds.
 
-> * Apache Flink has known issues with Decimal type and currently relies on our patches that have not been upstreamed yet, so stability is not guaranteed [FLINK-17804](https://issues.apache.org/jira/browse/FLINK-17804).
+Also, please **be patient with current performance** and resource usage. We fully realize that waiting 15s to process a few KiB of CSV isn't great. Stream processing technologies is a relatively new area, and the data processing engines `kamu` uses (e.g. Apache Spark and Flink) are tailored to run in large clusters, not on a laptop. They take a lot of resources to just boot up, so the start-stop-continue nature of `kamu`'s transformations is at odds with their design. We are hoping that the industry will recognize our use-case and expect to see a better support for it in future. We are committed to improving the performance significantly in the near future.
 
-> ** Arrow is lacking Decimal compute support [ARROW-RS-272](https://github.com/apache/arrow-rs/issues/272)
 
-## Transforms
+## Feature Coverage
 
-| Feature                           | Spark | Flink |
-| --------------------------------- | :---: | :---: |
-| Filter                            |   V   |   V   |
-| Map                               |   V   |   V   |
-| Aggregations                      |  X*   |   V   |
-| Stream-to-Stream Joins            |  X*   |   V   |
-| Projection / Temporal Table Joins |  X*   |   V   |
-| GIS extensions                    |   V   |   X   |
+| Feature                            |  ODF  | kamu  |
+| ---------------------------------- | :---: | :---: |
+| Root datasets                      |   ✔️   |   ✔️   |
+| Ingest merge strategies            |   ✔️   |   ✔️   |
+| Derivative datasets                |   ✔️   |   ✔️   |
+| Validation - Metadata integrity    |   ✔️   |   ✔️   |
+| Validation - Data integrity        |   ❌   |   ❌   |
+| Validation - Transformation replay |   ✔️   |   ✔️   |
+| Source evolution                   |   ❌   |   ❌   |
+| Schema evolution                   |   ❌   |   ❌   |
+| Query migrations                   |   ❌   |   ❌   |
+| Engine versioning                  |   ❌   |   ❌   |
+| Engine migrations                  |   ❌   |   ❌   |
 
-> * Spark Engine is capable of stream processing but temporarily we have to use it in the batch processing mode, so only row-level operations like map and filter are currently usable which do not require corrent stream processing and watermarking semantics.
+
+
+## Stability
+
+| Component              | Stability |
+| ---------------------- | :-------: |
+| Dataset on-disk layout | Unstable  |
+| CLI interface          | Unstable  |
+| Engine interface       | Unstable  |
+
+
+---
+
+See also:
+- [Supported engines](transform.md#supported-engines)
