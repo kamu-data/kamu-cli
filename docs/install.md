@@ -1,5 +1,7 @@
 # Installation <!-- omit in toc -->
 
+> Before using this product, please read the [current project status disclaimer](status.md).
+
 - [General Information](#general-information)
 - [Supported Platforms](#supported-platforms)
   - [Linux](#linux)
