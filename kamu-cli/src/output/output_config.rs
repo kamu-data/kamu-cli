@@ -30,7 +30,11 @@ impl OutputConfig {
             OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
             OutputFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
-            OutputFormat::Table => Box::new(TableWriter::new()),
+            OutputFormat::Table => Box::new(
+                TableWriter::new()
+                    .with_max_cell_len(Some(90))
+                    .with_binary_placeholder(Some("<binary>".to_owned())),
+            ),
         }
     }
 }

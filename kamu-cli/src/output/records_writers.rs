@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::array_value_to_string;
+use datafusion::arrow::{datatypes::DataType, record_batch::RecordBatch};
 pub use kamu::infra::utils::records_writers::{
     CsvWriter, CsvWriterBuilder, JsonArrayWriter, JsonLineDelimitedWriter, RecordsWriter,
 };
@@ -19,6 +19,8 @@ use prettytable::{Cell, Row, Table};
 pub struct TableWriter {
     first_row_written: bool,
     table: Table,
+    max_cell_len: Option<usize>,
+    binary_placeholder: Option<String>,
 }
 
 impl TableWriter {
@@ -31,6 +33,22 @@ impl TableWriter {
         Self {
             first_row_written: false,
             table,
+            max_cell_len: None,
+            binary_placeholder: None,
+        }
+    }
+
+    pub fn with_max_cell_len(self, max_cell_len: Option<usize>) -> Self {
+        Self {
+            max_cell_len,
+            ..self
+        }
+    }
+
+    pub fn with_binary_placeholder(self, binary_placeholder: Option<String>) -> Self {
+        Self {
+            binary_placeholder,
+            ..self
         }
     }
 
@@ -69,7 +87,27 @@ impl RecordsWriter for TableWriter {
             let mut cells = Vec::new();
             for col in 0..records.num_columns() {
                 let column = records.column(col);
-                let value = array_value_to_string(&column, row).unwrap();
+
+                if let Some(binary_placeholder) = &self.binary_placeholder {
+                    match column.data_type() {
+                        DataType::Binary
+                        | DataType::LargeBinary
+                        | DataType::List(_)
+                        | DataType::LargeList(_) => {
+                            cells.push(Cell::new(binary_placeholder).style_spec("r"));
+                            continue;
+                        }
+                        _ => (),
+                    }
+                }
+
+                let mut value = array_value_to_string(&column, row).unwrap();
+
+                if self.max_cell_len.is_some() && value.len() > self.max_cell_len.unwrap() {
+                    value.truncate(self.max_cell_len.unwrap());
+                    value.push_str("...");
+                }
+
                 cells.push(Cell::new(&value).style_spec("r"));
             }
             self.table.add_row(Row::new(cells));
