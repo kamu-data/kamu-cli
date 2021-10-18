@@ -4,7 +4,7 @@
 
 <p><strong><i>World's first decentralized real-time data warehouse, on your laptop</i></strong></p>
 
-[Documentation] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Website]
+[Docs] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Website]
 
 [![build](https://github.com/kamu-data/kamu-cli/workflows/build/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
 [![Release](https://github.com/kamu-data/kamu-cli/workflows/release/badge.svg)](https://github.com/kamu-data/kamu-cli/actions)
@@ -40,16 +40,76 @@ All datasets can be easily shared with others, creating a decentralized peer-to-
 </div>
 
 
+## Use Cases
+
+In general, `kamu` is a great fit for cases where data is exchanged between several independent parties, and for (low to moderate frequency & volume) mission-critical data where high degree of trustworthiness and protection from malicious actors is required.
+
+Examples:
+
+<details>
+<summary><b>Open Data</b></summary>
+To share data outside of your organization today you have limited options:
+
+- You can publish it on some open data portal and lose ownership and control of your data
+- You can deploy and operate some open-source data portal, but you probably have neither time or money to do so
+- You can self-host it as a CSV file on some simple HTTP/FTP server, but then you are making it extremely hard for others to discover your data
+
+For most data publishers, publishing data is not a core part of their business, so `kamu` aims to make publishing as easy as possible. It invisibly guides publishers towards best data management practices (preserving history, making data reproducible and verifiable) and lets consumers access data instantly, in a ready to use form.
+</details>
+
+<details>
+<summary><b>Science & Research</b></summary>
+One of the driving forces behind `kamu`'s design was the [ongoing reproducibility crisis](https://www.nature.com/articles/533452a) in science. We believe that to a large extent it's caused by our poor data management practices.
+
+After incidents like [The Surgisphere scandal](https://www.the-scientist.com/features/the-surgisphere-scandal-what-went-wrong--67955) the sentiment in research is changing from assuming that all research is done in good faith, to considering any research unreliable until its proven so.
+
+With `kamu`:
+
+- You can make your data projects fully reproducible using built-in stable references mechanism
+- Your data analysis results can be reproduced and verified by others in minutes
+- All the data prep work (that often accounts for [80% of time of a data scientist](https://www.forbes.com/sites/gilpress/2016/03/23/data-preparation-most-time-consuming-least-enjoyable-data-science-task-survey-says/?sh=348d5f876f63)) can be shared and reused by others
+- Your datasets will continue to function long after you're done with your project, so the work done years ago will continue to produce valuable insights with minimal maintenance on your part
+</details>
+
+<details>
+<summary><b>Data-driven Journalism</b></summary>
+Data-driven journalism is on the rise and has proven to be extremely effective. In the world of misinformation and extremely polarized opinions data provides us an achoring point to discuss complex problems and analyze cause and effect. Data itself is non-partisan and has no secret agenda, and arguments around different interpretations of data are infinitely more productive than ones based on gut feelings.
+
+Unfortunately, too often data has issues that undermine its trustworthiness. And even if the data is correct, it's very easy to pose a question about its sources that will take too long to answer - the data will be dismissed, and the gut feelings will step in.
+
+This is why `kamu`'s goal is to make data **verifiably trustworthy** and make answering **provenance** questions a matter of seconds. Only when data cannot be easily dismissed we will start to pay proper attention to it.
+</details>
+
+<details>
+<summary><b>Business core data</b></summary>
+`kamu` aims to be the most reliable data management solution that provides recent data while maintaining highest degree of accountability and tamper-proof provenance, without you having to put all data in some central database. We're developing it with financial and pharmaceutical use cases in mind, where audit and compliance could be fully automated through our system.
+
+Note that we currently focus on mission-critical data and `kamu` is not well suited for IoT or other high-frequency and high-volume cases.
+</details>
+
+<details>
+<summary><b>Personal analytics</b></summary>
+Being data geeks, we use `kamu` for data-driven decision making even in our personal lives. Actually, our largest data pipelines so far were created for personal finance - to collect and harmonize data from multiple bank accounts, convert currencies, and analyze stocks trading data. We also scrape a lot of websites to make smarter purchasing decisions. `kamu` lets us keep all this data up-to-date with absolute minimal effort.
+</details>
+
 ## Features
 
-**For Data Publishers:**
+`kamu` connects **publishers** and **consumers** of data through a decentralized network and lets people **collaborate** on extracting insight from data. It offers many perks for everyone who participates in this first-of-a-kind data supply chain:
+
+<details>
+<summary><b>For Data Publishers</b></summary>
+
 - Easily **share your data** with the world **without moving it** anywhere
 - Retain full **ownership and control** of your data
 - Close the feedback loop and **see who and how uses your data**
 - Provide **real-time**, **verifiable and reproducible** data that follows the best data management practices
   ![Pull Data](docs/readme_files/pull-multi.gif)
 
-**For Data Professionals:**
+</details>
+
+<details>
+<summary><b>For Data Scientists</b></summary>
+
 - **Ingest any existing dataset** from the web
 - Always **stay up-to-date** by pulling latest updates from the data sources with just one command
 - Use **stable data references** to make your data projects fully reproducible
@@ -59,21 +119,30 @@ All datasets can be easily shared with others, creating a decentralized peer-to-
 - Built-in support for **GIS data**
 - **Share** your results with others in a fully reproducible and reusable form
 
-**For Data Consumers:**
+</details>
+
+<details>
+<summary><b>For Data Consumers</b></summary>
+
 - **Download** a dataset from a shared repository
 - **Verify** that all data comes from trusted sources using 100% accurate **lineage**
 - **Audit** the chain of transformations this data went through
 - **Validate** that downloaded was not tampered with a single command
 - **Trust** your data by knowing where every single bit of information came from with our **fine grain provenance**
 
+</details>
 
-**For Data Exploration:**
+<details>
+<summary><b>For Data Exploration</b></summary>
+
 - Explore data and run **ad-hoc SQL queries** (backed by the power of Apache Spark)
 - Launch a **Jupyter notebook** with one command
 - Join, filter, and shape your data using SQL
 - Visualize the result using your favorite library
   ![SQL Shell](docs/first_steps_files/sql.gif)
   ![Jupyter](docs/first_steps_files/notebook-005.png)
+
+</details>
 
 
 ## Community
@@ -88,11 +157,12 @@ If you'd like to contribute [start here](docs/contributing.md).
 
 <div align="center">
   
-[Documentation] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Website] | [Contributing] | [License]
+[Docs] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Website] | [Contributing] | [License]
 </div>
 
 [Tutorials]: docs/learning_materials.md
 [Examples]: docs/examples/index.md
+[Docs]: docs/index.md
 [Documentation]: docs/index.md
 [FAQ]: docs/faq.md
 [Chat]: https://discord.gg/nU6TXRQNXC
