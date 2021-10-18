@@ -74,6 +74,8 @@ impl NewDatasetCommand {
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
                         preprocess:
                           kind: sql
+                          # Use one of the supported engines and a query in its dialect
+                          # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
                           engine: spark
                           query: >
                             SELECT
@@ -117,6 +119,8 @@ impl NewDatasetCommand {
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
                         transform:
                           kind: sql
+                          # Use one of the supported engines and a query in its dialect
+                          # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
                           engine: spark
                           query: >
                             SELECT
