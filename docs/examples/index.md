@@ -2,7 +2,7 @@
 
 | Name                                                               |    Level     |                          Topics                           |
 | ------------------------------------------------------------------ | :----------: | :-------------------------------------------------------: |
-| [Self-guided Demo](/images/demo/README.md)                         |   Beginner   |           datasets, repositories, collaboration           |
+| [Self-serve Demo](/images/demo/README.md)                          |   Beginner   |         datasets, repositories, data verification         |
 | [Currency Conversion](examples/currency_conversion.md)             |   Beginner   |                   temporal-table joins                    |
 | [Stock Market Trading Data Analysis](examples/trading.md)          |   Beginner   | aggregations, temporal-table joins, watermarks, notebooks |
 | [COVID-19 Daily Cases](examples/covid19.md)                        |   Beginner   |      harmonization, unions, aggregations, notebooks       |

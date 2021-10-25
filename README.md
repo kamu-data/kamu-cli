@@ -16,7 +16,7 @@
 ## Get Started
 
 * Watch [this introductory video](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk) to see `kamu` in action.
-* Learn how to use `kamu` with this [self-guided demo](/images/demo/README.md) without needing to install anything.
+* Learn how to use `kamu` with this [self-serve demo](/images/demo/README.md) without needing to install anything.
 * Then follow the "Getting Started" section of our [documentation] to install the tool and try a bunch of examples.
 
 ## About
