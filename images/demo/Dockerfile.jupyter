@@ -1,0 +1,84 @@
+# Source: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
+# TODO: Using old version due https://github.com/jupyter-incubator/sparkmagic/issues/492
+FROM jupyter/base-notebook:4a112c0f11eb
+
+ARG KAMU_VERSION
+ARG dev_mode=false
+
+#########################################################################################
+USER root
+
+# This is needed because requests-kerberos fails to install on debian due to missing linux headers
+RUN conda install requests-kerberos -y
+
+# Podman
+# Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
+RUN apt-get update && \
+    apt-get -y install ca-certificates curl gnupg unzip && \
+    . /etc/os-release && \
+    echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
+    curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | apt-key add - && \
+    apt-get update && \
+    apt-get -y install podman fuse-overlayfs && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY podman/containers.conf /etc/containers/containers.conf
+COPY podman/storage.conf /etc/containers/storage.conf
+COPY podman/containers-user.conf /home/$NB_USER/.config/containers/containers.conf
+COPY podman/storage-user.conf /home/$NB_USER/.config/containers/storage.conf
+
+# Create empty storage not to get errors when it's not mounted 
+# See: https://www.redhat.com/sysadmin/image-stores-podman
+RUN mkdir -p \
+    /var/lib/containers/shared/overlay-images \ 
+    /var/lib/containers/shared/overlay-layers \
+    /var/lib/containers/shared/vfs-images \
+    /var/lib/containers/shared/vfs-layers && \
+    touch /var/lib/containers/shared/overlay-images/images.lock && \
+    touch /var/lib/containers/shared/overlay-layers/layers.lock && \
+    touch /var/lib/containers/shared/vfs-images/images.lock && \
+    touch /var/lib/containers/shared/vfs-layers/layers.lock
+
+
+# AWS CLI
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf aws*
+
+
+# Kamu
+RUN wget https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSION/kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
+    tar -xf kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
+    chmod +x kamu-cli-x86_64-unknown-linux-gnu/kamu && \
+    mv kamu-cli-x86_64-unknown-linux-gnu/kamu /usr/local/bin/ && \
+    rm -rf kamu-cli-x86_64-unknown-linux-gnu* && \
+    echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
+COPY kamu/.kamuconfig /.kamuconfig
+COPY kamu/kamu.py /opt/conda/lib/python3.8/site-packages/kamu.py
+
+
+#########################################################################################
+USER $NB_USER
+
+RUN pip install --upgrade pip
+RUN pip install --upgrade --ignore-installed setuptools
+COPY kamu/requirements.in requirements.in
+RUN pip install -r requirements.in && rm requirements.in
+
+COPY kamu/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
+RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
+#RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkkernel
+RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/pysparkkernel
+#RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
+RUN jupyter serverextension enable --py sparkmagic
+
+
+#########################################################################################
+USER root
+RUN rm -r /home/$NB_USER/work
+COPY user-home/demo /home/$NB_USER/demo
+RUN chown -R $NB_USER:users /home/$NB_USER
+
+USER $NB_USER
+CMD ["start-notebook.sh", "--NotebookApp.iopub_data_rate_limit=1000000000"]

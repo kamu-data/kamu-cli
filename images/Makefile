@@ -1,7 +1,7 @@
 IMAGE_REPO = docker.io/kamudata
 IMAGE_JUPYTER_TAG = 0.1.0
 
-KAMU_VERSION = 0.67.0
+KAMU_VERSION = 0.68.0
 
 
 .PHONY: jupyter
@@ -15,6 +15,8 @@ jupyter:
 jupyter-push:
 	docker push $(IMAGE_REPO)/jupyter:$(IMAGE_JUPYTER_TAG)
 
+#########################################################################################
+
 
 .PHONY: kamu-base
 kamu-base:
@@ -27,6 +29,8 @@ kamu-base:
 .PHONY: kamu-base-push
 kamu-base-push:
 	docker push $(IMAGE_REPO)/kamu-base:$(KAMU_VERSION)
+
+#########################################################################################
 
 
 .PHONY: kamu-base-with-data

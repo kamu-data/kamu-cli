@@ -1,0 +1,10 @@
+sparkmagic
+pandas
+bokeh
+pandas-bokeh
+folium
+altair
+mapboxgl
+shapely
+geojson
+matplotlib == 3.4.2

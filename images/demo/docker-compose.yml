@@ -1,0 +1,42 @@
+version: "3.8"
+
+networks:
+  kamu:
+
+services:
+  jupyter:
+    image: kamudata/kamu-cli-demo-jupyter:latest
+    command:
+      - "start-notebook.sh"
+      - "--port=8765"
+    environment:
+      - AWS_ACCESS_KEY_ID=minio
+      - AWS_SECRET_ACCESS_KEY=minio123
+    # volumes:
+    #   - ./podman-images:/var/lib/containers/shared:ro
+    networks:
+      - kamu
+    ports:
+      - "8765:8765"
+    privileged: true
+    depends_on:
+      - minio
+
+  minio:
+    image: kamudata/kamu-cli-demo-minio:latest
+    command:
+      - "server"
+      - "--address"
+      - ":80"
+      - "/data"
+    environment:
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+    # volumes:
+    #   - ./minio-data:/data
+    networks:
+      - kamu
+    expose:
+      - "80"
+    # ports:
+    #   - "9000:9000"

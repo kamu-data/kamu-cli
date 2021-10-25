@@ -1,0 +1,36 @@
+apiVersion: 1
+kind: DatasetSnapshot
+content:
+  id: ca.ontario.data.covid19.case-details
+  source:
+    kind: root
+    fetch:
+      kind: url
+      url: https://data.ontario.ca/dataset/f4112442-bdc8-45d2-be3c-12efae72fb27/resource/455fd63b-603d-4608-8216-7d8647f43350/download/conposcovidloc.csv
+      #url: file:///home/jovyan/demo/data/455fd63b-603d-4608-8216-7d8647f43350.csv
+    read:
+      kind: csv
+      separator: ','
+      header: true
+      nullValue: ''
+    preprocess:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            Row_ID as id,
+            CAST(IFNULL(Case_Reported_Date, Test_Reported_Date) as TIMESTAMP) as case_reported_date,
+            CAST(Test_Reported_Date as TIMESTAMP) as test_reported_date,
+            Outcome1 as outcome,
+            Reporting_PHU_City as city,
+            Client_Gender as gender,
+            age_group,
+            Reporting_PHU_Latitude as latitude,
+            Reporting_PHU_Longitude as longitude
+          FROM input
+    merge:
+      kind: ledger
+      primaryKey:
+      - id
+  vocab:
+    eventTimeColumn: case_reported_date

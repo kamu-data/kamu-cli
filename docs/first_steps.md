@@ -4,6 +4,8 @@ This tutorial is also available in a video form:
 
 [![Kamu 101 - Basics](http://img.youtube.com/vi/oUTiWW6W78A/0.jpg)](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk "Kamu 101 - Basics")
 
+Not ready to install the tool yet? Try `kamu` in this [self-guided demo](/images/demo/README.md) without needing to install anything.
+
 - [Using the help command](#using-the-help-command)
 - [Getting data in](#getting-data-in)
   - [Initializing the workspace](#initializing-the-workspace)
