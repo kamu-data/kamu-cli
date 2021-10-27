@@ -78,3 +78,6 @@ pub use sync_service_impl::*;
 
 mod transform_service_impl;
 pub use transform_service_impl::*;
+
+mod verification_service_impl;
+pub use verification_service_impl::*;

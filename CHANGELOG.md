@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.69.0] - 2021-10-25
+### Added
+- The `verify` command now accepts root datasets and in future will perform data integrity check
+### Fixed
+- The `up-to-date` status reporting when pulling derivative datasets
+
 ## [0.68.0] - 2021-10-16
 ### Fixed
 - `tail` command will truncate cells that are too long and mask binary types for human-friendly output

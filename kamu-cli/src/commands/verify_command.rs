@@ -31,7 +31,7 @@ type GenericVerificationResult =
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
-    transform_svc: Arc<dyn TransformService>,
+    verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
     ids: Vec<String>,
     recursive: bool,
@@ -39,7 +39,7 @@ pub struct VerifyCommand {
 
 impl VerifyCommand {
     pub fn new<I, S>(
-        transform_svc: Arc<dyn TransformService>,
+        verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
         ids: I,
         recursive: bool,
@@ -49,7 +49,7 @@ impl VerifyCommand {
         S: AsRef<str>,
     {
         Self {
-            transform_svc,
+            verification_svc,
             output_config,
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             recursive,
@@ -84,7 +84,7 @@ impl VerifyCommand {
 
         let listener = listener.and_then(|l| l.begin_verify(&dataset_id));
 
-        let res = self.transform_svc.verify(
+        let res = self.verification_svc.verify(
             &dataset_id,
             (None, None),
             VerificationOptions::default(),
@@ -248,7 +248,7 @@ impl VerificationProgress {
                 block: Sha3_256::zero(),
                 block_index: 0,
                 num_blocks: 0,
-                phase: VerificationPhase::HashData,
+                phase: VerificationPhase::DataIntegrity,
             }),
         }
     }
@@ -304,45 +304,9 @@ impl VerificationProgress {
 }
 
 impl VerificationListener for VerificationProgress {
-    fn begin(&self, num_blocks: usize) {
-        self.curr_progress.set_message(self.spinner_message(
-            0,
-            num_blocks,
-            "Verifying dataset",
-            None,
-        ))
-    }
-
-    fn on_phase(
-        &self,
-        block: &Sha3_256,
-        block_index: usize,
-        num_blocks: usize,
-        phase: VerificationPhase,
-    ) {
-        self.save_state(block, block_index, num_blocks, phase);
-        match phase {
-            VerificationPhase::HashData => self.curr_progress.set_message(self.spinner_message(
-                block_index,
-                num_blocks,
-                "Hashing data",
-                Some(block),
-            )),
-            VerificationPhase::ReplayTransform => {
-                self.curr_progress.set_message(self.spinner_message(
-                    block_index,
-                    num_blocks,
-                    "Replaying transformation",
-                    Some(block),
-                ))
-            }
-            VerificationPhase::BlockValid => self.curr_progress.set_message(self.spinner_message(
-                block_index,
-                num_blocks,
-                "Block valid",
-                Some(block),
-            )),
-        }
+    fn begin(&self) {
+        self.curr_progress
+            .set_message(self.spinner_message(0, 0, "Verifying dataset", None))
     }
 
     fn success(&self, result: &VerificationResult) {
@@ -374,6 +338,46 @@ impl VerificationListener for VerificationProgress {
             console::style(msg).red(),
             None,
         ));
+    }
+
+    fn begin_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
+    fn end_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
+
+    fn begin_block(
+        &self,
+        block_hash: &Sha3_256,
+        block_index: usize,
+        num_blocks: usize,
+        phase: VerificationPhase,
+    ) {
+        self.save_state(block_hash, block_index, num_blocks, phase);
+        match phase {
+            VerificationPhase::DataIntegrity => {
+                self.curr_progress.set_message(self.spinner_message(
+                    block_index,
+                    num_blocks,
+                    "Verifying data integrity",
+                    Some(block_hash),
+                ))
+            }
+            VerificationPhase::ReplayTransform => {
+                self.curr_progress.set_message(self.spinner_message(
+                    block_index,
+                    num_blocks,
+                    "Replaying transformation",
+                    Some(block_hash),
+                ))
+            }
+        }
+    }
+
+    fn end_block(
+        &self,
+        _block_hash: &Sha3_256,
+        _block_index: usize,
+        _num_blocks: usize,
+        _phase: VerificationPhase,
+    ) {
     }
 
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>> {

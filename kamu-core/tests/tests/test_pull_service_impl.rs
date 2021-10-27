@@ -562,7 +562,7 @@ impl TransformService for TestTransformService {
         results
     }
 
-    fn verify(
+    fn verify_transform(
         &self,
         _dataset_id: &DatasetID,
         _block_range: (Option<Sha3_256>, Option<Sha3_256>),
@@ -572,7 +572,7 @@ impl TransformService for TestTransformService {
         unimplemented!()
     }
 
-    fn verify_multi(
+    fn verify_transform_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,

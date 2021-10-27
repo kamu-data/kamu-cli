@@ -380,7 +380,7 @@ impl TransformServiceImpl {
         }
 
         let span = info_span!(
-            "Preparing verification plan",
+            "Preparing transformations replay plan",
             output_dataset = dataset_id.as_str()
         );
         let _span_guard = span.enter();
@@ -422,6 +422,7 @@ impl TransformServiceImpl {
                 if !finished_range {
                     blocks.push(block);
                 } else if prev_checkpoint.is_none() {
+                    // TODO: this might be incorrect - test with specific start_block
                     prev_checkpoint = Some(block_hash);
                 }
             }
@@ -430,6 +431,8 @@ impl TransformServiceImpl {
                 finished_range = true;
             }
         }
+
+        // TODO: missing validation of whether start_block was found
 
         let source = source.ok_or(VerificationError::NotDerivative)?;
         let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
@@ -629,8 +632,7 @@ impl TransformService for TransformServiceImpl {
         dataset_id: &DatasetID,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        let null_listener = Arc::new(NullTransformListener {});
-        let listener = maybe_listener.unwrap_or(null_listener);
+        let listener = maybe_listener.unwrap_or(Arc::new(NullTransformListener {}));
 
         info!(
             dataset_id = dataset_id.as_str(),
@@ -664,6 +666,8 @@ impl TransformService for TransformServiceImpl {
                 listener,
             )
         } else {
+            listener.begin();
+            listener.success(&TransformResult::UpToDate);
             Ok(TransformResult::UpToDate)
         }
     }
@@ -683,11 +687,16 @@ impl TransformService for TransformServiceImpl {
         let requests: Vec<_> = dataset_ids_owned
             .into_iter()
             .map(|dataset_id| {
+                let listener = multi_listener
+                    .begin_transform(&dataset_id)
+                    .unwrap_or(Arc::new(NullTransformListener {}));
+
                 let next_op = self
                     .get_next_operation(&dataset_id)
                     .map_err(|e| TransformError::internal(e))
                     .unwrap();
-                (dataset_id, next_op)
+
+                (dataset_id, next_op, listener)
             })
             .collect();
 
@@ -696,56 +705,55 @@ impl TransformService for TransformServiceImpl {
 
         let thread_handles: Vec<_> = requests
             .into_iter()
-            .filter_map(|(dataset_id, maybe_request)| match maybe_request {
-                None => {
-                    results.push((dataset_id, Ok(TransformResult::UpToDate)));
-                    None
-                }
-                Some(request) => {
-                    let null_listener = Arc::new(NullTransformListener {});
+            .filter_map(
+                |(dataset_id, maybe_request, listener)| match maybe_request {
+                    None => {
+                        listener.begin();
+                        listener.success(&TransformResult::UpToDate);
+                        results.push((dataset_id, Ok(TransformResult::UpToDate)));
+                        None
+                    }
+                    Some(request) => {
+                        let engine_provisioner = self.engine_provisioner.clone();
 
-                    let listener = multi_listener
-                        .begin_transform(&dataset_id)
-                        .unwrap_or(null_listener);
+                        let commit_fn = {
+                            let meta_chain =
+                                self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+                            let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
+                            let dataset_id = dataset_id.clone();
+                            let dataset_layout =
+                                DatasetLayout::new(&self.volume_layout, &dataset_id);
 
-                    let engine_provisioner = self.engine_provisioner.clone();
+                            move |new_block, new_data_path: &Path, new_checkpoint_path: &Path| {
+                                Self::commit_transform(
+                                    meta_chain,
+                                    dataset_id,
+                                    dataset_layout,
+                                    head,
+                                    new_block,
+                                    new_data_path,
+                                    new_checkpoint_path,
+                                )
+                            }
+                        };
 
-                    let commit_fn = {
-                        let meta_chain =
-                            self.metadata_repo.get_metadata_chain(&dataset_id).unwrap();
-                        let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
-                        let dataset_id = dataset_id.clone();
-                        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_id);
+                        let thread_handle = std::thread::Builder::new()
+                            .name("transform_multi".to_owned())
+                            .spawn(move || {
+                                let res = Self::do_transform(
+                                    engine_provisioner,
+                                    request,
+                                    commit_fn,
+                                    listener,
+                                );
+                                (dataset_id, res)
+                            })
+                            .unwrap();
 
-                        move |new_block, new_data_path: &Path, new_checkpoint_path: &Path| {
-                            Self::commit_transform(
-                                meta_chain,
-                                dataset_id,
-                                dataset_layout,
-                                head,
-                                new_block,
-                                new_data_path,
-                                new_checkpoint_path,
-                            )
-                        }
-                    };
-
-                    let thread_handle = std::thread::Builder::new()
-                        .name("transform_multi".to_owned())
-                        .spawn(move || {
-                            let res = Self::do_transform(
-                                engine_provisioner,
-                                request,
-                                commit_fn,
-                                listener,
-                            );
-                            (dataset_id, res)
-                        })
-                        .unwrap();
-
-                    Some(thread_handle)
-                }
-            })
+                        Some(thread_handle)
+                    }
+                },
+            )
             .collect();
 
         results.extend(thread_handles.into_iter().map(|h| h.join().unwrap()));
@@ -753,22 +761,21 @@ impl TransformService for TransformServiceImpl {
         results
     }
 
-    fn verify(
+    fn verify_transform(
         &self,
         dataset_id: &DatasetID,
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
         _options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying dataset", dataset_id = dataset_id.as_str(), block_range = ?block_range);
+        let span = info_span!("Replaying dataset transformations", dataset_id = dataset_id.as_str(), block_range = ?block_range);
         let _span_guard = span.enter();
 
-        let null_listener = Arc::new(NullVerificationListener {});
-        let listener = maybe_listener.unwrap_or(null_listener);
+        let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let verification_plan = self.get_verification_plan(dataset_id, block_range)?;
         let num_steps = verification_plan.len();
-        listener.begin(num_steps);
+        listener.begin_phase(VerificationPhase::ReplayTransform, num_steps);
 
         for (step_index, step) in verification_plan.into_iter().enumerate() {
             let request = step.request;
@@ -777,24 +784,10 @@ impl TransformService for TransformServiceImpl {
 
             info!(
                 block_hash = ?expected_block.block_hash,
-                "Verifying block"
+                "Replaying block"
             );
 
-            listener.on_phase(
-                &expected_block.block_hash,
-                step_index,
-                num_steps,
-                VerificationPhase::HashData,
-            );
-            /////////////////////
-            ////////
-            //////////
-            // TODO: VERIFY DATA HASH!!!!!!!!!!!!!!!!
-            ///////////
-            /////////
-            //////////
-
-            listener.on_phase(
+            listener.begin_block(
                 &expected_block.block_hash,
                 step_index,
                 num_steps,
@@ -845,22 +838,21 @@ impl TransformService for TransformServiceImpl {
             }
 
             info!(block_hash = ?expected_block.block_hash, "Block valid");
-            listener.on_phase(
+            listener.end_block(
                 &expected_block.block_hash,
                 step_index,
                 num_steps,
-                VerificationPhase::BlockValid,
+                VerificationPhase::ReplayTransform,
             );
         }
 
-        let res = VerificationResult::Valid {
+        listener.end_phase(VerificationPhase::ReplayTransform, num_steps);
+        Ok(VerificationResult::Valid {
             blocks_verified: num_steps,
-        };
-        listener.success(&res);
-        Ok(res)
+        })
     }
 
-    fn verify_multi(
+    fn verify_transform_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,
