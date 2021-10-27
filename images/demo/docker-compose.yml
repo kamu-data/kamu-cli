@@ -13,6 +13,7 @@ services:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
     # volumes:
+    #   - ./user-home/demo:/home/jovyan/demo
     #   - ./podman-images:/var/lib/containers/shared:ro
     networks:
       - kamu

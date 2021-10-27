@@ -7,4 +7,5 @@ altair
 mapboxgl
 shapely
 geojson
+statsmodels
 matplotlib == 3.4.2

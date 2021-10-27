@@ -1,5 +1,5 @@
 IMAGE_REPO = docker.io/kamudata
-KAMU_VERSION = 0.68.0
+KAMU_VERSION = 0.69.0
 
 #########################################################################################
 
@@ -33,11 +33,11 @@ minio-push:
 .PHONY: minio-data
 minio-data:
 	rm -rf minio-data && \
-		mkdir -p minio-data/kamu && \
+		mkdir -p minio-data/kamu-hub && \
 		mkdir tmp && \
 		cd tmp && \
 		kamu init && \
-		kamu repo add kamu-hub file:///$(shell pwd)/minio-data/kamu && \
+		kamu repo add kamu-hub file:///$(shell pwd)/minio-data/kamu-hub && \
 		kamu repo list && \
 		kamu add ../user-home/demo/datasets/ca.ontario.data.covid19.case-details.yaml ../user-home/demo/datasets/ca.ontario.data.covid19.daily-cases.yaml && \
 		kamu pull --all && \
