@@ -2,9 +2,7 @@
 
 Thanks for considering to contribute! This project is a massive undertaking, so every little bit helps.
 
-We welcome contributors of any skill level - whether you're new to Rust language or to programming in general - we'll be happy to guide you. Start small and build up.
-
-Besides code you can cotribute in many different ways: improving documentation, improving our CI pipelines, or adding more interesting examples.
+We welcome contributors of any skill level and background. You [don't have to be a software engineer](https://dev.to/navendu/how-to-make-non-code-contributions-to-open-source-projects-35nj) to make large impact in an open-source project! Besides code you can cotribute in many different ways: improving documentation, improving our CI pipelines, graphic design, adding more interesting data science examples, mentoring others, working with the community...
 
 Before you start working on anything:
 1. Consider joining our [Discord Server](https://discord.gg/aSpVjWwu) to discuss your ideas

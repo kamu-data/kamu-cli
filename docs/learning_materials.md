@@ -12,6 +12,7 @@
 | Name                                                                                                                                                           |    Level     | Description                                                                                                     |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------: | --------------------------------------------------------------------------------------------------------------- |
 | [Open Data Fabric for Research Data Management](https://www.youtube.com/watch?v=Ivh-YDDmRf8)                                                                   |   Beginner   | Current state and problems of scientific data portals,<br/>motivation behind ODF and system's design principles |
+| [Time: The most misunderstood dimension in data modelling](https://www.youtube.com/watch?v=XxKnTusccUM)                                                        |   Beginner   | Educational talk from **PyData Global 2021**<br/>about event-based data models and stream processing            |
 | [Building a Distributed Collaborative Data Pipeline](https://databricks.com/session_eu20/building-a-distributed-collaborative-data-pipeline-with-apache-spark) | Intermediate | Technical talk from **Data+AI Summit 2020**                                                                     |
 
 ## Publications
