@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.70.0] - 2021-11-07
+### Changed
+- Upgraded to latest `rustc`
+- Upgraded to latest dependencies
+
 ## [0.69.0] - 2021-10-25
 ### Added
 - The `verify` command now accepts root datasets and in future will perform data integrity check

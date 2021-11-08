@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.69.0"
+version = "0.70.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -42,7 +42,7 @@ serde_yaml = "*"
 # Tracing / logging / telemetry
 tracing = "*"
 tracing-appender = "*"
-tracing-subscriber = "*"
+tracing-subscriber = { version = "*", features = ["env-filter"] }
 tracing-log = "*"
 tracing-bunyan-formatter = "*"
 
