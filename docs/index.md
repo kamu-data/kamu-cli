@@ -9,7 +9,7 @@
   - **[FAQ](faq.md)**
 - **Learning**
   - **[Learning Materials](learning_materials.md)**
-  - **[Examples](examples/indes.md)**
+  - **[Examples](examples/index.md)**
 - **[Ingesting Data](ingest.md)**
   - **[Merge Strategies](merge_strategies.md)**
   - **[Ingestion Examples](ingest_examples.md)**
