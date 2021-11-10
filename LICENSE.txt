@@ -1,7 +1,7 @@
 Kamu CLI is licensed under the Business Source License agreement below.
 
-For explanation of this license please visit
-https://github.com/kamu-data/kamu-cli/blob/master/docs/license_faq.md.
+For a simple explanation of this license please visit:
+https://docs.kamu.dev/contrib/license/
 
 -----------------------------------------------------------------------------
 
