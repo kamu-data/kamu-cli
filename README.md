@@ -31,8 +31,8 @@ In short, it can be described as:
 * Or even Kubernetes for data :)
 
 Using `kamu`, data publishers can easily **share structured data** with the world. Data can be static or **flow continuously**. In all cases `kamu` will ensure that it stays:
-* Reproducible - i.e. you can ask the publisher *"Give me the same exact data you gave me yesterday / a year ago"*
-* Verifiable - i.e. you can ask the publisher *"Is this the exact data you gave me yesterday / a year ago?"*
+* Reproducible - i.e. you can ask the publisher *"Give me the same exact data you gave me a year ago"*
+* Verifiable - i.e. you can ask the publisher *"Is this the exact data you gave me a year ago?"*
 
 Teams and data communities can then **collaborate** on cleaning, enriching, and aggregating data by building arbitrarily complex **decentralized data pipelines**. Following the **"data as code"** philosophy `kamu` doesn't let you touch data manually - instead, you transform it using **Streaming SQL** (we support [multiple frameworks](https://docs.kamu.dev/cli/transform/supported-engines/)). This ensures that data supply chains are:
 * Autonomous - write query once and run it forever, no more babysitting fragile batch workflows
@@ -62,6 +62,7 @@ Examples:
 
 <details>
 <summary><b>Open Data</b></summary>
+
 To share data **outside of your organization** today you have limited options:
 
 - You can publish it on some open data portal, but lose ownership and control of your data
@@ -81,6 +82,7 @@ As opposed to just the download counter you get on most data portals, `kamu` bri
 
 <details>
 <summary><b>Science & Research</b></summary>
+
 One of the driving forces behind `kamu`'s design was the [ongoing reproducibility crisis](https://www.nature.com/articles/533452a) in science, which we believe to a large extent is caused by our poor data management practices.
 
 After incidents like [The Surgisphere scandal](https://www.the-scientist.com/features/the-surgisphere-scandal-what-went-wrong--67955) the sentiment in research is changing from assuming that all research is done in good faith, to considering any research unreliable until proven otherwise.
@@ -103,6 +105,7 @@ When using `kamu`:
 
 <details>
 <summary><b>Data-driven Journalism</b></summary>
+
 Data-driven journalism is on the rise and has proven to be extremely effective. In the world of misinformation and extremely polarized opinions data provides us an anchoring point to discuss complex problems and analyze cause and effect. Data itself is non-partisan and has no secret agenda, and arguments around different interpretations of data are infinitely more productive than ones based on gut feelings.
 
 Unfortunately, too often data has issues that undermine its trustworthiness. And even if the data is correct, it's very easy to pose a question about its sources that will take too long to answer - the data will be dismissed, and the gut feelings will step in.
@@ -116,6 +119,7 @@ And once we agree that source data can be trusted, we can build analyses and **r
 
 <details>
 <summary><b>Business core data</b></summary>
+
 `kamu` aims to be the most reliable data management solution that provides recent data while maintaining the **highest degree of accountability** and **tamper-proof provenance**, without you having to put all data in some central database.
 
 We're developing it with financial and pharmaceutical use cases in mind, where **audit and compliance could be fully automated** through our system.
@@ -125,6 +129,7 @@ Note that we currently focus on mission-critical data and `kamu` is not well sui
 
 <details>
 <summary><b>Personal analytics</b></summary>
+
 Being data geeks, we use `kamu` for data-driven decision-making even in our personal lives.
 
 Actually, our largest data pipelines so far were created for personal finance:
