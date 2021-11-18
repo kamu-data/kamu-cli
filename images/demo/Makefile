@@ -5,6 +5,7 @@ KAMU_VERSION = 0.69.0
 
 .PHONY: jupyter
 jupyter:
+	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/demo/examples"
 	docker build \
 		-f Dockerfile.jupyter \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
