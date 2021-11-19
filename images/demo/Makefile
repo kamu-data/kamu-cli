@@ -13,12 +13,12 @@ jupyter: all-examples
 	docker build \
 		-f Dockerfile.jupyter \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
-		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
+		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)-odds \
 		.
 
 .PHONY: jupyter-push
 jupyter-push:
-	docker push $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)
+	docker push $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)-odds
 
 #########################################################################################
 
