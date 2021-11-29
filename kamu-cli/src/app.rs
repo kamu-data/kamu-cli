@@ -134,6 +134,20 @@ fn load_config(catalog: &mut Catalog) {
 
     catalog.add_value(EngineProvisionerLocalConfig {
         max_concurrency: config.engine.as_ref().unwrap().max_concurrency,
+        start_timeout: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .start_timeout
+            .unwrap()
+            .into(),
+        shutdown_timeout: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .shutdown_timeout
+            .unwrap()
+            .into(),
     });
 }
 

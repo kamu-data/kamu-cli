@@ -158,12 +158,12 @@ impl Command for ConfigSetCommand {
             self.config_svc.unset(&self.key, scope)?;
 
             eprintln!(
-                "{} {} {}",
+                "{} {} {} {} {}",
                 console::style("Removed").green().bold(),
                 self.key,
-                console::style(format!("from {:?} scope", scope).to_lowercase())
-                    .green()
-                    .bold(),
+                console::style("from").green().bold(),
+                format!("{:?}", scope).to_lowercase(),
+                console::style("scope").green().bold(),
             );
         }
         Ok(())

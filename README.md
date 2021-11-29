@@ -24,9 +24,9 @@
 `kamu` (pronounced `kaˈmju`) is an easy-to-use command-line tool for managing, transforming, and collaborating on structured data.
 
 In short, it can be described as:
+* Git for data
 * Decentralized data warehouse
 * A peer-to-peer stream processing data pipeline
-* Git for data
 * Blockchain-like ledger for data
 * Or even Kubernetes for data :)
 

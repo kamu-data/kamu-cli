@@ -23,11 +23,13 @@ use opendatafabric as odf;
 use rand::Rng;
 use tracing::{info, info_span, warn};
 
+use super::ODFEngineConfig;
 use crate::domain::*;
 use crate::infra::WorkspaceLayout;
 
 pub struct ODFEngine {
     container_runtime: ContainerRuntime,
+    engine_config: ODFEngineConfig,
     image: String,
     workspace_layout: Arc<WorkspaceLayout>,
 }
@@ -37,11 +39,13 @@ impl ODFEngine {
 
     pub fn new(
         container_runtime: ContainerRuntime,
+        engine_config: ODFEngineConfig,
         image: &str,
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
             container_runtime,
+            engine_config,
             image: image.to_owned(),
             workspace_layout,
         }
@@ -54,6 +58,7 @@ impl ODFEngine {
     ) -> Result<odf::ExecuteQueryResponseSuccess, EngineError> {
         let engine_container = EngineContainer::new(
             self.container_runtime.clone(),
+            self.engine_config.clone(),
             &self.image,
             &run_info,
             vec![(
@@ -252,6 +257,7 @@ impl RunInfo {
 
 struct EngineContainer {
     container_runtime: ContainerRuntime,
+    config: ODFEngineConfig,
     container_name: String,
     adapter_host_port: u16,
     engine_process: Child,
@@ -259,11 +265,10 @@ struct EngineContainer {
 
 impl EngineContainer {
     const ADAPTER_PORT: u16 = 2884;
-    const START_TIMEOUT: Duration = Duration::from_secs(30);
-    const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(3);
 
     pub fn new(
         container_runtime: ContainerRuntime,
+        config: ODFEngineConfig,
         image: &str,
         run_info: &RunInfo,
         volume_map: Vec<(PathBuf, PathBuf)>,
@@ -292,17 +297,18 @@ impl EngineContainer {
         );
 
         let adapter_host_port = container_runtime
-            .wait_for_host_port(&container_name, Self::ADAPTER_PORT, Self::START_TIMEOUT)
+            .wait_for_host_port(&container_name, Self::ADAPTER_PORT, config.start_timeout)
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         container_runtime
-            .wait_for_socket(adapter_host_port, Self::START_TIMEOUT)
+            .wait_for_socket(adapter_host_port, config.start_timeout)
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         info!(id = container_name.as_str(), "Engine running");
 
         Ok(Self {
             container_runtime,
+            config,
             container_name,
             adapter_host_port,
             engine_process: engine_process.unwrap(),
@@ -342,7 +348,7 @@ impl Drop for EngineContainer {
                 }
 
                 let start = std::time::Instant::now();
-                while (std::time::Instant::now() - start) < Self::SHUTDOWN_TIMEOUT {
+                while (std::time::Instant::now() - start) < self.config.shutdown_timeout {
                     if self.has_exited() {
                         return;
                     }

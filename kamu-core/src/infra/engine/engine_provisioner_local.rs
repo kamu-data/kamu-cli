@@ -21,6 +21,7 @@ use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::Condvar;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tracing::info_span;
 use tracing::warn;
 use tracing::{error, info};
@@ -49,6 +50,11 @@ impl EngineProvisionerLocal {
         workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
     ) -> Self {
+        let engine_config = ODFEngineConfig {
+            start_timeout: config.start_timeout,
+            shutdown_timeout: config.shutdown_timeout,
+        };
+
         Self {
             config,
             spark_ingest_engine: Arc::new(SparkEngine::new(
@@ -58,11 +64,13 @@ impl EngineProvisionerLocal {
             )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
+                engine_config.clone(),
                 docker_images::SPARK,
                 workspace_layout.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
+                engine_config.clone(),
                 docker_images::FLINK,
                 workspace_layout.clone(),
             )),
@@ -234,12 +242,19 @@ impl EngineProvisioner for EngineProvisionerLocal {
 pub struct EngineProvisionerLocalConfig {
     /// Maximum number of engine handles given out any single time
     pub max_concurrency: Option<u32>,
+    /// Timeout for starting engine container
+    pub start_timeout: Duration,
+    /// Timeout for waiting for engine container to shutdown cleanly
+    pub shutdown_timeout: Duration,
 }
 
+// This is for tests only
 impl Default for EngineProvisionerLocalConfig {
     fn default() -> Self {
         Self {
             max_concurrency: None,
+            start_timeout: Duration::from_secs(30),
+            shutdown_timeout: Duration::from_secs(5),
         }
     }
 }

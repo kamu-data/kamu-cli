@@ -15,6 +15,7 @@ use kamu::infra::Manifest;
 use kamu::infra::WorkspaceLayout;
 
 use dill::*;
+use duration_string::DurationString;
 use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -74,6 +75,10 @@ pub struct EngineConfig {
     pub runtime: Option<ContainerRuntimeType>,
     /// Type of the networking namespace (relevant when running in container environments)
     pub network_ns: Option<NetworkNamespaceType>,
+    /// Timeout for starting an engine container
+    pub start_timeout: Option<DurationString>,
+    /// Timeout for waiting the engine container to stop gracefully
+    pub shutdown_timeout: Option<DurationString>,
 }
 
 impl EngineConfig {
@@ -82,6 +87,8 @@ impl EngineConfig {
             max_concurrency: None,
             runtime: None,
             network_ns: None,
+            start_timeout: None,
+            shutdown_timeout: None,
         }
     }
 
@@ -99,6 +106,8 @@ impl Default for EngineConfig {
             max_concurrency: None,
             runtime: Some(ContainerRuntimeType::Docker),
             network_ns: Some(NetworkNamespaceType::Private),
+            start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
+            shutdown_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
         }
     }
 }

@@ -694,6 +694,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56899898ce76aaf4a0f24d914c97ea6ed976d42fec6ad33fcbb0a1103e07b2b0"
 
 [[package]]
+name = "duration-string"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b65bd8fceb01387287b3502b845588b9bf60e50e0d27392f724e6669385d6ac7"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1264,6 +1273,7 @@ dependencies = [
  "datafusion",
  "dill",
  "dirs 4.0.0",
+ "duration-string",
  "env_logger",
  "glob",
  "humansize",
