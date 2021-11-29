@@ -18,6 +18,7 @@ use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::cell::RefCell;
 use std::sync::Arc;
+use tracing::error;
 use tracing::info;
 use tracing::info_span;
 
@@ -108,10 +109,12 @@ impl IngestTask {
 
         match self.ingest_inner() {
             Ok(res) => {
+                info!("Ingest successful");
                 self.listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
+                error!(error = ?err, "Ingest failed");
                 self.listener.error(&err);
                 Err(err)
             }

@@ -17,6 +17,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::debug;
+use tracing::error;
 use tracing::info;
 use tracing::info_span;
 
@@ -47,14 +48,23 @@ impl TransformServiceImpl {
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
+        let span = info_span!(
+            "Performing transform",
+            output_dataset = request.dataset_id.as_str()
+        );
+        let _span_guard = span.enter();
+        info!(request = ?request, "Transform request");
+
         listener.begin();
 
         match Self::do_transform_inner(engine_provisioner, request, commit_fn, listener.clone()) {
             Ok(res) => {
+                info!("Transform successful");
                 listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
+                error!(error = ?err, "Transform failed");
                 listener.error(&err);
                 Err(err)
             }
@@ -68,13 +78,6 @@ impl TransformServiceImpl {
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        let span = info_span!(
-            "Performing transform",
-            output_dataset = request.dataset_id.as_str()
-        );
-        let _span_guard = span.enter();
-        info!(request = ?request, "Tranform request");
-
         let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
         let out_data_path = PathBuf::from(&request.out_data_path);
 
