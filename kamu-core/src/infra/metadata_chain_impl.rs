@@ -88,7 +88,7 @@ impl MetadataChainImpl {
     fn write_block(&mut self, block: &MetadataBlock) -> Result<Sha3_256, InfraError> {
         let (hash, buffer) = YamlMetadataBlockSerializer.write_manifest(block).unwrap();
 
-        let mut file = std::fs::File::with_options()
+        let mut file = std::fs::File::options()
             .write(true)
             .create_new(true)
             .open(self.block_path(&hash))?;

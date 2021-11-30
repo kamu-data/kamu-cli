@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.70.0"
+version = "0.71.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -42,8 +42,9 @@ rusoto_core = {version = "*", default_features = false, features=["rustls"]}
 rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 
 # Utils
+async-trait = "*"
 cfg-if = "*"  # Conditional compilation
-datafusion = "*"  # Reading data + SQL
+datafusion = "^5"  # Reading data + SQL
 glob = "*"  # Used for glob fetch
 rand = "^0.8"
 regex = "*"

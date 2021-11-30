@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.70.0"
+version = "0.71.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -50,7 +50,7 @@ tracing-bunyan-formatter = "*"
 # Utils
 chrono = "*"
 glob = "*"  # Used for path completions
-datafusion = "*"  # Reading data + SQL
+datafusion = "^5"  # Reading data + SQL
 dirs = "*"
 indoc = "*"
 itertools = "*"
@@ -67,4 +67,4 @@ rand = "^0.8"
 indoc = "*"  # Compile-time unindent
 parquet = "*"
 env_logger = "*"
-test-env-log = { version = "*", features = ["trace"] }
+test-log = { version = "*", features = ["trace"] }

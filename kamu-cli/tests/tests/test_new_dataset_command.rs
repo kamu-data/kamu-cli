@@ -12,13 +12,13 @@ use kamu::infra::ResourceLoaderImpl;
 use kamu_cli::commands::*;
 use kamu_cli::CLIError;
 
-#[test_env_log::test]
+#[test_log::test]
 fn test_ambiguity_is_punished() {
     let mut cmd = NewDatasetCommand::new("foo", false, false, None::<&str>);
     assert!(matches!(cmd.run(), Err(CLIError::UsageError { .. })));
 }
 
-#[test_env_log::test]
+#[test_log::test]
 fn test_root_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
@@ -31,7 +31,7 @@ fn test_root_dataset_parses() {
         .expect("Failed to parse template");
 }
 
-#[test_env_log::test]
+#[test_log::test]
 fn test_derivative_dataset_parses() {
     let tempdir = tempfile::tempdir().unwrap();
     let path = tempdir.path().join("ds.yaml");
