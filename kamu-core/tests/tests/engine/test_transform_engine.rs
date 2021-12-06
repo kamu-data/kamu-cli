@@ -162,21 +162,33 @@ fn test_transform_with_engine_spark() {
 
     assert_eq!(
         columns,
-        ["system_time", "event_time", "city", "population_x10"]
+        [
+            "offset",
+            "system_time",
+            "event_time",
+            "city",
+            "population_x10"
+        ]
     );
 
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
-        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .map(|r| {
+            (
+                r.get_long(0).unwrap().clone(),
+                r.get_string(3).unwrap().clone(),
+                r.get_int(4).unwrap(),
+            )
+        })
         .collect();
 
     assert_eq!(
         records,
         [
-            ("A".to_owned(), 10000),
-            ("B".to_owned(), 20000),
-            ("C".to_owned(), 30000)
+            (0, "A".to_owned(), 10000),
+            (1, "B".to_owned(), 20000),
+            (2, "C".to_owned(), 30000)
         ]
     );
 
@@ -211,10 +223,19 @@ fn test_transform_with_engine_spark() {
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
-        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .map(|r| {
+            (
+                r.get_long(0).unwrap().clone(),
+                r.get_string(3).unwrap().clone(),
+                r.get_int(4).unwrap(),
+            )
+        })
         .collect();
 
-    assert_eq!(records, [("D".to_owned(), 40000), ("E".to_owned(), 50000),]);
+    assert_eq!(
+        records,
+        [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
+    );
 }
 
 #[test]
@@ -358,21 +379,33 @@ fn test_transform_with_engine_flink() {
 
     assert_eq!(
         columns,
-        ["system_time", "event_time", "city", "population_x10"]
+        [
+            "offset",
+            "system_time",
+            "event_time",
+            "city",
+            "population_x10"
+        ]
     );
 
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
-        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .map(|r| {
+            (
+                r.get_long(0).unwrap().clone(),
+                r.get_string(3).unwrap().clone(),
+                r.get_int(4).unwrap(),
+            )
+        })
         .collect();
 
     assert_eq!(
         records,
         [
-            ("A".to_owned(), 10000),
-            ("B".to_owned(), 20000),
-            ("C".to_owned(), 30000)
+            (0, "A".to_owned(), 10000),
+            (1, "B".to_owned(), 20000),
+            (2, "C".to_owned(), 30000)
         ]
     );
 
@@ -407,8 +440,17 @@ fn test_transform_with_engine_flink() {
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
-        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .map(|r| {
+            (
+                r.get_long(0).unwrap().clone(),
+                r.get_string(3).unwrap().clone(),
+                r.get_int(4).unwrap(),
+            )
+        })
         .collect();
 
-    assert_eq!(records, [("D".to_owned(), 40000), ("E".to_owned(), 50000),]);
+    assert_eq!(
+        records,
+        [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
+    );
 }

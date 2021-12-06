@@ -9,6 +9,8 @@
 
 use crate::domain::*;
 use crate::infra::*;
+use chrono::DateTime;
+use chrono::Utc;
 use opendatafabric::*;
 
 use dill::*;
@@ -44,20 +46,20 @@ impl TransformServiceImpl {
     // Note: Can be called from multiple threads
     fn do_transform(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        request: ExecuteQueryRequest,
+        operation: TransformOperation,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
         let span = info_span!(
             "Performing transform",
-            output_dataset = request.dataset_id.as_str()
+            output_dataset = operation.request.dataset_id.as_str()
         );
         let _span_guard = span.enter();
-        info!(request = ?request, "Transform request");
+        info!(operation = ?operation, "Transform request");
 
         listener.begin();
 
-        match Self::do_transform_inner(engine_provisioner, request, commit_fn, listener.clone()) {
+        match Self::do_transform_inner(engine_provisioner, operation, commit_fn, listener.clone()) {
             Ok(res) => {
                 info!("Transform successful");
                 listener.success(&res);
@@ -74,26 +76,44 @@ impl TransformServiceImpl {
     // Note: Can be called from multiple threads
     fn do_transform_inner(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        request: ExecuteQueryRequest,
+        operation: TransformOperation,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        let new_checkpoint_path = PathBuf::from(&request.new_checkpoint_dir);
-        let out_data_path = PathBuf::from(&request.out_data_path);
+        let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_dir);
+        let out_data_path = PathBuf::from(&operation.request.out_data_path);
+        let offset = operation.request.offset;
 
         let engine = engine_provisioner.provision_engine(
-            match request.transform {
+            match operation.request.transform {
                 Transform::Sql(ref sql) => &sql.engine,
             },
             listener.clone().get_engine_provisioning_listener(),
         )?;
 
-        let result = engine.transform(request)?;
+        let metadata_block = engine.transform(operation.request)?.metadata_block;
 
-        if let Some(ref slice) = result.metadata_block.output_slice {
-            if slice.num_records == 0 {
+        let metadata_block = if metadata_block.input_slices.is_some() {
+            return Err(EngineError::contract_error(
+                "Engine wrote input slices into metadata block",
+                Vec::new(),
+            )
+            .into());
+        } else {
+            // TODO: This will go away once we move most block forming logic to coordinator
+            MetadataBlock {
+                input_slices: Some(operation.input_slices),
+                ..metadata_block
+            }
+        };
+
+        if let Some(ref slice) = metadata_block.output_slice {
+            // TODO: Move out this to validation
+            if slice.data_interval.end < slice.data_interval.start
+                || slice.data_interval.start != offset
+            {
                 return Err(EngineError::contract_error(
-                    "Engine returned an output slice with zero records",
+                    "Engine returned an output slice with invalid offset range",
                     Vec::new(),
                 )
                 .into());
@@ -113,7 +133,7 @@ impl TransformServiceImpl {
             .into());
         }
 
-        let result = commit_fn(result.metadata_block, &out_data_path, &new_checkpoint_path)?;
+        let result = commit_fn(metadata_block, &out_data_path, &new_checkpoint_path)?;
 
         // Commit should clean up
         assert!(!out_data_path.exists());
@@ -170,7 +190,8 @@ impl TransformServiceImpl {
     pub fn get_next_operation(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Option<ExecuteQueryRequest>, DomainError> {
+        system_time: DateTime<Utc>,
+    ) -> Result<Option<TransformOperation>, DomainError> {
         let span = info_span!(
             "Evaluating next transform operation",
             output_dataset = dataset_id.as_str()
@@ -207,18 +228,23 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        let inputs: Vec<_> = source
+        // Prepare inputs
+        let input_slices: Vec<_> = source
             .inputs
             .iter()
-            .enumerate()
-            .map(|(index, input_id)| {
-                let input_layout = DatasetLayout::new(&self.volume_layout, input_id);
-
-                self.get_input_slice(index, input_id, &input_layout, output_chain.as_ref())
-            })
+            .map(|input_id| self.get_input_slice(input_id, output_chain.as_ref()))
             .collect::<Result<Vec<_>, _>>()?;
 
-        if inputs.iter().all(|s| s.is_empty()) {
+        let query_inputs: Vec<_> = input_slices
+            .iter()
+            .map(|i| self.to_query_input(i, None))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Nothing to do?
+        if query_inputs
+            .iter()
+            .all(|i| i.data_paths.is_empty() && i.explicit_watermarks.is_empty())
+        {
             return Ok(None);
         }
 
@@ -227,6 +253,12 @@ impl TransformServiceImpl {
             .iter_blocks()
             .filter(|b| b.input_slices.is_some())
             .map(|b| b.block_hash)
+            .next();
+
+        let data_offset_end = output_chain
+            .iter_blocks()
+            .filter_map(|b| b.output_slice)
+            .map(|s| s.data_interval.end)
             .next();
 
         let output_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
@@ -244,15 +276,20 @@ impl TransformServiceImpl {
         std::fs::create_dir_all(&new_checkpoint_dir)
             .map_err(|e| DomainError::InfraError(e.into()))?;
 
-        Ok(Some(ExecuteQueryRequest {
-            dataset_id: dataset_id.to_owned(),
-            vocab: self.get_vocab(dataset_id)?,
-            transform: source.transform,
-            inputs,
-            prev_checkpoint_dir: prev_checkpoint
-                .map(|hash| output_layout.checkpoints_dir.join(hash.to_string())),
-            new_checkpoint_dir,
-            out_data_path,
+        Ok(Some(TransformOperation {
+            input_slices,
+            request: ExecuteQueryRequest {
+                dataset_id: dataset_id.to_owned(),
+                system_time,
+                offset: data_offset_end.map(|e| e + 1).unwrap_or(0),
+                vocab: self.get_vocab(dataset_id)?,
+                transform: source.transform,
+                inputs: query_inputs,
+                prev_checkpoint_dir: prev_checkpoint
+                    .map(|hash| output_layout.checkpoints_dir.join(hash.to_string())),
+                new_checkpoint_dir,
+                out_data_path,
+            },
         }))
     }
 
@@ -268,85 +305,144 @@ impl TransformServiceImpl {
     // TODO: Avoid iterating through output chain multiple times
     fn get_input_slice(
         &self,
-        index: usize,
         dataset_id: &DatasetID,
-        dataset_layout: &DatasetLayout,
         output_chain: &dyn MetadataChain,
-    ) -> Result<QueryInput, DomainError> {
-        // Determine processed data range
-        // Result is either: () or (inf, upper] or (lower, upper]
-        let iv_processed = output_chain
-            .iter_blocks()
-            .filter_map(|b| b.input_slices)
-            .map(|mut ss| ss.remove(index).interval)
-            .find(|iv| !iv.is_empty())
-            .unwrap_or(TimeInterval::empty());
-
-        // Determine unprocessed data range
-        // Result is either: (-inf, inf) or (lower, inf)
-        let iv_unprocessed = iv_processed.right_complement();
-
+    ) -> Result<InputSlice, DomainError> {
         let input_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
-        // Filter unprocessed input blocks
+        // Determine last processed input block
+        let last_processed_block = output_chain
+            .iter_blocks()
+            .filter_map(|b| b.input_slices)
+            .flatten()
+            .filter(|slice| slice.dataset_id == *dataset_id)
+            .filter_map(|slice| slice.block_interval)
+            .map(|bi| bi.end)
+            .next();
+
+        // Collect unprocessed input blocks
         let blocks_unprocessed: Vec<_> = input_chain
             .iter_blocks()
-            .take_while(|b| iv_unprocessed.contains_point(&b.system_time))
+            .take_while(|b| Some(b.block_hash) != last_processed_block)
             .collect();
 
-        // Determine available data/watermark range
-        // Result is either: () or (-inf, upper]
-        let iv_available = blocks_unprocessed
-            .first()
-            .map(|b| TimeInterval::unbounded_closed_right(b.system_time.clone()))
-            .unwrap_or(TimeInterval::empty());
+        // Sanity check: First (chronologically) unprocessed block should immediately follow the last processed block
+        if let Some(first_unprocessed) = blocks_unprocessed.last() {
+            if first_unprocessed.prev_block_hash != last_processed_block {
+                panic!(
+                    "Input data for {} is inconsistent - first unprocessed block {} does not imediately follows last processed block {:?}",
+                    dataset_id, first_unprocessed.block_hash, last_processed_block
+                );
+            }
+        }
 
-        // Result is either: () or (lower, upper]
-        let iv_to_process = iv_available.intersect(&iv_unprocessed);
-
-        // List of part files that will be read by the engine
-        // Note: Order is important
-        // Note: Engine will still filter the rows by system time interval
-        let data_paths: Vec<_> = blocks_unprocessed
-            .iter()
-            .rev()
-            .filter(|b| b.output_slice.is_some())
-            .map(|b| dataset_layout.data_dir.join(b.block_hash.to_string()))
-            .collect();
-
-        let explicit_watermarks: Vec<_> = blocks_unprocessed
-            .iter()
-            .rev()
-            .filter(|b| b.output_watermark.is_some())
-            .map(|b| Watermark {
-                system_time: b.system_time.clone(),
-                event_time: b.output_watermark.unwrap().clone(),
+        let block_interval = if blocks_unprocessed.is_empty() {
+            None
+        } else {
+            Some(BlockInterval {
+                start: blocks_unprocessed.last().map(|b| b.block_hash).unwrap(),
+                end: blocks_unprocessed.first().map(|b| b.block_hash).unwrap(),
             })
-            .collect();
+        };
+
+        // Determine unprocessed offset range. Can be (None, None) or [start, end]
+        let offset_end = blocks_unprocessed
+            .iter()
+            .filter_map(|b| b.output_slice.as_ref())
+            .map(|s| s.data_interval.end)
+            .next();
+        let offset_start = blocks_unprocessed
+            .iter()
+            .rev()
+            .filter_map(|b| b.output_slice.as_ref())
+            .map(|s| s.data_interval.start)
+            .next();
+        let data_interval = match (offset_start, offset_end) {
+            (None, None) => None,
+            (Some(start), Some(end)) if start <= end => Some(OffsetInterval { start, end }),
+            _ => panic!(
+                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset range ended up as ({:?}, {:?})",
+                dataset_id, block_interval, offset_start, offset_end
+            ),
+        };
+
+        Ok(InputSlice {
+            dataset_id: dataset_id.to_owned(),
+            block_interval,
+            data_interval,
+        })
+    }
+
+    // TODO: Avoid traversing same blocks again
+    fn to_query_input(
+        &self,
+        slice: &InputSlice,
+        vocab_hint: Option<DatasetVocabulary>,
+    ) -> Result<QueryInput, DomainError> {
+        let input_chain = self.metadata_repo.get_metadata_chain(&slice.dataset_id)?;
+        let input_layout = DatasetLayout::new(&self.volume_layout, &slice.dataset_id);
+
+        // List of part files and watermarks that will be used by the engine
+        // Note: Engine will still filter the records by the offset interval
+        let mut data_paths = Vec::new();
+        let mut explicit_watermarks = Vec::new();
+
+        if let Some(block_interval) = &slice.block_interval {
+            let hash_to_stop_at = input_chain
+                .get_block(&block_interval.start)
+                .expect("Starting block of the interval not found")
+                .prev_block_hash;
+
+            for block in input_chain
+                .iter_blocks_starting(&block_interval.end)
+                .unwrap()
+                .take_while(|b| Some(b.block_hash) != hash_to_stop_at)
+            {
+                if block.output_slice.is_some() {
+                    data_paths.push(input_layout.data_dir.join(block.block_hash.to_string()));
+                }
+
+                if let Some(wm) = block.output_watermark {
+                    explicit_watermarks.push(Watermark {
+                        system_time: block.system_time,
+                        event_time: wm,
+                    });
+                }
+            }
+
+            // Note: Order is important, so we reverse it to make chronological
+            data_paths.reverse();
+            explicit_watermarks.reverse();
+        }
 
         // TODO: Migrate to providing schema directly
         // TODO: Will not work with schema evolution
         let schema_file = data_paths
-            .first()
+            .last()
             .map(|p| p.clone())
-            .unwrap_or_else(|| self.get_schema_file_fallback(dataset_layout));
+            .unwrap_or_else(|| self.get_schema_file_fallback(&input_layout));
+
+        let vocab = match vocab_hint {
+            Some(v) => v,
+            None => self.get_vocab(&slice.dataset_id)?,
+        };
+
+        let is_empty = data_paths.is_empty() && explicit_watermarks.is_empty();
 
         let input = QueryInput {
-            dataset_id: dataset_id.to_owned(),
-            vocab: self.get_vocab(dataset_id)?,
-            interval: iv_to_process,
-            data_paths: data_paths,
-            schema_file: schema_file,
-            explicit_watermarks: explicit_watermarks,
+            dataset_id: slice.dataset_id.clone(),
+            vocab,
+            data_interval: slice.data_interval.clone(),
+            data_paths,
+            schema_file,
+            explicit_watermarks,
         };
 
         info!(
-            input_dataset = dataset_id.as_str(),
+            input_dataset = slice.dataset_id.as_str(),
             input = ?input,
-            empty = input.is_empty(),
-            iv_unprocessed = ?iv_unprocessed,
-            iv_available = ?iv_available,
-            unprocessed_blocks = blocks_unprocessed.len(),
+            slice = ?slice,
+            empty = is_empty,
             "Computed query input"
         );
 
@@ -370,6 +466,8 @@ impl TransformServiceImpl {
             .path()
     }
 
+    // TODO: Improve error handling
+    // Need an inconsistent medata error?
     pub fn get_verification_plan(
         &self,
         dataset_id: &DatasetID,
@@ -430,7 +528,7 @@ impl TransformServiceImpl {
                 }
             }
 
-            if Some(block_hash) == start_block {
+            if !finished_range && Some(block_hash) == start_block {
                 finished_range = true;
             }
         }
@@ -449,183 +547,63 @@ impl TransformServiceImpl {
         let mut plan: Vec<_> = blocks
             .into_iter()
             .rev()
-            .map(|block| VerificationStep {
-                request: ExecuteQueryRequest {
-                    dataset_id: dataset_id.to_owned(),
-                    transform: source.transform.clone(),
-                    vocab: vocab.clone().unwrap_or_default(),
-                    inputs: std::iter::zip(
-                        source.inputs.iter(),
-                        block.input_slices.as_ref().unwrap().iter(),
-                    )
-                    .map(|(id, slice)| {
-                        QueryInput {
-                            dataset_id: id.clone(),
-                            vocab: dataset_vocabs.get(id).unwrap().clone(),
-                            interval: slice.interval,
-                            data_paths: Vec::new(),      // Filled out below
-                            schema_file: PathBuf::new(), // Filled out below
-                            explicit_watermarks: Vec::new(), // Filled out below
-                        }
-                    })
-                    .collect(),
-                    prev_checkpoint_dir: None, // Filled out below
-                    new_checkpoint_dir: dataset_layout.checkpoints_dir.join(".pending"),
-                    out_data_path: dataset_layout.data_dir.join(".pending"),
-                },
-                expected: block,
+            .map(|block| -> Result<VerificationStep, DomainError> {
+                let step = VerificationStep {
+                    operation: TransformOperation {
+                        input_slices: block.input_slices.as_ref().unwrap().clone(),
+                        request: ExecuteQueryRequest {
+                            dataset_id: dataset_id.to_owned(),
+                            system_time: block.system_time,
+                            offset: block
+                                .output_slice
+                                .as_ref()
+                                .map(|s| s.data_interval.start)
+                                .unwrap_or(0), // TODO: Assuming offset does not matter if block is not supposed to produce data
+                            transform: source.transform.clone(),
+                            vocab: vocab.clone().unwrap_or_default(),
+                            inputs: block
+                                .input_slices
+                                .as_ref()
+                                .unwrap()
+                                .iter()
+                                .map(|slice| {
+                                    self.to_query_input(
+                                        slice,
+                                        Some(
+                                            dataset_vocabs
+                                                .get(&slice.dataset_id)
+                                                .map(|v| v.clone())
+                                                .unwrap(),
+                                        ),
+                                    )
+                                })
+                                .collect::<Result<_, _>>()?,
+                            prev_checkpoint_dir: None, // Filled out below
+                            new_checkpoint_dir: dataset_layout.checkpoints_dir.join(".pending"),
+                            out_data_path: dataset_layout.data_dir.join(".pending"),
+                        },
+                    },
+                    expected: block,
+                };
+
+                Ok(step)
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         // Populate prev checkpoints
         for i in 1..plan.len() {
-            plan[i].request.prev_checkpoint_dir = Some(
+            plan[i].operation.request.prev_checkpoint_dir = Some(
                 dataset_layout
                     .checkpoints_dir
                     .join(plan[i - 1].expected.block_hash.to_string()),
             )
         }
         if !plan.is_empty() {
-            plan[0].request.prev_checkpoint_dir =
+            plan[0].operation.request.prev_checkpoint_dir =
                 prev_checkpoint.map(|h| dataset_layout.checkpoints_dir.join(h.to_string()));
         }
 
-        // Populate input slices
-        // TODO: Assuming source never changes
-        // This is the rough part - we walk backwards through input datasets' metadata chains and
-        // include blocks into corresponding steps based on the time interval ranges.
-        // Think of this as a interval-based merge join X_X
-        for input_id in source.inputs.iter() {
-            let input_chain = self.metadata_repo.get_metadata_chain(input_id)?;
-            let input_layout = DatasetLayout::new(&self.volume_layout, &input_id);
-
-            let mut step_iter = plan.iter_mut().rev();
-            let mut input_blocks_iter = input_chain
-                .iter_blocks()
-                .filter(|b| b.output_slice.is_some() || b.output_watermark.is_some());
-
-            let mut curr_step = step_iter.next();
-            let mut curr_input_block = input_blocks_iter.next();
-
-            while curr_step.is_some() && curr_input_block.is_some() {
-                let step = curr_step.as_mut().unwrap();
-                let input_block = curr_input_block.as_ref().unwrap();
-                let slice = step
-                    .request
-                    .inputs
-                    .iter_mut()
-                    .filter(|i| i.dataset_id == *input_id)
-                    .next()
-                    .unwrap();
-
-                debug!(
-                    input_id = input_id.as_str(),
-                    output_block = ?step.expected.block_hash,
-                    input_block = ?input_block.block_hash,
-                    "Considering blocks"
-                );
-
-                // Interval can only be (), or (lower, upper]
-                if slice.interval.is_empty() {
-                    curr_step = step_iter.next();
-                    continue;
-                }
-
-                // Input block is younger than step block - continue to next input block
-                if slice
-                    .interval
-                    .right_complement()
-                    .contains_point(&input_block.system_time)
-                {
-                    curr_input_block = input_blocks_iter.next();
-                    continue;
-                }
-
-                // Input block is older than step block - continue to next step
-                if slice
-                    .interval
-                    .left_complement()
-                    .contains_point(&input_block.system_time)
-                {
-                    curr_step = step_iter.next();
-                    continue;
-                }
-
-                // Bingo! Include block inputs into the step
-                assert!(slice.interval.contains_point(&input_block.system_time));
-
-                debug!(
-                    input_id = input_id.as_str(),
-                    output_block = ?step.expected.block_hash,
-                    input_block = ?input_block.block_hash,
-                    "Associating input block"
-                );
-
-                if let Some(event_time) = input_block.output_watermark {
-                    slice.explicit_watermarks.push(Watermark {
-                        system_time: input_block.system_time,
-                        event_time,
-                    });
-                }
-
-                if input_block.output_slice.is_some() {
-                    slice.data_paths.push(
-                        input_layout
-                            .data_dir
-                            .join(input_block.block_hash.to_string()),
-                    )
-                }
-
-                curr_input_block = input_blocks_iter.next();
-            }
-        }
-
-        // Post-process input slices
-        for step in plan.iter_mut() {
-            for slice in step.request.inputs.iter_mut() {
-                slice.data_paths.reverse();
-                slice.explicit_watermarks.reverse();
-                // TODO: Migrate to providing schema directly
-                slice.schema_file =
-                    slice
-                        .data_paths
-                        .first()
-                        .map(|p| p.clone())
-                        .unwrap_or_else(|| {
-                            self.get_schema_file_fallback(&DatasetLayout::new(
-                                &self.volume_layout,
-                                &slice.dataset_id,
-                            ))
-                        });
-            }
-
-            if step.request.is_empty() {
-                panic!(
-                    "Produced empty transform for block {}",
-                    step.expected.block_hash
-                );
-            }
-        }
-
         Ok(plan)
-    }
-
-    fn check_blocks_equivalent(
-        expected_block: &MetadataBlock,
-        actual_block: &MetadataBlock,
-    ) -> bool {
-        // TODO: Moving from time intervals to offsets will avoid the need for this
-        let expected_output_slice = expected_block.output_slice.clone().map(|s| DataSlice {
-            interval: TimeInterval::empty(),
-            ..s
-        });
-        let actual_output_slice = actual_block.output_slice.clone().map(|s| DataSlice {
-            interval: TimeInterval::empty(),
-            ..s
-        });
-        expected_block.input_slices == actual_block.input_slices
-            && expected_output_slice == actual_output_slice
-            && expected_block.output_watermark == actual_block.output_watermark
     }
 }
 
@@ -643,8 +621,9 @@ impl TransformService for TransformServiceImpl {
         );
 
         // TODO: There might be more operations to do
-        if let Some(request) = self
-            .get_next_operation(dataset_id)
+        // TODO: Inject time source
+        if let Some(operation) = self
+            .get_next_operation(dataset_id, Utc::now())
             .map_err(|e| TransformError::internal(e))?
         {
             let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
@@ -654,7 +633,7 @@ impl TransformService for TransformServiceImpl {
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
-                request,
+                operation,
                 move |new_block, new_data_path, new_checkpoint_path| {
                     Self::commit_transform(
                         meta_chain,
@@ -694,8 +673,9 @@ impl TransformService for TransformServiceImpl {
                     .begin_transform(&dataset_id)
                     .unwrap_or(Arc::new(NullTransformListener {}));
 
+                // TODO: Inject time source
                 let next_op = self
-                    .get_next_operation(&dataset_id)
+                    .get_next_operation(&dataset_id, Utc::now())
                     .map_err(|e| TransformError::internal(e))
                     .unwrap();
 
@@ -781,7 +761,7 @@ impl TransformService for TransformServiceImpl {
         listener.begin_phase(VerificationPhase::ReplayTransform, num_steps);
 
         for (step_index, step) in verification_plan.into_iter().enumerate() {
-            let request = step.request;
+            let operation = step.operation;
             let expected_block = step.expected;
             let mut actual_block = None;
 
@@ -804,7 +784,7 @@ impl TransformService for TransformServiceImpl {
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
-                request,
+                operation,
                 |new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
                     // Cleanup not needed outputs
                     if new_block.output_slice.is_some() {
@@ -829,7 +809,7 @@ impl TransformService for TransformServiceImpl {
             let actual_block = actual_block.unwrap();
             debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
 
-            if !Self::check_blocks_equivalent(&expected_block, &actual_block) {
+            if expected_block != actual_block {
                 info!(block_hash = ?expected_block.block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
@@ -867,8 +847,14 @@ impl TransformService for TransformServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, PartialEq)]
+pub struct TransformOperation {
+    pub input_slices: Vec<InputSlice>,
+    pub request: ExecuteQueryRequest,
+}
+
 #[derive(Debug)]
 pub struct VerificationStep {
-    pub request: ExecuteQueryRequest,
+    pub operation: TransformOperation,
     pub expected: MetadataBlock,
 }

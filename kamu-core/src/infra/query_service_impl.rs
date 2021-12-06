@@ -117,10 +117,10 @@ impl QueryService for QueryServiceImpl {
 
         let query = if !has_decimal {
             format!(
-                r#"SELECT {fields} FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}"#,
+                r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
                 fields = fields.join(", "),
                 dataset = dataset_id,
-                event_time_col = vocab.event_time_column.unwrap_or("event_time".to_owned()),
+                offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
                 num_records = num_records
             )
         } else {
@@ -277,7 +277,8 @@ impl KamuSchema {
                 .iter_blocks()
                 .filter(|b| b.output_slice.is_some())
             {
-                num_records += block.output_slice.unwrap().num_records;
+                let data_iv = &block.output_slice.as_ref().unwrap().data_interval;
+                num_records += data_iv.end - data_iv.start + 1;
                 files.push(dataset_layout.data_dir.join(block.block_hash.to_string()));
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;

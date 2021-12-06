@@ -10,35 +10,14 @@ struct Timestamp {
   nanoseconds: uint32;
 }
 
-enum TimeIntervalType: uint8 {
-  Closed,
-  Open,
-  LeftHalfOpen,
-  RightHalfOpen,
-  UnboundedClosedRight,
-  UnboundedOpenRight,
-  UnboundedClosedLeft,
-  UnboundedOpenLeft,
-  Singleton,
-  Unbounded,
-  Empty,
-}
-
-struct TimeInterval {
-  type: TimeIntervalType;
-  left: Timestamp;
-  right: Timestamp;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+// BlockInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table DataSlice {
-  hash: [ubyte];
-  interval: TimeInterval;
-  num_records: int64;
+table BlockInterval {
+  start: [ubyte];
+  end: [ubyte];
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -272,6 +251,7 @@ union DatasetSource {
 table DatasetVocabulary {
   system_time_column: string;
   event_time_column: string;
+  offset_column: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -283,6 +263,16 @@ table DatasetSnapshot {
   id: string;
   source: DatasetSource;
   vocab: DatasetVocabulary;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table OffsetInterval {
+  start: int64;
+  end: int64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -303,7 +293,7 @@ table Watermark {
 table QueryInput {
   dataset_id: string;
   vocab: DatasetVocabulary;
-  interval: TimeInterval;
+  data_interval: OffsetInterval;
   data_paths: [string];
   schema_file: string;
   explicit_watermarks: [Watermark];
@@ -316,12 +306,35 @@ table QueryInput {
 
 table ExecuteQueryRequest {
   dataset_id: string;
+  system_time: Timestamp;
+  offset: int64;
   vocab: DatasetVocabulary;
   transform: Transform;
   inputs: [QueryInput];
   prev_checkpoint_dir: string;
   new_checkpoint_dir: string;
   out_data_path: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table OutputSlice {
+  data_logical_hash: [ubyte];
+  data_interval: OffsetInterval;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table InputSlice {
+  dataset_id: string;
+  block_interval: BlockInterval;
+  data_interval: OffsetInterval;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -333,9 +346,9 @@ table MetadataBlock {
   block_hash: [ubyte];
   prev_block_hash: [ubyte];
   system_time: Timestamp;
-  output_slice: DataSlice;
+  output_slice: OutputSlice;
   output_watermark: Timestamp;
-  input_slices: [DataSlice];
+  input_slices: [InputSlice];
   source: DatasetSource;
   vocab: DatasetVocabulary;
 }

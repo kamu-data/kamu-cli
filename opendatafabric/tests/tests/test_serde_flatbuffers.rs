@@ -49,8 +49,8 @@ fn get_block_root() -> MetadataBlock {
             }),
         })),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
     }
 }
@@ -74,27 +74,30 @@ fn get_block_deriv() -> MetadataBlock {
             }),
         })),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
-        output_slice: Some(DataSlice {
-            hash: Sha3_256::new([0x0a; 32]),
-            interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-            num_records: 10,
+        output_slice: Some(OutputSlice {
+            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
-            DataSlice {
-                hash: Sha3_256::new([0x0a; 32]),
-                interval: TimeInterval::unbounded_closed_right(
-                    Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-                ),
-                num_records: 10,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
-            DataSlice {
-                hash: Sha3_256::new([0x0b; 32]),
-                interval: TimeInterval::empty(),
-                num_records: 0,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: None,
             },
         ]),
     }
@@ -165,7 +168,7 @@ fn serializer_hashes_are_stable_deriv() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("9c8da1a7e766716f919f6a3b005d511e0498c33beab8dbae30f434f25f697296")
+        Sha3_256::try_from("f4c565176cbebc34f551e3bb86a891eca006d92fcdf6b87c66ff20ebe6e3c0f9")
             .unwrap()
     );
 }

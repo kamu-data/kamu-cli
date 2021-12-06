@@ -18,7 +18,6 @@ mod odf {
     pub use crate::dataset_id::*;
     pub use crate::dtos::*;
     pub use crate::sha::*;
-    pub use crate::time_interval::*;
 }
 use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
 use chrono::prelude::*;
@@ -45,32 +44,34 @@ pub trait FlatbuffersEnumDeserializable<'fb, E> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+// BlockInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSlice {
-    type OffsetT = WIPOffset<fb::DataSlice<'fb>>;
+impl<'fb> FlatbuffersSerializable<'fb> for odf::BlockInterval {
+    type OffsetT = WIPOffset<fb::BlockInterval<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let hash_offset = { fb.create_vector(&self.hash) };
-        let mut builder = fb::DataSliceBuilder::new(fb);
-        builder.add_hash(hash_offset);
-        builder.add_interval(&interval_to_fb(&self.interval));
-        builder.add_num_records(self.num_records);
+        let start_offset = { fb.create_vector(&self.start) };
+        let end_offset = { fb.create_vector(&self.end) };
+        let mut builder = fb::BlockIntervalBuilder::new(fb);
+        builder.add_start(start_offset);
+        builder.add_end(end_offset);
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
-    fn deserialize(proxy: fb::DataSlice<'fb>) -> Self {
-        odf::DataSlice {
-            hash: proxy
-                .hash()
+impl<'fb> FlatbuffersDeserializable<fb::BlockInterval<'fb>> for odf::BlockInterval {
+    fn deserialize(proxy: fb::BlockInterval<'fb>) -> Self {
+        odf::BlockInterval {
+            start: proxy
+                .start()
                 .map(|v| odf::Sha3_256::new(v.try_into().unwrap()))
                 .unwrap(),
-            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
-            num_records: proxy.num_records(),
+            end: proxy
+                .end()
+                .map(|v| odf::Sha3_256::new(v.try_into().unwrap()))
+                .unwrap(),
         }
     }
 }
@@ -272,9 +273,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetVocabulary {
             .event_time_column
             .as_ref()
             .map(|v| fb.create_string(&v));
+        let offset_column_offset = self.offset_column.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::DatasetVocabularyBuilder::new(fb);
         system_time_column_offset.map(|off| builder.add_system_time_column(off));
         event_time_column_offset.map(|off| builder.add_event_time_column(off));
+        offset_column_offset.map(|off| builder.add_offset_column(off));
         builder.finish()
     }
 }
@@ -284,6 +287,7 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetVocabulary<'fb>> for odf::Dataset
         odf::DatasetVocabulary {
             system_time_column: proxy.system_time_column().map(|v| v.to_owned()),
             event_time_column: proxy.event_time_column().map(|v| v.to_owned()),
+            offset_column: proxy.offset_column().map(|v| v.to_owned()),
         }
     }
 }
@@ -374,6 +378,8 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
         let out_data_path_offset = { fb.create_string(self.out_data_path.to_str().unwrap()) };
         let mut builder = fb::ExecuteQueryRequestBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
+        builder.add_system_time(&datetime_to_fb(&self.system_time));
+        builder.add_offset(self.offset);
         builder.add_vocab(vocab_offset);
         builder.add_transform_type(transform_offset.0);
         builder.add_transform(transform_offset.1);
@@ -392,6 +398,8 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
                 .dataset_id()
                 .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
                 .unwrap(),
+            system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
+            offset: proxy.offset(),
             vocab: proxy
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v))
@@ -677,6 +685,43 @@ impl Into<odf::SourceOrdering> for fb::SourceOrdering {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::InputSlice {
+    type OffsetT = WIPOffset<fb::InputSlice<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let dataset_id_offset = { fb.create_string(&self.dataset_id) };
+        let block_interval_offset = self.block_interval.as_ref().map(|v| v.serialize(fb));
+        let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
+        let mut builder = fb::InputSliceBuilder::new(fb);
+        builder.add_dataset_id(dataset_id_offset);
+        block_interval_offset.map(|off| builder.add_block_interval(off));
+        data_interval_offset.map(|off| builder.add_data_interval(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::InputSlice<'fb>> for odf::InputSlice {
+    fn deserialize(proxy: fb::InputSlice<'fb>) -> Self {
+        odf::InputSlice {
+            dataset_id: proxy
+                .dataset_id()
+                .map(|v| odf::DatasetIDBuf::try_from(v).unwrap())
+                .unwrap(),
+            block_interval: proxy
+                .block_interval()
+                .map(|v| odf::BlockInterval::deserialize(v)),
+            data_interval: proxy
+                .data_interval()
+                .map(|v| odf::OffsetInterval::deserialize(v)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -849,17 +894,77 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
                 .prev_block_hash()
                 .map(|v| odf::Sha3_256::new(v.try_into().unwrap())),
             system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
-            output_slice: proxy.output_slice().map(|v| odf::DataSlice::deserialize(v)),
+            output_slice: proxy
+                .output_slice()
+                .map(|v| odf::OutputSlice::deserialize(v)),
             output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
             input_slices: proxy
                 .input_slices()
-                .map(|v| v.iter().map(|i| odf::DataSlice::deserialize(i)).collect()),
+                .map(|v| v.iter().map(|i| odf::InputSlice::deserialize(i)).collect()),
             source: proxy
                 .source()
                 .map(|v| odf::DatasetSource::deserialize(v, proxy.source_type())),
             vocab: proxy
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::OffsetInterval {
+    type OffsetT = WIPOffset<fb::OffsetInterval<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::OffsetIntervalBuilder::new(fb);
+        builder.add_start(self.start);
+        builder.add_end(self.end);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::OffsetInterval<'fb>> for odf::OffsetInterval {
+    fn deserialize(proxy: fb::OffsetInterval<'fb>) -> Self {
+        odf::OffsetInterval {
+            start: proxy.start(),
+            end: proxy.end(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::OutputSlice {
+    type OffsetT = WIPOffset<fb::OutputSlice<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let data_logical_hash_offset = { fb.create_vector(&self.data_logical_hash) };
+        let data_interval_offset = { self.data_interval.serialize(fb) };
+        let mut builder = fb::OutputSliceBuilder::new(fb);
+        builder.add_data_logical_hash(data_logical_hash_offset);
+        builder.add_data_interval(data_interval_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::OutputSlice<'fb>> for odf::OutputSlice {
+    fn deserialize(proxy: fb::OutputSlice<'fb>) -> Self {
+        odf::OutputSlice {
+            data_logical_hash: proxy
+                .data_logical_hash()
+                .map(|v| odf::Sha3_256::new(v.try_into().unwrap()))
+                .unwrap(),
+            data_interval: proxy
+                .data_interval()
+                .map(|v| odf::OffsetInterval::deserialize(v))
+                .unwrap(),
         }
     }
 }
@@ -978,6 +1083,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::QueryInput {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let dataset_id_offset = { fb.create_string(&self.dataset_id) };
         let vocab_offset = { self.vocab.serialize(fb) };
+        let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
         let data_paths_offset = {
             let offsets: Vec<_> = self
                 .data_paths
@@ -998,7 +1104,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::QueryInput {
         let mut builder = fb::QueryInputBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
         builder.add_vocab(vocab_offset);
-        builder.add_interval(&interval_to_fb(&self.interval));
+        data_interval_offset.map(|off| builder.add_data_interval(off));
         builder.add_data_paths(data_paths_offset);
         builder.add_schema_file(schema_file_offset);
         builder.add_explicit_watermarks(explicit_watermarks_offset);
@@ -1017,7 +1123,9 @@ impl<'fb> FlatbuffersDeserializable<fb::QueryInput<'fb>> for odf::QueryInput {
                 .vocab()
                 .map(|v| odf::DatasetVocabulary::deserialize(v))
                 .unwrap(),
-            interval: proxy.interval().map(|v| fb_to_interval(v)).unwrap(),
+            data_interval: proxy
+                .data_interval()
+                .map(|v| odf::OffsetInterval::deserialize(v)),
             data_paths: proxy
                 .data_paths()
                 .map(|v| v.iter().map(|i| PathBuf::from(i)).collect())
@@ -1459,104 +1567,6 @@ fn fb_to_datetime(dt: &fb::Timestamp) -> DateTime<Utc> {
             .unwrap(),
         )
         .unwrap()
-}
-
-fn interval_to_fb(iv: &odf::TimeInterval) -> fb::TimeInterval {
-    use intervals_general::interval::Interval;
-    match iv.0 {
-        Interval::Closed { bound_pair: p } => fb::TimeInterval::new(
-            fb::TimeIntervalType::Closed,
-            &datetime_to_fb(p.left()),
-            &datetime_to_fb(p.right()),
-        ),
-        Interval::Open { bound_pair: p } => fb::TimeInterval::new(
-            fb::TimeIntervalType::Open,
-            &datetime_to_fb(p.left()),
-            &datetime_to_fb(p.right()),
-        ),
-        Interval::LeftHalfOpen { bound_pair: p } => fb::TimeInterval::new(
-            fb::TimeIntervalType::LeftHalfOpen,
-            &datetime_to_fb(p.left()),
-            &datetime_to_fb(p.right()),
-        ),
-        Interval::RightHalfOpen { bound_pair: p } => fb::TimeInterval::new(
-            fb::TimeIntervalType::RightHalfOpen,
-            &datetime_to_fb(p.left()),
-            &datetime_to_fb(p.right()),
-        ),
-        Interval::UnboundedClosedRight { right } => fb::TimeInterval::new(
-            fb::TimeIntervalType::UnboundedClosedRight,
-            &fb::Timestamp::default(),
-            &datetime_to_fb(&right),
-        ),
-        Interval::UnboundedOpenRight { right } => fb::TimeInterval::new(
-            fb::TimeIntervalType::UnboundedOpenRight,
-            &fb::Timestamp::default(),
-            &datetime_to_fb(&right),
-        ),
-        Interval::UnboundedClosedLeft { left } => fb::TimeInterval::new(
-            fb::TimeIntervalType::UnboundedClosedLeft,
-            &datetime_to_fb(&left),
-            &fb::Timestamp::default(),
-        ),
-        Interval::UnboundedOpenLeft { left } => fb::TimeInterval::new(
-            fb::TimeIntervalType::UnboundedOpenLeft,
-            &datetime_to_fb(&left),
-            &fb::Timestamp::default(),
-        ),
-        Interval::Singleton { at } => fb::TimeInterval::new(
-            fb::TimeIntervalType::Singleton,
-            &datetime_to_fb(&at),
-            &fb::Timestamp::default(),
-        ),
-        Interval::Unbounded => fb::TimeInterval::new(
-            fb::TimeIntervalType::Unbounded,
-            &fb::Timestamp::default(),
-            &fb::Timestamp::default(),
-        ),
-        Interval::Empty => fb::TimeInterval::new(
-            fb::TimeIntervalType::Empty,
-            &fb::Timestamp::default(),
-            &fb::Timestamp::default(),
-        ),
-    }
-}
-
-fn fb_to_interval(iv: &fb::TimeInterval) -> odf::TimeInterval {
-    match iv.type_() {
-        fb::TimeIntervalType::Closed => {
-            odf::TimeInterval::closed(fb_to_datetime(iv.left()), fb_to_datetime(iv.right()))
-                .unwrap()
-        }
-        fb::TimeIntervalType::Open => {
-            odf::TimeInterval::open(fb_to_datetime(iv.left()), fb_to_datetime(iv.right())).unwrap()
-        }
-        fb::TimeIntervalType::LeftHalfOpen => {
-            odf::TimeInterval::left_half_open(fb_to_datetime(iv.left()), fb_to_datetime(iv.right()))
-                .unwrap()
-        }
-        fb::TimeIntervalType::RightHalfOpen => odf::TimeInterval::right_half_open(
-            fb_to_datetime(iv.left()),
-            fb_to_datetime(iv.right()),
-        )
-        .unwrap(),
-        fb::TimeIntervalType::UnboundedClosedRight => {
-            odf::TimeInterval::unbounded_closed_right(fb_to_datetime(iv.right()))
-        }
-        fb::TimeIntervalType::UnboundedOpenRight => {
-            odf::TimeInterval::unbounded_open_right(fb_to_datetime(iv.right()))
-        }
-        fb::TimeIntervalType::UnboundedClosedLeft => {
-            odf::TimeInterval::unbounded_closed_left(fb_to_datetime(iv.left()))
-        }
-        fb::TimeIntervalType::UnboundedOpenLeft => {
-            odf::TimeInterval::unbounded_open_left(fb_to_datetime(iv.left()))
-        }
-        fb::TimeIntervalType::Singleton => odf::TimeInterval::singleton(fb_to_datetime(iv.left())),
-        fb::TimeIntervalType::Unbounded => odf::TimeInterval::unbounded(),
-        fb::TimeIntervalType::Empty => odf::TimeInterval::empty(),
-        _ => panic!("Invalid enum value: {}", iv.type_().0),
-    }
 }
 
 fn empty_table<'fb>(

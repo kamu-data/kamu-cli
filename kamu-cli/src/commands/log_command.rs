@@ -126,11 +126,14 @@ impl AsciiRenderer {
         )?;
 
         if let Some(ref s) = block.output_slice {
-            Self::render_property(output, "Output.Records", &s.num_records)?;
-            Self::render_property(output, "Output.Interval", &s.interval)?;
-            if !s.hash.is_empty() {
-                Self::render_property(output, "Output.Hash", &s.hash)?;
-            }
+            Self::render_property(output, "Output.Offset.Start", &s.data_interval.start)?;
+            Self::render_property(output, "Output.Offset.End", &s.data_interval.end)?;
+            Self::render_property(
+                output,
+                "Output.Records",
+                &(s.data_interval.end - s.data_interval.start + 1),
+            )?;
+            Self::render_property(output, "Output.LogicalHash", &s.data_logical_hash)?;
         }
 
         if let Some(ref wm) = block.output_watermark {
@@ -141,12 +144,36 @@ impl AsciiRenderer {
             )?;
         }
 
-        if let Some(ref slices) = block.input_slices {
-            for (i, ref s) in slices.iter().enumerate() {
-                Self::render_property(output, &format!("Input[{}].Records", i), &s.num_records)?;
-                Self::render_property(output, &format!("Input[{}].Interval", i), &s.interval)?;
-                if !s.hash.is_empty() {
-                    Self::render_property(output, &format!("Input[{}].Hash", i), &s.hash)?;
+        if let Some(slices) = &block.input_slices {
+            for s in slices.iter() {
+                if let Some(bi) = &s.block_interval {
+                    Self::render_property(
+                        output,
+                        &format!("Input[{}].Blocks.Start", s.dataset_id),
+                        &bi.start,
+                    )?;
+                    Self::render_property(
+                        output,
+                        &format!("Input[{}].Blocks.End", s.dataset_id),
+                        &bi.end,
+                    )?;
+                }
+                if let Some(iv) = &s.data_interval {
+                    Self::render_property(
+                        output,
+                        &format!("Input[{}].Offset.Start", s.dataset_id),
+                        &iv.start,
+                    )?;
+                    Self::render_property(
+                        output,
+                        &format!("Input[{}].Offset.End", s.dataset_id),
+                        &iv.end,
+                    )?;
+                    Self::render_property(
+                        output,
+                        &format!("Input[{}].Records", s.dataset_id),
+                        &(iv.end - iv.start + 1),
+                    )?;
                 }
             }
         }

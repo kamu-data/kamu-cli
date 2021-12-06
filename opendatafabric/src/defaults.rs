@@ -9,16 +9,14 @@
 
 use std::fmt::Display;
 
-use crate::{
-    ExecuteQueryRequest, ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery,
-    QueryInput, ReadStepCsv,
-};
+use crate::{ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv};
 
 use super::DatasetVocabulary;
 
 impl Default for DatasetVocabulary {
     fn default() -> Self {
         DatasetVocabulary {
+            offset_column: None,
             system_time_column: None,
             event_time_column: None,
         }
@@ -48,18 +46,6 @@ impl Default for ReadStepCsv {
             timestamp_format: None,
             multi_line: None,
         }
-    }
-}
-
-impl QueryInput {
-    pub fn is_empty(&self) -> bool {
-        self.data_paths.is_empty() && self.explicit_watermarks.is_empty()
-    }
-}
-
-impl ExecuteQueryRequest {
-    pub fn is_empty(&self) -> bool {
-        self.inputs.iter().all(|s| s.is_empty())
     }
 }
 

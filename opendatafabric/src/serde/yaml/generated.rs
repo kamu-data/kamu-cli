@@ -51,22 +51,21 @@ macro_rules! implement_serde_as {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+// BlockInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "DataSlice")]
+#[serde(remote = "BlockInterval")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct DataSliceDef {
-    pub hash: Sha3_256,
-    pub interval: TimeInterval,
-    pub num_records: i64,
+pub struct BlockIntervalDef {
+    pub start: Sha3_256,
+    pub end: Sha3_256,
 }
 
-implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
+implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
@@ -161,6 +160,7 @@ pub struct DatasetSourceDerivativeDef {
 pub struct DatasetVocabularyDef {
     pub system_time_column: Option<String>,
     pub event_time_column: Option<String>,
+    pub offset_column: Option<String>,
 }
 
 implement_serde_as!(
@@ -215,6 +215,9 @@ pub struct EventTimeSourceFromPathDef {
 pub struct ExecuteQueryRequestDef {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+    pub offset: i64,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
     #[serde_as(as = "TransformDef")]
@@ -374,6 +377,29 @@ pub enum SourceOrderingDef {
 implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
 
 ////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "InputSlice")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct InputSliceDef {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetIDBuf,
+    #[serde_as(as = "Option<BlockIntervalDef>")]
+    #[serde(default)]
+    pub block_interval: Option<BlockInterval>,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub data_interval: Option<OffsetInterval>,
+}
+
+implement_serde_as!(InputSlice, InputSliceDef, "InputSliceDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -441,14 +467,14 @@ pub struct MetadataBlockDef {
     pub prev_block_hash: Option<Sha3_256>,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
-    #[serde_as(as = "Option<DataSliceDef>")]
+    #[serde_as(as = "Option<OutputSliceDef>")]
     #[serde(default)]
-    pub output_slice: Option<DataSlice>,
+    pub output_slice: Option<OutputSlice>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub output_watermark: Option<DateTime<Utc>>,
-    #[serde_as(as = "Option<Vec<DataSliceDef>>")]
+    #[serde_as(as = "Option<Vec<InputSliceDef>>")]
     #[serde(default)]
-    pub input_slices: Option<Vec<DataSlice>>,
+    pub input_slices: Option<Vec<InputSlice>>,
     #[serde_as(as = "Option<DatasetSourceDef>")]
     #[serde(default)]
     pub source: Option<DatasetSource>,
@@ -458,6 +484,41 @@ pub struct MetadataBlockDef {
 }
 
 implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "OffsetInterval")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct OffsetIntervalDef {
+    pub start: i64,
+    pub end: i64,
+}
+
+implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "OutputSlice")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct OutputSliceDef {
+    pub data_logical_hash: Sha3_256,
+    #[serde_as(as = "OffsetIntervalDef")]
+    pub data_interval: OffsetInterval,
+}
+
+implement_serde_as!(OutputSlice, OutputSliceDef, "OutputSliceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // PrepStep
@@ -532,7 +593,9 @@ pub struct QueryInputDef {
     pub dataset_id: DatasetIDBuf,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
-    pub interval: TimeInterval,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub data_interval: Option<OffsetInterval>,
     pub data_paths: Vec<PathBuf>,
     pub schema_file: PathBuf,
     #[serde_as(as = "Vec<WatermarkDef>")]

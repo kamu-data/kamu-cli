@@ -207,7 +207,7 @@ impl MetadataBlockBuilder {
         self
     }
 
-    pub fn input_slice(mut self, slice: DataSlice) -> Self {
+    pub fn input_slice(mut self, slice: InputSlice) -> Self {
         if self.v.input_slices.is_none() {
             self.v.input_slices = Some(Vec::new());
         }
@@ -215,7 +215,7 @@ impl MetadataBlockBuilder {
         self
     }
 
-    pub fn output_slice(mut self, slice: DataSlice) -> Self {
+    pub fn output_slice(mut self, slice: OutputSlice) -> Self {
         self.v.output_slice = Some(slice);
         self
     }

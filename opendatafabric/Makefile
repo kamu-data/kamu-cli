@@ -1,5 +1,12 @@
 ODF_DIR=../../open-data-fabric
 RUSTFMT=rustfmt --edition 2018
+LICENSE_HEADER=../docs/license_header.txt
+
+define add_license_header
+	cat $(LICENSE_HEADER) > tmp
+	cat $(1) >> tmp
+	mv tmp $(1)
+endef
 
 .PHONY: codegen
 codegen:
@@ -11,3 +18,9 @@ codegen:
 	python $(ODF_DIR)/tools/jsonschema_to_rust_traits.py $(ODF_DIR)/schemas | $(RUSTFMT) > src/dynamic.rs
 	python $(ODF_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_DIR)/schemas | $(RUSTFMT) > src/serde/yaml/generated.rs
 	python $(ODF_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_DIR)/schemas | $(RUSTFMT) > src/serde/flatbuffers/convertors.rs
+
+	$(call add_license_header, "src/serde/flatbuffers/odf_generated.rs")
+	$(call add_license_header, "src/dtos.rs")
+	$(call add_license_header, "src/dynamic.rs")
+	$(call add_license_header, "src/serde/yaml/generated.rs")
+	$(call add_license_header, "src/serde/flatbuffers/convertors.rs")
