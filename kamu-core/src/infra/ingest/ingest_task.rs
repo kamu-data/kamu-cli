@@ -23,8 +23,9 @@ use tracing::info;
 use tracing::info_span;
 
 pub struct IngestTask {
-    dataset_id: DatasetIDBuf,
     options: IngestOptions,
+    dataset_id: DatasetIDBuf,
+    next_offset: i64,
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
     source: DatasetSourceRoot,
@@ -52,7 +53,15 @@ impl IngestTask {
         let mut source = None;
         let mut prev_checkpoint = None;
         let mut vocab = None;
+        let mut next_offset = 0;
+
         for block in meta_chain.iter_blocks() {
+            if next_offset == 0 {
+                if let Some(os) = &block.output_slice {
+                    next_offset = os.data_interval.end + 1;
+                }
+            }
+
             if source.is_none() {
                 match block.source {
                     Some(DatasetSource::Root(src)) => source = Some(src),
@@ -84,8 +93,9 @@ impl IngestTask {
         }
 
         Self {
-            dataset_id: dataset_id.to_owned(),
             options,
+            dataset_id: dataset_id.to_owned(),
+            next_offset,
             layout,
             meta_chain: RefCell::new(meta_chain),
             source,
@@ -121,7 +131,6 @@ impl IngestTask {
         }
     }
 
-    // Note: Can be called from multiple threads
     pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
         self.listener
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
@@ -313,7 +322,9 @@ impl IngestTask {
                         &self.source,
                         self.prev_checkpoint,
                         &self.vocab,
+                        Utc::now(), // TODO: inject
                         source_event_time,
+                        self.next_offset,
                         prep_result.checkpoint.last_prepared,
                         old_checkpoint,
                         &self.layout.cache_dir.join("prepared.bin"),
@@ -368,6 +379,9 @@ impl IngestTask {
                                 },
                             })
                         }
+                    } else {
+                        // Advance offset for the next run
+                        self.next_offset = new_block.output_slice.as_ref().unwrap().data_interval.end + 1;
                     }
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);

@@ -18,7 +18,7 @@ use super::DomainError;
 
 pub trait QueryService: Send + Sync {
     /// Returns the specified number of the latest records in the dataset
-    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
+    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`
     fn tail(
         &self,
         dataset_id: &DatasetID,

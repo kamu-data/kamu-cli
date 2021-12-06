@@ -105,20 +105,29 @@ fn test_ingest_with_engine() {
         .map(|cd| cd.path().string())
         .collect();
 
-    assert_eq!(columns, ["system_time", "event_time", "city", "population"]);
+    assert_eq!(
+        columns,
+        ["offset", "system_time", "event_time", "city", "population"]
+    );
 
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
-        .map(|r| (r.get_string(2).unwrap().clone(), r.get_int(3).unwrap()))
+        .map(|r| {
+            (
+                r.get_long(0).unwrap().clone(),
+                r.get_string(3).unwrap().clone(),
+                r.get_int(4).unwrap(),
+            )
+        })
         .collect();
 
     assert_eq!(
         records,
         [
-            ("A".to_owned(), 1000),
-            ("B".to_owned(), 2000),
-            ("C".to_owned(), 3000)
+            (0, "A".to_owned(), 1000),
+            (1, "B".to_owned(), 2000),
+            (2, "C".to_owned(), 3000)
         ]
     );
 }

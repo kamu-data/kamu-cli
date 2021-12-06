@@ -154,7 +154,8 @@ impl MetadataRepositoryImpl {
                 if summary.last_pulled.is_none() {
                     summary.last_pulled = Some(block.system_time);
                 }
-                summary.num_records += slice.num_records as u64;
+                summary.num_records +=
+                    (slice.data_interval.end - slice.data_interval.start + 1) as u64;
             }
         }
 

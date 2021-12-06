@@ -37,7 +37,9 @@ impl ReadService {
         source: &DatasetSourceRoot,
         prev_checkpoint: Option<Sha3_256>,
         vocab: &DatasetVocabulary,
+        system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
+        offset: i64,
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
@@ -62,7 +64,9 @@ impl ReadService {
         let request = IngestRequest {
             dataset_id: dataset_id.to_owned(),
             ingest_path: src_path.to_owned(),
+            system_time,
             event_time: source_event_time,
+            offset,
             source: source.clone(),
             dataset_vocab: vocab.clone(),
             prev_checkpoint_dir: prev_checkpoint
@@ -75,9 +79,9 @@ impl ReadService {
         let response = engine.ingest(request)?;
 
         if let Some(ref slice) = response.metadata_block.output_slice {
-            if slice.num_records == 0 {
+            if slice.data_interval.end < slice.data_interval.start {
                 return Err(EngineError::contract_error(
-                    "Engine returned an output slice with zero records",
+                    "Engine returned an output slice with invalid data inverval",
                     Vec::new(),
                 )
                 .into());

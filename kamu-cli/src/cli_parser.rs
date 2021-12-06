@@ -927,7 +927,7 @@ pub fn cli() -> App<'static, 'static> {
                     r#"
                     This command is simply a shortcut for:
 
-                        kamu sql --engine datafusion --command 'SELECT * FROM "{dataset}" ORDER BY {event_time_col} DESC LIMIT {num_records}'
+                        kamu sql --engine datafusion --command 'SELECT * FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}'
                     "#
                 ))
             ),

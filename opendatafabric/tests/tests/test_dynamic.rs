@@ -30,27 +30,30 @@ fn load() -> MetadataBlock {
             }),
         })),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
-        output_slice: Some(DataSlice {
-            hash: Sha3_256::new([0xA; 32]),
-            interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-            num_records: 10,
+        output_slice: Some(OutputSlice {
+            data_logical_hash: Sha3_256::new([0xA; 32]),
+            data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
-            DataSlice {
-                hash: Sha3_256::new([0xB; 32]),
-                interval: TimeInterval::unbounded_closed_right(
-                    Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-                ),
-                num_records: 10,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
-            DataSlice {
-                hash: Sha3_256::new([0xC; 32]),
-                interval: TimeInterval::empty(),
-                num_records: 0,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: None,
             },
         ]),
     }

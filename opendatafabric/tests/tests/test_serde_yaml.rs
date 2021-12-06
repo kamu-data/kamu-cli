@@ -100,8 +100,8 @@ fn serde_dataset_snapshot_root() {
             }),
         }),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
     };
 
@@ -181,17 +181,23 @@ fn serde_metadata_block() {
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00Z\"
           outputSlice:
-            hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-            interval: \"[2020-01-01T12:00:00Z, 2020-01-01T12:00:00Z]\"
-            numRecords: 10
+            dataLogicalHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
+            dataInterval:
+              start: 10
+              end: 20
           outputWatermark: \"2020-01-01T12:00:00Z\"
           inputSlices:
-            - hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-              interval: \"(-inf, 2020-01-01T12:00:00Z]\"
-              numRecords: 10
-            - hash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-              interval: ()
-              numRecords: 0
+            - datasetID: input1
+              blockInterval:
+                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
+              dataInterval:
+                start: 10
+                end: 20
+            - datasetID: input2
+              blockInterval:
+                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
           source:
             kind: derivative
             inputs:
@@ -223,27 +229,30 @@ fn serde_metadata_block() {
             }),
         })),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
-        output_slice: Some(DataSlice {
-            hash: Sha3_256::new([0x0a; 32]),
-            interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-            num_records: 10,
+        output_slice: Some(OutputSlice {
+            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
-            DataSlice {
-                hash: Sha3_256::new([0x0a; 32]),
-                interval: TimeInterval::unbounded_closed_right(
-                    Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-                ),
-                num_records: 10,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
-            DataSlice {
-                hash: Sha3_256::new([0x0b; 32]),
-                interval: TimeInterval::empty(),
-                num_records: 0,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: None,
             },
         ]),
     };
@@ -269,21 +278,27 @@ fn serde_metadata_block_hashes() {
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: 95ddbfebb877b823babcb90cb5c7a0a50561d9265eca45b324f8ac7b0f1c14a0
+          blockHash: 8a346aaeb3a467ecfeb340a3139ec6c6613b1559460a1b2086b70fbbbeb27cff
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00.123456789Z\"
           outputSlice:
-            hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-            interval: \"[2020-01-01T12:00:00Z, 2020-01-01T12:00:00Z]\"
-            numRecords: 10
+            dataLogicalHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
+            dataInterval:
+              start: 10
+              end: 20
           outputWatermark: \"2020-01-01T12:00:00Z\"
           inputSlices:
-            - hash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-              interval: \"(-inf, 2020-01-01T12:00:00Z]\"
-              numRecords: 10
-            - hash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-              interval: ()
-              numRecords: 0
+            - datasetID: input1
+              blockInterval:
+                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
+              dataInterval:
+                start: 10
+                end: 20
+            - datasetID: input2
+              blockInterval:
+                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
           source:
             kind: derivative
             inputs:
@@ -315,27 +330,30 @@ fn serde_metadata_block_hashes() {
             }),
         })),
         vocab: Some(DatasetVocabulary {
-            system_time_column: None,
             event_time_column: Some("date".to_owned()),
+            ..Default::default()
         }),
-        output_slice: Some(DataSlice {
-            hash: Sha3_256::new([0x0a; 32]),
-            interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-            num_records: 10,
+        output_slice: Some(OutputSlice {
+            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
-            DataSlice {
-                hash: Sha3_256::new([0x0a; 32]),
-                interval: TimeInterval::unbounded_closed_right(
-                    Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-                ),
-                num_records: 10,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
-            DataSlice {
-                hash: Sha3_256::new([0x0b; 32]),
-                interval: TimeInterval::empty(),
-                num_records: 0,
+            InputSlice {
+                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                block_interval: Some(BlockInterval {
+                    start: Sha3_256::new([0xB; 32]),
+                    end: Sha3_256::new([0xC; 32]),
+                }),
+                data_interval: None,
             },
         ]),
     };

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use container_runtime::PullImageListener;
-use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
+use opendatafabric::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::{
     DatasetIDBuf, DatasetSourceRoot, DatasetVocabulary, ExecuteQueryRequest,
@@ -75,8 +75,11 @@ pub struct IngestRequest {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetIDBuf,
     pub ingest_path: PathBuf,
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub event_time: Option<DateTime<Utc>>,
+    pub offset: i64,
     #[serde(with = "DatasetSourceRootDef")]
     pub source: DatasetSourceRoot,
     #[serde(with = "DatasetVocabularyDef")]

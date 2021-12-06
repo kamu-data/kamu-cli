@@ -14,19 +14,18 @@
 
 use std::path::PathBuf;
 
-use super::{DatasetIDBuf, Sha3_256, TimeInterval};
+use super::{DatasetIDBuf, Sha3_256};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+// BlockInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DataSlice {
-    pub hash: Sha3_256,
-    pub interval: TimeInterval,
-    pub num_records: i64,
+pub struct BlockInterval {
+    pub start: Sha3_256,
+    pub end: Sha3_256,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +75,7 @@ pub struct DatasetSourceDerivative {
 pub struct DatasetVocabulary {
     pub system_time_column: Option<String>,
     pub event_time_column: Option<String>,
+    pub offset_column: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -103,6 +103,8 @@ pub struct EventTimeSourceFromPath {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
     pub dataset_id: DatasetIDBuf,
+    pub system_time: DateTime<Utc>,
+    pub offset: i64,
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
     pub inputs: Vec<QueryInput>,
@@ -173,6 +175,18 @@ pub enum SourceOrdering {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct InputSlice {
+    pub dataset_id: DatasetIDBuf,
+    pub block_interval: Option<BlockInterval>,
+    pub data_interval: Option<OffsetInterval>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -209,11 +223,33 @@ pub struct MetadataBlock {
     pub block_hash: Sha3_256,
     pub prev_block_hash: Option<Sha3_256>,
     pub system_time: DateTime<Utc>,
-    pub output_slice: Option<DataSlice>,
+    pub output_slice: Option<OutputSlice>,
     pub output_watermark: Option<DateTime<Utc>>,
-    pub input_slices: Option<Vec<DataSlice>>,
+    pub input_slices: Option<Vec<InputSlice>>,
     pub source: Option<DatasetSource>,
     pub vocab: Option<DatasetVocabulary>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OffsetInterval {
+    pub start: i64,
+    pub end: i64,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct OutputSlice {
+    pub data_logical_hash: Sha3_256,
+    pub data_interval: OffsetInterval,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -253,7 +289,7 @@ pub enum CompressionFormat {
 pub struct QueryInput {
     pub dataset_id: DatasetIDBuf,
     pub vocab: DatasetVocabulary,
-    pub interval: TimeInterval,
+    pub data_interval: Option<OffsetInterval>,
     pub data_paths: Vec<PathBuf>,
     pub schema_file: PathBuf,
     pub explicit_watermarks: Vec<Watermark>,

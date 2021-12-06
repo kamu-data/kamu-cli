@@ -14,38 +14,33 @@
 
 use std::path::Path;
 
-use super::{CompressionFormat, DatasetID, Sha3_256, SourceOrdering, TimeInterval};
+use super::{CompressionFormat, DatasetID, Sha3_256, SourceOrdering};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
-// DataSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+// BlockInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait DataSlice {
-    fn hash(&self) -> &Sha3_256;
-    fn interval(&self) -> TimeInterval;
-    fn num_records(&self) -> i64;
+pub trait BlockInterval {
+    fn start(&self) -> &Sha3_256;
+    fn end(&self) -> &Sha3_256;
 }
 
-impl DataSlice for super::DataSlice {
-    fn hash(&self) -> &Sha3_256 {
-        &self.hash
+impl BlockInterval for super::BlockInterval {
+    fn start(&self) -> &Sha3_256 {
+        &self.start
     }
-    fn interval(&self) -> TimeInterval {
-        self.interval
-    }
-    fn num_records(&self) -> i64 {
-        self.num_records
+    fn end(&self) -> &Sha3_256 {
+        &self.end
     }
 }
 
-impl Into<super::DataSlice> for &dyn DataSlice {
-    fn into(self) -> super::DataSlice {
-        super::DataSlice {
-            hash: *self.hash(),
-            interval: self.interval(),
-            num_records: self.num_records(),
+impl Into<super::BlockInterval> for &dyn BlockInterval {
+    fn into(self) -> super::BlockInterval {
+        super::BlockInterval {
+            start: *self.start(),
+            end: *self.end(),
         }
     }
 }
@@ -184,6 +179,7 @@ impl Into<super::DatasetSourceDerivative> for &dyn DatasetSourceDerivative {
 pub trait DatasetVocabulary {
     fn system_time_column(&self) -> Option<&str>;
     fn event_time_column(&self) -> Option<&str>;
+    fn offset_column(&self) -> Option<&str>;
 }
 
 impl DatasetVocabulary for super::DatasetVocabulary {
@@ -197,6 +193,9 @@ impl DatasetVocabulary for super::DatasetVocabulary {
             .as_ref()
             .map(|v| -> &str { v.as_ref() })
     }
+    fn offset_column(&self) -> Option<&str> {
+        self.offset_column.as_ref().map(|v| -> &str { v.as_ref() })
+    }
 }
 
 impl Into<super::DatasetVocabulary> for &dyn DatasetVocabulary {
@@ -204,6 +203,7 @@ impl Into<super::DatasetVocabulary> for &dyn DatasetVocabulary {
         super::DatasetVocabulary {
             system_time_column: self.system_time_column().map(|v| v.to_owned()),
             event_time_column: self.event_time_column().map(|v| v.to_owned()),
+            offset_column: self.offset_column().map(|v| v.to_owned()),
         }
     }
 }
@@ -268,6 +268,8 @@ impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 
 pub trait ExecuteQueryRequest {
     fn dataset_id(&self) -> &DatasetID;
+    fn system_time(&self) -> DateTime<Utc>;
+    fn offset(&self) -> i64;
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn transform(&self) -> Transform;
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_>;
@@ -279,6 +281,12 @@ pub trait ExecuteQueryRequest {
 impl ExecuteQueryRequest for super::ExecuteQueryRequest {
     fn dataset_id(&self) -> &DatasetID {
         self.dataset_id.as_ref()
+    }
+    fn system_time(&self) -> DateTime<Utc> {
+        self.system_time
+    }
+    fn offset(&self) -> i64 {
+        self.offset
     }
     fn vocab(&self) -> &dyn DatasetVocabulary {
         &self.vocab
@@ -306,6 +314,8 @@ impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
     fn into(self) -> super::ExecuteQueryRequest {
         super::ExecuteQueryRequest {
             dataset_id: self.dataset_id().to_owned(),
+            system_time: self.system_time(),
+            offset: self.offset(),
             vocab: self.vocab().into(),
             transform: self.transform().into(),
             inputs: self.inputs().map(|i| i.into()).collect(),
@@ -507,6 +517,43 @@ impl Into<super::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait InputSlice {
+    fn dataset_id(&self) -> &DatasetID;
+    fn block_interval(&self) -> Option<&dyn BlockInterval>;
+    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
+}
+
+impl InputSlice for super::InputSlice {
+    fn dataset_id(&self) -> &DatasetID {
+        self.dataset_id.as_ref()
+    }
+    fn block_interval(&self) -> Option<&dyn BlockInterval> {
+        self.block_interval
+            .as_ref()
+            .map(|v| -> &dyn BlockInterval { v })
+    }
+    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.data_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
+    }
+}
+
+impl Into<super::InputSlice> for &dyn InputSlice {
+    fn into(self) -> super::InputSlice {
+        super::InputSlice {
+            dataset_id: self.dataset_id().to_owned(),
+            block_interval: self.block_interval().map(|v| v.into()),
+            data_interval: self.data_interval().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -615,9 +662,9 @@ pub trait MetadataBlock {
     fn block_hash(&self) -> &Sha3_256;
     fn prev_block_hash(&self) -> Option<&Sha3_256>;
     fn system_time(&self) -> DateTime<Utc>;
-    fn output_slice(&self) -> Option<&dyn DataSlice>;
+    fn output_slice(&self) -> Option<&dyn OutputSlice>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
-    fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn DataSlice> + '_>>;
+    fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn InputSlice> + '_>>;
     fn source(&self) -> Option<DatasetSource>;
     fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
 }
@@ -632,19 +679,21 @@ impl MetadataBlock for super::MetadataBlock {
     fn system_time(&self) -> DateTime<Utc> {
         self.system_time
     }
-    fn output_slice(&self) -> Option<&dyn DataSlice> {
-        self.output_slice.as_ref().map(|v| -> &dyn DataSlice { v })
+    fn output_slice(&self) -> Option<&dyn OutputSlice> {
+        self.output_slice
+            .as_ref()
+            .map(|v| -> &dyn OutputSlice { v })
     }
     fn output_watermark(&self) -> Option<DateTime<Utc>> {
         self.output_watermark
             .as_ref()
             .map(|v| -> DateTime<Utc> { *v })
     }
-    fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn DataSlice> + '_>> {
+    fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn InputSlice> + '_>> {
         self.input_slices
             .as_ref()
-            .map(|v| -> Box<dyn Iterator<Item = &dyn DataSlice> + '_> {
-                Box::new(v.iter().map(|i| -> &dyn DataSlice { i }))
+            .map(|v| -> Box<dyn Iterator<Item = &dyn InputSlice> + '_> {
+                Box::new(v.iter().map(|i| -> &dyn InputSlice { i }))
             })
     }
     fn source(&self) -> Option<DatasetSource> {
@@ -666,6 +715,62 @@ impl Into<super::MetadataBlock> for &dyn MetadataBlock {
             input_slices: self.input_slices().map(|v| v.map(|i| i.into()).collect()),
             source: self.source().map(|v| v.into()),
             vocab: self.vocab().map(|v| v.into()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait OffsetInterval {
+    fn start(&self) -> i64;
+    fn end(&self) -> i64;
+}
+
+impl OffsetInterval for super::OffsetInterval {
+    fn start(&self) -> i64 {
+        self.start
+    }
+    fn end(&self) -> i64 {
+        self.end
+    }
+}
+
+impl Into<super::OffsetInterval> for &dyn OffsetInterval {
+    fn into(self) -> super::OffsetInterval {
+        super::OffsetInterval {
+            start: self.start(),
+            end: self.end(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait OutputSlice {
+    fn data_logical_hash(&self) -> &Sha3_256;
+    fn data_interval(&self) -> &dyn OffsetInterval;
+}
+
+impl OutputSlice for super::OutputSlice {
+    fn data_logical_hash(&self) -> &Sha3_256 {
+        &self.data_logical_hash
+    }
+    fn data_interval(&self) -> &dyn OffsetInterval {
+        &self.data_interval
+    }
+}
+
+impl Into<super::OutputSlice> for &dyn OutputSlice {
+    fn into(self) -> super::OutputSlice {
+        super::OutputSlice {
+            data_logical_hash: *self.data_logical_hash(),
+            data_interval: self.data_interval().into(),
         }
     }
 }
@@ -747,7 +852,7 @@ impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
 pub trait QueryInput {
     fn dataset_id(&self) -> &DatasetID;
     fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn interval(&self) -> TimeInterval;
+    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
     fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
     fn schema_file(&self) -> &Path;
     fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
@@ -760,8 +865,10 @@ impl QueryInput for super::QueryInput {
     fn vocab(&self) -> &dyn DatasetVocabulary {
         &self.vocab
     }
-    fn interval(&self) -> TimeInterval {
-        self.interval
+    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.data_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
     }
     fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
         Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
@@ -783,7 +890,7 @@ impl Into<super::QueryInput> for &dyn QueryInput {
         super::QueryInput {
             dataset_id: self.dataset_id().to_owned(),
             vocab: self.vocab().into(),
-            interval: self.interval(),
+            data_interval: self.data_interval().map(|v| v.into()),
             data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
             schema_file: self.schema_file().to_owned(),
             explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),

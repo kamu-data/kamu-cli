@@ -68,10 +68,10 @@ fn test_pull_ingest_from_file() {
         let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
         assert_eq!(
             parquet.column_names(),
-            ["system_time", "event_time", "city", "population"]
+            ["offset", "system_time", "event_time", "city", "population"]
         );
         assert_eq!(
-            parquet.records(|r| (r.get_string(2).unwrap().clone(), r.get_long(3).unwrap())),
+            parquet.records(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap())),
             [
                 ("A".to_owned(), 1000),
                 ("B".to_owned(), 2000),
@@ -100,10 +100,10 @@ fn test_pull_ingest_from_file() {
         let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
         assert_eq!(
             parquet.column_names(),
-            ["system_time", "event_time", "city", "population"]
+            ["offset", "system_time", "event_time", "city", "population"]
         );
         assert_eq!(
-            parquet.records(|r| (r.get_string(2).unwrap().clone(), r.get_long(3).unwrap())),
+            parquet.records(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap())),
             [
                 ("A".to_owned(), 1100),
                 ("B".to_owned(), 2100),

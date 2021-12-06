@@ -13,7 +13,6 @@ use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
-use chrono::prelude::*;
 use std::assert_matches::assert_matches;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -175,10 +174,9 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b1)
-                .output_slice(DataSlice {
-                    hash: Sha3_256::zero(),
-                    interval: TimeInterval::singleton(Utc::now()),
-                    num_records: 10,
+                .output_slice(OutputSlice {
+                    data_logical_hash: Sha3_256::zero(),
+                    data_interval: OffsetInterval { start: 0, end: 9 },
                 })
                 .build(),
         );
@@ -190,10 +188,9 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b2)
-                .output_slice(DataSlice {
-                    hash: Sha3_256::zero(),
-                    interval: TimeInterval::singleton(Utc::now()),
-                    num_records: 20,
+                .output_slice(OutputSlice {
+                    data_logical_hash: Sha3_256::zero(),
+                    data_interval: OffsetInterval { start: 10, end: 29 },
                 })
                 .build(),
         );
@@ -264,10 +261,9 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b3)
-                .output_slice(DataSlice {
-                    hash: Sha3_256::zero(),
-                    interval: TimeInterval::singleton(Utc::now()),
-                    num_records: 20,
+                .output_slice(OutputSlice {
+                    data_logical_hash: Sha3_256::zero(),
+                    data_interval: OffsetInterval { start: 30, end: 49 },
                 })
                 .build(),
         );

@@ -42,15 +42,27 @@ fn new_deriv(
     (id, source)
 }
 
-fn append_data_block(metadata_repo: &MetadataRepositoryImpl, id: &DatasetID) -> MetadataBlock {
+fn append_data_block(
+    metadata_repo: &MetadataRepositoryImpl,
+    id: &DatasetID,
+    records: i64,
+) -> MetadataBlock {
     let mut chain = metadata_repo.get_metadata_chain(id).unwrap();
+    let offset = chain
+        .iter_blocks()
+        .filter_map(|b| b.output_slice)
+        .map(|s| s.data_interval.end + 1)
+        .next()
+        .unwrap_or(0);
     chain.append(
         MetadataFactory::metadata_block()
             .prev(&chain.read_ref(&BlockRef::Head).unwrap())
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::singleton(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval {
+                    start: offset,
+                    end: offset + records - 1,
+                },
             })
             .output_watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
             .build(),
@@ -76,18 +88,21 @@ fn test_get_next_operation() {
     let (bar, bar_source) = new_deriv(&metadata_repo, "bar", &[foo]);
 
     // No data - no work
-    assert_eq!(transform_svc.get_next_operation(bar).unwrap(), None);
+    assert_eq!(
+        transform_svc.get_next_operation(bar, Utc::now()).unwrap(),
+        None
+    );
 
-    let foo_block = append_data_block(&metadata_repo, foo);
+    let foo_block = append_data_block(&metadata_repo, foo, 10);
 
     assert!(matches!(
-        transform_svc.get_next_operation(bar).unwrap(),
-        Some(ExecuteQueryRequest { transform, inputs, .. })
+        transform_svc.get_next_operation(bar, Utc::now()).unwrap(),
+        Some(TransformOperation{ request: ExecuteQueryRequest { transform, inputs, .. }, ..})
         if transform == bar_source.transform &&
         inputs == vec![QueryInput {
             dataset_id: foo.to_owned(),
             vocab: DatasetVocabulary::default(),
-            interval: TimeInterval::unbounded_closed_right(foo_block.system_time),
+            data_interval: Some(OffsetInterval {start: 0, end: 9}),
             data_paths: vec![foo_layout.data_dir.join(foo_block.block_hash.to_string())],
             schema_file: foo_layout.data_dir.join(foo_block.block_hash.to_string()),
             explicit_watermarks: vec![Watermark {
@@ -142,10 +157,9 @@ fn test_get_verification_plan_one_to_one() {
         MetadataFactory::metadata_block()
             .system_time(t1)
             .prev(&root_head_src)
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::singleton(t1),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval { start: 0, end: 99 },
             })
             .output_watermark(t0)
             .build(),
@@ -156,22 +170,27 @@ fn test_get_verification_plan_one_to_one() {
     )
     .unwrap();
 
-    // T2: Transform (-inf; T1]
+    // T2: Transform [SRC; T1]
     let t2 = Utc.ymd(2020, 1, 2).and_hms(12, 0, 0);
-    let deriv_req_t2 = transform_svc.get_next_operation(deriv_id).unwrap().unwrap();
+    let deriv_req_t2 = transform_svc
+        .get_next_operation(deriv_id, t2)
+        .unwrap()
+        .unwrap();
     let deriv_head_t2 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
         MetadataFactory::metadata_block()
             .system_time(t2)
             .prev(&deriv_head_src)
-            .input_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::unbounded_closed_right(t1),
+            .input_slice(InputSlice {
+                dataset_id: root_id.to_owned(),
+                block_interval: Some(BlockInterval {
+                    start: root_head_src,
+                    end: root_head_t1,
+                }),
+                data_interval: Some(OffsetInterval { start: 0, end: 99 }),
             })
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::singleton(t2),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval { start: 0, end: 99 },
             })
             .output_watermark(t0)
             .build(),
@@ -183,10 +202,12 @@ fn test_get_verification_plan_one_to_one() {
         MetadataFactory::metadata_block()
             .system_time(t3)
             .prev(&root_head_t1)
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 10,
-                interval: TimeInterval::singleton(t3),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval {
+                    start: 100,
+                    end: 109,
+                },
             })
             .output_watermark(t2)
             .build(),
@@ -197,22 +218,33 @@ fn test_get_verification_plan_one_to_one() {
     )
     .unwrap();
 
-    // T4: Transform (T1; T3]
+    // T4: Transform [T3; T3]
     let t4 = Utc.ymd(2020, 1, 4).and_hms(12, 0, 0);
-    let deriv_req_t4 = transform_svc.get_next_operation(deriv_id).unwrap().unwrap();
+    let deriv_req_t4 = transform_svc
+        .get_next_operation(deriv_id, t4)
+        .unwrap()
+        .unwrap();
     let deriv_head_t4 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
         MetadataFactory::metadata_block()
             .system_time(t4)
             .prev(&deriv_head_t2)
-            .input_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::left_half_open(t1, t3).unwrap(),
+            .input_slice(InputSlice {
+                dataset_id: root_id.to_owned(),
+                block_interval: Some(BlockInterval {
+                    start: root_head_t3,
+                    end: root_head_t3,
+                }),
+                data_interval: Some(OffsetInterval {
+                    start: 100,
+                    end: 109,
+                }),
             })
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 100,
-                interval: TimeInterval::singleton(t4),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval {
+                    start: 100,
+                    end: 109,
+                },
             })
             .output_watermark(t2)
             .build(),
@@ -220,7 +252,7 @@ fn test_get_verification_plan_one_to_one() {
 
     // T5: Root watermark update only
     let t5 = Utc.ymd(2020, 1, 5).and_hms(12, 0, 0);
-    let _root_head_t5 = metadata_repo.get_metadata_chain(root_id).unwrap().append(
+    let root_head_t5 = metadata_repo.get_metadata_chain(root_id).unwrap().append(
         MetadataFactory::metadata_block()
             .system_time(t5)
             .prev(&root_head_t3)
@@ -228,22 +260,30 @@ fn test_get_verification_plan_one_to_one() {
             .build(),
     );
 
-    // T6: Transform (T3; T5]
+    // T6: Transform [T5; T5]
     let t6 = Utc.ymd(2020, 1, 6).and_hms(12, 0, 0);
-    let deriv_req_t6 = transform_svc.get_next_operation(deriv_id).unwrap().unwrap();
+    let deriv_req_t6 = transform_svc
+        .get_next_operation(deriv_id, t6)
+        .unwrap()
+        .unwrap();
     let deriv_head_t6 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
         MetadataFactory::metadata_block()
             .system_time(t6)
             .prev(&deriv_head_t4)
-            .input_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 0,
-                interval: TimeInterval::left_half_open(t3, t5).unwrap(),
+            .input_slice(InputSlice {
+                dataset_id: root_id.to_owned(),
+                block_interval: Some(BlockInterval {
+                    start: root_head_t5,
+                    end: root_head_t5,
+                }),
+                data_interval: None,
             })
-            .output_slice(DataSlice {
-                hash: Sha3_256::zero(),
-                num_records: 10,
-                interval: TimeInterval::singleton(t6),
+            .output_slice(OutputSlice {
+                data_logical_hash: Sha3_256::zero(),
+                data_interval: OffsetInterval {
+                    start: 110,
+                    end: 119,
+                },
             })
             .output_watermark(t4)
             .build(),
@@ -282,10 +322,19 @@ fn test_get_verification_plan_one_to_one() {
             .unwrap()
     );
 
-    assert_eq!(plan[0].request.inputs, deriv_req_t2.inputs);
-    assert_eq!(plan[0].request, deriv_req_t2);
-    assert_eq!(plan[1].request.inputs, deriv_req_t4.inputs);
-    assert_eq!(plan[1].request, deriv_req_t4);
-    assert_eq!(plan[2].request.inputs, deriv_req_t6.inputs);
-    assert_eq!(plan[2].request, deriv_req_t6);
+    assert_eq!(
+        plan[0].operation.request.inputs,
+        deriv_req_t2.request.inputs
+    );
+    assert_eq!(plan[0].operation.request, deriv_req_t2.request);
+    assert_eq!(
+        plan[1].operation.request.inputs,
+        deriv_req_t4.request.inputs
+    );
+    assert_eq!(plan[1].operation.request, deriv_req_t4.request);
+    assert_eq!(
+        plan[2].operation.request.inputs,
+        deriv_req_t6.request.inputs
+    );
+    assert_eq!(plan[2].operation.request, deriv_req_t6.request);
 }
