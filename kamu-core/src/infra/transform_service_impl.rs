@@ -14,6 +14,7 @@ use chrono::Utc;
 use opendatafabric::*;
 
 use dill::*;
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -785,7 +786,7 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                |new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
+                |mut new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
                     // Cleanup not needed outputs
                     if new_block.output_slice.is_some() {
                         std::fs::remove_file(new_data_path)
@@ -793,6 +794,15 @@ impl TransformService for TransformServiceImpl {
                     }
                     std::fs::remove_dir_all(new_checkpoint_path)
                         .map_err(|e| TransformError::internal(e))?;
+
+                    // Link new block
+                    new_block.prev_block_hash = expected_block.prev_block_hash;
+                    new_block.block_hash = FlatbuffersMetadataBlockSerializer
+                        .set_metadata_block_hash(
+                            &mut FlatbuffersMetadataBlockSerializer
+                                .serialize_metadata_block(&new_block),
+                        )
+                        .unwrap();
 
                     // All we care about is the new block
                     actual_block = Some(new_block);

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.72.0] - 2021-12-07
+### Changed
+- Breaking change - workspaces will need to be re-created. Sorry!
+- Implements [ODF RFC-001](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/001-record-offsets.md) that adds record offset system column.
+
 ## [0.71.0] - 2021-11-29
 ### Changed
 - Made engine timeouts configurable
