@@ -18,6 +18,7 @@ use parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };
+use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
@@ -236,6 +237,22 @@ fn test_transform_with_engine_spark() {
         records,
         [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
     );
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Verify
+    ///////////////////////////////////////////////////////////////////////////
+
+    let verify_result = transform_svc.verify_transform(
+        &deriv_id,
+        (None, None),
+        VerificationOptions::default(),
+        None,
+    );
+
+    assert_matches!(
+        verify_result,
+        Ok(VerificationResult::Valid { blocks_verified: 2 })
+    );
 }
 
 #[test]
@@ -452,5 +469,21 @@ fn test_transform_with_engine_flink() {
     assert_eq!(
         records,
         [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
+    );
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Verify
+    ///////////////////////////////////////////////////////////////////////////
+
+    let verify_result = transform_svc.verify_transform(
+        &deriv_id,
+        (None, None),
+        VerificationOptions::default(),
+        None,
+    );
+
+    assert_matches!(
+        verify_result,
+        Ok(VerificationResult::Valid { blocks_verified: 2 })
     );
 }
