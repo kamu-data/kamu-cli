@@ -13,6 +13,7 @@ use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};
+use digest::Digest;
 use std::sync::Arc;
 
 fn new_root(metadata_repo: &MetadataRepositoryImpl, id_str: &'static str) -> &'static DatasetID {
@@ -58,7 +59,14 @@ fn append_data_block(
         MetadataFactory::metadata_block()
             .prev(&chain.read_ref(&BlockRef::Head).unwrap())
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval {
                     start: offset,
                     end: offset + records - 1,
@@ -158,7 +166,14 @@ fn test_get_verification_plan_one_to_one() {
             .system_time(t1)
             .prev(&root_head_src)
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval { start: 0, end: 99 },
             })
             .output_watermark(t0)
@@ -189,7 +204,14 @@ fn test_get_verification_plan_one_to_one() {
                 data_interval: Some(OffsetInterval { start: 0, end: 99 }),
             })
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval { start: 0, end: 99 },
             })
             .output_watermark(t0)
@@ -203,7 +225,14 @@ fn test_get_verification_plan_one_to_one() {
             .system_time(t3)
             .prev(&root_head_t1)
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval {
                     start: 100,
                     end: 109,
@@ -240,7 +269,14 @@ fn test_get_verification_plan_one_to_one() {
                 }),
             })
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval {
                     start: 100,
                     end: 109,
@@ -279,7 +315,14 @@ fn test_get_verification_plan_one_to_one() {
                 data_interval: None,
             })
             .output_slice(OutputSlice {
-                data_logical_hash: Sha3_256::zero(),
+                data_logical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"foo"),
+                ),
+                data_physical_hash: Multihash::new(
+                    MulticodecCode::Sha3_256,
+                    &sha3::Sha3_256::digest(b"bar"),
+                ),
                 data_interval: OffsetInterval {
                     start: 110,
                     end: 119,

@@ -358,16 +358,36 @@ impl IngestTask {
                         }
                     }
 
-                    let new_block = MetadataBlock {
-                        prev_block_hash: Some(prev_hash),
-                        ..read_result.checkpoint.last_block
-                    };
+                    let output_data_interval = read_result.checkpoint.engine_response.data_interval;
+                    let output_watermark = read_result.checkpoint.engine_response.output_watermark;
 
                     // New block might not contain anything new, so we check for data
                     // and watermark differences to see if commit should be skipped
-                    if new_block.output_slice.is_none() {
-                        let prev_watermark = self.meta_chain.borrow().iter_blocks().filter_map(|b| b.output_watermark).next();
-                        if new_block.output_watermark.is_none() || new_block.output_watermark == prev_watermark {
+                    let output_slice = if let Some(output_data_interval) = output_data_interval {
+                        // TODO: Move out into common data commit procedure of sorts
+                        let data_logical_hash =
+                            crate::infra::utils::data_utils::get_parquet_logical_hash(&read_result.checkpoint.out_data_path)
+                                .map_err(|e| IngestError::internal(e))?;
+
+                        let data_physical_hash =
+                            crate::infra::utils::data_utils::get_parquet_physical_hash(&read_result.checkpoint.out_data_path)
+                                .map_err(|e| IngestError::internal(e))?;
+
+                        // Advance offset for the next run
+                        self.next_offset = output_data_interval.end + 1;
+
+                        Some(OutputSlice {
+                            data_logical_hash,
+                            data_physical_hash,
+                            data_interval: output_data_interval,
+                        })
+                    } else {
+                        let prev_watermark = self.meta_chain.borrow()
+                            .iter_blocks()
+                            .filter_map(|b| b.output_watermark)
+                            .next();
+
+                        if output_watermark.is_none() || output_watermark == prev_watermark {
                             info!("Skipping commit of new block as it neither has new data or watermark");
                             return Ok(ExecutionResult {
                                 was_up_to_date: false,  // The checkpoint is not up-to-date but dataset is
@@ -379,10 +399,19 @@ impl IngestTask {
                                 },
                             })
                         }
-                    } else {
-                        // Advance offset for the next run
-                        self.next_offset = new_block.output_slice.as_ref().unwrap().data_interval.end + 1;
-                    }
+                        None
+                    };
+
+                    let new_block = MetadataBlock {
+                        block_hash: Sha3_256::zero(),
+                        prev_block_hash: Some(prev_hash),
+                        system_time: read_result.checkpoint.system_time,
+                        input_slices: None,
+                        output_slice,
+                        output_watermark: read_result.checkpoint.engine_response.output_watermark,
+                        source: None,
+                        vocab: None,
+                    };
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
                     info!(new_head = ?new_head, "Committed new block");

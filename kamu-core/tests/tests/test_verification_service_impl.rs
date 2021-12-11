@@ -48,14 +48,18 @@ fn test_verify_data_consistency() {
     );
 
     let mut metadata_chain = metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+
     let data_logical_hash =
-        Sha3_256::from_str("3f6462b0f2ed522673cbe0177d59782adb9343e122e89f44d7e3ca5314428b88")
-            .unwrap();
+        Multihash::from_multibase_str("zW1diShRuwkajoPuAGcexm1LU71yey6DahGex9TK1YfKp71").unwrap();
+    // For now we don't verify physical hashes
+    let data_physical_hash = data_logical_hash.clone();
+
     let head = metadata_chain.append(
         MetadataFactory::metadata_block()
             .prev(&head)
             .output_slice(OutputSlice {
                 data_logical_hash,
+                data_physical_hash,
                 data_interval: OffsetInterval { start: 0, end: 0 },
             })
             .build(),

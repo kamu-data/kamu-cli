@@ -82,6 +82,7 @@ impl TransformServiceImpl {
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
         let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_dir);
+        let system_time = operation.request.system_time.clone();
         let out_data_path = PathBuf::from(&operation.request.out_data_path);
         let offset = operation.request.offset;
 
@@ -92,27 +93,11 @@ impl TransformServiceImpl {
             listener.clone().get_engine_provisioning_listener(),
         )?;
 
-        let metadata_block = engine.transform(operation.request)?.metadata_block;
+        let response = engine.transform(operation.request)?;
 
-        let mut metadata_block = if metadata_block.input_slices.is_some() {
-            return Err(EngineError::contract_error(
-                "Engine wrote input slices into metadata block",
-                Vec::new(),
-            )
-            .into());
-        } else {
-            // TODO: This will go away once we move most block forming logic to coordinator
-            MetadataBlock {
-                input_slices: Some(operation.input_slices),
-                ..metadata_block
-            }
-        };
-
-        if let Some(slice) = &mut metadata_block.output_slice {
+        let output_slice = if let Some(data_interval) = response.data_interval {
             // TODO: Move out this to validation
-            if slice.data_interval.end < slice.data_interval.start
-                || slice.data_interval.start != offset
-            {
+            if data_interval.end < data_interval.start || data_interval.start != offset {
                 return Err(EngineError::contract_error(
                     "Engine returned an output slice with invalid offset range",
                     Vec::new(),
@@ -127,18 +112,40 @@ impl TransformServiceImpl {
                 .into());
             }
 
-            // TODO: Make engine not return hashes to begin with
             // TODO: Move out into data commit procedure of sorts
-            slice.data_logical_hash =
+            let data_logical_hash =
                 crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
                     .map_err(|e| TransformError::internal(e))?;
+
+            let data_physical_hash =
+                crate::infra::utils::data_utils::get_parquet_physical_hash(&out_data_path)
+                    .map_err(|e| TransformError::internal(e))?;
+
+            Some(OutputSlice {
+                data_logical_hash,
+                data_physical_hash,
+                data_interval,
+            })
         } else if out_data_path.exists() {
             return Err(EngineError::contract_error(
                 "Engine wrote data file while the ouput slice is empty",
                 Vec::new(),
             )
             .into());
-        }
+        } else {
+            None
+        };
+
+        let metadata_block = MetadataBlock {
+            block_hash: Sha3_256::zero(),
+            prev_block_hash: None, // Filled out at commit
+            system_time,
+            input_slices: Some(operation.input_slices),
+            output_slice,
+            output_watermark: response.output_watermark,
+            source: None,
+            vocab: None,
+        };
 
         let result = commit_fn(metadata_block, &out_data_path, &new_checkpoint_path)?;
 

@@ -11,7 +11,7 @@ use super::*;
 use crate::domain::*;
 use crate::infra::*;
 use opendatafabric::serde::yaml::formats::datetime_rfc3339;
-use opendatafabric::serde::yaml::generated::MetadataBlockDef;
+use opendatafabric::serde::yaml::generated::ExecuteQueryResponseSuccessDef;
 use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
@@ -78,8 +78,8 @@ impl ReadService {
 
         let mut response = engine.ingest(request)?;
 
-        if let Some(slice) = &mut response.metadata_block.output_slice {
-            if slice.data_interval.end < slice.data_interval.start {
+        if let Some(data_interval) = &mut response.data_interval {
+            if data_interval.end < data_interval.start || data_interval.start != offset {
                 return Err(EngineError::contract_error(
                     "Engine returned an output slice with invalid data inverval",
                     Vec::new(),
@@ -93,12 +93,6 @@ impl ReadService {
                 )
                 .into());
             }
-
-            // TODO: Make engine not return hashes to begin with
-            // TODO: Move out into data commit procedure of sorts
-            slice.data_logical_hash =
-                crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
-                    .map_err(|e| IngestError::internal(e))?;
         }
 
         Ok(ExecutionResult {
@@ -106,7 +100,8 @@ impl ReadService {
             checkpoint: ReadCheckpoint {
                 last_read: Utc::now(),
                 for_prepared_at: for_prepared_at,
-                last_block: response.metadata_block,
+                system_time,
+                engine_response: response,
                 new_checkpoint_dir: new_checkpoint_dir,
                 out_data_path: out_data_path,
             },
@@ -122,8 +117,10 @@ pub struct ReadCheckpoint {
     pub last_read: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_prepared_at: DateTime<Utc>,
-    #[serde(with = "MetadataBlockDef")]
-    pub last_block: MetadataBlock,
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+    #[serde(with = "ExecuteQueryResponseSuccessDef")]
+    pub engine_response: ExecuteQueryResponseSuccess,
     pub new_checkpoint_dir: PathBuf,
     pub out_data_path: PathBuf,
 }
