@@ -286,8 +286,11 @@ implement_serde_as!(
 #[serde(remote = "ExecuteQueryResponseSuccess")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryResponseSuccessDef {
-    #[serde_as(as = "MetadataBlockDef")]
-    pub metadata_block: MetadataBlock,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub data_interval: Option<OffsetInterval>,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub output_watermark: Option<DateTime<Utc>>,
 }
 
 #[serde_as]
@@ -513,7 +516,8 @@ implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
 #[serde(remote = "OutputSlice")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct OutputSliceDef {
-    pub data_logical_hash: Sha3_256,
+    pub data_logical_hash: Multihash,
+    pub data_physical_hash: Multihash,
     #[serde_as(as = "OffsetIntervalDef")]
     pub data_interval: OffsetInterval,
 }

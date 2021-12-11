@@ -12,6 +12,9 @@
 mod grammar;
 pub use grammar::*;
 
+mod multihash;
+pub use multihash::*;
+
 mod dataset_id;
 pub use dataset_id::*;
 

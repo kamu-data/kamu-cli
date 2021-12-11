@@ -14,7 +14,7 @@
 
 use std::path::Path;
 
-use super::{CompressionFormat, DatasetID, Sha3_256, SourceOrdering};
+use super::{CompressionFormat, DatasetID, Multihash, Sha3_256, SourceOrdering};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -365,7 +365,8 @@ impl Into<super::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
 }
 
 pub trait ExecuteQueryResponseSuccess {
-    fn metadata_block(&self) -> &dyn MetadataBlock;
+    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn output_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
 pub trait ExecuteQueryResponseInvalidQuery {
@@ -378,8 +379,15 @@ pub trait ExecuteQueryResponseInternalError {
 }
 
 impl ExecuteQueryResponseSuccess for super::ExecuteQueryResponseSuccess {
-    fn metadata_block(&self) -> &dyn MetadataBlock {
-        &self.metadata_block
+    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.data_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
+    }
+    fn output_watermark(&self) -> Option<DateTime<Utc>> {
+        self.output_watermark
+            .as_ref()
+            .map(|v| -> DateTime<Utc> { *v })
     }
 }
 
@@ -401,7 +409,8 @@ impl ExecuteQueryResponseInternalError for super::ExecuteQueryResponseInternalEr
 impl Into<super::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSuccess {
     fn into(self) -> super::ExecuteQueryResponseSuccess {
         super::ExecuteQueryResponseSuccess {
-            metadata_block: self.metadata_block().into(),
+            data_interval: self.data_interval().map(|v| v.into()),
+            output_watermark: self.output_watermark().map(|v| v),
         }
     }
 }
@@ -753,13 +762,17 @@ impl Into<super::OffsetInterval> for &dyn OffsetInterval {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait OutputSlice {
-    fn data_logical_hash(&self) -> &Sha3_256;
+    fn data_logical_hash(&self) -> &Multihash;
+    fn data_physical_hash(&self) -> &Multihash;
     fn data_interval(&self) -> &dyn OffsetInterval;
 }
 
 impl OutputSlice for super::OutputSlice {
-    fn data_logical_hash(&self) -> &Sha3_256 {
+    fn data_logical_hash(&self) -> &Multihash {
         &self.data_logical_hash
+    }
+    fn data_physical_hash(&self) -> &Multihash {
+        &self.data_physical_hash
     }
     fn data_interval(&self) -> &dyn OffsetInterval {
         &self.data_interval
@@ -770,6 +783,7 @@ impl Into<super::OutputSlice> for &dyn OutputSlice {
     fn into(self) -> super::OutputSlice {
         super::OutputSlice {
             data_logical_hash: *self.data_logical_hash(),
+            data_physical_hash: *self.data_physical_hash(),
             data_interval: self.data_interval().into(),
         }
     }
