@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
+use digest::Digest;
 use opendatafabric::*;
 use std::convert::TryFrom;
 
@@ -34,7 +35,14 @@ fn load() -> MetadataBlock {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Sha3_256::new([0xA; 32]),
+            data_logical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"foo"),
+            ),
+            data_physical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"bar"),
+            ),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),

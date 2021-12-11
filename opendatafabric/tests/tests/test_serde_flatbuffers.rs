@@ -11,6 +11,7 @@ use opendatafabric::serde::{flatbuffers::*, EngineProtocolDeserializer, EnginePr
 use opendatafabric::*;
 
 use chrono::prelude::*;
+use digest::Digest;
 use std::convert::TryFrom;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,7 +79,14 @@ fn get_block_deriv() -> MetadataBlock {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_logical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"foo"),
+            ),
+            data_physical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"bar"),
+            ),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -168,7 +176,7 @@ fn serializer_hashes_are_stable_deriv() {
 
     assert_eq!(
         block_hash,
-        Sha3_256::try_from("f4c565176cbebc34f551e3bb86a891eca006d92fcdf6b87c66ff20ebe6e3c0f9")
+        Sha3_256::try_from("5b41fd5495c28b57526180bfa5ab617c1b20be6589ecfdc5dfe404ab970aaec9")
             .unwrap()
     );
 }
@@ -212,7 +220,8 @@ fn deserializer_rejects_incorrect_hashes() {
 fn serde_execute_query_response() {
     let examples = [
         ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
-            metadata_block: MetadataBlock { ..get_block_root() },
+            data_interval: Some(OffsetInterval { start: 0, end: 10 }),
+            output_watermark: Some(Utc::now()),
         }),
         ExecuteQueryResponse::InvalidQuery(ExecuteQueryResponseInvalidQuery {
             message: "boop".to_owned(),

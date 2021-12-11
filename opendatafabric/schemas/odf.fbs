@@ -317,43 +317,6 @@ table ExecuteQueryRequest {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// OutputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table OutputSlice {
-  data_logical_hash: [ubyte];
-  data_interval: OffsetInterval;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table InputSlice {
-  dataset_id: string;
-  block_interval: BlockInterval;
-  data_interval: OffsetInterval;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// MetadataBlock
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table MetadataBlock {
-  block_hash: [ubyte];
-  prev_block_hash: [ubyte];
-  system_time: Timestamp;
-  output_slice: OutputSlice;
-  output_watermark: Timestamp;
-  input_slices: [InputSlice];
-  source: DatasetSource;
-  vocab: DatasetVocabulary;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // ExecuteQueryResponse
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -362,7 +325,8 @@ table ExecuteQueryResponseProgress {
 }
 
 table ExecuteQueryResponseSuccess {
-  metadata_block: MetadataBlock;
+  data_interval: OffsetInterval;
+  output_watermark: Timestamp;
 }
 
 table ExecuteQueryResponseInvalidQuery {
@@ -382,6 +346,44 @@ union ExecuteQueryResponse {
 }
 
 table ExecuteQueryResponseRoot {
-  value : ExecuteQueryResponse;
+  value: ExecuteQueryResponse;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table InputSlice {
+  dataset_id: string;
+  block_interval: BlockInterval;
+  data_interval: OffsetInterval;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// OutputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table OutputSlice {
+  data_logical_hash: [ubyte];
+  data_physical_hash: [ubyte];
+  data_interval: OffsetInterval;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataBlock
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table MetadataBlock {
+  block_hash: [ubyte];
+  prev_block_hash: [ubyte];
+  system_time: Timestamp;
+  output_slice: OutputSlice;
+  output_watermark: Timestamp;
+  input_slices: [InputSlice];
+  source: DatasetSource;
+  vocab: DatasetVocabulary;
 }
 

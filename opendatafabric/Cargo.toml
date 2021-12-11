@@ -10,6 +10,11 @@ license-file = "../LICENSE.txt"
 chrono = { version = "*", features = ["serde"] }
 rust-crypto = "*"  # Data and metadata hashing
 
+# Multiformats
+bs58 = "*"  # base58 codec
+digest = "*"
+unsigned-varint = "*"
+
 # Serialization
 byteorder = "*"
 flatbuffers = "*"
@@ -25,6 +30,10 @@ prost = "*"
 # Utils
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
+
+
+[dev-dependencies]
+sha3 = "*"
 
 
 [build-dependencies]

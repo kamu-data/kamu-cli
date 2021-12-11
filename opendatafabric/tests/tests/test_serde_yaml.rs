@@ -9,6 +9,7 @@
 
 use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
+use digest::Digest;
 use indoc::indoc;
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::serde::yaml::*;
@@ -181,7 +182,8 @@ fn serde_metadata_block() {
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00Z\"
           outputSlice:
-            dataLogicalHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
+            dataLogicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
+            dataPhysicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
             dataInterval:
               start: 10
               end: 20
@@ -233,7 +235,14 @@ fn serde_metadata_block() {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_logical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"foo"),
+            ),
+            data_physical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"bar"),
+            ),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -278,11 +287,12 @@ fn serde_metadata_block_hashes() {
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: 8a346aaeb3a467ecfeb340a3139ec6c6613b1559460a1b2086b70fbbbeb27cff
+          blockHash: 0079c4c67f3e3e0cc1894ce60049e7993c243edf46cb54e64f4903a7d867464f
           prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
           systemTime: \"2020-01-01T12:00:00.123456789Z\"
           outputSlice:
-            dataLogicalHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
+            dataLogicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
+            dataPhysicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
             dataInterval:
               start: 10
               end: 20
@@ -334,7 +344,14 @@ fn serde_metadata_block_hashes() {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Sha3_256::new([0x0a; 32]),
+            data_logical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"foo"),
+            ),
+            data_physical_hash: Multihash::new(
+                MulticodecCode::Sha3_256,
+                &sha3::Sha3_256::digest(b"bar"),
+            ),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),

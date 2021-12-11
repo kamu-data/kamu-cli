@@ -17,6 +17,7 @@ use super::odf_generated as fb;
 mod odf {
     pub use crate::dataset_id::*;
     pub use crate::dtos::*;
+    pub use crate::multihash::*;
     pub use crate::sha::*;
 }
 use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
@@ -489,9 +490,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseSuccess {
     type OffsetT = WIPOffset<fb::ExecuteQueryResponseSuccess<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let metadata_block_offset = { self.metadata_block.serialize(fb) };
+        let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::ExecuteQueryResponseSuccessBuilder::new(fb);
-        builder.add_metadata_block(metadata_block_offset);
+        data_interval_offset.map(|off| builder.add_data_interval(off));
+        self.output_watermark
+            .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
         builder.finish()
     }
 }
@@ -501,10 +504,10 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseSuccess<'fb>>
 {
     fn deserialize(proxy: fb::ExecuteQueryResponseSuccess<'fb>) -> Self {
         odf::ExecuteQueryResponseSuccess {
-            metadata_block: proxy
-                .metadata_block()
-                .map(|v| odf::MetadataBlock::deserialize(v))
-                .unwrap(),
+            data_interval: proxy
+                .data_interval()
+                .map(|v| odf::OffsetInterval::deserialize(v)),
+            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
         }
     }
 }
@@ -945,10 +948,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::OutputSlice {
     type OffsetT = WIPOffset<fb::OutputSlice<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let data_logical_hash_offset = { fb.create_vector(&self.data_logical_hash) };
+        let data_logical_hash_offset = { fb.create_vector(&self.data_logical_hash.to_bytes()) };
+        let data_physical_hash_offset = { fb.create_vector(&self.data_physical_hash.to_bytes()) };
         let data_interval_offset = { self.data_interval.serialize(fb) };
         let mut builder = fb::OutputSliceBuilder::new(fb);
         builder.add_data_logical_hash(data_logical_hash_offset);
+        builder.add_data_physical_hash(data_physical_hash_offset);
         builder.add_data_interval(data_interval_offset);
         builder.finish()
     }
@@ -959,7 +964,11 @@ impl<'fb> FlatbuffersDeserializable<fb::OutputSlice<'fb>> for odf::OutputSlice {
         odf::OutputSlice {
             data_logical_hash: proxy
                 .data_logical_hash()
-                .map(|v| odf::Sha3_256::new(v.try_into().unwrap()))
+                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .unwrap(),
+            data_physical_hash: proxy
+                .data_physical_hash()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap())
                 .unwrap(),
             data_interval: proxy
                 .data_interval()

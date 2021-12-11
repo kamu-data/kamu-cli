@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use super::{DatasetIDBuf, Sha3_256};
+use super::{DatasetIDBuf, Multihash, Sha3_256};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +128,8 @@ pub enum ExecuteQueryResponse {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
-    pub metadata_block: MetadataBlock,
+    pub data_interval: Option<OffsetInterval>,
+    pub output_watermark: Option<DateTime<Utc>>,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -248,7 +249,8 @@ pub struct OffsetInterval {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OutputSlice {
-    pub data_logical_hash: Sha3_256,
+    pub data_logical_hash: Multihash,
+    pub data_physical_hash: Multihash,
     pub data_interval: OffsetInterval,
 }
 

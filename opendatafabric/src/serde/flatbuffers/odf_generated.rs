@@ -6491,643 +6491,6 @@ impl std::fmt::Debug for ExecuteQueryRequest<'_> {
         ds.finish()
     }
 }
-pub enum OutputSliceOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct OutputSlice<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for OutputSlice<'a> {
-    type Inner = OutputSlice<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> OutputSlice<'a> {
-    pub const VT_DATA_LOGICAL_HASH: flatbuffers::VOffsetT = 4;
-    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 6;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        OutputSlice { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args OutputSliceArgs<'args>,
-    ) -> flatbuffers::WIPOffset<OutputSlice<'bldr>> {
-        let mut builder = OutputSliceBuilder::new(_fbb);
-        if let Some(x) = args.data_interval {
-            builder.add_data_interval(x);
-        }
-        if let Some(x) = args.data_logical_hash {
-            builder.add_data_logical_hash(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn data_logical_hash(&self) -> Option<&'a [u8]> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                OutputSlice::VT_DATA_LOGICAL_HASH,
-                None,
-            )
-            .map(|v| v.safe_slice())
-    }
-    #[inline]
-    pub fn data_interval(&self) -> Option<OffsetInterval<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                OutputSlice::VT_DATA_INTERVAL,
-                None,
-            )
-    }
-}
-
-impl flatbuffers::Verifiable for OutputSlice<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
-                "data_logical_hash",
-                Self::VT_DATA_LOGICAL_HASH,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                "data_interval",
-                Self::VT_DATA_INTERVAL,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct OutputSliceArgs<'a> {
-    pub data_logical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
-}
-impl<'a> Default for OutputSliceArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        OutputSliceArgs {
-            data_logical_hash: None,
-            data_interval: None,
-        }
-    }
-}
-pub struct OutputSliceBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> OutputSliceBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_data_logical_hash(
-        &mut self,
-        data_logical_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            OutputSlice::VT_DATA_LOGICAL_HASH,
-            data_logical_hash,
-        );
-    }
-    #[inline]
-    pub fn add_data_interval(&mut self, data_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
-                OutputSlice::VT_DATA_INTERVAL,
-                data_interval,
-            );
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> OutputSliceBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        OutputSliceBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<OutputSlice<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for OutputSlice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("OutputSlice");
-        ds.field("data_logical_hash", &self.data_logical_hash());
-        ds.field("data_interval", &self.data_interval());
-        ds.finish()
-    }
-}
-pub enum InputSliceOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct InputSlice<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for InputSlice<'a> {
-    type Inner = InputSlice<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> InputSlice<'a> {
-    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_BLOCK_INTERVAL: flatbuffers::VOffsetT = 6;
-    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 8;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        InputSlice { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args InputSliceArgs<'args>,
-    ) -> flatbuffers::WIPOffset<InputSlice<'bldr>> {
-        let mut builder = InputSliceBuilder::new(_fbb);
-        if let Some(x) = args.data_interval {
-            builder.add_data_interval(x);
-        }
-        if let Some(x) = args.block_interval {
-            builder.add_block_interval(x);
-        }
-        if let Some(x) = args.dataset_id {
-            builder.add_dataset_id(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn dataset_id(&self) -> Option<&'a str> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<&str>>(InputSlice::VT_DATASET_ID, None)
-    }
-    #[inline]
-    pub fn block_interval(&self) -> Option<BlockInterval<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<BlockInterval>>(InputSlice::VT_BLOCK_INTERVAL, None)
-    }
-    #[inline]
-    pub fn data_interval(&self) -> Option<OffsetInterval<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(InputSlice::VT_DATA_INTERVAL, None)
-    }
-}
-
-impl flatbuffers::Verifiable for InputSlice<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "dataset_id",
-                Self::VT_DATASET_ID,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<BlockInterval>>(
-                "block_interval",
-                Self::VT_BLOCK_INTERVAL,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                "data_interval",
-                Self::VT_DATA_INTERVAL,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct InputSliceArgs<'a> {
-    pub dataset_id: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub block_interval: Option<flatbuffers::WIPOffset<BlockInterval<'a>>>,
-    pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
-}
-impl<'a> Default for InputSliceArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        InputSliceArgs {
-            dataset_id: None,
-            block_interval: None,
-            data_interval: None,
-        }
-    }
-}
-pub struct InputSliceBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> InputSliceBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_dataset_id(&mut self, dataset_id: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(InputSlice::VT_DATASET_ID, dataset_id);
-    }
-    #[inline]
-    pub fn add_block_interval(
-        &mut self,
-        block_interval: flatbuffers::WIPOffset<BlockInterval<'b>>,
-    ) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<BlockInterval>>(
-                InputSlice::VT_BLOCK_INTERVAL,
-                block_interval,
-            );
-    }
-    #[inline]
-    pub fn add_data_interval(&mut self, data_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
-                InputSlice::VT_DATA_INTERVAL,
-                data_interval,
-            );
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InputSliceBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        InputSliceBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<InputSlice<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for InputSlice<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("InputSlice");
-        ds.field("dataset_id", &self.dataset_id());
-        ds.field("block_interval", &self.block_interval());
-        ds.field("data_interval", &self.data_interval());
-        ds.finish()
-    }
-}
-pub enum MetadataBlockOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct MetadataBlock<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for MetadataBlock<'a> {
-    type Inner = MetadataBlock<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> MetadataBlock<'a> {
-    pub const VT_BLOCK_HASH: flatbuffers::VOffsetT = 4;
-    pub const VT_PREV_BLOCK_HASH: flatbuffers::VOffsetT = 6;
-    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 8;
-    pub const VT_OUTPUT_SLICE: flatbuffers::VOffsetT = 10;
-    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 12;
-    pub const VT_INPUT_SLICES: flatbuffers::VOffsetT = 14;
-    pub const VT_SOURCE_TYPE: flatbuffers::VOffsetT = 16;
-    pub const VT_SOURCE: flatbuffers::VOffsetT = 18;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 20;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        MetadataBlock { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args MetadataBlockArgs<'args>,
-    ) -> flatbuffers::WIPOffset<MetadataBlock<'bldr>> {
-        let mut builder = MetadataBlockBuilder::new(_fbb);
-        if let Some(x) = args.vocab {
-            builder.add_vocab(x);
-        }
-        if let Some(x) = args.source {
-            builder.add_source(x);
-        }
-        if let Some(x) = args.input_slices {
-            builder.add_input_slices(x);
-        }
-        if let Some(x) = args.output_watermark {
-            builder.add_output_watermark(x);
-        }
-        if let Some(x) = args.output_slice {
-            builder.add_output_slice(x);
-        }
-        if let Some(x) = args.system_time {
-            builder.add_system_time(x);
-        }
-        if let Some(x) = args.prev_block_hash {
-            builder.add_prev_block_hash(x);
-        }
-        if let Some(x) = args.block_hash {
-            builder.add_block_hash(x);
-        }
-        builder.add_source_type(args.source_type);
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn block_hash(&self) -> Option<&'a [u8]> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                MetadataBlock::VT_BLOCK_HASH,
-                None,
-            )
-            .map(|v| v.safe_slice())
-    }
-    #[inline]
-    pub fn prev_block_hash(&self) -> Option<&'a [u8]> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                MetadataBlock::VT_PREV_BLOCK_HASH,
-                None,
-            )
-            .map(|v| v.safe_slice())
-    }
-    #[inline]
-    pub fn system_time(&self) -> Option<&'a Timestamp> {
-        self._tab
-            .get::<Timestamp>(MetadataBlock::VT_SYSTEM_TIME, None)
-    }
-    #[inline]
-    pub fn output_slice(&self) -> Option<OutputSlice<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<OutputSlice>>(MetadataBlock::VT_OUTPUT_SLICE, None)
-    }
-    #[inline]
-    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
-        self._tab
-            .get::<Timestamp>(MetadataBlock::VT_OUTPUT_WATERMARK, None)
-    }
-    #[inline]
-    pub fn input_slices(
-        &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice<'a>>>> {
-        self._tab.get::<flatbuffers::ForwardsUOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice>>,
-        >>(MetadataBlock::VT_INPUT_SLICES, None)
-    }
-    #[inline]
-    pub fn source_type(&self) -> DatasetSource {
-        self._tab
-            .get::<DatasetSource>(MetadataBlock::VT_SOURCE_TYPE, Some(DatasetSource::NONE))
-            .unwrap()
-    }
-    #[inline]
-    pub fn source(&self) -> Option<flatbuffers::Table<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
-                MetadataBlock::VT_SOURCE,
-                None,
-            )
-    }
-    #[inline]
-    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(MetadataBlock::VT_VOCAB, None)
-    }
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn source_as_dataset_source_root(&self) -> Option<DatasetSourceRoot<'a>> {
-        if self.source_type() == DatasetSource::DatasetSourceRoot {
-            self.source().map(DatasetSourceRoot::init_from_table)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn source_as_dataset_source_derivative(&self) -> Option<DatasetSourceDerivative<'a>> {
-        if self.source_type() == DatasetSource::DatasetSourceDerivative {
-            self.source().map(DatasetSourceDerivative::init_from_table)
-        } else {
-            None
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for MetadataBlock<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("block_hash", Self::VT_BLOCK_HASH, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("prev_block_hash", Self::VT_PREV_BLOCK_HASH, false)?
-     .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<OutputSlice>>("output_slice", Self::VT_OUTPUT_SLICE, false)?
-     .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
-     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<InputSlice>>>>("input_slices", Self::VT_INPUT_SLICES, false)?
-     .visit_union::<DatasetSource, _>("source_type", Self::VT_SOURCE_TYPE, "source", Self::VT_SOURCE, false, |key, v, pos| {
-        match key {
-          DatasetSource::DatasetSourceRoot => v.verify_union_variant::<flatbuffers::ForwardsUOffset<DatasetSourceRoot>>("DatasetSource::DatasetSourceRoot", pos),
-          DatasetSource::DatasetSourceDerivative => v.verify_union_variant::<flatbuffers::ForwardsUOffset<DatasetSourceDerivative>>("DatasetSource::DatasetSourceDerivative", pos),
-          _ => Ok(()),
-        }
-     })?
-     .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>("vocab", Self::VT_VOCAB, false)?
-     .finish();
-        Ok(())
-    }
-}
-pub struct MetadataBlockArgs<'a> {
-    pub block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub prev_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub system_time: Option<&'a Timestamp>,
-    pub output_slice: Option<flatbuffers::WIPOffset<OutputSlice<'a>>>,
-    pub output_watermark: Option<&'a Timestamp>,
-    pub input_slices: Option<
-        flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice<'a>>>,
-        >,
-    >,
-    pub source_type: DatasetSource,
-    pub source: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
-    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
-}
-impl<'a> Default for MetadataBlockArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        MetadataBlockArgs {
-            block_hash: None,
-            prev_block_hash: None,
-            system_time: None,
-            output_slice: None,
-            output_watermark: None,
-            input_slices: None,
-            source_type: DatasetSource::NONE,
-            source: None,
-            vocab: None,
-        }
-    }
-}
-pub struct MetadataBlockBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> MetadataBlockBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_block_hash(
-        &mut self,
-        block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MetadataBlock::VT_BLOCK_HASH,
-            block_hash,
-        );
-    }
-    #[inline]
-    pub fn add_prev_block_hash(
-        &mut self,
-        prev_block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MetadataBlock::VT_PREV_BLOCK_HASH,
-            prev_block_hash,
-        );
-    }
-    #[inline]
-    pub fn add_system_time(&mut self, system_time: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(MetadataBlock::VT_SYSTEM_TIME, system_time);
-    }
-    #[inline]
-    pub fn add_output_slice(&mut self, output_slice: flatbuffers::WIPOffset<OutputSlice<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<OutputSlice>>(
-                MetadataBlock::VT_OUTPUT_SLICE,
-                output_slice,
-            );
-    }
-    #[inline]
-    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(MetadataBlock::VT_OUTPUT_WATERMARK, output_watermark);
-    }
-    #[inline]
-    pub fn add_input_slices(
-        &mut self,
-        input_slices: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<InputSlice<'b>>>,
-        >,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MetadataBlock::VT_INPUT_SLICES,
-            input_slices,
-        );
-    }
-    #[inline]
-    pub fn add_source_type(&mut self, source_type: DatasetSource) {
-        self.fbb_.push_slot::<DatasetSource>(
-            MetadataBlock::VT_SOURCE_TYPE,
-            source_type,
-            DatasetSource::NONE,
-        );
-    }
-    #[inline]
-    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(MetadataBlock::VT_SOURCE, source);
-    }
-    #[inline]
-    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
-                MetadataBlock::VT_VOCAB,
-                vocab,
-            );
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> MetadataBlockBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        MetadataBlockBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<MetadataBlock<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for MetadataBlock<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("MetadataBlock");
-        ds.field("block_hash", &self.block_hash());
-        ds.field("prev_block_hash", &self.prev_block_hash());
-        ds.field("system_time", &self.system_time());
-        ds.field("output_slice", &self.output_slice());
-        ds.field("output_watermark", &self.output_watermark());
-        ds.field("input_slices", &self.input_slices());
-        ds.field("source_type", &self.source_type());
-        match self.source_type() {
-            DatasetSource::DatasetSourceRoot => {
-                if let Some(x) = self.source_as_dataset_source_root() {
-                    ds.field("source", &x)
-                } else {
-                    ds.field(
-                        "source",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            DatasetSource::DatasetSourceDerivative => {
-                if let Some(x) = self.source_as_dataset_source_derivative() {
-                    ds.field("source", &x)
-                } else {
-                    ds.field(
-                        "source",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            _ => {
-                let x: Option<()> = None;
-                ds.field("source", &x)
-            }
-        };
-        ds.field("vocab", &self.vocab());
-        ds.finish()
-    }
-}
 pub enum ExecuteQueryResponseProgressOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -7226,7 +6589,8 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseSuccess<'a> {
 }
 
 impl<'a> ExecuteQueryResponseSuccess<'a> {
-    pub const VT_METADATA_BLOCK: flatbuffers::VOffsetT = 4;
+    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 4;
+    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -7238,19 +6602,27 @@ impl<'a> ExecuteQueryResponseSuccess<'a> {
         args: &'args ExecuteQueryResponseSuccessArgs<'args>,
     ) -> flatbuffers::WIPOffset<ExecuteQueryResponseSuccess<'bldr>> {
         let mut builder = ExecuteQueryResponseSuccessBuilder::new(_fbb);
-        if let Some(x) = args.metadata_block {
-            builder.add_metadata_block(x);
+        if let Some(x) = args.output_watermark {
+            builder.add_output_watermark(x);
+        }
+        if let Some(x) = args.data_interval {
+            builder.add_data_interval(x);
         }
         builder.finish()
     }
 
     #[inline]
-    pub fn metadata_block(&self) -> Option<MetadataBlock<'a>> {
+    pub fn data_interval(&self) -> Option<OffsetInterval<'a>> {
         self._tab
-            .get::<flatbuffers::ForwardsUOffset<MetadataBlock>>(
-                ExecuteQueryResponseSuccess::VT_METADATA_BLOCK,
+            .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                ExecuteQueryResponseSuccess::VT_DATA_INTERVAL,
                 None,
             )
+    }
+    #[inline]
+    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
+        self._tab
+            .get::<Timestamp>(ExecuteQueryResponseSuccess::VT_OUTPUT_WATERMARK, None)
     }
 }
 
@@ -7262,23 +6634,26 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseSuccess<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<MetadataBlock>>(
-                "metadata_block",
-                Self::VT_METADATA_BLOCK,
+            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                "data_interval",
+                Self::VT_DATA_INTERVAL,
                 false,
             )?
+            .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
             .finish();
         Ok(())
     }
 }
 pub struct ExecuteQueryResponseSuccessArgs<'a> {
-    pub metadata_block: Option<flatbuffers::WIPOffset<MetadataBlock<'a>>>,
+    pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+    pub output_watermark: Option<&'a Timestamp>,
 }
 impl<'a> Default for ExecuteQueryResponseSuccessArgs<'a> {
     #[inline]
     fn default() -> Self {
         ExecuteQueryResponseSuccessArgs {
-            metadata_block: None,
+            data_interval: None,
+            output_watermark: None,
         }
     }
 }
@@ -7288,15 +6663,19 @@ pub struct ExecuteQueryResponseSuccessBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
     #[inline]
-    pub fn add_metadata_block(
-        &mut self,
-        metadata_block: flatbuffers::WIPOffset<MetadataBlock<'b>>,
-    ) {
+    pub fn add_data_interval(&mut self, data_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<MetadataBlock>>(
-                ExecuteQueryResponseSuccess::VT_METADATA_BLOCK,
-                metadata_block,
+            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
+                ExecuteQueryResponseSuccess::VT_DATA_INTERVAL,
+                data_interval,
             );
+    }
+    #[inline]
+    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
+        self.fbb_.push_slot_always::<&Timestamp>(
+            ExecuteQueryResponseSuccess::VT_OUTPUT_WATERMARK,
+            output_watermark,
+        );
     }
     #[inline]
     pub fn new(
@@ -7318,7 +6697,8 @@ impl<'a: 'b, 'b> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
 impl std::fmt::Debug for ExecuteQueryResponseSuccess<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryResponseSuccess");
-        ds.field("metadata_block", &self.metadata_block());
+        ds.field("data_interval", &self.data_interval());
+        ds.field("output_watermark", &self.output_watermark());
         ds.finish()
     }
 }
@@ -7785,6 +7165,674 @@ impl std::fmt::Debug for ExecuteQueryResponseRoot<'_> {
                 ds.field("value", &x)
             }
         };
+        ds.finish()
+    }
+}
+pub enum InputSliceOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct InputSlice<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for InputSlice<'a> {
+    type Inner = InputSlice<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> InputSlice<'a> {
+    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_BLOCK_INTERVAL: flatbuffers::VOffsetT = 6;
+    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        InputSlice { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args InputSliceArgs<'args>,
+    ) -> flatbuffers::WIPOffset<InputSlice<'bldr>> {
+        let mut builder = InputSliceBuilder::new(_fbb);
+        if let Some(x) = args.data_interval {
+            builder.add_data_interval(x);
+        }
+        if let Some(x) = args.block_interval {
+            builder.add_block_interval(x);
+        }
+        if let Some(x) = args.dataset_id {
+            builder.add_dataset_id(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn dataset_id(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(InputSlice::VT_DATASET_ID, None)
+    }
+    #[inline]
+    pub fn block_interval(&self) -> Option<BlockInterval<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<BlockInterval>>(InputSlice::VT_BLOCK_INTERVAL, None)
+    }
+    #[inline]
+    pub fn data_interval(&self) -> Option<OffsetInterval<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(InputSlice::VT_DATA_INTERVAL, None)
+    }
+}
+
+impl flatbuffers::Verifiable for InputSlice<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "dataset_id",
+                Self::VT_DATASET_ID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<BlockInterval>>(
+                "block_interval",
+                Self::VT_BLOCK_INTERVAL,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                "data_interval",
+                Self::VT_DATA_INTERVAL,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct InputSliceArgs<'a> {
+    pub dataset_id: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub block_interval: Option<flatbuffers::WIPOffset<BlockInterval<'a>>>,
+    pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+}
+impl<'a> Default for InputSliceArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        InputSliceArgs {
+            dataset_id: None,
+            block_interval: None,
+            data_interval: None,
+        }
+    }
+}
+pub struct InputSliceBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> InputSliceBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_dataset_id(&mut self, dataset_id: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(InputSlice::VT_DATASET_ID, dataset_id);
+    }
+    #[inline]
+    pub fn add_block_interval(
+        &mut self,
+        block_interval: flatbuffers::WIPOffset<BlockInterval<'b>>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<BlockInterval>>(
+                InputSlice::VT_BLOCK_INTERVAL,
+                block_interval,
+            );
+    }
+    #[inline]
+    pub fn add_data_interval(&mut self, data_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
+                InputSlice::VT_DATA_INTERVAL,
+                data_interval,
+            );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> InputSliceBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        InputSliceBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<InputSlice<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for InputSlice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("InputSlice");
+        ds.field("dataset_id", &self.dataset_id());
+        ds.field("block_interval", &self.block_interval());
+        ds.field("data_interval", &self.data_interval());
+        ds.finish()
+    }
+}
+pub enum OutputSliceOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct OutputSlice<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for OutputSlice<'a> {
+    type Inner = OutputSlice<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> OutputSlice<'a> {
+    pub const VT_DATA_LOGICAL_HASH: flatbuffers::VOffsetT = 4;
+    pub const VT_DATA_PHYSICAL_HASH: flatbuffers::VOffsetT = 6;
+    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        OutputSlice { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args OutputSliceArgs<'args>,
+    ) -> flatbuffers::WIPOffset<OutputSlice<'bldr>> {
+        let mut builder = OutputSliceBuilder::new(_fbb);
+        if let Some(x) = args.data_interval {
+            builder.add_data_interval(x);
+        }
+        if let Some(x) = args.data_physical_hash {
+            builder.add_data_physical_hash(x);
+        }
+        if let Some(x) = args.data_logical_hash {
+            builder.add_data_logical_hash(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn data_logical_hash(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                OutputSlice::VT_DATA_LOGICAL_HASH,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn data_physical_hash(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                OutputSlice::VT_DATA_PHYSICAL_HASH,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn data_interval(&self) -> Option<OffsetInterval<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                OutputSlice::VT_DATA_INTERVAL,
+                None,
+            )
+    }
+}
+
+impl flatbuffers::Verifiable for OutputSlice<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "data_logical_hash",
+                Self::VT_DATA_LOGICAL_HASH,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "data_physical_hash",
+                Self::VT_DATA_PHYSICAL_HASH,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                "data_interval",
+                Self::VT_DATA_INTERVAL,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct OutputSliceArgs<'a> {
+    pub data_logical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub data_physical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+}
+impl<'a> Default for OutputSliceArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        OutputSliceArgs {
+            data_logical_hash: None,
+            data_physical_hash: None,
+            data_interval: None,
+        }
+    }
+}
+pub struct OutputSliceBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> OutputSliceBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_data_logical_hash(
+        &mut self,
+        data_logical_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            OutputSlice::VT_DATA_LOGICAL_HASH,
+            data_logical_hash,
+        );
+    }
+    #[inline]
+    pub fn add_data_physical_hash(
+        &mut self,
+        data_physical_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            OutputSlice::VT_DATA_PHYSICAL_HASH,
+            data_physical_hash,
+        );
+    }
+    #[inline]
+    pub fn add_data_interval(&mut self, data_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
+                OutputSlice::VT_DATA_INTERVAL,
+                data_interval,
+            );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> OutputSliceBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        OutputSliceBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<OutputSlice<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for OutputSlice<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("OutputSlice");
+        ds.field("data_logical_hash", &self.data_logical_hash());
+        ds.field("data_physical_hash", &self.data_physical_hash());
+        ds.field("data_interval", &self.data_interval());
+        ds.finish()
+    }
+}
+pub enum MetadataBlockOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct MetadataBlock<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for MetadataBlock<'a> {
+    type Inner = MetadataBlock<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> MetadataBlock<'a> {
+    pub const VT_BLOCK_HASH: flatbuffers::VOffsetT = 4;
+    pub const VT_PREV_BLOCK_HASH: flatbuffers::VOffsetT = 6;
+    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 8;
+    pub const VT_OUTPUT_SLICE: flatbuffers::VOffsetT = 10;
+    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 12;
+    pub const VT_INPUT_SLICES: flatbuffers::VOffsetT = 14;
+    pub const VT_SOURCE_TYPE: flatbuffers::VOffsetT = 16;
+    pub const VT_SOURCE: flatbuffers::VOffsetT = 18;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 20;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        MetadataBlock { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args MetadataBlockArgs<'args>,
+    ) -> flatbuffers::WIPOffset<MetadataBlock<'bldr>> {
+        let mut builder = MetadataBlockBuilder::new(_fbb);
+        if let Some(x) = args.vocab {
+            builder.add_vocab(x);
+        }
+        if let Some(x) = args.source {
+            builder.add_source(x);
+        }
+        if let Some(x) = args.input_slices {
+            builder.add_input_slices(x);
+        }
+        if let Some(x) = args.output_watermark {
+            builder.add_output_watermark(x);
+        }
+        if let Some(x) = args.output_slice {
+            builder.add_output_slice(x);
+        }
+        if let Some(x) = args.system_time {
+            builder.add_system_time(x);
+        }
+        if let Some(x) = args.prev_block_hash {
+            builder.add_prev_block_hash(x);
+        }
+        if let Some(x) = args.block_hash {
+            builder.add_block_hash(x);
+        }
+        builder.add_source_type(args.source_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn block_hash(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                MetadataBlock::VT_BLOCK_HASH,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn prev_block_hash(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                MetadataBlock::VT_PREV_BLOCK_HASH,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn system_time(&self) -> Option<&'a Timestamp> {
+        self._tab
+            .get::<Timestamp>(MetadataBlock::VT_SYSTEM_TIME, None)
+    }
+    #[inline]
+    pub fn output_slice(&self) -> Option<OutputSlice<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<OutputSlice>>(MetadataBlock::VT_OUTPUT_SLICE, None)
+    }
+    #[inline]
+    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
+        self._tab
+            .get::<Timestamp>(MetadataBlock::VT_OUTPUT_WATERMARK, None)
+    }
+    #[inline]
+    pub fn input_slices(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice<'a>>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice>>,
+        >>(MetadataBlock::VT_INPUT_SLICES, None)
+    }
+    #[inline]
+    pub fn source_type(&self) -> DatasetSource {
+        self._tab
+            .get::<DatasetSource>(MetadataBlock::VT_SOURCE_TYPE, Some(DatasetSource::NONE))
+            .unwrap()
+    }
+    #[inline]
+    pub fn source(&self) -> Option<flatbuffers::Table<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                MetadataBlock::VT_SOURCE,
+                None,
+            )
+    }
+    #[inline]
+    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(MetadataBlock::VT_VOCAB, None)
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn source_as_dataset_source_root(&self) -> Option<DatasetSourceRoot<'a>> {
+        if self.source_type() == DatasetSource::DatasetSourceRoot {
+            self.source().map(DatasetSourceRoot::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn source_as_dataset_source_derivative(&self) -> Option<DatasetSourceDerivative<'a>> {
+        if self.source_type() == DatasetSource::DatasetSourceDerivative {
+            self.source().map(DatasetSourceDerivative::init_from_table)
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for MetadataBlock<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("block_hash", Self::VT_BLOCK_HASH, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>("prev_block_hash", Self::VT_PREV_BLOCK_HASH, false)?
+     .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<OutputSlice>>("output_slice", Self::VT_OUTPUT_SLICE, false)?
+     .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<InputSlice>>>>("input_slices", Self::VT_INPUT_SLICES, false)?
+     .visit_union::<DatasetSource, _>("source_type", Self::VT_SOURCE_TYPE, "source", Self::VT_SOURCE, false, |key, v, pos| {
+        match key {
+          DatasetSource::DatasetSourceRoot => v.verify_union_variant::<flatbuffers::ForwardsUOffset<DatasetSourceRoot>>("DatasetSource::DatasetSourceRoot", pos),
+          DatasetSource::DatasetSourceDerivative => v.verify_union_variant::<flatbuffers::ForwardsUOffset<DatasetSourceDerivative>>("DatasetSource::DatasetSourceDerivative", pos),
+          _ => Ok(()),
+        }
+     })?
+     .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>("vocab", Self::VT_VOCAB, false)?
+     .finish();
+        Ok(())
+    }
+}
+pub struct MetadataBlockArgs<'a> {
+    pub block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub prev_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub system_time: Option<&'a Timestamp>,
+    pub output_slice: Option<flatbuffers::WIPOffset<OutputSlice<'a>>>,
+    pub output_watermark: Option<&'a Timestamp>,
+    pub input_slices: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice<'a>>>,
+        >,
+    >,
+    pub source_type: DatasetSource,
+    pub source: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
+}
+impl<'a> Default for MetadataBlockArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        MetadataBlockArgs {
+            block_hash: None,
+            prev_block_hash: None,
+            system_time: None,
+            output_slice: None,
+            output_watermark: None,
+            input_slices: None,
+            source_type: DatasetSource::NONE,
+            source: None,
+            vocab: None,
+        }
+    }
+}
+pub struct MetadataBlockBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> MetadataBlockBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_block_hash(
+        &mut self,
+        block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            MetadataBlock::VT_BLOCK_HASH,
+            block_hash,
+        );
+    }
+    #[inline]
+    pub fn add_prev_block_hash(
+        &mut self,
+        prev_block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            MetadataBlock::VT_PREV_BLOCK_HASH,
+            prev_block_hash,
+        );
+    }
+    #[inline]
+    pub fn add_system_time(&mut self, system_time: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(MetadataBlock::VT_SYSTEM_TIME, system_time);
+    }
+    #[inline]
+    pub fn add_output_slice(&mut self, output_slice: flatbuffers::WIPOffset<OutputSlice<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<OutputSlice>>(
+                MetadataBlock::VT_OUTPUT_SLICE,
+                output_slice,
+            );
+    }
+    #[inline]
+    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(MetadataBlock::VT_OUTPUT_WATERMARK, output_watermark);
+    }
+    #[inline]
+    pub fn add_input_slices(
+        &mut self,
+        input_slices: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<InputSlice<'b>>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            MetadataBlock::VT_INPUT_SLICES,
+            input_slices,
+        );
+    }
+    #[inline]
+    pub fn add_source_type(&mut self, source_type: DatasetSource) {
+        self.fbb_.push_slot::<DatasetSource>(
+            MetadataBlock::VT_SOURCE_TYPE,
+            source_type,
+            DatasetSource::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(MetadataBlock::VT_SOURCE, source);
+    }
+    #[inline]
+    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
+                MetadataBlock::VT_VOCAB,
+                vocab,
+            );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> MetadataBlockBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        MetadataBlockBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<MetadataBlock<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for MetadataBlock<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("MetadataBlock");
+        ds.field("block_hash", &self.block_hash());
+        ds.field("prev_block_hash", &self.prev_block_hash());
+        ds.field("system_time", &self.system_time());
+        ds.field("output_slice", &self.output_slice());
+        ds.field("output_watermark", &self.output_watermark());
+        ds.field("input_slices", &self.input_slices());
+        ds.field("source_type", &self.source_type());
+        match self.source_type() {
+            DatasetSource::DatasetSourceRoot => {
+                if let Some(x) = self.source_as_dataset_source_root() {
+                    ds.field("source", &x)
+                } else {
+                    ds.field(
+                        "source",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            DatasetSource::DatasetSourceDerivative => {
+                if let Some(x) = self.source_as_dataset_source_derivative() {
+                    ds.field("source", &x)
+                } else {
+                    ds.field(
+                        "source",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("source", &x)
+            }
+        };
+        ds.field("vocab", &self.vocab());
         ds.finish()
     }
 }
