@@ -94,7 +94,7 @@ impl TransformServiceImpl {
 
         let metadata_block = engine.transform(operation.request)?.metadata_block;
 
-        let metadata_block = if metadata_block.input_slices.is_some() {
+        let mut metadata_block = if metadata_block.input_slices.is_some() {
             return Err(EngineError::contract_error(
                 "Engine wrote input slices into metadata block",
                 Vec::new(),
@@ -108,7 +108,7 @@ impl TransformServiceImpl {
             }
         };
 
-        if let Some(ref slice) = metadata_block.output_slice {
+        if let Some(slice) = &mut metadata_block.output_slice {
             // TODO: Move out this to validation
             if slice.data_interval.end < slice.data_interval.start
                 || slice.data_interval.start != offset
@@ -126,6 +126,12 @@ impl TransformServiceImpl {
                 )
                 .into());
             }
+
+            // TODO: Make engine not return hashes to begin with
+            // TODO: Move out into data commit procedure of sorts
+            slice.data_logical_hash =
+                crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
+                    .map_err(|e| TransformError::internal(e))?;
         } else if out_data_path.exists() {
             return Err(EngineError::contract_error(
                 "Engine wrote data file while the ouput slice is empty",

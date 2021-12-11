@@ -18,3 +18,4 @@ mod test_search_service_impl;
 mod test_serde_yaml;
 mod test_sync_service_impl;
 mod test_transform_service_impl;
+mod test_verification_service_impl;

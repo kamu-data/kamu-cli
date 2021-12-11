@@ -76,9 +76,9 @@ impl ReadService {
             out_data_path: out_data_path.clone(),
         };
 
-        let response = engine.ingest(request)?;
+        let mut response = engine.ingest(request)?;
 
-        if let Some(ref slice) = response.metadata_block.output_slice {
+        if let Some(slice) = &mut response.metadata_block.output_slice {
             if slice.data_interval.end < slice.data_interval.start {
                 return Err(EngineError::contract_error(
                     "Engine returned an output slice with invalid data inverval",
@@ -93,6 +93,12 @@ impl ReadService {
                 )
                 .into());
             }
+
+            // TODO: Make engine not return hashes to begin with
+            // TODO: Move out into data commit procedure of sorts
+            slice.data_logical_hash =
+                crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
+                    .map_err(|e| IngestError::internal(e))?;
         }
 
         Ok(ExecutionResult {

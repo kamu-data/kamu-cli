@@ -260,6 +260,7 @@ pub fn get_command(
             catalog.get_one()?,
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("recursive"),
+            submatches.is_present("integrity"),
         )),
         _ => return Err(CommandInterpretationFailed.into()),
     };
