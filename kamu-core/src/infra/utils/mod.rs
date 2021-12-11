@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod data_utils;
 pub mod docker_images;
 pub mod records_writers;
 pub mod schema_utils;

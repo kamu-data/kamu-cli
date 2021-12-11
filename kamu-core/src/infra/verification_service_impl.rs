@@ -18,6 +18,7 @@ use tracing::info_span;
 pub struct VerificationServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
     transform_service: Arc<dyn TransformService>,
+    volume_layout: Arc<VolumeLayout>,
 }
 
 #[component(pub)]
@@ -25,10 +26,12 @@ impl VerificationServiceImpl {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         transform_service: Arc<dyn TransformService>,
+        volume_layout: Arc<VolumeLayout>,
     ) -> Self {
         Self {
             metadata_repo,
             transform_service,
+            volume_layout,
         }
     }
 
@@ -53,13 +56,7 @@ impl VerificationServiceImpl {
         let plan: Vec<_> = metadata_chain
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
-            .filter_map(|block| {
-                if block.output_slice.is_some() {
-                    Some(block)
-                } else {
-                    None
-                }
-            })
+            .filter(|block| block.output_slice.is_some())
             .take_while(|block| Some(block.block_hash) != start_block)
             .collect();
 
@@ -78,6 +75,7 @@ impl VerificationServiceImpl {
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
         let plan = self.get_integrity_check_plan(dataset_id, block_range)?;
 
         let num_blocks = plan.len();
@@ -85,6 +83,8 @@ impl VerificationServiceImpl {
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
 
         for (block_index, block) in plan.into_iter().enumerate() {
+            let output_slice = block.output_slice.as_ref().unwrap();
+
             listener.begin_block(
                 &block.block_hash,
                 block_index,
@@ -92,11 +92,23 @@ impl VerificationServiceImpl {
                 VerificationPhase::DataIntegrity,
             );
 
-            ////////////////////////////////////////////////////////////
-            // TODO: VERIFY DATA HASH
-            // Hashing design is still pending in the ODF protocol spec,
-            // so we do a no-op now.
-            ////////////////////////////////////////////////////////////
+            let data_path = dataset_layout.data_dir.join(block.block_hash.to_string());
+
+            // TODO: Make engine not return hashes to begin with
+            // TODO: Move out into data commit procedure of sorts
+            let logical_hash_actual =
+                crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+                    .map_err(|e| DomainError::InfraError(e.into()))?;
+
+            if logical_hash_actual != output_slice.data_logical_hash {
+                return Err(VerificationError::DataDoesNotMatchMetadata(
+                    DataDoesNotMatchMetadata {
+                        block_hash: block.block_hash,
+                        data_logical_hash_expected: output_slice.data_logical_hash.to_string(),
+                        data_logical_hash_actual: logical_hash_actual.to_string(),
+                    },
+                ));
+            }
 
             listener.end_block(
                 &block.block_hash,
@@ -129,16 +141,24 @@ impl VerificationService for VerificationServiceImpl {
         listener.begin();
 
         let res: Result<VerificationResult, VerificationError> = try {
-            let res = self.check_data_integrity(dataset_id, block_range, listener.clone())?;
+            let res = if options.check_integrity {
+                self.check_data_integrity(dataset_id, block_range, listener.clone())?
+            } else {
+                VerificationResult::Valid { blocks_verified: 0 }
+            };
 
-            match self.metadata_repo.get_summary(dataset_id)?.kind {
-                DatasetKind::Root => res,
-                DatasetKind::Derivative => self.transform_service.verify_transform(
-                    dataset_id,
-                    block_range,
-                    options,
-                    Some(listener.clone()),
-                )?,
+            if options.replay_transformations {
+                match self.metadata_repo.get_summary(dataset_id)?.kind {
+                    DatasetKind::Root => res,
+                    DatasetKind::Derivative => self.transform_service.verify_transform(
+                        dataset_id,
+                        block_range,
+                        options,
+                        Some(listener.clone()),
+                    )?,
+                }
+            } else {
+                res
             }
         };
 

@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.72.0"
+version = "0.73.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -33,6 +33,13 @@ curl-sys = "*"
 zip = "*"
 ringbuf = "*"
 
+# Data
+arrow-digest = { version = "*", default-features = false, features = ["use-arrow-5"] }  # Data hashing (in-house library)
+datafusion = "^5"  # Reading data + SQL
+parquet = "*"
+digest = "*"
+sha3 = "*"
+
 # Repositories
 bytes = "*"
 futures = "*"
@@ -44,7 +51,6 @@ rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 # Utils
 async-trait = "*"
 cfg-if = "*"  # Conditional compilation
-datafusion = "^5"  # Reading data + SQL
 glob = "*"  # Used for glob fetch
 rand = "^0.8"
 regex = "*"
@@ -63,4 +69,3 @@ users = "*"  # For getting uid:gid
 
 [dev-dependencies]
 filetime = "*"
-parquet = "*"

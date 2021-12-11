@@ -464,7 +464,7 @@ impl PullTestHarness {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum PullBatch {
+pub enum PullBatch {
     Ingest(Vec<DatasetRefBuf>),
     Transform(Vec<DatasetRefBuf>),
     Sync(Vec<(DatasetRefBuf, DatasetIDBuf)>),
@@ -527,12 +527,12 @@ impl IngestService for TestIngestService {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct TestTransformService {
+pub struct TestTransformService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
 }
 
 impl TestTransformService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
+    pub fn new(calls: Arc<Mutex<Vec<PullBatch>>>) -> Self {
         Self { calls }
     }
 }

@@ -35,6 +35,7 @@ pub struct VerifyCommand {
     output_config: Arc<OutputConfig>,
     ids: Vec<String>,
     recursive: bool,
+    integrity: bool,
 }
 
 impl VerifyCommand {
@@ -43,6 +44,7 @@ impl VerifyCommand {
         output_config: Arc<OutputConfig>,
         ids: I,
         recursive: bool,
+        integrity: bool,
     ) -> Self
     where
         I: Iterator<Item = S>,
@@ -53,10 +55,11 @@ impl VerifyCommand {
             output_config,
             ids: ids.map(|s| s.as_ref().to_owned()).collect(),
             recursive,
+            integrity,
         }
     }
 
-    fn verify_with_progress(&self) -> GenericVerificationResult {
+    fn verify_with_progress(&self, options: VerificationOptions) -> GenericVerificationResult {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
 
@@ -64,7 +67,7 @@ impl VerifyCommand {
             progress.draw();
         });
 
-        let results = self.verify(Some(listener.clone()));
+        let results = self.verify(options, Some(listener.clone()));
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -74,6 +77,7 @@ impl VerifyCommand {
 
     fn verify(
         &self,
+        options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_id = self
@@ -84,12 +88,9 @@ impl VerifyCommand {
 
         let listener = listener.and_then(|l| l.begin_verify(&dataset_id));
 
-        let res = self.verification_svc.verify(
-            &dataset_id,
-            (None, None),
-            VerificationOptions::default(),
-            listener,
-        );
+        let res = self
+            .verification_svc
+            .verify(&dataset_id, (None, None), options, listener);
 
         Ok(vec![(dataset_id, res)])
     }
@@ -109,13 +110,25 @@ impl Command for VerifyCommand {
             ));
         }
 
+        let options = if self.integrity {
+            VerificationOptions {
+                check_integrity: true,
+                replay_transformations: false,
+            }
+        } else {
+            VerificationOptions {
+                check_integrity: true,
+                replay_transformations: true,
+            }
+        };
+
         let verification_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
-            self.verify_with_progress()?
+            self.verify_with_progress(options)?
         } else {
-            self.verify(None)?
+            self.verify(options, None)?
         };
 
         let mut valid = 0;
@@ -269,7 +282,7 @@ impl VerificationProgress {
         block: Option<&Sha3_256>,
     ) -> String {
         let step_str = if out_of != 0 {
-            format!("[{}/{}]", step + 1, out_of)
+            format!("[{}/{}]", step, out_of)
         } else {
             format!("[-/-]")
         };
@@ -313,7 +326,7 @@ impl VerificationListener for VerificationProgress {
         match result {
             VerificationResult::Valid { blocks_verified } => {
                 self.curr_progress.finish_with_message(self.spinner_message(
-                    blocks_verified - 1,
+                    *blocks_verified,
                     *blocks_verified,
                     console::style("Dataset is valid".to_owned()).green(),
                     None,
@@ -323,6 +336,7 @@ impl VerificationListener for VerificationProgress {
     }
 
     fn error(&self, error: &VerificationError) {
+        let s = self.state.lock().unwrap();
         let msg = match error {
             VerificationError::DataDoesNotMatchMetadata(..) => {
                 format!("Validation error (data doesn't match metadata)")
@@ -333,8 +347,8 @@ impl VerificationListener for VerificationProgress {
             _ => format!("Error during transformation"),
         };
         self.curr_progress.finish_with_message(self.spinner_message(
-            0,
-            0,
+            s.block_index + 1,
+            s.num_blocks,
             console::style(msg).red(),
             None,
         ));
@@ -354,7 +368,7 @@ impl VerificationListener for VerificationProgress {
         match phase {
             VerificationPhase::DataIntegrity => {
                 self.curr_progress.set_message(self.spinner_message(
-                    block_index,
+                    block_index + 1,
                     num_blocks,
                     "Verifying data integrity",
                     Some(block_hash),
@@ -362,7 +376,7 @@ impl VerificationListener for VerificationProgress {
             }
             VerificationPhase::ReplayTransform => {
                 self.curr_progress.set_message(self.spinner_message(
-                    block_index,
+                    block_index + 1,
                     num_blocks,
                     "Replaying transformation",
                     Some(block_hash),
@@ -423,7 +437,7 @@ impl PullImageListener for VerificationProgress {
     fn begin(&self, image: &str) {
         let s = self.state.lock().unwrap();
         self.curr_progress.set_message(self.spinner_message(
-            s.block_index,
+            s.block_index + 1,
             s.num_blocks,
             format!("Pulling engine image {}", image),
             Some(&s.block),
@@ -433,7 +447,7 @@ impl PullImageListener for VerificationProgress {
     fn success(&self) {
         let s = self.state.lock().unwrap();
         self.curr_progress.set_message(self.spinner_message(
-            s.block_index,
+            s.block_index + 1,
             s.num_blocks,
             "Replaying transformation",
             Some(&s.block),

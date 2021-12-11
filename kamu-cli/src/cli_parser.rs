@@ -938,6 +938,9 @@ pub fn cli() -> App<'static, 'static> {
                         .short("r")
                         .long("recursive")
                         .help("Verify the entire transformation chain starting with root datasets"),
+                    Arg::with_name("integrity")
+                        .long("integrity")
+                        .help("Check only the hashes of metadata and data without replaying transformations"),
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
@@ -968,6 +971,10 @@ pub fn cli() -> App<'static, 'static> {
                     Verify the entire transformation chain starting with root datasets (may download a lot of data):
 
                         kamu pull --recursive com.example.deriv
+
+                    Verify only the hashes of metadata and data, without replaying the transformations. This is useful when you trust the peers performing transformations but want to ensure data was not tampered in storage or during the transmission:
+
+                        kamu verify --integrity com.example.deriv
                     "
                 )),
         ])

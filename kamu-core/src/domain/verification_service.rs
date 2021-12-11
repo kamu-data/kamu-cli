@@ -56,11 +56,17 @@ pub enum VerificationResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct VerificationOptions;
+pub struct VerificationOptions {
+    pub check_integrity: bool,
+    pub replay_transformations: bool,
+}
 
 impl Default for VerificationOptions {
     fn default() -> Self {
-        Self
+        Self {
+            check_integrity: true,
+            replay_transformations: true,
+        }
     }
 }
 
@@ -157,8 +163,8 @@ pub enum VerificationError {
 #[derive(Debug)]
 pub struct DataDoesNotMatchMetadata {
     pub block_hash: Sha3_256,
-    pub expected_hash: String,
-    pub actual_hash: String,
+    pub data_logical_hash_expected: String,
+    pub data_logical_hash_actual: String,
 }
 
 impl Display for DataDoesNotMatchMetadata {
@@ -166,7 +172,7 @@ impl Display for DataDoesNotMatchMetadata {
         write!(
             f,
             "Data hash for block {} is expected to be {} but actual {}",
-            self.block_hash, self.expected_hash, self.actual_hash
+            self.block_hash, self.data_logical_hash_expected, self.data_logical_hash_actual
         )
     }
 }
