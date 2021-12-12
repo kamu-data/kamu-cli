@@ -72,6 +72,7 @@ impl VerificationServiceImpl {
     fn check_data_integrity(
         &self,
         dataset_id: &DatasetID,
+        dataset_kind: DatasetKind,
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
@@ -104,10 +105,35 @@ impl VerificationServiceImpl {
                 return Err(VerificationError::DataDoesNotMatchMetadata(
                     DataDoesNotMatchMetadata {
                         block_hash: block.block_hash,
-                        data_logical_hash_expected: output_slice.data_logical_hash.to_string(),
-                        data_logical_hash_actual: logical_hash_actual.to_string(),
+                        logical_hash: Some(HashMismatch {
+                            expected: output_slice.data_logical_hash,
+                            actual: logical_hash_actual,
+                        }),
+                        physical_hash: None,
                     },
                 ));
+            }
+
+            // TODO: This extra layer of protection might not be needed or should be achieved otherwise
+            // The idea is that Root data files are non-reproducible by definition and thus they will have a
+            // stable physical hash, unlike derivative data that might have different binary layout when replayed
+            if dataset_kind == DatasetKind::Root {
+                let physical_hash_actual =
+                    crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
+                        .map_err(|e| DomainError::InfraError(e.into()))?;
+
+                if physical_hash_actual != output_slice.data_physical_hash {
+                    return Err(VerificationError::DataDoesNotMatchMetadata(
+                        DataDoesNotMatchMetadata {
+                            block_hash: block.block_hash,
+                            logical_hash: None,
+                            physical_hash: Some(HashMismatch {
+                                expected: output_slice.data_physical_hash,
+                                actual: physical_hash_actual,
+                            }),
+                        },
+                    ));
+                }
             }
 
             listener.end_block(
@@ -120,9 +146,7 @@ impl VerificationServiceImpl {
 
         listener.end_phase(VerificationPhase::DataIntegrity, num_blocks);
 
-        Ok(VerificationResult::Valid {
-            blocks_verified: num_blocks,
-        })
+        Ok(VerificationResult::Valid)
     }
 }
 
@@ -137,29 +161,26 @@ impl VerificationService for VerificationServiceImpl {
         let span = info_span!("Verifying dataset", dataset_id = dataset_id.as_str(), block_range = ?block_range);
         let _span_guard = span.enter();
 
+        let dataset_kind = self.metadata_repo.get_summary(dataset_id)?.kind;
+
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
         listener.begin();
 
-        let res: Result<VerificationResult, VerificationError> = try {
-            let res = if options.check_integrity {
-                self.check_data_integrity(dataset_id, block_range, listener.clone())?
-            } else {
-                VerificationResult::Valid { blocks_verified: 0 }
-            };
-
-            if options.replay_transformations {
-                match self.metadata_repo.get_summary(dataset_id)?.kind {
-                    DatasetKind::Root => res,
-                    DatasetKind::Derivative => self.transform_service.verify_transform(
-                        dataset_id,
-                        block_range,
-                        options,
-                        Some(listener.clone()),
-                    )?,
-                }
-            } else {
-                res
+        let res = try {
+            if options.check_integrity {
+                self.check_data_integrity(dataset_id, dataset_kind, block_range, listener.clone())?;
             }
+
+            if dataset_kind == DatasetKind::Derivative && options.replay_transformations {
+                self.transform_service.verify_transform(
+                    dataset_id,
+                    block_range,
+                    options,
+                    Some(listener.clone()),
+                )?;
+            }
+
+            VerificationResult::Valid
         };
 
         match &res {

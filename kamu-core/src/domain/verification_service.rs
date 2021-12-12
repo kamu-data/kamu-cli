@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::{DomainError, TransformError, TransformListener};
-use opendatafabric::{DatasetID, MetadataBlock, Sha3_256};
+use opendatafabric::{DatasetID, MetadataBlock, Multihash, Sha3_256};
 
 use std::fmt::Display;
 use std::sync::Arc;
@@ -50,7 +50,7 @@ pub struct VerificationRequest<'a> {
 
 #[derive(Debug)]
 pub enum VerificationResult {
-    Valid { blocks_verified: usize },
+    Valid,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -161,19 +161,35 @@ pub enum VerificationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
+pub struct HashMismatch {
+    pub expected: Multihash,
+    pub actual: Multihash,
+}
+
+#[derive(Debug)]
 pub struct DataDoesNotMatchMetadata {
     pub block_hash: Sha3_256,
-    pub data_logical_hash_expected: String,
-    pub data_logical_hash_actual: String,
+    pub logical_hash: Option<HashMismatch>,
+    pub physical_hash: Option<HashMismatch>,
 }
 
 impl Display for DataDoesNotMatchMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Data hash for block {} is expected to be {} but actual {}",
-            self.block_hash, self.data_logical_hash_expected, self.data_logical_hash_actual
-        )
+        if let Some(logical) = &self.logical_hash {
+            write!(
+                f,
+                "Logical data hash for block {} is expected to be {} but actual {}",
+                self.block_hash, logical.expected, logical.actual
+            )
+        } else if let Some(physical) = &self.physical_hash {
+            write!(
+                f,
+                "Physical data hash for block {} is expected to be {} but actual {}",
+                self.block_hash, physical.expected, physical.actual
+            )
+        } else {
+            Ok(())
+        }
     }
 }
 

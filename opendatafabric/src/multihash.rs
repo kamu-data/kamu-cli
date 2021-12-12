@@ -17,8 +17,11 @@ use unsigned_varint as uvar;
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(non_camel_case_types)]
 pub enum MulticodecCode {
     Sha3_256 = 0x16,
+    Arrow0_Sha3_256 = 0x300016,
+    // When adding codes don't forget to add them into TryFrom<u32> below
 }
 
 // TODO: use num-derive
@@ -28,6 +31,7 @@ impl TryFrom<u32> for MulticodecCode {
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             0x16 => Ok(MulticodecCode::Sha3_256),
+            0x300016 => Ok(MulticodecCode::Arrow0_Sha3_256),
             _ => Err(MulticodecError::UnsupportedCode(value)),
         }
     }

@@ -249,10 +249,7 @@ fn test_transform_with_engine_spark() {
         None,
     );
 
-    assert_matches!(
-        verify_result,
-        Ok(VerificationResult::Valid { blocks_verified: 2 })
-    );
+    assert_matches!(verify_result, Ok(VerificationResult::Valid));
 }
 
 #[test]
@@ -482,8 +479,5 @@ fn test_transform_with_engine_flink() {
         None,
     );
 
-    assert_matches!(
-        verify_result,
-        Ok(VerificationResult::Valid { blocks_verified: 2 })
-    );
+    assert_matches!(verify_result, Ok(VerificationResult::Valid));
 }
