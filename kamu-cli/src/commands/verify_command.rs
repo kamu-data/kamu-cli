@@ -324,10 +324,11 @@ impl VerificationListener for VerificationProgress {
 
     fn success(&self, result: &VerificationResult) {
         match result {
-            VerificationResult::Valid { blocks_verified } => {
+            VerificationResult::Valid => {
+                let s = self.state.lock().unwrap();
                 self.curr_progress.finish_with_message(self.spinner_message(
-                    *blocks_verified,
-                    *blocks_verified,
+                    s.num_blocks,
+                    s.num_blocks,
                     console::style("Dataset is valid".to_owned()).green(),
                     None,
                 ))

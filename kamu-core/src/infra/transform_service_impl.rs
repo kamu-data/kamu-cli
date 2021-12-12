@@ -808,6 +808,18 @@ impl TransformService for TransformServiceImpl {
                     std::fs::remove_dir_all(new_checkpoint_path)
                         .map_err(|e| TransformError::internal(e))?;
 
+                    // We overwrite the physical hash with the expected one because Parquet format is non-reproducible
+                    // We rely only on logical hash for equivalence test
+                    if let Some(slice) = &mut new_block.output_slice {
+                        if let Some(expected_physical_hash) = expected_block
+                            .output_slice
+                            .as_ref()
+                            .map(|s| &s.data_physical_hash)
+                        {
+                            slice.data_physical_hash = expected_physical_hash.clone();
+                        }
+                    }
+
                     // Link new block
                     new_block.prev_block_hash = expected_block.prev_block_hash;
                     new_block.block_hash = FlatbuffersMetadataBlockSerializer
@@ -853,9 +865,7 @@ impl TransformService for TransformServiceImpl {
         }
 
         listener.end_phase(VerificationPhase::ReplayTransform, num_steps);
-        Ok(VerificationResult::Valid {
-            blocks_verified: num_steps,
-        })
+        Ok(VerificationResult::Valid)
     }
 
     fn verify_transform_multi(

@@ -1,3 +1,12 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use std::assert_matches::assert_matches;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -7,6 +16,7 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::errors::ParquetError;
 use kamu::domain::*;
+use kamu::infra::utils::data_utils;
 use kamu::infra::*;
 use kamu::testing::MetadataFactory;
 use opendatafabric::*;
@@ -44,25 +54,7 @@ fn test_verify_data_consistency() {
             VerificationOptions::default(),
             None,
         ),
-        Ok(VerificationResult::Valid { blocks_verified: 0 })
-    );
-
-    let mut metadata_chain = metadata_repo.get_metadata_chain(&dataset_id).unwrap();
-
-    let data_logical_hash =
-        Multihash::from_multibase_str("zW1diShRuwkajoPuAGcexm1LU71yey6DahGex9TK1YfKp71").unwrap();
-    // For now we don't verify physical hashes
-    let data_physical_hash = data_logical_hash.clone();
-
-    let head = metadata_chain.append(
-        MetadataFactory::metadata_block()
-            .prev(&head)
-            .output_slice(OutputSlice {
-                data_logical_hash,
-                data_physical_hash,
-                data_interval: OffsetInterval { start: 0, end: 0 },
-            })
-            .build(),
+        Ok(VerificationResult::Valid)
     );
 
     // Write data
@@ -74,11 +66,25 @@ fn test_verify_data_consistency() {
     let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c", "d", "e"]));
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
-    write_record_batch_to_parquet(
-        &dataset_layout.data_dir.join(head.to_string()),
-        &record_batch,
-    )
-    .unwrap();
+    let data_path = tempdir.path().join("data");
+
+    write_record_batch_to_parquet(&data_path, &record_batch).unwrap();
+    let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
+    let data_physical_hash = data_utils::get_parquet_physical_hash(&data_path).unwrap();
+
+    // "Commit" data
+    let mut metadata_chain = metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+    let head = metadata_chain.append(
+        MetadataFactory::metadata_block()
+            .prev(&head)
+            .output_slice(OutputSlice {
+                data_logical_hash,
+                data_physical_hash,
+                data_interval: OffsetInterval { start: 0, end: 0 },
+            })
+            .build(),
+    );
+    std::fs::rename(data_path, dataset_layout.data_dir.join(head.to_string())).unwrap();
 
     assert_matches!(
         verification_svc.verify(
@@ -87,7 +93,7 @@ fn test_verify_data_consistency() {
             VerificationOptions::default(),
             None,
         ),
-        Ok(VerificationResult::Valid { blocks_verified: 1 })
+        Ok(VerificationResult::Valid)
     );
 
     // Overwrite with different data
@@ -110,10 +116,10 @@ fn test_verify_data_consistency() {
         Err(VerificationError::DataDoesNotMatchMetadata(
             DataDoesNotMatchMetadata {
                 block_hash,
-                data_logical_hash_expected,
-                data_logical_hash_actual: _,
+                logical_hash: Some(logical_hash),
+                physical_hash: None
             }
-        )) if block_hash == head && data_logical_hash_expected == data_logical_hash.to_string(),
+        )) if block_hash == head && logical_hash.expected == data_logical_hash,
     );
 }
 
