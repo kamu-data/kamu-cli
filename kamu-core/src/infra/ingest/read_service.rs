@@ -17,7 +17,7 @@ use opendatafabric::*;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 pub struct ReadService {
@@ -40,6 +40,8 @@ impl ReadService {
         system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
         offset: i64,
+        out_data_path: &Path,
+        out_checkpoint_dir: &Path,
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &Path,
@@ -49,17 +51,14 @@ impl ReadService {
             .engine_provisioner
             .provision_ingest_engine(listener.get_engine_provisioning_listener())?;
 
-        let out_data_path = dataset_layout.data_dir.join(".pending");
-        let new_checkpoint_dir = dataset_layout.checkpoints_dir.join(".pending");
-
         // Clean up previous state leftovers
         if out_data_path.exists() {
             std::fs::remove_file(&out_data_path).map_err(|e| IngestError::internal(e))?;
         }
-        if new_checkpoint_dir.exists() {
-            std::fs::remove_dir_all(&new_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
+        if out_checkpoint_dir.exists() {
+            std::fs::remove_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
         }
-        std::fs::create_dir_all(&new_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
+        std::fs::create_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
 
         let request = IngestRequest {
             dataset_id: dataset_id.to_owned(),
@@ -71,9 +70,9 @@ impl ReadService {
             dataset_vocab: vocab.clone(),
             prev_checkpoint_dir: prev_checkpoint
                 .map(|hash| dataset_layout.checkpoints_dir.join(hash.to_string())),
-            new_checkpoint_dir: new_checkpoint_dir.clone(),
             data_dir: dataset_layout.data_dir.clone(),
-            out_data_path: out_data_path.clone(),
+            out_data_path: out_data_path.to_owned(),
+            new_checkpoint_dir: out_checkpoint_dir.to_owned(),
         };
 
         let mut response = engine.ingest(request)?;
@@ -102,8 +101,6 @@ impl ReadService {
                 for_prepared_at: for_prepared_at,
                 system_time,
                 engine_response: response,
-                new_checkpoint_dir: new_checkpoint_dir,
-                out_data_path: out_data_path,
             },
         })
     }
@@ -121,6 +118,4 @@ pub struct ReadCheckpoint {
     pub system_time: DateTime<Utc>,
     #[serde(with = "ExecuteQueryResponseSuccessDef")]
     pub engine_response: ExecuteQueryResponseSuccess,
-    pub new_checkpoint_dir: PathBuf,
-    pub out_data_path: PathBuf,
 }

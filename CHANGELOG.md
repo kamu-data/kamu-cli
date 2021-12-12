@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Breaking change - workspaces will need to be re-created. Sorry again!
 - Implements [ODF RFC-002](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/002-logical-data-hashes.md).
 - Engines are no longer responsible for data hashing - a stable hash algorithm is implemented in `kamu`
+- Pending data part files and checkpoints will be stored in `cache` directory along with other ingest artifacts
 ### Added
 - A fully working implementation of data integrity checks
 - `kamu verify` command now accepts `--integrity` flag to only check data hashes without replaying transformations

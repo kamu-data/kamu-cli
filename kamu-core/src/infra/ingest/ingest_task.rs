@@ -254,6 +254,7 @@ impl IngestTask {
             .map_err(|e| IngestError::internal(e))?
     }
 
+    // TODO: PERF: Skip the copying if there are no prep steps
     fn maybe_prepare(
         &mut self,
         fetch_result: ExecutionResult<FetchCheckpoint>,
@@ -325,6 +326,8 @@ impl IngestTask {
                         Utc::now(), // TODO: inject
                         source_event_time,
                         self.next_offset,
+                        &self.layout.cache_dir.join("read.bin"),
+                        &self.layout.cache_dir.join("read.checkpoint"),
                         prep_result.checkpoint.last_prepared,
                         old_checkpoint,
                         &self.layout.cache_dir.join("prepared.bin"),
@@ -358,28 +361,30 @@ impl IngestTask {
                         }
                     }
 
-                    let output_data_interval = read_result.checkpoint.engine_response.data_interval;
+                    let data_path = self.layout.cache_dir.join("read.bin");
+                    let checkpoint_dir = self.layout.cache_dir.join("read.checkpoint");
+                    let data_interval = read_result.checkpoint.engine_response.data_interval;
                     let output_watermark = read_result.checkpoint.engine_response.output_watermark;
 
                     // New block might not contain anything new, so we check for data
                     // and watermark differences to see if commit should be skipped
-                    let output_slice = if let Some(output_data_interval) = output_data_interval {
+                    let output_slice = if let Some(data_interval) = data_interval {
                         // TODO: Move out into common data commit procedure of sorts
                         let data_logical_hash =
-                            crate::infra::utils::data_utils::get_parquet_logical_hash(&read_result.checkpoint.out_data_path)
+                            crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
                                 .map_err(|e| IngestError::internal(e))?;
 
                         let data_physical_hash =
-                            crate::infra::utils::data_utils::get_parquet_physical_hash(&read_result.checkpoint.out_data_path)
+                            crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
                                 .map_err(|e| IngestError::internal(e))?;
 
                         // Advance offset for the next run
-                        self.next_offset = output_data_interval.end + 1;
+                        self.next_offset = data_interval.end + 1;
 
                         Some(OutputSlice {
                             data_logical_hash,
                             data_physical_hash,
-                            data_interval: output_data_interval,
+                            data_interval,
                         })
                     } else {
                         let prev_watermark = self.meta_chain.borrow()
@@ -416,16 +421,18 @@ impl IngestTask {
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
                     info!(new_head = ?new_head, "Committed new block");
 
-                    // TODO: Data should be moved before writing block file
+                    std::fs::create_dir_all(&self.layout.data_dir).map_err(|e| IngestError::internal(e))?;
+
+                    // TODO: ACID: Data should be moved before writing block file
                     std::fs::rename(
-                        &read_result.checkpoint.out_data_path,
+                        &data_path,
                         self.layout.data_dir.join(new_head.to_string()),
                     )
                     .map_err(|e| IngestError::internal(e))?;
 
-                    // TODO: Checkpoint should be moved before writing block file
+                    // TODO: ACID: Checkpoint should be moved before writing block file
                     std::fs::rename(
-                        &read_result.checkpoint.new_checkpoint_dir,
+                        &checkpoint_dir,
                         self.layout.checkpoints_dir.join(new_head.to_string()),
                     )
                     .map_err(|e| IngestError::internal(e))?;
