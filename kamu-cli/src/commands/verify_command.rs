@@ -412,7 +412,7 @@ impl EngineProvisioningListener for VerificationProgress {
     fn begin(&self, engine_id: &str) {
         let s = self.state.lock().unwrap();
         self.curr_progress.set_message(self.spinner_message(
-            s.block_index,
+            s.block_index + 1,
             s.num_blocks,
             format!("Waiting for engine {}", engine_id),
             Some(&s.block),
@@ -422,7 +422,7 @@ impl EngineProvisioningListener for VerificationProgress {
     fn success(&self) {
         let s = self.state.lock().unwrap();
         self.curr_progress.set_message(self.spinner_message(
-            s.block_index,
+            s.block_index + 1,
             s.num_blocks,
             "Replaying transformation",
             Some(&s.block),

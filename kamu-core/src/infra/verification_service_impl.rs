@@ -40,12 +40,6 @@ impl VerificationServiceImpl {
         dataset_id: &DatasetID,
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
     ) -> Result<Vec<MetadataBlock>, VerificationError> {
-        let span = info_span!(
-            "Preparing data integrity verification plan",
-            output_dataset = dataset_id.as_str()
-        );
-        let _span_guard = span.enter();
-
         let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
 
         let start_block = block_range.0;
@@ -76,6 +70,9 @@ impl VerificationServiceImpl {
         block_range: (Option<Sha3_256>, Option<Sha3_256>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
+        let span = info_span!("Verifying data integrity", dataset_id = dataset_id.as_str());
+        let _span_guard = span.enter();
+
         let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
         let plan = self.get_integrity_check_plan(dataset_id, block_range)?;
 
@@ -95,34 +92,15 @@ impl VerificationServiceImpl {
 
             let data_path = dataset_layout.data_dir.join(block.block_hash.to_string());
 
-            // TODO: Make engine not return hashes to begin with
-            // TODO: Move out into data commit procedure of sorts
-            let logical_hash_actual =
-                crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+            // Do a fast pass using physical hash
+            let physical_hash_actual =
+                crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
                     .map_err(|e| DomainError::InfraError(e.into()))?;
 
-            if logical_hash_actual != output_slice.data_logical_hash {
-                return Err(VerificationError::DataDoesNotMatchMetadata(
-                    DataDoesNotMatchMetadata {
-                        block_hash: block.block_hash,
-                        logical_hash: Some(HashMismatch {
-                            expected: output_slice.data_logical_hash,
-                            actual: logical_hash_actual,
-                        }),
-                        physical_hash: None,
-                    },
-                ));
-            }
-
-            // TODO: This extra layer of protection might not be needed or should be achieved otherwise
-            // The idea is that Root data files are non-reproducible by definition and thus they will have a
-            // stable physical hash, unlike derivative data that might have different binary layout when replayed
-            if dataset_kind == DatasetKind::Root {
-                let physical_hash_actual =
-                    crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
-                        .map_err(|e| DomainError::InfraError(e.into()))?;
-
-                if physical_hash_actual != output_slice.data_physical_hash {
+            if physical_hash_actual != output_slice.data_physical_hash {
+                // Root data files are non-reproducible by definition, so
+                // if physical hashes don't match - we can give up right away.
+                if dataset_kind == DatasetKind::Root {
                     return Err(VerificationError::DataDoesNotMatchMetadata(
                         DataDoesNotMatchMetadata {
                             block_hash: block.block_hash,
@@ -133,6 +111,25 @@ impl VerificationServiceImpl {
                             }),
                         },
                     ));
+                } else {
+                    // Derivative data may be replayed and produce different binary file
+                    // but data must have same logical hash to be valid.
+                    let logical_hash_actual =
+                        crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+                            .map_err(|e| DomainError::InfraError(e.into()))?;
+
+                    if logical_hash_actual != output_slice.data_logical_hash {
+                        return Err(VerificationError::DataDoesNotMatchMetadata(
+                            DataDoesNotMatchMetadata {
+                                block_hash: block.block_hash,
+                                logical_hash: Some(HashMismatch {
+                                    expected: output_slice.data_logical_hash,
+                                    actual: logical_hash_actual,
+                                }),
+                                physical_hash: None,
+                            },
+                        ));
+                    }
                 }
             }
 

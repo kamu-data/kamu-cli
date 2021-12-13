@@ -369,6 +369,9 @@ impl IngestTask {
                     // New block might not contain anything new, so we check for data
                     // and watermark differences to see if commit should be skipped
                     let output_slice = if let Some(data_interval) = data_interval {
+                        let span = info_span!("Computing data hashes");
+                        let _span_guard = span.enter();
+
                         // TODO: Move out into common data commit procedure of sorts
                         let data_logical_hash =
                             crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
