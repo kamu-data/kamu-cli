@@ -27,7 +27,7 @@ use super::test_pull_service_impl::TestTransformService;
 fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let dataset_id = DatasetID::new_unchecked("foo");
+    let dataset_id = DatasetID::new_unchecked("bar");
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
     let dataset_layout = DatasetLayout::create(&volume_layout, dataset_id).unwrap();
@@ -40,9 +40,18 @@ fn test_verify_data_consistency() {
         volume_layout.clone(),
     ));
 
+    metadata_repo
+        .add_dataset(
+            MetadataFactory::dataset_snapshot()
+                .id("foo")
+                .source(MetadataFactory::dataset_source_root().build())
+                .build(),
+        )
+        .unwrap();
+
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .id(dataset_id)
-        .source(MetadataFactory::dataset_source_root().build())
+        .source(MetadataFactory::dataset_source_deriv(["foo"].iter()).build())
         .build();
 
     let head = metadata_repo.add_dataset(dataset_snapshot).unwrap();
@@ -51,7 +60,10 @@ fn test_verify_data_consistency() {
         verification_svc.verify(
             &dataset_id,
             (None, None),
-            VerificationOptions::default(),
+            VerificationOptions {
+                check_integrity: true,
+                replay_transformations: false
+            },
             None,
         ),
         Ok(VerificationResult::Valid)
@@ -90,7 +102,10 @@ fn test_verify_data_consistency() {
         verification_svc.verify(
             &dataset_id,
             (None, None),
-            VerificationOptions::default(),
+            VerificationOptions {
+                check_integrity: true,
+                replay_transformations: false
+            },
             None,
         ),
         Ok(VerificationResult::Valid)
@@ -110,7 +125,7 @@ fn test_verify_data_consistency() {
         verification_svc.verify(
             &dataset_id,
             (None, None),
-            VerificationOptions::default(),
+            VerificationOptions {check_integrity: true, replay_transformations: false},
             None,
         ),
         Err(VerificationError::DataDoesNotMatchMetadata(

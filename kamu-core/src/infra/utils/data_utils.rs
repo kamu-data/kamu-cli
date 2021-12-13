@@ -11,6 +11,8 @@ use std::{path::Path, sync::Arc};
 
 use opendatafabric::{MulticodecCode, Multihash};
 
+const ARROW_BATCH_SIZE: usize = 10_000;
+
 /// Computes a stable hash based on the content (not binary layout) of the Parquet file.
 pub fn get_parquet_logical_hash(
     data_path: &Path,
@@ -26,7 +28,7 @@ pub fn get_parquet_logical_hash(
 
     let mut hasher = RecordDigestV0::<sha3::Sha3_256>::new(&arrow_reader.get_schema()?);
 
-    for res_batch in arrow_reader.get_record_reader(1024)? {
+    for res_batch in arrow_reader.get_record_reader(ARROW_BATCH_SIZE)? {
         let batch = res_batch?;
         hasher.update(&batch);
     }

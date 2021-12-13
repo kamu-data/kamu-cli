@@ -112,6 +112,9 @@ impl TransformServiceImpl {
                 .into());
             }
 
+            let span = info_span!("Computing data hashes");
+            let _span_guard = span.enter();
+
             // TODO: Move out into data commit procedure of sorts
             let data_logical_hash =
                 crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
