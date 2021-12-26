@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use opendatafabric::{DatasetIDBuf, MetadataBlock};
+use opendatafabric::*;
 
 use super::IDFactory;
 use crate::{domain::MetadataChain, infra::MetadataChainImpl};
@@ -31,27 +31,30 @@ impl RepositoryFactoryFS {
 
     pub fn new_dataset(&self) -> DatasetBuilderFSInitial {
         DatasetBuilderFSInitial {
-            dataset_id: IDFactory::dataset_id(),
+            name: IDFactory::dataset_name(),
             repo_path: self.repo_path.clone(),
         }
     }
 }
 
 pub struct DatasetBuilderFSInitial {
-    dataset_id: DatasetIDBuf,
+    name: DatasetName,
     repo_path: PathBuf,
 }
 
 impl DatasetBuilderFSInitial {
-    pub fn id(self, dataset_id: &str) -> Self {
+    pub fn name<S: TryInto<DatasetName>>(self, name: S) -> Self
+    where
+        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+    {
         Self {
-            dataset_id: dataset_id.try_into().unwrap(),
+            name: name.try_into().unwrap(),
             ..self
         }
     }
 
     pub fn append(self, first_block: MetadataBlock) -> DatasetBuilderFSContinued {
-        let dataset_path = self.repo_path.join(&self.dataset_id);
+        let dataset_path = self.repo_path.join(&self.name);
         std::fs::create_dir(&dataset_path).unwrap();
         let meta_path = dataset_path.join("meta");
         let (meta_chain, _) = MetadataChainImpl::create(&meta_path, first_block).unwrap();

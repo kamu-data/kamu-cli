@@ -24,13 +24,13 @@ use tracing::info_span;
 
 pub struct IngestTask {
     options: IngestOptions,
-    dataset_id: DatasetIDBuf,
+    dataset_handle: DatasetHandle,
     next_offset: i64,
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
     source: DatasetSourceRoot,
     fetch_override: Option<FetchStep>,
-    prev_checkpoint: Option<Sha3_256>,
+    prev_checkpoint: Option<Multihash>,
     vocab: DatasetVocabulary,
     listener: Arc<dyn IngestListener>,
     checkpointing_executor: CheckpointingExecutor,
@@ -41,7 +41,7 @@ pub struct IngestTask {
 
 impl IngestTask {
     pub fn new<'a>(
-        dataset_id: &DatasetID,
+        dataset_handle: DatasetHandle,
         options: IngestOptions,
         layout: DatasetLayout,
         meta_chain: Box<dyn MetadataChain>,
@@ -55,7 +55,7 @@ impl IngestTask {
         let mut vocab = None;
         let mut next_offset = 0;
 
-        for block in meta_chain.iter_blocks() {
+        for (block_hash, block) in meta_chain.iter_blocks() {
             if next_offset == 0 {
                 if let Some(os) = &block.output_slice {
                     next_offset = os.data_interval.end + 1;
@@ -72,7 +72,7 @@ impl IngestTask {
             if prev_checkpoint.is_none()
                 && (block.output_slice.is_some() || block.output_watermark.is_some())
             {
-                prev_checkpoint = Some(block.block_hash)
+                prev_checkpoint = Some(block_hash)
             }
 
             if vocab.is_none() && block.vocab.is_some() {
@@ -94,7 +94,7 @@ impl IngestTask {
 
         Self {
             options,
-            dataset_id: dataset_id.to_owned(),
+            dataset_handle,
             next_offset,
             layout,
             meta_chain: RefCell::new(meta_chain),
@@ -111,7 +111,7 @@ impl IngestTask {
     }
 
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
-        let span = info_span!("Ingesting data", dataset_id = self.dataset_id.as_str());
+        let span = info_span!("Ingesting data", dataset_id = ?self.dataset_handle);
         let _span_guard = span.enter();
         info!(source = ?self.source, prev_checkpoint = ?self.prev_checkpoint, vocab = ?self.vocab, "Ingest details");
 
@@ -155,7 +155,7 @@ impl IngestTask {
         self.listener.on_stage_progress(IngestStage::Merge, 0, 1);
         self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
-        let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash)?;
+        let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash.clone())?;
 
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
             IngestResult::UpToDate {
@@ -318,10 +318,10 @@ impl IngestTask {
                     let _span_guard = span.enter();
 
                     self.read_service.read(
-                        &self.dataset_id,
+                        &self.dataset_handle,
                         &self.layout,
                         &self.source,
-                        self.prev_checkpoint,
+                        self.prev_checkpoint.clone(),
                         &self.vocab,
                         Utc::now(), // TODO: inject
                         source_event_time,
@@ -343,7 +343,7 @@ impl IngestTask {
         &mut self,
         fetch_result: ExecutionResult<FetchCheckpoint>,
         read_result: ExecutionResult<ReadCheckpoint>,
-        prev_hash: Sha3_256,
+        prev_hash: Multihash,
     ) -> Result<ExecutionResult<CommitCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("commit.yaml");
 
@@ -392,7 +392,7 @@ impl IngestTask {
                     } else {
                         let prev_watermark = self.meta_chain.borrow()
                             .iter_blocks()
-                            .filter_map(|b| b.output_watermark)
+                            .filter_map(|(_, b)| b.output_watermark)
                             .next();
 
                         if output_watermark.is_none() || output_watermark == prev_watermark {
@@ -411,7 +411,6 @@ impl IngestTask {
                     };
 
                     let new_block = MetadataBlock {
-                        block_hash: Sha3_256::zero(),
                         prev_block_hash: Some(prev_hash),
                         system_time: read_result.checkpoint.system_time,
                         input_slices: None,
@@ -419,6 +418,7 @@ impl IngestTask {
                         output_watermark: read_result.checkpoint.engine_response.output_watermark,
                         source: None,
                         vocab: None,
+                        seed: None,
                     };
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
@@ -479,5 +479,5 @@ pub struct CommitCheckpoint {
     pub for_read_at: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_fetched_at: DateTime<Utc>,
-    pub last_hash: Option<Sha3_256>,
+    pub last_hash: Option<Multihash>,
 }

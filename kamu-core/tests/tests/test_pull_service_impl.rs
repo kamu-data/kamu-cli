@@ -18,15 +18,42 @@ use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-macro_rules! id {
+macro_rules! n {
     ($s:expr) => {
-        DatasetIDBuf::new_unchecked($s)
+        DatasetName::try_from($s).unwrap()
     };
 }
 
-macro_rules! r {
+macro_rules! rl {
     ($s:expr) => {
-        DatasetRefBuf::new_unchecked($s)
+        DatasetRefLocal::Name(DatasetName::try_from($s).unwrap())
+    };
+}
+
+macro_rules! rr {
+    ($s:expr) => {
+        DatasetRefRemote::RemoteName(RemoteDatasetName::try_from($s).unwrap())
+    };
+}
+
+macro_rules! ar {
+    ($s:expr) => {
+        match DatasetName::try_from($s) {
+            Ok(n) => DatasetRefAny::Name(n),
+            _ => DatasetRefAny::RemoteName(RemoteDatasetName::try_from($s).unwrap()),
+        }
+    };
+}
+
+macro_rules! names {
+    [] => {
+        vec![]
+    };
+    [$x:expr] => {
+        vec![n!($x)]
+    };
+    [$x:expr, $($y:expr),+] => {
+        vec![n!($x), $(n!($y)),+]
     };
 }
 
@@ -35,23 +62,34 @@ macro_rules! refs {
         vec![]
     };
     [$x:expr] => {
-        vec![r!($x)]
+        vec![ar!($x)]
     };
     [$x:expr, $($y:expr),+] => {
-        vec![r!($x), $(r!($y)),+]
+        vec![ar!($x), $(ar!($y)),+]
     };
 }
 
-fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>) {
-    for (dataset_ref, deps) in &datasets {
+fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
+    for (dataset_name, deps) in &datasets {
         if deps.is_empty() {
-            repo.add_dataset(MetadataFactory::dataset_snapshot().id(dataset_ref).build())
-                .unwrap();
+            repo.add_dataset_from_block(
+                dataset_name,
+                MetadataFactory::metadata_block()
+                    .seed_from(dataset_name.as_str())
+                    .source(MetadataFactory::dataset_source_root().build())
+                    .build(),
+            )
+            .unwrap();
         } else {
-            repo.add_dataset(
-                MetadataFactory::dataset_snapshot()
-                    .id(dataset_ref)
-                    .source(MetadataFactory::dataset_source_deriv(deps.iter()).build())
+            repo.add_dataset_from_block(
+                dataset_name,
+                MetadataFactory::metadata_block()
+                    .seed_from(dataset_name.as_str())
+                    .source(
+                        MetadataFactory::dataset_source_deriv(deps.iter())
+                            .input_ids_from_names()
+                            .build(),
+                    )
                     .build(),
             )
             .unwrap();
@@ -59,27 +97,28 @@ fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetRefBuf, Vec
     }
 }
 
-fn create_graph_in_repository(
-    repo_path: &Path,
-    datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>,
-) {
+fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
     let repo_factory = RepositoryFactoryFS::new(repo_path);
 
-    for (dataset_ref, deps) in &datasets {
-        let ds_builder = repo_factory
-            .new_dataset()
-            .id(dataset_ref.as_local().unwrap());
+    for (dataset_name, deps) in &datasets {
+        let ds_builder = repo_factory.new_dataset().name(dataset_name);
 
         if deps.is_empty() {
             ds_builder.append(
                 MetadataFactory::metadata_block()
+                    .seed_from(dataset_name.as_str())
                     .source(MetadataFactory::dataset_source_root().build())
                     .build(),
             );
         } else {
             ds_builder.append(
                 MetadataFactory::metadata_block()
-                    .source(MetadataFactory::dataset_source_deriv(deps.iter()).build())
+                    .seed_from(dataset_name.as_str())
+                    .source(
+                        MetadataFactory::dataset_source_deriv(deps.iter())
+                            .input_ids_from_names()
+                            .build(),
+                    )
                     .build(),
             );
         }
@@ -93,27 +132,27 @@ fn create_graph_in_repository(
 fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
     repo: Arc<MetadataRepositoryImpl>,
-    datasets: Vec<(DatasetRefBuf, Vec<DatasetRefBuf>)>,
-    to_import: Vec<DatasetRefBuf>,
+    datasets: Vec<(DatasetName, Vec<DatasetName>)>,
+    to_import: Vec<DatasetName>,
 ) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     create_graph_in_repository(tmp_repo_dir.path(), datasets);
 
-    let tmp_repo_id = RepositoryID::new_unchecked("tmp");
+    let tmp_repo_name = RepositoryName::new_unchecked("tmp");
 
     repo.add_repository(
-        tmp_repo_id,
+        &tmp_repo_name,
         url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
     )
     .unwrap();
 
     let sync_service = SyncServiceImpl::new(ws, repo.clone(), Arc::new(RepositoryFactory::new()));
 
-    for r in &to_import {
+    for name in &to_import {
         sync_service
             .sync_from(
-                &DatasetRefBuf::new(Some(tmp_repo_id), None, r.as_local().unwrap()),
-                r.as_local().unwrap(),
+                &RemoteDatasetName::new(&tmp_repo_name, None, name).as_remote_ref(),
+                &name,
                 SyncOptions::default(),
                 None,
             )
@@ -130,9 +169,9 @@ fn test_pull_batching_chain() {
     create_graph(
         harness.metadata_repo.as_ref(),
         vec![
-            (r!("a"), refs![]),
-            (r!("b"), refs!["a"]),
-            (r!("c"), refs!["b"]),
+            (n!("a"), names![]),
+            (n!("b"), names!["a"]),
+            (n!("c"), names!["b"]),
         ],
     );
 
@@ -178,11 +217,11 @@ fn test_pull_batching_complex() {
     create_graph(
         harness.metadata_repo.as_ref(),
         vec![
-            (r!("a"), refs![]),
-            (r!("b"), refs![]),
-            (r!("c"), refs!["a"]),
-            (r!("d"), refs!["a"]),
-            (r!("e"), refs!["c", "d", "b"]),
+            (n!("a"), names![]),
+            (n!("b"), names![]),
+            (n!("c"), names!["a"]),
+            (n!("d"), names!["a"]),
+            (n!("e"), names!["c", "d", "b"]),
         ],
     );
 
@@ -220,28 +259,31 @@ fn test_pull_batching_complex_with_remote() {
         harness.workspace_layout.clone(),
         harness.metadata_repo.clone(),
         vec![
-            (r!("a"), refs![]),
-            (r!("b"), refs![]),
-            (r!("e"), refs!["a", "b"]),
+            (n!("a"), names![]),
+            (n!("b"), names![]),
+            (n!("e"), names!["a", "b"]),
         ],
-        refs!("e"),
+        names!("e"),
     );
     create_graph(
         harness.metadata_repo.as_ref(),
         vec![
-            (r!("c"), refs![]),
-            (r!("d"), refs![]),
-            (r!("f"), refs!["e", "c"]),
-            (r!("g"), refs!["f", "d"]),
+            (n!("c"), names![]),
+            (n!("d"), names![]),
+            (n!("f"), names!["e", "c"]),
+            (n!("g"), names!["f", "d"]),
         ],
     );
 
     // Add remote pull alias to E
     harness
         .metadata_repo
-        .get_remote_aliases(&id!("e"))
+        .get_remote_aliases(&rl!("e"))
         .unwrap()
-        .add(r!("kamu.dev/anonymous/e"), RemoteAliasKind::Pull)
+        .add(
+            &RemoteDatasetName::try_from("kamu.dev/anonymous/e").unwrap(),
+            RemoteAliasKind::Pull,
+        )
         .unwrap();
 
     // Pulling E results in a sync
@@ -253,9 +295,9 @@ fn test_pull_batching_complex_with_remote() {
                 ..PullOptions::default()
             }
         ),
-        vec![PullBatch::Sync(vec![(
-            r!("kamu.dev/anonymous/e"),
-            id!("e")
+        vec![PullBatch::SyncFrom(vec![(
+            rr!("kamu.dev/anonymous/e"),
+            n!("e")
         )])],
     );
 
@@ -268,9 +310,9 @@ fn test_pull_batching_complex_with_remote() {
                 ..PullOptions::default()
             }
         ),
-        vec![PullBatch::Sync(vec![(
-            r!("kamu.dev/anonymous/e"),
-            id!("e")
+        vec![PullBatch::SyncFrom(vec![(
+            rr!("kamu.dev/anonymous/e"),
+            n!("e")
         )])],
     );
 
@@ -284,7 +326,7 @@ fn test_pull_batching_complex_with_remote() {
             }
         ),
         vec![
-            PullBatch::Sync(vec![(r!("kamu.dev/anonymous/e"), id!("e"))]),
+            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -301,7 +343,7 @@ fn test_pull_batching_complex_with_remote() {
             }
         ),
         vec![
-            PullBatch::Sync(vec![(r!("kamu.dev/anonymous/e"), id!("e"))]),
+            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -318,7 +360,7 @@ fn test_pull_batching_complex_with_remote() {
             }
         ),
         vec![
-            PullBatch::Sync(vec![(r!("kamu.dev/anonymous/e"), id!("e"))]),
+            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -334,7 +376,7 @@ fn test_sync_from() {
     harness
         .metadata_repo
         .add_repository(
-            RepositoryID::new_unchecked("myrepo"),
+            &RepositoryName::new_unchecked("myrepo"),
             url::Url::parse("file:///tmp/nowhere").unwrap(),
         )
         .unwrap();
@@ -342,7 +384,7 @@ fn test_sync_from() {
     let res =
         harness
             .pull_svc
-            .sync_from(&r!("myrepo/foo"), &id!("bar"), PullOptions::default(), None);
+            .sync_from(&rr!("myrepo/foo"), &n!("bar"), PullOptions::default(), None);
 
     assert_matches!(
         res,
@@ -355,11 +397,17 @@ fn test_sync_from() {
 
     let aliases = harness
         .metadata_repo
-        .get_remote_aliases(&id!("bar"))
+        .get_remote_aliases(&rl!("bar"))
         .unwrap();
-    let pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
+    let pull_aliases: Vec<_> = aliases
+        .get_by_kind(RemoteAliasKind::Pull)
+        .map(|i| i.clone())
+        .collect();
 
-    assert_eq!(pull_aliases, vec![DatasetRef::new_unchecked("myrepo/foo")]);
+    assert_eq!(
+        pull_aliases,
+        vec![RemoteDatasetName::new_unchecked("myrepo/foo")]
+    );
 }
 
 #[test]
@@ -367,17 +415,21 @@ fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
-    let dataset_id = DatasetIDBuf::try_from("foo").unwrap();
+    let dataset_name = n!("foo");
 
     harness
         .metadata_repo
-        .add_dataset(MetadataFactory::dataset_snapshot().id(&dataset_id).build())
+        .add_dataset(
+            MetadataFactory::dataset_snapshot()
+                .name(&dataset_name)
+                .build(),
+        )
         .unwrap();
 
     let num_blocks = || {
         harness
             .metadata_repo
-            .get_metadata_chain(&dataset_id)
+            .get_metadata_chain(&dataset_name.as_local_ref())
             .unwrap()
             .iter_blocks()
             .count()
@@ -385,33 +437,37 @@ fn test_set_watermark() {
     assert_eq!(num_blocks(), 1);
 
     assert!(matches!(
-        harness
-            .pull_svc
-            .set_watermark(&dataset_id, Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)),
+        harness.pull_svc.set_watermark(
+            &dataset_name.as_local_ref(),
+            Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+        ),
         Ok(PullResult::Updated { .. })
     ));
     assert_eq!(num_blocks(), 2);
 
     assert!(matches!(
-        harness
-            .pull_svc
-            .set_watermark(&dataset_id, Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)),
+        harness.pull_svc.set_watermark(
+            &dataset_name.as_local_ref(),
+            Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+        ),
         Ok(PullResult::Updated { .. })
     ));
     assert_eq!(num_blocks(), 3);
 
     assert!(matches!(
-        harness
-            .pull_svc
-            .set_watermark(&dataset_id, Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)),
+        harness.pull_svc.set_watermark(
+            &dataset_name.as_local_ref(),
+            Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+        ),
         Ok(PullResult::UpToDate)
     ));
     assert_eq!(num_blocks(), 3);
 
     assert!(matches!(
-        harness
-            .pull_svc
-            .set_watermark(&dataset_id, Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)),
+        harness.pull_svc.set_watermark(
+            &dataset_name.as_local_ref(),
+            Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+        ),
         Ok(PullResult::UpToDate)
     ));
     assert_eq!(num_blocks(), 3);
@@ -451,23 +507,18 @@ impl PullTestHarness {
         calls
     }
 
-    fn pull(&self, refs: Vec<DatasetRefBuf>, options: PullOptions) -> Vec<PullBatch> {
-        self.pull_svc.pull_multi(
-            &mut refs.iter().map(|r| r.as_ref()),
-            options,
-            None,
-            None,
-            None,
-        );
+    fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
+        self.pull_svc
+            .pull_multi(&mut refs.into_iter(), options, None, None, None);
         self.collect_calls()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PullBatch {
-    Ingest(Vec<DatasetRefBuf>),
-    Transform(Vec<DatasetRefBuf>),
-    Sync(Vec<(DatasetRefBuf, DatasetIDBuf)>),
+    Ingest(Vec<DatasetRefAny>),
+    Transform(Vec<DatasetRefAny>),
+    SyncFrom(Vec<(DatasetRefRemote, DatasetName)>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -485,7 +536,7 @@ impl TestIngestService {
 impl IngestService for TestIngestService {
     fn ingest(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_ref: &DatasetRefLocal,
         _ingest_options: IngestOptions,
         _maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
@@ -494,7 +545,7 @@ impl IngestService for TestIngestService {
 
     fn ingest_from(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_ref: &DatasetRefLocal,
         _fetch: FetchStep,
         _options: IngestOptions,
         _listener: Option<Arc<dyn IngestListener>>,
@@ -504,22 +555,17 @@ impl IngestService for TestIngestService {
 
     fn ingest_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         _ingest_options: IngestOptions,
         _maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
-        let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
-        let results = ids
+    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
+        let dataset_refs: Vec<_> = dataset_refs.collect();
+        let results = dataset_refs
             .iter()
-            .map(|id| {
-                (
-                    id.clone(),
-                    Ok(IngestResult::UpToDate { uncacheable: false }),
-                )
-            })
+            .map(|r| (r.clone(), Ok(IngestResult::UpToDate { uncacheable: false })))
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
-            ids.into_iter().map(|id| id.into()).collect(),
+            dataset_refs.into_iter().map(|i| i.into()).collect(),
         ));
         results
     }
@@ -540,7 +586,7 @@ impl TestTransformService {
 impl TransformService for TestTransformService {
     fn transform(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_ref: &DatasetRefLocal,
         _maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         unimplemented!();
@@ -548,24 +594,24 @@ impl TransformService for TestTransformService {
 
     fn transform_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
-    ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)> {
-        let ids: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
-        let results = ids
+    ) -> Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)> {
+        let dataset_refs: Vec<_> = dataset_refs.collect();
+        let results = dataset_refs
             .iter()
-            .map(|id| (id.clone(), Ok(TransformResult::UpToDate)))
+            .map(|r| (r.clone(), Ok(TransformResult::UpToDate)))
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Transform(
-            ids.into_iter().map(|id| id.into()).collect(),
+            dataset_refs.into_iter().map(|i| i.into()).collect(),
         ));
         results
     }
 
     fn verify_transform(
         &self,
-        _dataset_id: &DatasetID,
-        _block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        _dataset_ref: &DatasetRefLocal,
+        _block_range: (Option<Multihash>, Option<Multihash>),
         _options: VerificationOptions,
         _listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
@@ -601,45 +647,44 @@ impl TestSyncService {
 impl SyncService for TestSyncService {
     fn sync_from(
         &self,
-        _remote_dataset_ref: &DatasetRef,
-        local_dataset_id: &DatasetID,
+        _remote_ref: &DatasetRefRemote,
+        local_name: &DatasetName,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         self.metadata_repo
-            .add_dataset(
-                MetadataFactory::dataset_snapshot()
-                    .id(local_dataset_id)
-                    .build(),
-            )
+            .add_dataset(MetadataFactory::dataset_snapshot().name(local_name).build())
             .unwrap();
         Ok(SyncResult::Updated {
             old_head: None,
-            new_head: Sha3_256::zero(),
+            new_head: Multihash::from_digest_sha3_256(b"boop"),
             num_blocks: 1,
         })
     }
 
     fn sync_from_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
+        datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)> {
+    ) -> Vec<(
+        (DatasetRefRemote, DatasetName),
+        Result<SyncResult, SyncError>,
+    )> {
         let mut call = Vec::new();
         let mut results = Vec::new();
         for (rem, loc) in datasets {
-            call.push((rem.to_owned(), loc.to_owned()));
-            results.push(((rem.to_owned(), loc.to_owned()), Ok(SyncResult::UpToDate)));
+            call.push((rem.clone(), loc.clone()));
+            results.push(((rem.clone(), loc.clone()), Ok(SyncResult::UpToDate)));
         }
-        self.calls.lock().unwrap().push(PullBatch::Sync(call));
+        self.calls.lock().unwrap().push(PullBatch::SyncFrom(call));
         results
     }
 
     fn sync_to(
         &self,
-        _local_dataset_id: &DatasetID,
-        _remote_dataset_ref: &DatasetRef,
+        _local_ref: &DatasetRefLocal,
+        _remote_name: &RemoteDatasetName,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
@@ -648,14 +693,17 @@ impl SyncService for TestSyncService {
 
     fn sync_to_multi(
         &self,
-        _datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
+        _datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
+    ) -> Vec<(
+        (DatasetRefLocal, RemoteDatasetName),
+        Result<SyncResult, SyncError>,
+    )> {
         unimplemented!()
     }
 
-    fn delete(&self, _remote_ref: &DatasetRef) -> Result<(), SyncError> {
+    fn delete(&self, _remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
         unimplemented!()
     }
 }

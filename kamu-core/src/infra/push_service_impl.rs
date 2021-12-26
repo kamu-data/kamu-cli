@@ -29,52 +29,66 @@ impl PushServiceImpl {
 
     fn collect_plan(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
-    ) -> Result<Vec<PushInfo>, (DatasetRefBuf, PushError)> {
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+    ) -> Result<Vec<PushInfo>, (DatasetRefAny, PushError)> {
         let mut plan = Vec::new();
         for r in dataset_refs {
             let item = self
-                .collect_plan_item(r)
+                .collect_plan_item(&r)
                 .map_err(|e| (r.to_owned(), e.into()))?;
             plan.push(item);
         }
         Ok(plan)
     }
 
-    fn collect_plan_item(&self, dataset_ref: &DatasetRef) -> Result<PushInfo, PushError> {
+    fn collect_plan_item(&self, dataset_ref: &DatasetRefAny) -> Result<PushInfo, PushError> {
         // A reference can be:
-        // - Local ID (should be resolved to a remote alias)
+        // - Local name or an ID (should be resolved to a remote alias)
         // - Remote alias (should be used to push the local dataset associated with it)
-        if dataset_ref.is_local() {
-            let mut push_aliases: Vec<_> = self
+        if let Some(local_ref) = dataset_ref.as_local_ref() {
+            let local_handle = self.metadata_repo.resolve_dataset_ref(&local_ref)?;
+
+            let remote_aliases = self
                 .metadata_repo
-                .get_remote_aliases(dataset_ref.local_id())?
-                .get_by_kind(RemoteAliasKind::Push)
-                .map(|r| r.to_owned())
-                .collect();
+                .get_remote_aliases(&local_handle.as_local_ref())?;
+
+            let mut push_aliases: Vec<_> =
+                remote_aliases.get_by_kind(RemoteAliasKind::Push).collect();
 
             match push_aliases.len() {
                 0 => Err(PushError::NoTarget),
                 1 => Ok(PushInfo {
-                    original_ref: dataset_ref.to_owned(),
-                    local_id: Some(dataset_ref.local_id().to_owned()),
-                    remote_ref: Some(push_aliases.remove(0).to_owned()),
+                    original_ref: dataset_ref.clone(),
+                    local_handle: Some(local_handle.clone()),
+                    remote_handle: Some(RemoteDatasetHandle::new(
+                        local_handle.id.clone(),
+                        push_aliases.remove(0).clone(),
+                    )),
                 }),
                 // TODO: Support disambiguation
                 _ => Err(PushError::AmbiguousTarget),
             }
         } else {
+            let remote_name = match dataset_ref.as_remote_ref().unwrap() {
+                DatasetRefRemote::ID(_) => unreachable!(),
+                DatasetRefRemote::RemoteName(name) => name,
+                DatasetRefRemote::RemoteHandle(hdl) => hdl.name,
+            };
+
             // TODO: avoid traversing all datasets for every alias
-            for dataset_id in self.metadata_repo.get_all_datasets() {
+            for dataset_handle in self.metadata_repo.get_all_datasets() {
                 if self
                     .metadata_repo
-                    .get_remote_aliases(&dataset_id)?
-                    .contains(dataset_ref, RemoteAliasKind::Push)
+                    .get_remote_aliases(&dataset_handle.as_local_ref())?
+                    .contains(&remote_name, RemoteAliasKind::Push)
                 {
                     return Ok(PushInfo {
                         original_ref: dataset_ref.to_owned(),
-                        local_id: Some(dataset_id),
-                        remote_ref: Some(dataset_ref.to_owned()),
+                        local_handle: Some(dataset_handle.clone()),
+                        remote_handle: Some(RemoteDatasetHandle {
+                            id: dataset_handle.id.clone(),
+                            name: remote_name,
+                        }),
                     });
                 }
             }
@@ -104,7 +118,7 @@ impl PushServiceImpl {
 impl PushService for PushServiceImpl {
     fn push_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PushOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
@@ -117,12 +131,12 @@ impl PushService for PushServiceImpl {
 
         let sync_plan = match self.collect_plan(dataset_refs) {
             Ok(plan) => plan,
-            Err((id, err)) => {
+            Err((dr, err)) => {
                 return vec![(
                     PushInfo {
-                        original_ref: id,
-                        local_id: None,
-                        remote_ref: None,
+                        original_ref: dr,
+                        local_handle: None,
+                        remote_handle: None,
                     },
                     Err(err),
                 )]
@@ -132,8 +146,8 @@ impl PushService for PushServiceImpl {
         let sync_results = self.sync_svc.sync_to_multi(
             &mut sync_plan.iter().map(|pi| {
                 (
-                    pi.local_id.as_ref().unwrap().as_ref(),
-                    pi.remote_ref.as_ref().unwrap().as_ref(),
+                    pi.local_handle.as_ref().unwrap().into(),
+                    pi.remote_handle.as_ref().unwrap().name.clone(),
                 )
             }),
             options.sync_options,

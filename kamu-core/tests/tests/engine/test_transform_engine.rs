@@ -68,7 +68,7 @@ fn test_transform_with_engine_spark() {
     .unwrap();
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
-        .id("root")
+        .name("root")
         .source(
             MetadataFactory::dataset_source_root()
                 .fetch_file(&src_path)
@@ -102,12 +102,12 @@ fn test_transform_with_engine_spark() {
         )
         .build();
 
-    let root_id = root_snapshot.id.clone();
+    let root_name = root_snapshot.name.clone();
 
     metadata_repo.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
-        .ingest(&root_id, IngestOptions::default(), None)
+        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -115,9 +115,9 @@ fn test_transform_with_engine_spark() {
     ///////////////////////////////////////////////////////////////////////////
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
-        .id("deriv")
+        .name("deriv")
         .source(
-            MetadataFactory::dataset_source_deriv([&root_id].iter())
+            MetadataFactory::dataset_source_deriv([&root_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("spark")
@@ -130,20 +130,23 @@ fn test_transform_with_engine_spark() {
         )
         .build();
 
-    let deriv_id = deriv_snapshot.id.clone();
+    let deriv_name = deriv_snapshot.name.clone();
 
     metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
-    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+    let block_hash = match transform_svc
+        .transform(&deriv_name.as_local_ref(), None)
+        .unwrap()
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
+    let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
         metadata_repo
-            .get_metadata_chain(&deriv_id)
+            .get_metadata_chain(&deriv_name.as_local_ref())
             .unwrap()
             .iter_blocks()
             .count(),
@@ -210,10 +213,13 @@ fn test_transform_with_engine_spark() {
     .unwrap();
 
     ingest_svc
-        .ingest(&root_id, IngestOptions::default(), None)
+        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
         .unwrap();
 
-    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+    let block_hash = match transform_svc
+        .transform(&deriv_name.as_local_ref(), None)
+        .unwrap()
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
@@ -243,7 +249,7 @@ fn test_transform_with_engine_spark() {
     ///////////////////////////////////////////////////////////////////////////
 
     let verify_result = transform_svc.verify_transform(
-        &deriv_id,
+        &deriv_name.as_local_ref(),
         (None, None),
         VerificationOptions::default(),
         None,
@@ -298,7 +304,7 @@ fn test_transform_with_engine_flink() {
     .unwrap();
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
-        .id("root")
+        .name("root")
         .source(
             MetadataFactory::dataset_source_root()
                 .fetch_file(&src_path)
@@ -332,12 +338,12 @@ fn test_transform_with_engine_flink() {
         )
         .build();
 
-    let root_id = root_snapshot.id.clone();
+    let root_name = root_snapshot.name.clone();
 
     metadata_repo.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
-        .ingest(&root_id, IngestOptions::default(), None)
+        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -345,9 +351,9 @@ fn test_transform_with_engine_flink() {
     ///////////////////////////////////////////////////////////////////////////
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
-        .id("deriv")
+        .name("deriv")
         .source(
-            MetadataFactory::dataset_source_deriv([&root_id].iter())
+            MetadataFactory::dataset_source_deriv([&root_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("flink")
@@ -360,20 +366,23 @@ fn test_transform_with_engine_flink() {
         )
         .build();
 
-    let deriv_id = deriv_snapshot.id.clone();
+    let deriv_name = deriv_snapshot.name.clone();
 
     metadata_repo.add_dataset(deriv_snapshot).unwrap();
 
-    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+    let block_hash = match transform_svc
+        .transform(&deriv_name.as_local_ref(), None)
+        .unwrap()
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_id);
+    let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
         metadata_repo
-            .get_metadata_chain(&deriv_id)
+            .get_metadata_chain(&deriv_name.as_local_ref())
             .unwrap()
             .iter_blocks()
             .count(),
@@ -440,10 +449,13 @@ fn test_transform_with_engine_flink() {
     .unwrap();
 
     ingest_svc
-        .ingest(&root_id, IngestOptions::default(), None)
+        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
         .unwrap();
 
-    let block_hash = match transform_svc.transform(&deriv_id, None).unwrap() {
+    let block_hash = match transform_svc
+        .transform(&deriv_name.as_local_ref(), None)
+        .unwrap()
+    {
         TransformResult::Updated { new_head, .. } => new_head,
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
@@ -473,7 +485,7 @@ fn test_transform_with_engine_flink() {
     ///////////////////////////////////////////////////////////////////////////
 
     let verify_result = transform_svc.verify_transform(
-        &deriv_id,
+        &deriv_name.as_local_ref(),
         (None, None),
         VerificationOptions::default(),
         None,

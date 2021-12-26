@@ -37,8 +37,8 @@ impl IngestServiceImpl {
     }
 
     // TODO: error handling
-    fn get_dataset_layout(&self, dataset_id: &DatasetID) -> DatasetLayout {
-        DatasetLayout::create(&self.volume_layout, dataset_id).unwrap()
+    fn get_dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
+        DatasetLayout::create(&self.volume_layout, &dataset_handle.name).unwrap()
     }
 
     // TODO: Introduce intermediate structs to avoid full unpacking
@@ -82,26 +82,97 @@ impl IngestServiceImpl {
 
         unreachable!()
     }
+
+    // TODO: Improve error handling
+    fn spawn_ingest_task(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+        options: IngestOptions,
+        multi_listener: &Arc<dyn IngestMultiListener>,
+    ) -> std::thread::JoinHandle<Result<IngestResult, IngestError>> {
+        let dataset_handle = self
+            .metadata_repo
+            .resolve_dataset_ref(&dataset_ref)
+            .unwrap();
+
+        let layout = self.get_dataset_layout(&dataset_handle);
+
+        let meta_chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())
+            .unwrap();
+
+        let engine_provisioner = self.engine_provisioner.clone();
+
+        let null_listener = Arc::new(NullIngestListener {});
+        let listener = multi_listener
+            .begin_ingest(&dataset_handle)
+            .unwrap_or(null_listener);
+
+        let thread_handle = std::thread::Builder::new()
+            .name("ingest_multi".to_owned())
+            .spawn(move || {
+                let exhaust_sources = options.exhaust_sources;
+
+                let mut ingest_task = IngestTask::new(
+                    dataset_handle.clone(),
+                    options,
+                    layout,
+                    meta_chain,
+                    None,
+                    listener,
+                    engine_provisioner,
+                );
+
+                let mut combined_result = None;
+                loop {
+                    match ingest_task.ingest() {
+                        Ok(res) => {
+                            combined_result = Some(Self::merge_results(combined_result, res));
+
+                            if let Some(IngestResult::Updated { has_more, .. }) = combined_result {
+                                if has_more && exhaust_sources {
+                                    continue;
+                                }
+                            }
+                        }
+                        Err(e) => return Err(e),
+                    }
+                    break;
+                }
+                Ok(combined_result.unwrap())
+            })
+            .unwrap();
+
+        thread_handle
+    }
 }
 
 impl IngestService for IngestServiceImpl {
     fn ingest(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(dataset = dataset_id.as_str(), "Ingesting single dataset");
+        info!(
+            dataset = ?dataset_ref,
+            "Ingesting single dataset"
+        );
 
-        let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let meta_chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())
+            .unwrap();
 
-        let layout = self.get_dataset_layout(dataset_id);
+        let layout = self.get_dataset_layout(&dataset_handle);
 
         let mut ingest_task = IngestTask::new(
-            dataset_id,
+            dataset_handle,
             options,
             layout,
             meta_chain,
@@ -115,7 +186,7 @@ impl IngestService for IngestServiceImpl {
 
     fn ingest_from(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
@@ -123,14 +194,18 @@ impl IngestService for IngestServiceImpl {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(dataset = dataset_id.as_str(), fetch = ?fetch, "Ingesting single dataset from overriden source");
+        info!(dataset = ?dataset_ref, fetch = ?fetch, "Ingesting single dataset from overriden source");
 
-        let meta_chain = self.metadata_repo.get_metadata_chain(dataset_id).unwrap();
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let meta_chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())
+            .unwrap();
 
-        let layout = self.get_dataset_layout(dataset_id);
+        let layout = self.get_dataset_layout(&dataset_handle);
 
         let mut ingest_task = IngestTask::new(
-            dataset_id,
+            dataset_handle,
             options,
             layout,
             meta_chain,
@@ -144,71 +219,30 @@ impl IngestService for IngestServiceImpl {
 
     fn ingest_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)> {
+    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
         let null_multi_listener: Arc<dyn IngestMultiListener> =
             Arc::new(NullIngestMultiListener {});
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
-        let dataset_ids_owned: Vec<_> = dataset_ids.map(|id| id.to_owned()).collect();
-        info!(datasets = ?dataset_ids_owned, "Ingesting multiple datasets");
+        let dataset_refs: Vec<_> = dataset_refs.collect();
+        info!(datasets = ?dataset_refs, "Ingesting multiple datasets");
 
-        let thread_handles: Vec<_> = dataset_ids_owned
+        let thread_handles: Vec<_> = dataset_refs
             .into_iter()
-            .map(|id| {
-                let layout = self.get_dataset_layout(&id);
-                let meta_chain = self.metadata_repo.get_metadata_chain(&id).unwrap();
-                let engine_provisioner = self.engine_provisioner.clone();
-                let task_options = options.clone();
-
-                let null_listener = Arc::new(NullIngestListener {});
-                let listener = multi_listener.begin_ingest(&id).unwrap_or(null_listener);
-
-                std::thread::Builder::new()
-                    .name("ingest_multi".to_owned())
-                    .spawn(move || {
-                        let exhaust_sources = task_options.exhaust_sources;
-
-                        let mut ingest_task = IngestTask::new(
-                            &id,
-                            task_options,
-                            layout,
-                            meta_chain,
-                            None,
-                            listener,
-                            engine_provisioner,
-                        );
-
-                        let mut combined_result = None;
-                        loop {
-                            match ingest_task.ingest() {
-                                Ok(res) => {
-                                    combined_result =
-                                        Some(Self::merge_results(combined_result, res));
-
-                                    if let Some(IngestResult::Updated { has_more, .. }) =
-                                        combined_result
-                                    {
-                                        if has_more && exhaust_sources {
-                                            continue;
-                                        }
-                                    }
-                                }
-                                Err(e) => return (id, Err(e)),
-                            }
-                            break;
-                        }
-                        (id, Ok(combined_result.unwrap()))
-                    })
-                    .unwrap()
+            .map(|dataset_ref| {
+                (
+                    dataset_ref.clone(),
+                    self.spawn_ingest_task(&dataset_ref, options.clone(), &multi_listener),
+                )
             })
             .collect();
 
         let results: Vec<_> = thread_handles
             .into_iter()
-            .map(|h| h.join().unwrap())
+            .map(|(r, h)| (r, h.join().unwrap()))
             .collect();
 
         results

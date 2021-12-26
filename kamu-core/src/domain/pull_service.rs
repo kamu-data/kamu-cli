@@ -13,7 +13,9 @@ use super::transform_service::*;
 use crate::domain::DomainError;
 
 use chrono::{DateTime, Utc};
-use opendatafabric::{DatasetID, DatasetRef, DatasetRefBuf, FetchStep, Sha3_256};
+use opendatafabric::{
+    DatasetName, DatasetRefAny, DatasetRefLocal, DatasetRefRemote, FetchStep, Multihash,
+};
 use thiserror::Error;
 
 use std::sync::Arc;
@@ -25,18 +27,18 @@ use std::sync::Arc;
 pub trait PullService: Send + Sync {
     fn pull_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PullOptions,
         ingest_listener: Option<Arc<dyn IngestMultiListener>>,
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)>;
+    ) -> Vec<(DatasetRefAny, Result<PullResult, PullError>)>;
 
     /// A special version of pull that can rename dataset when syncing it from a repository
     fn sync_from(
         &self,
-        remote_ref: &DatasetRef,
-        local_id: &DatasetID,
+        remote_ref: &DatasetRefRemote,
+        local_name: &DatasetName,
         options: PullOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError>;
@@ -44,7 +46,7 @@ pub trait PullService: Send + Sync {
     /// A special version of pull that allows overriding the fetch source on root datasets (e.g. to pull data from a specific file)
     fn ingest_from(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
         options: PullOptions,
         listener: Option<Arc<dyn IngestListener>>,
@@ -52,7 +54,7 @@ pub trait PullService: Send + Sync {
 
     fn set_watermark(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError>;
 }
@@ -91,8 +93,8 @@ impl Default for PullOptions {
 pub enum PullResult {
     UpToDate,
     Updated {
-        old_head: Option<Sha3_256>,
-        new_head: Sha3_256,
+        old_head: Option<Multihash>,
+        new_head: Multihash,
         num_blocks: usize,
     },
 }

@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{EngineError, EngineProvisioningListener};
-use opendatafabric::{DatasetID, DatasetIDBuf, FetchStep, Sha3_256};
+use super::{DomainError, EngineError, EngineProvisioningListener};
+use opendatafabric::{DatasetHandle, DatasetRefLocal, FetchStep, Multihash};
 
 use std::backtrace::Backtrace;
 use std::path::Path;
@@ -22,14 +22,14 @@ use thiserror::Error;
 pub trait IngestService: Send + Sync {
     fn ingest(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
     fn ingest_from(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
@@ -37,10 +37,10 @@ pub trait IngestService: Send + Sync {
 
     fn ingest_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetIDBuf, Result<IngestResult, IngestError>)>;
+    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)>;
 }
 
 #[derive(Debug, Clone)]
@@ -67,8 +67,8 @@ pub enum IngestResult {
         uncacheable: bool,
     },
     Updated {
-        old_head: Sha3_256,
-        new_head: Sha3_256,
+        old_head: Multihash,
+        new_head: Multihash,
         num_blocks: usize,
         has_more: bool,
         uncacheable: bool,
@@ -108,7 +108,7 @@ pub struct NullIngestListener;
 impl IngestListener for NullIngestListener {}
 
 pub trait IngestMultiListener {
-    fn begin_ingest(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn IngestListener>> {
+    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
         None
     }
 }
@@ -124,6 +124,8 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
 pub enum IngestError {
+    #[error("Domain error: {0}")]
+    DomainError(#[from] DomainError),
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,

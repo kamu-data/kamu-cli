@@ -14,6 +14,12 @@ use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
+macro_rules! rl {
+    ($s:expr) => {
+        DatasetRefLocal::Name(DatasetName::try_from($s).unwrap())
+    };
+}
+
 #[test]
 fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -23,44 +29,38 @@ fn test_delete_dataset() {
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
-            .id("foo")
+            .name("foo")
             .source(MetadataFactory::dataset_source_root().build())
             .build(),
         MetadataFactory::dataset_snapshot()
-            .id("bar")
-            .source(MetadataFactory::dataset_source_deriv(["foo"].iter()).build())
+            .name("bar")
+            .source(MetadataFactory::dataset_source_deriv(["foo"].into_iter()).build())
             .build(),
     ];
 
     metadata_repo.add_datasets(&mut snapshots.into_iter());
 
     assert!(matches!(
-        metadata_repo.delete_dataset(DatasetID::try_from("foo").unwrap()),
+        metadata_repo.delete_dataset(&rl!("foo")),
         Err(DomainError::DanglingReference { .. })
     ));
 
     assert!(matches!(
-        metadata_repo.get_metadata_chain(DatasetID::try_from("foo").unwrap()),
+        metadata_repo.get_metadata_chain(&rl!("foo")),
         Ok(_)
     ));
 
-    assert!(matches!(
-        metadata_repo.delete_dataset(DatasetID::try_from("bar").unwrap()),
-        Ok(_)
-    ));
+    assert!(matches!(metadata_repo.delete_dataset(&rl!("bar")), Ok(_)));
 
     assert!(matches!(
-        metadata_repo.get_metadata_chain(DatasetID::try_from("bar").unwrap()),
+        metadata_repo.get_metadata_chain(&rl!("bar")),
         Err(DomainError::DoesNotExist { .. })
     ));
 
-    assert!(matches!(
-        metadata_repo.delete_dataset(DatasetID::try_from("foo").unwrap()),
-        Ok(_)
-    ));
+    assert!(matches!(metadata_repo.delete_dataset(&rl!("foo")), Ok(_)));
 
     assert!(matches!(
-        metadata_repo.get_metadata_chain(DatasetID::try_from("foo").unwrap()),
+        metadata_repo.get_metadata_chain(&rl!("foo")),
         Err(DomainError::DoesNotExist { .. })
     ));
 }

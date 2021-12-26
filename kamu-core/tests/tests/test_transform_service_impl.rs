@@ -13,69 +13,65 @@ use kamu::testing::*;
 use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};
-use digest::Digest;
 use std::sync::Arc;
 
-fn new_root(metadata_repo: &MetadataRepositoryImpl, id_str: &'static str) -> &'static DatasetID {
-    let id = DatasetID::new_unchecked(id_str);
+fn new_root(metadata_repo: &MetadataRepositoryImpl, name: &str) -> DatasetHandle {
+    let name = DatasetName::try_from(name).unwrap();
     let snap = MetadataFactory::dataset_snapshot()
-        .id(id)
+        .name(name)
         .source(MetadataFactory::dataset_source_root().build())
         .build();
 
-    metadata_repo.add_dataset(snap).unwrap();
-    id
+    let (handle, _head) = metadata_repo.add_dataset(snap).unwrap();
+    handle
 }
 
 fn new_deriv(
     metadata_repo: &MetadataRepositoryImpl,
-    id_str: &'static str,
-    inputs: &[&'static DatasetID],
-) -> (&'static DatasetID, DatasetSourceDerivative) {
-    let id = DatasetID::new_unchecked(id_str);
-    let source = MetadataFactory::dataset_source_deriv(inputs.iter()).build_inner();
+    name: &str,
+    inputs: &[DatasetName],
+) -> (DatasetHandle, DatasetSourceDerivative) {
+    let name = DatasetName::try_from(name).unwrap();
+    let source = MetadataFactory::dataset_source_deriv(inputs).build_inner();
     let snap = MetadataFactory::dataset_snapshot()
-        .id(id)
+        .name(name)
         .source(DatasetSource::Derivative(source.clone()))
         .build();
 
-    metadata_repo.add_dataset(snap).unwrap();
-    (id, source)
+    let (handle, _head) = metadata_repo.add_dataset(snap).unwrap();
+    (handle, source)
 }
 
 fn append_data_block(
     metadata_repo: &MetadataRepositoryImpl,
-    id: &DatasetID,
+    name: &DatasetName,
     records: i64,
-) -> MetadataBlock {
-    let mut chain = metadata_repo.get_metadata_chain(id).unwrap();
+) -> (Multihash, MetadataBlock) {
+    let mut chain = metadata_repo
+        .get_metadata_chain(&name.as_local_ref())
+        .unwrap();
     let offset = chain
         .iter_blocks()
-        .filter_map(|b| b.output_slice)
+        .filter_map(|(_, b)| b.output_slice)
         .map(|s| s.data_interval.end + 1)
         .next()
         .unwrap_or(0);
-    chain.append(
-        MetadataFactory::metadata_block()
-            .prev(&chain.read_ref(&BlockRef::Head).unwrap())
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval {
-                    start: offset,
-                    end: offset + records - 1,
-                },
-            })
-            .output_watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
-            .build(),
-    );
-    chain.iter_blocks().next().unwrap()
+
+    let block = MetadataFactory::metadata_block()
+        .prev(&chain.read_ref(&BlockRef::Head).unwrap())
+        .output_slice(OutputSlice {
+            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+            data_interval: OffsetInterval {
+                start: offset,
+                end: offset + records - 1,
+            },
+        })
+        .output_watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
+        .build();
+
+    let block_hash = chain.append(block.clone());
+    (block_hash, block)
 }
 
 #[test]
@@ -91,28 +87,28 @@ fn test_get_next_operation() {
     );
 
     let foo = new_root(&metadata_repo, "foo");
-    let foo_layout = DatasetLayout::new(&volume_layout, foo);
+    let foo_layout = DatasetLayout::new(&volume_layout, &foo.name);
 
-    let (bar, bar_source) = new_deriv(&metadata_repo, "bar", &[foo]);
+    let (bar, bar_source) = new_deriv(&metadata_repo, "bar", &[foo.name.clone()]);
 
     // No data - no work
     assert_eq!(
-        transform_svc.get_next_operation(bar, Utc::now()).unwrap(),
+        transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
         None
     );
 
-    let foo_block = append_data_block(&metadata_repo, foo, 10);
+    let (foo_hash, foo_block) = append_data_block(&metadata_repo, &foo.name, 10);
 
     assert!(matches!(
-        transform_svc.get_next_operation(bar, Utc::now()).unwrap(),
+        transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
         Some(TransformOperation{ request: ExecuteQueryRequest { transform, inputs, .. }, ..})
         if transform == bar_source.transform &&
-        inputs == vec![QueryInput {
-            dataset_id: foo.to_owned(),
+        inputs == vec![ExecuteQueryInput {
+            dataset_id: foo.id.clone(),
             vocab: DatasetVocabulary::default(),
             data_interval: Some(OffsetInterval {start: 0, end: 9}),
-            data_paths: vec![foo_layout.data_dir.join(foo_block.block_hash.to_string())],
-            schema_file: foo_layout.data_dir.join(foo_block.block_hash.to_string()),
+            data_paths: vec![foo_layout.data_dir.join(foo_hash.to_string())],
+            schema_file: foo_layout.data_dir.join(foo_hash.to_string()),
             explicit_watermarks: vec![Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.ymd(2020, 1, 1).and_hms(10, 0, 0),
@@ -135,12 +131,13 @@ fn test_get_verification_plan_one_to_one() {
 
     // Create root dataset
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
-    let root_id = DatasetID::new_unchecked("foo");
-    let root_layout = DatasetLayout::create(&volume_layout, root_id).unwrap();
-    let root_head_src = metadata_repo
+    let root_name = DatasetName::new_unchecked("foo");
+    let root_layout = DatasetLayout::create(&volume_layout, &root_name).unwrap();
+    let (root_hdl, root_head_src) = metadata_repo
         .add_dataset_from_block(
-            root_id,
+            &root_name,
             MetadataFactory::metadata_block()
+                .seed_random()
                 .system_time(t0)
                 .source(MetadataFactory::dataset_source_root().build())
                 .build(),
@@ -148,37 +145,35 @@ fn test_get_verification_plan_one_to_one() {
         .unwrap();
 
     // Create derivative
-    let deriv_id = DatasetID::new_unchecked("bar");
-    let deriv_head_src = metadata_repo
+    let deriv_name = DatasetName::new_unchecked("bar");
+    let (deriv_hdl, deriv_head_src) = metadata_repo
         .add_dataset_from_block(
-            deriv_id,
+            &deriv_name,
             MetadataFactory::metadata_block()
+                .seed_random()
                 .system_time(t0)
-                .source(MetadataFactory::dataset_source_deriv([root_id].iter()).build())
+                .source(MetadataFactory::dataset_source_deriv([&root_name]).build())
                 .build(),
         )
         .unwrap();
 
     // T1: Root data added
     let t1 = Utc.ymd(2020, 1, 1).and_hms(12, 0, 0);
-    let root_head_t1 = metadata_repo.get_metadata_chain(root_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t1)
-            .prev(&root_head_src)
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval { start: 0, end: 99 },
-            })
-            .output_watermark(t0)
-            .build(),
-    );
+    let root_head_t1 = metadata_repo
+        .get_metadata_chain(&root_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t1)
+                .prev(&root_head_src)
+                .output_slice(OutputSlice {
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    data_interval: OffsetInterval { start: 0, end: 99 },
+                })
+                .output_watermark(t0)
+                .build(),
+        );
     std::fs::write(
         root_layout.data_dir.join(root_head_t1.to_string()),
         "<data>",
@@ -188,59 +183,53 @@ fn test_get_verification_plan_one_to_one() {
     // T2: Transform [SRC; T1]
     let t2 = Utc.ymd(2020, 1, 2).and_hms(12, 0, 0);
     let deriv_req_t2 = transform_svc
-        .get_next_operation(deriv_id, t2)
+        .get_next_operation(&deriv_hdl, t2)
         .unwrap()
         .unwrap();
-    let deriv_head_t2 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t2)
-            .prev(&deriv_head_src)
-            .input_slice(InputSlice {
-                dataset_id: root_id.to_owned(),
-                block_interval: Some(BlockInterval {
-                    start: root_head_src,
-                    end: root_head_t1,
-                }),
-                data_interval: Some(OffsetInterval { start: 0, end: 99 }),
-            })
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval { start: 0, end: 99 },
-            })
-            .output_watermark(t0)
-            .build(),
-    );
+    let deriv_head_t2 = metadata_repo
+        .get_metadata_chain(&deriv_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t2)
+                .prev(&deriv_head_src)
+                .input_slice(InputSlice {
+                    dataset_id: root_hdl.id.clone(),
+                    block_interval: Some(BlockInterval {
+                        start: root_head_src,
+                        end: root_head_t1.clone(),
+                    }),
+                    data_interval: Some(OffsetInterval { start: 0, end: 99 }),
+                })
+                .output_slice(OutputSlice {
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    data_interval: OffsetInterval { start: 0, end: 99 },
+                })
+                .output_watermark(t0)
+                .build(),
+        );
 
     // T3: More root data
     let t3 = Utc.ymd(2020, 1, 3).and_hms(12, 0, 0);
-    let root_head_t3 = metadata_repo.get_metadata_chain(root_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t3)
-            .prev(&root_head_t1)
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval {
-                    start: 100,
-                    end: 109,
-                },
-            })
-            .output_watermark(t2)
-            .build(),
-    );
+    let root_head_t3 = metadata_repo
+        .get_metadata_chain(&root_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t3)
+                .prev(&root_head_t1)
+                .output_slice(OutputSlice {
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    data_interval: OffsetInterval {
+                        start: 100,
+                        end: 109,
+                    },
+                })
+                .output_watermark(t2)
+                .build(),
+        );
     std::fs::write(
         root_layout.data_dir.join(root_head_t3.to_string()),
         "<data>",
@@ -250,119 +239,111 @@ fn test_get_verification_plan_one_to_one() {
     // T4: Transform [T3; T3]
     let t4 = Utc.ymd(2020, 1, 4).and_hms(12, 0, 0);
     let deriv_req_t4 = transform_svc
-        .get_next_operation(deriv_id, t4)
+        .get_next_operation(&deriv_hdl, t4)
         .unwrap()
         .unwrap();
-    let deriv_head_t4 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t4)
-            .prev(&deriv_head_t2)
-            .input_slice(InputSlice {
-                dataset_id: root_id.to_owned(),
-                block_interval: Some(BlockInterval {
-                    start: root_head_t3,
-                    end: root_head_t3,
-                }),
-                data_interval: Some(OffsetInterval {
-                    start: 100,
-                    end: 109,
-                }),
-            })
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval {
-                    start: 100,
-                    end: 109,
-                },
-            })
-            .output_watermark(t2)
-            .build(),
-    );
+    let deriv_head_t4 = metadata_repo
+        .get_metadata_chain(&deriv_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t4)
+                .prev(&deriv_head_t2)
+                .input_slice(InputSlice {
+                    dataset_id: root_hdl.id.clone(),
+                    block_interval: Some(BlockInterval {
+                        start: root_head_t3.clone(),
+                        end: root_head_t3.clone(),
+                    }),
+                    data_interval: Some(OffsetInterval {
+                        start: 100,
+                        end: 109,
+                    }),
+                })
+                .output_slice(OutputSlice {
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    data_interval: OffsetInterval {
+                        start: 100,
+                        end: 109,
+                    },
+                })
+                .output_watermark(t2)
+                .build(),
+        );
 
     // T5: Root watermark update only
     let t5 = Utc.ymd(2020, 1, 5).and_hms(12, 0, 0);
-    let root_head_t5 = metadata_repo.get_metadata_chain(root_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t5)
-            .prev(&root_head_t3)
-            .output_watermark(t4)
-            .build(),
-    );
+    let root_head_t5 = metadata_repo
+        .get_metadata_chain(&root_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t5)
+                .prev(&root_head_t3)
+                .output_watermark(t4)
+                .build(),
+        );
 
     // T6: Transform [T5; T5]
     let t6 = Utc.ymd(2020, 1, 6).and_hms(12, 0, 0);
     let deriv_req_t6 = transform_svc
-        .get_next_operation(deriv_id, t6)
+        .get_next_operation(&deriv_hdl, t6)
         .unwrap()
         .unwrap();
-    let deriv_head_t6 = metadata_repo.get_metadata_chain(deriv_id).unwrap().append(
-        MetadataFactory::metadata_block()
-            .system_time(t6)
-            .prev(&deriv_head_t4)
-            .input_slice(InputSlice {
-                dataset_id: root_id.to_owned(),
-                block_interval: Some(BlockInterval {
-                    start: root_head_t5,
-                    end: root_head_t5,
-                }),
-                data_interval: None,
-            })
-            .output_slice(OutputSlice {
-                data_logical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"foo"),
-                ),
-                data_physical_hash: Multihash::new(
-                    MulticodecCode::Sha3_256,
-                    &sha3::Sha3_256::digest(b"bar"),
-                ),
-                data_interval: OffsetInterval {
-                    start: 110,
-                    end: 119,
-                },
-            })
-            .output_watermark(t4)
-            .build(),
-    );
+    let deriv_head_t6 = metadata_repo
+        .get_metadata_chain(&deriv_hdl.as_local_ref())
+        .unwrap()
+        .append(
+            MetadataFactory::metadata_block()
+                .system_time(t6)
+                .prev(&deriv_head_t4)
+                .input_slice(InputSlice {
+                    dataset_id: root_hdl.id.clone(),
+                    block_interval: Some(BlockInterval {
+                        start: root_head_t5.clone(),
+                        end: root_head_t5.clone(),
+                    }),
+                    data_interval: None,
+                })
+                .output_slice(OutputSlice {
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    data_interval: OffsetInterval {
+                        start: 110,
+                        end: 119,
+                    },
+                })
+                .output_watermark(t4)
+                .build(),
+        );
 
     let plan = transform_svc
-        .get_verification_plan(deriv_id, (None, None))
+        .get_verification_plan(&deriv_hdl, (None, None))
+        .unwrap();
+
+    let deriv_chain = metadata_repo
+        .get_metadata_chain(&deriv_hdl.as_local_ref())
         .unwrap();
 
     assert_eq!(plan.len(), 3);
 
+    assert_eq!(plan[0].expected_hash, deriv_head_t2);
     assert_eq!(
-        plan[0].expected,
-        metadata_repo
-            .get_metadata_chain(deriv_id)
-            .unwrap()
-            .get_block(&deriv_head_t2)
-            .unwrap()
+        plan[0].expected_block,
+        deriv_chain.get_block(&deriv_head_t2).unwrap()
     );
 
+    assert_eq!(plan[1].expected_hash, deriv_head_t4);
     assert_eq!(
-        plan[1].expected,
-        metadata_repo
-            .get_metadata_chain(deriv_id)
-            .unwrap()
-            .get_block(&deriv_head_t4)
-            .unwrap()
+        plan[1].expected_block,
+        deriv_chain.get_block(&deriv_head_t4).unwrap()
     );
 
+    assert_eq!(plan[2].expected_hash, deriv_head_t6);
     assert_eq!(
-        plan[2].expected,
-        metadata_repo
-            .get_metadata_chain(deriv_id)
-            .unwrap()
-            .get_block(&deriv_head_t6)
-            .unwrap()
+        plan[2].expected_block,
+        deriv_chain.get_block(&deriv_head_t6).unwrap()
     );
 
     assert_eq!(

@@ -32,10 +32,10 @@ impl ReadService {
     // TODO: Don't use engine for anything but preprocessing
     pub fn read(
         &self,
-        dataset_id: &DatasetID,
+        dataset_handle: &DatasetHandle,
         dataset_layout: &DatasetLayout,
         source: &DatasetSourceRoot,
-        prev_checkpoint: Option<Sha3_256>,
+        prev_checkpoint: Option<Multihash>,
         vocab: &DatasetVocabulary,
         system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
@@ -61,7 +61,7 @@ impl ReadService {
         std::fs::create_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
 
         let request = IngestRequest {
-            dataset_id: dataset_id.to_owned(),
+            dataset_name: dataset_handle.name.clone(),
             ingest_path: src_path.to_owned(),
             system_time,
             event_time: source_event_time,

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::RepositoryError;
-use opendatafabric::{DatasetRefBuf, RepositoryBuf};
+use opendatafabric::{RemoteDatasetName, RepositoryName};
 
 use thiserror::Error;
 
@@ -26,12 +26,13 @@ pub trait SearchService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchOptions {
-    pub repository_ids: Vec<RepositoryBuf>,
+    pub repository_names: Vec<RepositoryName>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchResult {
-    pub datasets: Vec<DatasetRefBuf>,
+    // TODO: REMORE ID: Should be RemoteDatasetHandle
+    pub datasets: Vec<RemoteDatasetName>,
 }
 
 impl SearchResult {
@@ -49,8 +50,8 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
 pub enum SearchError {
-    #[error("Repository {repo_id} does not exist")]
-    RepositoryDoesNotExist { repo_id: RepositoryBuf },
+    #[error("Repository {repo_name} does not exist")]
+    RepositoryDoesNotExist { repo_name: RepositoryName },
     #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
         message: String,

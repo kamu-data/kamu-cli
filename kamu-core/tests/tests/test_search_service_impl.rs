@@ -20,9 +20,9 @@ use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches
 fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
-    let dataset_id = DatasetID::new_unchecked("foo");
-    let repo = RepositoryID::new_unchecked("repo");
-    let remote_dataset_ref = DatasetRefBuf::new_unchecked("repo/bar");
+    let dataset_local_name = DatasetName::new_unchecked("foo");
+    let repo_name = RepositoryName::new_unchecked("repo");
+    let dataset_remote_name = RemoteDatasetName::new_unchecked("repo/bar");
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
@@ -36,13 +36,13 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let search_svc = SearchServiceImpl::new(metadata_repo.clone(), repository_factory.clone());
 
     // Add repository
-    metadata_repo.add_repository(repo, repo_url).unwrap();
+    metadata_repo.add_repository(&repo_name, repo_url).unwrap();
 
     // Add and sync dataset
     metadata_repo
         .add_dataset(
             MetadataFactory::dataset_snapshot()
-                .id(&dataset_id)
+                .name(&dataset_local_name)
                 .source(MetadataFactory::dataset_source_root().build())
                 .build(),
         )
@@ -50,8 +50,8 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     sync_svc
         .sync_to(
-            dataset_id,
-            &remote_dataset_ref,
+            &dataset_local_name.as_local_ref(),
+            &dataset_remote_name,
             SyncOptions::default(),
             None,
         )
@@ -60,11 +60,11 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     // Search!
     assert_matches!(
         search_svc.search(None, SearchOptions::default()),
-        Ok(SearchResult { datasets }) if datasets == vec![remote_dataset_ref.clone()]
+        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
     );
     assert_matches!(
         search_svc.search(Some("bar"), SearchOptions::default()),
-        Ok(SearchResult { datasets }) if datasets == vec![remote_dataset_ref.clone()]
+        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
     );
     assert_matches!(
         search_svc.search(Some("foo"), SearchOptions::default()),

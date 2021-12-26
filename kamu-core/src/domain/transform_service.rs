@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use super::{
-    EngineError, EngineProvisioningListener, VerificationError, VerificationListener,
+    DomainError, EngineError, EngineProvisioningListener, VerificationError, VerificationListener,
     VerificationMultiListener, VerificationOptions, VerificationRequest, VerificationResult,
 };
-use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
+use opendatafabric::{DatasetHandle, DatasetRefLocal, Multihash};
 
 use std::backtrace::Backtrace;
 use std::sync::Arc;
@@ -25,20 +25,20 @@ use thiserror::Error;
 pub trait TransformService: Send + Sync {
     fn transform(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
     fn transform_multi(
         &self,
-        dataset_ids: &mut dyn Iterator<Item = &DatasetID>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         listener: Option<Arc<dyn TransformMultiListener>>,
-    ) -> Vec<(DatasetIDBuf, Result<TransformResult, TransformError>)>;
+    ) -> Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)>;
 
     fn verify_transform(
         &self,
-        dataset_id: &DatasetID,
-        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        dataset_ref: &DatasetRefLocal,
+        block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
@@ -59,8 +59,8 @@ pub trait TransformService: Send + Sync {
 pub enum TransformResult {
     UpToDate,
     Updated {
-        old_head: Sha3_256,
-        new_head: Sha3_256,
+        old_head: Multihash,
+        new_head: Multihash,
         num_blocks: usize,
     },
 }
@@ -87,7 +87,7 @@ impl TransformListener for NullTransformListener {}
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformMultiListener {
-    fn begin_transform(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn TransformListener>> {
+    fn begin_transform(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn TransformListener>> {
         None
     }
 }
@@ -103,6 +103,8 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
 pub enum TransformError {
+    #[error("Domain error: {0}")]
+    DomainError(#[from] DomainError),
     #[error("Engine error: {0}")]
     EngineError(#[from] EngineError),
     #[error("Internal error: {source}")]

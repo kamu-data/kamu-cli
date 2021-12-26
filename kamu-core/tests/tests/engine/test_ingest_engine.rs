@@ -59,7 +59,7 @@ fn test_ingest_with_engine() {
     .unwrap();
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .id("foo.bar")
+        .name("foo.bar")
         .source(
             MetadataFactory::dataset_source_root()
                 .fetch_file(&src_path)
@@ -77,14 +77,14 @@ fn test_ingest_with_engine() {
         )
         .build();
 
-    let dataset_id = dataset_snapshot.id.clone();
+    let dataset_name = dataset_snapshot.name.clone();
 
     metadata_repo.add_dataset(dataset_snapshot).unwrap();
 
-    let res = ingest_svc.ingest(&dataset_id, IngestOptions::default(), None);
+    let res = ingest_svc.ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None);
     assert_matches!(res, Ok(IngestResult::Updated { .. }));
 
-    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_id);
+    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
     assert!(dataset_layout.data_dir.exists());
 
     let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {

@@ -10,8 +10,9 @@
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
-use std::convert::TryFrom;
 use std::path::Path;
+
+use super::IDFactory;
 
 pub struct MetadataFactory;
 
@@ -26,10 +27,11 @@ impl MetadataFactory {
 
     pub fn dataset_source_deriv<S, I>(inputs: I) -> DatasetSourceBuilderDeriv
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
+        I: IntoIterator<Item = S>,
+        S: TryInto<DatasetName>,
+        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
-        DatasetSourceBuilderDeriv::new(inputs)
+        DatasetSourceBuilderDeriv::new(inputs.into_iter())
     }
 
     pub fn metadata_block() -> MetadataBlockBuilder {
@@ -147,16 +149,27 @@ impl DatasetSourceBuilderDeriv {
     fn new<S, I>(inputs: I) -> Self
     where
         I: Iterator<Item = S>,
-        S: AsRef<str>,
+        S: TryInto<DatasetName>,
+        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
         Self {
             v: DatasetSourceDerivative {
                 inputs: inputs
-                    .map(|s| DatasetIDBuf::try_from(s.as_ref()).unwrap())
+                    .map(|s| TransformInput {
+                        id: None,
+                        name: s.try_into().unwrap(),
+                    })
                     .collect(),
                 transform: TransformSqlBuilder::new().build(),
             },
         }
+    }
+
+    pub fn input_ids_from_names(mut self) -> Self {
+        for input in self.v.inputs.iter_mut() {
+            input.id = Some(DatasetID::from_pub_key_ed25519(input.name.as_bytes()));
+        }
+        self
     }
 
     pub fn transform(mut self, transform: Transform) -> Self {
@@ -185,7 +198,6 @@ impl MetadataBlockBuilder {
     fn new() -> Self {
         Self {
             v: MetadataBlock {
-                block_hash: Sha3_256::zero(),
                 prev_block_hash: None,
                 system_time: Utc::now(),
                 output_slice: None,
@@ -193,12 +205,13 @@ impl MetadataBlockBuilder {
                 input_slices: None,
                 source: None,
                 vocab: None,
+                seed: None,
             },
         }
     }
 
-    pub fn prev(mut self, prev_block_hash: &Sha3_256) -> Self {
-        self.v.prev_block_hash = Some(*prev_block_hash);
+    pub fn prev(mut self, prev_block_hash: &Multihash) -> Self {
+        self.v.prev_block_hash = Some(prev_block_hash.clone());
         self
     }
 
@@ -230,6 +243,16 @@ impl MetadataBlockBuilder {
         self
     }
 
+    pub fn seed_random(mut self) -> Self {
+        self.v.seed = Some(DatasetID::from_new_keypair_ed25519().1);
+        self
+    }
+
+    pub fn seed_from<B: AsRef<[u8]>>(mut self, key: B) -> Self {
+        self.v.seed = Some(DatasetID::from_pub_key_ed25519(key.as_ref()));
+        self
+    }
+
     pub fn build(self) -> MetadataBlock {
         self.v
     }
@@ -247,15 +270,18 @@ impl DatasetSnapshotBuilder {
     fn new() -> Self {
         Self {
             v: DatasetSnapshot {
-                id: DatasetIDBuf::try_from("com.example").unwrap(),
+                name: IDFactory::dataset_name(),
                 source: DatasetSourceBuilderRoot::new().build(),
                 vocab: None,
             },
         }
     }
 
-    pub fn id<S: AsRef<str>>(mut self, s: S) -> Self {
-        self.v.id = DatasetIDBuf::try_from(s.as_ref()).unwrap();
+    pub fn name<S: TryInto<DatasetName>>(mut self, s: S) -> Self
+    where
+        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+    {
+        self.v.name = s.try_into().unwrap();
         self
     }
 

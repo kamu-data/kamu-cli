@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::VolumeLayout;
-use opendatafabric::DatasetID;
+use opendatafabric::DatasetName;
 use std::path::PathBuf;
 
 /// Describes the layout of the dataset on disk
@@ -23,19 +23,19 @@ pub struct DatasetLayout {
 }
 
 impl DatasetLayout {
-    pub fn new(volume_layout: &VolumeLayout, dataset_id: &DatasetID) -> Self {
+    pub fn new(volume_layout: &VolumeLayout, dataset_name: &DatasetName) -> Self {
         Self {
-            data_dir: volume_layout.data_dir.join(dataset_id),
-            checkpoints_dir: volume_layout.checkpoints_dir.join(dataset_id),
-            cache_dir: volume_layout.cache_dir.join(dataset_id),
+            data_dir: volume_layout.data_dir.join(dataset_name),
+            checkpoints_dir: volume_layout.checkpoints_dir.join(dataset_name),
+            cache_dir: volume_layout.cache_dir.join(dataset_name),
         }
     }
 
     pub fn create(
         volume_layout: &VolumeLayout,
-        dataset_id: &DatasetID,
+        dataset_name: &DatasetName,
     ) -> Result<Self, std::io::Error> {
-        let dl = Self::new(volume_layout, dataset_id);
+        let dl = Self::new(volume_layout, dataset_name);
         std::fs::create_dir_all(&dl.data_dir)?;
         std::fs::create_dir_all(&dl.checkpoints_dir)?;
         std::fs::create_dir_all(&dl.cache_dir)?;

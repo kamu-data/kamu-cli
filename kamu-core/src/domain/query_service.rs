@@ -10,7 +10,7 @@
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
-use opendatafabric::{DatasetID, DatasetIDBuf};
+use opendatafabric::DatasetRefLocal;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -21,7 +21,7 @@ pub trait QueryService: Send + Sync {
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`
     fn tail(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         num_records: u64,
     ) -> Result<Arc<dyn DataFrame>, QueryError>;
 
@@ -31,7 +31,7 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<Arc<dyn DataFrame>, QueryError>;
 
-    fn get_schema(&self, dataset_id: &DatasetID) -> Result<Type, QueryError>;
+    fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,7 @@ pub struct QueryOptions {
 
 #[derive(Debug, Clone)]
 pub struct DatasetQueryOptions {
-    pub dataset_id: DatasetIDBuf,
+    pub dataset_ref: DatasetRefLocal,
     /// Number of records that output requires (starting from latest entries)
     /// Setting this value allows to limit the number of part files examined.
     pub limit: Option<u64>,

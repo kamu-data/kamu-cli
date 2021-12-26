@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::{DatasetRef, DatasetRefBuf, Sha3_256};
+use opendatafabric::serde::flatbuffers::*;
+use opendatafabric::*;
 
 use bytes::BytesMut;
 use futures::TryStreamExt;
@@ -46,15 +46,16 @@ impl RepositoryS3 {
 
     async fn read_ref_async(
         &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Option<Sha3_256>, RepositoryError> {
+        dataset_ref: &RemoteDatasetName,
+    ) -> Result<Option<Multihash>, RepositoryError> {
         if let Some(body) = self
-            .read_object_buf(format!("{}/meta/refs/head", dataset_ref.local_id()))
+            .read_object_buf(format!("{}/meta/refs/head", dataset_ref.dataset()))
             .await?
         {
             let s = std::str::from_utf8(&body).expect("Non-utf8 string in ref");
             Ok(Some(
-                Sha3_256::from_str(s.trim()).map_err(|e| RepositoryError::protocol(e.into()))?,
+                Multihash::from_multibase_str(s.trim())
+                    .map_err(|e| RepositoryError::protocol(e.into()))?,
             ))
         } else {
             Ok(None)
@@ -64,14 +65,14 @@ impl RepositoryS3 {
     // TODO: Locking
     async fn write_async(
         &self,
-        dataset_ref: &DatasetRef,
-        expected_head: Option<Sha3_256>,
-        new_head: Sha3_256,
-        blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Option<Multihash>,
+        new_head: &Multihash,
+        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RepositoryError> {
-        if self.read_ref_async(dataset_ref).await? != expected_head {
+        if self.read_ref_async(dataset_ref).await? != *expected_head {
             return Err(RepositoryError::UpdatedConcurrently);
         }
 
@@ -79,7 +80,7 @@ impl RepositoryS3 {
             self.upload_object_file(
                 format!(
                     "{}/data/{}",
-                    dataset_ref.local_id(),
+                    dataset_ref.dataset(),
                     data_file.file_name().unwrap().to_str().unwrap()
                 ),
                 data_file,
@@ -90,11 +91,7 @@ impl RepositoryS3 {
 
         for (hash, data) in blocks {
             self.upload_object_buf(
-                format!(
-                    "{}/meta/blocks/{}",
-                    dataset_ref.local_id(),
-                    hash.to_string()
-                ),
+                format!("{}/meta/blocks/{}", dataset_ref.dataset(), hash.to_string()),
                 data,
                 IfExists::Fail,
             )
@@ -103,13 +100,13 @@ impl RepositoryS3 {
 
         // TODO: This is really bad but we need to
         // establish proper checkpoint naming and rotation first
-        self.delete_objects(format!("{}/checkpoint/", dataset_ref.local_id()))
+        self.delete_objects(format!("{}/checkpoint/", dataset_ref.dataset()))
             .await?;
 
         if checkpoint_dir.exists() {
             self.upload_objects_dir(
                 checkpoint_dir,
-                format!("{}/checkpoint/", dataset_ref.local_id()),
+                format!("{}/checkpoint/", dataset_ref.dataset()),
                 IfExists::Overwrite,
             )
             .await?;
@@ -117,7 +114,7 @@ impl RepositoryS3 {
 
         let new_head_hash = new_head.to_string();
         self.upload_object_buf(
-            format!("{}/meta/refs/head", dataset_ref.local_id()),
+            format!("{}/meta/refs/head", dataset_ref.dataset()),
             Vec::from(new_head_hash.as_bytes()),
             IfExists::Overwrite,
         )
@@ -128,9 +125,9 @@ impl RepositoryS3 {
 
     async fn read_async(
         &self,
-        dataset_ref: &DatasetRef,
-        expected_head: Sha3_256,
-        last_seen_block: Option<Sha3_256>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Multihash,
+        last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
     ) -> Result<RepositoryReadResult, RepositoryError> {
         let mut result = RepositoryReadResult {
@@ -139,29 +136,28 @@ impl RepositoryS3 {
             checkpoint_dir: tmp_dir.join("checkpoint"),
         };
 
-        if self.read_ref_async(dataset_ref).await? != Some(expected_head) {
+        if self.read_ref_async(dataset_ref).await? != Some(expected_head.clone()) {
             return Err(RepositoryError::UpdatedConcurrently);
         }
 
         // Sync blocks
-        let mut current_hash = Some(expected_head);
-        while current_hash.is_some() && current_hash != last_seen_block {
+        let mut current_hash = Some(expected_head.clone());
+        while current_hash.is_some() && current_hash != *last_seen_block {
+            let block_hash = current_hash.unwrap();
+
             let buf = self
                 .read_object_buf(format!(
                     "{}/meta/blocks/{}",
-                    dataset_ref.local_id(),
-                    current_hash.unwrap()
+                    dataset_ref.dataset(),
+                    block_hash
                 ))
                 .await?
                 .ok_or_else(|| {
-                    RepositoryError::corrupted(format!(
-                        "Block {} is missing",
-                        current_hash.unwrap()
-                    ))
+                    RepositoryError::corrupted(format!("Block {} is missing", block_hash))
                 })?;
 
             // TODO: Avoid double-parsing
-            let block = YamlMetadataBlockDeserializer
+            let block = FlatbuffersMetadataBlockDeserializer
                 .read_manifest(&buf)
                 .map_err(|e| {
                     RepositoryError::corrupted_from(
@@ -170,28 +166,28 @@ impl RepositoryS3 {
                     )
                 })?;
 
+            result.blocks.push((block_hash, buf));
             current_hash = block.prev_block_hash;
-            result.blocks.push(buf);
         }
 
-        if current_hash != last_seen_block {
+        if current_hash != *last_seen_block {
             return Err(RepositoryError::Diverged {
-                remote_head: expected_head,
-                local_head: last_seen_block.unwrap(),
+                remote_head: expected_head.clone(),
+                local_head: last_seen_block.clone().unwrap(),
             });
         }
 
         // Sync data
         result.data_files = self
             .read_objects_to_dir(
-                format!("{}/data/", dataset_ref.local_id()),
+                format!("{}/data/", dataset_ref.dataset()),
                 &tmp_dir.join("data"),
             )
             .await?;
 
         // Sync checkpoints
         self.read_objects_to_dir(
-            format!("{}/checkpoint/", dataset_ref.local_id()),
+            format!("{}/checkpoint/", dataset_ref.dataset()),
             &result.checkpoint_dir,
         )
         .await?;
@@ -488,8 +484,8 @@ impl RepositoryS3 {
         }
     }
 
-    async fn delete_async(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
-        self.delete_objects(format!("{}/", dataset_ref.local_id()))
+    async fn delete_async(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+        self.delete_objects(format!("{}/", dataset_ref.dataset()))
             .await?;
         Ok(())
     }
@@ -515,6 +511,9 @@ impl RepositoryS3 {
             "Cannot handle truncated response"
         );
 
+        // TODO: Find a way to avoid this
+        let repo_name = RepositoryName::try_from("undefined").unwrap();
+
         let mut datasets = Vec::new();
 
         for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
@@ -523,18 +522,18 @@ impl RepositoryS3 {
                 prefix.pop();
             }
 
-            let id = DatasetRefBuf::try_from(prefix).map_err(|e| {
+            let name = DatasetName::try_from(prefix).map_err(|e| {
                 RepositoryError::corrupted_from(
                     format!(
-                        "Repository contains directory {} which is not a valid DatasetID",
+                        "Repository contains directory {} which is not a valid DatasetName",
                         e.value
                     ),
                     e,
                 )
             })?;
 
-            if query.is_empty() || id.contains(query) {
-                datasets.push(id);
+            if query.is_empty() || name.contains(query) {
+                datasets.push(RemoteDatasetName::new(&repo_name, None, &name));
             }
         }
 
@@ -543,7 +542,10 @@ impl RepositoryS3 {
 }
 
 impl RepositoryClient for RepositoryS3 {
-    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RepositoryError> {
+    fn read_ref(
+        &self,
+        dataset_ref: &RemoteDatasetName,
+    ) -> Result<Option<Multihash>, RepositoryError> {
         self.runtime
             .borrow_mut()
             .block_on(self.read_ref_async(dataset_ref))
@@ -552,10 +554,10 @@ impl RepositoryClient for RepositoryS3 {
     // TODO: Locking
     fn write(
         &mut self,
-        dataset_ref: &DatasetRef,
-        expected_head: Option<Sha3_256>,
-        new_head: Sha3_256,
-        blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Option<Multihash>,
+        new_head: &Multihash,
+        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RepositoryError> {
@@ -571,9 +573,9 @@ impl RepositoryClient for RepositoryS3 {
 
     fn read(
         &self,
-        dataset_ref: &DatasetRef,
-        expected_head: Sha3_256,
-        last_seen_block: Option<Sha3_256>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Multihash,
+        last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
     ) -> Result<RepositoryReadResult, RepositoryError> {
         self.runtime.borrow_mut().block_on(self.read_async(
@@ -584,7 +586,7 @@ impl RepositoryClient for RepositoryS3 {
         ))
     }
 
-    fn delete(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
+    fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
         self.runtime
             .borrow_mut()
             .block_on(self.delete_async(dataset_ref))
