@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 pub struct LogCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    dataset_id: DatasetIDBuf,
+    dataset_ref: DatasetRefLocal,
     outout_format: Option<String>,
     filter: Option<String>,
     output_config: Arc<OutputConfig>,
@@ -33,14 +33,14 @@ pub struct LogCommand {
 impl LogCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
-        dataset_id: DatasetIDBuf,
+        dataset_ref: DatasetRefLocal,
         outout_format: Option<&str>,
         filter: Option<&str>,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
             metadata_repo,
-            dataset_id,
+            dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
             output_config,
@@ -73,13 +73,15 @@ impl Command for LogCommand {
             _ => panic!("Unexpected output format combination"),
         };
 
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(&self.dataset_ref)?;
+
         let mut blocks = self
             .metadata_repo
-            .get_metadata_chain(&self.dataset_id)?
+            .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
-            .filter(|b| self.filter_block(b));
+            .filter(|(_, b)| self.filter_block(b));
 
-        renderer.show(&self.dataset_id, &mut blocks)?;
+        renderer.show(&dataset_handle, &mut blocks)?;
 
         Ok(())
     }
@@ -90,8 +92,8 @@ impl Command for LogCommand {
 trait MetadataRenderer {
     fn show(
         &mut self,
-        dataset_id: &DatasetID,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        dataset_handle: &DatasetHandle,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError>;
 }
 
@@ -106,17 +108,21 @@ impl AsciiRenderer {
 
     fn render_blocks(
         output: &mut impl Write,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), std::io::Error> {
-        for block in blocks {
-            Self::render_block(output, &block)?;
+        for (hash, block) in blocks {
+            Self::render_block(output, &hash, &block)?;
             writeln!(output)?;
         }
         Ok(())
     }
 
-    fn render_block(output: &mut impl Write, block: &MetadataBlock) -> Result<(), std::io::Error> {
-        Self::render_header(output, block)?;
+    fn render_block(
+        output: &mut impl Write,
+        hash: &Multihash,
+        block: &MetadataBlock,
+    ) -> Result<(), std::io::Error> {
+        Self::render_header(output, hash, block)?;
         Self::render_property(
             output,
             "SystemTime",
@@ -192,12 +198,16 @@ impl AsciiRenderer {
         Ok(())
     }
 
-    fn render_header(output: &mut impl Write, block: &MetadataBlock) -> Result<(), std::io::Error> {
+    fn render_header(
+        output: &mut impl Write,
+        hash: &Multihash,
+        _block: &MetadataBlock,
+    ) -> Result<(), std::io::Error> {
         writeln!(
             output,
             "{} {}",
             style("Block:").green(),
-            style(&block.block_hash).yellow()
+            style(&hash).yellow()
         )
     }
 
@@ -219,8 +229,8 @@ impl AsciiRenderer {
 impl MetadataRenderer for AsciiRenderer {
     fn show(
         &mut self,
-        _dataset_id: &DatasetID,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        _dataset_handle: &DatasetHandle,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
         Self::render_blocks(&mut std::io::stdout(), blocks)?;
         Ok(())
@@ -240,12 +250,12 @@ impl PagedAsciiRenderer {
 impl MetadataRenderer for PagedAsciiRenderer {
     fn show(
         &mut self,
-        dataset_id: &DatasetID,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        dataset_handle: &DatasetHandle,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new().unwrap();
         pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-        pager.set_prompt(dataset_id.to_string());
+        pager.set_prompt(&dataset_handle.name);
 
         AsciiRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
         minus::page_all(pager).unwrap();
@@ -279,18 +289,20 @@ impl YamlRenderer {
 
     fn render_blocks(
         output: &mut impl Write,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), std::io::Error> {
-        for block in blocks {
-            Self::render_block(output, block)?;
+        for (hash, block) in blocks {
+            Self::render_block(output, &hash, &block)?;
         }
         Ok(())
     }
 
-    fn render_block(output: &mut impl Write, block: MetadataBlock) -> Result<(), std::io::Error> {
-        let buf = YamlMetadataBlockSerializer
-            .write_manifest_unchecked(&block)
-            .unwrap();
+    fn render_block(
+        output: &mut impl Write,
+        _hash: &Multihash,
+        block: &MetadataBlock,
+    ) -> Result<(), std::io::Error> {
+        let buf = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
 
         writeln!(output, "{}", std::str::from_utf8(&buf).unwrap())
     }
@@ -299,8 +311,8 @@ impl YamlRenderer {
 impl MetadataRenderer for YamlRenderer {
     fn show(
         &mut self,
-        _dataset_id: &DatasetID,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        _dataset_handle: &DatasetHandle,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
         Self::render_blocks(&mut std::io::stdout(), blocks)?;
         Ok(())
@@ -320,12 +332,12 @@ impl PagedYamlRenderer {
 impl MetadataRenderer for PagedYamlRenderer {
     fn show(
         &mut self,
-        dataset_id: &DatasetID,
-        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+        dataset_handle: &DatasetHandle,
+        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new().unwrap();
         pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-        pager.set_prompt(dataset_id.to_string());
+        pager.set_prompt(&dataset_handle.name);
 
         YamlRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
         minus::page_all(pager).unwrap();

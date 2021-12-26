@@ -8,32 +8,35 @@
 // by the Apache License, Version 2.0.
 
 use super::{CLIError, Command};
+use opendatafabric::DatasetName;
 
 use indoc::indoc;
 use std::path::{Path, PathBuf};
 use std::{fs::OpenOptions, io::Write};
 
 pub struct NewDatasetCommand {
-    id: String,
+    name: DatasetName,
     is_root: bool,
     is_derivative: bool,
     output_path: Option<PathBuf>,
 }
 
 impl NewDatasetCommand {
-    pub fn new<P>(id: &str, is_root: bool, is_derivative: bool, output_path: Option<P>) -> Self
+    pub fn new<N, P>(name: N, is_root: bool, is_derivative: bool, output_path: Option<P>) -> Self
     where
+        N: TryInto<DatasetName>,
+        <N as TryInto<opendatafabric::DatasetName>>::Error: std::fmt::Debug,
         P: AsRef<Path>,
     {
         Self {
-            id: id.to_owned(),
+            name: name.try_into().unwrap(),
             is_root: is_root,
             is_derivative: is_derivative,
             output_path: output_path.map(|p| p.as_ref().to_owned()),
         }
     }
 
-    pub fn get_content(id: &str, is_root: bool) -> String {
+    pub fn get_content(name: &str, is_root: bool) -> String {
         if is_root {
             format!(
                 indoc!(
@@ -97,7 +100,7 @@ impl NewDatasetCommand {
                         eventTimeColumn: date
                     "#
                 ),
-                id
+                name
             )
         } else {
             format!(
@@ -132,7 +135,7 @@ impl NewDatasetCommand {
                         eventTimeColumn: date
                     "#
                 ),
-                id
+                name
             )
         }
     }
@@ -146,15 +149,15 @@ impl Command for NewDatasetCommand {
     // TODO: link to documentation
     fn run(&mut self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {
-            let mut p = PathBuf::from(&self.id);
+            let mut p = PathBuf::from(self.name.as_str());
             p.set_extension("yaml");
             p
         });
 
         let contents = if self.is_root {
-            Self::get_content(&self.id, true)
+            Self::get_content(&self.name, true)
         } else if self.is_derivative {
-            Self::get_content(&self.id, false)
+            Self::get_content(&self.name, false)
         } else {
             return Err(CLIError::usage_error(
                 "Please specify --root or --derivative",

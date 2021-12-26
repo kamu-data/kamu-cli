@@ -17,33 +17,34 @@ use std::sync::Arc;
 pub struct SetWatermarkCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     pull_svc: Arc<dyn PullService>,
-    refs: Vec<String>,
+    refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
     watermark: String,
 }
 
 impl SetWatermarkCommand {
-    pub fn new<I, S, S2>(
+    pub fn new<I, R, S>(
         metadata_repo: Arc<dyn MetadataRepository>,
         pull_svc: Arc<dyn PullService>,
-        ids: I,
+        refs: I,
         all: bool,
         recursive: bool,
-        watermark: S2,
+        watermark: S,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
-        S2: AsRef<str>,
+        S: Into<String>,
+        I: Iterator<Item = R>,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
     {
         Self {
             metadata_repo,
             pull_svc,
-            refs: ids.map(|s| s.as_ref().to_owned()).collect(),
+            refs: refs.map(|s| s.try_into().unwrap()).collect(),
             all,
             recursive,
-            watermark: watermark.as_ref().to_owned(),
+            watermark: watermark.into(),
         }
     }
 }
@@ -67,9 +68,11 @@ impl Command for SetWatermarkCommand {
             ))
         })?;
 
-        let dataset_id = DatasetRef::try_from(&self.refs[0]).unwrap().local_id();
+        let dataset_ref = self.refs[0]
+            .as_local_ref()
+            .ok_or_else(|| CLIError::usage_error("Expected a local dataset reference"))?;
 
-        let aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        let aliases = self.metadata_repo.get_remote_aliases(&dataset_ref)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.as_str())
@@ -83,7 +86,7 @@ impl Command for SetWatermarkCommand {
             );
         }
 
-        match self.pull_svc.set_watermark(dataset_id, watermark.into()) {
+        match self.pull_svc.set_watermark(&dataset_ref, watermark.into()) {
             Ok(PullResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())

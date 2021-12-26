@@ -17,29 +17,33 @@ use std::sync::Arc;
 pub struct DeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     sync_svc: Arc<dyn SyncService>,
-    ids: Vec<DatasetRefBuf>,
+    dataset_refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
 }
 
 impl DeleteCommand {
-    pub fn new<I, ID>(
+    pub fn new<I, R>(
         metadata_repo: Arc<dyn MetadataRepository>,
         sync_svc: Arc<dyn SyncService>,
-        ids: I,
+        dataset_refs: I,
         all: bool,
         recursive: bool,
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = ID>,
-        ID: Into<DatasetRefBuf>,
+        I: IntoIterator<Item = R>,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
     {
         Self {
             metadata_repo,
             sync_svc,
-            ids: ids.into_iter().map(|s| s.into()).collect(),
+            dataset_refs: dataset_refs
+                .into_iter()
+                .map(|s| s.try_into().unwrap())
+                .collect(),
             all,
             recursive,
             no_confirmation,
@@ -49,16 +53,16 @@ impl DeleteCommand {
 
 impl Command for DeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        if self.ids.is_empty() && !self.all {
+        if self.dataset_refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
-        let dataset_ids = if self.all {
+        let dataset_refs = if self.all {
             unimplemented!("Recursive deletion is not yet supported")
         } else if self.recursive {
             unimplemented!("Recursive deletion is not yet supported")
         } else {
-            self.ids.clone()
+            self.dataset_refs.clone()
         };
 
         let confirmed = if self.no_confirmation {
@@ -67,9 +71,9 @@ impl Command for DeleteCommand {
             common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
-                dataset_ids
+                dataset_refs
                     .iter()
-                    .map(|id| id.as_str())
+                    .map(|r| r.to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
                 console::style("This operation is irreversible!").yellow(),
@@ -80,16 +84,22 @@ impl Command for DeleteCommand {
             return Err(CLIError::Aborted);
         }
 
-        for id in dataset_ids.iter() {
-            match id.as_local() {
-                Some(local_id) => self.metadata_repo.delete_dataset(local_id)?,
-                None => self.sync_svc.delete(id).map_err(|e| CLIError::failure(e))?,
+        for r in dataset_refs.iter() {
+            match r.as_local_ref() {
+                Some(local_ref) => self.metadata_repo.delete_dataset(&local_ref)?,
+                None => match r.as_remote_ref() {
+                    Some(DatasetRefRemote::RemoteName(name)) => self
+                        .sync_svc
+                        .delete(&name)
+                        .map_err(|e| CLIError::failure(e))?,
+                    _ => unimplemented!(),
+                },
             }
         }
 
         eprintln!(
             "{}",
-            console::style(format!("Deleted {} dataset(s)", dataset_ids.len()))
+            console::style(format!("Deleted {} dataset(s)", dataset_refs.len()))
                 .green()
                 .bold()
         );

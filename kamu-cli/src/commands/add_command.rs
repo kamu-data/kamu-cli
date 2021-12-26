@@ -116,7 +116,11 @@ impl Command for AddCommand {
         if self.replace {
             let already_exist: Vec<_> = snapshots
                 .iter()
-                .filter(|s| self.metadata_repo.get_summary(&s.id).is_ok())
+                .filter_map(|s| {
+                    self.metadata_repo
+                        .resolve_dataset_ref(&s.name.as_local_ref())
+                        .ok()
+                })
                 .collect();
 
             if already_exist.len() != 0 {
@@ -125,7 +129,7 @@ impl Command for AddCommand {
                     console::style("You are about to replace following dataset(s)").yellow(),
                     already_exist
                         .iter()
-                        .map(|s| s.id.as_str())
+                        .map(|h| h.name.as_str())
                         .collect::<Vec<_>>()
                         .join(", "),
                     console::style("This operation is irreversible!").yellow(),
@@ -135,8 +139,8 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
-                for s in already_exist {
-                    self.metadata_repo.delete_dataset(&s.id)?;
+                for hdl in already_exist {
+                    self.metadata_repo.delete_dataset(&hdl.as_local_ref())?;
                 }
             }
         };

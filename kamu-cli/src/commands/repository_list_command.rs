@@ -10,7 +10,6 @@
 use super::{CLIError, Command};
 use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
-use opendatafabric::RepositoryBuf;
 
 use std::sync::Arc;
 
@@ -38,11 +37,11 @@ impl RepositoryListCommand {
         repos.sort();
 
         let mut out = std::io::stdout();
-        write!(out, "ID,URL\n")?;
+        write!(out, "Name,URL\n")?;
 
-        for id in repos {
-            let repo = self.metadata_repo.get_repository(&id)?;
-            write!(out, "{},\"{}\"\n", id, repo.url)?;
+        for name in repos {
+            let repo = self.metadata_repo.get_repository(&name)?;
+            write!(out, "{},\"{}\"\n", name, repo.url)?;
         }
         Ok(())
     }
@@ -50,18 +49,18 @@ impl RepositoryListCommand {
     fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut repos: Vec<RepositoryBuf> = self.metadata_repo.get_all_repositories().collect();
+        let mut repos: Vec<_> = self.metadata_repo.get_all_repositories().collect();
         repos.sort();
 
         let mut table = Table::new();
         table.set_format(TableWriter::get_table_format());
 
-        table.set_titles(row![bc->"ID", bc->"URL"]);
+        table.set_titles(row![bc->"Name", bc->"URL"]);
 
-        for id in repos.iter() {
-            let repo = self.metadata_repo.get_repository(&id)?;
+        for name in repos.iter() {
+            let repo = self.metadata_repo.get_repository(&name)?;
             table.add_row(Row::new(vec![
-                Cell::new(&id),
+                Cell::new(&name),
                 Cell::new(&repo.url.to_string()),
             ]));
         }

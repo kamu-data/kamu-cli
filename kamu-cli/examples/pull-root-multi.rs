@@ -14,7 +14,6 @@ use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 fn main() {
@@ -23,30 +22,30 @@ fn main() {
         pull_svc,
         Arc::new(MetadataRepositoryNull),
         Arc::new(OutputConfig::default()),
-        ["a"].iter(),
+        ["a"],
         false,
         false,
         false,
-        None,
-        None,
+        None as Option<&str>,
+        None as Option<&str>,
     );
     cmd.run().unwrap();
 }
 
-fn rand_hash() -> Sha3_256 {
+fn rand_hash() -> Multihash {
     use rand::RngCore;
     let mut hash = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut hash);
-    Sha3_256::new(hash)
+    Multihash::new(Multicodec::Sha3_256, &hash)
 }
 
 pub struct TestPullService;
 
 impl TestPullService {
     fn ingest(
-        id: DatasetRefBuf,
+        hdl: DatasetHandle,
         listener: Arc<dyn IngestListener>,
-    ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
+    ) -> (DatasetRefAny, Result<PullResult, PullError>) {
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
         let sleep_rand = |min: u64, max: u64| {
             let d = (max - min) as f32;
@@ -89,8 +88,8 @@ impl TestPullService {
         let old_head = rand_hash();
         let new_head = rand_hash();
         let result = IngestResult::Updated {
-            old_head,
-            new_head,
+            old_head: old_head.clone(),
+            new_head: new_head.clone(),
             num_blocks: 1,
             has_more: false,
             uncacheable: false,
@@ -98,7 +97,7 @@ impl TestPullService {
         listener.success(&result);
 
         (
-            id,
+            hdl.into(),
             Ok(PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
@@ -108,9 +107,9 @@ impl TestPullService {
     }
 
     fn transform(
-        id: DatasetRefBuf,
+        hdl: DatasetHandle,
         listener: Arc<dyn TransformListener>,
-    ) -> (DatasetRefBuf, Result<PullResult, PullError>) {
+    ) -> (DatasetRefAny, Result<PullResult, PullError>) {
         listener.begin();
 
         std::thread::sleep(std::time::Duration::from_millis(2000));
@@ -118,13 +117,13 @@ impl TestPullService {
         let old_head = rand_hash();
         let new_head = rand_hash();
         listener.success(&TransformResult::Updated {
-            new_head,
-            old_head,
+            new_head: new_head.clone(),
+            old_head: old_head.clone(),
             num_blocks: 1,
         });
 
         (
-            id,
+            hdl.into(),
             Ok(PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
@@ -137,12 +136,12 @@ impl TestPullService {
 impl PullService for TestPullService {
     fn pull_multi(
         &self,
-        _dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
+        _dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         _options: PullOptions,
         ingest_listener: Option<Arc<dyn IngestMultiListener>>,
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         _sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(DatasetRefBuf, Result<PullResult, PullError>)> {
+    ) -> Vec<(DatasetRefAny, Result<PullResult, PullError>)> {
         let in_l = ingest_listener.unwrap();
         let tr_l = transform_listener.unwrap();
 
@@ -151,11 +150,16 @@ impl PullService for TestPullService {
             "com.naturalearthdata.admin0",
             "gov.census.data",
         ]
-        .iter()
-        .map(|s| DatasetRefBuf::try_from(*s).unwrap())
-        .map(|id| {
-            let listener = in_l.begin_ingest(id.local_id()).unwrap();
-            std::thread::spawn(move || Self::ingest(id, listener))
+        .into_iter()
+        .map(|s| {
+            DatasetHandle::new(
+                DatasetID::from_pub_key_ed25519(s.as_bytes()),
+                s.try_into().unwrap(),
+            )
+        })
+        .map(|hdl| {
+            let listener = in_l.begin_ingest(&hdl).unwrap();
+            std::thread::spawn(move || Self::ingest(hdl, listener))
         })
         .collect();
 
@@ -166,11 +170,16 @@ impl PullService for TestPullService {
 
         let transform_handles: Vec<_> =
             ["com.acme.census.normalized", "com.acme.census.geolocated"]
-                .iter()
-                .map(|s| DatasetRefBuf::try_from(*s).unwrap())
-                .map(|id| {
-                    let listener = tr_l.begin_transform(id.local_id()).unwrap();
-                    std::thread::spawn(move || Self::transform(id, listener))
+                .into_iter()
+                .map(|s| {
+                    DatasetHandle::new(
+                        DatasetID::from_pub_key_ed25519(s.as_bytes()),
+                        s.try_into().unwrap(),
+                    )
+                })
+                .map(|hdl| {
+                    let listener = tr_l.begin_transform(&hdl).unwrap();
+                    std::thread::spawn(move || Self::transform(hdl, listener))
                 })
                 .collect();
 
@@ -181,8 +190,8 @@ impl PullService for TestPullService {
 
     fn sync_from(
         &self,
-        _remote_ref: &DatasetRef,
-        _local_id: &DatasetID,
+        _remote_ref: &DatasetRefRemote,
+        _local_name: &DatasetName,
         _options: PullOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<PullResult, PullError> {
@@ -191,7 +200,7 @@ impl PullService for TestPullService {
 
     fn ingest_from(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_ref: &DatasetRefLocal,
         _fetch: FetchStep,
         _options: PullOptions,
         _listener: Option<Arc<dyn IngestListener>>,
@@ -201,7 +210,7 @@ impl PullService for TestPullService {
 
     fn set_watermark(
         &self,
-        _dataset_id: &DatasetID,
+        _dataset_ref: &DatasetRefLocal,
         _watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError> {
         unimplemented!()

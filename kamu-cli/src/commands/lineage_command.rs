@@ -15,11 +15,9 @@ use kamu::infra::DatasetKind;
 use kamu::infra::DotStyle;
 use kamu::infra::DotVisitor;
 use kamu::infra::WorkspaceLayout;
-use opendatafabric::DatasetID;
-use opendatafabric::DatasetIDBuf;
+use opendatafabric::*;
 
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -28,33 +26,34 @@ pub struct LineageCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
-    ids: Vec<DatasetIDBuf>,
+    dataset_refs: Vec<DatasetRefLocal>,
     browse: bool,
     output_format: Option<String>,
     output_config: Arc<OutputConfig>,
 }
 
 impl LineageCommand {
-    pub fn new<I, S>(
+    pub fn new<I, R>(
         metadata_repo: Arc<dyn MetadataRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
-        ids: I,
+        dataset_refs: I,
         browse: bool,
         output_format: Option<&str>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: IntoIterator<Item = S>,
-        S: Into<String>,
+        I: IntoIterator<Item = R>,
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
             metadata_repo,
             provenance_svc,
             workspace_layout,
-            ids: ids
+            dataset_refs: dataset_refs
                 .into_iter()
-                .map(|s| DatasetIDBuf::try_from(s.into()).unwrap())
+                .map(|s| s.try_into().unwrap())
                 .collect(),
             browse,
             output_format: output_format.map(|s| s.to_owned()),
@@ -93,19 +92,26 @@ impl LineageCommand {
 // TODO: Support temporality and evolution
 impl Command for LineageCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let mut dataset_ids: Vec<_> = if self.ids.is_empty() {
+        let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
             self.metadata_repo.get_all_datasets().collect()
         } else {
-            self.ids.clone()
+            self.dataset_refs
+                .iter()
+                .map(|r| self.metadata_repo.resolve_dataset_ref(r))
+                .collect::<Result<_, _>>()?
         };
 
-        dataset_ids.sort();
+        dataset_handles.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut visitor = self.get_visitor();
         visitor.begin();
-        for dataset_id in dataset_ids {
+        for dataset_handle in dataset_handles {
             self.provenance_svc
-                .get_dataset_lineage(&dataset_id, visitor.as_mut(), LineageOptions {})
+                .get_dataset_lineage(
+                    &dataset_handle.as_local_ref(),
+                    visitor.as_mut(),
+                    LineageOptions {},
+                )
                 .map_err(|e| CLIError::failure(e))?;
         }
         visitor.done();
@@ -131,24 +137,24 @@ impl ShellVisitor {
 impl LineageVisitor for ShellVisitor {
     fn begin(&mut self) {}
 
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        let fmt = match info {
-            &NodeInfo::Local { kind, .. } => match kind {
+    fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
+        let fmt = match &dataset {
+            &NodeInfo::Local { name, kind, .. } => match kind {
                 DatasetKind::Root => format!(
                     "{}{}",
-                    console::style(id).bold(),
+                    console::style(name).bold(),
                     console::style(": Root").dim(),
                 ),
                 DatasetKind::Derivative => format!(
                     "{}{}",
-                    console::style(id).bold(),
+                    console::style(name).bold(),
                     console::style(": Derivative").dim(),
                 ),
             },
-            &NodeInfo::Remote => {
+            &NodeInfo::Remote { name, .. } => {
                 format!(
                     "{}{}",
-                    console::style(id).dim(),
+                    console::style(name).dim(),
                     console::style(": N/A").dim(),
                 )
             }
@@ -156,17 +162,17 @@ impl LineageVisitor for ShellVisitor {
 
         self.buffer.push(fmt);
 
-        if let &NodeInfo::Remote = info {
+        if let &NodeInfo::Remote { .. } = dataset {
             self.buffer.push(format!("{}", console::style("???").dim()))
         }
 
         true
     }
 
-    fn exit(&mut self, _id: &DatasetID, info: &NodeInfo<'_>) {
-        let num_deps = match info {
+    fn exit(&mut self, dataset: &NodeInfo<'_>) {
+        let num_deps = match dataset {
             &NodeInfo::Local { dependencies, .. } => dependencies.len(),
-            &NodeInfo::Remote => 1, // Questionmark dep
+            &NodeInfo::Remote { .. } => 1, // Questionmark dep
         };
 
         let mut deps_left = num_deps;
@@ -210,7 +216,7 @@ impl LineageVisitor for ShellVisitor {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct CsvVisitor {
-    visited: HashSet<DatasetIDBuf>,
+    visited: HashSet<DatasetName>,
 }
 
 impl CsvVisitor {
@@ -223,29 +229,29 @@ impl CsvVisitor {
 
 impl LineageVisitor for CsvVisitor {
     fn begin(&mut self) {
-        println!("id,available,depends_on");
+        println!("name,available,depends_on");
     }
 
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        if !self.visited.insert(id.to_owned()) {
+    fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
+        if !self.visited.insert(dataset.name().clone()) {
             return false;
         }
 
-        match info {
+        match dataset {
             &NodeInfo::Local { dependencies, .. } => {
                 for dep in dependencies {
-                    println!("\"{}\",\"true\",\"{}\"", id, dep);
+                    println!("\"{}\",\"true\",\"{}\"", dataset.name(), dep.name);
                 }
             }
-            &NodeInfo::Remote => {
-                println!("\"{}\",\"false\",\"\"", id);
+            &NodeInfo::Remote { .. } => {
+                println!("\"{}\",\"false\",\"\"", dataset.name());
             }
         }
 
         true
     }
 
-    fn exit(&mut self, _id: &DatasetID, _info: &NodeInfo<'_>) {}
+    fn exit(&mut self, _dataset: &NodeInfo<'_>) {}
 
     fn done(&mut self) {}
 }
@@ -394,12 +400,12 @@ impl<W: Write> LineageVisitor for HtmlVisitor<W> {
         self.dot_visitor.begin()
     }
 
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        self.dot_visitor.enter(id, info)
+    fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
+        self.dot_visitor.enter(dataset)
     }
 
-    fn exit(&mut self, id: &DatasetID, info: &NodeInfo<'_>) {
-        self.dot_visitor.exit(id, info)
+    fn exit(&mut self, dataset: &NodeInfo<'_>) {
+        self.dot_visitor.exit(dataset)
     }
 
     fn done(&mut self) {
@@ -453,12 +459,12 @@ impl LineageVisitor for HtmlBrowseVisitor {
         self.html_visitor.begin()
     }
 
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        self.html_visitor.enter(id, info)
+    fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
+        self.html_visitor.enter(dataset)
     }
 
-    fn exit(&mut self, id: &DatasetID, info: &NodeInfo<'_>) {
-        self.html_visitor.exit(id, info)
+    fn exit(&mut self, dataset: &NodeInfo<'_>) {
+        self.html_visitor.exit(dataset)
     }
 
     fn done(&mut self) {

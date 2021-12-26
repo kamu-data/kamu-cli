@@ -9,32 +9,38 @@
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use opendatafabric::{DatasetID, DatasetRef};
+use opendatafabric::*;
 
 use std::sync::Arc;
 
 pub struct AliasDeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    dataset: String,
-    alias: Option<String>,
+    dataset: DatasetRefLocal,
+    alias: Option<RemoteDatasetName>,
     all: bool,
     pull: bool,
     push: bool,
 }
 
 impl AliasDeleteCommand {
-    pub fn new(
+    pub fn new<R, N>(
         metadata_repo: Arc<dyn MetadataRepository>,
-        dataset: String,
-        alias: Option<String>,
+        dataset: R,
+        alias: Option<N>,
         all: bool,
         pull: bool,
         push: bool,
-    ) -> Self {
+    ) -> Self
+    where
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        N: TryInto<RemoteDatasetName>,
+        <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
+    {
         Self {
             metadata_repo,
-            dataset,
-            alias,
+            dataset: dataset.try_into().unwrap(),
+            alias: alias.map(|s| s.try_into().unwrap()),
             all,
             pull,
             push,
@@ -44,25 +50,23 @@ impl AliasDeleteCommand {
 
 impl Command for AliasDeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
-        let mut aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        let mut aliases = self.metadata_repo.get_remote_aliases(&self.dataset)?;
 
         let mut count = 0;
 
         if self.all {
             count += aliases.clear(RemoteAliasKind::Pull)?;
             count += aliases.clear(RemoteAliasKind::Push)?;
-        } else if let Some(ref alias) = self.alias {
-            let remote_ref = DatasetRef::try_from(&alias).unwrap();
+        } else if let Some(alias) = &self.alias {
             let both = !self.pull && !self.push;
 
             if self.pull || both {
-                if aliases.delete(remote_ref, RemoteAliasKind::Pull)? {
+                if aliases.delete(alias, RemoteAliasKind::Pull)? {
                     count += 1;
                 }
             }
             if self.push || both {
-                if aliases.delete(remote_ref, RemoteAliasKind::Push)? {
+                if aliases.delete(alias, RemoteAliasKind::Push)? {
                     count += 1;
                 }
             }

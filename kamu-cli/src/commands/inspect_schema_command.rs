@@ -16,19 +16,19 @@ use std::sync::Arc;
 
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_id: DatasetIDBuf,
+    dataset_ref: DatasetRefLocal,
     output_format: Option<String>,
 }
 
 impl InspectSchemaCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_id: DatasetIDBuf,
+        dataset_ref: DatasetRefLocal,
         output_format: Option<&str>,
     ) -> Self {
         Self {
             query_svc,
-            dataset_id,
+            dataset_ref,
             output_format: output_format.map(|s| s.to_owned()),
         }
     }
@@ -102,7 +102,7 @@ impl Command for InspectSchemaCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let schema = self
             .query_svc
-            .get_schema(&self.dataset_id)
+            .get_schema(&self.dataset_ref)
             .map_err(|e| match e {
                 QueryError::DomainError(e) => CLIError::usage_error_from(e),
                 e @ QueryError::DataFusionError(_) => CLIError::failure(e),

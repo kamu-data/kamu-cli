@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{convert::TryFrom, path::Path};
+use std::path::Path;
 
 use indoc::indoc;
 use opendatafabric::*;
@@ -22,7 +22,7 @@ fn test_pull_ingest_from_file() {
     let kamu = Kamu::new_workspace_tmp();
 
     kamu.add_dataset(DatasetSnapshot {
-        id: DatasetIDBuf::try_from("population").unwrap(),
+        name: "population".try_into().unwrap(),
         source: DatasetSource::Root(DatasetSourceRoot {
             fetch: FetchStep::Url(FetchStepUrl {
                 url: Url::from_file_path(&kamu.workspace_path().join("data.csv"))
@@ -65,7 +65,7 @@ fn test_pull_ingest_from_file() {
 
         kamu.execute(["pull", "population"]).unwrap();
 
-        let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
+        let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));
         assert_eq!(
             parquet.column_names(),
             ["offset", "system_time", "event_time", "city", "population"]
@@ -97,7 +97,7 @@ fn test_pull_ingest_from_file() {
         kamu.execute(["pull", "population", "--fetch", path(&data_path)])
             .unwrap();
 
-        let parquet = kamu.get_last_data_slice(DatasetID::new_unchecked("population"));
+        let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));
         assert_eq!(
             parquet.column_names(),
             ["offset", "system_time", "event_time", "city", "population"]

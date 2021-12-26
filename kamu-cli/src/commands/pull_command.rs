@@ -25,22 +25,22 @@ use std::sync::Mutex;
 // Command
 ///////////////////////////////////////////////////////////////////////////////
 
-type GenericPullResult = Result<Vec<(DatasetRefBuf, Result<PullResult, PullError>)>, CLIError>;
+type GenericPullResult = Result<Vec<(DatasetRefAny, Result<PullResult, PullError>)>, CLIError>;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     metadata_repo: Arc<dyn MetadataRepository>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<String>,
+    refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
     force_uncacheable: bool,
-    as_id: Option<String>,
+    as_name: Option<DatasetName>,
     fetch: Option<String>,
 }
 
 impl PullCommand {
-    pub fn new<I, S>(
+    pub fn new<I, R, S, SS>(
         pull_svc: Arc<dyn PullService>,
         metadata_repo: Arc<dyn MetadataRepository>,
         output_config: Arc<OutputConfig>,
@@ -48,54 +48,71 @@ impl PullCommand {
         all: bool,
         recursive: bool,
         force_uncacheable: bool,
-        as_id: Option<&str>,
-        fetch: Option<&str>,
+        as_name: Option<S>,
+        fetch: Option<SS>,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
+        I: IntoIterator<Item = R>,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+        S: TryInto<DatasetName>,
+        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        SS: Into<String>,
     {
         Self {
             pull_svc,
             metadata_repo,
             output_config,
-            refs: refs.map(|s| s.as_ref().to_owned()).collect(),
+            refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
             all: all,
             recursive,
             force_uncacheable,
-            as_id: as_id.map(|s| s.to_owned()),
-            fetch: fetch.map(|s| s.to_owned()),
+            as_name: as_name.map(|s| s.try_into().unwrap()),
+            fetch: fetch.map(|s| s.into()),
         }
     }
 
     fn sync_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
-        let as_id = self.as_id.as_ref().unwrap();
-        let local_id = DatasetID::try_from(as_id).unwrap();
-        let remote_ref = DatasetRef::try_from(&self.refs[0]).unwrap();
+        let local_name = self.as_name.as_ref().unwrap();
+        let remote_ref = self.refs[0].as_remote_ref().ok_or_else(|| {
+            CLIError::usage_error("When using --as reference should point to a remote dataset")
+        })?;
 
         let res = self.pull_svc.sync_from(
-            remote_ref,
-            local_id,
+            &remote_ref,
+            &local_name,
             PullOptions {
                 create_remote_aliases: true,
                 ..PullOptions::default()
             },
-            listener.and_then(|p| p.begin_sync(local_id, remote_ref)),
+            listener.and_then(|p| p.begin_sync(&local_name.as_local_ref(), &remote_ref)),
         );
 
         Ok(vec![(remote_ref.into(), res)])
     }
 
     fn ingest_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
-        let dataset_id = DatasetID::try_from(&self.refs[0]).unwrap();
-        let summary = self.metadata_repo.get_summary(dataset_id)?;
+        let dataset_handle = {
+            let dataset_ref = self.refs[0].as_local_ref().ok_or_else(|| {
+                CLIError::usage_error(
+                    "When using --fetch reference should point to a local dataset",
+                )
+            })?;
+            self.metadata_repo.resolve_dataset_ref(&dataset_ref)?
+        };
+
+        let summary = self
+            .metadata_repo
+            .get_summary(&dataset_handle.as_local_ref())?;
         if summary.kind != DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Cannot ingest data into non-root dataset",
             ));
         }
 
-        let aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        let aliases = self
+            .metadata_repo
+            .get_remote_aliases(&dataset_handle.as_local_ref())?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.as_str())
@@ -129,7 +146,7 @@ impl PullCommand {
         });
 
         let res = self.pull_svc.ingest_from(
-            dataset_id,
+            &dataset_handle.as_local_ref(),
             fetch_step,
             PullOptions {
                 ingest_options: IngestOptions {
@@ -138,15 +155,15 @@ impl PullCommand {
                 },
                 ..PullOptions::default()
             },
-            listener.and_then(|p| p.begin_ingest(dataset_id)),
+            listener.and_then(|p| p.begin_ingest(&dataset_handle)),
         );
 
-        Ok(vec![(dataset_id.into(), res)])
+        Ok(vec![(dataset_handle.into(), res)])
     }
 
     fn pull_multi(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         Ok(self.pull_svc.pull_multi(
-            &mut self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap()),
+            &mut self.refs.iter().cloned(),
             PullOptions {
                 recursive: self.recursive,
                 all: self.all,
@@ -182,7 +199,7 @@ impl PullCommand {
     }
 
     fn pull(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
-        if self.as_id.is_some() {
+        if self.as_name.is_some() {
             self.sync_from(listener)
         } else if self.fetch.is_some() {
             self.ingest_from(listener)
@@ -194,7 +211,7 @@ impl PullCommand {
 
 impl Command for PullCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        match (self.recursive, self.all, &self.as_id, &self.fetch) {
+        match (self.recursive, self.all, &self.as_name, &self.fetch) {
             (false, false, _, _) if self.refs.is_empty() => {
                 Err(CLIError::usage_error("Specify a dataset or pass --all"))
             }
@@ -324,18 +341,21 @@ impl PrettyPullProgress {
 }
 
 impl IngestMultiListener for PrettyPullProgress {
-    fn begin_ingest(&self, dataset_id: &DatasetID) -> Option<Arc<dyn IngestListener>> {
+    fn begin_ingest(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
         Some(Arc::new(PrettyIngestProgress::new(
-            dataset_id,
+            dataset_handle,
             self.multi_progress.clone(),
         )))
     }
 }
 
 impl TransformMultiListener for PrettyPullProgress {
-    fn begin_transform(&self, dataset_id: &DatasetID) -> Option<Arc<dyn TransformListener>> {
+    fn begin_transform(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Option<Arc<dyn TransformListener>> {
         Some(Arc::new(PrettyTransformProgress::new(
-            dataset_id,
+            dataset_handle,
             self.multi_progress.clone(),
         )))
     }
@@ -344,12 +364,12 @@ impl TransformMultiListener for PrettyPullProgress {
 impl SyncMultiListener for PrettyPullProgress {
     fn begin_sync(
         &self,
-        local_dataset_id: &DatasetID,
-        remote_dataset_ref: &DatasetRef,
+        local_ref: &DatasetRefLocal,
+        remote_ref: &DatasetRefRemote,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            local_dataset_id.to_owned(),
-            remote_dataset_ref.to_owned(),
+            local_ref.clone(),
+            remote_ref.clone(),
             self.multi_progress.clone(),
         )))
     }
@@ -364,7 +384,7 @@ enum ProgressStyle {
 }
 
 struct PrettyIngestProgress {
-    dataset_id: DatasetIDBuf,
+    dataset_handle: DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PrettyIngestProgressState>,
 }
@@ -376,14 +396,14 @@ struct PrettyIngestProgressState {
 }
 
 impl PrettyIngestProgress {
-    fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
-            dataset_id: dataset_id.to_owned(),
+            dataset_handle: dataset_handle.clone(),
             state: Mutex::new(PrettyIngestProgressState {
                 stage: IngestStage::CheckCache,
                 curr_progress_style: ProgressStyle::Spinner,
                 curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
-                    dataset_id,
+                    dataset_handle,
                     0,
                     "Checking for updates",
                 ))),
@@ -420,9 +440,13 @@ impl PrettyIngestProgress {
         pb
     }
 
-    fn spinner_message<T: std::fmt::Display>(dataset_id: &DatasetID, step: u32, msg: T) -> String {
+    fn spinner_message<T: std::fmt::Display>(
+        dataset_handle: &DatasetHandle,
+        step: u32,
+        msg: T,
+    ) -> String {
         let step_str = format!("[{}/7]", step + 1);
-        let dataset = format!("({})", dataset_id);
+        let dataset = format!("({})", dataset_handle.name);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),
@@ -448,7 +472,7 @@ impl PrettyIngestProgress {
             IngestStage::Merge => "Merging data",
             IngestStage::Commit => "Committing data",
         };
-        Self::spinner_message(&self.dataset_id, stage as u32, msg)
+        Self::spinner_message(&self.dataset_handle, stage as u32, msg)
     }
 }
 
@@ -467,7 +491,7 @@ impl IngestListener for PrettyIngestProgress {
                     .multi_progress
                     .add(Self::new_spinner(&self.message_for_stage(stage))),
                 ProgressStyle::Bar => self.multi_progress.add(Self::new_progress_bar(
-                    &self.dataset_id,
+                    &self.dataset_handle.name,
                     n,
                     out_of,
                     Some(1024),
@@ -491,7 +515,7 @@ impl IngestListener for PrettyIngestProgress {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
-                        &self.dataset_id,
+                        &self.dataset_handle,
                         IngestStage::Commit as u32,
                         if *uncacheable {
                             console::style(
@@ -515,7 +539,7 @@ impl IngestListener for PrettyIngestProgress {
                     state
                         .curr_progress
                         .finish_with_message(Self::spinner_message(
-                            &self.dataset_id,
+                            &self.dataset_handle,
                             IngestStage::Commit as u32,
                             console::style("Data source is uncacheable").yellow(),
                         ));
@@ -524,7 +548,7 @@ impl IngestListener for PrettyIngestProgress {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
-                        &self.dataset_id,
+                        &self.dataset_handle,
                         IngestStage::Commit as u32,
                         console::style(format!("Committed new block {}", new_head.short())).green(),
                     ));
@@ -537,7 +561,7 @@ impl IngestListener for PrettyIngestProgress {
         state
             .curr_progress
             .finish_with_message(Self::spinner_message(
-                &self.dataset_id,
+                &self.dataset_handle,
                 state.stage as u32,
                 console::style("Failed to update root dataset").red(),
             ));
@@ -556,7 +580,7 @@ impl EngineProvisioningListener for PrettyIngestProgress {
 
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
-            &self.dataset_id,
+            &self.dataset_handle,
             IngestStage::Read as u32,
             format!("Waiting for engine {}", engine_id),
         ));
@@ -577,7 +601,7 @@ impl PullImageListener for PrettyIngestProgress {
 
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
-            &self.dataset_id,
+            &self.dataset_handle,
             IngestStage::Read as u32,
             format!("Pulling engine image {}", image),
         ));
@@ -597,17 +621,17 @@ impl PullImageListener for PrettyIngestProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettyTransformProgress {
-    dataset_id: DatasetIDBuf,
+    dataset_handle: DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: Mutex<indicatif::ProgressBar>,
 }
 
 impl PrettyTransformProgress {
-    fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
-            dataset_id: dataset_id.to_owned(),
+            dataset_handle: dataset_handle.clone(),
             curr_progress: Mutex::new(multi_progress.add(Self::new_spinner(
-                &Self::spinner_message(dataset_id, 0, "Applying derivative transformations"),
+                &Self::spinner_message(dataset_handle, 0, "Applying derivative transformations"),
             ))),
             multi_progress: multi_progress,
         }
@@ -621,9 +645,13 @@ impl PrettyTransformProgress {
         pb
     }
 
-    fn spinner_message<T: std::fmt::Display>(dataset_id: &DatasetID, step: u32, msg: T) -> String {
+    fn spinner_message<T: std::fmt::Display>(
+        dataset_handle: &DatasetHandle,
+        step: u32,
+        msg: T,
+    ) -> String {
         let step_str = format!("[{}/1]", step + 1);
-        let dataset = format!("({})", dataset_id);
+        let dataset = format!("({})", dataset_handle.name);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),
@@ -648,7 +676,7 @@ impl TransformListener for PrettyTransformProgress {
         self.curr_progress
             .lock()
             .unwrap()
-            .finish_with_message(Self::spinner_message(&self.dataset_id, 0, msg));
+            .finish_with_message(Self::spinner_message(&self.dataset_handle, 0, msg));
     }
 
     fn error(&self, _error: &TransformError) {
@@ -656,7 +684,7 @@ impl TransformListener for PrettyTransformProgress {
             .lock()
             .unwrap()
             .finish_with_message(Self::spinner_message(
-                &self.dataset_id,
+                &self.dataset_handle,
                 0,
                 console::style("Failed to update derivative dataset").red(),
             ));
@@ -675,7 +703,7 @@ impl EngineProvisioningListener for PrettyTransformProgress {
             .lock()
             .unwrap()
             .set_message(Self::spinner_message(
-                &self.dataset_id,
+                &self.dataset_handle,
                 0,
                 format!("Waiting for engine {}", engine_id),
             ));
@@ -684,7 +712,7 @@ impl EngineProvisioningListener for PrettyTransformProgress {
     fn success(&self) {
         let curr_progress = self.curr_progress.lock().unwrap();
         curr_progress.set_message(Self::spinner_message(
-            &self.dataset_id,
+            &self.dataset_handle,
             0,
             "Applying derivative transformations",
         ));
@@ -701,7 +729,7 @@ impl PullImageListener for PrettyTransformProgress {
             .lock()
             .unwrap()
             .set_message(Self::spinner_message(
-                &self.dataset_id,
+                &self.dataset_handle,
                 0,
                 format!("Pulling engine image {}", image),
             ));
@@ -713,7 +741,7 @@ impl PullImageListener for PrettyTransformProgress {
         *curr_progress = self
             .multi_progress
             .add(Self::new_spinner(&Self::spinner_message(
-                &self.dataset_id,
+                &self.dataset_handle,
                 0,
                 "Applying derivative transformations",
             )));
@@ -723,20 +751,20 @@ impl PullImageListener for PrettyTransformProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_id: DatasetIDBuf,
-    remote_ref: DatasetRefBuf,
+    local_ref: DatasetRefLocal,
+    remote_ref: DatasetRefRemote,
     _multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
 }
 
 impl PrettySyncProgress {
     fn new(
-        local_id: DatasetIDBuf,
-        remote_ref: DatasetRefBuf,
+        local_ref: DatasetRefLocal,
+        remote_ref: DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
         let inst = Self {
-            local_id,
+            local_ref,
             remote_ref,
             curr_progress: multi_progress.add(Self::new_spinner("")),
             _multi_progress: multi_progress,
@@ -756,7 +784,7 @@ impl PrettySyncProgress {
 
     fn spinner_message<T: std::fmt::Display>(&self, step: u32, msg: T) -> String {
         let step_str = format!("[{}/1]", step + 1);
-        let dataset = format!("({} > {})", self.remote_ref, self.local_id);
+        let dataset = format!("({} > {})", self.remote_ref, self.local_ref);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),

@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::convert::TryFrom;
-
 use clap::value_t_or_exit;
-use opendatafabric::{DatasetIDBuf, DatasetRefBuf, RepositoryID};
+use opendatafabric::*;
 
 use crate::app::in_workspace;
 use crate::commands::*;
@@ -66,10 +64,7 @@ pub fn get_command(
         ("delete", Some(submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches
-                .values_of("dataset")
-                .unwrap_or_default()
-                .map(|s| DatasetRefBuf::try_from(s).unwrap()),
+            submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
             submatches.is_present("yes"),
@@ -97,12 +92,12 @@ pub fn get_command(
             )),
             ("query", Some(query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
-                value_t_or_exit!(query_matches.value_of("dataset"), DatasetIDBuf),
+                value_t_or_exit!(query_matches.value_of("dataset"), DatasetRefLocal),
                 catalog.get_one()?,
             )),
             ("schema", Some(schema_matches)) => Box::new(InspectSchemaCommand::new(
                 catalog.get_one()?,
-                value_t_or_exit!(schema_matches.value_of("dataset"), DatasetIDBuf),
+                value_t_or_exit!(schema_matches.value_of("dataset"), DatasetRefLocal),
                 schema_matches.value_of("output-format"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
@@ -112,13 +107,13 @@ pub fn get_command(
         }
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
-            value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+            value_t_or_exit!(submatches.value_of("dataset"), DatasetRefLocal),
             submatches.value_of("output-format"),
             submatches.value_of("filter"),
             catalog.get_one()?,
         )),
         ("new", Some(submatches)) => Box::new(NewDatasetCommand::new(
-            submatches.value_of("id").unwrap(),
+            value_t_or_exit!(submatches.value_of("name"), DatasetName),
             submatches.is_present("root"),
             submatches.is_present("derivative"),
             None::<&str>,
@@ -184,15 +179,15 @@ pub fn get_command(
             ("alias", Some(alias_matches)) => match alias_matches.subcommand() {
                 ("add", Some(add_matches)) => Box::new(AliasAddCommand::new(
                     catalog.get_one()?,
-                    add_matches.value_of("dataset").unwrap().to_owned(),
-                    add_matches.value_of("alias").unwrap().to_owned(),
+                    add_matches.value_of("dataset").unwrap(),
+                    add_matches.value_of("alias").unwrap(),
                     add_matches.is_present("pull"),
                     add_matches.is_present("push"),
                 )),
                 ("delete", Some(delete_matches)) => Box::new(AliasDeleteCommand::new(
                     catalog.get_one()?,
-                    delete_matches.value_of("dataset").unwrap().to_owned(),
-                    delete_matches.value_of("alias").map(|s| s.to_owned()),
+                    delete_matches.value_of("dataset").unwrap(),
+                    delete_matches.value_of("alias"),
                     delete_matches.is_present("all"),
                     delete_matches.is_present("pull"),
                     delete_matches.is_present("push"),
@@ -200,7 +195,7 @@ pub fn get_command(
                 ("list", Some(list_matches)) => Box::new(AliasListCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    list_matches.value_of("dataset").map(|s| s.to_owned()),
+                    list_matches.value_of("dataset"),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -210,10 +205,7 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             submatches.value_of("query"),
-            submatches
-                .values_of("repo")
-                .unwrap_or_default()
-                .map(|r| RepositoryID::try_from(r).unwrap()),
+            submatches.values_of("repo").unwrap_or_default(),
         )),
         ("sql", Some(submatches)) => match submatches.subcommand() {
             ("", None) => Box::new(SqlShellCommand::new(
@@ -251,11 +243,12 @@ pub fn get_command(
         },
         ("tail", Some(submatches)) => Box::new(TailCommand::new(
             catalog.get_one()?,
-            value_t_or_exit!(submatches.value_of("dataset"), DatasetIDBuf),
+            value_t_or_exit!(submatches.value_of("dataset"), DatasetRefLocal),
             value_t_or_exit!(submatches.value_of("num-records"), u64),
             catalog.get_one()?,
         )),
         ("verify", Some(submatches)) => Box::new(VerifyCommand::new(
+            catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
             submatches.values_of("dataset").unwrap_or_default(),

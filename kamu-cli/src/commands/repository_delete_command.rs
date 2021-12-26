@@ -9,31 +9,32 @@
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use opendatafabric::RepositoryBuf;
+use opendatafabric::RepositoryName;
 
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 pub struct RepositoryDeleteCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    names: Vec<String>,
+    names: Vec<RepositoryName>,
     all: bool,
     no_confirmation: bool,
 }
 
 impl RepositoryDeleteCommand {
-    pub fn new<I, S>(
+    pub fn new<I, N>(
         metadata_repo: Arc<dyn MetadataRepository>,
         names: I,
         all: bool,
         no_confirmation: bool,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
+        I: Iterator<Item = N>,
+        N: TryInto<RepositoryName>,
+        <N as TryInto<RepositoryName>>::Error: std::fmt::Debug,
     {
         Self {
             metadata_repo: metadata_repo,
-            names: names.map(|s| s.as_ref().to_owned()).collect(),
+            names: names.map(|s| s.try_into().unwrap()).collect(),
             all: all,
             no_confirmation: no_confirmation,
         }
@@ -60,16 +61,13 @@ impl RepositoryDeleteCommand {
 
 impl Command for RepositoryDeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let repo_ids: Vec<RepositoryBuf> = if self.all {
+        let repo_names: Vec<_> = if self.all {
             self.metadata_repo.get_all_repositories().collect()
         } else {
-            self.names
-                .iter()
-                .map(|s| RepositoryBuf::try_from(s.as_str()).unwrap())
-                .collect()
+            self.names.clone()
         };
 
-        if repo_ids.is_empty() {
+        if repo_names.is_empty() {
             return Err(CLIError::usage_error(
                 "Specify a repository or use --all flag",
             ));
@@ -81,9 +79,9 @@ impl Command for RepositoryDeleteCommand {
             self.prompt_yes_no(&format!(
                 "{}: {}\nDo you whish to continue? [y/N]: ",
                 console::style("You are about to delete following repository(s)").yellow(),
-                repo_ids
+                repo_names
                     .iter()
-                    .map(|id| id.as_str())
+                    .map(|name| name.as_str())
                     .collect::<Vec<&str>>()
                     .join(", "),
             ))
@@ -93,13 +91,13 @@ impl Command for RepositoryDeleteCommand {
             return Err(CLIError::Aborted);
         }
 
-        for id in repo_ids.iter() {
-            self.metadata_repo.delete_repository(id)?;
+        for name in &repo_names {
+            self.metadata_repo.delete_repository(name)?;
         }
 
         eprintln!(
             "{}",
-            console::style(format!("Deleted {} repository(s)", repo_ids.len()))
+            console::style(format!("Deleted {} repository(s)", repo_names.len()))
                 .green()
                 .bold()
         );

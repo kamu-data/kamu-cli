@@ -36,20 +36,19 @@ impl ListCommand {
     fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
-        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.get_all_datasets().collect();
-
-        datasets.sort();
+        let mut datasets: Vec<_> = self.metadata_repo.get_all_datasets().collect();
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut out = std::io::stdout();
-        write!(out, "ID,Kind,Pulled,Records,Size\n")?;
+        write!(out, "Name,Kind,Pulled,Records,Size\n")?;
 
-        for id in datasets {
-            let summary = self.metadata_repo.get_summary(&id)?;
+        for hdl in &datasets {
+            let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
             write!(
                 out,
                 "{},{},{},{},{}\n",
-                id,
-                self.get_kind(&summary)?,
+                hdl.name,
+                self.get_kind(hdl, &summary)?,
                 match summary.last_pulled {
                     None => "".to_owned(),
                     Some(t) => t.to_rfc3339(),
@@ -64,21 +63,20 @@ impl ListCommand {
     fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut datasets: Vec<DatasetIDBuf> = self.metadata_repo.get_all_datasets().collect();
-
-        datasets.sort();
+        let mut datasets: Vec<_> = self.metadata_repo.get_all_datasets().collect();
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut table = Table::new();
         table.set_format(TableWriter::get_table_format());
 
-        table.set_titles(row![bc->"ID", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
+        table.set_titles(row![bc->"Name", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
 
-        for id in datasets.iter() {
-            let summary = self.metadata_repo.get_summary(&id)?;
+        for hdl in datasets.iter() {
+            let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
 
             table.add_row(Row::new(vec![
-                Cell::new(&id),
-                Cell::new(&self.get_kind(&summary)?).style_spec("c"),
+                Cell::new(&hdl.name),
+                Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
                 Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                 Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
                 Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
@@ -123,10 +121,14 @@ impl ListCommand {
         num.to_formatted_string(&Locale::en)
     }
 
-    fn get_kind(&self, summary: &DatasetSummary) -> Result<String, DomainError> {
+    fn get_kind(
+        &self,
+        handle: &DatasetHandle,
+        summary: &DatasetSummary,
+    ) -> Result<String, DomainError> {
         let is_remote = self
             .metadata_repo
-            .get_remote_aliases(&summary.id)?
+            .get_remote_aliases(&handle.as_local_ref())?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()
             .is_some();

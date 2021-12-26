@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use clap::{App, AppSettings, Arg, Shell, SubCommand};
-use opendatafabric::{DatasetID, DatasetRef, RepositoryID};
+use opendatafabric::*;
 
 fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     app.args(&[
@@ -266,8 +266,8 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .validator(validate_dataset_ref)
-                        .help("Dataset ID(s)"),
+                        .validator(validate_dataset_ref_any)
+                        .help("Local or remote dataset reference(s)"),
                     Arg::with_name("yes")
                         .short("y")
                         .long("yes")
@@ -341,8 +341,8 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("dataset")
                                 .multiple(true)
                                 .index(1)
-                                .validator(validate_dataset_id)
-                                .help("ID of the dataset"),
+                                .validator(validate_dataset_ref_local)
+                                .help("Local dataset reference(s)"),
                         ])
                         .after_help(indoc::indoc!(
                             r"
@@ -369,8 +369,8 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("dataset")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_dataset_id)
-                                .help("ID of the dataset"),
+                                .validator(validate_dataset_ref_local)
+                                .help("Local dataset reference"),
                         ])
                         .after_help(indoc::indoc!(
                             r"
@@ -383,8 +383,8 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("dataset")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_dataset_id)
-                                .help("ID of the dataset"),
+                                .validator(validate_dataset_ref_local)
+                                .help("Local dataset reference"),
                             Arg::with_name("output-format")
                                 .long("output-format")
                                 .short("o")
@@ -433,8 +433,8 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_id)
-                        .help("ID of the dataset"),
+                        .validator(validate_dataset_ref_local)
+                        .help("Local dataset reference"),
                     Arg::with_name("output-format")
                         .long("output-format")
                         .short("o")
@@ -486,11 +486,11 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("derivative")
                         .long("derivative")
                         .help("Create a derivative dataset"),
-                    Arg::with_name("id")
+                    Arg::with_name("name")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_id)
-                        .help("ID of the new dataset"),
+                        .validator(validate_dataset_name)
+                        .help("Name of the new dataset"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -540,13 +540,13 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .validator(validate_dataset_ref)
-                        .help("Dataset ID(s) / Ref(s)"),
+                        .validator(validate_dataset_ref_any)
+                        .help("Local or remote dataset reference(s)"),
                     Arg::with_name("as")
                         .long("as")
                         .takes_value(true)
-                        .validator(validate_dataset_id)
-                        .value_name("ID")
+                        .validator(validate_dataset_name)
+                        .value_name("NAME")
                         .help("Local name of a dataset to use when syncing from a repository"),
                     Arg::with_name("fetch")
                         .long("fetch")
@@ -614,13 +614,13 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .validator(validate_dataset_ref)
-                        .help("Dataset ID(s) / Ref(s)"),
+                        .validator(validate_dataset_ref_any)
+                        .help("Local or remote dataset reference(s)"),
                     Arg::with_name("as")
                         .long("as")
                         .takes_value(true)
-                        .validator(validate_dataset_ref)
-                        .value_name("REF")
+                        .validator(validate_dataset_remote_name)
+                        .value_name("REM")
                         .help("Remote alias to use when pushing"),
                 ])
                 .after_help(indoc::indoc!(
@@ -687,7 +687,7 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("name")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_repository_id)
+                                .validator(validate_repository_name)
                                 .help("Local alias of the repository"),
                             Arg::with_name("url")
                                 .required(true)
@@ -704,7 +704,7 @@ pub fn cli() -> App<'static, 'static> {
                             Arg::with_name("repository")
                                 .multiple(true)
                                 .index(1)
-                                .validator(validate_repository_id)
+                                .validator(validate_repository_name)
                                 .help("Repository name(s)"),
                             Arg::with_name("yes")
                                 .short("y")
@@ -723,8 +723,8 @@ pub fn cli() -> App<'static, 'static> {
                                 .args(&[
                                     Arg::with_name("dataset")
                                         .index(1)
-                                        .validator(validate_dataset_id)
-                                        .help("ID of the dataset"),
+                                        .validator(validate_dataset_ref_local)
+                                        .help("Local dataset reference"),
                                 ])
                             ),
                             SubCommand::with_name("add")
@@ -733,13 +733,13 @@ pub fn cli() -> App<'static, 'static> {
                                     Arg::with_name("dataset")
                                         .required(true)
                                         .index(1)
-                                        .validator(validate_dataset_id)
-                                        .help("ID of the dataset"),
+                                        .validator(validate_dataset_ref_local)
+                                        .help("Local dataset reference"),
                                     Arg::with_name("alias")
                                         .required(true)
                                         .index(2)
-                                        .validator(validate_dataset_ref)
-                                        .help("Remote dataset reference"),
+                                        .validator(validate_dataset_remote_name)
+                                        .help("Remote dataset name"),
                                     Arg::with_name("push")
                                         .long("push")
                                         .help("Add a push alias"),
@@ -757,12 +757,12 @@ pub fn cli() -> App<'static, 'static> {
                                     Arg::with_name("dataset")
                                         .required(true)
                                         .index(1)
-                                        .validator(validate_dataset_id)
-                                        .help("ID of the dataset"),
+                                        .validator(validate_dataset_ref_local)
+                                        .help("Local dataset reference"),
                                     Arg::with_name("alias")
                                         .index(2)
-                                        .validator(validate_dataset_ref)
-                                        .help("Remote dataset reference"),
+                                        .validator(validate_dataset_remote_name)
+                                        .help("Remote dataset name"),
                                     Arg::with_name("push")
                                         .long("push")
                                         .help("Add a push alias"),
@@ -817,7 +817,8 @@ pub fn cli() -> App<'static, 'static> {
                         .long("repo")
                         .multiple(true)
                         .value_name("REPO")
-                        .help("Search terms"),
+                        .validator(validate_repository_name)
+                        .help("Repository name(s) to search in"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -913,8 +914,8 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_id)
-                        .help("ID of the dataset"),
+                        .validator(validate_dataset_ref_local)
+                        .help("Local dataset reference"),
                     Arg::with_name("num-records")
                         .long("num-records")
                         .short("n")
@@ -944,8 +945,8 @@ pub fn cli() -> App<'static, 'static> {
                     Arg::with_name("dataset")
                         .multiple(true)
                         .index(1)
-                        .validator(validate_dataset_id)
-                        .help("Dataset ID(s)"),
+                        .validator(validate_dataset_ref_local)
+                        .help("Local dataset reference(s)"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -980,26 +981,53 @@ pub fn cli() -> App<'static, 'static> {
         ])
 }
 
-fn validate_dataset_id(s: String) -> Result<(), String> {
-    match DatasetID::try_from(&s) {
+fn validate_dataset_name(s: String) -> Result<(), String> {
+    match DatasetName::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "DatasetID can only contain alphanumerics, dashes, and dots",
+            "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`",
         )),
     }
 }
 
-fn validate_dataset_ref(s: String) -> Result<(), String> {
-    match DatasetRef::try_from(&s) {
+fn validate_dataset_remote_name(s: String) -> Result<(), String> {
+    match RemoteDatasetName::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "DatasetRef should be in form: `dataset.id` or `repository/dataset.id` or `repository/username/dataset.id`",
+            "Remote dataset name should be in form: `repository/dataset-id` or `repository/account/dataset-id`",
         )),
     }
 }
 
-fn validate_repository_id(s: String) -> Result<(), String> {
-    match RepositoryID::try_from(&s) {
+fn validate_dataset_ref_local(s: String) -> Result<(), String> {
+    match DatasetRefLocal::try_from(&s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
+        )),
+    }
+}
+
+// fn validate_dataset_ref_remote(s: String) -> Result<(), String> {
+//     match DatasetRefRemote::try_from(&s) {
+//         Ok(_) => Ok(()),
+//         Err(_) => Err(format!(
+//             "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
+//         )),
+//     }
+// }
+
+fn validate_dataset_ref_any(s: String) -> Result<(), String> {
+    match DatasetRefRemote::try_from(&s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "Dataset reference should be in form: `did:odf:...` or `repository/account/dataset-id` or `my.dataset.id`",
+        )),
+    }
+}
+
+fn validate_repository_name(s: String) -> Result<(), String> {
+    match RepositoryName::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",

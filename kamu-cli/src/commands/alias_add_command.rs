@@ -9,30 +9,36 @@
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use opendatafabric::{DatasetID, DatasetRefBuf};
+use opendatafabric::*;
 
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 pub struct AliasAddCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    dataset: String,
-    alias: String,
+    dataset: DatasetRefLocal,
+    alias: RemoteDatasetName,
     pull: bool,
     push: bool,
 }
 
 impl AliasAddCommand {
-    pub fn new(
+    pub fn new<R, N>(
         metadata_repo: Arc<dyn MetadataRepository>,
-        dataset: String,
-        alias: String,
+        dataset: R,
+        alias: N,
         pull: bool,
         push: bool,
-    ) -> Self {
+    ) -> Self
+    where
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        N: TryInto<RemoteDatasetName>,
+        <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
+    {
         Self {
             metadata_repo,
-            dataset,
-            alias,
+            dataset: dataset.try_into().unwrap(),
+            alias: alias.try_into().unwrap(),
             pull,
             push,
         }
@@ -47,33 +53,27 @@ impl Command for AliasAddCommand {
             ));
         }
 
-        let dataset_id = DatasetID::try_from(&self.dataset).unwrap();
-        let remote_ref = DatasetRefBuf::try_from(self.alias.clone()).unwrap();
-
-        let repo_id = remote_ref.repository().ok_or(CLIError::usage_error(
-            "Alias should contain a repository part",
-        ))?;
-
-        self.metadata_repo.get_repository(repo_id)?;
-        let mut aliases = self.metadata_repo.get_remote_aliases(dataset_id)?;
+        self.metadata_repo
+            .get_repository(&self.alias.repository())?;
+        let mut aliases = self.metadata_repo.get_remote_aliases(&self.dataset)?;
 
         if self.pull {
-            if aliases.add(remote_ref.clone(), RemoteAliasKind::Pull)? {
+            if aliases.add(&self.alias, RemoteAliasKind::Pull)? {
                 eprintln!(
                     "{}: {} ({})",
                     console::style("Added").green(),
-                    remote_ref,
+                    self.alias,
                     "pull"
                 );
             }
         }
 
         if self.push {
-            if aliases.add(remote_ref.clone(), RemoteAliasKind::Push)? {
+            if aliases.add(&self.alias, RemoteAliasKind::Push)? {
                 eprintln!(
                     "{}: {} ({})",
                     console::style("Added").green(),
-                    remote_ref,
+                    self.alias,
                     "push"
                 );
             }

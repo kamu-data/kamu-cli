@@ -18,7 +18,7 @@ pub struct SearchCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     query: Option<String>,
-    repository_ids: Vec<RepositoryBuf>,
+    repository_names: Vec<RepositoryName>,
 }
 
 impl SearchCommand {
@@ -26,18 +26,22 @@ impl SearchCommand {
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         query: Option<S>,
-        repository_ids: I,
+        repository_names: I,
     ) -> Self
     where
         S: Into<String>,
-        R: Into<RepositoryBuf>,
         I: IntoIterator<Item = R>,
+        R: TryInto<RepositoryName>,
+        <R as TryInto<RepositoryName>>::Error: std::fmt::Debug,
     {
         Self {
             search_svc,
             output_config,
             query: query.map(|s| s.into()),
-            repository_ids: repository_ids.into_iter().map(|r| r.into()).collect(),
+            repository_names: repository_names
+                .into_iter()
+                .map(|r| r.try_into().unwrap())
+                .collect(),
         }
     }
 
@@ -50,12 +54,12 @@ impl SearchCommand {
         table.set_format(TableWriter::get_table_format());
 
         table.set_titles(
-            row![bc->"ID", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
+            row![bc->"Name", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
         );
 
-        for id in &search_result.datasets {
+        for name in &search_result.datasets {
             table.add_row(Row::new(vec![
-                Cell::new(id),
+                Cell::new(name),
                 Cell::new("-"),
                 Cell::new("-"),
                 Cell::new("-"),
@@ -85,10 +89,10 @@ impl SearchCommand {
         search_result.datasets.sort();
 
         let mut out = std::io::stdout();
-        write!(out, "ID\n").unwrap();
+        write!(out, "Name\n").unwrap();
 
-        for id in &search_result.datasets {
-            write!(out, "{}\n", id,).unwrap();
+        for name in &search_result.datasets {
+            write!(out, "{}\n", name).unwrap();
         }
     }
 }
@@ -98,9 +102,9 @@ impl Command for SearchCommand {
         let result = self
             .search_svc
             .search(
-                self.query.as_ref().map(|s| s.as_str()),
+                self.query.as_deref(),
                 SearchOptions {
-                    repository_ids: self.repository_ids.clone(),
+                    repository_names: self.repository_names.clone(),
                 },
             )
             .map_err(|e| CLIError::failure(e))?;
