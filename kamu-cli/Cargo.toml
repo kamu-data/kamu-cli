@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.73.0"
+version = "0.74.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -28,7 +28,7 @@ clap = "*"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
-minus = { version = "*", features = ["static_output", "search"] }  # Terminal paginator
+minus = { version = "=4.0.1", features = ["static_output", "search"] }  # Terminal paginator  TODO: https://github.com/arijit79/minus/issues/56
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser

@@ -105,6 +105,7 @@ fn test_get_next_operation() {
         if transform == bar_source.transform &&
         inputs == vec![ExecuteQueryInput {
             dataset_id: foo.id.clone(),
+            dataset_name: foo.name.clone(),
             vocab: DatasetVocabulary::default(),
             data_interval: Some(OffsetInterval {start: 0, end: 9}),
             data_paths: vec![foo_layout.data_dir.join(foo_hash.to_string())],

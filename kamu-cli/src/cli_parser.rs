@@ -1018,10 +1018,10 @@ fn validate_dataset_ref_local(s: String) -> Result<(), String> {
 // }
 
 fn validate_dataset_ref_any(s: String) -> Result<(), String> {
-    match DatasetRefRemote::try_from(&s) {
+    match DatasetRefAny::try_from(&s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "Dataset reference should be in form: `did:odf:...` or `repository/account/dataset-id` or `my.dataset.id`",
+            "Dataset reference should be in form: `my.dataset.id` or `repository/account/dataset-id` or `did:odf:...`",
         )),
     }
 }
