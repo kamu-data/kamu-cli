@@ -13,42 +13,22 @@ use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-pub enum MulticodecCode {
-    Sha3_256 = 0x16,
-    Arrow0_Sha3_256 = 0x300016,
-    // When adding codes don't forget to add them into TryFrom<u32> below
-}
-
-// TODO: use num-derive
-impl TryFrom<u32> for MulticodecCode {
-    type Error = MulticodecError;
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0x16 => Ok(MulticodecCode::Sha3_256),
-            0x300016 => Ok(MulticodecCode::Arrow0_Sha3_256),
-            _ => Err(MulticodecError::UnsupportedCode(value)),
-        }
-    }
-}
+use crate::{Multicodec, MulticodecError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type Multihash = MultihashGeneric<32>;
-pub type MultihashShort<'a> = MultihashShortGeneric<'a, 32>;
+pub const MAX_HASH_LENGTH_BYTES: usize = 32;
+
+pub type Multihash = MultihashGeneric<MAX_HASH_LENGTH_BYTES>;
+pub type MultihashShort<'a> = MultihashShortGeneric<'a, MAX_HASH_LENGTH_BYTES>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 /// S specifies maximum hash size in bytes(!) this type can handle, not the exact length of it
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MultihashGeneric<const S: usize> {
     /// The code of the Multihash.
-    code: MulticodecCode,
+    code: Multicodec,
     /// The actual length of the digest in bytes (not the allocated size).
     len: usize,
     /// The digest.
@@ -56,8 +36,11 @@ pub struct MultihashGeneric<const S: usize> {
 }
 
 impl<const S: usize> MultihashGeneric<S> {
-    pub fn new(code: MulticodecCode, digest: &[u8]) -> Self {
-        assert!(digest.len() <= S);
+    pub fn new(code: Multicodec, digest: &[u8]) -> Self {
+        assert!(
+            digest.len() <= S,
+            "Digest length is greater than max length"
+        );
 
         let mut inst = Self {
             code,
@@ -69,10 +52,17 @@ impl<const S: usize> MultihashGeneric<S> {
         inst
     }
 
-    pub fn from_digest<D: digest::Digest>(code: MulticodecCode, data: &[u8]) -> Self {
-        assert!(D::output_size() <= S);
+    pub fn from_digest<D: digest::Digest>(code: Multicodec, data: &[u8]) -> Self {
+        assert!(
+            D::output_size() <= S,
+            "Digest length is greater than max length"
+        );
         let digest = D::digest(data);
         Self::new(code, &digest)
+    }
+
+    pub fn from_digest_sha3_256(data: &[u8]) -> Self {
+        Self::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, data)
     }
 
     pub fn digest(&self) -> &[u8] {
@@ -81,7 +71,7 @@ impl<const S: usize> MultihashGeneric<S> {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, MultihashError> {
         let (code, rest) = uvar::decode::u32(bytes)?;
-        let code: MulticodecCode = code.try_into()?;
+        let code: Multicodec = code.try_into()?;
         let (len, rest) = uvar::decode::usize(rest)?;
         if len > S {
             Err(MultihashError::TooLong(len))
@@ -106,7 +96,11 @@ impl<const S: usize> MultihashGeneric<S> {
 
     // TODO: PERF: This is inefficient
     pub fn from_multibase_str(s: &str) -> Result<Self, MultihashError> {
-        assert_eq!(s.as_bytes()[0], b'z');
+        assert_eq!(
+            s.as_bytes()[0],
+            b'z',
+            "String does not have multibase prefix"
+        );
         let buf = bs58::decode(&s.split_at(1).1).into_vec()?;
         Self::from_bytes(&buf)
     }
@@ -160,7 +154,6 @@ impl<'de> Visitor<'de> for MultihashVisitor {
     }
 }
 
-// This is the trait that informs Serde how to deserialize MyMap.
 impl<'de> Deserialize<'de> for Multihash {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_str(MultihashVisitor)
@@ -168,12 +161,6 @@ impl<'de> Deserialize<'de> for Multihash {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum MulticodecError {
-    #[error("Unsupported code: {0}")]
-    UnsupportedCode(u32),
-}
 
 #[derive(Error, Debug)]
 pub enum MultihashError {

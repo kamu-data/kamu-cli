@@ -9,17 +9,23 @@
 
 #![feature(backtrace)]
 
-mod grammar;
-pub use grammar::*;
+mod cid;
+pub use cid::*;
+
+mod multicodec;
+pub use multicodec::*;
 
 mod multihash;
 pub use multihash::*;
 
-mod dataset_id;
-pub use dataset_id::*;
+mod grammar;
+pub use grammar::*;
 
-mod sha;
-pub use sha::*;
+mod dataset_identity;
+pub use dataset_identity::*;
+
+mod dataset_refs;
+pub use dataset_refs::*;
 
 mod dtos;
 pub use dtos::*;

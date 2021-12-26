@@ -219,6 +219,16 @@ union MergeStrategy {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// TransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformInput {
+  id: [ubyte];
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -234,7 +244,7 @@ table DatasetSourceRoot {
 }
 
 table DatasetSourceDerivative {
-  inputs: [string];
+  inputs: [TransformInput];
   transform: Transform;
 }
 
@@ -260,7 +270,7 @@ table DatasetVocabulary {
 ////////////////////////////////////////////////////////////////////////////////
 
 table DatasetSnapshot {
-  id: string;
+  name: string;
   source: DatasetSource;
   vocab: DatasetVocabulary;
 }
@@ -286,12 +296,12 @@ table Watermark {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// QueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
+// ExecuteQueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table QueryInput {
-  dataset_id: string;
+table ExecuteQueryInput {
+  dataset_id: [ubyte];
   vocab: DatasetVocabulary;
   data_interval: OffsetInterval;
   data_paths: [string];
@@ -305,12 +315,12 @@ table QueryInput {
 ////////////////////////////////////////////////////////////////////////////////
 
 table ExecuteQueryRequest {
-  dataset_id: string;
+  dataset_name: string;
   system_time: Timestamp;
   offset: int64;
   vocab: DatasetVocabulary;
   transform: Transform;
-  inputs: [QueryInput];
+  inputs: [ExecuteQueryInput];
   prev_checkpoint_dir: string;
   new_checkpoint_dir: string;
   out_data_path: string;
@@ -355,7 +365,7 @@ table ExecuteQueryResponseRoot {
 ////////////////////////////////////////////////////////////////////////////////
 
 table InputSlice {
-  dataset_id: string;
+  dataset_id: [ubyte];
   block_interval: BlockInterval;
   data_interval: OffsetInterval;
 }
@@ -377,7 +387,6 @@ table OutputSlice {
 ////////////////////////////////////////////////////////////////////////////////
 
 table MetadataBlock {
-  block_hash: [ubyte];
   prev_block_hash: [ubyte];
   system_time: Timestamp;
   output_slice: OutputSlice;
@@ -385,5 +394,6 @@ table MetadataBlock {
   input_slices: [InputSlice];
   source: DatasetSource;
   vocab: DatasetVocabulary;
+  seed: [ubyte];
 }
 

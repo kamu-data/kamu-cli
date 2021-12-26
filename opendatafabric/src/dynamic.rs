@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is auto-generated from Open Data Fabric Schemas
 // See: http://opendatafabric.org/
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 use std::path::Path;
 
-use super::{CompressionFormat, DatasetID, Multihash, Sha3_256, SourceOrdering};
+use super::{CompressionFormat, DatasetID, DatasetName, Multihash, SourceOrdering};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -23,15 +23,15 @@ use chrono::{DateTime, Utc};
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait BlockInterval {
-    fn start(&self) -> &Sha3_256;
-    fn end(&self) -> &Sha3_256;
+    fn start(&self) -> &Multihash;
+    fn end(&self) -> &Multihash;
 }
 
 impl BlockInterval for super::BlockInterval {
-    fn start(&self) -> &Sha3_256 {
+    fn start(&self) -> &Multihash {
         &self.start
     }
-    fn end(&self) -> &Sha3_256 {
+    fn end(&self) -> &Multihash {
         &self.end
     }
 }
@@ -39,8 +39,8 @@ impl BlockInterval for super::BlockInterval {
 impl Into<super::BlockInterval> for &dyn BlockInterval {
     fn into(self) -> super::BlockInterval {
         super::BlockInterval {
-            start: *self.start(),
-            end: *self.end(),
+            start: self.start().clone(),
+            end: self.end().clone(),
         }
     }
 }
@@ -51,14 +51,14 @@ impl Into<super::BlockInterval> for &dyn BlockInterval {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetSnapshot {
-    fn id(&self) -> &DatasetID;
+    fn name(&self) -> &DatasetName;
     fn source(&self) -> DatasetSource;
     fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
 }
 
 impl DatasetSnapshot for super::DatasetSnapshot {
-    fn id(&self) -> &DatasetID {
-        self.id.as_ref()
+    fn name(&self) -> &DatasetName {
+        &self.name
     }
     fn source(&self) -> DatasetSource {
         (&self.source).into()
@@ -71,7 +71,7 @@ impl DatasetSnapshot for super::DatasetSnapshot {
 impl Into<super::DatasetSnapshot> for &dyn DatasetSnapshot {
     fn into(self) -> super::DatasetSnapshot {
         super::DatasetSnapshot {
-            id: self.id().to_owned(),
+            name: self.name().to_owned(),
             source: self.source().into(),
             vocab: self.vocab().map(|v| v.into()),
         }
@@ -115,7 +115,7 @@ pub trait DatasetSourceRoot {
 }
 
 pub trait DatasetSourceDerivative {
-    fn inputs(&self) -> Box<dyn Iterator<Item = &DatasetID> + '_>;
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn TransformInput> + '_>;
     fn transform(&self) -> Transform;
 }
 
@@ -142,8 +142,8 @@ impl DatasetSourceRoot for super::DatasetSourceRoot {
 }
 
 impl DatasetSourceDerivative for super::DatasetSourceDerivative {
-    fn inputs(&self) -> Box<dyn Iterator<Item = &DatasetID> + '_> {
-        Box::new(self.inputs.iter().map(|i| -> &DatasetID { i.as_ref() }))
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn TransformInput> + '_> {
+        Box::new(self.inputs.iter().map(|i| -> &dyn TransformInput { i }))
     }
     fn transform(&self) -> Transform {
         (&self.transform).into()
@@ -165,7 +165,7 @@ impl Into<super::DatasetSourceRoot> for &dyn DatasetSourceRoot {
 impl Into<super::DatasetSourceDerivative> for &dyn DatasetSourceDerivative {
     fn into(self) -> super::DatasetSourceDerivative {
         super::DatasetSourceDerivative {
-            inputs: self.inputs().map(|i| i.to_owned()).collect(),
+            inputs: self.inputs().map(|i| i.into()).collect(),
             transform: self.transform().into(),
         }
     }
@@ -262,25 +262,79 @@ impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait ExecuteQueryInput {
+    fn dataset_id(&self) -> &DatasetID;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
+    fn schema_file(&self) -> &Path;
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
+}
+
+impl ExecuteQueryInput for super::ExecuteQueryInput {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
+    }
+    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.data_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
+    }
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
+        Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
+    }
+    fn schema_file(&self) -> &Path {
+        self.schema_file.as_ref()
+    }
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
+        Box::new(
+            self.explicit_watermarks
+                .iter()
+                .map(|i| -> &dyn Watermark { i }),
+        )
+    }
+}
+
+impl Into<super::ExecuteQueryInput> for &dyn ExecuteQueryInput {
+    fn into(self) -> super::ExecuteQueryInput {
+        super::ExecuteQueryInput {
+            dataset_id: self.dataset_id().clone(),
+            vocab: self.vocab().into(),
+            data_interval: self.data_interval().map(|v| v.into()),
+            data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
+            schema_file: self.schema_file().to_owned(),
+            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // ExecuteQueryRequest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID;
+    fn dataset_name(&self) -> &DatasetName;
     fn system_time(&self) -> DateTime<Utc>;
     fn offset(&self) -> i64;
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn transform(&self) -> Transform;
-    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_>;
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_>;
     fn prev_checkpoint_dir(&self) -> Option<&Path>;
     fn new_checkpoint_dir(&self) -> &Path;
     fn out_data_path(&self) -> &Path;
 }
 
 impl ExecuteQueryRequest for super::ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID {
-        self.dataset_id.as_ref()
+    fn dataset_name(&self) -> &DatasetName {
+        &self.dataset_name
     }
     fn system_time(&self) -> DateTime<Utc> {
         self.system_time
@@ -294,8 +348,8 @@ impl ExecuteQueryRequest for super::ExecuteQueryRequest {
     fn transform(&self) -> Transform {
         (&self.transform).into()
     }
-    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn QueryInput> + '_> {
-        Box::new(self.inputs.iter().map(|i| -> &dyn QueryInput { i }))
+    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_> {
+        Box::new(self.inputs.iter().map(|i| -> &dyn ExecuteQueryInput { i }))
     }
     fn prev_checkpoint_dir(&self) -> Option<&Path> {
         self.prev_checkpoint_dir
@@ -313,7 +367,7 @@ impl ExecuteQueryRequest for super::ExecuteQueryRequest {
 impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
     fn into(self) -> super::ExecuteQueryRequest {
         super::ExecuteQueryRequest {
-            dataset_id: self.dataset_id().to_owned(),
+            dataset_name: self.dataset_name().to_owned(),
             system_time: self.system_time(),
             offset: self.offset(),
             vocab: self.vocab().into(),
@@ -538,7 +592,7 @@ pub trait InputSlice {
 
 impl InputSlice for super::InputSlice {
     fn dataset_id(&self) -> &DatasetID {
-        self.dataset_id.as_ref()
+        &self.dataset_id
     }
     fn block_interval(&self) -> Option<&dyn BlockInterval> {
         self.block_interval
@@ -555,7 +609,7 @@ impl InputSlice for super::InputSlice {
 impl Into<super::InputSlice> for &dyn InputSlice {
     fn into(self) -> super::InputSlice {
         super::InputSlice {
-            dataset_id: self.dataset_id().to_owned(),
+            dataset_id: self.dataset_id().clone(),
             block_interval: self.block_interval().map(|v| v.into()),
             data_interval: self.data_interval().map(|v| v.into()),
         }
@@ -668,22 +722,19 @@ impl Into<super::MergeStrategySnapshot> for &dyn MergeStrategySnapshot {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataBlock {
-    fn block_hash(&self) -> &Sha3_256;
-    fn prev_block_hash(&self) -> Option<&Sha3_256>;
+    fn prev_block_hash(&self) -> Option<&Multihash>;
     fn system_time(&self) -> DateTime<Utc>;
     fn output_slice(&self) -> Option<&dyn OutputSlice>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
     fn input_slices(&self) -> Option<Box<dyn Iterator<Item = &dyn InputSlice> + '_>>;
     fn source(&self) -> Option<DatasetSource>;
     fn vocab(&self) -> Option<&dyn DatasetVocabulary>;
+    fn seed(&self) -> Option<&DatasetID>;
 }
 
 impl MetadataBlock for super::MetadataBlock {
-    fn block_hash(&self) -> &Sha3_256 {
-        &self.block_hash
-    }
-    fn prev_block_hash(&self) -> Option<&Sha3_256> {
-        self.prev_block_hash.as_ref().map(|v| -> &Sha3_256 { v })
+    fn prev_block_hash(&self) -> Option<&Multihash> {
+        self.prev_block_hash.as_ref().map(|v| -> &Multihash { v })
     }
     fn system_time(&self) -> DateTime<Utc> {
         self.system_time
@@ -711,19 +762,22 @@ impl MetadataBlock for super::MetadataBlock {
     fn vocab(&self) -> Option<&dyn DatasetVocabulary> {
         self.vocab.as_ref().map(|v| -> &dyn DatasetVocabulary { v })
     }
+    fn seed(&self) -> Option<&DatasetID> {
+        self.seed.as_ref().map(|v| -> &DatasetID { v })
+    }
 }
 
 impl Into<super::MetadataBlock> for &dyn MetadataBlock {
     fn into(self) -> super::MetadataBlock {
         super::MetadataBlock {
-            block_hash: *self.block_hash(),
-            prev_block_hash: self.prev_block_hash().map(|v| *v),
+            prev_block_hash: self.prev_block_hash().map(|v| v.clone()),
             system_time: self.system_time(),
             output_slice: self.output_slice().map(|v| v.into()),
             output_watermark: self.output_watermark().map(|v| v),
             input_slices: self.input_slices().map(|v| v.map(|i| i.into()).collect()),
             source: self.source().map(|v| v.into()),
             vocab: self.vocab().map(|v| v.into()),
+            seed: self.seed().map(|v| v.clone()),
         }
     }
 }
@@ -782,8 +836,8 @@ impl OutputSlice for super::OutputSlice {
 impl Into<super::OutputSlice> for &dyn OutputSlice {
     fn into(self) -> super::OutputSlice {
         super::OutputSlice {
-            data_logical_hash: *self.data_logical_hash(),
-            data_physical_hash: *self.data_physical_hash(),
+            data_logical_hash: self.data_logical_hash().clone(),
+            data_physical_hash: self.data_physical_hash().clone(),
             data_interval: self.data_interval().into(),
         }
     }
@@ -854,60 +908,6 @@ impl Into<super::PrepStepPipe> for &dyn PrepStepPipe {
     fn into(self) -> super::PrepStepPipe {
         super::PrepStepPipe {
             command: self.command().map(|i| i.to_owned()).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// QueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait QueryInput {
-    fn dataset_id(&self) -> &DatasetID;
-    fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
-    fn schema_file(&self) -> &Path;
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
-}
-
-impl QueryInput for super::QueryInput {
-    fn dataset_id(&self) -> &DatasetID {
-        self.dataset_id.as_ref()
-    }
-    fn vocab(&self) -> &dyn DatasetVocabulary {
-        &self.vocab
-    }
-    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.data_interval
-            .as_ref()
-            .map(|v| -> &dyn OffsetInterval { v })
-    }
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
-        Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
-    }
-    fn schema_file(&self) -> &Path {
-        self.schema_file.as_ref()
-    }
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
-        Box::new(
-            self.explicit_watermarks
-                .iter()
-                .map(|i| -> &dyn Watermark { i }),
-        )
-    }
-}
-
-impl Into<super::QueryInput> for &dyn QueryInput {
-    fn into(self) -> super::QueryInput {
-        super::QueryInput {
-            dataset_id: self.dataset_id().to_owned(),
-            vocab: self.vocab().into(),
-            data_interval: self.data_interval().map(|v| v.into()),
-            data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
-            schema_file: self.schema_file().to_owned(),
-            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
         }
     }
 }
@@ -1314,6 +1314,34 @@ impl Into<super::TransformSql> for &dyn TransformSql {
             temporal_tables: self
                 .temporal_tables()
                 .map(|v| v.map(|i| i.into()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait TransformInput {
+    fn id(&self) -> Option<&DatasetID>;
+    fn name(&self) -> &DatasetName;
+}
+
+impl TransformInput for super::TransformInput {
+    fn id(&self) -> Option<&DatasetID> {
+        self.id.as_ref().map(|v| -> &DatasetID { v })
+    }
+    fn name(&self) -> &DatasetName {
+        &self.name
+    }
+}
+
+impl Into<super::TransformInput> for &dyn TransformInput {
+    fn into(self) -> super::TransformInput {
+        super::TransformInput {
+            id: self.id().map(|v| v.clone()),
+            name: self.name().to_owned(),
         }
     }
 }

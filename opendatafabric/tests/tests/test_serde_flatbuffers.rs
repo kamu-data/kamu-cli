@@ -18,8 +18,7 @@ use std::convert::TryFrom;
 
 fn get_block_root() -> MetadataBlock {
     MetadataBlock {
-        block_hash: Sha3_256::zero(),
-        prev_block_hash: Some(Sha3_256::new([0x0b; 32])),
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
         input_slices: None,
         output_slice: None,
@@ -53,18 +52,24 @@ fn get_block_root() -> MetadataBlock {
             event_time_column: Some("date".to_owned()),
             ..Default::default()
         }),
+        seed: Some(DatasetID::from_pub_key_ed25519(b"root")),
     }
 }
 
 fn get_block_deriv() -> MetadataBlock {
     MetadataBlock {
-        block_hash: Sha3_256::zero(),
-        prev_block_hash: Some(Sha3_256::new([0x0b; 32])),
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
         source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
             inputs: vec![
-                DatasetIDBuf::try_from("input1").unwrap(),
-                DatasetIDBuf::try_from("input2").unwrap(),
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                    name: DatasetName::try_from("input1").unwrap(),
+                },
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                    name: DatasetName::try_from("input2").unwrap(),
+                },
             ],
             transform: Transform::Sql(TransformSql {
                 engine: "spark".to_owned(),
@@ -79,35 +84,30 @@ fn get_block_deriv() -> MetadataBlock {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"foo"),
-            ),
-            data_physical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"bar"),
-            ),
+            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: None,
             },
         ]),
+        seed: Some(DatasetID::from_pub_key_ed25519(b"deriv")),
     }
 }
 
@@ -118,16 +118,16 @@ fn serde_metadata_block_root() {
     let expected = get_block_root();
 
     let buffer = FlatbuffersMetadataBlockSerializer
-        .write_manifest_unchecked(&expected)
+        .write_manifest(&expected)
         .unwrap();
     let actual = FlatbuffersMetadataBlockDeserializer
-        .read_manifest_unchecked(&buffer)
+        .read_manifest(&buffer)
         .unwrap();
     assert_eq!(expected, actual);
 
     // Ensure produces same binary result
     let buffer2 = FlatbuffersMetadataBlockSerializer
-        .write_manifest_unchecked(&actual)
+        .write_manifest(&actual)
         .unwrap();
     assert_eq!(buffer.inner(), buffer2.inner());
 }
@@ -137,16 +137,16 @@ fn serde_metadata_block_deriv() {
     let expected = get_block_deriv();
 
     let buffer = FlatbuffersMetadataBlockSerializer
-        .write_manifest_unchecked(&expected)
+        .write_manifest(&expected)
         .unwrap();
     let actual = FlatbuffersMetadataBlockDeserializer
-        .read_manifest_unchecked(&buffer)
+        .read_manifest(&buffer)
         .unwrap();
     assert_eq!(expected, actual);
 
     // Ensure produces same binary result
     let buffer2 = FlatbuffersMetadataBlockSerializer
-        .write_manifest_unchecked(&actual)
+        .write_manifest(&actual)
         .unwrap();
     assert_eq!(buffer.inner(), buffer2.inner());
 }
@@ -155,14 +155,13 @@ fn serde_metadata_block_deriv() {
 fn serializer_hashes_are_stable_root() {
     let block = get_block_root();
 
-    let (block_hash, _) = FlatbuffersMetadataBlockSerializer
+    let buffer = FlatbuffersMetadataBlockSerializer
         .write_manifest(&block)
         .unwrap();
 
     assert_eq!(
-        block_hash,
-        Sha3_256::try_from("d8be7cde15b4507b98226444a8e75c3459be33de5aa2abf59974ed8f9a71faea")
-            .unwrap()
+        format!("{:x}", sha3::Sha3_256::digest(&buffer)),
+        "ee79db18f40dc77c2288952f498da761d940671cb1b95d69edd50303d0eedf15"
     );
 }
 
@@ -170,50 +169,14 @@ fn serializer_hashes_are_stable_root() {
 fn serializer_hashes_are_stable_deriv() {
     let block = get_block_deriv();
 
-    let (block_hash, _) = FlatbuffersMetadataBlockSerializer
+    let buffer = FlatbuffersMetadataBlockSerializer
         .write_manifest(&block)
         .unwrap();
 
     assert_eq!(
-        block_hash,
-        Sha3_256::try_from("5b41fd5495c28b57526180bfa5ab617c1b20be6589ecfdc5dfe404ab970aaec9")
-            .unwrap()
+        format!("{:x}", sha3::Sha3_256::digest(&buffer)),
+        "92f981290fd4db5bccf22fb4f1efc5b107efe5e9ca86867410cf3e2610cefbd3"
     );
-}
-
-#[test]
-fn serializer_rejects_incorrect_hashes() {
-    let invalid = MetadataBlock {
-        block_hash: Sha3_256::new([0xab; 32]),
-        ..get_block_root()
-    };
-
-    assert!(matches!(
-        FlatbuffersMetadataBlockSerializer.write_manifest(&invalid),
-        Err(opendatafabric::serde::Error::InvalidHash { .. })
-    ));
-}
-
-#[test]
-fn deserializer_rejects_incorrect_hashes() {
-    let invalid = MetadataBlock {
-        block_hash: Sha3_256::new([0xab; 32]),
-        ..get_block_root()
-    };
-
-    let buf = FlatbuffersMetadataBlockSerializer
-        .write_manifest_unchecked(&invalid)
-        .unwrap();
-
-    assert!(matches!(
-        FlatbuffersMetadataBlockDeserializer.validate_manifest(&buf),
-        Err(opendatafabric::serde::Error::InvalidHash { .. })
-    ));
-
-    assert!(matches!(
-        FlatbuffersMetadataBlockDeserializer.read_manifest(&buf),
-        Err(opendatafabric::serde::Error::InvalidHash { .. })
-    ));
 }
 
 #[test]

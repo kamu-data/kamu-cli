@@ -61,8 +61,8 @@ macro_rules! implement_serde_as {
 #[serde(remote = "BlockInterval")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct BlockIntervalDef {
-    pub start: Sha3_256,
-    pub end: Sha3_256,
+    pub start: Multihash,
+    pub end: Multihash,
 }
 
 implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
@@ -78,7 +78,7 @@ implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 #[serde(remote = "DatasetSnapshot")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSnapshotDef {
-    pub id: DatasetIDBuf,
+    pub name: DatasetName,
     #[serde_as(as = "DatasetSourceDef")]
     pub source: DatasetSource,
     #[serde_as(as = "Option<DatasetVocabularyDef>")]
@@ -142,7 +142,8 @@ pub struct DatasetSourceRootDef {
 #[serde(remote = "DatasetSourceDerivative")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSourceDerivativeDef {
-    pub inputs: Vec<DatasetIDBuf>,
+    #[serde_as(as = "Vec<TransformInputDef>")]
+    pub inputs: Vec<TransformInput>,
     #[serde_as(as = "TransformDef")]
     pub transform: Transform,
 }
@@ -203,6 +204,36 @@ pub struct EventTimeSourceFromPathDef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryInput")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryInputDef {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetID,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub data_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
+    #[serde_as(as = "Vec<WatermarkDef>")]
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+implement_serde_as!(
+    ExecuteQueryInput,
+    ExecuteQueryInputDef,
+    "ExecuteQueryInputDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
 // ExecuteQueryRequest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -213,8 +244,7 @@ pub struct EventTimeSourceFromPathDef {
 #[serde(remote = "ExecuteQueryRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryRequestDef {
-    #[serde(rename = "datasetID")]
-    pub dataset_id: DatasetIDBuf,
+    pub dataset_name: DatasetName,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     pub offset: i64,
@@ -222,8 +252,8 @@ pub struct ExecuteQueryRequestDef {
     pub vocab: DatasetVocabulary,
     #[serde_as(as = "TransformDef")]
     pub transform: Transform,
-    #[serde_as(as = "Vec<QueryInputDef>")]
-    pub inputs: Vec<QueryInput>,
+    #[serde_as(as = "Vec<ExecuteQueryInputDef>")]
+    pub inputs: Vec<ExecuteQueryInput>,
     pub prev_checkpoint_dir: Option<PathBuf>,
     pub new_checkpoint_dir: PathBuf,
     pub out_data_path: PathBuf,
@@ -391,7 +421,7 @@ implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct InputSliceDef {
     #[serde(rename = "datasetID")]
-    pub dataset_id: DatasetIDBuf,
+    pub dataset_id: DatasetID,
     #[serde_as(as = "Option<BlockIntervalDef>")]
     #[serde(default)]
     pub block_interval: Option<BlockInterval>,
@@ -466,8 +496,7 @@ pub struct MergeStrategySnapshotDef {
 #[serde(remote = "MetadataBlock")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MetadataBlockDef {
-    pub block_hash: Sha3_256,
-    pub prev_block_hash: Option<Sha3_256>,
+    pub prev_block_hash: Option<Multihash>,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     #[serde_as(as = "Option<OutputSliceDef>")]
@@ -484,6 +513,7 @@ pub struct MetadataBlockDef {
     #[serde_as(as = "Option<DatasetVocabularyDef>")]
     #[serde(default)]
     pub vocab: Option<DatasetVocabulary>,
+    pub seed: Option<DatasetID>,
 }
 
 implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
@@ -581,32 +611,6 @@ implement_serde_as!(
     CompressionFormatDef,
     "CompressionFormatDef"
 );
-
-////////////////////////////////////////////////////////////////////////////////
-// QueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "QueryInput")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct QueryInputDef {
-    #[serde(rename = "datasetID")]
-    pub dataset_id: DatasetIDBuf,
-    #[serde_as(as = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
-    #[serde_as(as = "Option<OffsetIntervalDef>")]
-    #[serde(default)]
-    pub data_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<PathBuf>,
-    pub schema_file: PathBuf,
-    #[serde_as(as = "Vec<WatermarkDef>")]
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-implement_serde_as!(QueryInput, QueryInputDef, "QueryInputDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // ReadStep
@@ -785,6 +789,23 @@ pub struct TransformSqlDef {
     #[serde(default)]
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformInput")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformInputDef {
+    pub id: Option<DatasetID>,
+    pub name: DatasetName,
+}
+
+implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // Watermark
