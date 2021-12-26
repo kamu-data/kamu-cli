@@ -10,10 +10,7 @@
 use container_runtime::PullImageListener;
 use opendatafabric::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
 use opendatafabric::serde::yaml::generated::*;
-use opendatafabric::{
-    DatasetName, DatasetSourceRoot, DatasetVocabulary, ExecuteQueryRequest,
-    ExecuteQueryResponseSuccess,
-};
+use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
@@ -72,6 +69,8 @@ pub trait EngineProvisioner: Send + Sync {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IngestRequest {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetID,
     pub dataset_name: DatasetName,
     pub ingest_path: PathBuf,
     #[serde(with = "datetime_rfc3339")]

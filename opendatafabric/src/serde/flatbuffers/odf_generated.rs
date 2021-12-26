@@ -6294,16 +6294,17 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryRequest<'a> {
 }
 
 impl<'a> ExecuteQueryRequest<'a> {
-    pub const VT_DATASET_NAME: flatbuffers::VOffsetT = 4;
-    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 6;
-    pub const VT_OFFSET: flatbuffers::VOffsetT = 8;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 10;
-    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 12;
-    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 14;
-    pub const VT_INPUTS: flatbuffers::VOffsetT = 16;
-    pub const VT_PREV_CHECKPOINT_DIR: flatbuffers::VOffsetT = 18;
-    pub const VT_NEW_CHECKPOINT_DIR: flatbuffers::VOffsetT = 20;
-    pub const VT_OUT_DATA_PATH: flatbuffers::VOffsetT = 22;
+    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_DATASET_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 8;
+    pub const VT_OFFSET: flatbuffers::VOffsetT = 10;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 12;
+    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 14;
+    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 16;
+    pub const VT_INPUTS: flatbuffers::VOffsetT = 18;
+    pub const VT_PREV_CHECKPOINT_DIR: flatbuffers::VOffsetT = 20;
+    pub const VT_NEW_CHECKPOINT_DIR: flatbuffers::VOffsetT = 22;
+    pub const VT_OUT_DATA_PATH: flatbuffers::VOffsetT = 24;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -6340,10 +6341,22 @@ impl<'a> ExecuteQueryRequest<'a> {
         if let Some(x) = args.dataset_name {
             builder.add_dataset_name(x);
         }
+        if let Some(x) = args.dataset_id {
+            builder.add_dataset_id(x);
+        }
         builder.add_transform_type(args.transform_type);
         builder.finish()
     }
 
+    #[inline]
+    pub fn dataset_id(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                ExecuteQueryRequest::VT_DATASET_ID,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
     #[inline]
     pub fn dataset_name(&self) -> Option<&'a str> {
         self._tab
@@ -6431,6 +6444,11 @@ impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "dataset_id",
+                Self::VT_DATASET_ID,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
                 "dataset_name",
                 Self::VT_DATASET_NAME,
@@ -6481,6 +6499,7 @@ impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
     }
 }
 pub struct ExecuteQueryRequestArgs<'a> {
+    pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub dataset_name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub system_time: Option<&'a Timestamp>,
     pub offset: i64,
@@ -6500,6 +6519,7 @@ impl<'a> Default for ExecuteQueryRequestArgs<'a> {
     #[inline]
     fn default() -> Self {
         ExecuteQueryRequestArgs {
+            dataset_id: None,
             dataset_name: None,
             system_time: None,
             offset: 0,
@@ -6518,6 +6538,16 @@ pub struct ExecuteQueryRequestBuilder<'a: 'b, 'b> {
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_dataset_id(
+        &mut self,
+        dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryRequest::VT_DATASET_ID,
+            dataset_id,
+        );
+    }
     #[inline]
     pub fn add_dataset_name(&mut self, dataset_name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
@@ -6615,6 +6645,7 @@ impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
 impl std::fmt::Debug for ExecuteQueryRequest<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryRequest");
+        ds.field("dataset_id", &self.dataset_id());
         ds.field("dataset_name", &self.dataset_name());
         ds.field("system_time", &self.system_time());
         ds.field("offset", &self.offset());

@@ -321,6 +321,7 @@ impl Into<super::ExecuteQueryInput> for &dyn ExecuteQueryInput {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID;
     fn dataset_name(&self) -> &DatasetName;
     fn system_time(&self) -> DateTime<Utc>;
     fn offset(&self) -> i64;
@@ -333,6 +334,9 @@ pub trait ExecuteQueryRequest {
 }
 
 impl ExecuteQueryRequest for super::ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
     fn dataset_name(&self) -> &DatasetName {
         &self.dataset_name
     }
@@ -367,6 +371,7 @@ impl ExecuteQueryRequest for super::ExecuteQueryRequest {
 impl Into<super::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
     fn into(self) -> super::ExecuteQueryRequest {
         super::ExecuteQueryRequest {
+            dataset_id: self.dataset_id().clone(),
             dataset_name: self.dataset_name().to_owned(),
             system_time: self.system_time(),
             offset: self.offset(),
