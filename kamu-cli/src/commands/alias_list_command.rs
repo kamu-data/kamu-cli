@@ -10,26 +10,30 @@
 use super::{CLIError, Command};
 use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
-use opendatafabric::DatasetIDBuf;
+use opendatafabric::DatasetRefLocal;
 
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 
 pub struct AliasListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     output_config: Arc<OutputConfig>,
-    dataset_id: Option<String>,
+    dataset_ref: Option<DatasetRefLocal>,
 }
 
 impl AliasListCommand {
-    pub fn new(
+    pub fn new<R>(
         metadata_repo: Arc<dyn MetadataRepository>,
         output_config: Arc<OutputConfig>,
-        dataset_id: Option<String>,
-    ) -> Self {
+        dataset_ref: Option<R>,
+    ) -> Self
+    where
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+    {
         Self {
             metadata_repo,
             output_config,
-            dataset_id,
+            dataset_ref: dataset_ref.map(|s| s.try_into().unwrap()),
         }
     }
 
@@ -40,21 +44,21 @@ impl AliasListCommand {
         let mut out = std::io::stdout();
         write!(out, "Dataset,Kind,Alias\n")?;
 
-        let mut datasets: Vec<DatasetIDBuf> = if self.dataset_id.is_none() {
-            self.metadata_repo.get_all_datasets().collect()
+        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
+            vec![self.metadata_repo.resolve_dataset_ref(dataset_ref)?]
         } else {
-            vec![DatasetIDBuf::try_from(self.dataset_id.clone().unwrap()).unwrap()]
+            self.metadata_repo.get_all_datasets().collect()
         };
-        datasets.sort();
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         for ds in &datasets {
-            let aliases = self.metadata_repo.get_remote_aliases(&ds)?;
+            let aliases = self.metadata_repo.get_remote_aliases(&ds.as_local_ref())?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                write!(out, "{},{},{}\n", &ds, "pull", &alias)?;
+                write!(out, "{},{},{}\n", &ds.name, "pull", &alias)?;
             }
             for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                write!(out, "{},{},{}\n", &ds, "push", &alias)?;
+                write!(out, "{},{},{}\n", &ds.name, "push", &alias)?;
             }
         }
 
@@ -64,12 +68,12 @@ impl AliasListCommand {
     fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut datasets: Vec<DatasetIDBuf> = if self.dataset_id.is_none() {
-            self.metadata_repo.get_all_datasets().collect()
+        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
+            vec![self.metadata_repo.resolve_dataset_ref(dataset_ref)?]
         } else {
-            vec![DatasetIDBuf::try_from(self.dataset_id.clone().unwrap()).unwrap()]
+            self.metadata_repo.get_all_datasets().collect()
         };
-        datasets.sort();
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut items = 0;
         let mut table = Table::new();
@@ -78,7 +82,7 @@ impl AliasListCommand {
         table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
 
         for ds in &datasets {
-            let aliases = self.metadata_repo.get_remote_aliases(&ds)?;
+            let aliases = self.metadata_repo.get_remote_aliases(&ds.as_local_ref())?;
             let mut pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
             let mut push_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Push).collect();
             pull_aliases.sort();
@@ -87,7 +91,7 @@ impl AliasListCommand {
             for alias in pull_aliases {
                 items += 1;
                 table.add_row(Row::new(vec![
-                    Cell::new(&ds),
+                    Cell::new(&ds.name),
                     Cell::new("Pull"),
                     Cell::new(&alias),
                 ]));
@@ -96,7 +100,7 @@ impl AliasListCommand {
             for alias in push_aliases {
                 items += 1;
                 table.add_row(Row::new(vec![
-                    Cell::new(&ds),
+                    Cell::new(&ds.name),
                     Cell::new("Push"),
                     Cell::new(&alias),
                 ]));

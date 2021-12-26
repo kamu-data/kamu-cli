@@ -66,21 +66,21 @@ impl Kamu {
     //    &self.volume_layout
     //}
 
-    pub fn dataset_layout(&self, dataset_id: &DatasetID) -> DatasetLayout {
-        DatasetLayout::new(&self.volume_layout, dataset_id)
+    pub fn dataset_layout(&self, dataset_name: &DatasetName) -> DatasetLayout {
+        DatasetLayout::new(&self.volume_layout, dataset_name)
     }
 
-    pub fn get_last_data_slice(&self, dataset_id: &DatasetID) -> ParquetHelper {
+    pub fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
         let metadata_repo = MetadataRepositoryImpl::new(Arc::new(self.workspace_layout.clone()));
 
         let part_file = metadata_repo
-            .get_metadata_chain(dataset_id)
+            .get_metadata_chain(&dataset_name.as_local_ref())
             .unwrap()
             .iter_blocks()
-            .map(|b| {
-                self.dataset_layout(dataset_id)
+            .map(|(h, _)| {
+                self.dataset_layout(dataset_name)
                     .data_dir
-                    .join(b.block_hash.to_string())
+                    .join(h.to_string())
             })
             .filter(|p| p.is_file())
             .next()
@@ -92,10 +92,10 @@ impl Kamu {
     pub fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
     where
         I: IntoIterator<Item = S>,
-        S: AsRef<OsStr>,
+        S: Into<OsString>,
     {
         let mut full_cmd = vec![OsStr::new("kamu").to_owned(), OsStr::new("-q").to_owned()];
-        full_cmd.extend(cmd.into_iter().map(|i| i.as_ref().to_owned()));
+        full_cmd.extend(cmd.into_iter().map(|i| i.into()));
 
         let app = kamu_cli::cli();
         let matches = app.get_matches_from_safe(&full_cmd).unwrap();

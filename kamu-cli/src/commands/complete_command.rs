@@ -59,9 +59,9 @@ impl CompleteCommand {
 
     fn complete_dataset(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for dataset_id in repo.get_all_datasets() {
-                if dataset_id.starts_with(prefix) {
-                    println!("{}", dataset_id);
+            for dataset_handle in repo.get_all_datasets() {
+                if dataset_handle.name.starts_with(prefix) {
+                    println!("{}", dataset_handle.name);
                 }
             }
         }
@@ -79,8 +79,10 @@ impl CompleteCommand {
 
     fn complete_alias(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for dataset_id in repo.get_all_datasets() {
-                let aliases = repo.get_remote_aliases(&dataset_id).unwrap();
+            for dataset_handle in repo.get_all_datasets() {
+                let aliases = repo
+                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                    .unwrap();
                 for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                     if alias.starts_with(prefix) {
                         println!("{}", alias);

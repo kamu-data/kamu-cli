@@ -19,27 +19,33 @@ use std::{io::Write, sync::Arc};
 
 pub struct InspectQueryCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
-    dataset_id: DatasetIDBuf,
+    dataset_ref: DatasetRefLocal,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
-        dataset_id: DatasetIDBuf,
+        dataset_ref: DatasetRefLocal,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
             metadata_repo,
-            dataset_id,
+            dataset_ref,
             output_config,
         }
     }
 
-    fn render(&self, output: &mut impl Write) -> Result<(), CLIError> {
-        let chain = self.metadata_repo.get_metadata_chain(&self.dataset_id)?;
+    fn render(
+        &self,
+        output: &mut impl Write,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), CLIError> {
+        let chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
-        for block in chain.iter_blocks() {
+        for (hash, block) in chain.iter_blocks() {
             match block.source {
                 Some(DatasetSource::Root(DatasetSourceRoot {
                     preprocess: Some(ref transform),
@@ -47,8 +53,10 @@ impl InspectQueryCommand {
                 })) => {
                     self.render_transform(
                         output,
+                        dataset_handle,
+                        &hash,
                         &block,
-                        &vec![self.dataset_id.clone()],
+                        &Vec::new(),
                         transform,
                     )?;
                 }
@@ -56,7 +64,14 @@ impl InspectQueryCommand {
                     ref inputs,
                     ref transform,
                 })) => {
-                    self.render_transform(output, &block, inputs, transform)?;
+                    self.render_transform(
+                        output,
+                        dataset_handle,
+                        &hash,
+                        &block,
+                        inputs,
+                        transform,
+                    )?;
                 }
                 _ => (),
             }
@@ -68,15 +83,17 @@ impl InspectQueryCommand {
     fn render_transform(
         &self,
         output: &mut impl Write,
+        dataset_handle: &DatasetHandle,
+        block_hash: &Multihash,
         block: &MetadataBlock,
-        inputs: &Vec<DatasetIDBuf>,
+        inputs: &Vec<TransformInput>,
         transform: &Transform,
     ) -> Result<(), std::io::Error> {
         writeln!(
             output,
             "{}: {}",
             style("Transform").green(),
-            style(block.block_hash).yellow(),
+            style(block_hash).yellow(),
         )?;
 
         writeln!(
@@ -90,8 +107,13 @@ impl InspectQueryCommand {
 
         writeln!(output, "{}", style("Inputs:").dim())?;
 
-        for id in inputs {
-            writeln!(output, "  {}", style(id).bold())?;
+        for input in inputs {
+            writeln!(
+                output,
+                "  {} ({})",
+                style(&input.name).bold(),
+                input.id.as_ref().unwrap()
+            )?;
         }
 
         match transform {
@@ -121,7 +143,7 @@ impl InspectQueryCommand {
                         let alias = query
                             .alias
                             .clone()
-                            .unwrap_or_else(|| self.dataset_id.to_string());
+                            .unwrap_or_else(|| dataset_handle.name.to_string());
                         writeln!(output, "{} {}", style("Query:").dim(), style(alias).bold(),)?;
                         for line in query.query.trim_end().split('\n') {
                             writeln!(output, "  {}", line)?;
@@ -134,7 +156,7 @@ impl InspectQueryCommand {
                         output,
                         "{} {}",
                         style("Query:").dim(),
-                        style(&self.dataset_id).bold(),
+                        style(&dataset_handle.name).bold(),
                     )?;
                     for line in query.trim_end().split('\n') {
                         writeln!(output, "  {}", line)?;
@@ -149,15 +171,17 @@ impl InspectQueryCommand {
 
 impl Command for InspectQueryCommand {
     fn run(&mut self) -> Result<(), CLIError> {
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(&self.dataset_ref)?;
+
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new().unwrap();
             pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-            pager.set_prompt(self.dataset_id.to_string());
+            pager.set_prompt(&dataset_handle.name);
 
-            self.render(&mut WritePager(&mut pager))?;
+            self.render(&mut WritePager(&mut pager), &dataset_handle)?;
             minus::page_all(pager).unwrap();
         } else {
-            self.render(&mut std::io::stdout())?;
+            self.render(&mut std::io::stdout(), &dataset_handle)?;
         }
         Ok(())
     }

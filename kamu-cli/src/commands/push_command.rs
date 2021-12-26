@@ -13,7 +13,6 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use std::backtrace::BacktraceStatus;
-use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -25,42 +24,44 @@ use std::sync::Arc;
 pub struct PushCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     push_svc: Arc<dyn PushService>,
-    refs: Vec<String>,
+    refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
-    as_ref: Option<String>,
+    as_name: Option<RemoteDatasetName>,
     output_config: Arc<OutputConfig>,
 }
 
 impl PushCommand {
-    pub fn new<I, S, S2>(
+    pub fn new<I, R, S>(
         metadata_repo: Arc<dyn MetadataRepository>,
         push_svc: Arc<dyn PushService>,
         refs: I,
         all: bool,
         recursive: bool,
-        as_ref: Option<S2>,
+        as_name: Option<S>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
-        S2: AsRef<str>,
+        I: Iterator<Item = R>,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+        S: TryInto<RemoteDatasetName>,
+        <S as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
     {
         Self {
             metadata_repo,
             push_svc,
-            refs: refs.map(|s| s.as_ref().to_owned()).collect(),
+            refs: refs.map(|s| s.try_into().unwrap()).collect(),
             all,
             recursive,
-            as_ref: as_ref.map(|s| s.as_ref().to_owned()),
+            as_name: as_name.map(|s| s.try_into().unwrap()),
             output_config,
         }
     }
 
     fn push_quiet(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
         self.push_svc.push_multi(
-            &mut self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap()),
+            &mut self.refs.iter().cloned(),
             PushOptions {
                 all: self.all,
                 recursive: self.recursive,
@@ -79,7 +80,7 @@ impl PushCommand {
         });
 
         let results = self.push_svc.push_multi(
-            &mut self.refs.iter().map(|s| DatasetRef::try_from(s).unwrap()),
+            &mut self.refs.iter().cloned(),
             PushOptions {
                 all: self.all,
                 recursive: self.recursive,
@@ -101,32 +102,26 @@ impl Command for PushCommand {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
 
-        if self.refs.len() > 1 && self.as_ref.is_some() {
+        if self.refs.len() > 1 && self.as_name.is_some() {
             return Err(CLIError::usage_error(
                 "Cannot specify multiple datasets with --as alias",
             ));
         }
 
         // If --as alias is used - add it to push aliases
-        let alias_added = if let Some(ref as_ref) = self.as_ref {
-            let local_id = match DatasetRef::try_from(&self.refs[0]).unwrap().as_local() {
-                Some(local_id) => local_id,
+        let alias_added = if let Some(remote_name) = &self.as_name {
+            let local_ref = match self.refs[0].as_local_ref() {
+                Some(local_ref) => local_ref,
                 None => {
                     return Err(CLIError::usage_error(
                         "When using --as dataset has to refer to a local ID",
                     ))
                 }
             };
-            let remote_ref = DatasetRefBuf::try_from(as_ref.clone()).unwrap();
-            if remote_ref.is_local() {
-                return Err(CLIError::usage_error(
-                    "When using --as the alias has to be a remote reference",
-                ));
-            }
 
             self.metadata_repo
-                .get_remote_aliases(local_id)?
-                .add(remote_ref, RemoteAliasKind::Push)?
+                .get_remote_aliases(&local_ref)?
+                .add(remote_name, RemoteAliasKind::Push)?
         } else {
             false
         };
@@ -155,15 +150,10 @@ impl Command for PushCommand {
         }
 
         if alias_added && errors != 0 {
-            // This is a bit ugly, but we don't want alias to stay unless first push is successful
-            let local_id = DatasetRef::try_from(&self.refs[0])
-                .unwrap()
-                .as_local()
-                .unwrap();
-            let remote_ref = DatasetRef::try_from(self.as_ref.as_ref().unwrap()).unwrap();
+            // This is a bit ugly, but we don't want alias to stay unless the first push is successful
             self.metadata_repo
-                .get_remote_aliases(local_id)?
-                .delete(remote_ref, RemoteAliasKind::Push)?;
+                .get_remote_aliases(&self.refs[0].as_local_ref().unwrap())?
+                .delete(self.as_name.as_ref().unwrap(), RemoteAliasKind::Push)?;
         }
 
         if updated != 0 {
@@ -257,12 +247,12 @@ impl PrettyPushProgress {
 impl SyncMultiListener for PrettyPushProgress {
     fn begin_sync(
         &self,
-        local_dataset_id: &DatasetID,
-        remote_dataset_ref: &DatasetRef,
+        local_ref: &DatasetRefLocal,
+        remote_ref: &DatasetRefRemote,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            local_dataset_id.to_owned(),
-            remote_dataset_ref.to_owned(),
+            local_ref.clone(),
+            remote_ref.clone(),
             self.multi_progress.clone(),
         )))
     }
@@ -271,21 +261,21 @@ impl SyncMultiListener for PrettyPushProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_dataset_id: DatasetIDBuf,
-    remote_dataset_ref: DatasetRefBuf,
+    local_ref: DatasetRefLocal,
+    remote_ref: DatasetRefRemote,
     _multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
 }
 
 impl PrettySyncProgress {
     fn new(
-        local_dataset_id: DatasetIDBuf,
-        remote_dataset_ref: DatasetRefBuf,
+        local_ref: DatasetRefLocal,
+        remote_ref: DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
         let inst = Self {
-            local_dataset_id: local_dataset_id.clone(),
-            remote_dataset_ref: remote_dataset_ref.clone(),
+            local_ref,
+            remote_ref,
             curr_progress: multi_progress.add(Self::new_spinner("")),
             _multi_progress: multi_progress,
         };
@@ -304,7 +294,7 @@ impl PrettySyncProgress {
 
     fn spinner_message<T: std::fmt::Display>(&self, step: u32, msg: T) -> String {
         let step_str = format!("[{}/1]", step + 1);
-        let dataset = format!("({} > {})", self.local_dataset_id, self.remote_dataset_ref);
+        let dataset = format!("({} > {})", self.local_ref, self.remote_ref);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),

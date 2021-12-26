@@ -9,7 +9,6 @@
 
 use std::{
     backtrace::BacktraceStatus,
-    convert::TryFrom,
     error::Error,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -18,42 +17,51 @@ use std::{
 };
 
 use kamu::domain::*;
-use opendatafabric::{DatasetID, DatasetIDBuf, Sha3_256};
+use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
 
-type GenericVerificationResult =
-    Result<Vec<(DatasetIDBuf, Result<VerificationResult, VerificationError>)>, CLIError>;
+type GenericVerificationResult = Result<
+    Vec<(
+        DatasetRefLocal,
+        Result<VerificationResult, VerificationError>,
+    )>,
+    CLIError,
+>;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
+    metadata_repo: Arc<dyn MetadataRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
-    ids: Vec<String>,
+    refs: Vec<DatasetRefLocal>,
     recursive: bool,
     integrity: bool,
 }
 
 impl VerifyCommand {
-    pub fn new<I, S>(
+    pub fn new<I, R>(
+        metadata_repo: Arc<dyn MetadataRepository>,
         verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
-        ids: I,
+        refs: I,
         recursive: bool,
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = S>,
-        S: AsRef<str>,
+        I: Iterator<Item = R>,
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
+            metadata_repo,
             verification_svc,
             output_config,
-            ids: ids.map(|s| s.as_ref().to_owned()).collect(),
+            refs: refs.map(|s| s.try_into().unwrap()).collect(),
             recursive,
             integrity,
         }
@@ -80,25 +88,26 @@ impl VerifyCommand {
         options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
-        let dataset_id = self
-            .ids
-            .first()
-            .map(|s| DatasetIDBuf::try_from(s.to_owned()).unwrap())
-            .unwrap();
+        let dataset_handle = self
+            .metadata_repo
+            .resolve_dataset_ref(self.refs.first().unwrap())?;
 
-        let listener = listener.and_then(|l| l.begin_verify(&dataset_id));
+        let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
 
-        let res = self
-            .verification_svc
-            .verify(&dataset_id, (None, None), options, listener);
+        let res = self.verification_svc.verify(
+            &dataset_handle.as_local_ref(),
+            (None, None),
+            options,
+            listener,
+        );
 
-        Ok(vec![(dataset_id, res)])
+        Ok(vec![(dataset_handle.into(), res)])
     }
 }
 
 impl Command for VerifyCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        if self.ids.len() != 1 {
+        if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Verifying multiple datasets at once is not yet supported",
             ));
@@ -227,9 +236,12 @@ impl VerificationMultiProgress {
 }
 
 impl VerificationMultiListener for VerificationMultiProgress {
-    fn begin_verify(&self, dataset_id: &DatasetID) -> Option<Arc<dyn VerificationListener>> {
+    fn begin_verify(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Option<Arc<dyn VerificationListener>> {
         Some(Arc::new(VerificationProgress::new(
-            dataset_id,
+            dataset_handle,
             self.multi_progress.clone(),
         )))
     }
@@ -238,27 +250,27 @@ impl VerificationMultiListener for VerificationMultiProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct VerificationProgress {
-    dataset_id: DatasetIDBuf,
+    dataset_handle: DatasetHandle,
     _multi_progress: Arc<indicatif::MultiProgress>,
     curr_progress: indicatif::ProgressBar,
     state: Mutex<VerificationState>,
 }
 
 struct VerificationState {
-    block: Sha3_256,
+    block_hash: Option<Multihash>,
     block_index: usize,
     num_blocks: usize,
     phase: VerificationPhase,
 }
 
 impl VerificationProgress {
-    fn new(dataset_id: &DatasetID, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
         Self {
-            dataset_id: dataset_id.to_owned(),
+            dataset_handle: dataset_handle.clone(),
             curr_progress: multi_progress.add(Self::new_spinner("Initializing")),
             _multi_progress: multi_progress,
             state: Mutex::new(VerificationState {
-                block: Sha3_256::zero(),
+                block_hash: None,
                 block_index: 0,
                 num_blocks: 0,
                 phase: VerificationPhase::DataIntegrity,
@@ -279,7 +291,7 @@ impl VerificationProgress {
         step: usize,
         out_of: usize,
         msg: T,
-        block: Option<&Sha3_256>,
+        block: Option<&Multihash>,
     ) -> String {
         let step_str = if out_of != 0 {
             format!("[{}/{}]", step, out_of)
@@ -288,9 +300,9 @@ impl VerificationProgress {
         };
 
         let dataset = if let Some(block) = block {
-            format!("({} @ {})", self.dataset_id, block.short())
+            format!("({} @ {})", self.dataset_handle.name, block.short())
         } else {
-            format!("({})", self.dataset_id)
+            format!("({})", self.dataset_handle.name)
         };
 
         format!(
@@ -303,13 +315,13 @@ impl VerificationProgress {
 
     fn save_state(
         &self,
-        block: &Sha3_256,
+        block_hash: &Multihash,
         block_index: usize,
         num_blocks: usize,
         phase: VerificationPhase,
     ) {
         let mut s = self.state.lock().unwrap();
-        s.block = *block;
+        s.block_hash = Some(block_hash.clone());
         s.block_index = block_index;
         s.num_blocks = num_blocks;
         s.phase = phase;
@@ -360,7 +372,7 @@ impl VerificationListener for VerificationProgress {
 
     fn begin_block(
         &self,
-        block_hash: &Sha3_256,
+        block_hash: &Multihash,
         block_index: usize,
         num_blocks: usize,
         phase: VerificationPhase,
@@ -388,7 +400,7 @@ impl VerificationListener for VerificationProgress {
 
     fn end_block(
         &self,
-        _block_hash: &Sha3_256,
+        _block_hash: &Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,
@@ -415,7 +427,7 @@ impl EngineProvisioningListener for VerificationProgress {
             s.block_index + 1,
             s.num_blocks,
             format!("Waiting for engine {}", engine_id),
-            Some(&s.block),
+            s.block_hash.as_ref(),
         ))
     }
 
@@ -425,7 +437,7 @@ impl EngineProvisioningListener for VerificationProgress {
             s.block_index + 1,
             s.num_blocks,
             "Replaying transformation",
-            Some(&s.block),
+            s.block_hash.as_ref(),
         ))
     }
 
@@ -441,7 +453,7 @@ impl PullImageListener for VerificationProgress {
             s.block_index + 1,
             s.num_blocks,
             format!("Pulling engine image {}", image),
-            Some(&s.block),
+            s.block_hash.as_ref(),
         ))
     }
 
@@ -451,7 +463,7 @@ impl PullImageListener for VerificationProgress {
             s.block_index + 1,
             s.num_blocks,
             "Replaying transformation",
-            Some(&s.block),
+            s.block_hash.as_ref(),
         ))
     }
 }
