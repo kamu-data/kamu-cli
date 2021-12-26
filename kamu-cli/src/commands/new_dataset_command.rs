@@ -45,7 +45,7 @@ impl NewDatasetCommand {
                     apiVersion: 1
                     kind: DatasetSnapshot
                     content:
-                      id: {}
+                      name: {}
                       # Reference: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
                       source:
                         # Root sources are the points of entry of external data into the system
@@ -110,14 +110,14 @@ impl NewDatasetCommand {
                     apiVersion: 1
                     kind: DatasetSnapshot
                     content:
-                      id: {}
+                      name: {}
                       # Reference: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsourcederivative-schema
                       source:
                         # Derivative sources produce data by transforming and combining one or multiple existing datasets.
                         kind: derivative
                         # Identifiers of the datasets that will be used as sources.
                         inputs:
-                        - com.example.city-populations
+                        - name: com.example.city-populations
                         # Transformation that will be applied to produce new data
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
                         transform:

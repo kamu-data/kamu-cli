@@ -95,9 +95,15 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
         let (version, kind, tail) = self.read_manifest_header(data)?;
 
-        // TODO: Handle conversions?
-        assert_eq!(version, 1);
         assert_eq!(kind, "MetadataBlock");
+
+        // TODO: Handle conversions
+        if version > 1 {
+            return Err(Error::UnsupportedVersion {
+                manifest_version: version,
+                supported_version: 1,
+            });
+        }
 
         let proxy = flatbuffers::root::<fbgen::MetadataBlock>(tail).map_err(|e| Error::serde(e))?;
 
