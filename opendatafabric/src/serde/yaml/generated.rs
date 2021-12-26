@@ -216,6 +216,7 @@ pub struct EventTimeSourceFromPathDef {
 pub struct ExecuteQueryInputDef {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
+    pub dataset_name: DatasetName,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
     #[serde_as(as = "Option<OffsetIntervalDef>")]
