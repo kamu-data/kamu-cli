@@ -14,7 +14,7 @@
 
 use std::path::PathBuf;
 
-use super::{DatasetIDBuf, Multihash, Sha3_256};
+use super::{DatasetID, DatasetName, Multihash};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -24,8 +24,8 @@ use chrono::{DateTime, Utc};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BlockInterval {
-    pub start: Sha3_256,
-    pub end: Sha3_256,
+    pub start: Multihash,
+    pub end: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +35,7 @@ pub struct BlockInterval {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetSnapshot {
-    pub id: DatasetIDBuf,
+    pub name: DatasetName,
     pub source: DatasetSource,
     pub vocab: Option<DatasetVocabulary>,
 }
@@ -62,7 +62,7 @@ pub struct DatasetSourceRoot {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetSourceDerivative {
-    pub inputs: Vec<DatasetIDBuf>,
+    pub inputs: Vec<TransformInput>,
     pub transform: Transform,
 }
 
@@ -96,18 +96,33 @@ pub struct EventTimeSourceFromPath {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryInput {
+    pub dataset_id: DatasetID,
+    pub vocab: DatasetVocabulary,
+    pub data_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // ExecuteQueryRequest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
-    pub dataset_id: DatasetIDBuf,
+    pub dataset_name: DatasetName,
     pub system_time: DateTime<Utc>,
     pub offset: i64,
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
-    pub inputs: Vec<QueryInput>,
+    pub inputs: Vec<ExecuteQueryInput>,
     pub prev_checkpoint_dir: Option<PathBuf>,
     pub new_checkpoint_dir: PathBuf,
     pub out_data_path: PathBuf,
@@ -182,7 +197,7 @@ pub enum SourceOrdering {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InputSlice {
-    pub dataset_id: DatasetIDBuf,
+    pub dataset_id: DatasetID,
     pub block_interval: Option<BlockInterval>,
     pub data_interval: Option<OffsetInterval>,
 }
@@ -221,14 +236,14 @@ pub struct MergeStrategySnapshot {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MetadataBlock {
-    pub block_hash: Sha3_256,
-    pub prev_block_hash: Option<Sha3_256>,
+    pub prev_block_hash: Option<Multihash>,
     pub system_time: DateTime<Utc>,
     pub output_slice: Option<OutputSlice>,
     pub output_watermark: Option<DateTime<Utc>>,
     pub input_slices: Option<Vec<InputSlice>>,
     pub source: Option<DatasetSource>,
     pub vocab: Option<DatasetVocabulary>,
+    pub seed: Option<DatasetID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -280,21 +295,6 @@ pub struct PrepStepPipe {
 pub enum CompressionFormat {
     Gzip,
     Zip,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// QueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#queryinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct QueryInput {
-    pub dataset_id: DatasetIDBuf,
-    pub vocab: DatasetVocabulary,
-    pub data_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<PathBuf>,
-    pub schema_file: PathBuf,
-    pub explicit_watermarks: Vec<Watermark>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,6 +403,17 @@ pub struct TransformSql {
     pub query: Option<String>,
     pub queries: Option<Vec<SqlQueryStep>>,
     pub temporal_tables: Option<Vec<TemporalTable>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformInput {
+    pub id: Option<DatasetID>,
+    pub name: DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

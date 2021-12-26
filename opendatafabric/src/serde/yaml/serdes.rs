@@ -13,13 +13,10 @@ pub use crate::serde::{
     MetadataBlockDeserializer, MetadataBlockSerializer,
 };
 use crate::{
-    serde::{
-        flatbuffers::{FlatbuffersMetadataBlockDeserializer, FlatbuffersMetadataBlockSerializer},
-        EngineProtocolDeserializer, EngineProtocolSerializer,
-    },
+    serde::{EngineProtocolDeserializer, EngineProtocolSerializer},
     ExecuteQueryRequest, ExecuteQueryResponse,
 };
-use crate::{DatasetSnapshot, MetadataBlock, Sha3_256};
+use crate::{DatasetSnapshot, MetadataBlock};
 use ::serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -57,24 +54,7 @@ impl YamlMetadataBlockSerializer {}
 ///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
-    fn write_manifest(&self, block: &MetadataBlock) -> Result<(Sha3_256, Buffer<u8>), Error> {
-        let (block_hash, _) = FlatbuffersMetadataBlockSerializer.write_manifest(block)?;
-        let new_block = MetadataBlock {
-            block_hash: block_hash,
-            ..block.clone()
-        };
-
-        let manifest = ManifestDefMetadataBlock {
-            api_version: 1,
-            kind: "MetadataBlock".to_owned(),
-            content: new_block,
-        };
-
-        let buf = serde_yaml::to_vec(&manifest).map_err(|e| Error::serde(e))?;
-        Ok((block_hash, Buffer::new(0, buf.len(), buf)))
-    }
-
-    fn write_manifest_unchecked(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
+    fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         let manifest = ManifestDefMetadataBlock {
             api_version: 1,
             kind: "MetadataBlock".to_owned(),
@@ -99,20 +79,7 @@ impl YamlMetadataBlockDeserializer {}
 ///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
-    fn validate_manifest(&self, data: &[u8]) -> Result<(), Error> {
-        self.read_manifest(data)?;
-        Ok(())
-    }
-
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        // TODO: Will not work if conversion took place
-        let block = self.read_manifest_unchecked(data)?;
-        let fbdata = FlatbuffersMetadataBlockSerializer.write_manifest_unchecked(&block)?;
-        FlatbuffersMetadataBlockDeserializer.validate_manifest(&fbdata)?;
-        Ok(block)
-    }
-
-    fn read_manifest_unchecked(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
         let manifest: ManifestDefMetadataBlock =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 

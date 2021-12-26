@@ -8,19 +8,24 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use digest::Digest;
 use opendatafabric::*;
 use std::convert::TryFrom;
 
 fn load() -> MetadataBlock {
     MetadataBlock {
-        block_hash: Sha3_256::new([0xAA; 32]),
-        prev_block_hash: Some(Sha3_256::new([0xBB; 32])),
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
+        seed: Some(DatasetID::from_pub_key_ed25519(b"pk")),
         source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
             inputs: vec![
-                DatasetIDBuf::try_from("input1").unwrap(),
-                DatasetIDBuf::try_from("input2").unwrap(),
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                    name: DatasetName::try_from("input1").unwrap(),
+                },
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                    name: DatasetName::try_from("input2").unwrap(),
+                },
             ],
             transform: Transform::Sql(TransformSql {
                 engine: "spark".to_owned(),
@@ -35,31 +40,25 @@ fn load() -> MetadataBlock {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"foo"),
-            ),
-            data_physical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"bar"),
-            ),
+            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: None,
             },
@@ -74,18 +73,26 @@ fn load_dynamic() -> Box<dyn dynamic::MetadataBlock> {
 #[test]
 fn test_accessors() {
     let block = load_dynamic();
-    assert_eq!(block.block_hash(), &Sha3_256::new([0xAA; 32]));
-    assert_eq!(block.prev_block_hash().unwrap(), &Sha3_256::new([0xBB; 32]));
+    assert_eq!(
+        *block.prev_block_hash().unwrap(),
+        Multihash::from_digest_sha3_256(b"prev")
+    );
     let source = match block.source().unwrap() {
         dynamic::DatasetSource::Derivative(source) => source,
         _ => panic!(),
     };
-    let inputs: Vec<DatasetIDBuf> = source.inputs().map(|id| id.to_owned()).collect();
+    let inputs: Vec<TransformInput> = source.inputs().map(|i| i.into()).collect();
     assert_eq!(
         inputs,
         vec![
-            DatasetIDBuf::try_from("input1").unwrap(),
-            DatasetIDBuf::try_from("input2").unwrap(),
+            TransformInput {
+                id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                name: DatasetName::try_from("input1").unwrap(),
+            },
+            TransformInput {
+                id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                name: DatasetName::try_from("input2").unwrap(),
+            },
         ]
     );
 }

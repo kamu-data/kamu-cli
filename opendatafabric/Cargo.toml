@@ -13,7 +13,12 @@ rust-crypto = "*"  # Data and metadata hashing
 # Multiformats
 bs58 = "*"  # base58 codec
 digest = "*"
+sha3 = "*"
 unsigned-varint = "*"
+
+# Crypto
+rand = "0.7"  # TODO: Pinned for ed25519-dalek compatibility
+ed25519-dalek = "*"
 
 # Serialization
 byteorder = "*"
@@ -30,10 +35,6 @@ prost = "*"
 # Utils
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
-
-
-[dev-dependencies]
-sha3 = "*"
 
 
 [build-dependencies]

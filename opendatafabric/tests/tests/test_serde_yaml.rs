@@ -9,7 +9,6 @@
 
 use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
-use digest::Digest;
 use indoc::indoc;
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::serde::yaml::*;
@@ -24,7 +23,7 @@ fn serde_dataset_snapshot_root() {
         apiVersion: 1
         kind: DatasetSnapshot
         content:
-          id: kamu.test
+          name: kamu.test
           source:
             kind: root
             fetch:
@@ -52,7 +51,7 @@ fn serde_dataset_snapshot_root() {
     );
 
     let expected = DatasetSnapshot {
-        id: DatasetIDBuf::try_from("kamu.test").unwrap(),
+        name: DatasetName::try_from("kamu.test").unwrap(),
         source: DatasetSource::Root(DatasetSourceRoot {
             fetch: FetchStep::Url(FetchStepUrl {
                 url: "ftp://kamu.dev/test.zip".to_owned(),
@@ -127,12 +126,12 @@ fn serde_dataset_snapshot_derivative() {
         apiVersion: 1
         kind: DatasetSnapshot
         content:
-          id: com.naturalearthdata.admin0
+          name: com.naturalearthdata.admin0
           source:
             kind: derivative
             inputs:
-              - com.naturalearthdata.10m.admin0
-              - com.naturalearthdata.50m.admin0
+              - name: com.naturalearthdata.10m.admin0
+              - name: com.naturalearthdata.50m.admin0
             transform:
               kind: sql
               engine: spark
@@ -140,11 +139,17 @@ fn serde_dataset_snapshot_derivative() {
     );
 
     let expected = DatasetSnapshot {
-        id: DatasetIDBuf::try_from("com.naturalearthdata.admin0").unwrap(),
+        name: DatasetName::try_from("com.naturalearthdata.admin0").unwrap(),
         source: DatasetSource::Derivative(DatasetSourceDerivative {
             inputs: vec![
-                DatasetIDBuf::try_from("com.naturalearthdata.10m.admin0").unwrap(),
-                DatasetIDBuf::try_from("com.naturalearthdata.50m.admin0").unwrap(),
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("com.naturalearthdata.10m.admin0").unwrap(),
+                },
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("com.naturalearthdata.50m.admin0").unwrap(),
+                },
             ],
             transform: Transform::Sql(TransformSql {
                 engine: "spark".to_owned(),
@@ -178,8 +183,7 @@ fn serde_metadata_block() {
         apiVersion: 1
         kind: MetadataBlock
         content:
-          blockHash: 0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a
-          prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
+          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
           systemTime: \"2020-01-01T12:00:00Z\"
           outputSlice:
             dataLogicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
@@ -189,38 +193,46 @@ fn serde_metadata_block() {
               end: 20
           outputWatermark: \"2020-01-01T12:00:00Z\"
           inputSlices:
-            - datasetID: input1
+            - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
               blockInterval:
-                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
+                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
               dataInterval:
                 start: 10
                 end: 20
-            - datasetID: input2
+            - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
               blockInterval:
-                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
+                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
           source:
             kind: derivative
             inputs:
-              - input1
-              - input2
+              - id: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
+                name: input1
+              - id: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
+                name: input2
             transform:
               kind: sql
               engine: spark
               query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
           vocab:
-            eventTimeColumn: date\n"
+            eventTimeColumn: date
+          seed: \"did:odf:z4k88e8k2itYG1sfanvUDxdmKyHYkxaowJNVb9yPHdsnGp3uZGb\"\n"
     );
 
     let expected = MetadataBlock {
-        block_hash: Sha3_256::new([0x0a; 32]),
-        prev_block_hash: Some(Sha3_256::new([0x0b; 32])),
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
         source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
             inputs: vec![
-                DatasetIDBuf::try_from("input1").unwrap(),
-                DatasetIDBuf::try_from("input2").unwrap(),
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                    name: DatasetName::try_from("input1").unwrap(),
+                },
+                TransformInput {
+                    id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                    name: DatasetName::try_from("input2").unwrap(),
+                },
             ],
             transform: Transform::Sql(TransformSql {
                 engine: "spark".to_owned(),
@@ -235,159 +247,41 @@ fn serde_metadata_block() {
             ..Default::default()
         }),
         output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"foo"),
-            ),
-            data_physical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"bar"),
-            ),
+            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
             data_interval: OffsetInterval { start: 10, end: 20 },
         }),
         output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         input_slices: Some(vec![
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: Some(OffsetInterval { start: 10, end: 20 }),
             },
             InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
+                dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
                 block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
+                    start: Multihash::from_digest_sha3_256(b"a"),
+                    end: Multihash::from_digest_sha3_256(b"b"),
                 }),
                 data_interval: None,
             },
         ]),
+        seed: Some(DatasetID::from_pub_key_ed25519(b"deriv")),
     };
 
     let actual = YamlMetadataBlockDeserializer
-        .read_manifest_unchecked(data.as_bytes())
+        .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlMetadataBlockSerializer
-        .write_manifest_unchecked(&actual)
-        .unwrap();
+    let data2 = YamlMetadataBlockSerializer.write_manifest(&actual).unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
-}
-
-#[test]
-fn serde_metadata_block_hashes() {
-    let expected = indoc!(
-        "
-        ---
-        apiVersion: 1
-        kind: MetadataBlock
-        content:
-          blockHash: 0079c4c67f3e3e0cc1894ce60049e7993c243edf46cb54e64f4903a7d867464f
-          prevBlockHash: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-          systemTime: \"2020-01-01T12:00:00.123456789Z\"
-          outputSlice:
-            dataLogicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
-            dataPhysicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
-            dataInterval:
-              start: 10
-              end: 20
-          outputWatermark: \"2020-01-01T12:00:00Z\"
-          inputSlices:
-            - datasetID: input1
-              blockInterval:
-                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
-              dataInterval:
-                start: 10
-                end: 20
-            - datasetID: input2
-              blockInterval:
-                start: 0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b
-                end: 0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c
-          source:
-            kind: derivative
-            inputs:
-              - input1
-              - input2
-            transform:
-              kind: sql
-              engine: spark
-              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
-          vocab:
-            eventTimeColumn: date\n"
-    );
-
-    let block = MetadataBlock {
-        block_hash: Sha3_256::new([0; 32]),
-        prev_block_hash: Some(Sha3_256::new([0x0b; 32])),
-        system_time: Utc.ymd(2020, 1, 1).and_hms_nano(12, 0, 0, 123456789),
-        source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
-            inputs: vec![
-                DatasetIDBuf::try_from("input1").unwrap(),
-                DatasetIDBuf::try_from("input2").unwrap(),
-            ],
-            transform: Transform::Sql(TransformSql {
-                engine: "spark".to_owned(),
-                version: None,
-                query: Some("SELECT * FROM input1 UNION ALL SELECT * FROM input2".to_owned()),
-                queries: None,
-                temporal_tables: None,
-            }),
-        })),
-        vocab: Some(DatasetVocabulary {
-            event_time_column: Some("date".to_owned()),
-            ..Default::default()
-        }),
-        output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"foo"),
-            ),
-            data_physical_hash: Multihash::new(
-                MulticodecCode::Sha3_256,
-                &sha3::Sha3_256::digest(b"bar"),
-            ),
-            data_interval: OffsetInterval { start: 10, end: 20 },
-        }),
-        output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-        input_slices: Some(vec![
-            InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input1").unwrap(),
-                block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
-                }),
-                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
-            },
-            InputSlice {
-                dataset_id: DatasetIDBuf::try_from("input2").unwrap(),
-                block_interval: Some(BlockInterval {
-                    start: Sha3_256::new([0xB; 32]),
-                    end: Sha3_256::new([0xC; 32]),
-                }),
-                data_interval: None,
-            },
-        ]),
-    };
-
-    let (_, actual) = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
-    assert_eq!(expected, std::str::from_utf8(&actual).unwrap());
-
-    let actual_block = YamlMetadataBlockDeserializer
-        .read_manifest(&actual)
-        .unwrap();
-    assert_eq!(
-        block,
-        MetadataBlock {
-            block_hash: Sha3_256::zero(),
-            ..actual_block
-        }
-    );
 }
 
 #[test]

@@ -11,11 +11,7 @@ use super::convertors::*;
 use super::odf_generated as fbgen;
 pub use crate::serde::{Buffer, Error, MetadataBlockDeserializer, MetadataBlockSerializer};
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
-use crate::{ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock, Sha3_256};
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
-use std::convert::TryInto;
-use thiserror::Error;
+use crate::{ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
 
 ///////////////////////////////////////////////////////////////////////////////
 // FlatbuffersMetadataBlockSerializer
@@ -35,18 +31,6 @@ impl FlatbuffersMetadataBlockSerializer {
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
         Buffer::new(head, buf.len(), buf)
-    }
-
-    pub fn set_metadata_block_hash(&self, data: &mut [u8]) -> Result<Sha3_256, Error> {
-        let hash_index = data.len() - Sha3_256::LENGTH;
-
-        FlatbuffersMetadataBlockDeserializer::validate_hash_buffer_position(data)?;
-
-        let mut digest = Sha3::sha3_256();
-        digest.input(&data[..hash_index]);
-        digest.result(&mut data[hash_index..]);
-
-        Ok(Sha3_256::new(data[hash_index..].try_into().unwrap()))
     }
 
     pub fn prepend_manifest(
@@ -76,21 +60,7 @@ impl FlatbuffersMetadataBlockSerializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
-    fn write_manifest(&self, block: &MetadataBlock) -> Result<(Sha3_256, Buffer<u8>), Error> {
-        let mut buffer = self.serialize_metadata_block(block);
-
-        let block_hash = if block.block_hash.is_zero() {
-            self.set_metadata_block_hash(&mut buffer)?
-        } else {
-            FlatbuffersMetadataBlockDeserializer::validate_block_hash(&buffer)?;
-            block.block_hash
-        };
-
-        let buffer = self.prepend_manifest(buffer, 1, "MetadataBlock")?;
-        Ok((block_hash, buffer))
-    }
-
-    fn write_manifest_unchecked(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
+    fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         let buffer = self.serialize_metadata_block(block);
         self.prepend_manifest(buffer, 1, "MetadataBlock")
     }
@@ -117,70 +87,12 @@ impl FlatbuffersMetadataBlockDeserializer {
         let kind = std::str::from_utf8(&data[4..4 + kind_len]).unwrap();
         Ok((version, kind, &data[4 + kind_len..]))
     }
-
-    fn validate_hash_buffer_position(data: &[u8]) -> Result<(), Error> {
-        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(data).map_err(|e| Error::serde(e))?;
-
-        let block_hash = proxy.block_hash().unwrap();
-
-        if block_hash.len() != Sha3_256::LENGTH {
-            return Err(Error::serde(MalformedFlatbufferError));
-        }
-
-        let p_buf_end: *const u8 = data.as_ptr().wrapping_add(data.len() - Sha3_256::LENGTH);
-        let p_hash: *const u8 = block_hash.as_ptr();
-        if p_buf_end != p_hash {
-            return Err(Error::serde(MalformedFlatbufferError));
-        }
-
-        Ok(())
-    }
-
-    fn validate_block_hash(data: &[u8]) -> Result<(), Error> {
-        Self::validate_hash_buffer_position(data)?;
-
-        let hash_index = data.len() - Sha3_256::LENGTH;
-        let block_hash = &data[hash_index..];
-        let mut true_block_hash = [0u8; 32];
-
-        let mut digest = Sha3::sha3_256();
-        digest.input(&data[..hash_index]);
-        digest.result(&mut true_block_hash);
-
-        if &true_block_hash != block_hash {
-            return Err(Error::invalid_hash(
-                Sha3_256::new(block_hash.try_into().unwrap()),
-                Sha3_256::new(true_block_hash),
-            ));
-        }
-
-        Ok(())
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
-    fn validate_manifest(&self, data: &[u8]) -> Result<(), Error> {
-        let (_, _, tail) = self.read_manifest_header(data)?;
-        Self::validate_block_hash(tail)
-    }
-
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        let (version, kind, tail) = self.read_manifest_header(data)?;
-
-        // TODO: Handle conversions?
-        assert_eq!(version, 1);
-        assert_eq!(kind, "MetadataBlock");
-
-        Self::validate_block_hash(tail)?;
-
-        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(tail).map_err(|e| Error::serde(e))?;
-
-        Ok(MetadataBlock::deserialize(proxy))
-    }
-
-    fn read_manifest_unchecked(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
         let (version, kind, tail) = self.read_manifest_header(data)?;
 
         // TODO: Handle conversions?
@@ -244,9 +156,3 @@ impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
         ))
     }
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("Malformet flatbuffers data")]
-pub struct MalformedFlatbufferError;
