@@ -61,6 +61,7 @@ impl ReadService {
         std::fs::create_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
 
         let request = IngestRequest {
+            dataset_id: dataset_handle.id.clone(),
             dataset_name: dataset_handle.name.clone(),
             ingest_path: src_path.to_owned(),
             system_time,

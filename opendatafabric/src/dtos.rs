@@ -117,6 +117,7 @@ pub struct ExecuteQueryInput {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
+    pub dataset_id: DatasetID,
     pub dataset_name: DatasetName,
     pub system_time: DateTime<Utc>,
     pub offset: i64,

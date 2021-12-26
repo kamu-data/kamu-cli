@@ -315,6 +315,7 @@ table ExecuteQueryInput {
 ////////////////////////////////////////////////////////////////////////////////
 
 table ExecuteQueryRequest {
+  dataset_id: [ubyte];
   dataset_name: string;
   system_time: Timestamp;
   offset: int64;

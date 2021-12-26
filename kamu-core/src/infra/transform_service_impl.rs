@@ -300,6 +300,7 @@ impl TransformServiceImpl {
         Ok(Some(TransformOperation {
             input_slices,
             request: ExecuteQueryRequest {
+                dataset_id: dataset_handle.id.clone(),
                 dataset_name: dataset_handle.name.clone(),
                 system_time,
                 offset: data_offset_end.map(|e| e + 1).unwrap_or(0),
@@ -589,6 +590,7 @@ impl TransformServiceImpl {
                         operation: TransformOperation {
                             input_slices: block.input_slices.as_ref().unwrap().clone(),
                             request: ExecuteQueryRequest {
+                                dataset_id: dataset_handle.id.clone(),
                                 dataset_name: dataset_handle.name.clone(),
                                 system_time: block.system_time,
                                 offset: block

@@ -244,6 +244,8 @@ implement_serde_as!(
 #[serde(remote = "ExecuteQueryRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryRequestDef {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetID,
     pub dataset_name: DatasetName,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
