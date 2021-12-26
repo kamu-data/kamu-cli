@@ -27,10 +27,10 @@ use super::test_pull_service_impl::TestTransformService;
 fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let dataset_id = DatasetID::new_unchecked("bar");
+    let dataset_name = DatasetName::new_unchecked("bar");
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
-    let dataset_layout = DatasetLayout::create(&volume_layout, dataset_id).unwrap();
+    let dataset_layout = DatasetLayout::create(&volume_layout, &dataset_name).unwrap();
 
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
 
@@ -43,22 +43,22 @@ fn test_verify_data_consistency() {
     metadata_repo
         .add_dataset(
             MetadataFactory::dataset_snapshot()
-                .id("foo")
+                .name("foo")
                 .source(MetadataFactory::dataset_source_root().build())
                 .build(),
         )
         .unwrap();
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .id(dataset_id)
-        .source(MetadataFactory::dataset_source_deriv(["foo"].iter()).build())
+        .name(&dataset_name)
+        .source(MetadataFactory::dataset_source_deriv(["foo"]).build())
         .build();
 
-    let head = metadata_repo.add_dataset(dataset_snapshot).unwrap();
+    let (_hdl, head) = metadata_repo.add_dataset(dataset_snapshot).unwrap();
 
     assert_matches!(
         verification_svc.verify(
-            &dataset_id,
+            &dataset_name.as_local_ref(),
             (None, None),
             VerificationOptions {
                 check_integrity: true,
@@ -85,12 +85,14 @@ fn test_verify_data_consistency() {
     let data_physical_hash = data_utils::get_parquet_physical_hash(&data_path).unwrap();
 
     // "Commit" data
-    let mut metadata_chain = metadata_repo.get_metadata_chain(&dataset_id).unwrap();
+    let mut metadata_chain = metadata_repo
+        .get_metadata_chain(&dataset_name.as_local_ref())
+        .unwrap();
     let head = metadata_chain.append(
         MetadataFactory::metadata_block()
             .prev(&head)
             .output_slice(OutputSlice {
-                data_logical_hash,
+                data_logical_hash: data_logical_hash.clone(),
                 data_physical_hash,
                 data_interval: OffsetInterval { start: 0, end: 0 },
             })
@@ -100,7 +102,7 @@ fn test_verify_data_consistency() {
 
     assert_matches!(
         verification_svc.verify(
-            &dataset_id,
+            &dataset_name.as_local_ref(),
             (None, None),
             VerificationOptions {
                 check_integrity: true,
@@ -123,7 +125,7 @@ fn test_verify_data_consistency() {
 
     assert_matches!(
         verification_svc.verify(
-            &dataset_id,
+            &dataset_name.as_local_ref(),
             (None, None),
             VerificationOptions {check_integrity: true, replay_transformations: false},
             None,

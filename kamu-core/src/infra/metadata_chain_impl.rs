@@ -9,7 +9,7 @@
 
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::serde::yaml::*;
+use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use std::io::prelude::*;
@@ -31,8 +31,31 @@ impl MetadataChainImpl {
     pub fn create(
         meta_path: &Path,
         first_block: MetadataBlock,
-    ) -> Result<(Self, Sha3_256), InfraError> {
-        assert_eq!(first_block.prev_block_hash, None);
+    ) -> Result<(Self, Multihash), InfraError> {
+        assert_eq!(
+            first_block.prev_block_hash, None,
+            "First block cannot reference previous blocks"
+        );
+        assert!(
+            first_block.seed.is_some(),
+            "First block has to contain a seed"
+        );
+        assert!(
+            first_block.source.is_some(),
+            "First block has to specify source"
+        );
+
+        match &first_block.source {
+            Some(DatasetSource::Derivative(ds)) => {
+                for input in &ds.inputs {
+                    assert!(
+                        input.id.is_some(),
+                        "Transform inputs must be resolved to DatasetIDs"
+                    );
+                }
+            }
+            _ => (),
+        }
 
         std::fs::create_dir(&meta_path)?;
         std::fs::create_dir(meta_path.join("blocks"))?;
@@ -40,7 +63,7 @@ impl MetadataChainImpl {
         let mut chain = Self::new(meta_path);
 
         // TODO: Validate that first block contains source info, schema, etc.?
-        let hash = chain.write_block(&first_block)?;
+        let hash = chain.write_block_unchecked(&first_block)?;
         chain.write_ref(&BlockRef::Head, &hash)?;
 
         Ok((chain, hash))
@@ -49,44 +72,39 @@ impl MetadataChainImpl {
     pub fn from_blocks(
         meta_path: &Path,
         blocks: &mut dyn Iterator<Item = MetadataBlock>,
-    ) -> Result<(Self, Sha3_256), InfraError> {
-        std::fs::create_dir(&meta_path)?;
-        std::fs::create_dir(meta_path.join("blocks"))?;
-        std::fs::create_dir(meta_path.join("refs"))?;
+    ) -> Result<(Self, Multihash), InfraError> {
+        let first_block = blocks
+            .next()
+            .expect("Cannot create MetadataChain from empty set of blocks");
 
-        let mut chain = Self::new(meta_path);
-        let mut last_hash = Sha3_256::zero();
+        let (mut chain, mut last_hash) = Self::create(meta_path, first_block)?;
 
         for b in blocks {
-            last_hash = if last_hash.is_zero() {
-                assert_eq!(b.prev_block_hash, None);
-                let hash = chain.write_block(&b)?;
-                chain.write_ref(&BlockRef::Head, &hash)?;
-                hash
-            } else {
-                chain.append(b)
-            };
+            last_hash = chain.append(b);
         }
 
-        assert!(!last_hash.is_zero());
         Ok((chain, last_hash))
     }
 
-    fn read_block(path: &Path) -> MetadataBlock {
+    fn read_block_unchecked(path: &Path) -> MetadataBlock {
         // TODO: Use mmap
         let buffer = std::fs::read(path).unwrap_or_else(|e| {
             panic!("Failed to open the block file at {}: {}", path.display(), e)
         });
 
-        YamlMetadataBlockDeserializer
+        FlatbuffersMetadataBlockDeserializer
             .read_manifest(&buffer)
             .unwrap_or_else(|e| {
                 panic!("Failed to open the block file at {}: {}", path.display(), e)
             })
     }
 
-    fn write_block(&mut self, block: &MetadataBlock) -> Result<Sha3_256, InfraError> {
-        let (hash, buffer) = YamlMetadataBlockSerializer.write_manifest(block).unwrap();
+    fn write_block_unchecked(&mut self, block: &MetadataBlock) -> Result<Multihash, InfraError> {
+        let buffer = FlatbuffersMetadataBlockSerializer
+            .write_manifest(block)
+            .unwrap();
+
+        let hash = Multihash::from_digest_sha3_256(&buffer);
 
         let mut file = std::fs::File::options()
             .write(true)
@@ -98,16 +116,16 @@ impl MetadataChainImpl {
     }
 
     // TODO: atomicity
-    fn write_ref(&mut self, r: &BlockRef, hash: &Sha3_256) -> Result<(), InfraError> {
+    fn write_ref(&mut self, r: &BlockRef, hash: &Multihash) -> Result<(), InfraError> {
         let mut file = std::fs::File::create(self.ref_path(r))?;
-        file.write_all(hash.to_string().as_bytes())?;
+        file.write_all(hash.to_multibase_string().as_bytes())?;
         file.sync_all()?;
         Ok(())
     }
 
-    fn block_path(&self, hash: &Sha3_256) -> PathBuf {
+    fn block_path(&self, hash: &Multihash) -> PathBuf {
         let mut p = self.meta_path.join("blocks");
-        p.push(hash.to_string());
+        p.push(hash.to_multibase_string());
         p
     }
 
@@ -123,30 +141,30 @@ impl MetadataChainImpl {
 }
 
 impl MetadataChain for MetadataChainImpl {
-    fn read_ref(&self, r: &BlockRef) -> Option<Sha3_256> {
+    fn read_ref(&self, r: &BlockRef) -> Option<Multihash> {
         let path = self.ref_path(r);
         if !path.exists() {
             None
         } else {
             let s = std::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("Failed to read ref at {}: {}", path.display(), e));
-            Some(Sha3_256::from_str(s.trim()).unwrap())
+            Some(Multihash::from_multibase_str(s.trim()).expect("Ref contains invalid multihash"))
         }
     }
 
-    fn get_block(&self, block_hash: &Sha3_256) -> Option<MetadataBlock> {
+    fn get_block(&self, block_hash: &Multihash) -> Option<MetadataBlock> {
         let path = self.block_path(block_hash);
         if !path.exists() {
             None
         } else {
-            Some(Self::read_block(&path))
+            Some(Self::read_block_unchecked(&path))
         }
     }
 
     fn iter_blocks_starting(
         &self,
-        block_hash: &Sha3_256,
-    ) -> Option<Box<dyn Iterator<Item = MetadataBlock>>> {
+        block_hash: &Multihash,
+    ) -> Option<Box<dyn Iterator<Item = (Multihash, MetadataBlock)>>> {
         if !self.block_path(block_hash).exists() {
             None
         } else {
@@ -154,23 +172,25 @@ impl MetadataChain for MetadataChainImpl {
                 reader: BlockReader {
                     blocks_dir: self.meta_path.join("blocks"),
                 },
-                next_hash: Some(*block_hash),
+                next_hash: Some(block_hash.clone()),
             }))
         }
     }
 
-    fn append_ref(&mut self, r: &BlockRef, block: MetadataBlock) -> Sha3_256 {
+    fn append_ref(&mut self, r: &BlockRef, block: MetadataBlock) -> Multihash {
         let last_hash = self
             .read_ref(r)
             .unwrap_or_else(|| panic!("Ref {:?} does not exist", r));
 
         assert_eq!(
             block.prev_block_hash,
-            Some(last_hash),
+            Some(last_hash.clone()),
             "New block doesn't specify correct prev block hash"
         );
 
-        let last_block = Self::read_block(&self.block_path(&last_hash));
+        assert!(block.seed.is_none(), "Only starting block can have a seed");
+
+        let last_block = Self::read_block_unchecked(&self.block_path(&last_hash));
 
         assert!(
             last_block.system_time < block.system_time,
@@ -191,7 +211,7 @@ impl MetadataChain for MetadataChainImpl {
             _ => (),
         }
 
-        let hash = self.write_block(&block).unwrap();
+        let hash = self.write_block_unchecked(&block).unwrap();
         self.write_ref(r, &hash).unwrap();
 
         hash
@@ -203,27 +223,27 @@ struct BlockReader {
 }
 
 impl BlockReader {
-    fn read_block(&self, hash: &Sha3_256) -> MetadataBlock {
+    fn read_block(&self, hash: &Multihash) -> MetadataBlock {
         let path = self.blocks_dir.join(hash.to_string());
-        MetadataChainImpl::read_block(&path)
+        MetadataChainImpl::read_block_unchecked(&path)
     }
 }
 
 struct MetadataBlockIter {
     reader: BlockReader,
-    next_hash: Option<Sha3_256>,
+    next_hash: Option<Multihash>,
 }
 
 impl Iterator for MetadataBlockIter {
-    type Item = MetadataBlock;
+    type Item = (Multihash, MetadataBlock);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next_hash {
+        match self.next_hash.clone() {
             None => None,
-            Some(ref hash) => {
-                let block = self.reader.read_block(hash);
-                self.next_hash = block.prev_block_hash;
-                Some(block)
+            Some(hash) => {
+                let block = self.reader.read_block(&hash);
+                self.next_hash = block.prev_block_hash.clone();
+                Some((hash, block))
             }
         }
     }

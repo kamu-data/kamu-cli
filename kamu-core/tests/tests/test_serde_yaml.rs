@@ -22,12 +22,13 @@ fn serde_dataset_summary() {
     apiVersion: 1
     kind: DatasetSummary
     content:
-      id: foo.bar
+      id: \"did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh\"
+      name: foo.bar
       kind: root
-      lastBlockHash: 8b310549db6da0e1fedadda588a0e3c809f99454879f9953b06dbbb8af6a91ca
+      lastBlockHash: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
       dependencies:
-        - foo
-        - bar
+        - name: foo
+        - name: bar
       lastPulled: \"2020-01-01T12:00:00Z\"
       numRecords: 100
       dataSize: 1024\n"
@@ -39,15 +40,22 @@ fn serde_dataset_summary() {
         api_version: 1,
         kind: "DatasetSummary".to_owned(),
         content: DatasetSummary {
-            id: DatasetIDBuf::try_from("foo.bar").unwrap(),
+            id: DatasetID::from_pub_key_ed25519(b"boop"),
+            name: DatasetName::try_from("foo.bar").unwrap(),
             kind: DatasetKind::Root,
-            last_block_hash: Sha3_256::from_str(
-                "8b310549db6da0e1fedadda588a0e3c809f99454879f9953b06dbbb8af6a91ca",
+            last_block_hash: Multihash::from_multibase_str(
+                "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )
             .unwrap(),
             dependencies: vec![
-                DatasetIDBuf::try_from("foo").unwrap(),
-                DatasetIDBuf::try_from("bar").unwrap(),
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("foo").unwrap(),
+                },
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("bar").unwrap(),
+                },
             ],
             last_pulled: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             data_size: 1024,
@@ -55,6 +63,6 @@ fn serde_dataset_summary() {
         },
     };
 
-    assert_eq!(expected, actual);
+    assert_eq!(expected.content, actual.content);
     assert_eq!(serde_yaml::to_string(&actual).unwrap(), data);
 }

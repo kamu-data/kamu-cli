@@ -25,7 +25,7 @@ use datafusion::{
     prelude::*,
 };
 use dill::*;
-use opendatafabric::DatasetID;
+use opendatafabric::*;
 use std::{path::PathBuf, sync::Arc};
 use tracing::info_span;
 
@@ -70,14 +70,16 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     fn tail(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         num_records: u64,
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+
         let vocab = self
             .metadata_repo
-            .get_metadata_chain(dataset_id)?
+            .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
-            .filter_map(|b| b.vocab)
+            .filter_map(|(_, b)| b.vocab)
             .next()
             .unwrap_or_default();
 
@@ -90,7 +92,7 @@ impl QueryService for QueryServiceImpl {
         // See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
-        let schema = self.get_schema(dataset_id)?;
+        let schema = self.get_schema(&dataset_handle.as_local_ref())?;
         let fields: Vec<String> = match schema {
             Type::GroupType { fields, .. } => fields
                 .iter()
@@ -119,7 +121,7 @@ impl QueryService for QueryServiceImpl {
             format!(
                 r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
                 fields = fields.join(", "),
-                dataset = dataset_id,
+                dataset = dataset_handle.name,
                 offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
                 num_records = num_records
             )
@@ -127,7 +129,7 @@ impl QueryService for QueryServiceImpl {
             format!(
                 r#"SELECT {fields} FROM "{dataset}" DESC LIMIT {num_records}"#,
                 fields = fields.join(", "),
-                dataset = dataset_id,
+                dataset = dataset_handle.name,
                 num_records = num_records
             )
         };
@@ -136,7 +138,7 @@ impl QueryService for QueryServiceImpl {
             &query,
             QueryOptions {
                 datasets: vec![DatasetQueryOptions {
-                    dataset_id: dataset_id.to_owned(),
+                    dataset_ref: dataset_handle.as_local_ref(),
                     limit: Some(num_records),
                 }],
             },
@@ -169,14 +171,17 @@ impl QueryService for QueryServiceImpl {
         Ok(ctx.sql(statement)?)
     }
 
-    fn get_schema(&self, dataset_id: &DatasetID) -> Result<Type, QueryError> {
-        let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+    fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let metadata_chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
         let last_data_file = metadata_chain
             .iter_blocks()
-            .filter(|b| b.output_slice.is_some())
-            .map(|b| dataset_layout.data_dir.join(b.block_hash.to_string()))
+            .filter(|(_, b)| b.output_slice.is_some())
+            .map(|(block_hash, _)| dataset_layout.data_dir.join(block_hash.to_string()))
             .next()
             .expect("Obtaining schema from datasets with no data is not yet supported");
 
@@ -253,9 +258,9 @@ impl KamuSchema {
         }
     }
 
-    fn has_data(&self, dataset_id: &DatasetID) -> bool {
-        let limit = self.options_for(dataset_id).and_then(|o| o.limit);
-        let files = self.collect_data_files(dataset_id, limit);
+    fn has_data(&self, dataset_handle: &DatasetHandle) -> bool {
+        let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
+        let files = self.collect_data_files(dataset_handle, limit);
         if files.is_empty() {
             return false;
         }
@@ -266,20 +271,27 @@ impl KamuSchema {
             .unwrap_or(false)
     }
 
-    fn collect_data_files(&self, dataset_id: &DatasetID, limit: Option<u64>) -> Vec<PathBuf> {
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
+    fn collect_data_files(
+        &self,
+        dataset_handle: &DatasetHandle,
+        limit: Option<u64>,
+    ) -> Vec<PathBuf> {
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
-        if let Ok(metadata_chain) = self.metadata_repo.get_metadata_chain(dataset_id) {
+        if let Ok(metadata_chain) = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())
+        {
             let mut files = Vec::new();
             let mut num_records = 0;
 
-            for block in metadata_chain
+            for (block_hash, block) in metadata_chain
                 .iter_blocks()
-                .filter(|b| b.output_slice.is_some())
+                .filter(|(_, b)| b.output_slice.is_some())
             {
                 let data_iv = &block.output_slice.as_ref().unwrap().data_interval;
                 num_records += data_iv.end - data_iv.start + 1;
-                files.push(dataset_layout.data_dir.join(block.block_hash.to_string()));
+                files.push(dataset_layout.data_dir.join(block_hash.to_string()));
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;
                 }
@@ -291,9 +303,14 @@ impl KamuSchema {
         }
     }
 
-    fn options_for(&self, dataset_id: &DatasetID) -> Option<&DatasetQueryOptions> {
+    fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
         for opt in &self.options.datasets {
-            if &opt.dataset_id == dataset_id {
+            let same = match &opt.dataset_ref {
+                DatasetRefLocal::ID(id) => *id == dataset_handle.id,
+                DatasetRefLocal::Name(name) => *name == dataset_handle.name,
+                DatasetRefLocal::Handle(h) => h.id == dataset_handle.id,
+            };
+            if same {
                 return Some(opt);
             }
         }
@@ -310,22 +327,25 @@ impl SchemaProvider for KamuSchema {
         if self.options.datasets.is_empty() {
             self.metadata_repo
                 .get_all_datasets()
-                .filter(|id| self.has_data(id))
-                .map(|id| id.into())
+                .filter(|hdl| self.has_data(hdl))
+                .map(|hdl| hdl.name.to_string())
                 .collect()
         } else {
             self.options
                 .datasets
                 .iter()
-                .map(|d| d.dataset_id.to_string())
+                .map(|d| d.dataset_ref.to_string())
                 .collect()
         }
     }
 
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_id = DatasetID::try_from(name).unwrap();
-        let limit = self.options_for(dataset_id).and_then(|o| o.limit);
-        let files = self.collect_data_files(dataset_id, limit);
+        let dataset_handle = self
+            .metadata_repo
+            .resolve_dataset_ref(&DatasetName::try_from(name).unwrap().into())
+            .unwrap();
+        let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
+        let files = self.collect_data_files(&dataset_handle, limit);
 
         if files.is_empty() {
             None

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
-use opendatafabric::{DatasetRefBuf, RepositoryID};
+use opendatafabric::*;
 use tracing::info;
 
 use crate::domain::{
@@ -39,19 +39,19 @@ impl SearchServiceImpl {
     fn search_in_repo(
         &self,
         query: Option<&str>,
-        repo_id: &RepositoryID,
+        repo_name: &RepositoryName,
     ) -> Result<SearchResult, SearchError> {
         let repo = self
             .metadata_repo
-            .get_repository(&repo_id)
+            .get_repository(&repo_name)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SearchError::RepositoryDoesNotExist {
-                    repo_id: repo_id.to_owned(),
+                    repo_name: repo_name.clone(),
                 },
                 e @ _ => SearchError::InternalError(e.into()),
             })?;
 
-        info!(repo_id = repo_id.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
+        info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 
         let repo_client = self
             .repo_factory
@@ -60,12 +60,18 @@ impl SearchServiceImpl {
 
         let resp = repo_client.lock().unwrap().search(query)?;
 
-        // Prefix all IDs with the local name of a repo
+        // TODO: Avoid rewriting remote name to prefix with the local name of a repo
         Ok(SearchResult {
             datasets: resp
                 .datasets
                 .into_iter()
-                .map(|id| DatasetRefBuf::new(Some(repo_id), id.username(), id.local_id()))
+                .map(|remote_name| {
+                    RemoteDatasetName::new(
+                        repo_name,
+                        remote_name.account().as_ref(),
+                        &remote_name.dataset(),
+                    )
+                })
                 .collect(),
         })
     }
@@ -77,16 +83,16 @@ impl SearchService for SearchServiceImpl {
         query: Option<&str>,
         options: SearchOptions,
     ) -> Result<SearchResult, SearchError> {
-        let repo_ids = if !options.repository_ids.is_empty() {
-            options.repository_ids
+        let repo_names = if !options.repository_names.is_empty() {
+            options.repository_names
         } else {
             self.metadata_repo.get_all_repositories().collect()
         };
 
         itertools::process_results(
-            repo_ids
+            repo_names
                 .iter()
-                .map(|repo_id| self.search_in_repo(query, repo_id)),
+                .map(|repo| self.search_in_repo(query, repo)),
             |it| it.fold(SearchResult::default(), |a, b| a.merge(b)),
         )
     }

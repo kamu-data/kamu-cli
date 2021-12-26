@@ -9,7 +9,7 @@
 
 use super::sync_service::*;
 use crate::domain::DomainError;
-use opendatafabric::{DatasetIDBuf, DatasetRef, DatasetRefBuf, Sha3_256};
+use opendatafabric::{DatasetHandle, DatasetRefAny, Multihash, RemoteDatasetHandle};
 
 use std::sync::Arc;
 use thiserror::Error;
@@ -21,7 +21,7 @@ use thiserror::Error;
 pub trait PushService: Send + Sync {
     fn push_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = &DatasetRef>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PushOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<(PushInfo, Result<PushResult, PushError>)>;
@@ -49,17 +49,17 @@ impl Default for PushOptions {
 
 #[derive(Debug)]
 pub struct PushInfo {
-    pub original_ref: DatasetRefBuf,
-    pub local_id: Option<DatasetIDBuf>,
-    pub remote_ref: Option<DatasetRefBuf>,
+    pub original_ref: DatasetRefAny,
+    pub local_handle: Option<DatasetHandle>,
+    pub remote_handle: Option<RemoteDatasetHandle>,
 }
 
 #[derive(Debug)]
 pub enum PushResult {
     UpToDate,
     Updated {
-        old_head: Option<Sha3_256>,
-        new_head: Sha3_256,
+        old_head: Option<Multihash>,
+        new_head: Multihash,
         num_blocks: usize,
     },
 }

@@ -9,7 +9,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use opendatafabric::{MulticodecCode, Multihash};
+use opendatafabric::{Multicodec, Multihash};
 
 const ARROW_BATCH_SIZE: usize = 10_000;
 
@@ -34,7 +34,7 @@ pub fn get_parquet_logical_hash(
     }
 
     let digest = hasher.finalize();
-    Ok(Multihash::new(MulticodecCode::Arrow0_Sha3_256, &digest))
+    Ok(Multihash::new(Multicodec::Arrow0_Sha3_256, &digest))
 }
 
 pub fn get_parquet_physical_hash(data_path: &Path) -> Result<Multihash, std::io::Error> {
@@ -53,5 +53,5 @@ pub fn get_parquet_physical_hash(data_path: &Path) -> Result<Multihash, std::io:
         hasher.update(&buffer[..count]);
     }
 
-    Ok(Multihash::new(MulticodecCode::Sha3_256, &hasher.finalize()))
+    Ok(Multihash::new(Multicodec::Sha3_256, &hasher.finalize()))
 }

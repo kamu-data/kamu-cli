@@ -13,7 +13,6 @@ use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
-use digest::Digest;
 use std::assert_matches::assert_matches;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -51,16 +50,16 @@ fn _list_files_rec(dir: &Path) -> Vec<PathBuf> {
 
 fn assert_in_sync(
     workspace_layout: &WorkspaceLayout,
-    dataset_id_1: &DatasetID,
-    dataset_id_2: &DatasetID,
+    dataset_name_1: &DatasetName,
+    dataset_name_2: &DatasetName,
 ) {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let dataset_1_layout = DatasetLayout::new(&volume_layout, dataset_id_1);
-    let dataset_2_layout = DatasetLayout::new(&volume_layout, dataset_id_2);
+    let dataset_1_layout = DatasetLayout::new(&volume_layout, dataset_name_1);
+    let dataset_2_layout = DatasetLayout::new(&volume_layout, dataset_name_2);
 
-    let meta_dir_1 = workspace_layout.datasets_dir.join(dataset_id_1);
-    let meta_dir_2 = workspace_layout.datasets_dir.join(dataset_id_2);
+    let meta_dir_1 = workspace_layout.datasets_dir.join(dataset_name_1);
+    let meta_dir_2 = workspace_layout.datasets_dir.join(dataset_name_2);
 
     let blocks_dir_1 = meta_dir_1.join("blocks");
     let blocks_dir_2 = meta_dir_2.join("blocks");
@@ -86,23 +85,24 @@ fn assert_in_sync(
 fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
     use rand::RngCore;
 
-    let mut hash = Sha3_256::zero();
-    rand::thread_rng().fill_bytes(hash.as_array_mut());
+    let mut data = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut data);
+    let hash = Multihash::from_digest_sha3_256(&data);
 
     std::fs::create_dir_all(&dataset_layout.data_dir).unwrap();
-    let path = dataset_layout.data_dir.join(hash.to_string());
-    std::fs::write(&path, "<data>".as_bytes()).unwrap();
+    let path = dataset_layout.data_dir.join(hash.to_multibase_string());
+    std::fs::write(&path, &data).unwrap();
     path
 }
 
 fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     // Tests sync between "foo" -> remote -> "bar"
-    let dataset_id = DatasetID::new_unchecked("foo");
-    let dataset_id_2 = DatasetID::new_unchecked("bar");
+    let dataset_name = DatasetName::new_unchecked("foo");
+    let dataset_name_2 = DatasetName::new_unchecked("bar");
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
-    let dataset_layout = DatasetLayout::new(&volume_layout, dataset_id);
+    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
     let repository_factory = Arc::new(RepositoryFactory::new());
 
@@ -113,15 +113,15 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     // Add repository
-    let repo_id = RepositoryID::new_unchecked("remote");
-    let remote_dataset_ref = DatasetRefBuf::new(Some(repo_id), None, dataset_id);
-    metadata_repo.add_repository(&repo_id, repo_url).unwrap();
+    let repo_name = RepositoryName::new_unchecked("remote");
+    let remote_dataset_name = RemoteDatasetName::new(&repo_name, None, &dataset_name);
+    metadata_repo.add_repository(&repo_name, repo_url).unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
         sync_svc.sync_to(
-            dataset_id,
-            &remote_dataset_ref,
+            &dataset_name.as_local_ref(),
+            &remote_dataset_name,
             SyncOptions::default(),
             None,
         ),
@@ -130,8 +130,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     assert_matches!(
         sync_svc.sync_from(
-            &remote_dataset_ref,
-            dataset_id_2,
+            &remote_dataset_name.as_remote_ref(),
+            &dataset_name_2,
             SyncOptions::default(),
             None,
         ),
@@ -140,15 +140,15 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
-        .id(&dataset_id)
+        .name(&dataset_name)
         .source(MetadataFactory::dataset_source_root().build())
         .build();
 
-    let b1 = metadata_repo.add_dataset(snapshot).unwrap();
+    let (_, b1) = metadata_repo.add_dataset(snapshot).unwrap();
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(dataset_id, &remote_dataset_ref,  SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name,  SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -157,7 +157,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_ref, dataset_id_2, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -165,25 +165,19 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         }) if new_head == b1
     );
 
-    assert_in_sync(&workspace_layout, dataset_id, dataset_id_2);
+    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
     // Subsequent sync ////////////////////////////////////////////////////////
     create_fake_data_file(&dataset_layout);
     let b2 = metadata_repo
-        .get_metadata_chain(dataset_id)
+        .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b1)
                 .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"foo"),
-                    ),
-                    data_physical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"bar"),
-                    ),
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     data_interval: OffsetInterval { start: 0, end: 9 },
                 })
                 .build(),
@@ -191,20 +185,14 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     create_fake_data_file(&dataset_layout);
     let b3 = metadata_repo
-        .get_metadata_chain(dataset_id)
+        .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b2)
                 .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"foo"),
-                    ),
-                    data_physical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"bar"),
-                    ),
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     data_interval: OffsetInterval { start: 10, end: 29 },
                 })
                 .build(),
@@ -219,36 +207,36 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     .unwrap();
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_ref, dataset_id, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None),
         Err(SyncError::DatasetsDiverged { local_head, remote_head})
         if local_head == b3 && remote_head == b1
     );
 
     assert_matches!(
-        sync_svc.sync_to(dataset_id, &remote_dataset_ref, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1) && new_head == b3
+        }) if old_head == Some(b1.clone()) && new_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_ref, dataset_id_2, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1) && new_head == b3
+        }) if old_head == Some(b1.clone()) && new_head == b3
     );
 
-    assert_in_sync(&workspace_layout, dataset_id, dataset_id_2);
+    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc.sync_to(
-            dataset_id,
-            &remote_dataset_ref,
+            &dataset_name.as_local_ref(),
+            &remote_dataset_name,
             SyncOptions::default(),
             None
         ),
@@ -257,51 +245,45 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     assert_matches!(
         sync_svc.sync_from(
-            &remote_dataset_ref,
-            dataset_id_2,
+            &remote_dataset_name.as_remote_ref(),
+            &dataset_name_2,
             SyncOptions::default(),
             None
         ),
         Ok(SyncResult::UpToDate)
     );
 
-    assert_in_sync(&workspace_layout, dataset_id, dataset_id_2);
+    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
     // Datasets diverged on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
     let diverged_head = metadata_repo
-        .get_metadata_chain(dataset_id_2)
+        .get_metadata_chain(&dataset_name_2.as_local_ref())
         .unwrap()
         .append(
             MetadataFactory::metadata_block()
                 .prev(&b3)
                 .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"foo"),
-                    ),
-                    data_physical_hash: Multihash::new(
-                        MulticodecCode::Sha3_256,
-                        &sha3::Sha3_256::digest(b"bar"),
-                    ),
+                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     data_interval: OffsetInterval { start: 30, end: 49 },
                 })
                 .build(),
         );
 
     assert_matches!(
-        sync_svc.sync_to(dataset_id_2, &remote_dataset_ref, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
         Ok(SyncResult::Updated {
             old_head,
             new_head,
             num_blocks: 1,
-        }) if old_head == Some(b3) && new_head == diverged_head
+        }) if old_head == Some(b3.clone()) && new_head == diverged_head
     );
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync_to(dataset_id, &remote_dataset_ref, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
         Err(SyncError::DatasetsDiverged { local_head, remote_head })
         if local_head == b3 && remote_head == diverged_head
     );

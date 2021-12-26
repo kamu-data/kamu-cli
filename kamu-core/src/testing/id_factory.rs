@@ -9,22 +9,29 @@
 
 use std::convert::TryFrom;
 
-use opendatafabric::DatasetIDBuf;
+use digest::Digest;
+use opendatafabric::*;
 use rand::Rng;
 
 pub struct IDFactory;
 
 /// Generates randomized unique identities for different resources
 impl IDFactory {
-    pub fn dataset_id() -> DatasetIDBuf {
+    pub fn dataset_id() -> DatasetID {
+        let name = Self::dataset_name();
+        let digest = sha3::Sha3_256::digest(name.as_bytes());
+        DatasetID::from_pub_key_ed25519(&digest)
+    }
+
+    pub fn dataset_name() -> DatasetName {
         // TODO: create more readable IDs like docker does
-        let mut id = String::with_capacity(20);
-        id.extend(
+        let mut name = String::with_capacity(20);
+        name.extend(
             rand::thread_rng()
                 .sample_iter(&rand::distributions::Alphanumeric)
                 .take(20)
                 .map(char::from),
         );
-        DatasetIDBuf::try_from(id).unwrap()
+        DatasetName::try_from(name).unwrap()
     }
 }

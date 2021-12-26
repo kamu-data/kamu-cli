@@ -17,7 +17,7 @@ use std::{
 use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
 use odf::{
     engine::{EngineClient, ExecuteQueryError},
-    ExecuteQueryRequest, ExecuteQueryResponseSuccess, QueryInput,
+    ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess,
 };
 use opendatafabric as odf;
 use rand::Rng;
@@ -152,7 +152,7 @@ impl Engine for ODFEngine {
             inputs: request
                 .inputs
                 .into_iter()
-                .map(|input| QueryInput {
+                .map(|input| ExecuteQueryInput {
                     data_paths: input
                         .data_paths
                         .into_iter()

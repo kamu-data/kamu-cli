@@ -9,9 +9,8 @@
 
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::{DatasetRef, Sha3_256};
+use opendatafabric::*;
 
-use std::convert::TryInto;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -26,10 +25,13 @@ impl RepositoryLocalFS {
 }
 
 impl RepositoryClient for RepositoryLocalFS {
-    fn read_ref(&self, dataset_ref: &DatasetRef) -> Result<Option<Sha3_256>, RepositoryError> {
+    fn read_ref(
+        &self,
+        dataset_ref: &RemoteDatasetName,
+    ) -> Result<Option<Multihash>, RepositoryError> {
         let ref_path: PathBuf = [
             self.path.as_ref() as &OsStr,
-            OsStr::new(dataset_ref.local_id() as &str),
+            OsStr::new(dataset_ref.dataset().as_str()),
             OsStr::new("meta"),
             OsStr::new("refs"),
             OsStr::new("head"),
@@ -40,7 +42,7 @@ impl RepositoryClient for RepositoryLocalFS {
             let hash = std::fs::read_to_string(&ref_path)
                 .map_err(|e| RepositoryError::protocol(e.into()))?;
             Ok(Some(
-                Sha3_256::from_str(hash.trim()).expect("Malformed hash"),
+                Multihash::from_multibase_str(hash.trim()).expect("Malformed hash"),
             ))
         } else {
             Ok(None)
@@ -50,18 +52,18 @@ impl RepositoryClient for RepositoryLocalFS {
     // TODO: Locking
     fn write(
         &mut self,
-        dataset_ref: &DatasetRef,
-        expected_head: Option<Sha3_256>,
-        new_head: Sha3_256,
-        blocks: &mut dyn Iterator<Item = (Sha3_256, Vec<u8>)>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Option<Multihash>,
+        new_head: &Multihash,
+        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RepositoryError> {
-        if self.read_ref(dataset_ref)? != expected_head {
+        if self.read_ref(dataset_ref)? != *expected_head {
             return Err(RepositoryError::UpdatedConcurrently);
         }
 
-        let out_dataset_dir = self.path.join(dataset_ref.local_id());
+        let out_dataset_dir = self.path.join(dataset_ref.dataset());
         let out_meta_dir = out_dataset_dir.join("meta");
         let out_blocks_dir = out_meta_dir.join("blocks");
         let out_refs_dir = out_meta_dir.join("refs");
@@ -116,12 +118,12 @@ impl RepositoryClient for RepositoryLocalFS {
 
     fn read(
         &self,
-        dataset_ref: &DatasetRef,
-        expected_head: Sha3_256,
-        last_seen_block: Option<Sha3_256>,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Multihash,
+        last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
     ) -> Result<RepositoryReadResult, RepositoryError> {
-        let in_dataset_dir = self.path.join(dataset_ref.local_id());
+        let in_dataset_dir = self.path.join(dataset_ref.dataset());
         if !in_dataset_dir.exists() {
             return Err(RepositoryError::DoesNotExist);
         }
@@ -129,7 +131,7 @@ impl RepositoryClient for RepositoryLocalFS {
         let in_meta_dir = in_dataset_dir.join("meta");
         let chain = MetadataChainImpl::new(&in_meta_dir);
 
-        if chain.read_ref(&BlockRef::Head) != Some(expected_head) {
+        if chain.read_ref(&BlockRef::Head) != Some(expected_head.clone()) {
             return Err(RepositoryError::UpdatedConcurrently);
         }
 
@@ -149,20 +151,20 @@ impl RepositoryClient for RepositoryLocalFS {
 
         let mut found_last_seen_block = false;
 
-        for block in chain.iter_blocks() {
-            if Some(block.block_hash) == last_seen_block {
+        for (block_hash, _) in chain.iter_blocks() {
+            if Some(block_hash.clone()) == *last_seen_block {
                 found_last_seen_block = true;
                 break;
             }
-            let block_path = in_blocks_dir.join(block.block_hash.to_string());
+            let block_path = in_blocks_dir.join(block_hash.to_string());
             let data = std::fs::read(block_path)?;
-            result.blocks.push(data);
+            result.blocks.push((block_hash, data));
         }
 
         if !found_last_seen_block && last_seen_block.is_some() {
             return Err(RepositoryError::Diverged {
-                remote_head: expected_head,
-                local_head: last_seen_block.unwrap(),
+                remote_head: expected_head.clone(),
+                local_head: last_seen_block.clone().unwrap(),
             });
         }
 
@@ -196,8 +198,8 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(result)
     }
 
-    fn delete(&self, dataset_ref: &DatasetRef) -> Result<(), RepositoryError> {
-        let dataset_dir = self.path.join(dataset_ref.local_id());
+    fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+        let dataset_dir = self.path.join(dataset_ref.dataset());
         if !dataset_dir.exists() {
             return Err(RepositoryError::DoesNotExist);
         }
@@ -208,13 +210,17 @@ impl RepositoryClient for RepositoryLocalFS {
     }
 
     fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
+        // TODO: Find a way to avoid this
+        let repo_name = RepositoryName::try_from("undefined").unwrap();
+
         let query = query.unwrap_or_default();
         let mut datasets = Vec::new();
 
         for entry in std::fs::read_dir(&self.path)? {
             if let Some(file_name) = entry?.file_name().to_str() {
                 if query.is_empty() || file_name.contains(query) {
-                    datasets.push(file_name.try_into().unwrap());
+                    let dataset_name = DatasetName::try_from(file_name).unwrap();
+                    datasets.push(RemoteDatasetName::new(&repo_name, None, &dataset_name));
                 }
             }
         }

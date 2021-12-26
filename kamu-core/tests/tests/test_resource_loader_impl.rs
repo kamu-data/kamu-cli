@@ -17,7 +17,7 @@ use opendatafabric::*;
 use std::path::Path;
 
 fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
-    let snapshot = MetadataFactory::dataset_snapshot().id("test").build();
+    let snapshot = MetadataFactory::dataset_snapshot().name("test").build();
     let buffer = YamlDatasetSnapshotSerializer
         .write_manifest(&snapshot)
         .unwrap();

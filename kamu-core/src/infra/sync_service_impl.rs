@@ -9,7 +9,7 @@
 
 use super::*;
 use crate::domain::*;
-use opendatafabric::serde::yaml::*;
+use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use dill::*;
@@ -38,24 +38,26 @@ impl SyncServiceImpl {
 
     fn do_sync_from(
         &self,
-        remote_dataset_ref: &DatasetRef,
-        local_dataset_id: &DatasetID,
+        remote_ref: &DatasetRefRemote,
+        local_name: &DatasetName,
         _options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let repo_id = remote_dataset_ref.repository().unwrap_or_else(|| {
-            panic!(
-                "Non-remote reference passed to sync_from: {}",
-                remote_dataset_ref
-            )
-        });
+        // TODO: REMOTE ID
+        let remote_name = match remote_ref {
+            DatasetRefRemote::ID(_) => {
+                unimplemented!("Syncing remote dataset by ID is not yet supported")
+            }
+            DatasetRefRemote::RemoteName(name) => name,
+            DatasetRefRemote::RemoteHandle(hdl) => &hdl.name,
+        };
+
+        let repo_name = remote_name.repository();
 
         let repo = self
             .metadata_repo
-            .get_repository(repo_id)
+            .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_id: repo_id.to_owned(),
-                },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
@@ -67,18 +69,21 @@ impl SyncServiceImpl {
         let cl = client.lock().unwrap();
 
         let remote_head = match cl
-            .read_ref(remote_dataset_ref)
+            .read_ref(remote_name)
             .map_err(|e| SyncError::ProtocolError(e.into()))?
         {
             Some(hash) => hash,
             None => {
                 return Err(SyncError::RemoteDatasetDoesNotExist {
-                    dataset_ref: remote_dataset_ref.to_owned(),
+                    dataset_ref: remote_ref.clone(),
                 })
             }
         };
 
-        let chain = match self.metadata_repo.get_metadata_chain(local_dataset_id) {
+        let chain = match self
+            .metadata_repo
+            .get_metadata_chain(&local_name.as_local_ref())
+        {
             Ok(chain) => Some(chain),
             Err(DomainError::DoesNotExist { .. }) => None,
             Err(e @ _) => return Err(SyncError::InternalError(e.into())),
@@ -86,38 +91,46 @@ impl SyncServiceImpl {
 
         let local_head = chain.as_ref().and_then(|c| c.read_ref(&BlockRef::Head));
 
-        if Some(remote_head) == local_head {
+        if Some(remote_head.clone()) == local_head {
             return Ok(SyncResult::UpToDate);
         }
 
-        let tmp_dir = self.workspace_layout.run_info_dir.join(local_dataset_id);
+        let tmp_dir = self.workspace_layout.run_info_dir.join(&local_name);
         std::fs::create_dir_all(&tmp_dir)?;
 
         let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
-        let dataset_layout = DatasetLayout::new(&volume_layout, local_dataset_id);
+        let dataset_layout = DatasetLayout::new(&volume_layout, &local_name);
 
         let read_result = cl
-            .read(remote_dataset_ref, remote_head, local_head, &tmp_dir)
+            .read(&remote_name, &remote_head, &local_head, &tmp_dir)
             .map_err(|e| match e {
                 RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
-                    dataset_ref: remote_dataset_ref.to_owned(),
+                    dataset_ref: remote_ref.clone(),
                 },
                 e => e.into(),
             })?;
 
-        let de = YamlMetadataBlockDeserializer;
+        // Validate block hashes
+        for (remote_hash, block_data) in &read_result.blocks {
+            let actual_hash = Multihash::from_digest_sha3_256(block_data);
+            if actual_hash != *remote_hash {
+                return Err(SyncError::Corrupted {
+                    message: format!(
+                        "Inconsistent metadata: Remote declared block hash {} but actual {}",
+                        remote_hash, actual_hash
+                    ),
+                    source: None,
+                });
+            }
+        }
+
+        let de = FlatbuffersMetadataBlockDeserializer;
         let new_blocks = read_result
             .blocks
             .iter()
-            .map(|data| de.read_manifest(&data))
+            .map(|(_, data)| de.read_manifest(&data))
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| match e {
-                opendatafabric::serde::Error::InvalidHash { .. } => SyncError::Corrupted {
-                    message: "Inconsistent metadata".to_owned(),
-                    source: e.into(),
-                },
-                _ => SyncError::ProtocolError(e.into()),
-            })?;
+            .map_err(|e| SyncError::ProtocolError(e.into()))?;
 
         // TODO: Read only checkpoints and data for blocks we're syncing
         // TODO: This is very unsafe
@@ -149,11 +162,11 @@ impl SyncServiceImpl {
 
         let num_blocks = new_blocks.len();
 
-        // TODO: Remote assumption on block ordering
+        // TODO: Remove assumption on block ordering
         match chain {
             None => {
                 MetadataChainImpl::from_blocks(
-                    &self.workspace_layout.datasets_dir.join(local_dataset_id),
+                    &self.workspace_layout.datasets_dir.join(&local_name),
                     &mut new_blocks.iter().rev().map(|b| b.clone()),
                 )
                 .map_err(|e| SyncError::InternalError(e.into()))?;
@@ -179,34 +192,27 @@ impl SyncServiceImpl {
 
     fn do_sync_to(
         &self,
-        local_dataset_id: &DatasetID,
-        remote_dataset_ref: &DatasetRef,
+        local_ref: &DatasetRefLocal,
+        remote_name: &RemoteDatasetName,
         _options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let chain = match self.metadata_repo.get_metadata_chain(local_dataset_id) {
-            Ok(c) => c,
-            Err(DomainError::DoesNotExist { .. }) => {
-                return Err(SyncError::LocalDatasetDoesNotExist {
-                    dataset_id: local_dataset_id.to_owned(),
-                })
-            }
-            Err(e) => return Err(SyncError::InternalError(e.into())),
-        };
+        let local_handle =
+            self.metadata_repo
+                .resolve_dataset_ref(local_ref)
+                .map_err(|e| match e {
+                    DomainError::DoesNotExist { .. } => SyncError::LocalDatasetDoesNotExist {
+                        dataset_ref: local_ref.clone(),
+                    },
+                    _ => SyncError::InternalError(e.into()),
+                })?;
 
-        let repo_id = remote_dataset_ref.repository().unwrap_or_else(|| {
-            panic!(
-                "Non-remote reference passed to sync_to: {}",
-                remote_dataset_ref
-            )
-        });
+        let repo_name = remote_name.repository();
 
         let repo = self
             .metadata_repo
-            .get_repository(repo_id)
+            .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_id: repo_id.to_owned(),
-                },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
@@ -217,26 +223,31 @@ impl SyncServiceImpl {
 
         let mut cl = client.lock().unwrap();
 
-        let remote_head = cl.read_ref(remote_dataset_ref)?;
+        let remote_head = cl.read_ref(remote_name)?;
+
+        let chain = self
+            .metadata_repo
+            .get_metadata_chain(&local_handle.as_local_ref())
+            .map_err(|e| SyncError::InternalError(e.into()))?;
 
         let local_head = chain.read_ref(&BlockRef::Head).unwrap();
 
-        if remote_head == Some(local_head) {
+        if remote_head == Some(local_head.clone()) {
             return Ok(SyncResult::UpToDate);
         }
 
         let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
-        let dataset_layout = DatasetLayout::new(&volume_layout, local_dataset_id);
-        let metadata_dir = self.workspace_layout.datasets_dir.join(local_dataset_id);
+        let dataset_layout = DatasetLayout::new(&volume_layout, &local_handle.name);
+        let metadata_dir = self.workspace_layout.datasets_dir.join(&local_handle.name);
         let blocks_dir = metadata_dir.join("blocks");
 
         let mut found_remote_head = false;
 
-        let blocks_to_sync: Vec<(Sha3_256, Vec<u8>)> = chain
+        let blocks_to_sync: Vec<(Multihash, Vec<u8>)> = chain
             .iter_blocks()
-            .map(|b| b.block_hash)
+            .map(|(h, _)| h)
             .take_while(|h| {
-                if Some(*h) == remote_head {
+                if Some(h.clone()) == remote_head {
                     found_remote_head = true;
                     false
                 } else {
@@ -268,9 +279,9 @@ impl SyncServiceImpl {
         let num_blocks = blocks_to_sync.len();
 
         cl.write(
-            remote_dataset_ref,
-            remote_head,
-            local_head,
+            remote_name,
+            &remote_head,
+            &local_head,
             &mut blocks_to_sync.into_iter(),
             &mut data_files_to_sync.iter().map(|e| e as &Path),
             &dataset_layout.checkpoints_dir,
@@ -287,15 +298,15 @@ impl SyncServiceImpl {
 impl SyncService for SyncServiceImpl {
     fn sync_from(
         &self,
-        remote_ref: &DatasetRef,
-        local_id: &DatasetID,
+        remote_ref: &DatasetRefRemote,
+        local_name: &DatasetName,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.do_sync_from(remote_ref, local_id, options) {
+        match self.do_sync_from(remote_ref, local_name, options) {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -310,26 +321,26 @@ impl SyncService for SyncServiceImpl {
     // TODO: Parallelism
     fn sync_from_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (&DatasetRef, &DatasetID)>,
+        datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<((DatasetRefBuf, DatasetIDBuf), Result<SyncResult, SyncError>)> {
+    ) -> Vec<(
+        (DatasetRefRemote, DatasetName),
+        Result<SyncResult, SyncError>,
+    )> {
         let mut results = Vec::new();
 
-        for (remote_dataset_ref, local_dataset_id) in datasets {
+        for (remote_ref, local_name) in datasets {
             let res = self.sync_from(
-                remote_dataset_ref,
-                local_dataset_id,
+                &remote_ref,
+                &local_name,
                 options.clone(),
                 listener
                     .as_ref()
-                    .and_then(|l| l.begin_sync(local_dataset_id, remote_dataset_ref)),
+                    .and_then(|l| l.begin_sync(&local_name.as_local_ref(), &remote_ref)),
             );
 
-            results.push((
-                (remote_dataset_ref.to_owned(), local_dataset_id.to_owned()),
-                res,
-            ));
+            results.push(((remote_ref, local_name), res));
         }
 
         results
@@ -337,15 +348,15 @@ impl SyncService for SyncServiceImpl {
 
     fn sync_to(
         &self,
-        local_id: &DatasetID,
-        remote_ref: &DatasetRef,
+        local_ref: &DatasetRefLocal,
+        remote_name: &RemoteDatasetName,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.do_sync_to(local_id, remote_ref, options) {
+        match self.do_sync_to(local_ref, remote_name, options) {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -360,43 +371,39 @@ impl SyncService for SyncServiceImpl {
     // TODO: Parallelism
     fn sync_to_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (&DatasetID, &DatasetRef)>,
+        datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
         options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<((DatasetIDBuf, DatasetRefBuf), Result<SyncResult, SyncError>)> {
+    ) -> Vec<(
+        (DatasetRefLocal, RemoteDatasetName),
+        Result<SyncResult, SyncError>,
+    )> {
         let mut results = Vec::new();
 
-        for (local_dataset_id, remote_dataset_ref) in datasets {
+        for (local_ref, remote_name) in datasets {
             let res = self.sync_to(
-                local_dataset_id,
-                remote_dataset_ref,
+                &local_ref,
+                &remote_name,
                 options.clone(),
                 listener
                     .as_ref()
-                    .and_then(|l| l.begin_sync(local_dataset_id, remote_dataset_ref)),
+                    .and_then(|l| l.begin_sync(&local_ref, &remote_name.as_remote_ref())),
             );
 
-            results.push((
-                (local_dataset_id.to_owned(), remote_dataset_ref.to_owned()),
-                res,
-            ));
+            results.push(((local_ref, remote_name), res));
         }
 
         results
     }
 
-    fn delete(&self, remote_ref: &DatasetRef) -> Result<(), SyncError> {
-        let repo_id = remote_ref
-            .repository()
-            .unwrap_or_else(|| panic!("Non-remote reference passed to delete: {}", remote_ref));
+    fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
+        let repo_name = remote_ref.repository();
 
         let repo = self
             .metadata_repo
-            .get_repository(repo_id)
+            .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_id: repo_id.to_owned(),
-                },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
                 _ => SyncError::InternalError(e.into()),
             })?;
 

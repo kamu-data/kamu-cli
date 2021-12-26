@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::{DomainError, TransformError, TransformListener};
-use opendatafabric::{DatasetID, MetadataBlock, Multihash, Sha3_256};
+use opendatafabric::{DatasetHandle, DatasetRefLocal, MetadataBlock, Multihash};
 
 use std::fmt::Display;
 use std::sync::Arc;
@@ -22,15 +22,15 @@ use thiserror::Error;
 pub trait VerificationService: Send + Sync {
     fn verify(
         &self,
-        dataset_id: &DatasetID,
-        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        dataset_ref: &DatasetRefLocal,
+        block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 
     fn verify_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        requests: &mut dyn Iterator<Item = VerificationRequest>,
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError>;
@@ -41,9 +41,9 @@ pub trait VerificationService: Send + Sync {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct VerificationRequest<'a> {
-    pub dataset_id: &'a DatasetID,
-    pub block_range: (Option<Sha3_256>, Option<Sha3_256>),
+pub struct VerificationRequest {
+    pub dataset_ref: DatasetRefLocal,
+    pub block_range: (Option<Multihash>, Option<Multihash>),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -104,7 +104,7 @@ pub trait VerificationListener {
 
     fn begin_block(
         &self,
-        _block_hash: &Sha3_256,
+        _block_hash: &Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,
@@ -112,7 +112,7 @@ pub trait VerificationListener {
     }
     fn end_block(
         &self,
-        _block_hash: &Sha3_256,
+        _block_hash: &Multihash,
         _block_index: usize,
         _num_blocks: usize,
         _phase: VerificationPhase,
@@ -130,7 +130,7 @@ impl VerificationListener for NullVerificationListener {}
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait VerificationMultiListener {
-    fn begin_verify(&self, _dataset_id: &DatasetID) -> Option<Arc<dyn VerificationListener>> {
+    fn begin_verify(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
         None
     }
 }
@@ -147,7 +147,7 @@ pub enum VerificationError {
     #[error("Dataset is not derivative")]
     NotDerivative,
     #[error("Block {0} not found")]
-    NoSuchBlock(Sha3_256),
+    NoSuchBlock(Multihash),
     #[error("Data doesn't match metadata: {0}")]
     DataDoesNotMatchMetadata(DataDoesNotMatchMetadata),
     #[error("Data is not reproducible: {0}")]
@@ -168,7 +168,7 @@ pub struct HashMismatch {
 
 #[derive(Debug)]
 pub struct DataDoesNotMatchMetadata {
-    pub block_hash: Sha3_256,
+    pub block_hash: Multihash,
     pub logical_hash: Option<HashMismatch>,
     pub physical_hash: Option<HashMismatch>,
 }
@@ -197,7 +197,9 @@ impl Display for DataDoesNotMatchMetadata {
 
 #[derive(Debug)]
 pub struct DataNotReproducible {
+    pub expected_block_hash: Multihash,
     pub expected_block: MetadataBlock,
+    pub actual_block_hash: Multihash,
     pub actual_block: MetadataBlock,
 }
 
@@ -205,8 +207,11 @@ impl Display for DataNotReproducible {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Expected block {:?} but got non-equivalent block {:?}",
-            self.expected_block, self.actual_block
+            "Expected block {:?} ({:?}) but got non-equivalent block {:?} ({:?})",
+            self.expected_block,
+            self.expected_block_hash,
+            self.actual_block,
+            self.actual_block_hash
         )
     }
 }

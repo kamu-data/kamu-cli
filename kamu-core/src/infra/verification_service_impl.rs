@@ -37,10 +37,12 @@ impl VerificationServiceImpl {
 
     fn get_integrity_check_plan(
         &self,
-        dataset_id: &DatasetID,
-        block_range: (Option<Sha3_256>, Option<Sha3_256>),
-    ) -> Result<Vec<MetadataBlock>, VerificationError> {
-        let metadata_chain = self.metadata_repo.get_metadata_chain(dataset_id)?;
+        dataset_handle: &DatasetHandle,
+        block_range: (Option<Multihash>, Option<Multihash>),
+    ) -> Result<Vec<(Multihash, MetadataBlock)>, VerificationError> {
+        let metadata_chain = self
+            .metadata_repo
+            .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         let start_block = block_range.0;
         let end_block = block_range
@@ -50,12 +52,12 @@ impl VerificationServiceImpl {
         let plan: Vec<_> = metadata_chain
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
-            .filter(|block| block.output_slice.is_some())
-            .take_while(|block| Some(block.block_hash) != start_block)
+            .filter(|(_, block)| block.output_slice.is_some())
+            .take_while(|(hash, _)| Some(hash.clone()) != start_block)
             .collect();
 
         if let Some(start_block) = start_block {
-            if start_block != plan[plan.len() - 1].block_hash {
+            if start_block != plan[plan.len() - 1].0 {
                 return Err(VerificationError::NoSuchBlock(start_block));
             }
         }
@@ -65,32 +67,32 @@ impl VerificationServiceImpl {
 
     fn check_data_integrity(
         &self,
-        dataset_id: &DatasetID,
+        dataset_handle: &DatasetHandle,
         dataset_kind: DatasetKind,
-        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying data integrity", dataset_id = dataset_id.as_str());
+        let span = info_span!("Verifying data integrity", dataset_id = ?dataset_handle);
         let _span_guard = span.enter();
 
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, dataset_id);
-        let plan = self.get_integrity_check_plan(dataset_id, block_range)?;
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        let plan = self.get_integrity_check_plan(dataset_handle, block_range)?;
 
         let num_blocks = plan.len();
 
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
 
-        for (block_index, block) in plan.into_iter().enumerate() {
+        for (block_index, (block_hash, block)) in plan.into_iter().enumerate() {
             let output_slice = block.output_slice.as_ref().unwrap();
 
             listener.begin_block(
-                &block.block_hash,
+                &block_hash,
                 block_index,
                 num_blocks,
                 VerificationPhase::DataIntegrity,
             );
 
-            let data_path = dataset_layout.data_dir.join(block.block_hash.to_string());
+            let data_path = dataset_layout.data_dir.join(block_hash.to_string());
 
             // Do a fast pass using physical hash
             let physical_hash_actual =
@@ -103,10 +105,10 @@ impl VerificationServiceImpl {
                 if dataset_kind == DatasetKind::Root {
                     return Err(VerificationError::DataDoesNotMatchMetadata(
                         DataDoesNotMatchMetadata {
-                            block_hash: block.block_hash,
+                            block_hash,
                             logical_hash: None,
                             physical_hash: Some(HashMismatch {
-                                expected: output_slice.data_physical_hash,
+                                expected: output_slice.data_physical_hash.clone(),
                                 actual: physical_hash_actual,
                             }),
                         },
@@ -121,9 +123,9 @@ impl VerificationServiceImpl {
                     if logical_hash_actual != output_slice.data_logical_hash {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
-                                block_hash: block.block_hash,
+                                block_hash,
                                 logical_hash: Some(HashMismatch {
-                                    expected: output_slice.data_logical_hash,
+                                    expected: output_slice.data_logical_hash.clone(),
                                     actual: logical_hash_actual,
                                 }),
                                 physical_hash: None,
@@ -134,7 +136,7 @@ impl VerificationServiceImpl {
             }
 
             listener.end_block(
-                &block.block_hash,
+                &block_hash,
                 block_index,
                 num_blocks,
                 VerificationPhase::DataIntegrity,
@@ -150,28 +152,38 @@ impl VerificationServiceImpl {
 impl VerificationService for VerificationServiceImpl {
     fn verify(
         &self,
-        dataset_id: &DatasetID,
-        block_range: (Option<Sha3_256>, Option<Sha3_256>),
+        dataset_ref: &DatasetRefLocal,
+        block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying dataset", dataset_id = dataset_id.as_str(), block_range = ?block_range);
+        let span =
+            info_span!("Verifying dataset", dataset_ref = ?dataset_ref, block_range = ?block_range);
         let _span_guard = span.enter();
 
-        let dataset_kind = self.metadata_repo.get_summary(dataset_id)?.kind;
+        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_kind = self
+            .metadata_repo
+            .get_summary(&dataset_handle.as_local_ref())?
+            .kind;
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
         listener.begin();
 
         let res = try {
             if options.check_integrity {
-                self.check_data_integrity(dataset_id, dataset_kind, block_range, listener.clone())?;
+                self.check_data_integrity(
+                    &dataset_handle,
+                    dataset_kind,
+                    block_range.clone(),
+                    listener.clone(),
+                )?;
             }
 
             if dataset_kind == DatasetKind::Derivative && options.replay_transformations {
                 self.transform_service.verify_transform(
-                    dataset_id,
-                    block_range,
+                    &dataset_handle.as_local_ref(),
+                    block_range.clone(),
                     options,
                     Some(listener.clone()),
                 )?;
@@ -190,7 +202,7 @@ impl VerificationService for VerificationServiceImpl {
 
     fn verify_multi(
         &self,
-        _datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        _requests: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,
         _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {

@@ -15,23 +15,30 @@ use url::Url;
 
 pub trait MetadataRepository: Send + Sync {
     // Datasets
+    fn resolve_dataset_ref(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<DatasetHandle, DomainError>;
 
-    fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetIDBuf> + 's>;
+    fn get_all_datasets<'s>(&'s self) -> Box<dyn Iterator<Item = DatasetHandle> + 's>;
 
-    fn add_dataset(&self, snapshot: DatasetSnapshot) -> Result<Sha3_256, DomainError>;
+    fn add_dataset(
+        &self,
+        snapshot: DatasetSnapshot,
+    ) -> Result<(DatasetHandle, Multihash), DomainError>;
 
     fn add_dataset_from_block(
         &self,
-        dataset_id: &DatasetID,
+        dataset_name: &DatasetName,
         first_block: MetadataBlock,
-    ) -> Result<Sha3_256, DomainError>;
+    ) -> Result<(DatasetHandle, Multihash), DomainError>;
 
     fn add_datasets(
         &self,
         snapshots: &mut dyn Iterator<Item = DatasetSnapshot>,
-    ) -> Vec<(DatasetIDBuf, Result<Sha3_256, DomainError>)>;
+    ) -> Vec<(DatasetName, Result<(DatasetHandle, Multihash), DomainError>)>;
 
-    fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DomainError>;
+    fn delete_dataset(&self, dataset_ref: &DatasetRefLocal) -> Result<(), DomainError>;
 
     // Metadata
 
@@ -39,30 +46,25 @@ pub trait MetadataRepository: Send + Sync {
     // See: https://github.com/rust-lang/rfcs/issues/2035
     fn get_metadata_chain(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
     ) -> Result<Box<dyn MetadataChain>, DomainError>;
 
     // Dataset Extras
 
-    fn get_summary(&self, dataset_id: &DatasetID) -> Result<DatasetSummary, DomainError>;
+    fn get_summary(&self, dataset_ref: &DatasetRefLocal) -> Result<DatasetSummary, DomainError>;
 
     fn get_remote_aliases(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
     ) -> Result<Box<dyn RemoteAliases>, DomainError>;
 
     // Repositories
 
-    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryBuf> + 's>;
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's>;
 
-    fn get_repository(&self, repo_id: &RepositoryID) -> Result<Repository, DomainError>;
+    fn get_repository(&self, repo_name: &RepositoryName) -> Result<Repository, DomainError>;
 
-    fn add_repository(&self, repo_id: &RepositoryID, url: Url) -> Result<(), DomainError>;
+    fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), DomainError>;
 
-    fn delete_repository(&self, repo_id: &RepositoryID) -> Result<(), DomainError>;
-}
-
-pub trait DatasetDependencyVisitor {
-    fn enter(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain) -> bool;
-    fn exit(&mut self, dataset_id: &DatasetID, meta_chain: &dyn MetadataChain);
+    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DomainError>;
 }

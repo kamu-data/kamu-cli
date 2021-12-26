@@ -10,7 +10,7 @@
 use std::{collections::HashSet, fmt::Write, marker::PhantomData, sync::Arc};
 
 use dill::*;
-use opendatafabric::{DatasetID, DatasetIDBuf};
+use opendatafabric::*;
 
 use crate::domain::{
     DomainError, LineageOptions, LineageVisitor, MetadataRepository, NodeInfo, ProvenanceError,
@@ -33,34 +33,46 @@ impl ProvenanceServiceImpl {
 
     fn visit_upstream_dependencies_rec(
         &self,
-        id: &DatasetID,
+        dataset_handle: &DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), ProvenanceError> {
-        let summary = match self.metadata_repo.get_summary(id) {
+        let summary = match self
+            .metadata_repo
+            .get_summary(&dataset_handle.as_local_ref())
+        {
             Ok(s) => Some(s),
             Err(DomainError::DoesNotExist { .. }) => None,
             Err(e) => return Err(e.into()),
         };
 
-        let info = summary
+        let dataset_info = summary
             .as_ref()
             .map(|s| NodeInfo::Local {
+                id: s.id.clone(),
+                name: s.name.clone(),
                 kind: s.kind,
                 dependencies: &s.dependencies,
             })
-            .unwrap_or_else(|| NodeInfo::Remote);
+            .unwrap_or_else(|| NodeInfo::Remote {
+                id: dataset_handle.id.clone(),
+                name: dataset_handle.name.clone(),
+            });
 
-        if !visitor.enter(id, &info) {
+        if !visitor.enter(&dataset_info) {
             return Ok(());
         }
 
         if let Some(s) = &summary {
-            for dep_id in &s.dependencies {
-                self.visit_upstream_dependencies_rec(dep_id, visitor)?;
+            for input in &s.dependencies {
+                let input_handle = DatasetHandle {
+                    id: input.id.clone().unwrap(),
+                    name: input.name.clone(),
+                };
+                self.visit_upstream_dependencies_rec(&input_handle, visitor)?;
             }
         }
 
-        visitor.exit(id, &info);
+        visitor.exit(&dataset_info);
 
         Ok(())
     }
@@ -69,11 +81,12 @@ impl ProvenanceServiceImpl {
 impl ProvenanceService for ProvenanceServiceImpl {
     fn get_dataset_lineage(
         &self,
-        dataset_id: &DatasetID,
+        dataset_ref: &DatasetRefLocal,
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), ProvenanceError> {
-        self.visit_upstream_dependencies_rec(dataset_id, visitor)
+        let hdl = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        self.visit_upstream_dependencies_rec(&hdl, visitor)
     }
 }
 
@@ -82,7 +95,7 @@ impl ProvenanceService for ProvenanceServiceImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DotVisitor<W: Write, S: DotStyle = DefaultStyle> {
-    visited: HashSet<DatasetIDBuf>,
+    visited: HashSet<DatasetID>,
     writer: W,
     _style: PhantomData<S>,
 }
@@ -116,36 +129,36 @@ impl<W: Write, S: DotStyle> LineageVisitor for DotVisitor<W, S> {
         writeln!(self.writer, "digraph datasets {{\nrankdir = LR;").unwrap();
     }
 
-    fn enter(&mut self, id: &DatasetID, info: &NodeInfo<'_>) -> bool {
-        if !self.visited.insert(id.to_owned()) {
+    fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
+        if !self.visited.insert(dataset.id().clone()) {
             return false;
         }
 
-        match info {
-            &NodeInfo::Local { kind, .. } => match kind {
+        match dataset {
+            NodeInfo::Local { name, kind, .. } => match kind {
                 DatasetKind::Root => {
-                    writeln!(self.writer, "\"{}\" [{}];", id, S::root_style())
+                    writeln!(self.writer, "\"{}\" [{}];", name, S::root_style())
                 }
                 DatasetKind::Derivative => {
-                    writeln!(self.writer, "\"{}\" [{}];", id, S::derivative_style())
+                    writeln!(self.writer, "\"{}\" [{}];", name, S::derivative_style())
                 }
             },
-            &NodeInfo::Remote => {
-                writeln!(self.writer, "\"{}\" [{}];", id, S::remote_style())
+            NodeInfo::Remote { name, .. } => {
+                writeln!(self.writer, "\"{}\" [{}];", name, S::remote_style())
             }
         }
         .unwrap();
 
-        if let &NodeInfo::Local { dependencies, .. } = info {
+        if let &NodeInfo::Local { dependencies, .. } = dataset {
             for dep in dependencies {
-                writeln!(self.writer, "\"{}\" -> \"{}\";", dep, id).unwrap();
+                writeln!(self.writer, "\"{}\" -> \"{}\";", dep.name, dataset.name()).unwrap();
             }
         }
 
         true
     }
 
-    fn exit(&mut self, _id: &DatasetID, _info: &NodeInfo<'_>) {}
+    fn exit(&mut self, _dataset: &NodeInfo<'_>) {}
 
     fn done(&mut self) {
         writeln!(self.writer, "}}").unwrap();
