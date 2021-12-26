@@ -462,7 +462,8 @@ impl TransformServiceImpl {
         let is_empty = data_paths.is_empty() && explicit_watermarks.is_empty();
 
         let input = ExecuteQueryInput {
-            dataset_id: slice.dataset_id.clone(),
+            dataset_id: input_handle.id.clone(),
+            dataset_name: input_handle.name.clone(),
             vocab,
             data_interval: slice.data_interval.clone(),
             data_paths,

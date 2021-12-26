@@ -6033,11 +6033,12 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryInput<'a> {
 
 impl<'a> ExecuteQueryInput<'a> {
     pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 6;
-    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 8;
-    pub const VT_DATA_PATHS: flatbuffers::VOffsetT = 10;
-    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 12;
-    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 14;
+    pub const VT_DATASET_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 8;
+    pub const VT_DATA_INTERVAL: flatbuffers::VOffsetT = 10;
+    pub const VT_DATA_PATHS: flatbuffers::VOffsetT = 12;
+    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 14;
+    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 16;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -6064,6 +6065,9 @@ impl<'a> ExecuteQueryInput<'a> {
         if let Some(x) = args.vocab {
             builder.add_vocab(x);
         }
+        if let Some(x) = args.dataset_name {
+            builder.add_dataset_name(x);
+        }
         if let Some(x) = args.dataset_id {
             builder.add_dataset_id(x);
         }
@@ -6078,6 +6082,11 @@ impl<'a> ExecuteQueryInput<'a> {
                 None,
             )
             .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn dataset_name(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(ExecuteQueryInput::VT_DATASET_NAME, None)
     }
     #[inline]
     pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
@@ -6131,6 +6140,11 @@ impl flatbuffers::Verifiable for ExecuteQueryInput<'_> {
                 Self::VT_DATASET_ID,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "dataset_name",
+                Self::VT_DATASET_NAME,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
                 "vocab",
                 Self::VT_VOCAB,
@@ -6158,6 +6172,7 @@ impl flatbuffers::Verifiable for ExecuteQueryInput<'_> {
 }
 pub struct ExecuteQueryInputArgs<'a> {
     pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub dataset_name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
     pub data_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
     pub data_paths: Option<
@@ -6175,6 +6190,7 @@ impl<'a> Default for ExecuteQueryInputArgs<'a> {
     fn default() -> Self {
         ExecuteQueryInputArgs {
             dataset_id: None,
+            dataset_name: None,
             vocab: None,
             data_interval: None,
             data_paths: None,
@@ -6196,6 +6212,13 @@ impl<'a: 'b, 'b> ExecuteQueryInputBuilder<'a, 'b> {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
             ExecuteQueryInput::VT_DATASET_ID,
             dataset_id,
+        );
+    }
+    #[inline]
+    pub fn add_dataset_name(&mut self, dataset_name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQueryInput::VT_DATASET_NAME,
+            dataset_name,
         );
     }
     #[inline]
@@ -6266,6 +6289,7 @@ impl std::fmt::Debug for ExecuteQueryInput<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryInput");
         ds.field("dataset_id", &self.dataset_id());
+        ds.field("dataset_name", &self.dataset_name());
         ds.field("vocab", &self.vocab());
         ds.field("data_interval", &self.data_interval());
         ds.field("data_paths", &self.data_paths());

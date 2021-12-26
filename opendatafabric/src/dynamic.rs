@@ -268,6 +268,7 @@ impl Into<super::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 
 pub trait ExecuteQueryInput {
     fn dataset_id(&self) -> &DatasetID;
+    fn dataset_name(&self) -> &DatasetName;
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn data_interval(&self) -> Option<&dyn OffsetInterval>;
     fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
@@ -278,6 +279,9 @@ pub trait ExecuteQueryInput {
 impl ExecuteQueryInput for super::ExecuteQueryInput {
     fn dataset_id(&self) -> &DatasetID {
         &self.dataset_id
+    }
+    fn dataset_name(&self) -> &DatasetName {
+        &self.dataset_name
     }
     fn vocab(&self) -> &dyn DatasetVocabulary {
         &self.vocab
@@ -306,6 +310,7 @@ impl Into<super::ExecuteQueryInput> for &dyn ExecuteQueryInput {
     fn into(self) -> super::ExecuteQueryInput {
         super::ExecuteQueryInput {
             dataset_id: self.dataset_id().clone(),
+            dataset_name: self.dataset_name().to_owned(),
             vocab: self.vocab().into(),
             data_interval: self.data_interval().map(|v| v.into()),
             data_paths: self.data_paths().map(|i| i.to_owned()).collect(),

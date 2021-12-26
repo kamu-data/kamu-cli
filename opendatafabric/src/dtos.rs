@@ -103,6 +103,7 @@ pub struct EventTimeSourceFromPath {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryInput {
     pub dataset_id: DatasetID,
+    pub dataset_name: DatasetName,
     pub vocab: DatasetVocabulary,
     pub data_interval: Option<OffsetInterval>,
     pub data_paths: Vec<PathBuf>,

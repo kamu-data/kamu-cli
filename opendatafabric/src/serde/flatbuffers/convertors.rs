@@ -363,6 +363,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryInput {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let dataset_name_offset = { fb.create_string(&self.dataset_name) };
         let vocab_offset = { self.vocab.serialize(fb) };
         let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
         let data_paths_offset = {
@@ -384,6 +385,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryInput {
         };
         let mut builder = fb::ExecuteQueryInputBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
+        builder.add_dataset_name(dataset_name_offset);
         builder.add_vocab(vocab_offset);
         data_interval_offset.map(|off| builder.add_data_interval(off));
         builder.add_data_paths(data_paths_offset);
@@ -399,6 +401,10 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryInput<'fb>> for odf::Execute
             dataset_id: proxy
                 .dataset_id()
                 .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .unwrap(),
+            dataset_name: proxy
+                .dataset_name()
+                .map(|v| odf::DatasetName::try_from(v).unwrap())
                 .unwrap(),
             vocab: proxy
                 .vocab()

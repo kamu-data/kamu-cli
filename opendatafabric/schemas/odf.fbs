@@ -302,6 +302,7 @@ table Watermark {
 
 table ExecuteQueryInput {
   dataset_id: [ubyte];
+  dataset_name: string;
   vocab: DatasetVocabulary;
   data_interval: OffsetInterval;
   data_paths: [string];
