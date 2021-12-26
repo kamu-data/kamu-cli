@@ -15,6 +15,7 @@ use opendatafabric::*;
 
 use dill::*;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
@@ -871,8 +872,11 @@ impl TransformService for TransformServiceImpl {
 
                     // All we care about is the new block and its hash
                     actual_block_hash = Some(Multihash::from_digest_sha3_256(
-                        &FlatbuffersMetadataBlockSerializer.serialize_metadata_block(&new_block),
+                        &FlatbuffersMetadataBlockSerializer
+                            .write_manifest(&new_block)
+                            .map_err(|e| TransformError::internal(e))?,
                     ));
+
                     actual_block = Some(new_block);
 
                     Ok(TransformResult::Updated {
