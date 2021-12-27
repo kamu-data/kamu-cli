@@ -74,8 +74,8 @@ pub enum Error {
     },
     #[error("Unsupported version: manifest has version {manifest_version} while maximum supported version is {supported_version}")]
     UnsupportedVersion {
-        manifest_version: u16,
-        supported_version: u16,
+        manifest_version: i32,
+        supported_version: i32,
     },
 }
 

@@ -7540,6 +7540,143 @@ impl std::fmt::Debug for InputSlice<'_> {
         ds.finish()
     }
 }
+pub enum ManifestOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct Manifest<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Manifest<'a> {
+    type Inner = Manifest<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> Manifest<'a> {
+    pub const VT_KIND: flatbuffers::VOffsetT = 4;
+    pub const VT_VERSION: flatbuffers::VOffsetT = 6;
+    pub const VT_CONTENT: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        Manifest { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args ManifestArgs<'args>,
+    ) -> flatbuffers::WIPOffset<Manifest<'bldr>> {
+        let mut builder = ManifestBuilder::new(_fbb);
+        builder.add_kind(args.kind);
+        if let Some(x) = args.content {
+            builder.add_content(x);
+        }
+        builder.add_version(args.version);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn kind(&self) -> i64 {
+        self._tab.get::<i64>(Manifest::VT_KIND, Some(0)).unwrap()
+    }
+    #[inline]
+    pub fn version(&self) -> i32 {
+        self._tab.get::<i32>(Manifest::VT_VERSION, Some(0)).unwrap()
+    }
+    #[inline]
+    pub fn content(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                Manifest::VT_CONTENT,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+}
+
+impl flatbuffers::Verifiable for Manifest<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<i64>("kind", Self::VT_KIND, false)?
+            .visit_field::<i32>("version", Self::VT_VERSION, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "content",
+                Self::VT_CONTENT,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ManifestArgs<'a> {
+    pub kind: i64,
+    pub version: i32,
+    pub content: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+}
+impl<'a> Default for ManifestArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ManifestArgs {
+            kind: 0,
+            version: 0,
+            content: None,
+        }
+    }
+}
+pub struct ManifestBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ManifestBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_kind(&mut self, kind: i64) {
+        self.fbb_.push_slot::<i64>(Manifest::VT_KIND, kind, 0);
+    }
+    #[inline]
+    pub fn add_version(&mut self, version: i32) {
+        self.fbb_.push_slot::<i32>(Manifest::VT_VERSION, version, 0);
+    }
+    #[inline]
+    pub fn add_content(&mut self, content: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(Manifest::VT_CONTENT, content);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ManifestBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        ManifestBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Manifest<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for Manifest<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("Manifest");
+        ds.field("kind", &self.kind());
+        ds.field("version", &self.version());
+        ds.field("content", &self.content());
+        ds.finish()
+    }
+}
 pub enum OutputSliceOffset {}
 #[derive(Copy, Clone, PartialEq)]
 

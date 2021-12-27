@@ -14,7 +14,7 @@ pub use crate::serde::{
 };
 use crate::{
     serde::{EngineProtocolDeserializer, EngineProtocolSerializer},
-    ExecuteQueryRequest, ExecuteQueryResponse,
+    ExecuteQueryRequest, ExecuteQueryResponse, Multicodec,
 };
 use crate::{DatasetSnapshot, MetadataBlock};
 use ::serde::{Deserialize, Serialize};
@@ -26,8 +26,8 @@ use ::serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ManifestDefMetadataBlock {
-    pub api_version: i32,
-    pub kind: String,
+    pub kind: Multicodec,
+    pub version: i32,
     #[serde(with = "MetadataBlockDef")]
     pub content: MetadataBlock,
 }
@@ -35,8 +35,8 @@ struct ManifestDefMetadataBlock {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ManifestDefDatasetSnapshot {
-    pub api_version: i32,
-    pub kind: String,
+    pub kind: Multicodec,
+    pub version: i32,
     #[serde(with = "DatasetSnapshotDef")]
     pub content: DatasetSnapshot,
 }
@@ -56,8 +56,8 @@ impl YamlMetadataBlockSerializer {}
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         let manifest = ManifestDefMetadataBlock {
-            api_version: 1,
-            kind: "MetadataBlock".to_owned(),
+            version: 1,
+            kind: Multicodec::ODFMetadataBlock,
             content: block.clone(),
         };
 
@@ -84,8 +84,8 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         // TODO: Handle conversions?
-        assert_eq!(manifest.api_version, 1);
-        assert_eq!(manifest.kind, "MetadataBlock");
+        assert_eq!(manifest.version, 1);
+        assert_eq!(manifest.kind, Multicodec::ODFMetadataBlock);
 
         Ok(manifest.content)
     }
@@ -100,8 +100,8 @@ pub struct YamlDatasetSnapshotSerializer;
 impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
     fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error> {
         let manifest = ManifestDefDatasetSnapshot {
-            api_version: 1,
-            kind: "DatasetSnapshot".to_owned(),
+            version: 1,
+            kind: Multicodec::ODFDatasetSnapshot,
             content: snapshot.clone(),
         };
 
@@ -122,8 +122,8 @@ impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         // TODO: Handle conversions?
-        assert_eq!(manifest.api_version, 1);
-        assert_eq!(manifest.kind, "DatasetSnapshot");
+        assert_eq!(manifest.version, 1);
+        assert_eq!(manifest.kind, Multicodec::ODFDatasetSnapshot);
 
         Ok(manifest.content)
     }

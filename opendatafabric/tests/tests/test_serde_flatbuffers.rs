@@ -161,7 +161,7 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         format!("{:x}", sha3::Sha3_256::digest(&buffer)),
-        "ee79db18f40dc77c2288952f498da761d940671cb1b95d69edd50303d0eedf15"
+        "1485beddeeb2349f34edeb981c78efd0da1f26dfbb69c54eb39a5c9db90877be"
     );
 }
 
@@ -175,7 +175,7 @@ fn serializer_hashes_are_stable_deriv() {
 
     assert_eq!(
         format!("{:x}", sha3::Sha3_256::digest(&buffer)),
-        "92f981290fd4db5bccf22fb4f1efc5b107efe5e9ca86867410cf3e2610cefbd3"
+        "6654bd8ab8eb5ba3840a71e57349d4b337b48c553e8027543b576dcc594f62de"
     );
 }
 

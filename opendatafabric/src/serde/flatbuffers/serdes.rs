@@ -11,6 +11,7 @@ use super::convertors::*;
 use super::odf_generated as fbgen;
 pub use crate::serde::{Buffer, Error, MetadataBlockDeserializer, MetadataBlockSerializer};
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
+use crate::Multicodec;
 use crate::{ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -24,7 +25,7 @@ pub struct FlatbuffersMetadataBlockSerializer;
 impl FlatbuffersMetadataBlockSerializer {
     const METADATA_BLOCK_SIZE_ESTIMATE: usize = 10 * 1024;
 
-    pub fn serialize_metadata_block(&self, block: &MetadataBlock) -> Buffer<u8> {
+    fn serialize_metadata_block(&self, block: &MetadataBlock) -> Buffer<u8> {
         let mut fb =
             flatbuffers::FlatBufferBuilder::with_capacity(Self::METADATA_BLOCK_SIZE_ESTIMATE);
         let offset = block.serialize(&mut fb);
@@ -32,37 +33,31 @@ impl FlatbuffersMetadataBlockSerializer {
         let (buf, head) = fb.collapse();
         Buffer::new(head, buf.len(), buf)
     }
-
-    pub fn prepend_manifest(
-        &self,
-        mut buffer: Buffer<u8>,
-        version: u16,
-        kind: &str,
-    ) -> Result<Buffer<u8>, Error> {
-        use byteorder::{LittleEndian, WriteBytesExt};
-        use std::io::Write;
-
-        let kind_bytes = kind.as_bytes();
-        let header_size = kind_bytes.len() + 2 + 2;
-        buffer.ensure_capacity(header_size, 0);
-
-        let header_start = buffer.head() - header_size;
-        let header_end = buffer.head();
-        let mut cursor = std::io::Cursor::new(&mut buffer.inner_mut()[header_start..header_end]);
-        cursor.write_u16::<LittleEndian>(version)?;
-        cursor.write_u16::<LittleEndian>(kind_bytes.len() as u16)?;
-        cursor.write(kind_bytes)?;
-        buffer.set_head(header_start);
-        Ok(buffer)
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
-        let buffer = self.serialize_metadata_block(block);
-        self.prepend_manifest(buffer, 1, "MetadataBlock")
+        // TODO: PERF: Serializing nested flatbuffers turned out to be a pain
+        // It's hard to make the inner object length-prefixed in order to then treat it as a [ubyte] array
+        // so for now we allocate twice and copy inner object into secondary buffer :(
+        let block_buffer = self.serialize_metadata_block(block);
+
+        let mut fb = flatbuffers::FlatBufferBuilder::with_capacity(block_buffer.len() + 1024);
+
+        let content_offset = fb.create_vector(&block_buffer);
+
+        let mut builder = fbgen::ManifestBuilder::new(&mut fb);
+        builder.add_kind(Multicodec::ODFMetadataBlock as i64);
+        builder.add_version(1);
+        builder.add_content(content_offset);
+        let offset = builder.finish();
+
+        fb.finish(offset, None);
+        let (buf, head) = fb.collapse();
+
+        Ok(Buffer::new(head, buf.len(), buf))
     }
 }
 
@@ -74,40 +69,29 @@ pub struct FlatbuffersMetadataBlockDeserializer;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl FlatbuffersMetadataBlockDeserializer {
-    pub fn read_manifest_header<'a>(
-        &self,
-        data: &'a [u8],
-    ) -> Result<(u16, &'a str, &'a [u8]), Error> {
-        use byteorder::{LittleEndian, ReadBytesExt};
-
-        let mut cursor = std::io::Cursor::new(data);
-        let version = cursor.read_u16::<LittleEndian>()?;
-        let kind_len = cursor.read_u16::<LittleEndian>()? as usize;
-        let kind = std::str::from_utf8(&data[4..4 + kind_len]).unwrap();
-        Ok((version, kind, &data[4 + kind_len..]))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        let (version, kind, tail) = self.read_manifest_header(data)?;
+        let manifest_proxy =
+            flatbuffers::root::<fbgen::Manifest>(data).map_err(|e| Error::serde(e))?;
 
-        assert_eq!(kind, "MetadataBlock");
+        // TODO: Better error handling
+        let kind = Multicodec::try_from(manifest_proxy.kind() as u32).unwrap();
+        assert_eq!(kind, Multicodec::ODFMetadataBlock);
 
         // TODO: Handle conversions
-        if version > 1 {
+        if manifest_proxy.version() > 1 {
             return Err(Error::UnsupportedVersion {
-                manifest_version: version,
+                manifest_version: manifest_proxy.version(),
                 supported_version: 1,
             });
         }
 
-        let proxy = flatbuffers::root::<fbgen::MetadataBlock>(tail).map_err(|e| Error::serde(e))?;
+        let block_proxy =
+            flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap())
+                .map_err(|e| Error::serde(e))?;
 
-        Ok(MetadataBlock::deserialize(proxy))
+        let block = MetadataBlock::deserialize(block_proxy);
+        Ok(block)
     }
 }
 
