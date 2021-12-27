@@ -1440,7 +1440,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TemporalTable {
     type OffsetT = WIPOffset<fb::TemporalTable<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let id_offset = { fb.create_string(&self.id) };
+        let name_offset = { fb.create_string(&self.name) };
         let primary_key_offset = {
             let offsets: Vec<_> = self
                 .primary_key
@@ -1450,7 +1450,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TemporalTable {
             fb.create_vector(&offsets)
         };
         let mut builder = fb::TemporalTableBuilder::new(fb);
-        builder.add_id(id_offset);
+        builder.add_name(name_offset);
         builder.add_primary_key(primary_key_offset);
         builder.finish()
     }
@@ -1459,7 +1459,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TemporalTable {
 impl<'fb> FlatbuffersDeserializable<fb::TemporalTable<'fb>> for odf::TemporalTable {
     fn deserialize(proxy: fb::TemporalTable<'fb>) -> Self {
         odf::TemporalTable {
-            id: proxy.id().map(|v| v.to_owned()).unwrap(),
+            name: proxy.name().map(|v| v.to_owned()).unwrap(),
             primary_key: proxy
                 .primary_key()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect())

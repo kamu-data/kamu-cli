@@ -20,7 +20,7 @@ fn serde_dataset_snapshot_root() {
     let data = indoc!(
         "
         ---
-        kind: odf-dataset-snapshot
+        kind: DatasetSnapshot
         version: 1
         content:
           name: kamu.test
@@ -123,7 +123,7 @@ fn serde_dataset_snapshot_derivative() {
     let data = indoc!(
         "
         ---
-        kind: odf-dataset-snapshot
+        kind: DatasetSnapshot
         version: 1
         content:
           name: com.naturalearthdata.admin0
@@ -180,7 +180,7 @@ fn serde_metadata_block() {
     let data = indoc!(
         "
         ---
-        kind: odf-metadata-block
+        kind: MetadataBlock
         version: 1
         content:
           prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P

@@ -3622,7 +3622,7 @@ impl<'a> flatbuffers::Follow<'a> for TemporalTable<'a> {
 }
 
 impl<'a> TemporalTable<'a> {
-    pub const VT_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_NAME: flatbuffers::VOffsetT = 4;
     pub const VT_PRIMARY_KEY: flatbuffers::VOffsetT = 6;
 
     #[inline]
@@ -3638,16 +3638,16 @@ impl<'a> TemporalTable<'a> {
         if let Some(x) = args.primary_key {
             builder.add_primary_key(x);
         }
-        if let Some(x) = args.id {
-            builder.add_id(x);
+        if let Some(x) = args.name {
+            builder.add_name(x);
         }
         builder.finish()
     }
 
     #[inline]
-    pub fn id(&self) -> Option<&'a str> {
+    pub fn name(&self) -> Option<&'a str> {
         self._tab
-            .get::<flatbuffers::ForwardsUOffset<&str>>(TemporalTable::VT_ID, None)
+            .get::<flatbuffers::ForwardsUOffset<&str>>(TemporalTable::VT_NAME, None)
     }
     #[inline]
     pub fn primary_key(
@@ -3667,7 +3667,7 @@ impl flatbuffers::Verifiable for TemporalTable<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("id", Self::VT_ID, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
             >>("primary_key", Self::VT_PRIMARY_KEY, false)?
@@ -3676,7 +3676,7 @@ impl flatbuffers::Verifiable for TemporalTable<'_> {
     }
 }
 pub struct TemporalTableArgs<'a> {
-    pub id: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub primary_key: Option<
         flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
     >,
@@ -3685,7 +3685,7 @@ impl<'a> Default for TemporalTableArgs<'a> {
     #[inline]
     fn default() -> Self {
         TemporalTableArgs {
-            id: None,
+            name: None,
             primary_key: None,
         }
     }
@@ -3696,9 +3696,9 @@ pub struct TemporalTableBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> TemporalTableBuilder<'a, 'b> {
     #[inline]
-    pub fn add_id(&mut self, id: flatbuffers::WIPOffset<&'b str>) {
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(TemporalTable::VT_ID, id);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(TemporalTable::VT_NAME, name);
     }
     #[inline]
     pub fn add_primary_key(
@@ -3730,7 +3730,7 @@ impl<'a: 'b, 'b> TemporalTableBuilder<'a, 'b> {
 impl std::fmt::Debug for TemporalTable<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("TemporalTable");
-        ds.field("id", &self.id());
+        ds.field("name", &self.name());
         ds.field("primary_key", &self.primary_key());
         ds.finish()
     }

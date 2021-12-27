@@ -1233,13 +1233,13 @@ impl Into<super::SqlQueryStep> for &dyn SqlQueryStep {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait TemporalTable {
-    fn id(&self) -> &str;
+    fn name(&self) -> &str;
     fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_>;
 }
 
 impl TemporalTable for super::TemporalTable {
-    fn id(&self) -> &str {
-        self.id.as_ref()
+    fn name(&self) -> &str {
+        self.name.as_ref()
     }
     fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_> {
         Box::new(self.primary_key.iter().map(|i| -> &str { i.as_ref() }))
@@ -1249,7 +1249,7 @@ impl TemporalTable for super::TemporalTable {
 impl Into<super::TemporalTable> for &dyn TemporalTable {
     fn into(self) -> super::TemporalTable {
         super::TemporalTable {
-            id: self.id().to_owned(),
+            name: self.name().to_owned(),
             primary_key: self.primary_key().map(|i| i.to_owned()).collect(),
         }
     }

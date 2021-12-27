@@ -753,7 +753,7 @@ implement_serde_as!(SqlQueryStep, SqlQueryStepDef, "SqlQueryStepDef");
 #[serde(remote = "TemporalTable")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TemporalTableDef {
-    pub id: String,
+    pub name: String,
     pub primary_key: Vec<String>,
 }
 

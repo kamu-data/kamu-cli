@@ -132,7 +132,7 @@ impl InspectQueryCommand {
                             output,
                             "{} {} PRIMARY KEY ({})",
                             style("Temporal Table:").dim(),
-                            tt.id,
+                            tt.name,
                             tt.primary_key.join(", ")
                         )?;
                     }
