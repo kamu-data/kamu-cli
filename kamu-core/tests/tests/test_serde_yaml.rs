@@ -19,8 +19,8 @@ fn serde_dataset_summary() {
     let data = indoc!(
         "
     ---
-    apiVersion: 1
     kind: DatasetSummary
+    version: 1
     content:
       id: \"did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh\"
       name: foo.bar
@@ -37,8 +37,8 @@ fn serde_dataset_summary() {
     let actual: Manifest<DatasetSummary> = serde_yaml::from_str(data).unwrap();
 
     let expected = Manifest {
-        api_version: 1,
         kind: "DatasetSummary".to_owned(),
+        version: 1,
         content: DatasetSummary {
             id: DatasetID::from_pub_key_ed25519(b"boop"),
             name: DatasetName::try_from("foo.bar").unwrap(),

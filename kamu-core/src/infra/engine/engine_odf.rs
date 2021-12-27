@@ -80,7 +80,7 @@ impl ODFEngine {
 
         let response = client.execute_query(request).await;
 
-        info!(id = engine_container.container_name.as_str(), response = ?response, "Operation response");
+        info!(?response, "Operation response");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {

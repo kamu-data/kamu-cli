@@ -150,7 +150,7 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
-        let span = info_span!("Executing SQL query", statement = statement);
+        let span = info_span!("Executing SQL query", statement);
         let _span_guard = span.enter();
 
         let cfg = ExecutionConfig::new()
