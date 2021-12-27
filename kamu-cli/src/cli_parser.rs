@@ -413,6 +413,12 @@ pub fn cli() -> App<'static, 'static> {
                 ]),
             tabular_output_params(SubCommand::with_name("list")
                 .about("List all datasets in the workspace")
+                .args(&[
+                    Arg::with_name("wide")
+                    .short("w")
+                    .multiple(true)
+                    .help("Show more details (repeat for more)"),
+                ])
                 .after_help(indoc::indoc!(
                     r"
                     ### Examples ###
@@ -420,6 +426,10 @@ pub fn cli() -> App<'static, 'static> {
                     To see a human-friendly list of datasets in your workspace:
 
                         kamu list
+
+                    To see more details:
+
+                        kamu list -w
 
                     To get a machine-readable list of datasets:
 
