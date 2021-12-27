@@ -332,7 +332,7 @@ fn serde_transform() {
         kind: sql
         engine: flink
         temporalTables:
-        - id: foo
+        - name: foo
           primaryKey:
           - id
         queries:
@@ -351,7 +351,7 @@ fn serde_transform() {
         version: None,
         query: None,
         temporal_tables: Some(vec![TemporalTable {
-            id: "foo".to_owned(),
+            name: "foo".to_owned(),
             primary_key: vec!["id".to_owned()],
         }]),
         queries: Some(vec![SqlQueryStep {
@@ -373,7 +373,7 @@ fn serde_transform() {
               - alias: bar
                 query: SELECT * FROM foo
             temporalTables:
-              - id: foo
+              - name: foo
                 primaryKey:
                   - id\n"
         )
