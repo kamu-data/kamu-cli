@@ -107,8 +107,8 @@ impl NewDatasetCommand {
                 indoc!(
                     r#"
                     ---
-                    apiVersion: 1
                     kind: DatasetSnapshot
+                    version: 1
                     content:
                       name: {}
                       # Reference: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsourcederivative-schema

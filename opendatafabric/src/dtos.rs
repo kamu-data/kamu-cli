@@ -384,7 +384,7 @@ pub struct SqlQueryStep {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TemporalTable {
-    pub id: String,
+    pub name: String,
     pub primary_key: Vec<String>,
 }
 
