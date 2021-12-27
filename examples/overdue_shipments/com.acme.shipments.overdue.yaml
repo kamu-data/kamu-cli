@@ -1,12 +1,12 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: com.acme.shipments.overdue
+  name: com.acme.shipments.overdue
   source:
     kind: derivative
     inputs:
-    - com.acme.orders
-    - com.acme.shipments
+    - name: com.acme.orders
+    - name: com.acme.shipments
     transform:
       kind: sql
       engine: flink

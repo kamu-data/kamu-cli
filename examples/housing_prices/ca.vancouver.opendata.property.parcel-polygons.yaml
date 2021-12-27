@@ -1,7 +1,7 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: ca.vancouver.opendata.property.parcel-polygons
+  name: ca.vancouver.opendata.property.parcel-polygons
   source:
     kind: root
     fetch:
@@ -19,7 +19,7 @@ content:
       command:
       - 'jq'
       - '-c'
-      - '.features[] | {type: .type, geometry: .geometry, properties: {tax_coord: .properties.tax_coord, civic_number: .properties.civic_number, site_id: .properties.site_id, street_name: .properties.streetname}}'
+      - '.features[] | {type: .type, geometry: .geometry, properties: {tax_coord: .properties.tax_coord, civic_number: .properties.civic_number, site_name: .properties.site_id, street_name: .properties.streetname}}'
     read:
       kind: geoJson
     merge:

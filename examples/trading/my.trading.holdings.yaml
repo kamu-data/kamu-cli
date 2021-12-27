@@ -1,11 +1,11 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: my.trading.holdings
+  name: my.trading.holdings
   source:
     kind: derivative
     inputs:
-      - my.trading.transactions
+      - name: my.trading.transactions
     transform:
       kind: sql
       engine: flink

@@ -1,4 +1,4 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
   id: ca.bccdc.covid19.case-details
