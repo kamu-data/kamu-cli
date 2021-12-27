@@ -204,9 +204,8 @@ impl<'a, const S: usize> MultihashShortGeneric<'a, S> {
 
 impl<const S: usize> fmt::Display for MultihashShortGeneric<'_, S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let digest = self.0.digest();
-        let tail_len = std::cmp::min(self.1 / 2, digest.len()); // 1 byte == 2 base16 characters
-        let s = hex::encode(&digest[digest.len() - tail_len..]);
-        write!(f, "{}", s)
+        let s = self.0.to_multibase_string();
+        let start = s.len() - std::cmp::min(self.1, s.len());
+        write!(f, "{}", &s[start..])
     }
 }
