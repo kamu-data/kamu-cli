@@ -1,11 +1,11 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: ca.ontario.data.covid19.daily-cases
+  name: ca.ontario.data.covid19.daily-cases
   source:
     kind: derivative
     inputs:
-      - ca.ontario.data.covid19.case-details
+      - name: ca.ontario.data.covid19.case-details
     transform:
       kind: sql
       engine: flink

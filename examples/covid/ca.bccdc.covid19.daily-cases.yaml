@@ -1,11 +1,11 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: ca.bccdc.covid19.daily-cases
+  name: ca.bccdc.covid19.daily-cases
   source:
     kind: derivative
     inputs:
-      - ca.bccdc.covid19.case-details
+      - name: ca.bccdc.covid19.case-details
     transform:
       kind: sql
       engine: flink

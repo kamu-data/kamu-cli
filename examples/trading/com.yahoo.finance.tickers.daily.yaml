@@ -1,7 +1,7 @@
-apiVersion: 1
+version: 1
 kind: DatasetSnapshot
 content:
-  id: com.yahoo.finance.tickers.daily
+  name: com.yahoo.finance.tickers.daily
   source:
     kind: root
     fetch:
