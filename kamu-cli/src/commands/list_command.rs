@@ -19,16 +19,19 @@ use std::sync::Arc;
 pub struct ListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
     output_config: Arc<OutputConfig>,
+    detail_level: u8,
 }
 
 impl ListCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
         output_config: Arc<OutputConfig>,
+        detail_level: u8,
     ) -> Self {
         Self {
             metadata_repo,
             output_config,
+            detail_level,
         }
     }
 
@@ -40,15 +43,24 @@ impl ListCommand {
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut out = std::io::stdout();
-        write!(out, "Name,Kind,Pulled,Records,Size\n")?;
+        write!(out, "ID,Name,Kind,Head,Pulled,Records,Size\n")?;
 
         for hdl in &datasets {
+            let head = self
+                .metadata_repo
+                .get_metadata_chain(&hdl.as_local_ref())?
+                .read_ref(&BlockRef::Head)
+                .unwrap();
+
             let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
+
             write!(
                 out,
-                "{},{},{},{},{}\n",
+                "{},{},{},{},{},{},{}\n",
+                hdl.id,
                 hdl.name,
                 self.get_kind(hdl, &summary)?,
+                head,
                 match summary.last_pulled {
                     None => "".to_owned(),
                     Some(t) => t.to_rfc3339(),
@@ -69,29 +81,63 @@ impl ListCommand {
         let mut table = Table::new();
         table.set_format(TableWriter::get_table_format());
 
-        table.set_titles(row![bc->"Name", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
+        if self.detail_level == 0 {
+            table.set_titles(row![bc->"Name", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
+        } else {
+            table.set_titles(row![bc->"ID", bc->"Name", bc->"Kind", bc->"Head", bc->"Pulled", bc->"Records", bc->"Size"]);
+        }
 
         for hdl in datasets.iter() {
+            let head = self
+                .metadata_repo
+                .get_metadata_chain(&hdl.as_local_ref())?
+                .read_ref(&BlockRef::Head)
+                .unwrap();
+
             let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
 
-            table.add_row(Row::new(vec![
-                Cell::new(&hdl.name),
-                Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
-                Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
-                Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
-                Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
-            ]));
+            if self.detail_level == 0 {
+                table.add_row(Row::new(vec![
+                    Cell::new(&hdl.name),
+                    Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
+                    Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
+                    Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
+                    Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
+                ]));
+            } else {
+                table.add_row(Row::new(vec![
+                    Cell::new(&hdl.id.to_did_string()),
+                    Cell::new(&hdl.name),
+                    Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
+                    Cell::new(&head.to_multibase_string()),
+                    Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
+                    Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
+                    Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
+                ]));
+            }
         }
 
         // Header doesn't render when there are no data rows in the table
         if datasets.is_empty() {
-            table.add_row(Row::new(vec![
-                Cell::new(""),
-                Cell::new(""),
-                Cell::new(""),
-                Cell::new(""),
-                Cell::new(""),
-            ]));
+            if self.detail_level == 0 {
+                table.add_row(Row::new(vec![
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                ]));
+            } else {
+                table.add_row(Row::new(vec![
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                    Cell::new(""),
+                ]));
+            }
         }
 
         table.printstd();

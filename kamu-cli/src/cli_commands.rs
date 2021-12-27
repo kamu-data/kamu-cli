@@ -102,9 +102,11 @@ pub fn get_command(
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
-        ("list", Some(_submatches)) => {
-            Box::new(ListCommand::new(catalog.get_one()?, catalog.get_one()?))
-        }
+        ("list", Some(submatches)) => Box::new(ListCommand::new(
+            catalog.get_one()?,
+            catalog.get_one()?,
+            submatches.occurrences_of("wide") as u8,
+        )),
         ("log", Some(submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
             value_t_or_exit!(submatches.value_of("dataset"), DatasetRefLocal),
