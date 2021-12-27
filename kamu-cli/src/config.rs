@@ -194,8 +194,8 @@ impl ConfigService {
             .unwrap();
 
         let manifest = Manifest {
-            api_version: CONFIG_VERSION,
             kind: "CLIConfig".to_owned(),
+            version: CONFIG_VERSION,
             content: config,
         };
 
@@ -281,8 +281,8 @@ impl ConfigService {
             serde_yaml::to_writer(
                 file,
                 &Manifest {
-                    api_version: CONFIG_VERSION,
                     kind: "CLIConfig".to_owned(),
+                    version: CONFIG_VERSION,
                     content: config_raw,
                 },
             )
@@ -378,7 +378,7 @@ impl ConfigService {
 
         // TODO: Migrations
         assert_eq!(manifest.kind, "CLIConfig");
-        assert_eq!(manifest.api_version, CONFIG_VERSION);
+        assert_eq!(manifest.version, CONFIG_VERSION);
 
         manifest.content
     }

@@ -64,14 +64,14 @@ pub(crate) use impl_try_from_str;
 
 macro_rules! impl_invalid_value {
     ($typ:ident) => {
-        impl fmt::Debug for InvalidValue<$typ> {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        impl std::fmt::Debug for InvalidValue<$typ> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "InvalidValue<{}>({:?})", stringify!($typ), self.value)
             }
         }
 
-        impl fmt::Display for InvalidValue<$typ> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        impl std::fmt::Display for InvalidValue<$typ> {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(f, "Invalid {}: {}", stringify!($typ), self.value)
             }
         }
@@ -430,9 +430,9 @@ pub struct InvalidValue<T: ?Sized> {
 }
 
 impl<T: ?Sized> InvalidValue<T> {
-    pub fn new<S: AsRef<str> + ?Sized>(s: &S) -> Self {
+    pub fn new<S: Into<String>>(s: S) -> Self {
         Self {
-            value: s.as_ref().to_owned(),
+            value: s.into(),
             _ph: PhantomData,
         }
     }
