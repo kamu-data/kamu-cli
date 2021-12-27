@@ -111,7 +111,7 @@ impl IngestTask {
     }
 
     pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
-        let span = info_span!("Ingesting data", dataset_id = ?self.dataset_handle);
+        let span = info_span!("Ingesting data", dataset_handle = %self.dataset_handle);
         let _span_guard = span.enter();
         info!(source = ?self.source, prev_checkpoint = ?self.prev_checkpoint, vocab = ?self.vocab, "Ingest details");
 

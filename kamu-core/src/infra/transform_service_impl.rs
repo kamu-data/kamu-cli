@@ -52,12 +52,9 @@ impl TransformServiceImpl {
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        let span = info_span!(
-            "Performing transform",
-            output_dataset = ?operation.request.dataset_name
-        );
+        let span = info_span!("Performing transform", dataset_handle = %operation.dataset_handle);
         let _span_guard = span.enter();
-        info!(operation = ?operation, "Transform request");
+        info!(?operation, "Transform request");
 
         listener.begin();
 
@@ -210,10 +207,7 @@ impl TransformServiceImpl {
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
     ) -> Result<Option<TransformOperation>, DomainError> {
-        let span = info_span!(
-            "Evaluating next transform operation",
-            output_dataset = ?dataset_handle
-        );
+        let span = info_span!("Evaluating next transform operation");
         let _span_guard = span.enter();
 
         let output_chain = self
@@ -299,6 +293,7 @@ impl TransformServiceImpl {
             .map_err(|e| DomainError::InfraError(e.into()))?;
 
         Ok(Some(TransformOperation {
+            dataset_handle: dataset_handle.clone(),
             input_slices,
             request: ExecuteQueryRequest {
                 dataset_id: dataset_handle.id.clone(),
@@ -473,10 +468,10 @@ impl TransformServiceImpl {
         };
 
         info!(
-            input_dataset = ?input_handle,
-            input = ?input,
-            slice = ?slice,
-            empty = is_empty,
+            %input_handle,
+            ?input,
+            ?slice,
+            is_empty,
             "Computed query input"
         );
 
@@ -514,10 +509,7 @@ impl TransformServiceImpl {
             }
         }
 
-        let span = info_span!(
-            "Preparing transformations replay plan",
-            output_dataset = ?dataset_handle
-        );
+        let span = info_span!("Preparing transformations replay plan");
         let _span_guard = span.enter();
 
         let metadata_chain = self
@@ -590,6 +582,7 @@ impl TransformServiceImpl {
                 |(block_hash, block)| -> Result<VerificationStep, DomainError> {
                     let step = VerificationStep {
                         operation: TransformOperation {
+                            dataset_handle: dataset_handle.clone(),
                             input_slices: block.input_slices.as_ref().unwrap().clone(),
                             request: ExecuteQueryRequest {
                                 dataset_id: dataset_handle.id.clone(),
@@ -711,7 +704,7 @@ impl TransformService for TransformServiceImpl {
         let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
 
         let dataset_refs: Vec<_> = dataset_refs.collect();
-        info!(dataset_refs = ?dataset_refs, "Transforming multiple datasets");
+        info!(?dataset_refs, "Transforming multiple datasets");
 
         // TODO: handle errors without crashing
         let requests: Vec<_> = dataset_refs
@@ -807,12 +800,13 @@ impl TransformService for TransformServiceImpl {
         _options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Replaying dataset transformations", dataset_ref = ?dataset_ref, block_range = ?block_range);
-        let _span_guard = span.enter();
-
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+
+        let span = info_span!("Replaying dataset transformations", %dataset_handle, ?block_range);
+        let _span_guard = span.enter();
+
         let verification_plan = self.get_verification_plan(&dataset_handle, block_range)?;
         let num_steps = verification_plan.len();
         listener.begin_phase(VerificationPhase::ReplayTransform, num_steps);
@@ -932,6 +926,7 @@ impl TransformService for TransformServiceImpl {
 
 #[derive(Debug, PartialEq)]
 pub struct TransformOperation {
+    pub dataset_handle: DatasetHandle,
     pub input_slices: Vec<InputSlice>,
     pub request: ExecuteQueryRequest,
 }

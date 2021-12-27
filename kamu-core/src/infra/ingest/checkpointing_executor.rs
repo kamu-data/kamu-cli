@@ -76,8 +76,8 @@ impl CheckpointingExecutor {
         kind: &str,
     ) -> Result<(), CheckpointingError> {
         let manifest = Manifest {
-            api_version: 1,
             kind: kind.to_owned(),
+            version: 1,
             content: checkpoint,
         };
         let file = File::create(path)?;

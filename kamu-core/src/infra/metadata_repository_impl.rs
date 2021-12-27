@@ -144,8 +144,8 @@ impl MetadataRepositoryImpl {
 
     fn write_summary(&self, path: &Path, summary: DatasetSummary) -> Result<(), DomainError> {
         let manifest = Manifest {
-            api_version: 1,
             kind: "DatasetSummary".to_owned(),
+            version: 1,
             content: summary,
         };
         let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
@@ -233,8 +233,8 @@ impl MetadataRepositoryImpl {
 
     fn write_config(&self, path: &Path, config: DatasetConfig) -> Result<(), DomainError> {
         let manifest = Manifest {
-            api_version: 1,
             kind: "DatasetConfig".to_owned(),
+            version: 1,
             content: config,
         };
         let file = std::fs::File::create(&path).map_err(|e| InfraError::from(e).into())?;
@@ -552,8 +552,8 @@ impl MetadataRepository for MetadataRepositoryImpl {
         }
 
         let manifest = Manifest {
-            api_version: 1,
             kind: "Repository".to_owned(),
+            version: 1,
             content: Repository { url: url },
         };
 
