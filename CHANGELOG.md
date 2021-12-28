@@ -6,14 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.74.0] - 2021-12-xx
+## [0.74.0] - 2021-12-28
 ### Changed
-- Breaking changes
-  - Workspaces will need to be re-created. Sorry again!
-  - Some manifest formats have changed and will need to be updated.
+- Breaking: Workspaces will need to be re-created. Sorry again!
+- Breaking: Some manifest formats have changed and will need to be updated.
+  - `Manifest.apiVersion` renamed to `version`
+  - `DatasetSnapshot.id` renamed to `name`
+  - `DatasetSourceDerivative.inputs` should now specify `id` (optional) and `name` (required)
+  - `TemporalTable.id` renamed to `name`
 - Implements [ODF RFC-003](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/002-content-addressability.md).
 - Datasets now have a globally unique identity.
-- Metadata format switched to a much faster and compact `flatbuffers` (you can still inspect it in YAML using `kamu log` command).
+  - IDs can be viewed using `kamu log -w`
+- Metadata format switched to a much faster and compact `flatbuffers`.
+  - You can still inspect it as YAML using `kamu log --output-format yaml`
 
 ## [0.73.0] - 2021-12-11
 ### Changed

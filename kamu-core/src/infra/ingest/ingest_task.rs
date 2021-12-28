@@ -422,7 +422,7 @@ impl IngestTask {
                     };
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
-                    info!(new_head = ?new_head, "Committed new block");
+                    info!(%new_head, "Committed new block");
 
                     std::fs::create_dir_all(&self.layout.data_dir).map_err(|e| IngestError::internal(e))?;
 

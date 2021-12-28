@@ -158,10 +158,7 @@ impl IngestService for IngestServiceImpl {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(
-            dataset = ?dataset_ref,
-            "Ingesting single dataset"
-        );
+        info!(%dataset_ref, "Ingesting single dataset");
 
         let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
         let meta_chain = self
@@ -194,7 +191,7 @@ impl IngestService for IngestServiceImpl {
         let null_listener = Arc::new(NullIngestListener {});
         let listener = maybe_listener.unwrap_or(null_listener);
 
-        info!(dataset = ?dataset_ref, fetch = ?fetch, "Ingesting single dataset from overriden source");
+        info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
 
         let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
         let meta_chain = self
