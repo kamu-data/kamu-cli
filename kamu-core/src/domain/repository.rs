@@ -74,7 +74,7 @@ pub enum RepositoryError {
     DoesNotExist,
     #[error("Operation is not allowed")]
     NotAllowed,
-    #[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged")]
+    #[error("Local and remote datasets have diverged. Local head: {local_head}, remote head {remote_head}")]
     Diverged {
         local_head: Multihash,
         remote_head: Multihash,

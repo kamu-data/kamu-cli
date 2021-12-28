@@ -110,9 +110,9 @@ impl InspectQueryCommand {
         for input in inputs {
             writeln!(
                 output,
-                "  {} ({})",
+                "  {}  {}",
                 style(&input.name).bold(),
-                input.id.as_ref().unwrap()
+                style(input.id.as_ref().unwrap()).dim(),
             )?;
         }
 

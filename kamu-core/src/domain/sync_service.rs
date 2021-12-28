@@ -121,7 +121,7 @@ pub enum SyncError {
     RepositoryDoesNotExist { repo_name: RepositoryName },
     // TODO: Report divergence type (e.g. remote is ahead of local)
     //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
-    #[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged")]
+    #[error("Local and remote datasets have diverged. Local head: {local_head}, remote head {remote_head}")]
     DatasetsDiverged {
         local_head: Multihash,
         remote_head: Multihash,

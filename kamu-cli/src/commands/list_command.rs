@@ -109,7 +109,7 @@ impl ListCommand {
                     Cell::new(&hdl.id.to_did_string()),
                     Cell::new(&hdl.name),
                     Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
-                    Cell::new(&head.to_multibase_string()),
+                    Cell::new(&head.short().to_string()),
                     Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                     Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
                     Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),

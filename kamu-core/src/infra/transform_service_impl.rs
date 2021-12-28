@@ -192,7 +192,7 @@ impl TransformServiceImpl {
         )
         .map_err(|e| TransformError::internal(e))?;
 
-        info!(output_dataset = ?dataset_handle, new_head = ?new_block_hash, "Committed new block");
+        info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
 
         Ok(TransformResult::Updated {
             old_head: prev_block_hash,
@@ -821,7 +821,7 @@ impl TransformService for TransformServiceImpl {
             let mut actual_block_hash = None;
 
             info!(
-                block_hash = ?expected_block_hash,
+                block_hash = %expected_block_hash,
                 "Replaying block"
             );
 
@@ -887,7 +887,7 @@ impl TransformService for TransformServiceImpl {
             debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
 
             if expected_block_hash != actual_block_hash || expected_block != actual_block {
-                info!(block_hash = ?expected_block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
+                info!(block_hash = %expected_block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
                     expected_block_hash,
@@ -899,7 +899,7 @@ impl TransformService for TransformServiceImpl {
                 return Err(err);
             }
 
-            info!(block_hash = ?expected_block_hash, "Block valid");
+            info!(block_hash = %expected_block_hash, "Block valid");
             listener.end_block(
                 &expected_block_hash,
                 step_index,
