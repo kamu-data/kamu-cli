@@ -24,7 +24,8 @@ dill = { version = "~0.2.0" }
 # UI
 read_input = "*"  # Basic user input
 chrono-humanize = "*"  # Human readable durations
-clap = "^2"
+clap = "*"
+clap_complete = "*"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners

@@ -13,7 +13,7 @@ name = "create-test-workspace"
 path = "src/create_test_workspace.rs"
 
 [dependencies]
-clap = "^2"
+clap = "*"
 chrono = "*"
 glob = "*"
 regex = "*"

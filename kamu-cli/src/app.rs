@@ -265,7 +265,7 @@ fn configure_logging(
 // Output format
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
+fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
     let verbosity_level = matches.occurrences_of("verbose") as u8;
@@ -275,7 +275,7 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
 
     let quiet = matches.is_present("quiet");
 
-    let format_str = get_output_format_recursive(matches);
+    let format_str = get_output_format_recursive(matches, &super::cli());
 
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
@@ -300,13 +300,27 @@ fn configure_output_format(matches: &clap::ArgMatches<'_>) -> OutputConfig {
     }
 }
 
-fn get_output_format_recursive<'a>(matches: &'a clap::ArgMatches<'_>) -> Option<&'a str> {
-    if let (_, Some(submatches)) = matches.subcommand() {
-        if let Some(fmt) = submatches.value_of("output-format") {
-            Some(fmt)
-        } else {
-            get_output_format_recursive(submatches)
+fn get_output_format_recursive<'a>(
+    matches: &'a clap::ArgMatches,
+    cmd: &clap::App<'_>,
+) -> Option<&'a str> {
+    if let Some((subcommand_name, submatches)) = matches.subcommand() {
+        let subcommand = cmd
+            .get_subcommands()
+            .find(|s| s.get_name() == subcommand_name)
+            .unwrap();
+        let has_output_format = subcommand
+            .get_opts()
+            .find(|opt| opt.get_name() == "output-format")
+            .is_some();
+
+        if has_output_format {
+            if let Some(fmt) = submatches.value_of("output-format") {
+                return Some(fmt);
+            }
         }
+
+        get_output_format_recursive(submatches, subcommand)
     } else {
         None
     }

@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::{App, AppSettings, Arg, Shell, SubCommand};
+use clap::{App, AppSettings, Arg};
 use opendatafabric::*;
 
-fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
+fn tabular_output_params<'a>(app: App<'a>) -> App<'a> {
     app.args(&[
-        Arg::with_name("output-format")
+        Arg::new("output-format")
             .long("output-format")
-            .short("o")
+            .short('o')
             .takes_value(true)
             .value_name("FMT")
             .possible_values(&[
@@ -26,51 +26,51 @@ fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
                 "json", "json-ld", "json-soa",
             ])
             .help("Format to display the results in"),
-        /*Arg::with_name("no-color")
+        /*Arg::new("no-color")
             .long("no-color")
             .help("Control whether color is used for display"),
-        Arg::with_name("incremental")
+        Arg::new("incremental")
             .long("incremental")
             .help("Display result rows immediately as they are fetched"),
-        Arg::with_name("no-header")
+        Arg::new("no-header")
             .long("no-header")
             .help("Whether to show column names in query results"),
-        Arg::with_name("header-interval")
+        Arg::new("header-interval")
             .long("header-interval")
             .takes_value(true)
             .value_name("INT")
             .help("The number of rows between which headers are displayed"),
-        Arg::with_name("csv-delimiter")
+        Arg::new("csv-delimiter")
             .long("csv-delimiter")
             .takes_value(true)
             .value_name("DELIM")
             .help("Delimiter in the csv output format"),
-        Arg::with_name("csv-quote-character")
+        Arg::new("csv-quote-character")
             .long("csv-quote-character")
             .takes_value(true)
             .value_name("CHAR")
             .help("Quote character in the csv output format"),
-        Arg::with_name("null-value")
+        Arg::new("null-value")
             .long("null-value")
             .takes_value(true)
             .value_name("VAL")
             .help("Use specified string in place of NULL values"),
-        Arg::with_name("number-format")
+        Arg::new("number-format")
             .long("number-format")
             .takes_value(true)
             .value_name("FMT")
             .help("Format numbers using DecimalFormat pattern"),
-        Arg::with_name("date-format")
+        Arg::new("date-format")
             .long("date-format")
             .takes_value(true)
             .value_name("FMT")
             .help("Format dates using SimpleDateFormat pattern"),
-        Arg::with_name("time-format")
+        Arg::new("time-format")
             .long("time-format")
             .takes_value(true)
             .value_name("FMT")
             .help("Format times using SimpleDateFormat pattern"),
-        Arg::with_name("timestamp-format")
+        Arg::new("timestamp-format")
             .long("timestamp-format")
             .takes_value(true)
             .value_name("FMT")
@@ -78,19 +78,18 @@ fn tabular_output_params<'a, 'b>(app: App<'a, 'b>) -> App<'a, 'b> {
     ])
 }
 
-pub fn cli() -> App<'static, 'static> {
+pub fn cli() -> App<'static> {
     App::new(crate::BINARY_NAME)
-        .global_settings(&[AppSettings::ColoredHelp])
-        .settings(&[AppSettings::SubcommandRequiredElseHelp])
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .version(crate::VERSION)
         .args(&[
-            Arg::with_name("verbose")
-                .short("v")
-                .multiple(true)
+            Arg::new("verbose")
+                .short('v')
+                .multiple_occurrences(true)
                 .help("Sets the level of verbosity (repeat for more)"),
-            Arg::with_name("quiet")
+            Arg::new("quiet")
                 .long("quiet")
-                .short("q")
+                .short('q')
                 .help("Suppress all non-essential output"),
         ])
         .after_help(indoc::indoc!(
@@ -100,19 +99,19 @@ pub fn cli() -> App<'static, 'static> {
               kamu <command> <sub-command> -h
             "
         ))
-        .subcommands(vec![
-            SubCommand::with_name("add")
+        .subcommands([
+            App::new("add")
                 .about("Add a new dataset or modify an existing one")
                 .args(&[
-                    Arg::with_name("recursive")
-                        .short("r")
+                    Arg::new("recursive")
+                        .short('r')
                         .long("recursive")
                         .help("Recursively search for all manifest in the specified directory"),
-                    Arg::with_name("replace")
+                    Arg::new("replace")
                         .long("replace")
                         .help("Delete and re-add datasets that already exist"),
-                    Arg::with_name("manifest")
-                        .multiple(true)
+                    Arg::new("manifest")
+                        .multiple_occurrences(true)
                         .required(true)
                         .index(1)
                         .help("Dataset manifest reference(s) (path, or URL)"),
@@ -142,12 +141,12 @@ pub fn cli() -> App<'static, 'static> {
                     To add dataset from a repository see `kamu pull` command.
                     "
                 )),
-            SubCommand::with_name("complete")
+            App::new("complete")
                 .about("Completes a command in the shell")
                 .setting(AppSettings::Hidden)
-                .arg(Arg::with_name("input").required(true).index(1))
-                .arg(Arg::with_name("current").required(true).index(2)),
-            SubCommand::with_name("completions")
+                .arg(Arg::new("input").required(true).index(1))
+                .arg(Arg::new("current").required(true).index(2)),
+            App::new("completions")
                 .about("Generate tab-completion scripts for your shell")
                 .after_help(indoc::indoc!(
                     r"
@@ -176,49 +175,49 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
                 .arg(
-                    Arg::with_name("shell")
+                    Arg::new("shell")
                         .required(true)
-                        .possible_values(&Shell::variants()),
+                        .possible_values(clap_complete::Shell::possible_values()),
                 ),
-            SubCommand::with_name("config")
+            App::new("config")
                 .about("Get or set configuration options")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommands(vec![
-                    SubCommand::with_name("list")
+                .subcommands([
+                    App::new("list")
                         .about("Display current configuration combined from all config files")
                         .args(&[
-                            Arg::with_name("user")
+                            Arg::new("user")
                                 .long("user")
                                 .help("Show only user scope configuration"),
-                            Arg::with_name("with-defaults")
+                            Arg::new("with-defaults")
                                 .long("with-defaults")
                                 .help("Show configuration with all default values applied"),
                         ]),
-                    SubCommand::with_name("get")
+                    App::new("get")
                         .about("Get current configuration value")
                         .args(&[
-                            Arg::with_name("user")
+                            Arg::new("user")
                                 .long("user")
                                 .help("Operate on the user scope configuration file"),
-                            Arg::with_name("with-defaults")
+                            Arg::new("with-defaults")
                                 .long("with-defaults")
                                 .help("Get default value if config option is not explicitly set"),
-                            Arg::with_name("cfgkey")
+                            Arg::new("cfgkey")
                                 .required(true)
                                 .index(1)
                                 .help("Path to the config option"),
                         ]),
-                    SubCommand::with_name("set")
+                    App::new("set")
                         .about("Set or unset configuration value")
                         .args(&[
-                            Arg::with_name("user")
+                            Arg::new("user")
                                 .long("user")
                                 .help("Operate on the user scope configuration file"),
-                            Arg::with_name("cfgkey")
+                            Arg::new("cfgkey")
                                 .required(true)
                                 .index(1)
                                 .help("Path to the config option"),
-                            Arg::with_name("value")
+                            Arg::new("value")
                                 .index(2)
                                 .help("New value to set"),
                         ]),
@@ -252,24 +251,24 @@ pub fn cli() -> App<'static, 'static> {
                         kamu config set --user engine.runtime
                     "
                 )),
-            SubCommand::with_name("delete")
+            App::new("delete")
                 .about("Delete a dataset")
                 .args(&[
-                    Arg::with_name("all")
-                        .short("a")
+                    Arg::new("all")
+                        .short('a')
                         .long("all")
                         .help("Delete all datasets in the workspace"),
-                    Arg::with_name("recursive")
-                        .short("r")
+                    Arg::new("recursive")
+                        .short('r')
                         .long("recursive")
                         .help("Also delete all transitive dependencies of specified datasets"),
-                    Arg::with_name("dataset")
-                        .multiple(true)
+                    Arg::new("dataset")
+                        .multiple_occurrences(true)
                         .index(1)
                         .validator(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
-                    Arg::with_name("yes")
-                        .short("y")
+                    Arg::new("yes")
+                        .short('y')
                         .long("yes")
                         .help("Don't ask for confirmation"),
                 ])
@@ -292,19 +291,19 @@ pub fn cli() -> App<'static, 'static> {
                         kamu delete kamu.dev/my.dataset
                     "
                 )),
-            SubCommand::with_name("init")
+            App::new("init")
                 .about("Initialize an empty workspace in the current directory")
                 .args(&[
-                    Arg::with_name("pull-images")
+                    Arg::new("pull-images")
                         .long("pull-images")
                         .help("Only pull container images and exit"),
-                    Arg::with_name("pull-test-images")
+                    Arg::new("pull-test-images")
                         .long("pull-test-images")
-                        .hidden(true)
+                        .hide(true)
                         .help("Only pull test-related container images and exit"),
-                    Arg::with_name("list-only")
+                    Arg::new("list-only")
                         .long("list-only")
-                        .hidden(true)
+                        .hide(true)
                         .help("List image names instead of pulling")
                 ])
                 .after_help(indoc::indoc!(
@@ -318,28 +317,28 @@ pub fn cli() -> App<'static, 'static> {
                         .kamu.local - a local data volume where all raw data is stored
                     "
                 )),
-            SubCommand::with_name("inspect")
+            App::new("inspect")
                 .about("Group of commands for exploring dataset metadata")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommands(vec![
-                    SubCommand::with_name("lineage")
+                .subcommands([
+                    App::new("lineage")
                         .about("Shows the dependency tree of a dataset")
                         .args(&[
-                            Arg::with_name("output-format")
+                            Arg::new("output-format")
                                 .long("output-format")
-                                .short("o")
+                                .short('o')
                                 .takes_value(true)
                                 .value_name("FMT")
                                 .possible_values(&[
                                     "shell", "dot", "csv", "html"
                                 ])
                                 .help("Format of an output"),
-                            Arg::with_name("browse")
+                            Arg::new("browse")
                                 .long("browse")
-                                .short("b")
+                                .short('b')
                                 .help("Produce HTML and open it in a browser"),
-                            Arg::with_name("dataset")
-                                .multiple(true)
+                            Arg::new("dataset")
+                                .multiple_occurrences(true)
                                 .index(1)
                                 .validator(validate_dataset_ref_local)
                                 .help("Local dataset reference(s)"),
@@ -363,10 +362,10 @@ pub fn cli() -> App<'static, 'static> {
                                 kamu inspect lineage -o dot | dot -Tpng > depgraph.png
                             "
                         )),
-                    SubCommand::with_name("query")
+                    App::new("query")
                         .about("Shows the transformations used by a derivative dataset")
                         .args(&[
-                            Arg::with_name("dataset")
+                            Arg::new("dataset")
                                 .required(true)
                                 .index(1)
                                 .validator(validate_dataset_ref_local)
@@ -377,17 +376,17 @@ pub fn cli() -> App<'static, 'static> {
                             This command allows you to audit the transformations performed by a derivative dataset and their evolution. Such audit is an important step in validating the trustworthiness of data (see `kamu verify` command).
                             "
                         )),
-                    SubCommand::with_name("schema")
+                    App::new("schema")
                         .about("Shows the dataset schema")
                         .args(&[
-                            Arg::with_name("dataset")
+                            Arg::new("dataset")
                                 .required(true)
                                 .index(1)
                                 .validator(validate_dataset_ref_local)
                                 .help("Local dataset reference"),
-                            Arg::with_name("output-format")
+                            Arg::new("output-format")
                                 .long("output-format")
-                                .short("o")
+                                .short('o')
                                 .takes_value(true)
                                 .value_name("FMT")
                                 .possible_values(&[
@@ -411,12 +410,12 @@ pub fn cli() -> App<'static, 'static> {
                             "
                         )),
                 ]),
-            tabular_output_params(SubCommand::with_name("list")
+            tabular_output_params(App::new("list")
                 .about("List all datasets in the workspace")
                 .args(&[
-                    Arg::with_name("wide")
-                    .short("w")
-                    .multiple(true)
+                    Arg::new("wide")
+                    .short('w')
+                    .multiple_occurrences(true)
                     .help("Show more details (repeat for more)"),
                 ])
                 .after_help(indoc::indoc!(
@@ -437,25 +436,25 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
             ),
-            SubCommand::with_name("log")
+            App::new("log")
                 .about("Shows dataset metadata history")
                 .args(&[
-                    Arg::with_name("dataset")
+                    Arg::new("dataset")
                         .required(true)
                         .index(1)
                         .validator(validate_dataset_ref_local)
                         .help("Local dataset reference"),
-                    Arg::with_name("output-format")
+                    Arg::new("output-format")
                         .long("output-format")
-                        .short("o")
+                        .short('o')
                         .takes_value(true)
                         .value_name("FMT")
                         .possible_values(&[
                             "yaml",
                         ]),
-                    Arg::with_name("filter")
+                    Arg::new("filter")
                         .long("filter")
-                        .short("f")
+                        .short('f')
                         .takes_value(true)
                         .value_name("FLT")
                         .validator(validate_log_filter),
@@ -487,16 +486,16 @@ pub fn cli() -> App<'static, 'static> {
                         kamu log -o yaml --filter source org.example.data
                     "
                 )),
-            SubCommand::with_name("new")
+            App::new("new")
                 .about("Creates a new dataset manifest from a template")
                 .args(&[
-                    Arg::with_name("root")
+                    Arg::new("root")
                         .long("root")
                         .help("Create a root dataset"),
-                    Arg::with_name("derivative")
+                    Arg::new("derivative")
                         .long("derivative")
                         .help("Create a derivative dataset"),
-                    Arg::with_name("name")
+                    Arg::new("name")
                         .required(true)
                         .index(1)
                         .validator(validate_dataset_name)
@@ -513,7 +512,7 @@ pub fn cli() -> App<'static, 'static> {
                         kamu new org.example.data --root
                     "
                 )),
-            SubCommand::with_name("notebook")
+            App::new("notebook")
                 .about("Starts the notebook server for exploring the data in the workspace")
                 .after_help(indoc::indoc!(
                     r"
@@ -525,45 +524,45 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
                 .arg(
-                    Arg::with_name("env")
-                        .short("e")
+                    Arg::new("env")
+                        .short('e')
                         .long("env")
                         .takes_value(true)
                         .value_name("VAR")
-                        .multiple(true)
+                        .multiple_occurrences(true)
                         .help("Pass specified environment variable into the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                 ),
-            SubCommand::with_name("pull")
+            App::new("pull")
                 .about("Pull new data into the datasets")
                 .args(&[
-                    Arg::with_name("all")
-                        .short("a")
+                    Arg::new("all")
+                        .short('a')
                         .long("all")
                         .help("Pull all datasets in the workspace"),
-                    Arg::with_name("recursive")
-                        .short("r")
+                    Arg::new("recursive")
+                        .short('r')
                         .long("recursive")
                         .help("Also pull all transitive dependencies of specified datasets"),
-                    Arg::with_name("force-uncacheable")
+                    Arg::new("force-uncacheable")
                         .long("force-uncacheable")
                         .help("Pull latest data from the uncacheable data sources"),
-                    Arg::with_name("dataset")
-                        .multiple(true)
+                    Arg::new("dataset")
+                        .multiple_occurrences(true)
                         .index(1)
                         .validator(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
-                    Arg::with_name("as")
+                    Arg::new("as")
                         .long("as")
                         .takes_value(true)
                         .validator(validate_dataset_name)
                         .value_name("NAME")
                         .help("Local name of a dataset to use when syncing from a repository"),
-                    Arg::with_name("fetch")
+                    Arg::new("fetch")
                         .long("fetch")
                         .takes_value(true)
                         .value_name("SRC")
                         .help("Data location (path or URL)"),
-                    Arg::with_name("set-watermark")
+                    Arg::new("set-watermark")
                         .long("set-watermark")
                         .takes_value(true)
                         .value_name("TIME")
@@ -610,23 +609,23 @@ pub fn cli() -> App<'static, 'static> {
                         kamu pull org.example.data --fetch https://example.com/data.csv
                     "
                 )),
-            SubCommand::with_name("push")
+            App::new("push")
                 .about("Push local data into a repository")
                 .args(&[
-                    Arg::with_name("all")
-                        .short("a")
+                    Arg::new("all")
+                        .short('a')
                         .long("all")
                         .help("Push all datasets in the workspace"),
-                    Arg::with_name("recursive")
-                        .short("r")
+                    Arg::new("recursive")
+                        .short('r')
                         .long("recursive")
                         .help("Also push all transitive dependencies of specified datasets"),
-                    Arg::with_name("dataset")
-                        .multiple(true)
+                    Arg::new("dataset")
+                        .multiple_occurrences(true)
                         .index(1)
                         .validator(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
-                    Arg::with_name("as")
+                    Arg::new("as")
                         .long("as")
                         .takes_value(true)
                         .validator(validate_dataset_remote_name)
@@ -650,19 +649,19 @@ pub fn cli() -> App<'static, 'static> {
                         kamu push org.example.data
                     "
                 )),
-            /*SubCommand::with_name("reset")
+            /*App::new("reset")
                 .about("Revert the dataset back to the specified state")
                 .args(&[
-                    Arg::with_name("dataset")
+                    Arg::new("dataset")
                         .required(true)
                         .index(1)
                         .validator(validate_dataset_id)
                         .help("ID of the dataset"),
-                    Arg::with_name("hash")
+                    Arg::new("hash")
                         .required(true)
                         .index(2)
                         .help("Hash of the block to reset to"),
-                    Arg::with_name("yes")
+                    Arg::new("yes")
                         .short("y")
                         .long("yes")
                         .help("Don't ask for confirmation"),
@@ -674,14 +673,14 @@ pub fn cli() -> App<'static, 'static> {
                     Keep in mind that blocks that were already pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back.
                     "
                 )),*/
-            SubCommand::with_name("repo")
+            App::new("repo")
                 .about("Manage set of tracked repositories")
                 .setting(AppSettings::SubcommandRequiredElseHelp)
-                .subcommands(vec![
-                    tabular_output_params(SubCommand::with_name("list")
+                .subcommands([
+                    tabular_output_params(App::new("list")
                         .about("Lists known repositories")
                     ),
-                    SubCommand::with_name("add")
+                    App::new("add")
                         .about("Adds a repository")
                         .after_help(indoc::indoc!(r"
                             For Local Filesystem basic repository use following URL formats:
@@ -694,89 +693,89 @@ pub fn cli() -> App<'static, 'static> {
                                 s3+https://my-minio-server:9000/bucket
                         "))
                         .args(&[
-                            Arg::with_name("name")
+                            Arg::new("name")
                                 .required(true)
                                 .index(1)
                                 .validator(validate_repository_name)
                                 .help("Local alias of the repository"),
-                            Arg::with_name("url")
+                            Arg::new("url")
                                 .required(true)
                                 .index(2)
                                 .help("URL of the repository"),
                         ]),
-                    SubCommand::with_name("delete")
+                    App::new("delete")
                         .about("Deletes a reference to repository")
                         .args(&[
-                            Arg::with_name("all")
-                                .short("a")
+                            Arg::new("all")
+                                .short('a')
                                 .long("all")
                                 .help("Delete all known repositories"),
-                            Arg::with_name("repository")
-                                .multiple(true)
+                            Arg::new("repository")
+                                .multiple_occurrences(true)
                                 .index(1)
                                 .validator(validate_repository_name)
                                 .help("Repository name(s)"),
-                            Arg::with_name("yes")
-                                .short("y")
+                            Arg::new("yes")
+                                .short('y')
                                 .long("yes")
                                 .help("Don't ask for confirmation"),
                         ]),
-                    tabular_output_params(SubCommand::with_name("list")
+                    tabular_output_params(App::new("list")
                         .about("Lists known repositories")
                     ),
-                    SubCommand::with_name("alias")
+                    App::new("alias")
                         .about("Manage set of remote aliases associated with datasets")
                         .setting(AppSettings::SubcommandRequiredElseHelp)
-                        .subcommands(vec![
-                            tabular_output_params(SubCommand::with_name("list")
+                        .subcommands([
+                            tabular_output_params(App::new("list")
                                 .about("Lists remote aliases")
                                 .args(&[
-                                    Arg::with_name("dataset")
+                                    Arg::new("dataset")
                                         .index(1)
                                         .validator(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
                                 ])
                             ),
-                            SubCommand::with_name("add")
+                            App::new("add")
                                 .about("Adds a remote alias to a dataset")
                                 .args(&[
-                                    Arg::with_name("dataset")
+                                    Arg::new("dataset")
                                         .required(true)
                                         .index(1)
                                         .validator(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
-                                    Arg::with_name("alias")
+                                    Arg::new("alias")
                                         .required(true)
                                         .index(2)
                                         .validator(validate_dataset_remote_name)
                                         .help("Remote dataset name"),
-                                    Arg::with_name("push")
+                                    Arg::new("push")
                                         .long("push")
                                         .help("Add a push alias"),
-                                    Arg::with_name("pull")
+                                    Arg::new("pull")
                                         .long("pull")
                                         .help("Add a pull alias"),
                                 ]),
-                            SubCommand::with_name("delete")
+                            App::new("delete")
                                 .about("Deletes a remote alias associated with a dataset")
                                 .args(&[
-                                    Arg::with_name("all")
-                                        .short("a")
+                                    Arg::new("all")
+                                        .short('a')
                                         .long("all")
                                         .help("Delete all aliases"),
-                                    Arg::with_name("dataset")
+                                    Arg::new("dataset")
                                         .required(true)
                                         .index(1)
                                         .validator(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
-                                    Arg::with_name("alias")
+                                    Arg::new("alias")
                                         .index(2)
                                         .validator(validate_dataset_remote_name)
                                         .help("Remote dataset name"),
-                                    Arg::with_name("push")
+                                    Arg::new("push")
                                         .long("push")
                                         .help("Add a push alias"),
-                                    Arg::with_name("pull")
+                                    Arg::new("pull")
                                         .long("pull")
                                         .help("Add a pull alias"),
                                 ]),
@@ -816,16 +815,16 @@ pub fn cli() -> App<'static, 'static> {
                         kamu repo add example-repo s3://bucket.my-company.example
                     "
                 )),
-                tabular_output_params(SubCommand::with_name("search")
+                tabular_output_params(App::new("search")
                 .about("Searches for datasets in the registered repositories")
                 .args(&[
-                    Arg::with_name("query")
+                    Arg::new("query")
                         .index(1)
                         .value_name("QUERY")
                         .help("Search terms"),
-                    Arg::with_name("repo")
+                    Arg::new("repo")
                         .long("repo")
-                        .multiple(true)
+                        .multiple_occurrences(true)
                         .value_name("REPO")
                         .validator(validate_repository_name)
                         .help("Repository name(s) to search in"),
@@ -846,44 +845,44 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
             ),
-            tabular_output_params(SubCommand::with_name("sql")
+            tabular_output_params(App::new("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
-                    SubCommand::with_name("server")
+                    App::new("server")
                         .about("Run JDBC server only")
                         .args(&[
-                            Arg::with_name("address")
+                            Arg::new("address")
                                 .long("address")
                                 .default_value("127.0.0.1")
                                 .help("Expose JDBC server on specific network interface"),
-                            Arg::with_name("port")
+                            Arg::new("port")
                                 .long("port")
                                 .default_value("10000")
                                 .help("Expose JDBC server on specific port"),
-                            Arg::with_name("livy")
+                            Arg::new("livy")
                                 .long("livy")
                                 .help("Run Livy server instead of JDBC")
-                                .hidden(true),
+                                .hide(true),
                         ]),
                 )
                 .args(&[
-                    Arg::with_name("url")
+                    Arg::new("url")
                         .long("url")
                         .takes_value(true)
                         .value_name("URL")
                         .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)"),
-                    Arg::with_name("command")
-                        .short("c")
+                    Arg::new("command")
+                        .short('c')
                         .long("command")
                         .takes_value(true)
                         .value_name("CMD")
                         .help("SQL command to run"),
-                    Arg::with_name("script")
+                    Arg::new("script")
                         .long("script")
                         .takes_value(true)
                         .value_name("FILE")
                         .help("SQL script file to execute"),
-                    Arg::with_name("engine")
+                    Arg::new("engine")
                         .long("engine")
                         .takes_value(true)
                         .possible_values(&["spark", "datafusion"])
@@ -918,17 +917,17 @@ pub fn cli() -> App<'static, 'static> {
                     "
                 ))
             ),
-            tabular_output_params(SubCommand::with_name("tail")
+            tabular_output_params(App::new("tail")
                 .about("Displays a sample of most recent records in a dataset")
                 .args(&[
-                    Arg::with_name("dataset")
+                    Arg::new("dataset")
                         .required(true)
                         .index(1)
                         .validator(validate_dataset_ref_local)
                         .help("Local dataset reference"),
-                    Arg::with_name("num-records")
+                    Arg::new("num-records")
                         .long("num-records")
-                        .short("n")
+                        .short('n')
                         .takes_value(true)
                         .default_value("10")
                         .value_name("NUM")
@@ -942,18 +941,18 @@ pub fn cli() -> App<'static, 'static> {
                     "#
                 ))
             ),
-            SubCommand::with_name("verify")
+            App::new("verify")
                 .about("Verifies the validity of a dataset")
                 .args(&[
-                    Arg::with_name("recursive")
-                        .short("r")
+                    Arg::new("recursive")
+                        .short('r')
                         .long("recursive")
                         .help("Verify the entire transformation chain starting with root datasets"),
-                    Arg::with_name("integrity")
+                    Arg::new("integrity")
                         .long("integrity")
                         .help("Check only the hashes of metadata and data without replaying transformations"),
-                    Arg::with_name("dataset")
-                        .multiple(true)
+                    Arg::new("dataset")
+                        .multiple_occurrences(true)
                         .index(1)
                         .validator(validate_dataset_ref_local)
                         .help("Local dataset reference(s)"),
@@ -991,8 +990,8 @@ pub fn cli() -> App<'static, 'static> {
         ])
 }
 
-fn validate_dataset_name(s: String) -> Result<(), String> {
-    match DatasetName::try_from(&s) {
+fn validate_dataset_name(s: &str) -> Result<(), String> {
+    match DatasetName::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`",
@@ -1000,8 +999,8 @@ fn validate_dataset_name(s: String) -> Result<(), String> {
     }
 }
 
-fn validate_dataset_remote_name(s: String) -> Result<(), String> {
-    match RemoteDatasetName::try_from(&s) {
+fn validate_dataset_remote_name(s: &str) -> Result<(), String> {
+    match RemoteDatasetName::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "Remote dataset name should be in form: `repository/dataset-id` or `repository/account/dataset-id`",
@@ -1009,8 +1008,8 @@ fn validate_dataset_remote_name(s: String) -> Result<(), String> {
     }
 }
 
-fn validate_dataset_ref_local(s: String) -> Result<(), String> {
-    match DatasetRefLocal::try_from(&s) {
+fn validate_dataset_ref_local(s: &str) -> Result<(), String> {
+    match DatasetRefLocal::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
@@ -1018,8 +1017,8 @@ fn validate_dataset_ref_local(s: String) -> Result<(), String> {
     }
 }
 
-// fn validate_dataset_ref_remote(s: String) -> Result<(), String> {
-//     match DatasetRefRemote::try_from(&s) {
+// fn validate_dataset_ref_remote(s: &str) -> Result<(), String> {
+//     match DatasetRefRemote::try_from(s) {
 //         Ok(_) => Ok(()),
 //         Err(_) => Err(format!(
 //             "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
@@ -1027,8 +1026,8 @@ fn validate_dataset_ref_local(s: String) -> Result<(), String> {
 //     }
 // }
 
-fn validate_dataset_ref_any(s: String) -> Result<(), String> {
-    match DatasetRefAny::try_from(&s) {
+fn validate_dataset_ref_any(s: &str) -> Result<(), String> {
+    match DatasetRefAny::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "Dataset reference should be in form: `my.dataset.id` or `repository/account/dataset-id` or `did:odf:...`",
@@ -1036,8 +1035,8 @@ fn validate_dataset_ref_any(s: String) -> Result<(), String> {
     }
 }
 
-fn validate_repository_name(s: String) -> Result<(), String> {
-    match RepositoryName::try_from(&s) {
+fn validate_repository_name(s: &str) -> Result<(), String> {
+    match RepositoryName::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",
@@ -1045,7 +1044,7 @@ fn validate_repository_name(s: String) -> Result<(), String> {
     }
 }
 
-fn validate_log_filter(s: String) -> Result<(), String> {
+fn validate_log_filter(s: &str) -> Result<(), String> {
     let items: Vec<_> = s.split(',').collect();
     for item in items {
         match item {

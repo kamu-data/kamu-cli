@@ -20,14 +20,13 @@ const CHANGE_DATE_YEARS: i32 = 4;
 
 fn main() {
     let matches = clap::App::new("release")
-        .global_setting(clap::AppSettings::ColoredHelp)
         .args(&[
-            clap::Arg::with_name("version")
+            clap::Arg::new("version")
                 .long("version")
-                .short("v")
+                .short('v')
                 .takes_value(true),
-            clap::Arg::with_name("next-minor").long("minor"),
-            clap::Arg::with_name("next-patch").long("patch"),
+            clap::Arg::new("next-minor").long("minor"),
+            clap::Arg::new("next-patch").long("patch"),
         ])
         .get_matches();
 

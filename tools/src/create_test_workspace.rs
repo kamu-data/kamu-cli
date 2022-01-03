@@ -18,8 +18,7 @@ use std::{
 
 fn main() {
     let matches = clap::App::new("create-test-workspace")
-        .global_setting(clap::AppSettings::ColoredHelp)
-        .args(&[clap::Arg::with_name("force").long("force").short("f")])
+        .args(&[clap::Arg::new("force").long("force").short('f')])
         .get_matches();
 
     let work_dir = PathBuf::from_str("examples/covid").unwrap();

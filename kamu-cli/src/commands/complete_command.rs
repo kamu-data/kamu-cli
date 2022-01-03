@@ -21,7 +21,7 @@ use std::sync::Arc;
 pub struct CompleteCommand {
     metadata_repo: Option<Arc<dyn MetadataRepository>>,
     config_service: Arc<ConfigService>,
-    app: clap::App<'static, 'static>,
+    app: clap::App<'static>,
     input: String,
     current: usize,
 }
@@ -32,7 +32,7 @@ impl CompleteCommand {
     pub fn new(
         metadata_repo: Option<Arc<dyn MetadataRepository>>,
         config_service: Arc<ConfigService>,
-        app: clap::App<'static, 'static>,
+        app: clap::App<'static>,
         input: String,
         current: usize,
     ) -> Self {
@@ -156,13 +156,13 @@ impl Command for CompleteCommand {
 
         args.truncate(self.current + 1);
 
-        let mut last_cmd = &self.app.p;
+        let mut last_cmd = &self.app;
 
         // Establish command context
         for arg in args[1..].iter() {
-            for s in last_cmd.subcommands.iter() {
-                if s.p.meta.name == *arg {
-                    last_cmd = &s.p;
+            for s in last_cmd.get_subcommands() {
+                if s.get_name() == *arg {
+                    last_cmd = s;
                 }
             }
         }
@@ -173,11 +173,11 @@ impl Command for CompleteCommand {
 
         // Complete option values
         if prev.starts_with("--") {
-            for opt in last_cmd.opts.iter() {
-                let full_name = format!("--{}", opt.s.long.unwrap());
-                if full_name == *prev && opt.b.is_set(clap::ArgSettings::TakesValue) {
-                    if let Some(val_names) = &opt.v.val_names {
-                        for (_, name) in val_names.iter() {
+            for opt in last_cmd.get_opts() {
+                let full_name = format!("--{}", opt.get_long().unwrap_or_default());
+                if full_name == *prev && opt.is_set(clap::ArgSettings::TakesValue) {
+                    if let Some(val_names) = opt.get_value_names() {
+                        for name in val_names {
                             match *name {
                                 "REPO" => self.complete_repository(to_complete),
                                 "TIME" => self.complete_timestamp(),
@@ -187,10 +187,10 @@ impl Command for CompleteCommand {
                             }
                         }
                     }
-                    if let Some(possible_vals) = &opt.v.possible_vals {
+                    if let Some(possible_vals) = opt.get_possible_values() {
                         for pval in possible_vals {
-                            if pval.starts_with(to_complete) {
-                                println!("{}", pval);
+                            if pval.get_name().starts_with(to_complete) {
+                                println!("{}", pval.get_name());
                             }
                         }
                     }
@@ -200,15 +200,15 @@ impl Command for CompleteCommand {
         }
 
         // Complete commands
-        for s in last_cmd.subcommands.iter() {
-            if !s.p.is_set(clap::AppSettings::Hidden) && s.p.meta.name.starts_with(to_complete) {
-                println!("{}", s.p.meta.name);
+        for s in last_cmd.get_subcommands() {
+            if !s.is_set(clap::AppSettings::Hidden) && s.get_name().starts_with(to_complete) {
+                println!("{}", s.get_name());
             }
         }
 
         // Complete positionals
-        for pos in last_cmd.positionals.iter() {
-            match pos.1.b.name {
+        for pos in last_cmd.get_positionals() {
+            match pos.get_name() {
                 "dataset" => self.complete_dataset(to_complete),
                 "repository" => self.complete_repository(to_complete),
                 "alias" => self.complete_alias(to_complete),
@@ -224,21 +224,20 @@ impl Command for CompleteCommand {
                 println!("--help");
             }
             for flg in last_cmd
-                .flags
-                .iter()
-                .filter(|f| !f.b.is_set(clap::ArgSettings::Hidden))
+                .get_opts()
+                .filter(|opt| !opt.is_positional() && !opt.is_set(clap::ArgSettings::TakesValue))
             {
-                let full_name = if flg.s.long.is_some() {
-                    format!("--{}", flg.s.long.unwrap())
+                let full_name = if let Some(long) = flg.get_long() {
+                    format!("--{}", long)
                 } else {
-                    format!("-{}", flg.s.short.unwrap())
+                    format!("-{}", flg.get_short().unwrap())
                 };
                 if full_name.starts_with(to_complete) {
                     println!("{}", full_name);
                 }
             }
-            for opt in last_cmd.opts.iter() {
-                let full_name = format!("--{}", opt.s.long.unwrap());
+            for opt in last_cmd.get_opts() {
+                let full_name = format!("--{}", opt.get_long().unwrap());
                 if full_name.starts_with(to_complete) {
                     println!("{}", full_name);
                 }

@@ -98,7 +98,7 @@ impl Kamu {
         full_cmd.extend(cmd.into_iter().map(|i| i.into()));
 
         let app = kamu_cli::cli();
-        let matches = app.get_matches_from_safe(&full_cmd).unwrap();
+        let matches = app.try_get_matches_from(&full_cmd).unwrap();
 
         kamu_cli::run(
             self.workspace_layout.clone(),
