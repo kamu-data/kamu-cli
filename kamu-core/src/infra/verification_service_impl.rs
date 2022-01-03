@@ -39,7 +39,7 @@ impl VerificationServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<(Multihash, MetadataBlock)>, VerificationError> {
+    ) -> Result<Vec<(Multihash, DataSlice)>, VerificationError> {
         let metadata_chain = self
             .metadata_repo
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
@@ -52,8 +52,12 @@ impl VerificationServiceImpl {
         let plan: Vec<_> = metadata_chain
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
-            .filter(|(_, block)| block.output_slice.is_some())
-            .take_while(|(hash, _)| Some(hash.clone()) != start_block)
+            .take_while(|(hash, _)| Some(hash) != start_block.as_ref())
+            .filter_map(|(hash, block)| match block.event {
+                MetadataEvent::AddData(e) => Some((hash, e.output_data)),
+                MetadataEvent::ExecuteQuery(e) => e.output_data.map(|v| (hash, v)),
+                _ => None,
+            })
             .collect();
 
         if let Some(start_block) = start_block {
@@ -82,9 +86,7 @@ impl VerificationServiceImpl {
 
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
 
-        for (block_index, (block_hash, block)) in plan.into_iter().enumerate() {
-            let output_slice = block.output_slice.as_ref().unwrap();
-
+        for (block_index, (block_hash, output_slice)) in plan.into_iter().enumerate() {
             listener.begin_block(
                 &block_hash,
                 block_index,
@@ -99,7 +101,7 @@ impl VerificationServiceImpl {
                 crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
                     .map_err(|e| DomainError::InfraError(e.into()))?;
 
-            if physical_hash_actual != output_slice.data_physical_hash {
+            if physical_hash_actual != output_slice.physical_hash {
                 // Root data files are non-reproducible by definition, so
                 // if physical hashes don't match - we can give up right away.
                 if dataset_kind == DatasetKind::Root {
@@ -108,7 +110,7 @@ impl VerificationServiceImpl {
                             block_hash,
                             logical_hash: None,
                             physical_hash: Some(HashMismatch {
-                                expected: output_slice.data_physical_hash.clone(),
+                                expected: output_slice.physical_hash.clone(),
                                 actual: physical_hash_actual,
                             }),
                         },
@@ -120,12 +122,12 @@ impl VerificationServiceImpl {
                         crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
                             .map_err(|e| DomainError::InfraError(e.into()))?;
 
-                    if logical_hash_actual != output_slice.data_logical_hash {
+                    if logical_hash_actual != output_slice.logical_hash {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
                                 block_hash,
                                 logical_hash: Some(HashMismatch {
-                                    expected: output_slice.data_logical_hash.clone(),
+                                    expected: output_slice.logical_hash.clone(),
                                     actual: logical_hash_actual,
                                 }),
                                 physical_hash: None,

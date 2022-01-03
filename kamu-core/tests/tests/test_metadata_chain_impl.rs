@@ -12,6 +12,7 @@ use std::assert_matches::assert_matches;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
+use opendatafabric::*;
 
 use chrono::{TimeZone, Utc};
 
@@ -20,10 +21,8 @@ fn test_create_new_chain() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain_dir = tmp_dir.path().join("foo.test");
 
-    let block = MetadataFactory::metadata_block()
-        .seed_random()
-        .source(MetadataFactory::dataset_source_root().build())
-        .build();
+    let block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
 
     let (chain, _) = MetadataChainImpl::create(&chain_dir, block.clone()).unwrap();
 
@@ -34,10 +33,8 @@ fn test_create_new_chain() {
 fn test_create_new_chain_error_dir_already_exists() {
     let tmp_dir = tempfile::tempdir().unwrap();
 
-    let block = MetadataFactory::metadata_block()
-        .seed_random()
-        .source(MetadataFactory::dataset_source_root().build())
-        .build();
+    let block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
 
     let res = MetadataChainImpl::create(tmp_dir.path(), block);
     assert_matches!(res, Err(InfraError::IOError { .. }));
@@ -48,25 +45,23 @@ fn test_append_and_iter_blocks() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain_dir = tmp_dir.path().join("foo.test");
 
-    let block1 = MetadataFactory::metadata_block()
+    let block1 = MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
         .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
-        .seed_random()
-        .source(MetadataFactory::dataset_source_root().build())
         .build();
     let (mut chain, block1_hash) = MetadataChainImpl::create(&chain_dir, block1.clone()).unwrap();
 
-    let block2 = MetadataFactory::metadata_block()
+    let block2 = MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
         .system_time(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
         .prev(&block1_hash)
-        .output_watermark(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
         .build();
     let block2_hash = chain.append(block2.clone());
 
-    let block3 = MetadataFactory::metadata_block()
-        .system_time(Utc.ymd(2000, 1, 3).and_hms(12, 0, 0))
-        .prev(&block2_hash)
-        .output_watermark(Utc.ymd(2000, 1, 2).and_hms(12, 0, 0))
-        .build();
+    let block3 = MetadataFactory::metadata_block(SetWatermark {
+        output_watermark: Utc.ymd(2000, 1, 2).and_hms(12, 0, 0),
+    })
+    .system_time(Utc.ymd(2000, 1, 3).and_hms(12, 0, 0))
+    .prev(&block2_hash)
+    .build();
     let block3_hash = chain.append(block3.clone());
 
     let mut block_iter = chain.iter_blocks();

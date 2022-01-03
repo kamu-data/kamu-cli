@@ -30,11 +30,13 @@ fn test_delete_dataset() {
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
             .name("foo")
-            .source(MetadataFactory::dataset_source_root().build())
+            .kind(DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
             .build(),
         MetadataFactory::dataset_snapshot()
             .name("bar")
-            .source(MetadataFactory::dataset_source_deriv(["foo"].into_iter()).build())
+            .kind(DatasetKind::Derivative)
+            .push_event(MetadataFactory::set_transform(["foo"]).build())
             .build(),
     ];
 

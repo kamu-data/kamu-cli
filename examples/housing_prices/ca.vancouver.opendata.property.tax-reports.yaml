@@ -1,20 +1,22 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: ca.vancouver.opendata.property.tax-reports
-  source:
-    kind: root
-    fetch:
-      kind: url
-      url: https://opendata.vancouver.ca/explore/dataset/property-tax-report/download/?format=csv&timezone=America/Los_Angeles&lang=en&use_labels_for_header=true&csv_separator=%3B
-    read:
-      kind: csv
-      separator: ';'
-      header: true
-      nullValue: ''
-    merge:
-      kind: ledger
-      primaryKey:
-      - PID
-  vocab:
-    eventTimeColumn: TAX_ASSESSMENT_YEAR
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: url
+        url: https://opendata.vancouver.ca/explore/dataset/property-tax-report/download/?format=csv&timezone=America/Los_Angeles&lang=en&use_labels_for_header=true&csv_separator=%3B
+      read:
+        kind: csv
+        separator: ';'
+        header: true
+        nullValue: ''
+      merge:
+        kind: ledger
+        primaryKey:
+        - PID
+    - kind: setVocab
+      vocab:
+        eventTimeColumn: TAX_ASSESSMENT_YEAR

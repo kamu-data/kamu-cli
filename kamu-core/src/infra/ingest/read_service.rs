@@ -34,7 +34,7 @@ impl ReadService {
         &self,
         dataset_handle: &DatasetHandle,
         dataset_layout: &DatasetLayout,
-        source: &DatasetSourceRoot,
+        source: &SetPollingSource,
         prev_checkpoint: Option<Multihash>,
         vocab: &DatasetVocabulary,
         system_time: DateTime<Utc>,

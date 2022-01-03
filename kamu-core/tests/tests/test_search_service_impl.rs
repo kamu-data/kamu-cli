@@ -43,7 +43,8 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_local_name)
-                .source(MetadataFactory::dataset_source_root().build())
+                .kind(DatasetKind::Root)
+                .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
         .unwrap();

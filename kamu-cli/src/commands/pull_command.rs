@@ -10,7 +10,6 @@
 use super::{CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
-use kamu::infra::DatasetKind;
 use opendatafabric::*;
 use url::Url;
 

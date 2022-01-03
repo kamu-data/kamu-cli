@@ -17,8 +17,6 @@ use crate::domain::{
     ProvenanceService,
 };
 
-use super::DatasetKind;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {

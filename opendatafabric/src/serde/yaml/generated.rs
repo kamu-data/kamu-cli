@@ -51,6 +51,25 @@ macro_rules! implement_serde_as {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddData
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "AddData")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AddDataDef {
+    #[serde_as(as = "DataSliceDef")]
+    pub output_data: DataSlice,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub output_watermark: Option<DateTime<Utc>>,
+}
+
+implement_serde_as!(AddData, AddDataDef, "AddDataDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +87,40 @@ pub struct BlockIntervalDef {
 implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 
 ////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DataSlice")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DataSliceDef {
+    pub logical_hash: Multihash,
+    pub physical_hash: Multihash,
+    #[serde_as(as = "OffsetIntervalDef")]
+    pub interval: OffsetInterval,
+}
+
+implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetKind
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DatasetKind")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub enum DatasetKindDef {
+    Root,
+    Derivative,
+}
+
+implement_serde_as!(DatasetKind, DatasetKindDef, "DatasetKindDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,74 +132,13 @@ implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSnapshotDef {
     pub name: DatasetName,
-    #[serde_as(as = "DatasetSourceDef")]
-    pub source: DatasetSource,
-    #[serde_as(as = "Option<DatasetVocabularyDef>")]
-    #[serde(default)]
-    pub vocab: Option<DatasetVocabulary>,
+    #[serde_as(as = "DatasetKindDef")]
+    pub kind: DatasetKind,
+    #[serde_as(as = "Vec<MetadataEventDef>")]
+    pub metadata: Vec<MetadataEvent>,
 }
 
 implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef, "DatasetSnapshotDef");
-
-////////////////////////////////////////////////////////////////////////////////
-// DatasetSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "DatasetSource")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
-pub enum DatasetSourceDef {
-    #[serde(rename_all = "camelCase")]
-    Root(#[serde_as(as = "DatasetSourceRootDef")] DatasetSourceRoot),
-    #[serde(rename_all = "camelCase")]
-    Derivative(#[serde_as(as = "DatasetSourceDerivativeDef")] DatasetSourceDerivative),
-}
-
-implement_serde_as!(DatasetSource, DatasetSourceDef, "DatasetSourceDef");
-implement_serde_as!(
-    DatasetSourceRoot,
-    DatasetSourceRootDef,
-    "DatasetSourceRootDef"
-);
-implement_serde_as!(
-    DatasetSourceDerivative,
-    DatasetSourceDerivativeDef,
-    "DatasetSourceDerivativeDef"
-);
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "DatasetSourceRoot")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct DatasetSourceRootDef {
-    #[serde_as(as = "FetchStepDef")]
-    pub fetch: FetchStep,
-    #[serde_as(as = "Option<Vec<PrepStepDef>>")]
-    #[serde(default)]
-    pub prepare: Option<Vec<PrepStep>>,
-    #[serde_as(as = "ReadStepDef")]
-    pub read: ReadStep,
-    #[serde_as(as = "Option<TransformDef>")]
-    #[serde(default)]
-    pub preprocess: Option<Transform>,
-    #[serde_as(as = "MergeStrategyDef")]
-    pub merge: MergeStrategy,
-}
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "DatasetSourceDerivative")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct DatasetSourceDerivativeDef {
-    #[serde_as(as = "Vec<TransformInputDef>")]
-    pub inputs: Vec<TransformInput>,
-    #[serde_as(as = "TransformDef")]
-    pub transform: Transform,
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetVocabulary
@@ -202,6 +194,28 @@ pub struct EventTimeSourceFromPathDef {
     pub pattern: String,
     pub timestamp_format: Option<String>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQuery")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryDef {
+    #[serde_as(as = "Vec<InputSliceDef>")]
+    pub input_slices: Vec<InputSlice>,
+    #[serde_as(as = "Option<DataSliceDef>")]
+    #[serde(default)]
+    pub output_data: Option<DataSlice>,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub output_watermark: Option<DateTime<Utc>>,
+}
+
+implement_serde_as!(ExecuteQuery, ExecuteQueryDef, "ExecuteQueryDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // ExecuteQueryInput
@@ -499,27 +513,42 @@ pub struct MergeStrategySnapshotDef {
 #[serde(remote = "MetadataBlock")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MetadataBlockDef {
-    pub prev_block_hash: Option<Multihash>,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
-    #[serde_as(as = "Option<OutputSliceDef>")]
-    #[serde(default)]
-    pub output_slice: Option<OutputSlice>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
-    pub output_watermark: Option<DateTime<Utc>>,
-    #[serde_as(as = "Option<Vec<InputSliceDef>>")]
-    #[serde(default)]
-    pub input_slices: Option<Vec<InputSlice>>,
-    #[serde_as(as = "Option<DatasetSourceDef>")]
-    #[serde(default)]
-    pub source: Option<DatasetSource>,
-    #[serde_as(as = "Option<DatasetVocabularyDef>")]
-    #[serde(default)]
-    pub vocab: Option<DatasetVocabulary>,
-    pub seed: Option<DatasetID>,
+    pub prev_block_hash: Option<Multihash>,
+    #[serde_as(as = "MetadataEventDef")]
+    pub event: MetadataEvent,
 }
 
 implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataEvent
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MetadataEvent")]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+pub enum MetadataEventDef {
+    #[serde(rename_all = "camelCase")]
+    AddData(#[serde_as(as = "AddDataDef")] AddData),
+    #[serde(rename_all = "camelCase")]
+    ExecuteQuery(#[serde_as(as = "ExecuteQueryDef")] ExecuteQuery),
+    #[serde(rename_all = "camelCase")]
+    Seed(#[serde_as(as = "SeedDef")] Seed),
+    #[serde(rename_all = "camelCase")]
+    SetPollingSource(#[serde_as(as = "SetPollingSourceDef")] SetPollingSource),
+    #[serde(rename_all = "camelCase")]
+    SetTransform(#[serde_as(as = "SetTransformDef")] SetTransform),
+    #[serde(rename_all = "camelCase")]
+    SetVocab(#[serde_as(as = "SetVocabDef")] SetVocab),
+    #[serde(rename_all = "camelCase")]
+    SetWatermark(#[serde_as(as = "SetWatermarkDef")] SetWatermark),
+}
+
+implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
@@ -537,25 +566,6 @@ pub struct OffsetIntervalDef {
 }
 
 implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
-
-////////////////////////////////////////////////////////////////////////////////
-// OutputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "OutputSlice")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct OutputSliceDef {
-    pub data_logical_hash: Multihash,
-    pub data_physical_hash: Multihash,
-    #[serde_as(as = "OffsetIntervalDef")]
-    pub data_interval: OffsetInterval,
-}
-
-implement_serde_as!(OutputSlice, OutputSliceDef, "OutputSliceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // PrepStep
@@ -708,6 +718,105 @@ pub struct ReadStepEsriShapefileDef {
     pub schema: Option<Vec<String>>,
     pub sub_path: Option<String>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Seed
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "Seed")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SeedDef {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetID,
+    #[serde_as(as = "DatasetKindDef")]
+    pub dataset_kind: DatasetKind,
+}
+
+implement_serde_as!(Seed, SeedDef, "SeedDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetPollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetPollingSource")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetPollingSourceDef {
+    #[serde_as(as = "FetchStepDef")]
+    pub fetch: FetchStep,
+    #[serde_as(as = "Option<Vec<PrepStepDef>>")]
+    #[serde(default)]
+    pub prepare: Option<Vec<PrepStep>>,
+    #[serde_as(as = "ReadStepDef")]
+    pub read: ReadStep,
+    #[serde_as(as = "Option<TransformDef>")]
+    #[serde(default)]
+    pub preprocess: Option<Transform>,
+    #[serde_as(as = "MergeStrategyDef")]
+    pub merge: MergeStrategy,
+}
+
+implement_serde_as!(SetPollingSource, SetPollingSourceDef, "SetPollingSourceDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetTransform")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetTransformDef {
+    #[serde_as(as = "Vec<TransformInputDef>")]
+    pub inputs: Vec<TransformInput>,
+    #[serde_as(as = "TransformDef")]
+    pub transform: Transform,
+}
+
+implement_serde_as!(SetTransform, SetTransformDef, "SetTransformDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetVocab
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetVocab")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetVocabDef {
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+}
+
+implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetWatermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetWatermark")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetWatermarkDef {
+    #[serde(with = "datetime_rfc3339")]
+    pub output_watermark: DateTime<Utc>,
+}
+
+implement_serde_as!(SetWatermark, SetWatermarkDef, "SetWatermarkDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // SourceCaching

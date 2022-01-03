@@ -69,8 +69,9 @@ fn test_transform_with_engine_spark() {
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
         .name("root")
-        .source(
-            MetadataFactory::dataset_source_root()
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),
@@ -80,23 +81,7 @@ fn test_transform_with_engine_spark() {
                             .map(|s| s.to_string())
                             .collect(),
                     ),
-                    separator: None,
-                    encoding: None,
-                    quote: None,
-                    escape: None,
-                    comment: None,
-                    enforce_schema: None,
-                    infer_schema: None,
-                    ignore_leading_white_space: None,
-                    ignore_trailing_white_space: None,
-                    null_value: None,
-                    empty_value: None,
-                    nan_value: None,
-                    positive_inf: None,
-                    negative_inf: None,
-                    date_format: None,
-                    timestamp_format: None,
-                    multi_line: None,
+                    ..ReadStepCsv::default()
                 }))
                 .build(),
         )
@@ -116,8 +101,9 @@ fn test_transform_with_engine_spark() {
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .source(
-            MetadataFactory::dataset_source_deriv([&root_name])
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform([&root_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("spark")
@@ -150,7 +136,7 @@ fn test_transform_with_engine_spark() {
             .unwrap()
             .iter_blocks()
             .count(),
-        2
+        3
     );
 
     let part_file = dataset_layout.data_dir.join(block_hash.to_string());
@@ -305,8 +291,9 @@ fn test_transform_with_engine_flink() {
 
     let root_snapshot = MetadataFactory::dataset_snapshot()
         .name("root")
-        .source(
-            MetadataFactory::dataset_source_root()
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),
@@ -316,23 +303,7 @@ fn test_transform_with_engine_flink() {
                             .map(|s| s.to_string())
                             .collect(),
                     ),
-                    separator: None,
-                    encoding: None,
-                    quote: None,
-                    escape: None,
-                    comment: None,
-                    enforce_schema: None,
-                    infer_schema: None,
-                    ignore_leading_white_space: None,
-                    ignore_trailing_white_space: None,
-                    null_value: None,
-                    empty_value: None,
-                    nan_value: None,
-                    positive_inf: None,
-                    negative_inf: None,
-                    date_format: None,
-                    timestamp_format: None,
-                    multi_line: None,
+                    ..ReadStepCsv::default()
                 }))
                 .build(),
         )
@@ -352,8 +323,9 @@ fn test_transform_with_engine_flink() {
 
     let deriv_snapshot = MetadataFactory::dataset_snapshot()
         .name("deriv")
-        .source(
-            MetadataFactory::dataset_source_deriv([&root_name])
+        .kind(DatasetKind::Derivative)
+        .push_event(
+            MetadataFactory::set_transform([&root_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("flink")
@@ -386,7 +358,7 @@ fn test_transform_with_engine_flink() {
             .unwrap()
             .iter_blocks()
             .count(),
-        2
+        3
     );
 
     let part_file = dataset_layout.data_dir.join(block_hash.to_string());

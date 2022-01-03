@@ -72,31 +72,46 @@ macro_rules! refs {
 fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
     for (dataset_name, deps) in &datasets {
         if deps.is_empty() {
-            repo.add_dataset_from_block(
+            repo.add_dataset_from_blocks(
                 dataset_name,
-                MetadataFactory::metadata_block()
-                    .seed_from(dataset_name.as_str())
-                    .source(MetadataFactory::dataset_source_root().build())
+                &mut [
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::seed(DatasetKind::Root)
+                            .id_from(dataset_name.as_str())
+                            .build(),
+                    )
                     .build(),
+                    MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
+                        .build(),
+                ]
+                .into_iter(),
             )
             .unwrap();
         } else {
-            repo.add_dataset_from_block(
+            repo.add_dataset_from_blocks(
                 dataset_name,
-                MetadataFactory::metadata_block()
-                    .seed_from(dataset_name.as_str())
-                    .source(
-                        MetadataFactory::dataset_source_deriv(deps.iter())
+                &mut [
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::seed(DatasetKind::Derivative)
+                            .id_from(dataset_name.as_str())
+                            .build(),
+                    )
+                    .build(),
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::set_transform(deps)
                             .input_ids_from_names()
                             .build(),
                     )
                     .build(),
+                ]
+                .into_iter(),
             )
             .unwrap();
         }
     }
 }
 
+// TODO: Rewrite this abomination
 fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
     let repo_factory = RepositoryFactoryFS::new(repo_path);
 
@@ -104,23 +119,39 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
         let ds_builder = repo_factory.new_dataset().name(dataset_name);
 
         if deps.is_empty() {
-            ds_builder.append(
-                MetadataFactory::metadata_block()
-                    .seed_from(dataset_name.as_str())
-                    .source(MetadataFactory::dataset_source_root().build())
+            ds_builder
+                .append(
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::seed(DatasetKind::Root)
+                            .id_from(dataset_name.as_str())
+                            .build(),
+                    )
                     .build(),
-            );
+                )
+                .append(
+                    MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
+                        .build(),
+                    None,
+                );
         } else {
-            ds_builder.append(
-                MetadataFactory::metadata_block()
-                    .seed_from(dataset_name.as_str())
-                    .source(
-                        MetadataFactory::dataset_source_deriv(deps.iter())
+            ds_builder
+                .append(
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::seed(DatasetKind::Derivative)
+                            .id_from(dataset_name.as_str())
+                            .build(),
+                    )
+                    .build(),
+                )
+                .append(
+                    MetadataFactory::metadata_block(
+                        MetadataFactory::set_transform(deps)
                             .input_ids_from_names()
                             .build(),
                     )
                     .build(),
-            );
+                    None,
+                );
         }
     }
 }

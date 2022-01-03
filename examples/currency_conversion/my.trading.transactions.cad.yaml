@@ -1,29 +1,30 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: my.trading.transactions.cad
-  source:
-    kind: derivative
-    inputs:
-    - name: ca.bankofcanada.exchange-rates.daily
-    - name: my.trading.transactions
-    transform:
-      kind: sql
-      engine: flink
-      temporalTables:
-      - name: ca.bankofcanada.exchange-rates.daily
-        primaryKey:
-        - currency_base
-      query: >
-        SELECT
-          tr.`event_time`,
-          tr.`symbol`,
-          tr.`quantity`,
-          tr.`price` as `price_usd`,
-          tr.`price` * exc.`rate` as `price_cad`,
-          tr.`settlement` as `settlement_usd`,
-          tr.`settlement` * exc.`rate` as `settlement_cad`
-        FROM
-          `my.trading.transactions` as tr,
-          LATERAL TABLE (`ca.bankofcanada.exchange-rates.daily`(tr.`event_time`)) as exc
-        WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: ca.bankofcanada.exchange-rates.daily
+        - name: my.trading.transactions
+      transform:
+        kind: sql
+        engine: flink
+        temporalTables:
+          - name: ca.bankofcanada.exchange-rates.daily
+            primaryKey:
+            - currency_base
+        query: >
+          SELECT
+            tr.`event_time`,
+            tr.`symbol`,
+            tr.`quantity`,
+            tr.`price` as `price_usd`,
+            tr.`price` * exc.`rate` as `price_cad`,
+            tr.`settlement` as `settlement_usd`,
+            tr.`settlement` * exc.`rate` as `settlement_cad`
+          FROM
+            `my.trading.transactions` as tr,
+            LATERAL TABLE (`ca.bankofcanada.exchange-rates.daily`(tr.`event_time`)) as exc
+          WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'

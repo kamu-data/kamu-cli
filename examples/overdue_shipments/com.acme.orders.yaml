@@ -1,20 +1,21 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: com.acme.orders
-  source:
-    kind: root
-    fetch:
-      kind: filesGlob
-      path: data/orders-*.csv
-    read:
-      kind: csv
-      header: true
-      schema:
-      - "event_time TIMESTAMP"
-      - "order_id BIGINT"
-      - "quantity BIGINT"
-    merge:
-      kind: ledger
-      primaryKey:
-      - order_id
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: filesGlob
+        path: data/orders-*.csv
+      read:
+        kind: csv
+        header: true
+        schema:
+        - "event_time TIMESTAMP"
+        - "order_id BIGINT"
+        - "quantity BIGINT"
+      merge:
+        kind: ledger
+        primaryKey:
+        - order_id

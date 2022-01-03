@@ -1,21 +1,22 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: my.trading.holdings
-  source:
-    kind: derivative
-    inputs:
-      - name: my.trading.transactions
-    transform:
-      kind: sql
-      engine: flink
-      query: >
-        SELECT
-          event_time,
-          symbol,
-          quantity,
-          price,
-          settlement,
-          sum(quantity) over(partition by symbol order by event_time rows unbounded preceding) as cum_quantity,
-          sum(settlement) over(partition by symbol order by event_time rows unbounded preceding) as cum_balance
-        FROM `my.trading.transactions`
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: my.trading.transactions
+      transform:
+        kind: sql
+        engine: flink
+        query: >
+          SELECT
+            event_time,
+            symbol,
+            quantity,
+            price,
+            settlement,
+            sum(quantity) over(partition by symbol order by event_time rows unbounded preceding) as cum_quantity,
+            sum(settlement) over(partition by symbol order by event_time rows unbounded preceding) as cum_balance
+          FROM `my.trading.transactions`

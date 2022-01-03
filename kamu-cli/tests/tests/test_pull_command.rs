@@ -23,7 +23,8 @@ fn test_pull_ingest_from_file() {
 
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
-        source: DatasetSource::Root(DatasetSourceRoot {
+        kind: DatasetKind::Root,
+        metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
             fetch: FetchStep::Url(FetchStepUrl {
                 url: Url::from_file_path(&kamu.workspace_path().join("data.csv"))
                     .unwrap()
@@ -44,8 +45,7 @@ fn test_pull_ingest_from_file() {
             merge: MergeStrategy::Ledger(MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "city".to_owned()],
             }),
-        }),
-        vocab: None,
+        })],
     })
     .unwrap();
 

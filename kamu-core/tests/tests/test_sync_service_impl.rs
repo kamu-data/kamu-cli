@@ -141,7 +141,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(&dataset_name)
-        .source(MetadataFactory::dataset_source_root().build())
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
     let (_, b1) = metadata_repo.add_dataset(snapshot).unwrap();
@@ -152,7 +153,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
-            num_blocks: 1,
+            num_blocks: 2,
         }) if new_head == b1
     );
 
@@ -161,7 +162,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
-            num_blocks: 1,
+            num_blocks: 2,
         }) if new_head == b1
     );
 
@@ -173,13 +174,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block()
+            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
                 .prev(&b1)
-                .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    data_interval: OffsetInterval { start: 0, end: 9 },
-                })
                 .build(),
         );
 
@@ -188,13 +184,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block()
+            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
                 .prev(&b2)
-                .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    data_interval: OffsetInterval { start: 10, end: 29 },
-                })
                 .build(),
         );
 
@@ -262,13 +253,8 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .get_metadata_chain(&dataset_name_2.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block()
+            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
                 .prev(&b3)
-                .output_slice(OutputSlice {
-                    data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    data_interval: OffsetInterval { start: 30, end: 49 },
-                })
                 .build(),
         );
 

@@ -78,8 +78,8 @@ pub struct IngestRequest {
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub event_time: Option<DateTime<Utc>>,
     pub offset: i64,
-    #[serde(with = "DatasetSourceRootDef")]
-    pub source: DatasetSourceRoot,
+    #[serde(with = "SetPollingSourceDef")]
+    pub source: SetPollingSource,
     #[serde(with = "DatasetVocabularyDef")]
     pub dataset_vocab: DatasetVocabulary,
     pub prev_checkpoint_dir: Option<PathBuf>,

@@ -17,29 +17,70 @@ use super::IDFactory;
 pub struct MetadataFactory;
 
 impl MetadataFactory {
+    pub fn seed(kind: DatasetKind) -> SeedBuilder {
+        SeedBuilder::new(kind)
+    }
+
     pub fn transform() -> TransformSqlBuilder {
         TransformSqlBuilder::new()
     }
 
-    pub fn dataset_source_root() -> DatasetSourceBuilderRoot {
-        DatasetSourceBuilderRoot::new()
+    pub fn set_polling_source() -> SetPollingSourceBuilder {
+        SetPollingSourceBuilder::new()
     }
 
-    pub fn dataset_source_deriv<S, I>(inputs: I) -> DatasetSourceBuilderDeriv
+    pub fn add_data() -> AddDataBuilder {
+        AddDataBuilder::new()
+    }
+
+    pub fn set_transform<S, I>(inputs: I) -> SetTransformBuilder
     where
         I: IntoIterator<Item = S>,
         S: TryInto<DatasetName>,
         <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
-        DatasetSourceBuilderDeriv::new(inputs.into_iter())
+        SetTransformBuilder::new(inputs.into_iter())
     }
 
-    pub fn metadata_block() -> MetadataBlockBuilder {
-        MetadataBlockBuilder::new()
+    pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder {
+        MetadataBlockBuilder::new(event)
     }
 
     pub fn dataset_snapshot() -> DatasetSnapshotBuilder {
         DatasetSnapshotBuilder::new()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Seed Builder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SeedBuilder {
+    v: Seed,
+}
+
+impl SeedBuilder {
+    fn new(kind: DatasetKind) -> Self {
+        Self {
+            v: Seed {
+                dataset_id: DatasetID::from_pub_key_ed25519(b""),
+                dataset_kind: kind,
+            },
+        }
+    }
+
+    pub fn id_random(mut self) -> Self {
+        self.v.dataset_id = DatasetID::from_new_keypair_ed25519().1;
+        self
+    }
+
+    pub fn id_from<B: AsRef<[u8]>>(mut self, key: B) -> Self {
+        self.v.dataset_id = DatasetID::from_pub_key_ed25519(key.as_ref());
+        self
+    }
+
+    pub fn build(self) -> Seed {
+        self.v
     }
 }
 
@@ -80,17 +121,17 @@ impl TransformSqlBuilder {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DatasetSource Builder Root
+// SetPollingSourceBuilder
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetSourceBuilderRoot {
-    v: DatasetSourceRoot,
+pub struct SetPollingSourceBuilder {
+    v: SetPollingSource,
 }
 
-impl DatasetSourceBuilderRoot {
+impl SetPollingSourceBuilder {
     fn new() -> Self {
         Self {
-            v: DatasetSourceRoot {
+            v: SetPollingSource {
                 fetch: FetchStep::Url(FetchStepUrl {
                     url: "http://nowhere.org".to_owned(),
                     event_time: None,
@@ -105,7 +146,7 @@ impl DatasetSourceBuilderRoot {
     }
 
     pub fn fetch(mut self, fetch_step: FetchStep) -> Self {
-        self.v = DatasetSourceRoot {
+        self.v = SetPollingSource {
             fetch: fetch_step,
             ..self.v
         };
@@ -121,31 +162,27 @@ impl DatasetSourceBuilderRoot {
     }
 
     pub fn read(mut self, read_step: ReadStep) -> Self {
-        self.v = DatasetSourceRoot {
+        self.v = SetPollingSource {
             read: read_step,
             ..self.v
         };
         self
     }
 
-    pub fn build(self) -> DatasetSource {
-        DatasetSource::Root(self.v)
-    }
-
-    pub fn build_inner(self) -> DatasetSourceRoot {
+    pub fn build(self) -> SetPollingSource {
         self.v
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// DatasetSource Builder Deriv
+// SetTransformBuilder
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetSourceBuilderDeriv {
-    v: DatasetSourceDerivative,
+pub struct SetTransformBuilder {
+    v: SetTransform,
 }
 
-impl DatasetSourceBuilderDeriv {
+impl SetTransformBuilder {
     fn new<S, I>(inputs: I) -> Self
     where
         I: Iterator<Item = S>,
@@ -153,7 +190,7 @@ impl DatasetSourceBuilderDeriv {
         <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
         Self {
-            v: DatasetSourceDerivative {
+            v: SetTransform {
                 inputs: inputs
                     .map(|s| TransformInput {
                         id: None,
@@ -177,11 +214,44 @@ impl DatasetSourceBuilderDeriv {
         self
     }
 
-    pub fn build(self) -> DatasetSource {
-        DatasetSource::Derivative(self.v)
+    pub fn build(self) -> SetTransform {
+        self.v
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// AddDataBuilder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct AddDataBuilder {
+    v: AddData,
+}
+
+impl AddDataBuilder {
+    fn new() -> Self {
+        Self {
+            v: AddData {
+                output_data: DataSlice {
+                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                    interval: OffsetInterval { start: 0, end: 9 },
+                },
+                output_watermark: Some(Utc::now()),
+            },
+        }
     }
 
-    pub fn build_inner(self) -> DatasetSourceDerivative {
+    pub fn interval(mut self, start: i64, end: i64) -> Self {
+        self.v.output_data.interval = OffsetInterval { start, end };
+        self
+    }
+
+    pub fn watermark(mut self, wm: DateTime<Utc>) -> Self {
+        self.v.output_watermark = Some(wm);
+        self
+    }
+
+    pub fn build(self) -> AddData {
         self.v
     }
 }
@@ -191,70 +261,36 @@ impl DatasetSourceBuilderDeriv {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataBlockBuilder {
-    v: MetadataBlock,
+    prev_block_hash: Option<Multihash>,
+    system_time: DateTime<Utc>,
+    event: MetadataEvent,
 }
 
 impl MetadataBlockBuilder {
-    fn new() -> Self {
+    fn new<E: Into<MetadataEvent>>(event: E) -> Self {
         Self {
-            v: MetadataBlock {
-                prev_block_hash: None,
-                system_time: Utc::now(),
-                output_slice: None,
-                output_watermark: None,
-                input_slices: None,
-                source: None,
-                vocab: None,
-                seed: None,
-            },
+            prev_block_hash: None,
+            system_time: Utc::now(),
+            event: event.into(),
         }
     }
 
     pub fn prev(mut self, prev_block_hash: &Multihash) -> Self {
-        self.v.prev_block_hash = Some(prev_block_hash.clone());
+        self.prev_block_hash = Some(prev_block_hash.clone());
         self
     }
 
     pub fn system_time(mut self, system_time: DateTime<Utc>) -> Self {
-        self.v.system_time = system_time;
-        self
-    }
-
-    pub fn input_slice(mut self, slice: InputSlice) -> Self {
-        if self.v.input_slices.is_none() {
-            self.v.input_slices = Some(Vec::new());
-        }
-        self.v.input_slices.as_mut().unwrap().push(slice);
-        self
-    }
-
-    pub fn output_slice(mut self, slice: OutputSlice) -> Self {
-        self.v.output_slice = Some(slice);
-        self
-    }
-
-    pub fn output_watermark(mut self, wm: DateTime<Utc>) -> Self {
-        self.v.output_watermark = Some(wm);
-        self
-    }
-
-    pub fn source(mut self, source: DatasetSource) -> Self {
-        self.v.source = Some(source);
-        self
-    }
-
-    pub fn seed_random(mut self) -> Self {
-        self.v.seed = Some(DatasetID::from_new_keypair_ed25519().1);
-        self
-    }
-
-    pub fn seed_from<B: AsRef<[u8]>>(mut self, key: B) -> Self {
-        self.v.seed = Some(DatasetID::from_pub_key_ed25519(key.as_ref()));
+        self.system_time = system_time;
         self
     }
 
     pub fn build(self) -> MetadataBlock {
-        self.v
+        MetadataBlock {
+            system_time: self.system_time,
+            prev_block_hash: self.prev_block_hash,
+            event: self.event,
+        }
     }
 }
 
@@ -263,17 +299,17 @@ impl MetadataBlockBuilder {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSnapshotBuilder {
-    v: DatasetSnapshot,
+    name: Option<DatasetName>,
+    kind: DatasetKind,
+    metadata: Vec<MetadataEvent>,
 }
 
 impl DatasetSnapshotBuilder {
     fn new() -> Self {
         Self {
-            v: DatasetSnapshot {
-                name: IDFactory::dataset_name(),
-                source: DatasetSourceBuilderRoot::new().build(),
-                vocab: None,
-            },
+            name: None,
+            kind: DatasetKind::Root,
+            metadata: Vec::new(),
         }
     }
 
@@ -281,16 +317,25 @@ impl DatasetSnapshotBuilder {
     where
         <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
-        self.v.name = s.try_into().unwrap();
+        self.name = Some(s.try_into().unwrap());
         self
     }
 
-    pub fn source(mut self, source: DatasetSource) -> Self {
-        self.v.source = source;
+    pub fn kind(mut self, kind: DatasetKind) -> Self {
+        self.kind = kind;
+        self
+    }
+
+    pub fn push_event<E: Into<MetadataEvent>>(mut self, event: E) -> Self {
+        self.metadata.push(event.into());
         self
     }
 
     pub fn build(self) -> DatasetSnapshot {
-        self.v
+        DatasetSnapshot {
+            name: self.name.unwrap_or_else(|| IDFactory::dataset_name()),
+            kind: self.kind,
+            metadata: self.metadata,
+        }
     }
 }

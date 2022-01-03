@@ -44,6 +44,36 @@ pub trait FlatbuffersEnumDeserializable<'fb, E> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddData
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
+    type OffsetT = WIPOffset<fb::AddData<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let output_data_offset = { self.output_data.serialize(fb) };
+        let mut builder = fb::AddDataBuilder::new(fb);
+        builder.add_output_data(output_data_offset);
+        self.output_watermark
+            .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
+    fn deserialize(proxy: fb::AddData<'fb>) -> Self {
+        odf::AddData {
+            output_data: proxy
+                .output_data()
+                .map(|v| odf::DataSlice::deserialize(v))
+                .unwrap(),
+            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,181 +107,64 @@ impl<'fb> FlatbuffersDeserializable<fb::BlockInterval<'fb>> for odf::BlockInterv
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetSnapshot
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetSnapshot {
-    type OffsetT = WIPOffset<fb::DatasetSnapshot<'fb>>;
+impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSlice {
+    type OffsetT = WIPOffset<fb::DataSlice<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let name_offset = { fb.create_string(&self.name) };
-        let source_offset = { self.source.serialize(fb) };
-        let vocab_offset = self.vocab.as_ref().map(|v| v.serialize(fb));
-        let mut builder = fb::DatasetSnapshotBuilder::new(fb);
-        builder.add_name(name_offset);
-        builder.add_source_type(source_offset.0);
-        builder.add_source(source_offset.1);
-        vocab_offset.map(|off| builder.add_vocab(off));
+        let logical_hash_offset = { fb.create_vector(&self.logical_hash.to_bytes()) };
+        let physical_hash_offset = { fb.create_vector(&self.physical_hash.to_bytes()) };
+        let interval_offset = { self.interval.serialize(fb) };
+        let mut builder = fb::DataSliceBuilder::new(fb);
+        builder.add_logical_hash(logical_hash_offset);
+        builder.add_physical_hash(physical_hash_offset);
+        builder.add_interval(interval_offset);
         builder.finish()
     }
 }
 
-impl<'fb> FlatbuffersDeserializable<fb::DatasetSnapshot<'fb>> for odf::DatasetSnapshot {
-    fn deserialize(proxy: fb::DatasetSnapshot<'fb>) -> Self {
-        odf::DatasetSnapshot {
-            name: proxy
-                .name()
-                .map(|v| odf::DatasetName::try_from(v).unwrap())
+impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
+    fn deserialize(proxy: fb::DataSlice<'fb>) -> Self {
+        odf::DataSlice {
+            logical_hash: proxy
+                .logical_hash()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap())
                 .unwrap(),
-            source: proxy
-                .source()
-                .map(|v| odf::DatasetSource::deserialize(v, proxy.source_type()))
+            physical_hash: proxy
+                .physical_hash()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap())
                 .unwrap(),
-            vocab: proxy
-                .vocab()
-                .map(|v| odf::DatasetVocabulary::deserialize(v)),
+            interval: proxy
+                .interval()
+                .map(|v| odf::OffsetInterval::deserialize(v))
+                .unwrap(),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
+// DatasetKind
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'fb> FlatbuffersEnumSerializable<'fb, fb::DatasetSource> for odf::DatasetSource {
-    fn serialize(
-        &self,
-        fb: &mut FlatBufferBuilder<'fb>,
-    ) -> (fb::DatasetSource, WIPOffset<UnionWIPOffset>) {
+impl From<odf::DatasetKind> for fb::DatasetKind {
+    fn from(v: odf::DatasetKind) -> Self {
+        match v {
+            odf::DatasetKind::Root => fb::DatasetKind::Root,
+            odf::DatasetKind::Derivative => fb::DatasetKind::Derivative,
+        }
+    }
+}
+
+impl Into<odf::DatasetKind> for fb::DatasetKind {
+    fn into(self) -> odf::DatasetKind {
         match self {
-            odf::DatasetSource::Root(v) => (
-                fb::DatasetSource::DatasetSourceRoot,
-                v.serialize(fb).as_union_value(),
-            ),
-            odf::DatasetSource::Derivative(v) => (
-                fb::DatasetSource::DatasetSourceDerivative,
-                v.serialize(fb).as_union_value(),
-            ),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::DatasetSource> for odf::DatasetSource {
-    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::DatasetSource) -> Self {
-        match t {
-            fb::DatasetSource::DatasetSourceRoot => odf::DatasetSource::Root(
-                odf::DatasetSourceRoot::deserialize(fb::DatasetSourceRoot::init_from_table(table)),
-            ),
-            fb::DatasetSource::DatasetSourceDerivative => {
-                odf::DatasetSource::Derivative(odf::DatasetSourceDerivative::deserialize(
-                    fb::DatasetSourceDerivative::init_from_table(table),
-                ))
-            }
-            _ => panic!("Invalid enum value: {}", t.0),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetSourceRoot {
-    type OffsetT = WIPOffset<fb::DatasetSourceRoot<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let fetch_offset = { self.fetch.serialize(fb) };
-        let prepare_offset = self.prepare.as_ref().map(|v| {
-            let offsets: Vec<_> = v
-                .iter()
-                .map(|i| {
-                    let (value_type, value_offset) = i.serialize(fb);
-                    let mut builder = fb::PrepStepWrapperBuilder::new(fb);
-                    builder.add_value_type(value_type);
-                    builder.add_value(value_offset);
-                    builder.finish()
-                })
-                .collect();
-            fb.create_vector(&offsets)
-        });
-        let read_offset = { self.read.serialize(fb) };
-        let preprocess_offset = self.preprocess.as_ref().map(|v| v.serialize(fb));
-        let merge_offset = { self.merge.serialize(fb) };
-        let mut builder = fb::DatasetSourceRootBuilder::new(fb);
-        builder.add_fetch_type(fetch_offset.0);
-        builder.add_fetch(fetch_offset.1);
-        prepare_offset.map(|off| builder.add_prepare(off));
-        builder.add_read_type(read_offset.0);
-        builder.add_read(read_offset.1);
-        preprocess_offset.map(|(e, off)| {
-            builder.add_preprocess_type(e);
-            builder.add_preprocess(off)
-        });
-        builder.add_merge_type(merge_offset.0);
-        builder.add_merge(merge_offset.1);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::DatasetSourceRoot<'fb>> for odf::DatasetSourceRoot {
-    fn deserialize(proxy: fb::DatasetSourceRoot<'fb>) -> Self {
-        odf::DatasetSourceRoot {
-            fetch: proxy
-                .fetch()
-                .map(|v| odf::FetchStep::deserialize(v, proxy.fetch_type()))
-                .unwrap(),
-            prepare: proxy.prepare().map(|v| {
-                v.iter()
-                    .map(|i| odf::PrepStep::deserialize(i.value().unwrap(), i.value_type()))
-                    .collect()
-            }),
-            read: proxy
-                .read()
-                .map(|v| odf::ReadStep::deserialize(v, proxy.read_type()))
-                .unwrap(),
-            preprocess: proxy
-                .preprocess()
-                .map(|v| odf::Transform::deserialize(v, proxy.preprocess_type())),
-            merge: proxy
-                .merge()
-                .map(|v| odf::MergeStrategy::deserialize(v, proxy.merge_type()))
-                .unwrap(),
-        }
-    }
-}
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetSourceDerivative {
-    type OffsetT = WIPOffset<fb::DatasetSourceDerivative<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let inputs_offset = {
-            let offsets: Vec<_> = self.inputs.iter().map(|i| i.serialize(fb)).collect();
-            fb.create_vector(&offsets)
-        };
-        let transform_offset = { self.transform.serialize(fb) };
-        let mut builder = fb::DatasetSourceDerivativeBuilder::new(fb);
-        builder.add_inputs(inputs_offset);
-        builder.add_transform_type(transform_offset.0);
-        builder.add_transform(transform_offset.1);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::DatasetSourceDerivative<'fb>>
-    for odf::DatasetSourceDerivative
-{
-    fn deserialize(proxy: fb::DatasetSourceDerivative<'fb>) -> Self {
-        odf::DatasetSourceDerivative {
-            inputs: proxy
-                .inputs()
-                .map(|v| {
-                    v.iter()
-                        .map(|i| odf::TransformInput::deserialize(i))
-                        .collect()
-                })
-                .unwrap(),
-            transform: proxy
-                .transform()
-                .map(|v| odf::Transform::deserialize(v, proxy.transform_type()))
-                .unwrap(),
+            fb::DatasetKind::Root => odf::DatasetKind::Root,
+            fb::DatasetKind::Derivative => odf::DatasetKind::Derivative,
+            _ => panic!("Invalid enum value: {}", self.0),
         }
     }
 }
@@ -349,6 +262,42 @@ impl<'fb> FlatbuffersDeserializable<fb::EventTimeSourceFromPath<'fb>>
         odf::EventTimeSourceFromPath {
             pattern: proxy.pattern().map(|v| v.to_owned()).unwrap(),
             timestamp_format: proxy.timestamp_format().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQuery {
+    type OffsetT = WIPOffset<fb::ExecuteQuery<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let input_slices_offset = {
+            let offsets: Vec<_> = self.input_slices.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let output_data_offset = self.output_data.as_ref().map(|v| v.serialize(fb));
+        let mut builder = fb::ExecuteQueryBuilder::new(fb);
+        builder.add_input_slices(input_slices_offset);
+        output_data_offset.map(|off| builder.add_output_data(off));
+        self.output_watermark
+            .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ExecuteQuery<'fb>> for odf::ExecuteQuery {
+    fn deserialize(proxy: fb::ExecuteQuery<'fb>) -> Self {
+        odf::ExecuteQuery {
+            input_slices: proxy
+                .input_slices()
+                .map(|v| v.iter().map(|i| odf::InputSlice::deserialize(i)).collect())
+                .unwrap(),
+            output_data: proxy.output_data().map(|v| odf::DataSlice::deserialize(v)),
+            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
         }
     }
 }
@@ -946,27 +895,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
             .prev_block_hash
             .as_ref()
             .map(|v| fb.create_vector(&v.to_bytes()));
-        let output_slice_offset = self.output_slice.as_ref().map(|v| v.serialize(fb));
-        let input_slices_offset = self.input_slices.as_ref().map(|v| {
-            let offsets: Vec<_> = v.iter().map(|i| i.serialize(fb)).collect();
-            fb.create_vector(&offsets)
-        });
-        let source_offset = self.source.as_ref().map(|v| v.serialize(fb));
-        let vocab_offset = self.vocab.as_ref().map(|v| v.serialize(fb));
-        let seed_offset = self.seed.as_ref().map(|v| fb.create_vector(&v.to_bytes()));
+        let event_offset = { self.event.serialize(fb) };
         let mut builder = fb::MetadataBlockBuilder::new(fb);
-        prev_block_hash_offset.map(|off| builder.add_prev_block_hash(off));
         builder.add_system_time(&datetime_to_fb(&self.system_time));
-        output_slice_offset.map(|off| builder.add_output_slice(off));
-        self.output_watermark
-            .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
-        input_slices_offset.map(|off| builder.add_input_slices(off));
-        source_offset.map(|(e, off)| {
-            builder.add_source_type(e);
-            builder.add_source(off)
-        });
-        vocab_offset.map(|off| builder.add_vocab(off));
-        seed_offset.map(|off| builder.add_seed(off));
+        prev_block_hash_offset.map(|off| builder.add_prev_block_hash(off));
+        builder.add_event_type(event_offset.0);
+        builder.add_event(event_offset.1);
         builder.finish()
     }
 }
@@ -974,24 +908,84 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
 impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlock {
     fn deserialize(proxy: fb::MetadataBlock<'fb>) -> Self {
         odf::MetadataBlock {
+            system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
             prev_block_hash: proxy
                 .prev_block_hash()
                 .map(|v| odf::Multihash::from_bytes(v).unwrap()),
-            system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
-            output_slice: proxy
-                .output_slice()
-                .map(|v| odf::OutputSlice::deserialize(v)),
-            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
-            input_slices: proxy
-                .input_slices()
-                .map(|v| v.iter().map(|i| odf::InputSlice::deserialize(i)).collect()),
-            source: proxy
-                .source()
-                .map(|v| odf::DatasetSource::deserialize(v, proxy.source_type())),
-            vocab: proxy
-                .vocab()
-                .map(|v| odf::DatasetVocabulary::deserialize(v)),
-            seed: proxy.seed().map(|v| odf::DatasetID::from_bytes(v).unwrap()),
+            event: proxy
+                .event()
+                .map(|v| odf::MetadataEvent::deserialize(v, proxy.event_type()))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataEvent
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MetadataEvent> for odf::MetadataEvent {
+    fn serialize(
+        &self,
+        fb: &mut FlatBufferBuilder<'fb>,
+    ) -> (fb::MetadataEvent, WIPOffset<UnionWIPOffset>) {
+        match self {
+            odf::MetadataEvent::AddData(v) => {
+                (fb::MetadataEvent::AddData, v.serialize(fb).as_union_value())
+            }
+            odf::MetadataEvent::ExecuteQuery(v) => (
+                fb::MetadataEvent::ExecuteQuery,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MetadataEvent::Seed(v) => {
+                (fb::MetadataEvent::Seed, v.serialize(fb).as_union_value())
+            }
+            odf::MetadataEvent::SetPollingSource(v) => (
+                fb::MetadataEvent::SetPollingSource,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MetadataEvent::SetTransform(v) => (
+                fb::MetadataEvent::SetTransform,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MetadataEvent::SetVocab(v) => (
+                fb::MetadataEvent::SetVocab,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MetadataEvent::SetWatermark(v) => (
+                fb::MetadataEvent::SetWatermark,
+                v.serialize(fb).as_union_value(),
+            ),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::MetadataEvent {
+    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::MetadataEvent) -> Self {
+        match t {
+            fb::MetadataEvent::AddData => odf::MetadataEvent::AddData(odf::AddData::deserialize(
+                fb::AddData::init_from_table(table),
+            )),
+            fb::MetadataEvent::ExecuteQuery => odf::MetadataEvent::ExecuteQuery(
+                odf::ExecuteQuery::deserialize(fb::ExecuteQuery::init_from_table(table)),
+            ),
+            fb::MetadataEvent::Seed => {
+                odf::MetadataEvent::Seed(odf::Seed::deserialize(fb::Seed::init_from_table(table)))
+            }
+            fb::MetadataEvent::SetPollingSource => odf::MetadataEvent::SetPollingSource(
+                odf::SetPollingSource::deserialize(fb::SetPollingSource::init_from_table(table)),
+            ),
+            fb::MetadataEvent::SetTransform => odf::MetadataEvent::SetTransform(
+                odf::SetTransform::deserialize(fb::SetTransform::init_from_table(table)),
+            ),
+            fb::MetadataEvent::SetVocab => odf::MetadataEvent::SetVocab(
+                odf::SetVocab::deserialize(fb::SetVocab::init_from_table(table)),
+            ),
+            fb::MetadataEvent::SetWatermark => odf::MetadataEvent::SetWatermark(
+                odf::SetWatermark::deserialize(fb::SetWatermark::init_from_table(table)),
+            ),
+            _ => panic!("Invalid enum value: {}", t.0),
         }
     }
 }
@@ -1017,45 +1011,6 @@ impl<'fb> FlatbuffersDeserializable<fb::OffsetInterval<'fb>> for odf::OffsetInte
         odf::OffsetInterval {
             start: proxy.start(),
             end: proxy.end(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// OutputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::OutputSlice {
-    type OffsetT = WIPOffset<fb::OutputSlice<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let data_logical_hash_offset = { fb.create_vector(&self.data_logical_hash.to_bytes()) };
-        let data_physical_hash_offset = { fb.create_vector(&self.data_physical_hash.to_bytes()) };
-        let data_interval_offset = { self.data_interval.serialize(fb) };
-        let mut builder = fb::OutputSliceBuilder::new(fb);
-        builder.add_data_logical_hash(data_logical_hash_offset);
-        builder.add_data_physical_hash(data_physical_hash_offset);
-        builder.add_data_interval(data_interval_offset);
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::OutputSlice<'fb>> for odf::OutputSlice {
-    fn deserialize(proxy: fb::OutputSlice<'fb>) -> Self {
-        odf::OutputSlice {
-            data_logical_hash: proxy
-                .data_logical_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
-                .unwrap(),
-            data_physical_hash: proxy
-                .data_physical_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
-                .unwrap(),
-            data_interval: proxy
-                .data_interval()
-                .map(|v| odf::OffsetInterval::deserialize(v))
-                .unwrap(),
         }
     }
 }
@@ -1372,6 +1327,195 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepEsriShapefile<'fb>> for odf::Rea
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
             sub_path: proxy.sub_path().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Seed
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::Seed {
+    type OffsetT = WIPOffset<fb::Seed<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let mut builder = fb::SeedBuilder::new(fb);
+        builder.add_dataset_id(dataset_id_offset);
+        builder.add_dataset_kind(self.dataset_kind.into());
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::Seed<'fb>> for odf::Seed {
+    fn deserialize(proxy: fb::Seed<'fb>) -> Self {
+        odf::Seed {
+            dataset_id: proxy
+                .dataset_id()
+                .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .unwrap(),
+            dataset_kind: proxy.dataset_kind().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetPollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetPollingSource {
+    type OffsetT = WIPOffset<fb::SetPollingSource<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let fetch_offset = { self.fetch.serialize(fb) };
+        let prepare_offset = self.prepare.as_ref().map(|v| {
+            let offsets: Vec<_> = v
+                .iter()
+                .map(|i| {
+                    let (value_type, value_offset) = i.serialize(fb);
+                    let mut builder = fb::PrepStepWrapperBuilder::new(fb);
+                    builder.add_value_type(value_type);
+                    builder.add_value(value_offset);
+                    builder.finish()
+                })
+                .collect();
+            fb.create_vector(&offsets)
+        });
+        let read_offset = { self.read.serialize(fb) };
+        let preprocess_offset = self.preprocess.as_ref().map(|v| v.serialize(fb));
+        let merge_offset = { self.merge.serialize(fb) };
+        let mut builder = fb::SetPollingSourceBuilder::new(fb);
+        builder.add_fetch_type(fetch_offset.0);
+        builder.add_fetch(fetch_offset.1);
+        prepare_offset.map(|off| builder.add_prepare(off));
+        builder.add_read_type(read_offset.0);
+        builder.add_read(read_offset.1);
+        preprocess_offset.map(|(e, off)| {
+            builder.add_preprocess_type(e);
+            builder.add_preprocess(off)
+        });
+        builder.add_merge_type(merge_offset.0);
+        builder.add_merge(merge_offset.1);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetPollingSource<'fb>> for odf::SetPollingSource {
+    fn deserialize(proxy: fb::SetPollingSource<'fb>) -> Self {
+        odf::SetPollingSource {
+            fetch: proxy
+                .fetch()
+                .map(|v| odf::FetchStep::deserialize(v, proxy.fetch_type()))
+                .unwrap(),
+            prepare: proxy.prepare().map(|v| {
+                v.iter()
+                    .map(|i| odf::PrepStep::deserialize(i.value().unwrap(), i.value_type()))
+                    .collect()
+            }),
+            read: proxy
+                .read()
+                .map(|v| odf::ReadStep::deserialize(v, proxy.read_type()))
+                .unwrap(),
+            preprocess: proxy
+                .preprocess()
+                .map(|v| odf::Transform::deserialize(v, proxy.preprocess_type())),
+            merge: proxy
+                .merge()
+                .map(|v| odf::MergeStrategy::deserialize(v, proxy.merge_type()))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetTransform {
+    type OffsetT = WIPOffset<fb::SetTransform<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let inputs_offset = {
+            let offsets: Vec<_> = self.inputs.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let transform_offset = { self.transform.serialize(fb) };
+        let mut builder = fb::SetTransformBuilder::new(fb);
+        builder.add_inputs(inputs_offset);
+        builder.add_transform_type(transform_offset.0);
+        builder.add_transform(transform_offset.1);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetTransform<'fb>> for odf::SetTransform {
+    fn deserialize(proxy: fb::SetTransform<'fb>) -> Self {
+        odf::SetTransform {
+            inputs: proxy
+                .inputs()
+                .map(|v| {
+                    v.iter()
+                        .map(|i| odf::TransformInput::deserialize(i))
+                        .collect()
+                })
+                .unwrap(),
+            transform: proxy
+                .transform()
+                .map(|v| odf::Transform::deserialize(v, proxy.transform_type()))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetVocab
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
+    type OffsetT = WIPOffset<fb::SetVocab<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let vocab_offset = { self.vocab.serialize(fb) };
+        let mut builder = fb::SetVocabBuilder::new(fb);
+        builder.add_vocab(vocab_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetVocab<'fb>> for odf::SetVocab {
+    fn deserialize(proxy: fb::SetVocab<'fb>) -> Self {
+        odf::SetVocab {
+            vocab: proxy
+                .vocab()
+                .map(|v| odf::DatasetVocabulary::deserialize(v))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetWatermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetWatermark {
+    type OffsetT = WIPOffset<fb::SetWatermark<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let mut builder = fb::SetWatermarkBuilder::new(fb);
+        builder.add_output_watermark(&datetime_to_fb(&self.output_watermark));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetWatermark<'fb>> for odf::SetWatermark {
+    fn deserialize(proxy: fb::SetWatermark<'fb>) -> Self {
+        odf::SetWatermark {
+            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)).unwrap(),
         }
     }
 }

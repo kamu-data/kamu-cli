@@ -79,7 +79,10 @@ impl QueryService for QueryServiceImpl {
             .metadata_repo
             .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
-            .filter_map(|(_, b)| b.vocab)
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::SetVocab(sv) => Some(sv.vocab),
+                _ => None,
+            })
             .next()
             .unwrap_or_default();
 
@@ -180,7 +183,11 @@ impl QueryService for QueryServiceImpl {
 
         let last_data_file = metadata_chain
             .iter_blocks()
-            .filter(|(_, b)| b.output_slice.is_some())
+            .filter(|(_, b)| match &b.event {
+                MetadataEvent::AddData(_) => true,
+                MetadataEvent::ExecuteQuery(eq) => eq.output_data.is_some(),
+                _ => false,
+            })
             .map(|(block_hash, _)| dataset_layout.data_dir.join(block_hash.to_string()))
             .next()
             .expect("Obtaining schema from datasets with no data is not yet supported");
@@ -285,12 +292,16 @@ impl KamuSchema {
             let mut files = Vec::new();
             let mut num_records = 0;
 
-            for (block_hash, block) in metadata_chain
-                .iter_blocks()
-                .filter(|(_, b)| b.output_slice.is_some())
+            for (block_hash, slice) in
+                metadata_chain
+                    .iter_blocks()
+                    .filter_map(|(h, b)| match b.event {
+                        MetadataEvent::AddData(e) => Some((h, e.output_data)),
+                        MetadataEvent::ExecuteQuery(e) => e.output_data.map(|v| (h, v)),
+                        _ => None,
+                    })
             {
-                let data_iv = &block.output_slice.as_ref().unwrap().data_interval;
-                num_records += data_iv.end - data_iv.start + 1;
+                num_records += slice.interval.end - slice.interval.start + 1;
                 files.push(dataset_layout.data_dir.join(block_hash.to_string()));
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;

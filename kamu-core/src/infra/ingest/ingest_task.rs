@@ -28,7 +28,7 @@ pub struct IngestTask {
     next_offset: i64,
     layout: DatasetLayout,
     meta_chain: RefCell<Box<dyn MetadataChain>>,
-    source: DatasetSourceRoot,
+    source: SetPollingSource,
     fetch_override: Option<FetchStep>,
     prev_checkpoint: Option<Multihash>,
     vocab: DatasetVocabulary,
@@ -56,27 +56,23 @@ impl IngestTask {
         let mut next_offset = 0;
 
         for (block_hash, block) in meta_chain.iter_blocks() {
-            if next_offset == 0 {
-                if let Some(os) = &block.output_slice {
-                    next_offset = os.data_interval.end + 1;
+            match block.event {
+                MetadataEvent::AddData(add_data) => {
+                    if next_offset == 0 {
+                        next_offset = add_data.output_data.interval.end + 1;
+                    }
+                    // TODO: Keep track of other types of blocks that may produce checkpoints
+                    if prev_checkpoint.is_none() {
+                        prev_checkpoint = Some(block_hash);
+                    }
                 }
-            }
-
-            if source.is_none() {
-                match block.source {
-                    Some(DatasetSource::Root(src)) => source = Some(src),
-                    _ => (),
+                MetadataEvent::SetPollingSource(src) if source.is_none() => {
+                    source = Some(src);
                 }
-            }
-            // TODO: Verify assumption that only blocks with output_slice or output_watermark have checkpoints
-            if prev_checkpoint.is_none()
-                && (block.output_slice.is_some() || block.output_watermark.is_some())
-            {
-                prev_checkpoint = Some(block_hash)
-            }
-
-            if vocab.is_none() && block.vocab.is_some() {
-                vocab = block.vocab;
+                MetadataEvent::SetVocab(set_vocab) => {
+                    vocab = Some(set_vocab.vocab);
+                }
+                _ => (),
             }
 
             if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
@@ -368,7 +364,7 @@ impl IngestTask {
 
                     // New block might not contain anything new, so we check for data
                     // and watermark differences to see if commit should be skipped
-                    let output_slice = if let Some(data_interval) = data_interval {
+                    let metadata_event = if let Some(data_interval) = data_interval {
                         let span = info_span!("Computing data hashes");
                         let _span_guard = span.enter();
 
@@ -384,15 +380,22 @@ impl IngestTask {
                         // Advance offset for the next run
                         self.next_offset = data_interval.end + 1;
 
-                        Some(OutputSlice {
-                            data_logical_hash,
-                            data_physical_hash,
-                            data_interval,
-                        })
+                        MetadataEvent::AddData(AddData{
+                            output_data: DataSlice {
+                            logical_hash: data_logical_hash,
+                            physical_hash: data_physical_hash,
+                            interval: data_interval,
+                        },
+                        output_watermark,
+                    })
                     } else {
                         let prev_watermark = self.meta_chain.borrow()
                             .iter_blocks()
-                            .filter_map(|(_, b)| b.output_watermark)
+                            .filter_map(|(_, b)| match b.event {
+                                MetadataEvent::AddData(add_data) => add_data.output_watermark,
+                                MetadataEvent::SetWatermark(set_wm) => Some(set_wm.output_watermark),
+                                _ => None,
+                            })
                             .next();
 
                         if output_watermark.is_none() || output_watermark == prev_watermark {
@@ -407,18 +410,15 @@ impl IngestTask {
                                 },
                             })
                         }
-                        None
+                        MetadataEvent::SetWatermark(SetWatermark{
+                            output_watermark: output_watermark.unwrap(),
+                        })
                     };
 
                     let new_block = MetadataBlock {
-                        prev_block_hash: Some(prev_hash),
                         system_time: read_result.checkpoint.system_time,
-                        input_slices: None,
-                        output_slice,
-                        output_watermark: read_result.checkpoint.engine_response.output_watermark,
-                        source: None,
-                        vocab: None,
-                        seed: None,
+                        prev_block_hash: Some(prev_hash),
+                        event: metadata_event,
                     };
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);

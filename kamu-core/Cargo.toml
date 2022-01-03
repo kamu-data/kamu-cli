@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.74.0"
+version = "0.75.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -69,3 +69,6 @@ users = "*"  # For getting uid:gid
 
 [dev-dependencies]
 filetime = "*"
+env_logger = "*"
+test-log = { version = "*", features = ["trace"] }
+tracing-subscriber = { version = "*", features = ["env-filter"] }

@@ -45,31 +45,28 @@ impl InspectQueryCommand {
             .metadata_repo
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
-        for (hash, block) in chain.iter_blocks() {
-            match block.source {
-                Some(DatasetSource::Root(DatasetSourceRoot {
-                    preprocess: Some(ref transform),
-                    ..
-                })) => {
+        for (block_hash, block) in chain.iter_blocks() {
+            match &block.event {
+                MetadataEvent::SetTransform(SetTransform { inputs, transform }) => {
                     self.render_transform(
                         output,
                         dataset_handle,
-                        &hash,
+                        &block_hash,
                         &block,
-                        &Vec::new(),
+                        inputs,
                         transform,
                     )?;
                 }
-                Some(DatasetSource::Derivative(DatasetSourceDerivative {
-                    ref inputs,
-                    ref transform,
-                })) => {
+                MetadataEvent::SetPollingSource(SetPollingSource {
+                    preprocess: Some(transform),
+                    ..
+                }) => {
                     self.render_transform(
                         output,
                         dataset_handle,
-                        &hash,
+                        &block_hash,
                         &block,
-                        inputs,
+                        &Vec::new(),
                         transform,
                     )?;
                 }

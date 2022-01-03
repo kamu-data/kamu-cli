@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.74.0"
+version = "0.75.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -24,7 +24,7 @@ dill = { version = "~0.2.0" }
 # UI
 read_input = "*"  # Basic user input
 chrono-humanize = "*"  # Human readable durations
-clap = "*"
+clap = "^2"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners

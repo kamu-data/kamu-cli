@@ -1,45 +1,47 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
-  id: ca.covid19.case-details
-  source:
-    kind: derivative
-    inputs:
-      - ca.bccdc.covid19.case-details
-      - ca.ontario.data.covid19.case-details
-    transform:
-      kind: sql
-      engine: spark
-      query: >
-        SELECT
-          "BC" as province,
-          id,
-          reported_date,
-          sex as gender,
-          Case when age_group = '<10' then '<20'
-               when age_group = '10-19' then '<20' 
-               when age_group = '20-29' then '20s'
-               when age_group = '30-39' then '30s'
-               when age_group = '40-49' then '40s'
-               when age_group = '50-59' then '50s'
-               when age_group = '60-69' then '60s'
-               when age_group = '70-79' then '70s'
-               when age_group = '80-89' then '80s'
-               when age_group = '90+' then '90+'
-               else 'UNKNOWN' end as age_group,
-            ha as location
-          FROM `ca.bccdc.covid19.case-details`
-        UNION ALL
-        SELECT
-          "ON" as province,
-          id,
-          case_reported_date as reported_date,
-          Case when lower(gender) = 'male' then 'M' 
-               when lower(gender) = 'female' then 'F' 
-               else 'U' end as gender,
-          age_group,
-          city as location
-          FROM `ca.ontario.data.covid19.case-details`
-  vocab:
-    eventTimeColumn: reported_date
+  name: ca.covid19.case-details
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: ca.bccdc.covid19.case-details
+        - name: ca.ontario.data.covid19.case-details
+      transform:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            "BC" as province,
+            id,
+            reported_date,
+            sex as gender,
+            Case when age_group = '<10' then '<20'
+                 when age_group = '10-19' then '<20' 
+                 when age_group = '20-29' then '20s'
+                 when age_group = '30-39' then '30s'
+                 when age_group = '40-49' then '40s'
+                 when age_group = '50-59' then '50s'
+                 when age_group = '60-69' then '60s'
+                 when age_group = '70-79' then '70s'
+                 when age_group = '80-89' then '80s'
+                 when age_group = '90+' then '90+'
+                 else 'UNKNOWN' end as age_group,
+              ha as location
+            FROM `ca.bccdc.covid19.case-details`
+          UNION
+          SELECT
+            "ON" as province,
+            id,
+            case_reported_date as reported_date,
+            Case when lower(gender) = 'male' then 'M' 
+                 when lower(gender) = 'female' then 'F' 
+                 else 'U' end as gender,
+            age_group,
+            city as location
+            FROM `ca.ontario.data.covid19.case-details`
+    - kind: setVocab
+      vocab:
+        eventTimeColumn: reported_date
 

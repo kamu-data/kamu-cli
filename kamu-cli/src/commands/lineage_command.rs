@@ -11,7 +11,6 @@ use crate::OutputConfig;
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use kamu::infra::DatasetKind;
 use kamu::infra::DotStyle;
 use kamu::infra::DotVisitor;
 use kamu::infra::WorkspaceLayout;

@@ -24,35 +24,35 @@ fn serde_dataset_snapshot_root() {
         version: 1
         content:
           name: kamu.test
-          source:
-            kind: root
-            fetch:
-              kind: url
-              url: \"ftp://kamu.dev/test.zip\"
-              cache:
-                kind: forever
-            prepare:
-              - kind: decompress
-                format: zip
-                subPath: data_*.csv
-            read:
-              kind: csv
-              header: true
-            preprocess:
-              kind: sql
-              engine: spark
-              query: SELECT * FROM input
-            merge:
-              kind: snapshot
-              primaryKey:
-                - id
-          vocab:
-            eventTimeColumn: date\n"
+          kind: root
+          metadata:
+            - kind: setPollingSource
+              fetch:
+                kind: url
+                url: \"ftp://kamu.dev/test.zip\"
+                cache:
+                  kind: forever
+              prepare:
+                - kind: decompress
+                  format: zip
+                  subPath: data_*.csv
+              read:
+                kind: csv
+                header: true
+              preprocess:
+                kind: sql
+                engine: spark
+                query: SELECT * FROM input
+              merge:
+                kind: snapshot
+                primaryKey:
+                  - id\n"
     );
 
     let expected = DatasetSnapshot {
         name: DatasetName::try_from("kamu.test").unwrap(),
-        source: DatasetSource::Root(DatasetSourceRoot {
+        kind: DatasetKind::Root,
+        metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
             fetch: FetchStep::Url(FetchStepUrl {
                 url: "ftp://kamu.dev/test.zip".to_owned(),
                 event_time: None,
@@ -98,11 +98,7 @@ fn serde_dataset_snapshot_root() {
                 obsv_changed: None,
                 obsv_removed: None,
             }),
-        }),
-        vocab: Some(DatasetVocabulary {
-            event_time_column: Some("date".to_owned()),
-            ..Default::default()
-        }),
+        })],
     };
 
     let actual = YamlDatasetSnapshotDeserializer
@@ -127,20 +123,22 @@ fn serde_dataset_snapshot_derivative() {
         version: 1
         content:
           name: com.naturalearthdata.admin0
-          source:
-            kind: derivative
-            inputs:
-              - name: com.naturalearthdata.10m.admin0
-              - name: com.naturalearthdata.50m.admin0
-            transform:
-              kind: sql
-              engine: spark
-              query: SOME_SQL\n"
+          kind: derivative
+          metadata:
+            - kind: setTransform
+              inputs:
+                - name: com.naturalearthdata.10m.admin0
+                - name: com.naturalearthdata.50m.admin0
+              transform:
+                kind: sql
+                engine: spark
+                query: SOME_SQL\n"
     );
 
     let expected = DatasetSnapshot {
         name: DatasetName::try_from("com.naturalearthdata.admin0").unwrap(),
-        source: DatasetSource::Derivative(DatasetSourceDerivative {
+        kind: DatasetKind::Derivative,
+        metadata: vec![MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
                     id: None,
@@ -158,8 +156,7 @@ fn serde_dataset_snapshot_derivative() {
                 queries: None,
                 temporal_tables: None,
             }),
-        }),
-        vocab: None,
+        })],
     };
 
     let actual = YamlDatasetSnapshotDeserializer
@@ -183,94 +180,60 @@ fn serde_metadata_block() {
         kind: MetadataBlock
         version: 1
         content:
-          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
           systemTime: \"2020-01-01T12:00:00Z\"
-          outputSlice:
-            dataLogicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
-            dataPhysicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
-            dataInterval:
-              start: 10
-              end: 20
-          outputWatermark: \"2020-01-01T12:00:00Z\"
-          inputSlices:
-            - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
-              blockInterval:
-                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
-              dataInterval:
+          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+          event:
+            kind: executeQuery
+            inputSlices:
+              - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
+                blockInterval:
+                  start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                  end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+                dataInterval:
+                  start: 10
+                  end: 20
+              - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
+                blockInterval:
+                  start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                  end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+            outputData:
+              logicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
+              physicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
+              interval:
                 start: 10
                 end: 20
-            - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
-              blockInterval:
-                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
-          source:
-            kind: derivative
-            inputs:
-              - id: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
-                name: input1
-              - id: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
-                name: input2
-            transform:
-              kind: sql
-              engine: spark
-              query: SELECT * FROM input1 UNION ALL SELECT * FROM input2
-          vocab:
-            eventTimeColumn: date
-          seed: \"did:odf:z4k88e8k2itYG1sfanvUDxdmKyHYkxaowJNVb9yPHdsnGp3uZGb\"\n"
+            outputWatermark: \"2020-01-01T12:00:00Z\"\n"
     );
 
     let expected = MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-        source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
-            inputs: vec![
-                TransformInput {
-                    id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
-                    name: DatasetName::try_from("input1").unwrap(),
+        event: MetadataEvent::ExecuteQuery(ExecuteQuery {
+            input_slices: vec![
+                InputSlice {
+                    dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
+                    block_interval: Some(BlockInterval {
+                        start: Multihash::from_digest_sha3_256(b"a"),
+                        end: Multihash::from_digest_sha3_256(b"b"),
+                    }),
+                    data_interval: Some(OffsetInterval { start: 10, end: 20 }),
                 },
-                TransformInput {
-                    id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
-                    name: DatasetName::try_from("input2").unwrap(),
+                InputSlice {
+                    dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
+                    block_interval: Some(BlockInterval {
+                        start: Multihash::from_digest_sha3_256(b"a"),
+                        end: Multihash::from_digest_sha3_256(b"b"),
+                    }),
+                    data_interval: None,
                 },
             ],
-            transform: Transform::Sql(TransformSql {
-                engine: "spark".to_owned(),
-                version: None,
-                query: Some("SELECT * FROM input1 UNION ALL SELECT * FROM input2".to_owned()),
-                queries: None,
-                temporal_tables: None,
+            output_data: Some(DataSlice {
+                logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                interval: OffsetInterval { start: 10, end: 20 },
             }),
-        })),
-        vocab: Some(DatasetVocabulary {
-            event_time_column: Some("date".to_owned()),
-            ..Default::default()
+            output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         }),
-        output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-            data_interval: OffsetInterval { start: 10, end: 20 },
-        }),
-        output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-        input_slices: Some(vec![
-            InputSlice {
-                dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
-                block_interval: Some(BlockInterval {
-                    start: Multihash::from_digest_sha3_256(b"a"),
-                    end: Multihash::from_digest_sha3_256(b"b"),
-                }),
-                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
-            },
-            InputSlice {
-                dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
-                block_interval: Some(BlockInterval {
-                    start: Multihash::from_digest_sha3_256(b"a"),
-                    end: Multihash::from_digest_sha3_256(b"b"),
-                }),
-                data_interval: None,
-            },
-        ]),
-        seed: Some(DatasetID::from_pub_key_ed25519(b"deriv")),
     };
 
     let actual = YamlMetadataBlockDeserializer

@@ -51,12 +51,23 @@ impl LogCommand {
     fn filter_block(&self, block: &MetadataBlock) -> bool {
         // Keep in sync with CLI parser
         // TODO: replace with bitfield enum
-        match &self.filter {
-            None => true,
-            Some(f) if f.contains("source") && block.source.is_some() => true,
-            Some(f) if f.contains("watermark") && block.output_watermark.is_some() => true,
-            Some(f) if f.contains("data") && block.output_slice.is_some() => true,
-            _ => false,
+        if let Some(f) = &self.filter {
+            match &block.event {
+                MetadataEvent::AddData(_) if f.contains("data") || f.contains("watermark") => true,
+                MetadataEvent::ExecuteQuery(_) if f.contains("data") || f.contains("watermark") => {
+                    true
+                }
+                MetadataEvent::Seed(_) if f.contains("source") => true,
+                MetadataEvent::SetPollingSource(_) if f.contains("source") => true,
+                MetadataEvent::SetTransform(_) if f.contains("source") => true,
+                MetadataEvent::SetVocab(_) if f.contains("source") => true,
+                MetadataEvent::SetWatermark(_) if f.contains("data") || f.contains("watermark") => {
+                    true
+                }
+                _ => false,
+            }
+        } else {
+            true
         }
     }
 }
@@ -143,69 +154,126 @@ impl AsciiRenderer {
                 .to_rfc3339_opts(SecondsFormat::AutoSi, true),
         )?;
 
-        if let Some(id) = &block.seed {
-            self.render_property(output, 0, "Seed", &id)?;
-        }
+        match &block.event {
+            MetadataEvent::AddData(AddData {
+                output_data,
+                output_watermark,
+            }) => {
+                self.render_property(output, 0, "Kind", "AddData")?;
+                self.render_section(output, 0, "Event")?;
 
-        if let Some(slices) = &block.input_slices {
-            self.render_section(output, 0, "Inputs")?;
+                self.render_section(output, 1, "Data")?;
+                self.render_property(output, 2, "Offset.Start", &output_data.interval.start)?;
+                self.render_property(output, 2, "Offset.End", &output_data.interval.end)?;
+                self.render_property(
+                    output,
+                    2,
+                    "Records",
+                    &(output_data.interval.end - output_data.interval.start + 1),
+                )?;
+                self.render_property(output, 2, "LogicalHash", &output_data.logical_hash)?;
+                self.render_property(output, 2, "PhysicalHash", &output_data.physical_hash)?;
 
-            for (i, s) in slices.iter().enumerate() {
-                self.render_section(output, 1, &format!("Input[{}]", i))?;
-
-                self.render_property(output, 2, "ID", &s.dataset_id)?;
-
-                if let Some(name) = self.id_to_name_lookup.get(&s.dataset_id) {
-                    self.render_property(output, 2, "Name", name)?;
-                }
-
-                if let Some(bi) = &s.block_interval {
-                    self.render_property(output, 2, "Blocks.Start", &bi.start)?;
-                    self.render_property(output, 2, "Blocks.End", &bi.end)?;
-                }
-                if let Some(iv) = &s.data_interval {
-                    self.render_property(output, 2, "Offset.Start", &iv.start)?;
-                    self.render_property(output, 2, "Offset.End", &iv.end)?;
-                    self.render_property(output, 2, "Records", &(iv.end - iv.start + 1))?;
+                if let Some(wm) = output_watermark {
+                    self.render_property(
+                        output,
+                        1,
+                        "Watermark",
+                        wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+                    )?;
                 }
             }
-        }
+            MetadataEvent::ExecuteQuery(ExecuteQuery {
+                input_slices,
+                output_data,
+                output_watermark,
+            }) => {
+                self.render_property(output, 0, "Kind", "ExecuteQuery")?;
+                self.render_section(output, 0, "Inputs")?;
+                for (i, s) in input_slices.iter().enumerate() {
+                    self.render_section(output, 1, &format!("Input[{}]", i))?;
 
-        if let Some(ref s) = block.output_slice {
-            self.render_section(output, 0, "Output")?;
-            self.render_property(output, 1, "Offset.Start", &s.data_interval.start)?;
-            self.render_property(output, 1, "Offset.End", &s.data_interval.end)?;
-            self.render_property(
-                output,
-                1,
-                "Records",
-                &(s.data_interval.end - s.data_interval.start + 1),
-            )?;
-            self.render_property(output, 1, "LogicalHash", &s.data_logical_hash)?;
-            self.render_property(output, 1, "PhysicalHash", &s.data_physical_hash)?;
-        }
+                    self.render_property(output, 2, "ID", &s.dataset_id)?;
 
-        if let Some(ref wm) = block.output_watermark {
-            if !block.output_slice.is_some() {
-                self.render_section(output, 0, "Output")?;
+                    if let Some(name) = self.id_to_name_lookup.get(&s.dataset_id) {
+                        self.render_property(output, 2, "Name", name)?;
+                    }
+
+                    if let Some(bi) = &s.block_interval {
+                        self.render_property(output, 2, "Blocks.Start", &bi.start)?;
+                        self.render_property(output, 2, "Blocks.End", &bi.end)?;
+                    }
+                    if let Some(iv) = &s.data_interval {
+                        self.render_property(output, 2, "Offset.Start", &iv.start)?;
+                        self.render_property(output, 2, "Offset.End", &iv.end)?;
+                        self.render_property(output, 2, "Records", &(iv.end - iv.start + 1))?;
+                    }
+                }
+
+                if let Some(output_data) = output_data {
+                    self.render_section(output, 0, "Data")?;
+                    self.render_property(output, 1, "Offset.Start", &output_data.interval.start)?;
+                    self.render_property(output, 1, "Offset.End", &output_data.interval.end)?;
+                    self.render_property(
+                        output,
+                        1,
+                        "NumRecords",
+                        &(output_data.interval.end - output_data.interval.start + 1),
+                    )?;
+                    self.render_property(output, 1, "LogicalHash", &output_data.logical_hash)?;
+                    self.render_property(output, 1, "PhysicalHash", &output_data.physical_hash)?;
+                }
+
+                if let Some(wm) = output_watermark {
+                    self.render_property(
+                        output,
+                        1,
+                        "Watermark",
+                        wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+                    )?;
+                }
             }
-
-            self.render_property(
-                output,
-                1,
-                "Watermark",
-                &wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
-            )?;
-        }
-
-        if let Some(ref source) = block.source {
-            match source {
-                DatasetSource::Root { .. } => {
-                    self.render_property(output, 0, "Source", &"<Root source updated>")?
+            MetadataEvent::Seed(e) => {
+                self.render_property(output, 0, "Kind", "Seed")?;
+                self.render_property(output, 0, "DatasetKind", format!("{:?}", e.dataset_kind))?;
+                self.render_property(output, 0, "DatasetID", &e.dataset_id)?;
+            }
+            MetadataEvent::SetPollingSource(_) => {
+                self.render_property(output, 0, "Kind", "SetPollingSource")?;
+                self.render_property(output, 0, "Source", "...")?
+            }
+            MetadataEvent::SetTransform(_) => {
+                self.render_property(output, 0, "Kind", &"SetTransform")?;
+                self.render_property(output, 0, "Transform", "...")?
+            }
+            MetadataEvent::SetVocab(SetVocab {
+                vocab:
+                    DatasetVocabulary {
+                        offset_column,
+                        system_time_column,
+                        event_time_column,
+                    },
+            }) => {
+                self.render_property(output, 0, "Kind", &"SetVocab")?;
+                if let Some(offset_column) = offset_column {
+                    self.render_property(output, 0, "OffsetColumn", offset_column)?;
                 }
-                DatasetSource::Derivative { .. } => {
-                    self.render_property(output, 0, "Source", &"<Derivative source updated>")?
+                if let Some(system_time_column) = system_time_column {
+                    self.render_property(output, 0, "SystemTimeColumn", system_time_column)?;
                 }
+                if let Some(event_time_column) = event_time_column {
+                    self.render_property(output, 0, "EventTimeColumn", event_time_column)?;
+                }
+            }
+            MetadataEvent::SetWatermark(e) => {
+                self.render_property(output, 0, "Kind", &"SetWatermark")?;
+                self.render_property(
+                    output,
+                    0,
+                    "Watermark",
+                    e.output_watermark
+                        .to_rfc3339_opts(SecondsFormat::AutoSi, true),
+                )?;
             }
         }
 
@@ -241,7 +309,7 @@ impl AsciiRenderer {
         output: &mut impl Write,
         indent: i32,
         name: &str,
-        value: &T,
+        value: T,
     ) -> Result<(), std::io::Error> {
         self.indent(output, indent)?;
         writeln!(

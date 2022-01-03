@@ -1,27 +1,28 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: ca.vancouver.opendata.property.parcel-polygons
-  source:
-    kind: root
-    fetch:
-      kind: url
-      url: https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/download/?format=geojson&timezone=America/Los_Angeles&lang=en
-    prepare:
-    # Transforms the single object GeoJson with "FeatureCollection" at the root
-    # into file with one "Feature" object per line
-    # as expected by Apache Sedona.
-    # In future this will not be required.
-    - kind: pipe
-      # Apache Sedona is unfortunately very sensitive to number of keys in "properties"
-      # so we have to ensure that all objects have the same set of properties with
-      # null values if needed.
-      command:
-      - 'jq'
-      - '-c'
-      - '.features[] | {type: .type, geometry: .geometry, properties: {tax_coord: .properties.tax_coord, civic_number: .properties.civic_number, site_name: .properties.site_id, street_name: .properties.streetname}}'
-    read:
-      kind: geoJson
-    merge:
-      # TODO
-      kind: append
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: url
+        url: https://opendata.vancouver.ca/explore/dataset/property-parcel-polygons/download/?format=geojson&timezone=America/Los_Angeles&lang=en
+      prepare:
+      # Transforms the single object GeoJson with "FeatureCollection" at the root
+      # into file with one "Feature" object per line
+      # as expected by Apache Sedona.
+      # In future this will not be required.
+      - kind: pipe
+        # Apache Sedona is unfortunately very sensitive to number of keys in "properties"
+        # so we have to ensure that all objects have the same set of properties with
+        # null values if needed.
+        command:
+        - 'jq'
+        - '-c'
+        - '.features[] | {type: .type, geometry: .geometry, properties: {tax_coord: .properties.tax_coord, civic_number: .properties.civic_number, site_name: .properties.site_id, street_name: .properties.streetname}}'
+      read:
+        kind: geoJson
+      merge:
+        # TODO
+        kind: append

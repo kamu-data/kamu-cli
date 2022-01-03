@@ -93,7 +93,7 @@ impl TransformServiceImpl {
 
         let response = engine.transform(operation.request)?;
 
-        let output_slice = if let Some(data_interval) = response.data_interval {
+        let output_data = if let Some(data_interval) = response.data_interval {
             // TODO: Move out this to validation
             if data_interval.end < data_interval.start || data_interval.start != offset {
                 return Err(EngineError::contract_error(
@@ -122,10 +122,10 @@ impl TransformServiceImpl {
                 crate::infra::utils::data_utils::get_parquet_physical_hash(&out_data_path)
                     .map_err(|e| TransformError::internal(e))?;
 
-            Some(OutputSlice {
-                data_logical_hash,
-                data_physical_hash,
-                data_interval,
+            Some(DataSlice {
+                logical_hash: data_logical_hash,
+                physical_hash: data_physical_hash,
+                interval: data_interval,
             })
         } else if out_data_path.exists() {
             return Err(EngineError::contract_error(
@@ -138,14 +138,13 @@ impl TransformServiceImpl {
         };
 
         let metadata_block = MetadataBlock {
-            prev_block_hash: None, // Filled out at commit
             system_time,
-            input_slices: Some(operation.input_slices),
-            output_slice,
-            output_watermark: response.output_watermark,
-            source: None,
-            vocab: None,
-            seed: None,
+            prev_block_hash: None, // Filled out at commit
+            event: MetadataEvent::ExecuteQuery(ExecuteQuery {
+                input_slices: operation.input_slices,
+                output_data,
+                output_watermark: response.output_watermark,
+            }),
         };
 
         let result = commit_fn(metadata_block, &out_data_path, &new_checkpoint_path)?;
@@ -171,7 +170,11 @@ impl TransformServiceImpl {
             ..new_block
         };
 
-        let has_data = new_block.output_slice.is_some();
+        let has_data = match &new_block.event {
+            MetadataEvent::ExecuteQuery(eq) => eq.output_data.is_some(),
+            _ => unreachable!(),
+        };
+
         let new_block_hash = meta_chain.append(new_block);
 
         // TODO: Data should be moved before writing block file
@@ -217,15 +220,13 @@ impl TransformServiceImpl {
         // TODO: limit traversal depth
         let mut sources: Vec<_> = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.source {
-                Some(DatasetSource::Derivative(t)) => Some(t),
-                Some(DatasetSource::Root(_)) => {
-                    panic!(
-                        "Transform called on non-derivative dataset {}",
-                        dataset_handle
-                    )
-                }
-                None => None,
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::SetTransform(st) => Some(st),
+                MetadataEvent::SetPollingSource(_) => panic!(
+                    "Transform called on non-derivative dataset {}",
+                    dataset_handle
+                ),
+                _ => None,
             })
             .collect();
 
@@ -235,6 +236,7 @@ impl TransformServiceImpl {
         }
 
         let source = sources.pop().unwrap();
+        debug!(?source, "Transforming using source");
 
         if source.inputs.iter().any(|input| {
             self.is_never_pulled(&input.id.as_ref().unwrap().as_local_ref())
@@ -264,17 +266,23 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        // TODO: Verify assumption that `input_slices` is a reliable indicator of a checkpoint presence
+        // TODO: Checkpoint hash should be contained in metadata explicitly, not inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter(|(_, b)| b.input_slices.is_some())
+            .filter(|(_, b)| match &b.event {
+                MetadataEvent::ExecuteQuery(_) => true,
+                _ => false,
+            })
             .map(|(h, _)| h)
             .next();
 
         let data_offset_end = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.output_slice)
-            .map(|s| s.data_interval.end)
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::ExecuteQuery(eq) => eq.output_data,
+                _ => None,
+            })
+            .map(|s| s.interval.end)
             .next();
 
         let output_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
@@ -315,8 +323,11 @@ impl TransformServiceImpl {
         let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
         Ok(chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.output_slice)
-            .next()
+            .find_map(|(_, b)| match b.event {
+                MetadataEvent::AddData(e) => Some(e.output_data),
+                MetadataEvent::ExecuteQuery(e) => e.output_data,
+                _ => None,
+            })
             .is_none())
     }
 
@@ -336,7 +347,10 @@ impl TransformServiceImpl {
         // Determine last processed input block
         let last_processed_block = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.input_slices)
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::ExecuteQuery(eq) => Some(eq.input_slices),
+                _ => None,
+            })
             .flatten()
             .filter(|slice| slice.dataset_id == *dataset_id)
             .filter_map(|slice| slice.block_interval)
@@ -346,7 +360,7 @@ impl TransformServiceImpl {
         // Collect unprocessed input blocks
         let blocks_unprocessed: Vec<_> = input_chain
             .iter_blocks()
-            .take_while(|(block_hash, _)| Some(block_hash.clone()) != last_processed_block)
+            .take_while(|(block_hash, _)| Some(block_hash) != last_processed_block.as_ref())
             .collect();
 
         // Sanity check: First (chronologically) unprocessed block should immediately follow the last processed block
@@ -371,14 +385,22 @@ impl TransformServiceImpl {
         // Determine unprocessed offset range. Can be (None, None) or [start, end]
         let offset_end = blocks_unprocessed
             .iter()
-            .filter_map(|(_, b)| b.output_slice.as_ref())
-            .map(|s| s.data_interval.end)
+            .filter_map(|(_, b)| match &b.event {
+                MetadataEvent::AddData(e) => Some(&e.output_data),
+                MetadataEvent::ExecuteQuery(e) => e.output_data.as_ref(),
+                _ => None,
+            })
+            .map(|s| s.interval.end)
             .next();
         let offset_start = blocks_unprocessed
             .iter()
             .rev()
-            .filter_map(|(_, b)| b.output_slice.as_ref())
-            .map(|s| s.data_interval.start)
+            .filter_map(|(_, b)| match &b.event {
+                MetadataEvent::AddData(e) => Some(&e.output_data),
+                MetadataEvent::ExecuteQuery(e) => e.output_data.as_ref(),
+                _ => None,
+            })
+            .map(|s| s.interval.start)
             .next();
         let data_interval = match (offset_start, offset_end) {
             (None, None) => None,
@@ -424,17 +446,38 @@ impl TransformServiceImpl {
             for (block_hash, block) in input_chain
                 .iter_blocks_starting(&block_interval.end)
                 .unwrap()
-                .take_while(|(block_hash, _)| Some(block_hash.clone()) != hash_to_stop_at)
+                .take_while(|(block_hash, _)| Some(block_hash) != hash_to_stop_at.as_ref())
             {
-                if block.output_slice.is_some() {
-                    data_paths.push(input_layout.data_dir.join(block_hash.to_multibase_string()));
-                }
-
-                if let Some(wm) = block.output_watermark {
-                    explicit_watermarks.push(Watermark {
-                        system_time: block.system_time,
-                        event_time: wm,
-                    });
+                match &block.event {
+                    MetadataEvent::AddData(e) => {
+                        data_paths
+                            .push(input_layout.data_dir.join(block_hash.to_multibase_string()));
+                        if let Some(wm) = e.output_watermark {
+                            explicit_watermarks.push(Watermark {
+                                system_time: block.system_time,
+                                event_time: wm,
+                            });
+                        }
+                    }
+                    MetadataEvent::ExecuteQuery(e) => {
+                        if e.output_data.is_some() {
+                            data_paths
+                                .push(input_layout.data_dir.join(block_hash.to_multibase_string()));
+                        }
+                        if let Some(wm) = e.output_watermark {
+                            explicit_watermarks.push(Watermark {
+                                system_time: block.system_time,
+                                event_time: wm,
+                            });
+                        }
+                    }
+                    MetadataEvent::SetWatermark(sw) => {
+                        explicit_watermarks.push(Watermark {
+                            system_time: block.system_time,
+                            event_time: sw.output_watermark,
+                        });
+                    }
+                    _ => (),
                 }
             }
 
@@ -481,7 +524,13 @@ impl TransformServiceImpl {
     // TODO: Avoid iterating through output chain multiple times
     fn get_vocab(&self, dataset_ref: &DatasetRefLocal) -> Result<DatasetVocabulary, DomainError> {
         let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
-        let vocab = chain.iter_blocks().filter_map(|(_, b)| b.vocab).next();
+        let vocab = chain
+            .iter_blocks()
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::SetVocab(sv) => Some(sv.vocab),
+                _ => None,
+            })
+            .next();
         Ok(vocab.unwrap_or_default())
     }
 
@@ -502,13 +551,6 @@ impl TransformServiceImpl {
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
     ) -> Result<Vec<VerificationStep>, VerificationError> {
-        fn as_deriv_source(block: &MetadataBlock) -> Option<&DatasetSourceDerivative> {
-            match &block.source {
-                Some(DatasetSource::Derivative(s)) => Some(s),
-                _ => None,
-            }
-        }
-
         let span = info_span!("Preparing transformations replay plan");
         let _span_guard = span.enter();
 
@@ -531,30 +573,26 @@ impl TransformServiceImpl {
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
         {
-            if let Some(src) = as_deriv_source(&block) {
-                if block.prev_block_hash.is_some() {
-                    // TODO: Support dataset evolution
-                    unimplemented!("Verifying datasets with evolving queries is not yet supported")
+            match block.event {
+                MetadataEvent::SetTransform(st) if source.is_none() => {
+                    source = Some(st);
                 }
-
-                source = Some(src.clone());
-            }
-
-            if let Some(vc) = &block.vocab {
-                vocab = Some(vc.clone())
-            }
-
-            // TODO: Assuming `input_slices` is a reliable indicator of a transform block and a checkpoint presence
-            if block.input_slices.is_some() {
-                if !finished_range {
+                MetadataEvent::SetTransform(_) if source.is_some() => {
+                    // TODO: Support dataset evolution
+                    unimplemented!("Verifying datasets with evolving queries is not yet supported");
+                }
+                MetadataEvent::SetVocab(sv) if vocab.is_none() => vocab = Some(sv.vocab),
+                MetadataEvent::ExecuteQuery(_) if !finished_range => {
                     blocks.push((block_hash.clone(), block));
-                } else if prev_checkpoint.is_none() {
+                }
+                MetadataEvent::ExecuteQuery(_) if finished_range => {
                     // TODO: this might be incorrect - test with specific start_block
                     prev_checkpoint = Some(block_hash.clone());
                 }
+                _ => (),
             }
 
-            if !finished_range && Some(block_hash.clone()) == start_block {
+            if !finished_range && Some(&block_hash) == start_block.as_ref() {
                 finished_range = true;
             }
         }
@@ -580,25 +618,27 @@ impl TransformServiceImpl {
             .rev()
             .map(
                 |(block_hash, block)| -> Result<VerificationStep, DomainError> {
+                    let block_t = block.as_typed::<ExecuteQuery>().unwrap();
+
                     let step = VerificationStep {
                         operation: TransformOperation {
                             dataset_handle: dataset_handle.clone(),
-                            input_slices: block.input_slices.as_ref().unwrap().clone(),
+                            input_slices: block_t.event.input_slices.clone(),
                             request: ExecuteQueryRequest {
                                 dataset_id: dataset_handle.id.clone(),
                                 dataset_name: dataset_handle.name.clone(),
                                 system_time: block.system_time,
-                                offset: block
-                                    .output_slice
+                                offset: block_t
+                                    .event
+                                    .output_data
                                     .as_ref()
-                                    .map(|s| s.data_interval.start)
+                                    .map(|s| s.interval.start)
                                     .unwrap_or(0), // TODO: Assuming offset does not matter if block is not supposed to produce data
                                 transform: source.transform.clone(),
                                 vocab: vocab.clone().unwrap_or_default(),
-                                inputs: block
+                                inputs: block_t
+                                    .event
                                     .input_slices
-                                    .as_ref()
-                                    .unwrap()
                                     .iter()
                                     .map(|slice| {
                                         self.to_query_input(
@@ -841,8 +881,11 @@ impl TransformService for TransformServiceImpl {
                 self.engine_provisioner.clone(),
                 operation,
                 |mut new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
+                    let new_block_t = new_block.as_typed_mut::<ExecuteQuery>().unwrap();
+                    let expected_block_t = expected_block.as_typed::<ExecuteQuery>().unwrap();
+
                     // Cleanup not needed outputs
-                    if new_block.output_slice.is_some() {
+                    if new_block_t.event.output_data.is_some() {
                         std::fs::remove_file(new_data_path)
                             .map_err(|e| TransformError::internal(e))?;
                     }
@@ -851,13 +894,14 @@ impl TransformService for TransformServiceImpl {
 
                     // We overwrite the physical hash with the expected one because Parquet format is non-reproducible
                     // We rely only on logical hash for equivalence test
-                    if let Some(slice) = &mut new_block.output_slice {
-                        if let Some(expected_physical_hash) = expected_block
-                            .output_slice
+                    if let Some(slice) = &mut new_block_t.event.output_data {
+                        if let Some(expected_physical_hash) = expected_block_t
+                            .event
+                            .output_data
                             .as_ref()
-                            .map(|s| &s.data_physical_hash)
+                            .map(|s| &s.physical_hash)
                         {
-                            slice.data_physical_hash = expected_physical_hash.clone();
+                            slice.physical_hash = expected_physical_hash.clone();
                         }
                     }
 

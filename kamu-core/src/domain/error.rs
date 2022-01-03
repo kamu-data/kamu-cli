@@ -47,6 +47,11 @@ pub enum DomainError {
         to_id: String,
         backtrace: Backtrace,
     },
+    #[error("Bad input: {message}")]
+    BadInput {
+        message: String,
+        backtrace: Backtrace,
+    },
     #[error("Underlying storage is read-only")]
     ReadOnly,
     #[error("{0}")]
@@ -94,6 +99,13 @@ impl DomainError {
             from_kinds_ids: from_kinds_ids,
             to_kind: to_kind,
             to_id: to_id,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn bad_input<S: Into<String>>(msg: S) -> Self {
+        Self::BadInput {
+            message: msg.into(),
             backtrace: Backtrace::capture(),
         }
     }

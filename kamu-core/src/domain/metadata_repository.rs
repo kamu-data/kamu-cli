@@ -27,10 +27,10 @@ pub trait MetadataRepository: Send + Sync {
         snapshot: DatasetSnapshot,
     ) -> Result<(DatasetHandle, Multihash), DomainError>;
 
-    fn add_dataset_from_block(
+    fn add_dataset_from_blocks(
         &self,
         dataset_name: &DatasetName,
-        first_block: MetadataBlock,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
     ) -> Result<(DatasetHandle, Multihash), DomainError>;
 
     fn add_datasets(

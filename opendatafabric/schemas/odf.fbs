@@ -11,6 +11,37 @@ struct Timestamp {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// OffsetInterval
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table OffsetInterval {
+  start: int64;
+  end: int64;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DataSlice {
+  logical_hash: [ubyte];
+  physical_hash: [ubyte];
+  interval: OffsetInterval;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AddData
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table AddData {
+  output_data: DataSlice;
+  output_watermark: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -18,6 +49,48 @@ struct Timestamp {
 table BlockInterval {
   start: [ubyte];
   end: [ubyte];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetKind
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
+////////////////////////////////////////////////////////////////////////////////
+
+enum DatasetKind: int32 {
+  Root,
+  Derivative,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// InputSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table InputSlice {
+  dataset_id: [ubyte];
+  block_interval: BlockInterval;
+  data_interval: OffsetInterval;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table ExecuteQuery {
+  input_slices: [InputSlice];
+  output_data: DataSlice;
+  output_watermark: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Seed
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table Seed {
+  dataset_id: [ubyte];
+  dataset_kind: DatasetKind;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -219,6 +292,21 @@ union MergeStrategy {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetPollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table PrepStepWrapper { value: PrepStep; }
+
+table SetPollingSource {
+  fetch: FetchStep;
+  prepare: [PrepStepWrapper];
+  read: ReadStep;
+  preprocess: Transform;
+  merge: MergeStrategy;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // TransformInput
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -229,28 +317,13 @@ table TransformInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
+// SetTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table PrepStepWrapper { value: PrepStep; }
-
-table DatasetSourceRoot {
-  fetch: FetchStep;
-  prepare: [PrepStepWrapper];
-  read: ReadStep;
-  preprocess: Transform;
-  merge: MergeStrategy;
-}
-
-table DatasetSourceDerivative {
+table SetTransform {
   inputs: [TransformInput];
   transform: Transform;
-}
-
-union DatasetSource {
-  DatasetSourceRoot,
-  DatasetSourceDerivative,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -265,24 +338,36 @@ table DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetSnapshot
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
+// SetVocab
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table DatasetSnapshot {
-  name: string;
-  source: DatasetSource;
+table SetVocab {
   vocab: DatasetVocabulary;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// OffsetInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
+// SetWatermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table OffsetInterval {
-  start: int64;
-  end: int64;
+table SetWatermark {
+  output_watermark: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataEvent
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+////////////////////////////////////////////////////////////////////////////////
+
+union MetadataEvent {
+  AddData,
+  ExecuteQuery,
+  Seed,
+  SetPollingSource,
+  SetTransform,
+  SetVocab,
+  SetWatermark,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -362,17 +447,6 @@ table ExecuteQueryResponseRoot {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table InputSlice {
-  dataset_id: [ubyte];
-  block_interval: BlockInterval;
-  data_interval: OffsetInterval;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Manifest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#manifest-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -384,29 +458,13 @@ table Manifest {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// OutputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table OutputSlice {
-  data_logical_hash: [ubyte];
-  data_physical_hash: [ubyte];
-  data_interval: OffsetInterval;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // MetadataBlock
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 table MetadataBlock {
-  prev_block_hash: [ubyte];
   system_time: Timestamp;
-  output_slice: OutputSlice;
-  output_watermark: Timestamp;
-  input_slices: [InputSlice];
-  source: DatasetSource;
-  vocab: DatasetVocabulary;
-  seed: [ubyte];
+  prev_block_hash: [ubyte];
+  event: MetadataEvent;
 }
 

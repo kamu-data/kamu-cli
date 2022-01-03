@@ -403,7 +403,13 @@ impl PullService for PullServiceImpl {
 
         if let Some(last_watermark) = chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.output_watermark)
+            .filter_map(|(_, b)| match b.event {
+                MetadataEvent::SetWatermark(sw) => Some(sw.output_watermark),
+                // TODO: Should we support setting explicit watermarks on deriv datasets?
+                MetadataEvent::ExecuteQuery(eq) => eq.output_watermark,
+                MetadataEvent::AddData(ad) => ad.output_watermark,
+                _ => None,
+            })
             .next()
         {
             if last_watermark >= watermark {
@@ -414,14 +420,11 @@ impl PullService for PullServiceImpl {
         let old_head = chain.read_ref(&BlockRef::Head);
 
         let new_block = MetadataBlock {
-            prev_block_hash: old_head.clone(),
             system_time: Utc::now(),
-            output_slice: None,
-            output_watermark: Some(watermark),
-            input_slices: None,
-            source: None,
-            vocab: None,
-            seed: None,
+            prev_block_hash: old_head.clone(),
+            event: MetadataEvent::SetWatermark(SetWatermark {
+                output_watermark: watermark,
+            }),
         };
 
         let new_head = chain.append(new_block);

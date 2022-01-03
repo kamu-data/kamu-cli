@@ -9,19 +9,11 @@
 
 use chrono::{DateTime, Utc};
 use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
-use opendatafabric::serde::yaml::generated::TransformInputDef;
-use opendatafabric::{DatasetID, DatasetName, Multihash, TransformInput};
+use opendatafabric::serde::yaml::generated::{DatasetKindDef, TransformInputDef};
+use opendatafabric::{DatasetID, DatasetKind, DatasetName, Multihash, TransformInput};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use serde_with::skip_serializing_none;
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub enum DatasetKind {
-    Root,
-    Derivative,
-}
 
 #[serde_as]
 #[skip_serializing_none]
@@ -30,6 +22,7 @@ pub enum DatasetKind {
 pub struct DatasetSummary {
     pub id: DatasetID,
     pub name: DatasetName,
+    #[serde_as(as = "DatasetKindDef")]
     pub kind: DatasetKind,
     pub last_block_hash: Multihash,
     #[serde_as(as = "Vec<TransformInputDef>")]

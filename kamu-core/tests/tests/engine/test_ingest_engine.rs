@@ -60,8 +60,9 @@ fn test_ingest_with_engine() {
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
-        .source(
-            MetadataFactory::dataset_source_root()
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),

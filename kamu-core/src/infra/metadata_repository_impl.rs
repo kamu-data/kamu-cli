@@ -81,19 +81,29 @@ impl MetadataRepositoryImpl {
 
         // TODO: cycle detection
         while !snapshots.is_empty() {
-            let head = snapshots.pop_front().unwrap();
-            let has_deps = match head.source {
-                DatasetSource::Derivative(ref src) => {
-                    src.inputs.iter().any(|input| pending.contains(&input.name))
-                }
-                _ => false,
-            };
-            if !has_deps {
-                pending.remove(&head.name);
-                added.insert(head.name.clone());
-                ordered.push(head);
+            let snapshot = snapshots.pop_front().unwrap();
+
+            let inputs = snapshot
+                .metadata
+                .iter()
+                .filter_map(|e| match e {
+                    MetadataEvent::SetTransform(st) => Some(&st.inputs),
+                    _ => None,
+                })
+                .next();
+
+            let has_pending_deps = if let Some(inputs) = inputs {
+                inputs.iter().any(|input| pending.contains(&input.name))
             } else {
-                snapshots.push_back(head);
+                false
+            };
+
+            if !has_pending_deps {
+                pending.remove(&snapshot.name);
+                added.insert(snapshot.name.clone());
+                ordered.push(snapshot);
+            } else {
+                snapshots.push_back(snapshot);
             }
         }
         ordered
@@ -166,28 +176,27 @@ impl MetadataRepositoryImpl {
         let mut num_records = 0;
 
         for (_, block) in chain.iter_blocks() {
-            if let Some(seed) = block.seed {
-                id = Some(seed);
-            }
-
-            match block.source {
-                Some(DatasetSource::Root(_)) => {
-                    kind = Some(DatasetKind::Root);
+            match block.event {
+                MetadataEvent::Seed(seed) => {
+                    id = Some(seed.dataset_id);
+                    kind = Some(seed.dataset_kind);
                 }
-                Some(DatasetSource::Derivative(src)) => {
-                    kind = Some(DatasetKind::Derivative);
-                    if dependencies.is_empty() {
-                        dependencies = src.inputs;
+                MetadataEvent::SetTransform(set_transform) if dependencies.is_empty() => {
+                    dependencies = set_transform.inputs;
+                }
+                MetadataEvent::AddData(add_data) if last_pulled.is_none() => {
+                    last_pulled = Some(block.system_time);
+                    let iv = add_data.output_data.interval;
+                    num_records += (iv.end - iv.start + 1) as u64;
+                }
+                MetadataEvent::ExecuteQuery(execute_query) if last_pulled.is_none() => {
+                    last_pulled = Some(block.system_time);
+                    if let Some(output_data) = execute_query.output_data {
+                        num_records +=
+                            (output_data.interval.end - output_data.interval.start + 1) as u64;
                     }
                 }
-                None => (),
-            }
-
-            if let Some(slice) = block.output_slice {
-                if last_pulled.is_none() {
-                    last_pulled = Some(block.system_time);
-                }
-                num_records += (slice.data_interval.end - slice.data_interval.start + 1) as u64;
+                _ => (),
             }
         }
 
@@ -315,58 +324,28 @@ impl MetadataRepository for MetadataRepositoryImpl {
 
     fn add_dataset(
         &self,
-        snapshot: DatasetSnapshot,
+        mut snapshot: DatasetSnapshot,
     ) -> Result<(DatasetHandle, Multihash), DomainError> {
-        // We are generating a key pair and deriving a dataset ID from it.
-        // The key pair is discarded for now, but in future can be used for
-        // proof of control over dataset and metadata signing.
-        let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
+        if snapshot.kind == DatasetKind::Derivative {
+            // Resolve inputs
+            let source = snapshot
+                .metadata
+                .iter_mut()
+                .find_map(|e| e.as_variant_mut::<SetTransform>())
+                .ok_or_else(|| {
+                    DomainError::bad_input(
+                        "Snapshot of a derivative dataset does not set transformation",
+                    )
+                })?;
 
-        let first_block = MetadataBlock {
-            prev_block_hash: None,
-            system_time: Utc::now(),
-            source: Some(snapshot.source),
-            vocab: snapshot.vocab,
-            output_slice: None,
-            output_watermark: None,
-            input_slices: None,
-            seed: Some(dataset_id.clone()),
-        };
-
-        self.add_dataset_from_block(&snapshot.name, first_block)
-    }
-
-    fn add_dataset_from_block(
-        &self,
-        dataset_name: &DatasetName,
-        mut first_block: MetadataBlock,
-    ) -> Result<(DatasetHandle, Multihash), DomainError> {
-        assert!(first_block.prev_block_hash.is_none());
-        assert!(first_block.source.is_some());
-
-        let dataset_id = first_block
-            .seed
-            .clone()
-            .expect("First block has to contain seed");
-
-        let dataset_metadata_dir = self.get_dataset_metadata_dir(dataset_name);
-
-        if dataset_metadata_dir.exists() {
-            return Err(DomainError::already_exists(
-                ResourceKind::Dataset,
-                dataset_name.into(),
-            ));
-        }
-
-        if let Some(DatasetSource::Derivative(src)) = &mut first_block.source {
-            for input in src.inputs.iter_mut() {
+            for input in source.inputs.iter_mut() {
                 if let Some(input_id) = &input.id {
                     // Input is referenced by ID - in this case we allow any name
                     self.resolve_dataset_ref(&input_id.as_local_ref())
                         .map_err(|e| match e {
                             DomainError::DoesNotExist { .. } => DomainError::missing_reference(
                                 ResourceKind::Dataset,
-                                dataset_name.to_string(),
+                                snapshot.name.to_string(),
                                 ResourceKind::Dataset,
                                 input_id.to_string(),
                             ),
@@ -379,7 +358,7 @@ impl MetadataRepository for MetadataRepositoryImpl {
                         .map_err(|e| match e {
                             DomainError::DoesNotExist { .. } => DomainError::missing_reference(
                                 ResourceKind::Dataset,
-                                dataset_name.to_string(),
+                                snapshot.name.to_string(),
                                 ResourceKind::Dataset,
                                 input.name.to_string(),
                             ),
@@ -389,17 +368,72 @@ impl MetadataRepository for MetadataRepositoryImpl {
                     input.id = Some(hdl.id);
                 }
             }
-        };
+        }
 
-        let (_chain, block_hash) =
+        let system_time = Utc::now();
+        let mut blocks = Vec::new();
+
+        // We are generating a key pair and deriving a dataset ID from it.
+        // The key pair is discarded for now, but in future can be used for
+        // proof of control over dataset and metadata signing.
+        let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
+        blocks.push(MetadataBlock {
+            system_time,
+            prev_block_hash: None,
+            event: MetadataEvent::Seed(Seed {
+                dataset_id,
+                dataset_kind: snapshot.kind,
+            }),
+        });
+
+        for event in snapshot.metadata {
+            blocks.push(MetadataBlock {
+                system_time,
+                prev_block_hash: None,
+                event,
+            });
+        }
+
+        self.add_dataset_from_blocks(&snapshot.name, &mut blocks.into_iter())
+    }
+
+    fn add_dataset_from_blocks(
+        &self,
+        dataset_name: &DatasetName,
+        blocks: &mut dyn Iterator<Item = MetadataBlock>,
+    ) -> Result<(DatasetHandle, Multihash), DomainError> {
+        let first_block = blocks.next().expect("Empty block chain");
+        let seed = first_block
+            .event
+            .as_variant::<Seed>()
+            .expect("First block has to contain seed");
+
+        let dataset_id = seed.dataset_id.clone();
+
+        let dataset_metadata_dir = self.get_dataset_metadata_dir(dataset_name);
+        if dataset_metadata_dir.exists() {
+            return Err(DomainError::already_exists(
+                ResourceKind::Dataset,
+                dataset_name.into(),
+            ));
+        }
+
+        let (mut chain, mut head) =
             MetadataChainImpl::create(&dataset_metadata_dir, first_block).map_err(|e| e.into())?;
+
+        for mut block in blocks {
+            if block.prev_block_hash.is_none() {
+                block.prev_block_hash = Some(head);
+            }
+            head = chain.append(block);
+        }
 
         Ok((
             DatasetHandle {
                 id: dataset_id,
                 name: dataset_name.clone(),
             },
-            block_hash,
+            head,
         ))
     }
 
@@ -719,10 +753,10 @@ impl MetadataRepository for MetadataRepositoryNull {
         Err(DomainError::ReadOnly)
     }
 
-    fn add_dataset_from_block(
+    fn add_dataset_from_blocks(
         &self,
         _dataset_name: &DatasetName,
-        _first_block: MetadataBlock,
+        _blocks: &mut dyn Iterator<Item = MetadataBlock>,
     ) -> Result<(DatasetHandle, Multihash), DomainError> {
         Err(DomainError::ReadOnly)
     }

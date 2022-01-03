@@ -15,8 +15,7 @@ fn load() -> MetadataBlock {
     MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
-        seed: Some(DatasetID::from_pub_key_ed25519(b"pk")),
-        source: Some(DatasetSource::Derivative(DatasetSourceDerivative {
+        event: MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
                     id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
@@ -34,35 +33,7 @@ fn load() -> MetadataBlock {
                 queries: None,
                 temporal_tables: None,
             }),
-        })),
-        vocab: Some(DatasetVocabulary {
-            event_time_column: Some("date".to_owned()),
-            ..Default::default()
         }),
-        output_slice: Some(OutputSlice {
-            data_logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-            data_physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-            data_interval: OffsetInterval { start: 10, end: 20 },
-        }),
-        output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
-        input_slices: Some(vec![
-            InputSlice {
-                dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
-                block_interval: Some(BlockInterval {
-                    start: Multihash::from_digest_sha3_256(b"a"),
-                    end: Multihash::from_digest_sha3_256(b"b"),
-                }),
-                data_interval: Some(OffsetInterval { start: 10, end: 20 }),
-            },
-            InputSlice {
-                dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
-                block_interval: Some(BlockInterval {
-                    start: Multihash::from_digest_sha3_256(b"a"),
-                    end: Multihash::from_digest_sha3_256(b"b"),
-                }),
-                data_interval: None,
-            },
-        ]),
     }
 }
 
@@ -77,11 +48,11 @@ fn test_accessors() {
         *block.prev_block_hash().unwrap(),
         Multihash::from_digest_sha3_256(b"prev")
     );
-    let source = match block.source().unwrap() {
-        dynamic::DatasetSource::Derivative(source) => source,
+    let transform = match block.event() {
+        dynamic::MetadataEvent::SetTransform(t) => t,
         _ => panic!(),
     };
-    let inputs: Vec<TransformInput> = source.inputs().map(|i| i.into()).collect();
+    let inputs: Vec<TransformInput> = transform.inputs().map(|i| i.into()).collect();
     assert_eq!(
         inputs,
         vec![

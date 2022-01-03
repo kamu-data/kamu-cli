@@ -1,27 +1,28 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: my.trading.holdings.market-value
-  source:
-    kind: derivative
-    inputs:
-    - name: com.yahoo.finance.tickers.daily
-    - name: my.trading.holdings
-    transform:
-      kind: sql
-      engine: flink
-      temporalTables:
-      - name: my.trading.holdings
-        primaryKey:
-        - symbol
-      query: >
-        SELECT
-          tickers.`event_time`,
-          holdings.`symbol`,
-          holdings.`cum_quantity`,
-          holdings.`quantity` as `quantity`,
-          tickers.`close_adj` * holdings.`cum_quantity` as `market_value`
-        FROM
-          `com.yahoo.finance.tickers.daily` as tickers,
-          LATERAL TABLE (`my.trading.holdings`(tickers.`event_time`)) as holdings
-        WHERE tickers.`symbol` = holdings.`symbol`
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: com.yahoo.finance.tickers.daily
+        - name: my.trading.holdings
+      transform:
+        kind: sql
+        engine: flink
+        temporalTables:
+          - name: my.trading.holdings
+            primaryKey:
+              - symbol
+        query: >
+          SELECT
+            tickers.`event_time`,
+            holdings.`symbol`,
+            holdings.`cum_quantity`,
+            holdings.`quantity` as `quantity`,
+            tickers.`close_adj` * holdings.`cum_quantity` as `market_value`
+          FROM
+            `com.yahoo.finance.tickers.daily` as tickers,
+            LATERAL TABLE (`my.trading.holdings`(tickers.`event_time`)) as holdings
+          WHERE tickers.`symbol` = holdings.`symbol`

@@ -6,15 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.75.0] - 2022-01-04
+### Changed
+- Implements [ODF RFC-004](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/004-metadata-extensibility.md).
+- Breaking: Workspaces will need to be re-created. This is the last major metadata format change - we will be working on stabilizing metadata now.
+- Breaking: Some manifest formats have changed and will need to be updated.
+  - `DatasetSnapshot` needs to specify `kind` field (`root` or `derivative`)
+  - `DatasetSnapshot.source` was replaced with `metadata` which is an array of metadata events
+
 ## [0.74.0] - 2021-12-28
 ### Changed
+- Implements [ODF RFC-003](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/003-content-addressability.md).
 - Breaking: Workspaces will need to be re-created. Sorry again!
 - Breaking: Some manifest formats have changed and will need to be updated.
   - `Manifest.apiVersion` renamed to `version`
   - `DatasetSnapshot.id` renamed to `name`
   - `DatasetSourceDerivative.inputs` should now specify `id` (optional) and `name` (required)
   - `TemporalTable.id` renamed to `name`
-- Implements [ODF RFC-003](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/002-content-addressability.md).
 - Datasets now have a globally unique identity.
   - IDs can be viewed using `kamu log -w`
 - Metadata format switched to a much faster and compact `flatbuffers`.
@@ -22,8 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.73.0] - 2021-12-11
 ### Changed
-- Breaking change - workspaces will need to be re-created. Sorry again!
 - Implements [ODF RFC-002](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/002-logical-data-hashes.md).
+- Breaking change - workspaces will need to be re-created. Sorry again!
 - Engines are no longer responsible for data hashing - a stable hash algorithm is implemented in `kamu`
 - Pending data part files and checkpoints will be stored in `cache` directory along with other ingest artifacts
 ### Added

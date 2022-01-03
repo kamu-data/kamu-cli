@@ -36,25 +36,10 @@ impl MetadataChainImpl {
             first_block.prev_block_hash, None,
             "First block cannot reference previous blocks"
         );
-        assert!(
-            first_block.seed.is_some(),
-            "First block has to contain a seed"
-        );
-        assert!(
-            first_block.source.is_some(),
-            "First block has to specify source"
-        );
 
-        match &first_block.source {
-            Some(DatasetSource::Derivative(ds)) => {
-                for input in &ds.inputs {
-                    assert!(
-                        input.id.is_some(),
-                        "Transform inputs must be resolved to DatasetIDs"
-                    );
-                }
-            }
-            _ => (),
+        if let MetadataEvent::Seed(_) = first_block.event {
+        } else {
+            panic!("First block has to be a Seed")
         }
 
         std::fs::create_dir(&meta_path)?;
@@ -188,28 +173,27 @@ impl MetadataChain for MetadataChainImpl {
             "New block doesn't specify correct prev block hash"
         );
 
-        assert!(block.seed.is_none(), "Only starting block can have a seed");
+        match &block.event {
+            MetadataEvent::Seed(_) => panic!("Only starting block can have a seed"),
+            MetadataEvent::SetTransform(st) => {
+                for input in &st.inputs {
+                    assert!(
+                        input.id.is_some(),
+                        "Transform inputs must be resolved to DatasetIDs"
+                    );
+                }
+            }
+            _ => (),
+        }
 
         let last_block = Self::read_block_unchecked(&self.block_path(&last_hash));
 
         assert!(
-            last_block.system_time < block.system_time,
-            "New block's system_time must be greater than the previous block's: {} <= {}",
+            last_block.system_time <= block.system_time,
+            "New block's system_time must be greater or equal to the previous block's: {} < {}",
             block.system_time,
             last_block.system_time,
         );
-
-        match (
-            &block.source,
-            &block.vocab,
-            &block.input_slices,
-            &block.output_slice,
-            &block.output_watermark,
-        ) {
-            (None, None, None, None, None) => panic!("Block cannot be empty: {:?}", block),
-            (_, _, Some(_), None, None) => panic!("Block has an input but no outputs: {:?}", block),
-            _ => (),
-        }
 
         let hash = self.write_block_unchecked(&block).unwrap();
         self.write_ref(r, &hash).unwrap();

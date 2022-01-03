@@ -1,40 +1,41 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
   name: com.yahoo.finance.tickers.daily
-  source:
-    kind: root
-    fetch:
-      kind: filesGlob
-      path: data/tickers.csv
-    read:
-      kind: csv
-      header: true
-      schema:
-      - "`Date` TIMESTAMP"
-      - "`Symbol` STRING"
-      - "`Adj Close` DECIMAL(18,4)"
-      - "`Close` DECIMAL(18,4)"
-      - "`High` DECIMAL(18,4)"
-      - "`Low` DECIMAL(18,4)"
-      - "`Open` DECIMAL(18,4)"
-      - "`Volume` DECIMAL(18,4)"
-    preprocess:
-      kind: sql
-      engine: spark
-      query: >
-        SELECT
-          `Date` as event_time,
-          `Symbol` as symbol,
-          `Adj Close` as close_adj,
-          `Close` as close,
-          `High` as high,
-          `Low` as low,
-          `Open` as open,
-          `Volume` as volume
-        FROM input
-    merge:
-      kind: ledger
-      primaryKey:
-      - event_time
-      - symbol
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: filesGlob
+        path: data/tickers.csv
+      read:
+        kind: csv
+        header: true
+        schema:
+          - "`Date` TIMESTAMP"
+          - "`Symbol` STRING"
+          - "`Adj Close` DECIMAL(18,4)"
+          - "`Close` DECIMAL(18,4)"
+          - "`High` DECIMAL(18,4)"
+          - "`Low` DECIMAL(18,4)"
+          - "`Open` DECIMAL(18,4)"
+          - "`Volume` DECIMAL(18,4)"
+      preprocess:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            `Date` as event_time,
+            `Symbol` as symbol,
+            `Adj Close` as close_adj,
+            `Close` as close,
+            `High` as high,
+            `Low` as low,
+            `Open` as open,
+            `Volume` as volume
+          FROM input
+      merge:
+        kind: ledger
+        primaryKey:
+          - event_time
+          - symbol

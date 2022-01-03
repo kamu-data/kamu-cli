@@ -44,17 +44,21 @@ fn test_verify_data_consistency() {
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
-                .source(MetadataFactory::dataset_source_root().build())
+                .kind(DatasetKind::Root)
+                .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
         .unwrap();
 
-    let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .name(&dataset_name)
-        .source(MetadataFactory::dataset_source_deriv(["foo"]).build())
-        .build();
-
-    let (_hdl, head) = metadata_repo.add_dataset(dataset_snapshot).unwrap();
+    let (_hdl, head) = metadata_repo
+        .add_dataset(
+            MetadataFactory::dataset_snapshot()
+                .name(&dataset_name)
+                .kind(DatasetKind::Derivative)
+                .push_event(MetadataFactory::set_transform(["foo"]).build())
+                .build(),
+        )
+        .unwrap();
 
     assert_matches!(
         verification_svc.verify(
@@ -89,14 +93,16 @@ fn test_verify_data_consistency() {
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap();
     let head = metadata_chain.append(
-        MetadataFactory::metadata_block()
-            .prev(&head)
-            .output_slice(OutputSlice {
-                data_logical_hash: data_logical_hash.clone(),
-                data_physical_hash,
-                data_interval: OffsetInterval { start: 0, end: 0 },
-            })
-            .build(),
+        MetadataFactory::metadata_block(AddData {
+            output_data: DataSlice {
+                logical_hash: data_logical_hash.clone(),
+                physical_hash: data_physical_hash,
+                interval: OffsetInterval { start: 0, end: 0 },
+            },
+            output_watermark: None,
+        })
+        .prev(&head)
+        .build(),
     );
     std::fs::rename(data_path, dataset_layout.data_dir.join(head.to_string())).unwrap();
 

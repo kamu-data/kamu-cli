@@ -1,20 +1,22 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
-  id: ca.ontario.data.covid19.daily-cases
-  source:
-    kind: derivative
-    inputs:
-      - ca.ontario.data.covid19.case-details
-    transform:
-      kind: sql
-      engine: flink
-      query: >
-        SELECT
-          TUMBLE_START(`case_reported_date`, INTERVAL '1' DAY) as `case_reported_date`,
-          COUNT(*) as `total_daily`
-        FROM `ca.ontario.data.covid19.case-details`
-        GROUP BY TUMBLE(`case_reported_date`, INTERVAL '1' DAY)
-  vocab:
-    eventTimeColumn: case_reported_date
+  name: ca.ontario.data.covid19.daily-cases
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: ca.ontario.data.covid19.case-details
+      transform:
+        kind: sql
+        engine: flink
+        query: >
+          SELECT
+            TUMBLE_START(`case_reported_date`, INTERVAL '1' DAY) as `case_reported_date`,
+            COUNT(*) as `total_daily`
+          FROM `ca.ontario.data.covid19.case-details`
+          GROUP BY TUMBLE(`case_reported_date`, INTERVAL '1' DAY)
+    - kind: setVocab
+      vocab:
+        eventTimeColumn: case_reported_date
 

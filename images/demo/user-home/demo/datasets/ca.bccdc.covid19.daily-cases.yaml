@@ -1,20 +1,22 @@
-version: 1
 kind: DatasetSnapshot
+version: 1
 content:
-  id: ca.bccdc.covid19.daily-cases
-  source:
-    kind: derivative
-    inputs:
-      - ca.bccdc.covid19.case-details
-    transform:
-      kind: sql
-      engine: flink
-      query: >
-        SELECT
-          TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
-          COUNT(*) as `total_daily`
-        FROM `ca.bccdc.covid19.case-details`
-        GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY)
-  vocab:
-    eventTimeColumn: reported_date
+  name: ca.bccdc.covid19.daily-cases
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: ca.bccdc.covid19.case-details
+      transform:
+        kind: sql
+        engine: flink
+        query: >
+          SELECT
+            TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
+            COUNT(*) as `total_daily`
+          FROM `ca.bccdc.covid19.case-details`
+          GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY)
+    - kind: setVocab
+      vocab:
+        eventTimeColumn: reported_date
 

@@ -15,8 +15,12 @@ use std::{
 use opendatafabric::*;
 
 use super::IDFactory;
-use crate::{domain::MetadataChain, infra::MetadataChainImpl};
+use crate::{
+    domain::{BlockRef, MetadataChain},
+    infra::MetadataChainImpl,
+};
 
+// TODO: These classes should be scrapped
 /// Allows creating ODF-compliant datasets in a repository backed by local file system.
 pub struct RepositoryFactoryFS {
     repo_path: PathBuf,
@@ -71,7 +75,10 @@ pub struct DatasetBuilderFSContinued {
 }
 
 impl DatasetBuilderFSContinued {
-    pub fn append(mut self, block: MetadataBlock, data: Option<&[u8]>) -> Self {
+    pub fn append(mut self, mut block: MetadataBlock, data: Option<&[u8]>) -> Self {
+        let old_head = self.meta_chain.read_ref(&BlockRef::Head);
+        block.prev_block_hash = old_head;
+
         let new_head = self.meta_chain.append(block);
         if let Some(data) = data {
             let data_path = self.dataset_path.join("data");

@@ -18,6 +18,17 @@ use super::{DatasetID, DatasetName, Multihash};
 use chrono::{DateTime, Utc};
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddData
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AddData {
+    pub output_data: DataSlice,
+    pub output_watermark: Option<DateTime<Utc>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +40,29 @@ pub struct BlockInterval {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataslice-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DataSlice {
+    pub logical_hash: Multihash,
+    pub physical_hash: Multihash,
+    pub interval: OffsetInterval,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetKind
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DatasetKind {
+    Root,
+    Derivative,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,34 +70,8 @@ pub struct BlockInterval {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetSnapshot {
     pub name: DatasetName,
-    pub source: DatasetSource,
-    pub vocab: Option<DatasetVocabulary>,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DatasetSource
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum DatasetSource {
-    Root(DatasetSourceRoot),
-    Derivative(DatasetSourceDerivative),
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DatasetSourceRoot {
-    pub fetch: FetchStep,
-    pub prepare: Option<Vec<PrepStep>>,
-    pub read: ReadStep,
-    pub preprocess: Option<Transform>,
-    pub merge: MergeStrategy,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct DatasetSourceDerivative {
-    pub inputs: Vec<TransformInput>,
-    pub transform: Transform,
+    pub kind: DatasetKind,
+    pub metadata: Vec<MetadataEvent>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -93,6 +101,18 @@ pub enum EventTimeSource {
 pub struct EventTimeSourceFromPath {
     pub pattern: String,
     pub timestamp_format: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQuery
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQuery {
+    pub input_slices: Vec<InputSlice>,
+    pub output_data: Option<DataSlice>,
+    pub output_watermark: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -238,14 +258,25 @@ pub struct MergeStrategySnapshot {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MetadataBlock {
-    pub prev_block_hash: Option<Multihash>,
     pub system_time: DateTime<Utc>,
-    pub output_slice: Option<OutputSlice>,
-    pub output_watermark: Option<DateTime<Utc>>,
-    pub input_slices: Option<Vec<InputSlice>>,
-    pub source: Option<DatasetSource>,
-    pub vocab: Option<DatasetVocabulary>,
-    pub seed: Option<DatasetID>,
+    pub prev_block_hash: Option<Multihash>,
+    pub event: MetadataEvent,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MetadataEvent
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum MetadataEvent {
+    AddData(AddData),
+    ExecuteQuery(ExecuteQuery),
+    Seed(Seed),
+    SetPollingSource(SetPollingSource),
+    SetTransform(SetTransform),
+    SetVocab(SetVocab),
+    SetWatermark(SetWatermark),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,18 +288,6 @@ pub struct MetadataBlock {
 pub struct OffsetInterval {
     pub start: i64,
     pub end: i64,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// OutputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#outputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct OutputSlice {
-    pub data_logical_hash: Multihash,
-    pub data_physical_hash: Multihash,
-    pub data_interval: OffsetInterval,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,6 +373,62 @@ pub struct ReadStepGeoJson {
 pub struct ReadStepEsriShapefile {
     pub schema: Option<Vec<String>>,
     pub sub_path: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Seed
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Seed {
+    pub dataset_id: DatasetID,
+    pub dataset_kind: DatasetKind,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetPollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetPollingSource {
+    pub fetch: FetchStep,
+    pub prepare: Option<Vec<PrepStep>>,
+    pub read: ReadStep,
+    pub preprocess: Option<Transform>,
+    pub merge: MergeStrategy,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetTransform {
+    pub inputs: Vec<TransformInput>,
+    pub transform: Transform,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetVocab
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetVocab {
+    pub vocab: DatasetVocabulary,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetWatermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetWatermark {
+    pub output_watermark: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

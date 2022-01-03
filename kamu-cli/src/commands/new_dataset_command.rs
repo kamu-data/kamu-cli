@@ -45,59 +45,65 @@ impl NewDatasetCommand {
                     kind: DatasetSnapshot
                     version: 1
                     content:
+                      # A human-friendly alias of the dataset
                       name: {}
-                      # Reference: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsource-schema
-                      source:
-                        # Root sources are the points of entry of external data into the system
-                        kind: root
-                        # Where to fetch the data from.
-                        # Includes source URL, a protocol to use, cache control
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
-                        fetch:
-                          kind: url
-                          url: https://example.com/city_populations_over_time.zip
-                        # OPTIONAL: How to prepare the binary data
-                        # Includes decompression, file filtering, format conversions
-                        prepare:
-                        - kind: decompress
-                          format: zip
-                        # How to interpret the data.
-                        # Includes data format, schema to apply, error handling
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
-                        read:
-                          kind: csv
-                          header: true
-                          timestampFormat: yyyy-M-d
-                          schema:
-                          - "date TIMESTAMP"
-                          - "city STRING"
-                          - "population STRING"
-                        # OPTIONAL: Pre-processing query that shapes the data
-                        # Useful for converting text data read from CSVs into strict types
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-                        preprocess:
-                          kind: sql
-                          # Use one of the supported engines and a query in its dialect
-                          # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
-                          engine: spark
-                          query: >
-                            SELECT
-                              date,
-                              city,
-                              CAST(REPLACE(population, ",", "") as BIGINT)  -- removes commas between thousands
-                            FROM input
-                        # How to combine data ingested in the past with the new data:
-                        # append as log or diff as a snapshot of the current state.
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
-                        merge:
-                          kind: ledger
-                          primaryKey:
-                          - date
-                          - city
-                        # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetvocabulary-schema
-                      vocab:
-                        eventTimeColumn: date
+                      # Root sources are the points of entry of external data into the system
+                      kind: root
+                      # List of metadata events that get dataset into its initial state
+                      # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+                      metadata:
+                          # Specifies the source of data that can be periodically polled to refresh the dataset
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+                        - kind: setPollingSource
+                          # Where to fetch the data from.
+                          # Includes source URL, a protocol to use, cache control
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
+                          fetch:
+                            kind: url
+                            url: https://example.com/city_populations_over_time.zip
+                          # OPTIONAL: How to prepare the binary data
+                          # Includes decompression, file filtering, format conversions
+                          prepare:
+                          - kind: decompress
+                            format: zip
+                          # How to interpret the data.
+                          # Includes data format, schema to apply, error handling
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
+                          read:
+                            kind: csv
+                            header: true
+                            timestampFormat: yyyy-M-d
+                            schema:
+                            - "date TIMESTAMP"
+                            - "city STRING"
+                            - "population STRING"
+                          # OPTIONAL: Pre-processing query that shapes the data
+                          # Useful for converting text data read from CSVs into strict types
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
+                          preprocess:
+                            kind: sql
+                            # Use one of the supported engines and a query in its dialect
+                            # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
+                            engine: spark
+                            query: >
+                              SELECT
+                                date,
+                                city,
+                                CAST(REPLACE(population, ",", "") as BIGINT)  -- removes commas between thousands
+                              FROM input
+                          # How to combine data ingested in the past with the new data:
+                          # append as log or diff as a snapshot of the current state.
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
+                          merge:
+                            kind: ledger
+                            primaryKey:
+                            - date
+                            - city
+                          # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+                        - kind: setVocab
+                          vocab:
+                            eventTimeColumn: date
                     "#
                 ),
                 name
@@ -110,29 +116,36 @@ impl NewDatasetCommand {
                     kind: DatasetSnapshot
                     version: 1
                     content:
+                      # A human-friendly alias of the dataset
                       name: {}
-                      # Reference: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsourcederivative-schema
-                      source:
-                        # Derivative sources produce data by transforming and combining one or multiple existing datasets.
-                        kind: derivative
-                        # Identifiers of the datasets that will be used as sources.
-                        inputs:
-                        - name: com.example.city-populations
-                        # Transformation that will be applied to produce new data
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-                        transform:
-                          kind: sql
-                          # Use one of the supported engines and a query in its dialect
-                          # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
-                          engine: spark
-                          query: >
-                            SELECT
-                              date,
-                              city,
-                              population + 1 as population
-                            FROM `com.example.city-populations`
-                      vocab:
-                        eventTimeColumn: date
+                      # Derivative sources produce data by transforming and combining one or multiple existing datasets.
+                      kind: root
+                      # List of metadata events that get dataset into its initial state
+                      # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
+                      metadata:
+                          # Transformation that will be applied to produce new data
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
+                        - kind: setTransform
+                          # References the datasets that will be used as sources.
+                          # Note: We are associating inputs by name, but could also use IDs.
+                          inputs:
+                            - name: com.example.city-populations
+                          transform:
+                            kind: sql
+                            # Use one of the supported engines and a query in its dialect
+                            # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
+                            engine: spark
+                            query: >
+                              SELECT
+                                date,
+                                city,
+                                population + 1 as population
+                              FROM `com.example.city-populations`
+                          # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+                        - kind: setVocab
+                          vocab:
+                            eventTimeColumn: date
                     "#
                 ),
                 name
