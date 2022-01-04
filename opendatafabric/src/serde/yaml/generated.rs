@@ -795,8 +795,9 @@ implement_serde_as!(SetTransform, SetTransformDef, "SetTransformDef");
 #[serde(remote = "SetVocab")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetVocabDef {
-    #[serde_as(as = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
+    pub system_time_column: Option<String>,
+    pub event_time_column: Option<String>,
+    pub offset_column: Option<String>,
 }
 
 implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");

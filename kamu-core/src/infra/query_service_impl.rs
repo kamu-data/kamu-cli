@@ -75,12 +75,12 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
         let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
 
-        let vocab = self
+        let vocab: DatasetVocabulary = self
             .metadata_repo
             .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
             .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetVocab(sv) => Some(sv.vocab),
+                MetadataEvent::SetVocab(sv) => Some(sv.into()),
                 _ => None,
             })
             .next()

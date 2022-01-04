@@ -42,6 +42,5 @@ content:
             city as location
             FROM `ca.ontario.data.covid19.case-details`
     - kind: setVocab
-      vocab:
-        eventTimeColumn: reported_date
+      eventTimeColumn: reported_date
 

@@ -247,12 +247,9 @@ impl AsciiRenderer {
                 self.render_property(output, 0, "Transform", "...")?
             }
             MetadataEvent::SetVocab(SetVocab {
-                vocab:
-                    DatasetVocabulary {
-                        offset_column,
-                        system_time_column,
-                        event_time_column,
-                    },
+                offset_column,
+                system_time_column,
+                event_time_column,
             }) => {
                 self.render_property(output, 0, "Kind", &"SetVocab")?;
                 if let Some(offset_column) = offset_column {

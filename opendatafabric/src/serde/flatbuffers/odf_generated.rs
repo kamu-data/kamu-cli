@@ -6380,6 +6380,262 @@ impl std::fmt::Debug for SetTransform<'_> {
         ds.finish()
     }
 }
+pub enum SetVocabOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SetVocab<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SetVocab<'a> {
+    type Inner = SetVocab<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> SetVocab<'a> {
+    pub const VT_SYSTEM_TIME_COLUMN: flatbuffers::VOffsetT = 4;
+    pub const VT_EVENT_TIME_COLUMN: flatbuffers::VOffsetT = 6;
+    pub const VT_OFFSET_COLUMN: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SetVocab { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SetVocabArgs<'args>,
+    ) -> flatbuffers::WIPOffset<SetVocab<'bldr>> {
+        let mut builder = SetVocabBuilder::new(_fbb);
+        if let Some(x) = args.offset_column {
+            builder.add_offset_column(x);
+        }
+        if let Some(x) = args.event_time_column {
+            builder.add_event_time_column(x);
+        }
+        if let Some(x) = args.system_time_column {
+            builder.add_system_time_column(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn system_time_column(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_SYSTEM_TIME_COLUMN, None)
+    }
+    #[inline]
+    pub fn event_time_column(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_EVENT_TIME_COLUMN, None)
+    }
+    #[inline]
+    pub fn offset_column(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_OFFSET_COLUMN, None)
+    }
+}
+
+impl flatbuffers::Verifiable for SetVocab<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "system_time_column",
+                Self::VT_SYSTEM_TIME_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "event_time_column",
+                Self::VT_EVENT_TIME_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "offset_column",
+                Self::VT_OFFSET_COLUMN,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SetVocabArgs<'a> {
+    pub system_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub event_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub offset_column: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for SetVocabArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SetVocabArgs {
+            system_time_column: None,
+            event_time_column: None,
+            offset_column: None,
+        }
+    }
+}
+pub struct SetVocabBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SetVocabBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_system_time_column(&mut self, system_time_column: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetVocab::VT_SYSTEM_TIME_COLUMN,
+            system_time_column,
+        );
+    }
+    #[inline]
+    pub fn add_event_time_column(&mut self, event_time_column: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetVocab::VT_EVENT_TIME_COLUMN,
+            event_time_column,
+        );
+    }
+    #[inline]
+    pub fn add_offset_column(&mut self, offset_column: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetVocab::VT_OFFSET_COLUMN,
+            offset_column,
+        );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetVocabBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SetVocabBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SetVocab<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for SetVocab<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("SetVocab");
+        ds.field("system_time_column", &self.system_time_column());
+        ds.field("event_time_column", &self.event_time_column());
+        ds.field("offset_column", &self.offset_column());
+        ds.finish()
+    }
+}
+pub enum SetWatermarkOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SetWatermark<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SetWatermark<'a> {
+    type Inner = SetWatermark<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> SetWatermark<'a> {
+    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SetWatermark { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SetWatermarkArgs<'args>,
+    ) -> flatbuffers::WIPOffset<SetWatermark<'bldr>> {
+        let mut builder = SetWatermarkBuilder::new(_fbb);
+        if let Some(x) = args.output_watermark {
+            builder.add_output_watermark(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
+        self._tab
+            .get::<Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, None)
+    }
+}
+
+impl flatbuffers::Verifiable for SetWatermark<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SetWatermarkArgs<'a> {
+    pub output_watermark: Option<&'a Timestamp>,
+}
+impl<'a> Default for SetWatermarkArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SetWatermarkArgs {
+            output_watermark: None,
+        }
+    }
+}
+pub struct SetWatermarkBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SetWatermarkBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, output_watermark);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetWatermarkBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SetWatermarkBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SetWatermark<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for SetWatermark<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("SetWatermark");
+        ds.field("output_watermark", &self.output_watermark());
+        ds.finish()
+    }
+}
 pub enum DatasetVocabularyOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -6538,213 +6794,6 @@ impl std::fmt::Debug for DatasetVocabulary<'_> {
         ds.field("system_time_column", &self.system_time_column());
         ds.field("event_time_column", &self.event_time_column());
         ds.field("offset_column", &self.offset_column());
-        ds.finish()
-    }
-}
-pub enum SetVocabOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct SetVocab<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for SetVocab<'a> {
-    type Inner = SetVocab<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> SetVocab<'a> {
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 4;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        SetVocab { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args SetVocabArgs<'args>,
-    ) -> flatbuffers::WIPOffset<SetVocab<'bldr>> {
-        let mut builder = SetVocabBuilder::new(_fbb);
-        if let Some(x) = args.vocab {
-            builder.add_vocab(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
-        self._tab
-            .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(SetVocab::VT_VOCAB, None)
-    }
-}
-
-impl flatbuffers::Verifiable for SetVocab<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
-                "vocab",
-                Self::VT_VOCAB,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct SetVocabArgs<'a> {
-    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
-}
-impl<'a> Default for SetVocabArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        SetVocabArgs { vocab: None }
-    }
-}
-pub struct SetVocabBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> SetVocabBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
-                SetVocab::VT_VOCAB,
-                vocab,
-            );
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetVocabBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        SetVocabBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<SetVocab<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for SetVocab<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("SetVocab");
-        ds.field("vocab", &self.vocab());
-        ds.finish()
-    }
-}
-pub enum SetWatermarkOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-pub struct SetWatermark<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for SetWatermark<'a> {
-    type Inner = SetWatermark<'a>;
-    #[inline]
-    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table { buf, loc },
-        }
-    }
-}
-
-impl<'a> SetWatermark<'a> {
-    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 4;
-
-    #[inline]
-    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        SetWatermark { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args SetWatermarkArgs<'args>,
-    ) -> flatbuffers::WIPOffset<SetWatermark<'bldr>> {
-        let mut builder = SetWatermarkBuilder::new(_fbb);
-        if let Some(x) = args.output_watermark {
-            builder.add_output_watermark(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
-        self._tab
-            .get::<Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, None)
-    }
-}
-
-impl flatbuffers::Verifiable for SetWatermark<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct SetWatermarkArgs<'a> {
-    pub output_watermark: Option<&'a Timestamp>,
-}
-impl<'a> Default for SetWatermarkArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        SetWatermarkArgs {
-            output_watermark: None,
-        }
-    }
-}
-pub struct SetWatermarkBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> SetWatermarkBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, output_watermark);
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetWatermarkBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        SetWatermarkBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<SetWatermark<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl std::fmt::Debug for SetWatermark<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("SetWatermark");
-        ds.field("output_watermark", &self.output_watermark());
         ds.finish()
     }
 }

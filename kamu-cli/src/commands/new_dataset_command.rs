@@ -102,8 +102,7 @@ impl NewDatasetCommand {
                           # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
-                          vocab:
-                            eventTimeColumn: date
+                          eventTimeColumn: date
                     "#
                 ),
                 name
@@ -144,8 +143,7 @@ impl NewDatasetCommand {
                           # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
-                          vocab:
-                            eventTimeColumn: date
+                          eventTimeColumn: date
                     "#
                 ),
                 name

@@ -60,5 +60,4 @@ content:
             FXUSDCAD as rate
           FROM input
     - kind: setVocab
-      vocab:
-        eventTimeColumn: date
+      eventTimeColumn: date

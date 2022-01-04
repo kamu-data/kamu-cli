@@ -1479,9 +1479,19 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
     type OffsetT = WIPOffset<fb::SetVocab<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let vocab_offset = { self.vocab.serialize(fb) };
+        let system_time_column_offset = self
+            .system_time_column
+            .as_ref()
+            .map(|v| fb.create_string(&v));
+        let event_time_column_offset = self
+            .event_time_column
+            .as_ref()
+            .map(|v| fb.create_string(&v));
+        let offset_column_offset = self.offset_column.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::SetVocabBuilder::new(fb);
-        builder.add_vocab(vocab_offset);
+        system_time_column_offset.map(|off| builder.add_system_time_column(off));
+        event_time_column_offset.map(|off| builder.add_event_time_column(off));
+        offset_column_offset.map(|off| builder.add_offset_column(off));
         builder.finish()
     }
 }
@@ -1489,10 +1499,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
 impl<'fb> FlatbuffersDeserializable<fb::SetVocab<'fb>> for odf::SetVocab {
     fn deserialize(proxy: fb::SetVocab<'fb>) -> Self {
         odf::SetVocab {
-            vocab: proxy
-                .vocab()
-                .map(|v| odf::DatasetVocabulary::deserialize(v))
-                .unwrap(),
+            system_time_column: proxy.system_time_column().map(|v| v.to_owned()),
+            event_time_column: proxy.event_time_column().map(|v| v.to_owned()),
+            offset_column: proxy.offset_column().map(|v| v.to_owned()),
         }
     }
 }

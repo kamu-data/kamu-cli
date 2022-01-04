@@ -17,6 +17,5 @@ content:
           FROM `ca.bccdc.covid19.case-details`
           GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY)
     - kind: setVocab
-      vocab:
-        eventTimeColumn: reported_date
+      eventTimeColumn: reported_date
 

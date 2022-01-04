@@ -30,5 +30,4 @@ content:
         primaryKey:
         - id
     - kind: setVocab
-      vocab:
-        eventTimeColumn: reported_date
+      eventTimeColumn: reported_date

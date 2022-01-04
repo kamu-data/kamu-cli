@@ -18,5 +18,4 @@ content:
         primaryKey:
         - PID
     - kind: setVocab
-      vocab:
-        eventTimeColumn: TAX_ASSESSMENT_YEAR
+      eventTimeColumn: TAX_ASSESSMENT_YEAR

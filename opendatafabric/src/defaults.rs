@@ -9,7 +9,9 @@
 
 use std::fmt::Display;
 
-use crate::{ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv};
+use crate::{
+    ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv, SetVocab,
+};
 
 use super::DatasetVocabulary;
 
@@ -19,6 +21,16 @@ impl Default for DatasetVocabulary {
             offset_column: None,
             system_time_column: None,
             event_time_column: None,
+        }
+    }
+}
+
+impl From<SetVocab> for DatasetVocabulary {
+    fn from(v: SetVocab) -> Self {
+        Self {
+            offset_column: v.offset_column,
+            system_time_column: v.system_time_column,
+            event_time_column: v.event_time_column,
         }
     }
 }

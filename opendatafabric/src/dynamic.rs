@@ -1268,19 +1268,33 @@ impl Into<super::SetTransform> for &dyn SetTransform {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait SetVocab {
-    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn system_time_column(&self) -> Option<&str>;
+    fn event_time_column(&self) -> Option<&str>;
+    fn offset_column(&self) -> Option<&str>;
 }
 
 impl SetVocab for super::SetVocab {
-    fn vocab(&self) -> &dyn DatasetVocabulary {
-        &self.vocab
+    fn system_time_column(&self) -> Option<&str> {
+        self.system_time_column
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
+    fn event_time_column(&self) -> Option<&str> {
+        self.event_time_column
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
+    fn offset_column(&self) -> Option<&str> {
+        self.offset_column.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
 impl Into<super::SetVocab> for &dyn SetVocab {
     fn into(self) -> super::SetVocab {
         super::SetVocab {
-            vocab: self.vocab().into(),
+            system_time_column: self.system_time_column().map(|v| v.to_owned()),
+            event_time_column: self.event_time_column().map(|v| v.to_owned()),
+            offset_column: self.offset_column().map(|v| v.to_owned()),
         }
     }
 }

@@ -527,7 +527,7 @@ impl TransformServiceImpl {
         let vocab = chain
             .iter_blocks()
             .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetVocab(sv) => Some(sv.vocab),
+                MetadataEvent::SetVocab(sv) => Some(sv.into()),
                 _ => None,
             })
             .next();
@@ -581,7 +581,7 @@ impl TransformServiceImpl {
                     // TODO: Support dataset evolution
                     unimplemented!("Verifying datasets with evolving queries is not yet supported");
                 }
-                MetadataEvent::SetVocab(sv) if vocab.is_none() => vocab = Some(sv.vocab),
+                MetadataEvent::SetVocab(sv) if vocab.is_none() => vocab = Some(sv.into()),
                 MetadataEvent::ExecuteQuery(_) if !finished_range => {
                     blocks.push((block_hash.clone(), block));
                 }

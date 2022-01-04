@@ -418,7 +418,9 @@ pub struct SetTransform {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetVocab {
-    pub vocab: DatasetVocabulary,
+    pub system_time_column: Option<String>,
+    pub event_time_column: Option<String>,
+    pub offset_column: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

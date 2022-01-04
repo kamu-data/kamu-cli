@@ -43,5 +43,4 @@ content:
               FROM order_shipments_agg
               WHERE order_quantity <> shipped_quantity_total
     - kind: setVocab
-      vocab:
-        eventTimeColumn: order_time
+      eventTimeColumn: order_time

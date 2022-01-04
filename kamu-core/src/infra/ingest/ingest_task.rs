@@ -70,7 +70,7 @@ impl IngestTask {
                     source = Some(src);
                 }
                 MetadataEvent::SetVocab(set_vocab) => {
-                    vocab = Some(set_vocab.vocab);
+                    vocab = Some(set_vocab.into());
                 }
                 _ => (),
             }
