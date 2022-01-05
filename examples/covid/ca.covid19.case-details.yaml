@@ -3,11 +3,14 @@ version: 1
 content:
   name: ca.covid19.case-details
   kind: derivative
+  # List of metadata events that get dataset into its initial state
   metadata:
     - kind: setTransform
+      # References the datasets that will be used as sources of data.
       inputs:
         - name: ca.bccdc.covid19.case-details
         - name: ca.ontario.data.covid19.case-details
+      # Transformation that will be applied to produce new data
       transform:
         kind: sql
         engine: spark

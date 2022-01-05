@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.75.1] - 2022-01-05
+### Fixed
+- Added more validation on events that appear in `DatasetSnapshot`s.
+- Fix flag completion after `clap` crate upgrade.
+
 ## [0.75.0] - 2022-01-04
 ### Changed
 - Implements [ODF RFC-004](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/004-metadata-extensibility.md).

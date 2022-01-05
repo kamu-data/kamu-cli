@@ -4,15 +4,20 @@ content:
   name: ca.bccdc.covid19.case-details
   kind: root
   metadata:
+    # Specifies the source of data that can be periodically polled to refresh the dataset
+    # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
     - kind: setPollingSource
+      # Where to fetch the data from.
       fetch:
         kind: url
         url: http://www.bccdc.ca/Health-Info-Site/Documents/BCCDC_COVID19_Dashboard_Case_Details.csv
+      # How to interpret the data.
       read:
         kind: csv
         separator: ','
         header: true
         nullValue: ''
+      # Pre-processing query that shapes the data (optional)
       preprocess:
           kind: sql
           engine: spark
@@ -25,9 +30,11 @@ content:
               sex,
               age_group
             FROM input
+      # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: ledger
         primaryKey:
         - id
+    # Tells kamu to use `reported_date` column as event time intead of the default `event_tume`
     - kind: setVocab
       eventTimeColumn: reported_date
