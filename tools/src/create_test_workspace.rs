@@ -119,7 +119,7 @@ fn download_source_data(work_dir: &Path, datasets: &[&str]) -> Vec<(String, Drop
             .into_iter()
             .next()
             .unwrap();
-        let url = &manifest["content"]["source"]["fetch"]["url"]
+        let url = &manifest["content"]["metadata"][0]["fetch"]["url"]
             .as_str()
             .unwrap();
 
