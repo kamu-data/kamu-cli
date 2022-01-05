@@ -53,11 +53,8 @@ impl VerificationServiceImpl {
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
             .take_while(|(hash, _)| Some(hash) != start_block.as_ref())
-            .filter_map(|(hash, block)| match block.event {
-                MetadataEvent::AddData(e) => Some((hash, e.output_data)),
-                MetadataEvent::ExecuteQuery(e) => e.output_data.map(|v| (hash, v)),
-                _ => None,
-            })
+            .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
+            .filter_map(|(h, b)| b.event.output_data.map(|s| (h, s)))
             .collect();
 
         if let Some(start_block) = start_block {

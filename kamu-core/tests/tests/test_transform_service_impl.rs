@@ -54,10 +54,7 @@ fn append_data_block(
         .unwrap();
     let offset = chain
         .iter_blocks()
-        .filter_map(|(_, b)| match b.event {
-            MetadataEvent::AddData(e) => Some(e),
-            _ => None,
-        })
+        .filter_map(|(_, b)| b.event.into_variant::<AddData>())
         .map(|e| e.output_data.interval.end + 1)
         .next()
         .unwrap_or(0);

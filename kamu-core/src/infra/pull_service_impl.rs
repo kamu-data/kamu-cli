@@ -403,14 +403,8 @@ impl PullService for PullServiceImpl {
 
         if let Some(last_watermark) = chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetWatermark(sw) => Some(sw.output_watermark),
-                // TODO: Should we support setting explicit watermarks on deriv datasets?
-                MetadataEvent::ExecuteQuery(eq) => eq.output_watermark,
-                MetadataEvent::AddData(ad) => ad.output_watermark,
-                _ => None,
-            })
-            .next()
+            .filter_map(|(_, b)| b.into_data_stream_block())
+            .find_map(|b| b.event.output_watermark)
         {
             if last_watermark >= watermark {
                 return Ok(PullResult::UpToDate);

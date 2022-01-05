@@ -79,11 +79,8 @@ impl QueryService for QueryServiceImpl {
             .metadata_repo
             .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetVocab(sv) => Some(sv.into()),
-                _ => None,
-            })
-            .next()
+            .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
+            .map(|sv| sv.into())
             .unwrap_or_default();
 
         // TODO: This is a workaround for Arrow not supporting any operations on Decimals yet
@@ -183,11 +180,8 @@ impl QueryService for QueryServiceImpl {
 
         let last_data_file = metadata_chain
             .iter_blocks()
-            .filter(|(_, b)| match &b.event {
-                MetadataEvent::AddData(_) => true,
-                MetadataEvent::ExecuteQuery(eq) => eq.output_data.is_some(),
-                _ => false,
-            })
+            .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
+            .filter(|(_, b)| b.event.output_data.is_some())
             .map(|(block_hash, _)| dataset_layout.data_dir.join(block_hash.to_string()))
             .next()
             .expect("Obtaining schema from datasets with no data is not yet supported");
@@ -292,14 +286,10 @@ impl KamuSchema {
             let mut files = Vec::new();
             let mut num_records = 0;
 
-            for (block_hash, slice) in
-                metadata_chain
-                    .iter_blocks()
-                    .filter_map(|(h, b)| match b.event {
-                        MetadataEvent::AddData(e) => Some((h, e.output_data)),
-                        MetadataEvent::ExecuteQuery(e) => e.output_data.map(|v| (h, v)),
-                        _ => None,
-                    })
+            for (block_hash, slice) in metadata_chain
+                .iter_blocks()
+                .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
+                .filter_map(|(h, b)| b.event.output_data.map(|s| (h, s)))
             {
                 num_records += slice.interval.end - slice.interval.start + 1;
                 files.push(dataset_layout.data_dir.join(block_hash.to_string()));

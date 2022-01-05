@@ -173,6 +173,7 @@ impl MetadataChain for MetadataChainImpl {
             "New block doesn't specify correct prev block hash"
         );
 
+        // TODO: Implement complete validation
         match &block.event {
             MetadataEvent::Seed(_) => panic!("Only starting block can have a seed"),
             MetadataEvent::SetTransform(st) => {

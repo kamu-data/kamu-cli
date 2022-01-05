@@ -38,5 +38,5 @@ mod defaults;
 
 pub mod engine;
 
-mod extra;
-pub use extra::*;
+mod metadata_utils;
+pub use metadata_utils::*;

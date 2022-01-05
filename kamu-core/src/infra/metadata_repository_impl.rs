@@ -83,17 +83,16 @@ impl MetadataRepositoryImpl {
         while !snapshots.is_empty() {
             let snapshot = snapshots.pop_front().unwrap();
 
-            let inputs = snapshot
+            let transform = snapshot
                 .metadata
                 .iter()
-                .filter_map(|e| match e {
-                    MetadataEvent::SetTransform(st) => Some(&st.inputs),
-                    _ => None,
-                })
-                .next();
+                .find_map(|e| e.as_variant::<SetTransform>());
 
-            let has_pending_deps = if let Some(inputs) = inputs {
-                inputs.iter().any(|input| pending.contains(&input.name))
+            let has_pending_deps = if let Some(transform) = transform {
+                transform
+                    .inputs
+                    .iter()
+                    .any(|input| pending.contains(&input.name))
             } else {
                 false
             };
@@ -181,22 +180,30 @@ impl MetadataRepositoryImpl {
                     id = Some(seed.dataset_id);
                     kind = Some(seed.dataset_kind);
                 }
-                MetadataEvent::SetTransform(set_transform) if dependencies.is_empty() => {
-                    dependencies = set_transform.inputs;
+                MetadataEvent::SetTransform(set_transform) => {
+                    if dependencies.is_empty() {
+                        dependencies = set_transform.inputs;
+                    }
                 }
-                MetadataEvent::AddData(add_data) if last_pulled.is_none() => {
-                    last_pulled = Some(block.system_time);
+                MetadataEvent::AddData(add_data) => {
+                    if last_pulled.is_none() {
+                        last_pulled = Some(block.system_time);
+                    }
                     let iv = add_data.output_data.interval;
                     num_records += (iv.end - iv.start + 1) as u64;
                 }
-                MetadataEvent::ExecuteQuery(execute_query) if last_pulled.is_none() => {
-                    last_pulled = Some(block.system_time);
+                MetadataEvent::ExecuteQuery(execute_query) => {
+                    if last_pulled.is_none() {
+                        last_pulled = Some(block.system_time);
+                    }
                     if let Some(output_data) = execute_query.output_data {
                         num_records +=
                             (output_data.interval.end - output_data.interval.start + 1) as u64;
                     }
                 }
-                _ => (),
+                MetadataEvent::SetPollingSource(_)
+                | MetadataEvent::SetWatermark(_)
+                | MetadataEvent::SetVocab(_) => (),
             }
         }
 

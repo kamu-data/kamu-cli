@@ -66,13 +66,18 @@ impl IngestTask {
                         prev_checkpoint = Some(block_hash);
                     }
                 }
-                MetadataEvent::SetPollingSource(src) if source.is_none() => {
-                    source = Some(src);
+                MetadataEvent::SetPollingSource(src) => {
+                    if source.is_none() {
+                        source = Some(src);
+                    }
                 }
                 MetadataEvent::SetVocab(set_vocab) => {
                     vocab = Some(set_vocab.into());
                 }
-                _ => (),
+                MetadataEvent::ExecuteQuery(_)
+                | MetadataEvent::Seed(_)
+                | MetadataEvent::SetTransform(_)
+                | MetadataEvent::SetWatermark(_) => (),
             }
 
             if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
@@ -391,12 +396,8 @@ impl IngestTask {
                     } else {
                         let prev_watermark = self.meta_chain.borrow()
                             .iter_blocks()
-                            .filter_map(|(_, b)| match b.event {
-                                MetadataEvent::AddData(add_data) => add_data.output_watermark,
-                                MetadataEvent::SetWatermark(set_wm) => Some(set_wm.output_watermark),
-                                _ => None,
-                            })
-                            .next();
+                            .filter_map(|(_, b)| b.into_data_stream_block())
+                            .find_map(|b| b.event.output_watermark);
 
                         if output_watermark.is_none() || output_watermark == prev_watermark {
                             info!("Skipping commit of new block as it neither has new data or watermark");

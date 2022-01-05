@@ -269,19 +269,14 @@ impl TransformServiceImpl {
         // TODO: Checkpoint hash should be contained in metadata explicitly, not inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter(|(_, b)| match &b.event {
-                MetadataEvent::ExecuteQuery(_) => true,
-                _ => false,
-            })
+            .filter(|(_, b)| b.event.is_variant::<ExecuteQuery>())
             .map(|(h, _)| h)
             .next();
 
         let data_offset_end = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::ExecuteQuery(eq) => eq.output_data,
-                _ => None,
-            })
+            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .filter_map(|eq| eq.output_data)
             .map(|s| s.interval.end)
             .next();
 
@@ -323,11 +318,8 @@ impl TransformServiceImpl {
         let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
         Ok(chain
             .iter_blocks()
-            .find_map(|(_, b)| match b.event {
-                MetadataEvent::AddData(e) => Some(e.output_data),
-                MetadataEvent::ExecuteQuery(e) => e.output_data,
-                _ => None,
-            })
+            .filter_map(|(_, b)| b.into_data_stream_block())
+            .find_map(|b| b.event.output_data)
             .is_none())
     }
 
@@ -347,10 +339,8 @@ impl TransformServiceImpl {
         // Determine last processed input block
         let last_processed_block = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::ExecuteQuery(eq) => Some(eq.input_slices),
-                _ => None,
-            })
+            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .map(|eq| eq.input_slices)
             .flatten()
             .filter(|slice| slice.dataset_id == *dataset_id)
             .filter_map(|slice| slice.block_interval)
@@ -385,21 +375,15 @@ impl TransformServiceImpl {
         // Determine unprocessed offset range. Can be (None, None) or [start, end]
         let offset_end = blocks_unprocessed
             .iter()
-            .filter_map(|(_, b)| match &b.event {
-                MetadataEvent::AddData(e) => Some(&e.output_data),
-                MetadataEvent::ExecuteQuery(e) => e.output_data.as_ref(),
-                _ => None,
-            })
+            .filter_map(|(_, b)| b.as_data_stream_block())
+            .filter_map(|b| b.event.output_data)
             .map(|s| s.interval.end)
             .next();
         let offset_start = blocks_unprocessed
             .iter()
             .rev()
-            .filter_map(|(_, b)| match &b.event {
-                MetadataEvent::AddData(e) => Some(&e.output_data),
-                MetadataEvent::ExecuteQuery(e) => e.output_data.as_ref(),
-                _ => None,
-            })
+            .filter_map(|(_, b)| b.as_data_stream_block())
+            .filter_map(|b| b.event.output_data)
             .map(|s| s.interval.start)
             .next();
         let data_interval = match (offset_start, offset_end) {
@@ -447,37 +431,17 @@ impl TransformServiceImpl {
                 .iter_blocks_starting(&block_interval.end)
                 .unwrap()
                 .take_while(|(block_hash, _)| Some(block_hash) != hash_to_stop_at.as_ref())
+                .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
             {
-                match &block.event {
-                    MetadataEvent::AddData(e) => {
-                        data_paths
-                            .push(input_layout.data_dir.join(block_hash.to_multibase_string()));
-                        if let Some(wm) = e.output_watermark {
-                            explicit_watermarks.push(Watermark {
-                                system_time: block.system_time,
-                                event_time: wm,
-                            });
-                        }
-                    }
-                    MetadataEvent::ExecuteQuery(e) => {
-                        if e.output_data.is_some() {
-                            data_paths
-                                .push(input_layout.data_dir.join(block_hash.to_multibase_string()));
-                        }
-                        if let Some(wm) = e.output_watermark {
-                            explicit_watermarks.push(Watermark {
-                                system_time: block.system_time,
-                                event_time: wm,
-                            });
-                        }
-                    }
-                    MetadataEvent::SetWatermark(sw) => {
-                        explicit_watermarks.push(Watermark {
-                            system_time: block.system_time,
-                            event_time: sw.output_watermark,
-                        });
-                    }
-                    _ => (),
+                if block.event.output_data.is_some() {
+                    data_paths.push(input_layout.data_dir.join(block_hash.to_multibase_string()));
+                }
+
+                if let Some(wm) = block.event.output_watermark {
+                    explicit_watermarks.push(Watermark {
+                        system_time: block.system_time,
+                        event_time: wm,
+                    });
                 }
             }
 
@@ -526,12 +490,10 @@ impl TransformServiceImpl {
         let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
         let vocab = chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetVocab(sv) => Some(sv.into()),
-                _ => None,
-            })
-            .next();
-        Ok(vocab.unwrap_or_default())
+            .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
+            .map(|sv| sv.into())
+            .unwrap_or_default();
+        Ok(vocab)
     }
 
     // TODO: Migrate to providing schema directly
@@ -574,22 +536,31 @@ impl TransformServiceImpl {
             .ok_or(VerificationError::NoSuchBlock(end_block))?
         {
             match block.event {
-                MetadataEvent::SetTransform(st) if source.is_none() => {
-                    source = Some(st);
+                MetadataEvent::SetTransform(st) => {
+                    if source.is_none() {
+                        source = Some(st);
+                    } else {
+                        // TODO: Support dataset evolution
+                        unimplemented!(
+                            "Verifying datasets with evolving queries is not yet supported"
+                        );
+                    }
                 }
-                MetadataEvent::SetTransform(_) if source.is_some() => {
-                    // TODO: Support dataset evolution
-                    unimplemented!("Verifying datasets with evolving queries is not yet supported");
+                MetadataEvent::SetVocab(sv) => {
+                    if vocab.is_none() {
+                        vocab = Some(sv.into())
+                    }
                 }
-                MetadataEvent::SetVocab(sv) if vocab.is_none() => vocab = Some(sv.into()),
-                MetadataEvent::ExecuteQuery(_) if !finished_range => {
-                    blocks.push((block_hash.clone(), block));
+                MetadataEvent::ExecuteQuery(_) => {
+                    if !finished_range {
+                        blocks.push((block_hash.clone(), block));
+                    } else {
+                        // TODO: this might be incorrect - test with specific start_block
+                        prev_checkpoint = Some(block_hash.clone());
+                    }
                 }
-                MetadataEvent::ExecuteQuery(_) if finished_range => {
-                    // TODO: this might be incorrect - test with specific start_block
-                    prev_checkpoint = Some(block_hash.clone());
-                }
-                _ => (),
+                MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => unreachable!(),
+                MetadataEvent::Seed(_) | MetadataEvent::SetWatermark(_) => (),
             }
 
             if !finished_range && Some(&block_hash) == start_block.as_ref() {
