@@ -218,26 +218,16 @@ impl Command for CompleteCommand {
             }
         }
 
-        // Complete flags and options
+        // Complete args
         if to_complete.starts_with("-") {
-            if "--help".starts_with(to_complete) {
-                println!("--help");
-            }
-            for flg in last_cmd
-                .get_opts()
-                .filter(|opt| !opt.is_positional() && !opt.is_set(clap::ArgSettings::TakesValue))
-            {
-                let full_name = if let Some(long) = flg.get_long() {
+            for arg in last_cmd.get_arguments() {
+                let full_name = if let Some(long) = arg.get_long() {
                     format!("--{}", long)
+                } else if let Some(short) = arg.get_short() {
+                    format!("-{}", short)
                 } else {
-                    format!("-{}", flg.get_short().unwrap())
+                    "".into()
                 };
-                if full_name.starts_with(to_complete) {
-                    println!("{}", full_name);
-                }
-            }
-            for opt in last_cmd.get_opts() {
-                let full_name = format!("--{}", opt.get_long().unwrap());
                 if full_name.starts_with(to_complete) {
                     println!("{}", full_name);
                 }

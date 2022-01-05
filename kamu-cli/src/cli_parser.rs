@@ -145,7 +145,22 @@ pub fn cli() -> App<'static> {
                 .about("Completes a command in the shell")
                 .setting(AppSettings::Hidden)
                 .arg(Arg::new("input").required(true).index(1))
-                .arg(Arg::new("current").required(true).index(2)),
+                .arg(Arg::new("current").required(true).index(2))
+                .after_help(indoc::indoc!(
+                    r#"
+                    This hidden command is called by shell completions to use domain knowledge to complete commands and arguments.
+
+                    ### Examples ###
+
+                    Should complete to "new":
+
+                        kamu complete "kamu ne" 1
+
+                    Should complete to "--derivative:
+
+                        kamu complete "kamu new --de" 2
+                    "#
+                )),
             App::new("completions")
                 .about("Generate tab-completion scripts for your shell")
                 .after_help(indoc::indoc!(
