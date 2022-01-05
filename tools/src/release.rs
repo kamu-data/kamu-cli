@@ -59,6 +59,10 @@ fn main() {
     }
 
     update_license(&Path::new("LICENSE.txt"), &current_version, &new_version);
+
+    update_makefile(&Path::new("images/Makefile"), &new_version);
+
+    update_makefile(&Path::new("images/demo/Makefile"), &new_version);
 }
 
 fn get_all_crates() -> Vec<Crate> {
@@ -139,6 +143,19 @@ fn update_license_text<'t>(
         text
     }
     .to_string()
+}
+
+fn update_makefile(makefile_path: &Path, new_version: &Version) {
+    eprintln!("Updating version in makefile: {}", makefile_path.display());
+    let text = std::fs::read_to_string(makefile_path).expect("Could not read the Makefile");
+    let new_text = update_makefile_text(&text, new_version);
+    std::fs::write(makefile_path, new_text).expect("Failed to write to Makefile");
+}
+
+fn update_makefile_text(text: &str, new_version: &Version) -> String {
+    let re = regex::Regex::new(r"(KAMU_VERSION = )(\d+\.\d+\.\d+)").unwrap();
+    re.replace(text, |c: &Captures| format!("{}{}", &c[1], new_version))
+        .to_string()
 }
 
 fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
