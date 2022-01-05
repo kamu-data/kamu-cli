@@ -52,8 +52,8 @@ impl NewDatasetCommand {
                       # List of metadata events that get dataset into its initial state
                       # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
                       metadata:
-                          # Specifies the source of data that can be periodically polled to refresh the dataset
-                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+                        # Specifies the source of data that can be periodically polled to refresh the dataset
+                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
                         - kind: setPollingSource
                           # Where to fetch the data from.
                           # Includes source URL, a protocol to use, cache control
@@ -77,13 +77,13 @@ impl NewDatasetCommand {
                             - "date TIMESTAMP"
                             - "city STRING"
                             - "population STRING"
-                          # OPTIONAL: Pre-processing query that shapes the data
+                          # OPTIONAL: Pre-processing query that shapes the data.
                           # Useful for converting text data read from CSVs into strict types
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
                           preprocess:
                             kind: sql
                             # Use one of the supported engines and a query in its dialect
-                            # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
+                            # See: https://docs.kamu.dev/cli/transform/supported-engines/
                             engine: spark
                             query: >
                               SELECT
@@ -91,16 +91,15 @@ impl NewDatasetCommand {
                                 city,
                                 CAST(REPLACE(population, ",", "") as BIGINT)  -- removes commas between thousands
                               FROM input
-                          # How to combine data ingested in the past with the new data:
-                          # append as log or diff as a snapshot of the current state.
+                          # How to combine data ingested in the past with the new data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
                           merge:
                             kind: ledger
                             primaryKey:
                             - date
                             - city
-                          # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
-                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+                        # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
+                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
                           eventTimeColumn: date
                     "#
@@ -118,21 +117,21 @@ impl NewDatasetCommand {
                       # A human-friendly alias of the dataset
                       name: {}
                       # Derivative sources produce data by transforming and combining one or multiple existing datasets.
-                      kind: root
+                      kind: derivative
                       # List of metadata events that get dataset into its initial state
                       # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
                       metadata:
-                          # Transformation that will be applied to produce new data
-                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
+                        # Transformation that will be applied to produce new data
+                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
                         - kind: setTransform
                           # References the datasets that will be used as sources.
                           # Note: We are associating inputs by name, but could also use IDs.
                           inputs:
                             - name: com.example.city-populations
+                          # Transformation steps that ise one of the supported engines and query dialects
+                          # See: https://docs.kamu.dev/cli/transform/supported-engines/
                           transform:
                             kind: sql
-                            # Use one of the supported engines and a query in its dialect
-                            # See: https://github.com/kamu-data/kamu-cli/blob/master/docs/transform.md#supported-engines
                             engine: spark
                             query: >
                               SELECT
@@ -140,8 +139,8 @@ impl NewDatasetCommand {
                                 city,
                                 population + 1 as population
                               FROM `com.example.city-populations`
-                          # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
-                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+                        # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
+                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
                           eventTimeColumn: date
                     "#

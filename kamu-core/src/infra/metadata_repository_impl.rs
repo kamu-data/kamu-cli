@@ -108,6 +108,44 @@ impl MetadataRepositoryImpl {
         ordered
     }
 
+    fn resolve_transform_inputs(
+        &self,
+        dataset_name: &DatasetName,
+        inputs: &mut Vec<TransformInput>,
+    ) -> Result<(), DomainError> {
+        for input in inputs.iter_mut() {
+            if let Some(input_id) = &input.id {
+                // Input is referenced by ID - in this case we allow any name
+                self.resolve_dataset_ref(&input_id.as_local_ref())
+                    .map_err(|e| match e {
+                        DomainError::DoesNotExist { .. } => DomainError::missing_reference(
+                            ResourceKind::Dataset,
+                            dataset_name.to_string(),
+                            ResourceKind::Dataset,
+                            input_id.to_string(),
+                        ),
+                        _ => e,
+                    })?;
+            } else {
+                // When ID is not specified we try resolving it by name
+                let hdl = self
+                    .resolve_dataset_ref(&input.name.as_local_ref())
+                    .map_err(|e| match e {
+                        DomainError::DoesNotExist { .. } => DomainError::missing_reference(
+                            ResourceKind::Dataset,
+                            dataset_name.to_string(),
+                            ResourceKind::Dataset,
+                            input.name.to_string(),
+                        ),
+                        _ => e,
+                    })?;
+
+                input.id = Some(hdl.id);
+            }
+        }
+        Ok(())
+    }
+
     fn get_summary_impl(&self, dataset_name: &DatasetName) -> Result<DatasetSummary, DomainError> {
         let path = self.get_dataset_metadata_dir(&dataset_name).join("summary");
 
@@ -333,48 +371,39 @@ impl MetadataRepository for MetadataRepositoryImpl {
         &self,
         mut snapshot: DatasetSnapshot,
     ) -> Result<(DatasetHandle, Multihash), DomainError> {
-        if snapshot.kind == DatasetKind::Derivative {
-            // Resolve inputs
-            let source = snapshot
-                .metadata
-                .iter_mut()
-                .find_map(|e| e.as_variant_mut::<SetTransform>())
-                .ok_or_else(|| {
-                    DomainError::bad_input(
-                        "Snapshot of a derivative dataset does not set transformation",
-                    )
-                })?;
-
-            for input in source.inputs.iter_mut() {
-                if let Some(input_id) = &input.id {
-                    // Input is referenced by ID - in this case we allow any name
-                    self.resolve_dataset_ref(&input_id.as_local_ref())
-                        .map_err(|e| match e {
-                            DomainError::DoesNotExist { .. } => DomainError::missing_reference(
-                                ResourceKind::Dataset,
-                                snapshot.name.to_string(),
-                                ResourceKind::Dataset,
-                                input_id.to_string(),
-                            ),
-                            _ => e,
-                        })?;
-                } else {
-                    // When ID is not specified we try resolving it by name
-                    let hdl = self
-                        .resolve_dataset_ref(&input.name.as_local_ref())
-                        .map_err(|e| match e {
-                            DomainError::DoesNotExist { .. } => DomainError::missing_reference(
-                                ResourceKind::Dataset,
-                                snapshot.name.to_string(),
-                                ResourceKind::Dataset,
-                                input.name.to_string(),
-                            ),
-                            _ => e,
-                        })?;
-
-                    input.id = Some(hdl.id);
+        // Validate / resolve events
+        for event in snapshot.metadata.iter_mut() {
+            match event {
+                MetadataEvent::Seed(_) => Err(DomainError::bad_input(
+                    "Seed event is generated and cannot be specified explicitly",
+                )),
+                MetadataEvent::SetPollingSource(_) => {
+                    if snapshot.kind != DatasetKind::Root {
+                        Err(DomainError::bad_input(
+                            "SetPollingSource is only allowed on root datasets",
+                        ))
+                    } else {
+                        Ok(())
+                    }
                 }
-            }
+                MetadataEvent::SetTransform(e) => {
+                    if snapshot.kind != DatasetKind::Derivative {
+                        Err(DomainError::bad_input(
+                            "SetTransform is only allowed on derivative datasets",
+                        ))
+                    } else {
+                        self.resolve_transform_inputs(&snapshot.name, &mut e.inputs)?;
+                        Ok(())
+                    }
+                }
+                MetadataEvent::SetVocab(_) => Ok(()),
+                MetadataEvent::AddData(_)
+                | MetadataEvent::ExecuteQuery(_)
+                | MetadataEvent::SetWatermark(_) => Err(DomainError::bad_input(format!(
+                    "Event is not allowed to appear in a DatasetSnapshot: {:?}",
+                    event
+                ))),
+            }?;
         }
 
         let system_time = Utc::now();
