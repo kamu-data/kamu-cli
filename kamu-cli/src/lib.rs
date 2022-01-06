@@ -23,6 +23,8 @@ pub use cli_parser::*;
 pub mod commands;
 pub use commands::*;
 
+pub mod explore;
+
 pub mod config;
 pub use config::*;
 

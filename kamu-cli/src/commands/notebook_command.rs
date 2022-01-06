@@ -9,9 +9,9 @@
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
+use crate::explore::NotebookServerImpl;
 use crate::output::OutputConfig;
 use container_runtime::ContainerRuntime;
-use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;

@@ -50,17 +50,25 @@ tracing-bunyan-formatter = "*"
 
 # Utils
 chrono = "*"
+cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions
 datafusion = "^5"  # Reading data + SQL
 dirs = "*"
 indoc = "*"
 itertools = "*"
+libc = "*"  # Signal names
+regex = "*"
 shlex = "*"  # Parsing partial input for custom completions
+signal-hook = "*"  # Signal handling
 tokio = { version = "*", features = [] }
 tempfile = "*"
 thiserror = "*"  # Structured error derivations
 url = "*"
 urlencoding = "*"
+
+
+[target.'cfg(unix)'.dependencies]
+users = "*"  # For getting uid:gid
 
 
 [dev-dependencies]

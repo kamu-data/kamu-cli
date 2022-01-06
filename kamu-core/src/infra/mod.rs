@@ -13,7 +13,6 @@ pub use engine::*;
 mod repository;
 pub use repository::*;
 
-pub mod explore;
 pub mod ingest;
 pub mod utils;
 

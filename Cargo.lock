@@ -1321,7 +1321,6 @@ dependencies = [
  "serde_with",
  "serde_yaml",
  "sha3",
- "signal-hook",
  "tempfile",
  "test-log",
  "thiserror",
@@ -1339,6 +1338,7 @@ dependencies = [
 name = "kamu-cli"
 version = "0.75.1"
 dependencies = [
+ "cfg-if",
  "chrono",
  "chrono-humanize",
  "clap",
@@ -1356,6 +1356,7 @@ dependencies = [
  "indoc",
  "itertools",
  "kamu",
+ "libc",
  "merge",
  "minus",
  "num-format",
@@ -1364,10 +1365,12 @@ dependencies = [
  "prettytable-rs",
  "rand 0.8.4",
  "read_input",
+ "regex",
  "serde",
  "serde_with",
  "serde_yaml",
  "shlex",
+ "signal-hook",
  "tempfile",
  "test-log",
  "thiserror",
@@ -1379,6 +1382,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
+ "users",
  "webbrowser",
 ]
 

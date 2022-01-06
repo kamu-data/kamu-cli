@@ -58,7 +58,6 @@ indoc = "*"  # Compile-time unindent
 itertools = "*"
 libc = "*"  # Signal names
 pathdiff = "*"  # Relative paths
-signal-hook = "*"  # Signal handling
 thiserror = "*"  # Structured error derivations
 tracing = "*"
 tempfile = "*"

@@ -9,9 +9,9 @@
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
+use crate::explore::SqlShellImpl;
 use crate::output::*;
 use container_runtime::{ContainerHandle, ContainerRuntime};
-use kamu::infra::explore::*;
 use kamu::infra::*;
 
 use console::style as s;
