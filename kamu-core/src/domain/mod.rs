@@ -17,6 +17,9 @@ pub use error::*;
 mod engine;
 pub use engine::*;
 
+mod engine_provisioner;
+pub use engine_provisioner::*;
+
 mod ingest_service;
 pub use ingest_service::*;
 

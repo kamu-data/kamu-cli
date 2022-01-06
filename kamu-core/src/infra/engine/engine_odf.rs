@@ -16,7 +16,7 @@ use std::{
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
 use odf::{
-    engine::{EngineClient, ExecuteQueryError},
+    engine::{EngineGrpcClient, ExecuteQueryError},
     ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess,
 };
 use opendatafabric as odf;
@@ -99,7 +99,7 @@ impl ODFEngine {
             ExecuteQueryError::InvalidQuery(e) => {
                 EngineError::invalid_query(e.message, run_info.log_files())
             }
-            e @ ExecuteQueryError::InternalError(_) => {
+            e @ ExecuteQueryError::EngineInternalError(_) => {
                 EngineError::internal(e, run_info.log_files())
             }
             e @ ExecuteQueryError::RpcError(_) => EngineError::internal(e, run_info.log_files()),
@@ -315,8 +315,11 @@ impl EngineContainer {
         })
     }
 
-    pub async fn connect_client(&self, run_info: &RunInfo) -> Result<EngineClient, EngineError> {
-        Ok(EngineClient::connect(
+    pub async fn connect_client(
+        &self,
+        run_info: &RunInfo,
+    ) -> Result<EngineGrpcClient, EngineError> {
+        Ok(EngineGrpcClient::connect(
             &self.container_runtime.get_runtime_host_addr(),
             self.adapter_host_port,
         )

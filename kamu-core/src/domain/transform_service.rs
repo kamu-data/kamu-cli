@@ -7,10 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{
-    DomainError, EngineError, EngineProvisioningListener, VerificationError, VerificationListener,
-    VerificationMultiListener, VerificationOptions, VerificationRequest, VerificationResult,
-};
+use super::*;
 use opendatafabric::{DatasetHandle, DatasetRefLocal, Multihash};
 
 use std::backtrace::Backtrace;
@@ -105,6 +102,8 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub enum TransformError {
     #[error("Domain error: {0}")]
     DomainError(#[from] DomainError),
+    #[error("Engine provisioning error: {0}")]
+    EngineProvisioningError(#[from] EngineProvisioningError),
     #[error("Engine error: {0}")]
     EngineError(#[from] EngineError),
     #[error("Internal error: {source}")]

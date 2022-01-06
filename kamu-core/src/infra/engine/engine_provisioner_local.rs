@@ -87,7 +87,7 @@ impl EngineProvisionerLocal {
         &self,
         image: &str,
         listener: Arc<dyn EngineProvisioningListener>,
-    ) -> Result<(), EngineError> {
+    ) -> Result<(), EngineProvisioningError> {
         let pull_image = {
             let mut state = self.state.lock().unwrap();
             if state.known_images.contains(image) {
@@ -114,11 +114,12 @@ impl EngineProvisionerLocal {
                 .pull_cmd(image)
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
-                .status()?
+                .status()
+                .map_err(|e| EngineProvisioningError::internal(e))?
                 .exit_ok()
                 .map_err(|e| {
                     error!(image_name = image, error = ?e, "Failed to pull engine image");
-                    EngineError::image_not_found(image)
+                    EngineProvisioningError::image_not_found(image)
                 })?;
 
             info!(image_name = image, "Successfully pulled engine image");
@@ -171,7 +172,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
     fn provision_ingest_engine(
         &self,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineError> {
+    ) -> Result<IngestEngineHandle, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
         self.ensure_image(docker_images::SPARK, listener.clone())?;
 
@@ -189,7 +190,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineError> {
+    ) -> Result<EngineHandle, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
 
         let (engine, image) = match engine_id {
@@ -201,7 +202,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.flink_engine.clone() as Arc<dyn Engine>,
                 docker_images::FLINK,
             )),
-            _ => Err(EngineError::image_not_found(engine_id)),
+            _ => Err(EngineProvisioningError::image_not_found(engine_id)),
         }?;
 
         self.ensure_image(image, listener.clone())?;
@@ -270,15 +271,15 @@ impl EngineProvisioner for EngineProvisionerNull {
         &self,
         engine_id: &str,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineError> {
-        Err(EngineError::image_not_found(engine_id))
+    ) -> Result<EngineHandle, EngineProvisioningError> {
+        Err(EngineProvisioningError::image_not_found(engine_id))
     }
 
     fn provision_ingest_engine(
         &self,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineError> {
-        Err(EngineError::image_not_found("spark-ingest"))
+    ) -> Result<IngestEngineHandle, EngineProvisioningError> {
+        Err(EngineProvisioningError::image_not_found("spark-ingest"))
     }
 
     fn release_engine(&self, _engine: &dyn Engine) {}

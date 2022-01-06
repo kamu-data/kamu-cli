@@ -14,16 +14,16 @@ use crate::{
     ExecuteQueryResponseInvalidQuery, ExecuteQueryResponseSuccess,
 };
 
-use super::generated::engine_client::EngineClient as EngineClientGRPC;
-use super::generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
+use super::engine_grpc_generated::engine_client::EngineClient as EngineClientGRPC;
+use super::engine_grpc_generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
 
 use thiserror::Error;
 
-pub struct EngineClient {
+pub struct EngineGrpcClient {
     client: EngineClientGRPC<tonic::transport::Channel>,
 }
 
-impl EngineClient {
+impl EngineGrpcClient {
     pub async fn connect(host: &str, port: u16) -> Result<Self, tonic::transport::Error> {
         let client = EngineClientGRPC::connect(format!("http://{}:{}", host, port)).await?;
 
@@ -67,8 +67,8 @@ impl EngineClient {
 pub enum ExecuteQueryError {
     #[error("Invalid query: {0}")]
     InvalidQuery(ExecuteQueryResponseInvalidQuery),
-    #[error("Internal error: {0}")]
-    InternalError(ExecuteQueryResponseInternalError),
+    #[error("Engine internal error: {0}")]
+    EngineInternalError(ExecuteQueryResponseInternalError),
     #[error("Rpc error: {0}")]
     RpcError(#[from] tonic::Status),
 }
@@ -81,6 +81,6 @@ impl From<ExecuteQueryResponseInvalidQuery> for ExecuteQueryError {
 
 impl From<ExecuteQueryResponseInternalError> for ExecuteQueryError {
     fn from(error: ExecuteQueryResponseInternalError) -> Self {
-        Self::InternalError(error)
+        Self::EngineInternalError(error)
     }
 }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod client;
-pub use client::*;
+mod engine_grpc_client;
+pub use engine_grpc_client::*;
 
-pub mod generated;
+pub mod engine_grpc_generated;

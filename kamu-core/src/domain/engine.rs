@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use container_runtime::PullImageListener;
 use opendatafabric::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
 use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::*;
@@ -16,9 +15,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::backtrace::Backtrace;
-use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::Arc;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -35,30 +32,6 @@ pub trait Engine: Send + Sync {
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
 pub trait IngestEngine: Send + Sync {
     fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError>;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// EngineProvisioner
-///////////////////////////////////////////////////////////////////////////////
-
-pub trait EngineProvisioner: Send + Sync {
-    fn provision_engine(
-        &self,
-        engine_id: &str,
-        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineError>;
-
-    /// Do not use directly - called automatically by [EngineHandle]
-    fn release_engine(&self, engine: &dyn Engine);
-
-    /// TODO: Will be removed
-    fn provision_ingest_engine(
-        &self,
-        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineError>;
-
-    /// Do not use directly - called automatically by [IngestEngineHandle]
-    fn release_ingest_engine(&self, engine: &dyn IngestEngine);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -89,29 +62,11 @@ pub struct IngestRequest {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Listener
-///////////////////////////////////////////////////////////////////////////////
-
-pub trait EngineProvisioningListener: Send + Sync {
-    fn begin(&self, _engine_id: &str) {}
-    fn success(&self) {}
-
-    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
-        None
-    }
-}
-
-pub struct NullEngineProvisioningListener;
-impl EngineProvisioningListener for NullEngineProvisioningListener {}
-
-///////////////////////////////////////////////////////////////////////////////
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum EngineError {
-    #[error("{0}")]
-    ImageNotFound(#[from] ImageNotFoundError),
     #[error("{0}")]
     InvalidQuery(#[from] InvalidQueryError),
     #[error("{0}")]
@@ -120,15 +75,6 @@ pub enum EngineError {
     ContractError(#[from] ContractError),
     #[error("{0}")]
     InternalError(#[from] InternalEngineError),
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Image not found: {image_name}")]
-pub struct ImageNotFoundError {
-    pub image_name: String,
-    pub backtrace: Backtrace,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -237,13 +183,6 @@ impl std::fmt::Display for InternalEngineError {
 ///////////////////////////////////////////////////////////////////////////////
 
 impl EngineError {
-    pub fn image_not_found(image_name: &str) -> Self {
-        EngineError::ImageNotFound(ImageNotFoundError {
-            image_name: image_name.to_owned(),
-            backtrace: Backtrace::capture(),
-        })
-    }
-
     pub fn invalid_query(message: impl Into<String>, log_files: Vec<PathBuf>) -> Self {
         EngineError::InvalidQuery(InvalidQueryError {
             message: message.into(),
@@ -295,70 +234,5 @@ impl EngineError {
 impl From<std::io::Error> for EngineError {
     fn from(e: std::io::Error) -> Self {
         Self::internal(e, Vec::new())
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// EngineHandle
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct EngineHandle<'a> {
-    provisioner: &'a dyn EngineProvisioner,
-    engine: Arc<dyn Engine>,
-}
-
-impl<'a> EngineHandle<'a> {
-    pub(crate) fn new(provisioner: &'a dyn EngineProvisioner, engine: Arc<dyn Engine>) -> Self {
-        Self {
-            provisioner,
-            engine,
-        }
-    }
-}
-
-impl<'a> Deref for EngineHandle<'a> {
-    type Target = dyn Engine;
-
-    fn deref(&self) -> &Self::Target {
-        self.engine.as_ref()
-    }
-}
-
-impl<'a> Drop for EngineHandle<'a> {
-    fn drop(&mut self) {
-        self.provisioner.release_engine(self.engine.as_ref());
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct IngestEngineHandle<'a> {
-    provisioner: &'a dyn EngineProvisioner,
-    engine: Arc<dyn IngestEngine>,
-}
-
-impl<'a> IngestEngineHandle<'a> {
-    pub(crate) fn new(
-        provisioner: &'a dyn EngineProvisioner,
-        engine: Arc<dyn IngestEngine>,
-    ) -> Self {
-        Self {
-            provisioner,
-            engine,
-        }
-    }
-}
-
-impl<'a> Deref for IngestEngineHandle<'a> {
-    type Target = dyn IngestEngine;
-
-    fn deref(&self) -> &Self::Target {
-        self.engine.as_ref()
-    }
-}
-
-impl<'a> Drop for IngestEngineHandle<'a> {
-    fn drop(&mut self) {
-        self.provisioner.release_ingest_engine(self.engine.as_ref());
     }
 }

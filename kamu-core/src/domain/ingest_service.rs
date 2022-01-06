@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{DomainError, EngineError, EngineProvisioningListener};
+use super::{DomainError, EngineError, EngineProvisioningError, EngineProvisioningListener};
 use opendatafabric::{DatasetHandle, DatasetRefLocal, FetchStep, Multihash};
 
 use std::backtrace::Backtrace;
@@ -138,6 +138,8 @@ pub enum IngestError {
         #[source]
         source: Option<BoxedError>,
     },
+    #[error("Engine provisioning error: {0}")]
+    EngineProvisioningError(#[from] EngineProvisioningError),
     #[error("Engine error: {0}")]
     EngineError(#[from] EngineError),
     #[error("Pipe command error: {command:?} {source}")]
