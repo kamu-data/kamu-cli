@@ -10,7 +10,6 @@
 use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
 use indoc::indoc;
-use opendatafabric::serde::yaml::generated::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use std::convert::TryFrom;

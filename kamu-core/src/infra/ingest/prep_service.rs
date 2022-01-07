@@ -9,7 +9,7 @@
 
 use super::*;
 use crate::domain::*;
-use opendatafabric::serde::yaml::formats::datetime_rfc3339;
+use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};

@@ -10,6 +10,7 @@
 use std::fmt;
 
 use super::dataset_identity::*;
+use crate::formats::InvalidValue;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -113,7 +114,7 @@ impl std::str::FromStr for DatasetRefLocal {
 
 super::dataset_identity::impl_try_from_str!(DatasetRefLocal);
 
-super::dataset_identity::impl_invalid_value!(DatasetRefLocal);
+crate::formats::impl_invalid_value!(DatasetRefLocal);
 
 impl fmt::Display for DatasetRefLocal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,7 +152,7 @@ impl std::str::FromStr for DatasetRefRemote {
 
 super::dataset_identity::impl_try_from_str!(DatasetRefRemote);
 
-super::dataset_identity::impl_invalid_value!(DatasetRefRemote);
+crate::formats::impl_invalid_value!(DatasetRefRemote);
 
 impl fmt::Display for DatasetRefRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -226,7 +227,7 @@ impl std::str::FromStr for DatasetRefAny {
 
 super::dataset_identity::impl_try_from_str!(DatasetRefAny);
 
-super::dataset_identity::impl_invalid_value!(DatasetRefAny);
+crate::formats::impl_invalid_value!(DatasetRefAny);
 
 impl fmt::Display for DatasetRefAny {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

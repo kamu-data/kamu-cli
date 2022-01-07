@@ -13,11 +13,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 #![allow(unused_variables)]
-use super::odf_generated as fb;
+use super::proxies_generated as fb;
 mod odf {
-    pub use crate::dataset_identity::*;
     pub use crate::dtos::*;
-    pub use crate::multihash::*;
+    pub use crate::formats::*;
+    pub use crate::identity::*;
 }
 use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
 use chrono::prelude::*;

@@ -54,6 +54,7 @@ impl Grammar {
         }
     }
 
+    #[allow(dead_code)]
     // Multibase = [a-zA-Z0-9+/=]+
     fn match_multibase(s: &str) -> Option<(&str, &str)> {
         let chars = s
@@ -71,6 +72,7 @@ impl Grammar {
         }
     }
 
+    #[allow(dead_code)]
     // DatasetID = "did:odf:" Multibase
     pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
         let (h, t) = Self::match_str(s, "did:odf:")?;

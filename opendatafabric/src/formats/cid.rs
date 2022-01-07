@@ -13,7 +13,7 @@ use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 
-use crate::{Multicodec, MulticodecError, MultihashError, MultihashGeneric};
+use super::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 

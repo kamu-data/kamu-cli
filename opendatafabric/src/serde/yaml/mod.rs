@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod formats;
-pub mod generated;
+mod formats;
+pub use formats::*;
+
+mod derivations_generated;
+pub use derivations_generated::*;
 
 mod serdes;
 pub use serdes::*;

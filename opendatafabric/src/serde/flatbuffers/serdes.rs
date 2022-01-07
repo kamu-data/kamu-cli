@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::convertors::*;
-use super::odf_generated as fbgen;
+use super::convertors_generated::*;
+use super::proxies_generated as fbgen;
 pub use crate::serde::{Buffer, Error, MetadataBlockDeserializer, MetadataBlockSerializer};
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
 use crate::Multicodec;
@@ -139,7 +139,7 @@ impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
     }
 
     fn read_execute_query_response(&self, data: &[u8]) -> Result<ExecuteQueryResponse, Error> {
-        let proxy = flatbuffers::root::<super::odf_generated::ExecuteQueryResponseRoot>(data)
+        let proxy = flatbuffers::root::<super::proxies_generated::ExecuteQueryResponseRoot>(data)
             .map_err(|e| Error::serde(e))?;
 
         Ok(ExecuteQueryResponse::deserialize(

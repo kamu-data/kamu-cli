@@ -9,34 +9,18 @@
 
 #![feature(backtrace)]
 
-mod cid;
-pub use cid::*;
-
-mod multicodec;
-pub use multicodec::*;
-
-mod multihash;
-pub use multihash::*;
-
-mod grammar;
-pub use grammar::*;
-
-mod dataset_identity;
-pub use dataset_identity::*;
-
-mod dataset_refs;
-pub use dataset_refs::*;
-
-mod dtos;
+pub mod dtos;
 pub use dtos::*;
 
-pub mod dynamic;
+pub mod formats;
+pub use formats::*;
+
+pub mod identity;
+pub use identity::*;
 
 pub mod serde;
 
-mod defaults;
-
 pub mod engine;
 
-mod metadata_utils;
-pub use metadata_utils::*;
+pub mod metadata;
+pub use metadata::*;

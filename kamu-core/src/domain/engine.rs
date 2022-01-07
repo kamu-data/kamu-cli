@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::serde::yaml::formats::{datetime_rfc3339, datetime_rfc3339_opt};
-use opendatafabric::serde::yaml::generated::*;
+use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};

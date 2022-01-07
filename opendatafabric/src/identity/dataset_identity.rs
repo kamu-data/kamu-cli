@@ -10,16 +10,14 @@
 use std::cmp;
 use std::convert::{AsRef, TryFrom};
 use std::fmt;
-use std::marker::PhantomData;
 use std::ops;
 use std::sync::Arc;
 
 use ed25519_dalek::Keypair;
 
 use super::grammar::Grammar;
-use super::{CIDError, CID};
 use super::{DatasetRefAny, DatasetRefLocal, DatasetRefRemote};
-use super::{Multicodec, Multihash};
+use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Macro helpers
@@ -61,26 +59,6 @@ macro_rules! impl_try_from_str {
 }
 
 pub(crate) use impl_try_from_str;
-
-macro_rules! impl_invalid_value {
-    ($typ:ident) => {
-        impl std::fmt::Debug for InvalidValue<$typ> {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "InvalidValue<{}>({:?})", stringify!($typ), self.value)
-            }
-        }
-
-        impl std::fmt::Display for InvalidValue<$typ> {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(f, "Invalid {}: {}", stringify!($typ), self.value)
-            }
-        }
-
-        impl std::error::Error for InvalidValue<$typ> {}
-    };
-}
-
-pub(crate) use impl_invalid_value;
 
 macro_rules! newtype_str {
     ($buf_type:ident, $parse:expr) => {
@@ -258,6 +236,18 @@ impl fmt::Display for DatasetID {
     }
 }
 
+impl fmt::Debug for InvalidValue<DatasetID> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InvalidValue<DatasetID>({:?})", self.value)
+    }
+}
+
+impl fmt::Display for InvalidValue<DatasetID> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Invalid DatasetID: {}", self.value)
+    }
+}
+
 impl serde::Serialize for DatasetID {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.to_did_string())
@@ -416,36 +406,5 @@ impl<'de> serde::de::Visitor<'de> for RemoteDatasetNameSerdeVisitor {
 
     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
         RemoteDatasetName::try_from(v).map_err(serde::de::Error::custom)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Errors
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, serde::Deserialize, serde::Serialize)]
-pub struct InvalidValue<T: ?Sized> {
-    pub value: String,
-    _ph: PhantomData<T>,
-}
-
-impl<T: ?Sized> InvalidValue<T> {
-    pub fn new<S: Into<String>>(s: S) -> Self {
-        Self {
-            value: s.into(),
-            _ph: PhantomData,
-        }
-    }
-}
-
-impl fmt::Debug for InvalidValue<DatasetID> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "InvalidValue<DatasetID>({:?})", self.value)
-    }
-}
-
-impl fmt::Display for InvalidValue<DatasetID> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid DatasetID: {}", self.value)
     }
 }

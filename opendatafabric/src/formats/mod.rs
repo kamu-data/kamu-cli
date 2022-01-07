@@ -7,10 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod convertors_generated;
+mod cid;
+pub use cid::*;
 
-#[allow(dead_code, unused_imports)]
-mod proxies_generated;
+mod multicodec;
+pub use multicodec::*;
 
-mod serdes;
-pub use serdes::*;
+mod multihash;
+pub use multihash::*;
+
+mod error;
+pub use error::*;

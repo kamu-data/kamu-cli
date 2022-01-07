@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use opendatafabric::serde::yaml::formats::datetime_rfc3339_opt;
-use opendatafabric::serde::yaml::generated::{DatasetKindDef, TransformInputDef};
+use opendatafabric::serde::yaml::*;
 use opendatafabric::{DatasetID, DatasetKind, DatasetName, Multihash, TransformInput};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;

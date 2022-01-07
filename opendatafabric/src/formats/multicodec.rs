@@ -66,7 +66,7 @@ impl std::str::FromStr for Multicodec {
     }
 }
 
-super::impl_try_from_str!(Multicodec);
+crate::identity::impl_try_from_str!(Multicodec);
 
 impl std::fmt::Display for Multicodec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
