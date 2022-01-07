@@ -32,15 +32,15 @@ fn test_verify_data_consistency() {
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
     let dataset_layout = DatasetLayout::create(&volume_layout, &dataset_name).unwrap();
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
         volume_layout.clone(),
     ));
 
-    metadata_repo
+    dataset_reg
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -50,7 +50,7 @@ fn test_verify_data_consistency() {
         )
         .unwrap();
 
-    let (_hdl, head) = metadata_repo
+    let (_hdl, head) = dataset_reg
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
@@ -89,7 +89,7 @@ fn test_verify_data_consistency() {
     let data_physical_hash = data_utils::get_parquet_physical_hash(&data_path).unwrap();
 
     // "Commit" data
-    let mut metadata_chain = metadata_repo
+    let mut metadata_chain = dataset_reg
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap();
     let head = metadata_chain.append(

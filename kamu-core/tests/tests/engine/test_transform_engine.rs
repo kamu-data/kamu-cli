@@ -30,7 +30,7 @@ fn test_transform_with_engine_spark() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
@@ -39,12 +39,12 @@ fn test_transform_with_engine_spark() {
 
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         engine_provisioner.clone(),
         &volume_layout,
     );
@@ -89,7 +89,7 @@ fn test_transform_with_engine_spark() {
 
     let root_name = root_snapshot.name.clone();
 
-    metadata_repo.add_dataset(root_snapshot).unwrap();
+    dataset_reg.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
@@ -118,7 +118,7 @@ fn test_transform_with_engine_spark() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    metadata_repo.add_dataset(deriv_snapshot).unwrap();
+    dataset_reg.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
@@ -131,7 +131,7 @@ fn test_transform_with_engine_spark() {
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
-        metadata_repo
+        dataset_reg
             .get_metadata_chain(&deriv_name.as_local_ref())
             .unwrap()
             .iter_blocks()
@@ -252,7 +252,7 @@ fn test_transform_with_engine_flink() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
@@ -261,12 +261,12 @@ fn test_transform_with_engine_flink() {
 
     let ingest_svc = IngestServiceImpl::new(
         &volume_layout,
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         engine_provisioner.clone(),
         &volume_layout,
     );
@@ -311,7 +311,7 @@ fn test_transform_with_engine_flink() {
 
     let root_name = root_snapshot.name.clone();
 
-    metadata_repo.add_dataset(root_snapshot).unwrap();
+    dataset_reg.add_dataset(root_snapshot).unwrap();
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
@@ -340,7 +340,7 @@ fn test_transform_with_engine_flink() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    metadata_repo.add_dataset(deriv_snapshot).unwrap();
+    dataset_reg.add_dataset(deriv_snapshot).unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
@@ -353,7 +353,7 @@ fn test_transform_with_engine_flink() {
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
     assert_eq!(
-        metadata_repo
+        dataset_reg
             .get_metadata_chain(&deriv_name.as_local_ref())
             .unwrap()
             .iter_blocks()

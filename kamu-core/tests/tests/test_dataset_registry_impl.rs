@@ -25,7 +25,7 @@ fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let metadata_repo = MetadataRepositoryImpl::new(Arc::new(workspace_layout));
+    let dataset_reg = DatasetRegistryImpl::new(Arc::new(workspace_layout));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -40,29 +40,26 @@ fn test_delete_dataset() {
             .build(),
     ];
 
-    metadata_repo.add_datasets(&mut snapshots.into_iter());
+    dataset_reg.add_datasets(&mut snapshots.into_iter());
 
     assert!(matches!(
-        metadata_repo.delete_dataset(&rl!("foo")),
+        dataset_reg.delete_dataset(&rl!("foo")),
         Err(DomainError::DanglingReference { .. })
     ));
 
-    assert!(matches!(
-        metadata_repo.get_metadata_chain(&rl!("foo")),
-        Ok(_)
-    ));
+    assert!(matches!(dataset_reg.get_metadata_chain(&rl!("foo")), Ok(_)));
 
-    assert!(matches!(metadata_repo.delete_dataset(&rl!("bar")), Ok(_)));
+    assert!(matches!(dataset_reg.delete_dataset(&rl!("bar")), Ok(_)));
 
     assert!(matches!(
-        metadata_repo.get_metadata_chain(&rl!("bar")),
+        dataset_reg.get_metadata_chain(&rl!("bar")),
         Err(DomainError::DoesNotExist { .. })
     ));
 
-    assert!(matches!(metadata_repo.delete_dataset(&rl!("foo")), Ok(_)));
+    assert!(matches!(dataset_reg.delete_dataset(&rl!("foo")), Ok(_)));
 
     assert!(matches!(
-        metadata_repo.get_metadata_chain(&rl!("foo")),
+        dataset_reg.get_metadata_chain(&rl!("foo")),
         Err(DomainError::DoesNotExist { .. })
     ));
 }

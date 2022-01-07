@@ -10,7 +10,7 @@
 use super::*;
 use opendatafabric::*;
 
-pub trait MetadataRepository: Send + Sync {
+pub trait DatasetRegistry: Send + Sync {
     fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,

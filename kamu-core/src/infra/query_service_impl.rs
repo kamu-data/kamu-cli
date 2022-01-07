@@ -29,25 +29,20 @@ use opendatafabric::*;
 use std::{path::PathBuf, sync::Arc};
 use tracing::info_span;
 
-use crate::domain::{
-    DatasetQueryOptions, MetadataRepository, QueryError, QueryOptions, QueryService,
-};
+use crate::domain::*;
 
 use super::{DatasetLayout, VolumeLayout};
 
 pub struct QueryServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     volume_layout: Arc<VolumeLayout>,
 }
 
 #[component(pub)]
 impl QueryServiceImpl {
-    pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
-        volume_layout: Arc<VolumeLayout>,
-    ) -> Self {
+    pub fn new(dataset_reg: Arc<dyn DatasetRegistry>, volume_layout: Arc<VolumeLayout>) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             volume_layout,
         }
     }
@@ -73,10 +68,10 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
 
         let vocab: DatasetVocabulary = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
             .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
@@ -162,7 +157,7 @@ impl QueryService for QueryServiceImpl {
         ctx.register_catalog(
             "kamu",
             Arc::new(KamuCatalog::new(
-                self.metadata_repo.clone(),
+                self.dataset_reg.clone(),
                 self.volume_layout.clone(),
                 options,
             )),
@@ -172,9 +167,9 @@ impl QueryService for QueryServiceImpl {
     }
 
     fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         let metadata_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
@@ -195,19 +190,19 @@ impl QueryService for QueryServiceImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct KamuCatalog {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     volume_layout: Arc<VolumeLayout>,
     options: QueryOptions,
 }
 
 impl KamuCatalog {
     fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         volume_layout: Arc<VolumeLayout>,
         options: QueryOptions,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             volume_layout,
             options,
         }
@@ -226,7 +221,7 @@ impl CatalogProvider for KamuCatalog {
     fn schema(&self, name: &str) -> Option<Arc<dyn datafusion::catalog::schema::SchemaProvider>> {
         if name == "kamu" {
             Some(Arc::new(KamuSchema::new(
-                self.metadata_repo.clone(),
+                self.dataset_reg.clone(),
                 self.volume_layout.clone(),
                 self.options.clone(),
             )))
@@ -241,19 +236,19 @@ impl CatalogProvider for KamuCatalog {
 // TODO: Performance is poor as it essentially reads all data files in the workspace
 // and in some cases (like 'show tables') even twice
 struct KamuSchema {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     volume_layout: Arc<VolumeLayout>,
     options: QueryOptions,
 }
 
 impl KamuSchema {
     fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         volume_layout: Arc<VolumeLayout>,
         options: QueryOptions,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             volume_layout,
             options,
         }
@@ -280,7 +275,7 @@ impl KamuSchema {
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
         if let Ok(metadata_chain) = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())
         {
             let mut files = Vec::new();
@@ -326,7 +321,7 @@ impl SchemaProvider for KamuSchema {
 
     fn table_names(&self) -> Vec<String> {
         if self.options.datasets.is_empty() {
-            self.metadata_repo
+            self.dataset_reg
                 .get_all_datasets()
                 .filter(|hdl| self.has_data(hdl))
                 .map(|hdl| hdl.name.to_string())
@@ -342,7 +337,7 @@ impl SchemaProvider for KamuSchema {
 
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         let dataset_handle = self
-            .metadata_repo
+            .dataset_reg
             .resolve_dataset_ref(&DatasetName::try_from(name).unwrap().into())
             .unwrap();
         let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);

@@ -17,7 +17,7 @@ use chrono_humanize::HumanTime;
 use std::sync::Arc;
 
 pub struct ListCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
@@ -25,13 +25,13 @@ pub struct ListCommand {
 
 impl ListCommand {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             remote_alias_reg,
             output_config,
             detail_level,
@@ -42,7 +42,7 @@ impl ListCommand {
     fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
-        let mut datasets: Vec<_> = self.metadata_repo.get_all_datasets().collect();
+        let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut out = std::io::stdout();
@@ -50,12 +50,12 @@ impl ListCommand {
 
         for hdl in &datasets {
             let head = self
-                .metadata_repo
+                .dataset_reg
                 .get_metadata_chain(&hdl.as_local_ref())?
                 .read_ref(&BlockRef::Head)
                 .unwrap();
 
-            let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
+            let summary = self.dataset_reg.get_summary(&hdl.as_local_ref())?;
 
             write!(
                 out,
@@ -78,7 +78,7 @@ impl ListCommand {
     fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut datasets: Vec<_> = self.metadata_repo.get_all_datasets().collect();
+        let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut table = Table::new();
@@ -92,12 +92,12 @@ impl ListCommand {
 
         for hdl in datasets.iter() {
             let head = self
-                .metadata_repo
+                .dataset_reg
                 .get_metadata_chain(&hdl.as_local_ref())?
                 .read_ref(&BlockRef::Head)
                 .unwrap();
 
-            let summary = self.metadata_repo.get_summary(&hdl.as_local_ref())?;
+            let summary = self.dataset_reg.get_summary(&hdl.as_local_ref())?;
 
             if self.detail_level == 0 {
                 table.add_row(Row::new(vec![

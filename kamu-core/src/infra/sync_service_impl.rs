@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 pub struct SyncServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     repository_factory: Arc<RepositoryFactory>,
 }
@@ -27,13 +27,13 @@ pub struct SyncServiceImpl {
 impl SyncServiceImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         repository_factory: Arc<RepositoryFactory>,
     ) -> Self {
         Self {
             workspace_layout,
-            metadata_repo,
+            dataset_reg,
             remote_repo_reg,
             repository_factory,
         }
@@ -84,7 +84,7 @@ impl SyncServiceImpl {
         };
 
         let chain = match self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&local_name.as_local_ref())
         {
             Ok(chain) => Some(chain),
@@ -200,7 +200,7 @@ impl SyncServiceImpl {
         _options: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
         let local_handle =
-            self.metadata_repo
+            self.dataset_reg
                 .resolve_dataset_ref(local_ref)
                 .map_err(|e| match e {
                     DomainError::DoesNotExist { .. } => SyncError::LocalDatasetDoesNotExist {
@@ -229,7 +229,7 @@ impl SyncServiceImpl {
         let remote_head = cl.read_ref(remote_name)?;
 
         let chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&local_handle.as_local_ref())
             .map_err(|e| SyncError::InternalError(e.into()))?;
 

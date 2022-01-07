@@ -15,7 +15,7 @@ use opendatafabric::DatasetRefLocal;
 use std::sync::Arc;
 
 pub struct AliasListCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     dataset_ref: Option<DatasetRefLocal>,
@@ -23,7 +23,7 @@ pub struct AliasListCommand {
 
 impl AliasListCommand {
     pub fn new<R>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         dataset_ref: Option<R>,
@@ -33,7 +33,7 @@ impl AliasListCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            dataset_reg,
             remote_alias_reg,
             output_config,
             dataset_ref: dataset_ref.map(|s| s.try_into().unwrap()),
@@ -48,9 +48,9 @@ impl AliasListCommand {
         write!(out, "Dataset,Kind,Alias\n")?;
 
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            vec![self.metadata_repo.resolve_dataset_ref(dataset_ref)?]
+            vec![self.dataset_reg.resolve_dataset_ref(dataset_ref)?]
         } else {
-            self.metadata_repo.get_all_datasets().collect()
+            self.dataset_reg.get_all_datasets().collect()
         };
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
@@ -74,9 +74,9 @@ impl AliasListCommand {
         use prettytable::*;
 
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            vec![self.metadata_repo.resolve_dataset_ref(dataset_ref)?]
+            vec![self.dataset_reg.resolve_dataset_ref(dataset_ref)?]
         } else {
-            self.metadata_repo.get_all_datasets().collect()
+            self.dataset_reg.get_all_datasets().collect()
         };
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 

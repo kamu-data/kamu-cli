@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct LineageCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRefLocal>,
@@ -33,7 +33,7 @@ pub struct LineageCommand {
 
 impl LineageCommand {
     pub fn new<I, R>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,
@@ -47,7 +47,7 @@ impl LineageCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            dataset_reg,
             provenance_svc,
             workspace_layout,
             dataset_refs: dataset_refs
@@ -92,11 +92,11 @@ impl LineageCommand {
 impl Command for LineageCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
-            self.metadata_repo.get_all_datasets().collect()
+            self.dataset_reg.get_all_datasets().collect()
         } else {
             self.dataset_refs
                 .iter()
-                .map(|r| self.metadata_repo.resolve_dataset_ref(r))
+                .map(|r| self.dataset_reg.resolve_dataset_ref(r))
                 .collect::<Result<_, _>>()?
         };
 

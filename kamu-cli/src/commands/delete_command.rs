@@ -15,7 +15,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct DeleteCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     sync_svc: Arc<dyn SyncService>,
     dataset_refs: Vec<DatasetRefAny>,
     all: bool,
@@ -25,7 +25,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     pub fn new<I, R>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         sync_svc: Arc<dyn SyncService>,
         dataset_refs: I,
         all: bool,
@@ -38,7 +38,7 @@ impl DeleteCommand {
         <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            dataset_reg,
             sync_svc,
             dataset_refs: dataset_refs
                 .into_iter()
@@ -86,7 +86,7 @@ impl Command for DeleteCommand {
 
         for r in dataset_refs.iter() {
             match r.as_local_ref() {
-                Some(local_ref) => self.metadata_repo.delete_dataset(&local_ref)?,
+                Some(local_ref) => self.dataset_reg.delete_dataset(&local_ref)?,
                 None => match r.as_remote_ref() {
                     Some(DatasetRefRemote::RemoteName(name)) => self
                         .sync_svc

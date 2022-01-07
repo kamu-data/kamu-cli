@@ -13,20 +13,20 @@ use dill::*;
 use opendatafabric::*;
 
 use crate::domain::{
-    DomainError, LineageOptions, LineageVisitor, MetadataRepository, NodeInfo, ProvenanceError,
+    DatasetRegistry, DomainError, LineageOptions, LineageVisitor, NodeInfo, ProvenanceError,
     ProvenanceService,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(metadata_repo: Arc<dyn MetadataRepository>) -> Self {
-        Self { metadata_repo }
+    pub fn new(dataset_reg: Arc<dyn DatasetRegistry>) -> Self {
+        Self { dataset_reg }
     }
 
     fn visit_upstream_dependencies_rec(
@@ -34,10 +34,7 @@ impl ProvenanceServiceImpl {
         dataset_handle: &DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), ProvenanceError> {
-        let summary = match self
-            .metadata_repo
-            .get_summary(&dataset_handle.as_local_ref())
-        {
+        let summary = match self.dataset_reg.get_summary(&dataset_handle.as_local_ref()) {
             Ok(s) => Some(s),
             Err(DomainError::DoesNotExist { .. }) => None,
             Err(e) => return Err(e.into()),
@@ -83,7 +80,7 @@ impl ProvenanceService for ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), ProvenanceError> {
-        let hdl = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let hdl = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         self.visit_upstream_dependencies_rec(&hdl, visitor)
     }
 }

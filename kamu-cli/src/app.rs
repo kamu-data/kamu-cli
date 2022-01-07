@@ -86,8 +86,8 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<ConfigService>();
     catalog.add::<ContainerRuntime>();
 
-    catalog.add::<MetadataRepositoryImpl>();
-    catalog.bind::<dyn MetadataRepository, MetadataRepositoryImpl>()?;
+    catalog.add::<DatasetRegistryImpl>();
+    catalog.bind::<dyn DatasetRegistry, DatasetRegistryImpl>()?;
 
     catalog.add::<RemoteRepositoryRegistryImpl>();
     catalog.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()?;

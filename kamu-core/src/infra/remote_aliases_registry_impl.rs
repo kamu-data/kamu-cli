@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct RemoteAliasesRegistryImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     workspace_layout: Arc<WorkspaceLayout>,
 }
 
@@ -28,11 +28,11 @@ pub struct RemoteAliasesRegistryImpl {
 #[component(pub)]
 impl RemoteAliasesRegistryImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             workspace_layout,
         }
     }
@@ -101,7 +101,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         &self,
         dataset_ref: &DatasetRefLocal,
     ) -> Result<Box<dyn RemoteAliases>, DomainError> {
-        let hdl = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let hdl = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         let config = self.get_config(&hdl.name)?;
         Ok(Box::new(RemoteAliasesImpl::new(self.clone(), hdl, config)))
     }

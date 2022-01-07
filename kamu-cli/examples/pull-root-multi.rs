@@ -20,7 +20,7 @@ fn main() {
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
-        Arc::new(MetadataRepositoryNull),
+        Arc::new(DatasetRegistryNull),
         Arc::new(RemoteAliasesRegistryNull),
         Arc::new(OutputConfig::default()),
         ["a"],

@@ -15,7 +15,7 @@ use opendatafabric::*;
 use chrono::{TimeZone, Utc};
 use std::sync::Arc;
 
-fn new_root(metadata_repo: &MetadataRepositoryImpl, name: &str) -> DatasetHandle {
+fn new_root(dataset_reg: &DatasetRegistryImpl, name: &str) -> DatasetHandle {
     let name = DatasetName::try_from(name).unwrap();
     let snap = MetadataFactory::dataset_snapshot()
         .name(name)
@@ -23,12 +23,12 @@ fn new_root(metadata_repo: &MetadataRepositoryImpl, name: &str) -> DatasetHandle
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (handle, _head) = metadata_repo.add_dataset(snap).unwrap();
+    let (handle, _head) = dataset_reg.add_dataset(snap).unwrap();
     handle
 }
 
 fn new_deriv(
-    metadata_repo: &MetadataRepositoryImpl,
+    dataset_reg: &DatasetRegistryImpl,
     name: &str,
     inputs: &[DatasetName],
 ) -> (DatasetHandle, SetTransform) {
@@ -40,16 +40,16 @@ fn new_deriv(
         .push_event(transform.clone())
         .build();
 
-    let (handle, _head) = metadata_repo.add_dataset(snap).unwrap();
+    let (handle, _head) = dataset_reg.add_dataset(snap).unwrap();
     (handle, transform)
 }
 
 fn append_data_block(
-    metadata_repo: &MetadataRepositoryImpl,
+    dataset_reg: &DatasetRegistryImpl,
     name: &DatasetName,
     records: i64,
 ) -> (Multihash, MetadataBlock) {
-    let mut chain = metadata_repo
+    let mut chain = dataset_reg
         .get_metadata_chain(&name.as_local_ref())
         .unwrap();
     let offset = chain
@@ -77,17 +77,17 @@ fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
 
-    let foo = new_root(&metadata_repo, "foo");
+    let foo = new_root(&dataset_reg, "foo");
     let foo_layout = DatasetLayout::new(&volume_layout, &foo.name);
 
-    let (bar, bar_source) = new_deriv(&metadata_repo, "bar", &[foo.name.clone()]);
+    let (bar, bar_source) = new_deriv(&dataset_reg, "bar", &[foo.name.clone()]);
 
     // No data - no work
     assert_eq!(
@@ -95,7 +95,7 @@ fn test_get_next_operation() {
         None
     );
 
-    let (foo_hash, foo_block) = append_data_block(&metadata_repo, &foo.name, 10);
+    let (foo_hash, foo_block) = append_data_block(&dataset_reg, &foo.name, 10);
 
     assert!(matches!(
         transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
@@ -121,9 +121,9 @@ fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
@@ -132,7 +132,7 @@ fn test_get_verification_plan_one_to_one() {
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
     let root_name = DatasetName::new_unchecked("foo");
     let root_layout = DatasetLayout::create(&volume_layout, &root_name).unwrap();
-    let (root_hdl, root_head_src) = metadata_repo
+    let (root_hdl, root_head_src) = dataset_reg
         .add_dataset_from_blocks(
             &root_name,
             &mut [
@@ -153,7 +153,7 @@ fn test_get_verification_plan_one_to_one() {
 
     // Create derivative
     let deriv_name = DatasetName::new_unchecked("bar");
-    let (deriv_hdl, deriv_head_src) = metadata_repo
+    let (deriv_hdl, deriv_head_src) = dataset_reg
         .add_dataset_from_blocks(
             &deriv_name,
             &mut [
@@ -178,7 +178,7 @@ fn test_get_verification_plan_one_to_one() {
 
     // T1: Root data added
     let t1 = Utc.ymd(2020, 1, 1).and_hms(12, 0, 0);
-    let root_head_t1 = metadata_repo
+    let root_head_t1 = dataset_reg
         .get_metadata_chain(&root_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -206,7 +206,7 @@ fn test_get_verification_plan_one_to_one() {
         .get_next_operation(&deriv_hdl, t2)
         .unwrap()
         .unwrap();
-    let deriv_head_t2 = metadata_repo
+    let deriv_head_t2 = dataset_reg
         .get_metadata_chain(&deriv_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -233,7 +233,7 @@ fn test_get_verification_plan_one_to_one() {
 
     // T3: More root data
     let t3 = Utc.ymd(2020, 1, 3).and_hms(12, 0, 0);
-    let root_head_t3 = metadata_repo
+    let root_head_t3 = dataset_reg
         .get_metadata_chain(&root_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -264,7 +264,7 @@ fn test_get_verification_plan_one_to_one() {
         .get_next_operation(&deriv_hdl, t4)
         .unwrap()
         .unwrap();
-    let deriv_head_t4 = metadata_repo
+    let deriv_head_t4 = dataset_reg
         .get_metadata_chain(&deriv_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -297,7 +297,7 @@ fn test_get_verification_plan_one_to_one() {
 
     // T5: Root watermark update only
     let t5 = Utc.ymd(2020, 1, 5).and_hms(12, 0, 0);
-    let root_head_t5 = metadata_repo
+    let root_head_t5 = dataset_reg
         .get_metadata_chain(&root_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -315,7 +315,7 @@ fn test_get_verification_plan_one_to_one() {
         .get_next_operation(&deriv_hdl, t6)
         .unwrap()
         .unwrap();
-    let deriv_head_t6 = metadata_repo
+    let deriv_head_t6 = dataset_reg
         .get_metadata_chain(&deriv_hdl.as_local_ref())
         .unwrap()
         .append(
@@ -347,7 +347,7 @@ fn test_get_verification_plan_one_to_one() {
         .get_verification_plan(&deriv_hdl, (None, None))
         .unwrap();
 
-    let deriv_chain = metadata_repo
+    let deriv_chain = dataset_reg
         .get_metadata_chain(&deriv_hdl.as_local_ref())
         .unwrap();
 

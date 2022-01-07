@@ -28,7 +28,7 @@ type GenericPullResult = Result<Vec<(DatasetRefAny, Result<PullResult, PullError
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
@@ -42,7 +42,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, R, S, SS>(
         pull_svc: Arc<dyn PullService>,
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -62,7 +62,7 @@ impl PullCommand {
     {
         Self {
             pull_svc,
-            metadata_repo,
+            dataset_reg,
             remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
@@ -100,11 +100,11 @@ impl PullCommand {
                     "When using --fetch reference should point to a local dataset",
                 )
             })?;
-            self.metadata_repo.resolve_dataset_ref(&dataset_ref)?
+            self.dataset_reg.resolve_dataset_ref(&dataset_ref)?
         };
 
         let summary = self
-            .metadata_repo
+            .dataset_reg
             .get_summary(&dataset_handle.as_local_ref())?;
         if summary.kind != DatasetKind::Root {
             return Err(CLIError::usage_error(

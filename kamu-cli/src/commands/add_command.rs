@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -28,7 +28,7 @@ pub struct AddCommand {
 impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -38,7 +38,7 @@ impl AddCommand {
     {
         Self {
             resource_loader,
-            metadata_repo,
+            dataset_reg,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
@@ -117,7 +117,7 @@ impl Command for AddCommand {
             let already_exist: Vec<_> = snapshots
                 .iter()
                 .filter_map(|s| {
-                    self.metadata_repo
+                    self.dataset_reg
                         .resolve_dataset_ref(&s.name.as_local_ref())
                         .ok()
                 })
@@ -140,12 +140,12 @@ impl Command for AddCommand {
                 }
 
                 for hdl in already_exist {
-                    self.metadata_repo.delete_dataset(&hdl.as_local_ref())?;
+                    self.dataset_reg.delete_dataset(&hdl.as_local_ref())?;
                 }
             }
         };
 
-        let mut add_results = self.metadata_repo.add_datasets(&mut snapshots.into_iter());
+        let mut add_results = self.dataset_reg.add_datasets(&mut snapshots.into_iter());
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
 

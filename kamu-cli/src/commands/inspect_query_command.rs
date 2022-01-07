@@ -18,19 +18,19 @@ use opendatafabric::*;
 use std::{io::Write, sync::Arc};
 
 pub struct InspectQueryCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     dataset_ref: DatasetRefLocal,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         dataset_ref: DatasetRefLocal,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             dataset_ref,
             output_config,
         }
@@ -42,7 +42,7 @@ impl InspectQueryCommand {
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
         let chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         for (block_hash, block) in chain.iter_blocks() {
@@ -168,7 +168,7 @@ impl InspectQueryCommand {
 
 impl Command for InspectQueryCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(&self.dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new().unwrap();

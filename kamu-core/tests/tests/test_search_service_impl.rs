@@ -25,12 +25,12 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_remote_name = RemoteDatasetName::new_unchecked("repo/bar");
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let repository_factory = Arc::new(RepositoryFactory::new());
     let sync_svc = SyncServiceImpl::new(
         workspace_layout.clone(),
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         remote_repo_reg.clone(),
         repository_factory.clone(),
     );
@@ -43,7 +43,7 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    metadata_repo
+    dataset_reg
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_local_name)

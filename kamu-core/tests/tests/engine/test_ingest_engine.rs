@@ -30,7 +30,7 @@ fn test_ingest_with_engine() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -40,7 +40,7 @@ fn test_ingest_with_engine() {
 
     let ingest_svc = Arc::new(IngestServiceImpl::new(
         &volume_layout,
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         engine_provisioner,
     ));
 
@@ -80,7 +80,7 @@ fn test_ingest_with_engine() {
 
     let dataset_name = dataset_snapshot.name.clone();
 
-    metadata_repo.add_dataset(dataset_snapshot).unwrap();
+    dataset_reg.add_dataset(dataset_snapshot).unwrap();
 
     let res = ingest_svc.ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None);
     assert_matches!(res, Ok(IngestResult::Updated { .. }));

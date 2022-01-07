@@ -18,7 +18,7 @@ use std::sync::Arc;
 use tracing::info;
 
 pub struct PullServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
@@ -28,14 +28,14 @@ pub struct PullServiceImpl {
 #[component(pub)]
 impl PullServiceImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             remote_alias_reg,
             ingest_svc,
             transform_svc,
@@ -67,7 +67,7 @@ impl PullServiceImpl {
         visited: &mut HashMap<DatasetName, PullInfo>,
     ) -> Result<i32, (DatasetRefAny, PullError)> {
         let (dataset_id, local_name, remote_name) = if let Some(id) = dataset_ref.id() {
-            if let Ok(local_hdl) = self.metadata_repo.resolve_dataset_ref(&id.as_local_ref()) {
+            if let Ok(local_hdl) = self.dataset_reg.resolve_dataset_ref(&id.as_local_ref()) {
                 let remote_name = self
                     .resolve_local_to_remote_alias(&local_hdl.as_local_ref())
                     .map_err(|e| (dataset_ref.clone(), e))?;
@@ -78,7 +78,7 @@ impl PullServiceImpl {
             }
         } else if let Some(local_ref) = dataset_ref.as_local_ref() {
             let local_hdl = self
-                .metadata_repo
+                .dataset_reg
                 .resolve_dataset_ref(&local_ref)
                 .map_err(|e| (dataset_ref.clone(), e.into()))?;
 
@@ -119,7 +119,7 @@ impl PullServiceImpl {
 
         // Pulling an existing local root or derivative dataset
         let summary = self
-            .metadata_repo
+            .dataset_reg
             .get_summary(&local_name.as_local_ref())
             .unwrap();
 
@@ -149,7 +149,7 @@ impl PullServiceImpl {
     fn resolve_remote_name_to_local(&self, remote_name: &RemoteDatasetName) -> DatasetName {
         // Do a quick check when remote and local names match
         if let Ok(local_hdl) = self
-            .metadata_repo
+            .dataset_reg
             .resolve_dataset_ref(&remote_name.dataset().as_local_ref())
         {
             if let Ok(aliases) = self
@@ -164,7 +164,7 @@ impl PullServiceImpl {
 
         // No luck - now have to search through aliases
         // TODO: Avoid iterating all datasets for every remote reference
-        for local_hdl in self.metadata_repo.get_all_datasets() {
+        for local_hdl in self.dataset_reg.get_all_datasets() {
             let aliases = self
                 .remote_alias_reg
                 .get_remote_aliases(&local_hdl.as_local_ref())
@@ -246,7 +246,7 @@ impl PullService for PullServiceImpl {
         let starting_dataset_refs: Vec<_> = if !options.all {
             dataset_refs.collect()
         } else {
-            self.metadata_repo
+            self.dataset_reg
                 .get_all_datasets()
                 .map(|hdl| hdl.into())
                 .collect()
@@ -402,7 +402,7 @@ impl PullService for PullServiceImpl {
             panic!("Attempting to set watermark on a remote dataset");
         }
 
-        let mut chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
+        let mut chain = self.dataset_reg.get_metadata_chain(dataset_ref)?;
 
         if let Some(last_watermark) = chain
             .iter_blocks()

@@ -14,7 +14,7 @@ use dill::*;
 use std::sync::Arc;
 
 pub struct PushServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     sync_svc: Arc<dyn SyncService>,
 }
@@ -22,12 +22,12 @@ pub struct PushServiceImpl {
 #[component(pub)]
 impl PushServiceImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             remote_alias_reg,
             sync_svc,
         }
@@ -52,7 +52,7 @@ impl PushServiceImpl {
         // - Local name or an ID (should be resolved to a remote alias)
         // - Remote alias (should be used to push the local dataset associated with it)
         if let Some(local_ref) = dataset_ref.as_local_ref() {
-            let local_handle = self.metadata_repo.resolve_dataset_ref(&local_ref)?;
+            let local_handle = self.dataset_reg.resolve_dataset_ref(&local_ref)?;
 
             let remote_aliases = self
                 .remote_alias_reg
@@ -82,7 +82,7 @@ impl PushServiceImpl {
             };
 
             // TODO: avoid traversing all datasets for every alias
-            for dataset_handle in self.metadata_repo.get_all_datasets() {
+            for dataset_handle in self.dataset_reg.get_all_datasets() {
                 if self
                     .remote_alias_reg
                     .get_remote_aliases(&dataset_handle.as_local_ref())?

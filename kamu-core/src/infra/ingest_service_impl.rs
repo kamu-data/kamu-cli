@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 pub struct IngestServiceImpl {
     volume_layout: VolumeLayout,
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
@@ -26,12 +26,12 @@ pub struct IngestServiceImpl {
 impl IngestServiceImpl {
     pub fn new(
         volume_layout: &VolumeLayout,
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
             volume_layout: volume_layout.clone(),
-            metadata_repo,
+            dataset_reg,
             engine_provisioner,
         }
     }
@@ -90,15 +90,12 @@ impl IngestServiceImpl {
         options: IngestOptions,
         multi_listener: &Arc<dyn IngestMultiListener>,
     ) -> std::thread::JoinHandle<Result<IngestResult, IngestError>> {
-        let dataset_handle = self
-            .metadata_repo
-            .resolve_dataset_ref(&dataset_ref)
-            .unwrap();
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
 
         let layout = self.get_dataset_layout(&dataset_handle);
 
         let meta_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())
             .unwrap();
 
@@ -160,9 +157,9 @@ impl IngestService for IngestServiceImpl {
 
         info!(%dataset_ref, "Ingesting single dataset");
 
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         let meta_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())
             .unwrap();
 
@@ -193,9 +190,9 @@ impl IngestService for IngestServiceImpl {
 
         info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
 
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         let meta_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())
             .unwrap();
 

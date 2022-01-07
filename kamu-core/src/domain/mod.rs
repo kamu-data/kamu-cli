@@ -17,8 +17,8 @@ pub use error::*;
 
 // Repositories
 
-mod metadata_repository;
-pub use metadata_repository::*;
+mod dataset_registry;
+pub use dataset_registry::*;
 
 mod remote_aliases_registry;
 pub use remote_aliases_registry::*;

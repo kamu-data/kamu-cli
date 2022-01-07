@@ -22,14 +22,14 @@ use std::sync::Arc;
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
-pub struct MetadataRepositoryImpl {
+pub struct DatasetRegistryImpl {
     workspace_layout: Arc<WorkspaceLayout>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-impl MetadataRepositoryImpl {
+impl DatasetRegistryImpl {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
         Self { workspace_layout }
     }
@@ -259,7 +259,7 @@ impl MetadataRepositoryImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-impl MetadataRepository for MetadataRepositoryImpl {
+impl DatasetRegistry for DatasetRegistryImpl {
     // TODO: Can workspace contain multiple datasets with same ID?
     // TODO: PERF: Resolving handles currently involves reading summary files
     fn resolve_dataset_ref(
@@ -492,9 +492,9 @@ impl MetadataRepository for MetadataRepositoryImpl {
 // Null
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataRepositoryNull;
+pub struct DatasetRegistryNull;
 
-impl MetadataRepository for MetadataRepositoryNull {
+impl DatasetRegistry for DatasetRegistryNull {
     fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,

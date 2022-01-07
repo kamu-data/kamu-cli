@@ -39,8 +39,8 @@ pub use workspace_layout::*;
 // Repositories
 ///////////////////////////////////////////////////////////////////////////////
 
-mod metadata_repository_impl;
-pub use metadata_repository_impl::*;
+mod dataset_registry_impl;
+pub use dataset_registry_impl::*;
 
 mod remote_aliases_registry_impl;
 pub use remote_aliases_registry_impl::*;

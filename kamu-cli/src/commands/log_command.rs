@@ -24,7 +24,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 pub struct LogCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     dataset_ref: DatasetRefLocal,
     outout_format: Option<String>,
     filter: Option<String>,
@@ -33,14 +33,14 @@ pub struct LogCommand {
 
 impl LogCommand {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         dataset_ref: DatasetRefLocal,
         outout_format: Option<&str>,
         filter: Option<&str>,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
@@ -75,7 +75,7 @@ impl LogCommand {
 impl Command for LogCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let id_to_name_lookup: BTreeMap<_, _> = self
-            .metadata_repo
+            .dataset_reg
             .get_all_datasets()
             .map(|h| (h.id, h.name))
             .collect();
@@ -91,10 +91,10 @@ impl Command for LogCommand {
             _ => panic!("Unexpected output format combination"),
         };
 
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(&self.dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
 
         let mut blocks = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?
             .iter_blocks()
             .filter(|(_, b)| self.filter_block(b));

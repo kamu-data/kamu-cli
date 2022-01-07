@@ -69,7 +69,7 @@ macro_rules! refs {
     };
 }
 
-fn create_graph(repo: &MetadataRepositoryImpl, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
+fn create_graph(repo: &DatasetRegistryImpl, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
     for (dataset_name, deps) in &datasets {
         if deps.is_empty() {
             repo.add_dataset_from_blocks(
@@ -162,7 +162,7 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
 // TODO: Add simpler way to import remote dataset
 fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
-    repo: Arc<MetadataRepositoryImpl>,
+    repo: Arc<DatasetRegistryImpl>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetName, Vec<DatasetName>)>,
     to_import: Vec<DatasetName>,
@@ -204,7 +204,7 @@ fn test_pull_batching_chain() {
 
     // A - B - C
     create_graph(
-        harness.metadata_repo.as_ref(),
+        harness.dataset_reg.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -252,7 +252,7 @@ fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.metadata_repo.as_ref(),
+        harness.dataset_reg.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -294,7 +294,7 @@ fn test_pull_batching_complex_with_remote() {
     // D -----------/
     create_graph_remote(
         harness.workspace_layout.clone(),
-        harness.metadata_repo.clone(),
+        harness.dataset_reg.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -304,7 +304,7 @@ fn test_pull_batching_complex_with_remote() {
         names!("e"),
     );
     create_graph(
-        harness.metadata_repo.as_ref(),
+        harness.dataset_reg.as_ref(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -456,7 +456,7 @@ fn test_set_watermark() {
     let dataset_name = n!("foo");
 
     harness
-        .metadata_repo
+        .dataset_reg
         .add_dataset(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
@@ -466,7 +466,7 @@ fn test_set_watermark() {
 
     let num_blocks = || {
         harness
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_name.as_local_ref())
             .unwrap()
             .iter_blocks()
@@ -516,7 +516,7 @@ fn test_set_watermark() {
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     workspace_layout: Arc<WorkspaceLayout>,
-    metadata_repo: Arc<MetadataRepositoryImpl>,
+    dataset_reg: Arc<DatasetRegistryImpl>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
     pull_svc: PullServiceImpl,
@@ -526,17 +526,17 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
-        let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+        let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
-            metadata_repo.clone(),
+            dataset_reg.clone(),
             workspace_layout.clone(),
         ));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
-        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), metadata_repo.clone()));
+        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), dataset_reg.clone()));
         let pull_svc = PullServiceImpl::new(
-            metadata_repo.clone(),
+            dataset_reg.clone(),
             remote_alias_reg.clone(),
             ingest_svc,
             transform_svc,
@@ -546,7 +546,7 @@ impl PullTestHarness {
         Self {
             calls,
             workspace_layout,
-            metadata_repo,
+            dataset_reg,
             remote_repo_reg,
             remote_alias_reg,
             pull_svc,
@@ -684,15 +684,12 @@ impl TransformService for TestTransformService {
 
 struct TestSyncService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
 }
 
 impl TestSyncService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, metadata_repo: Arc<dyn MetadataRepository>) -> Self {
-        Self {
-            calls,
-            metadata_repo,
-        }
+    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, dataset_reg: Arc<dyn DatasetRegistry>) -> Self {
+        Self { calls, dataset_reg }
     }
 }
 
@@ -704,7 +701,7 @@ impl SyncService for TestSyncService {
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        self.metadata_repo
+        self.dataset_reg
             .add_dataset(MetadataFactory::dataset_snapshot().name(local_name).build())
             .unwrap();
         Ok(SyncResult::Updated {

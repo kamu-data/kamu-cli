@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tracing::info_span;
 
 pub struct VerificationServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     transform_service: Arc<dyn TransformService>,
     volume_layout: Arc<VolumeLayout>,
 }
@@ -24,12 +24,12 @@ pub struct VerificationServiceImpl {
 #[component(pub)]
 impl VerificationServiceImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         transform_service: Arc<dyn TransformService>,
         volume_layout: Arc<VolumeLayout>,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             transform_service,
             volume_layout,
         }
@@ -41,7 +41,7 @@ impl VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
     ) -> Result<Vec<(Multihash, DataSlice)>, VerificationError> {
         let metadata_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         let start_block = block_range.0;
@@ -156,13 +156,13 @@ impl VerificationService for VerificationServiceImpl {
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
 
         let span = info_span!("Verifying dataset", %dataset_handle, ?block_range);
         let _span_guard = span.enter();
 
         let dataset_kind = self
-            .metadata_repo
+            .dataset_reg
             .get_summary(&dataset_handle.as_local_ref())?
             .kind;
 

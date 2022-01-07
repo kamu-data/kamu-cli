@@ -103,13 +103,13 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
-    let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let repository_factory = Arc::new(RepositoryFactory::new());
 
     let sync_svc = SyncServiceImpl::new(
         workspace_layout.clone(),
-        metadata_repo.clone(),
+        dataset_reg.clone(),
         remote_repo_reg.clone(),
         repository_factory.clone(),
     );
@@ -149,7 +149,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (_, b1) = metadata_repo.add_dataset(snapshot).unwrap();
+    let (_, b1) = dataset_reg.add_dataset(snapshot).unwrap();
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -174,7 +174,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Subsequent sync ////////////////////////////////////////////////////////
     create_fake_data_file(&dataset_layout);
-    let b2 = metadata_repo
+    let b2 = dataset_reg
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
@@ -184,7 +184,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         );
 
     create_fake_data_file(&dataset_layout);
-    let b3 = metadata_repo
+    let b3 = dataset_reg
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
@@ -253,7 +253,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     // Datasets diverged on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let diverged_head = metadata_repo
+    let diverged_head = dataset_reg
         .get_metadata_chain(&dataset_name_2.as_local_ref())
         .unwrap()
         .append(

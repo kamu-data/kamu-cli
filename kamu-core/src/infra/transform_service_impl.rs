@@ -26,7 +26,7 @@ use tracing::info;
 use tracing::info_span;
 
 pub struct TransformServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    dataset_reg: Arc<dyn DatasetRegistry>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     volume_layout: VolumeLayout,
 }
@@ -34,12 +34,12 @@ pub struct TransformServiceImpl {
 #[component(pub)]
 impl TransformServiceImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        dataset_reg: Arc<dyn DatasetRegistry>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         volume_layout: &VolumeLayout,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             engine_provisioner,
             volume_layout: volume_layout.clone(),
         }
@@ -214,7 +214,7 @@ impl TransformServiceImpl {
         let _span_guard = span.enter();
 
         let output_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         // TODO: limit traversal depth
@@ -315,7 +315,7 @@ impl TransformServiceImpl {
     }
 
     fn is_never_pulled(&self, dataset_ref: &DatasetRefLocal) -> Result<bool, DomainError> {
-        let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
+        let chain = self.dataset_reg.get_metadata_chain(dataset_ref)?;
         Ok(chain
             .iter_blocks()
             .filter_map(|(_, b)| b.into_data_stream_block())
@@ -330,10 +330,10 @@ impl TransformServiceImpl {
         output_chain: &dyn MetadataChain,
     ) -> Result<InputSlice, DomainError> {
         let input_handle = self
-            .metadata_repo
+            .dataset_reg
             .resolve_dataset_ref(&dataset_id.as_local_ref())?;
         let input_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&input_handle.as_local_ref())?;
 
         // Determine last processed input block
@@ -409,10 +409,10 @@ impl TransformServiceImpl {
         vocab_hint: Option<DatasetVocabulary>,
     ) -> Result<ExecuteQueryInput, DomainError> {
         let input_handle = self
-            .metadata_repo
+            .dataset_reg
             .resolve_dataset_ref(&slice.dataset_id.as_local_ref())?;
         let input_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&input_handle.as_local_ref())?;
         let input_layout = DatasetLayout::new(&self.volume_layout, &input_handle.name);
 
@@ -487,7 +487,7 @@ impl TransformServiceImpl {
 
     // TODO: Avoid iterating through output chain multiple times
     fn get_vocab(&self, dataset_ref: &DatasetRefLocal) -> Result<DatasetVocabulary, DomainError> {
-        let chain = self.metadata_repo.get_metadata_chain(dataset_ref)?;
+        let chain = self.dataset_reg.get_metadata_chain(dataset_ref)?;
         let vocab = chain
             .iter_blocks()
             .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
@@ -517,7 +517,7 @@ impl TransformServiceImpl {
         let _span_guard = span.enter();
 
         let metadata_chain = self
-            .metadata_repo
+            .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         let start_block = block_range.0;
@@ -667,7 +667,7 @@ impl TransformService for TransformServiceImpl {
             "Transforming a single dataset"
         );
 
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
@@ -678,7 +678,7 @@ impl TransformService for TransformServiceImpl {
             let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
             let meta_chain = self
-                .metadata_repo
+                .dataset_reg
                 .get_metadata_chain(&dataset_handle.as_local_ref())
                 .unwrap();
             let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
@@ -721,10 +721,7 @@ impl TransformService for TransformServiceImpl {
         let requests: Vec<_> = dataset_refs
             .into_iter()
             .map(|dataset_ref| {
-                let dataset_handle = self
-                    .metadata_repo
-                    .resolve_dataset_ref(&dataset_ref)
-                    .unwrap();
+                let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
 
                 let listener = multi_listener
                     .begin_transform(&dataset_handle)
@@ -758,12 +755,10 @@ impl TransformService for TransformServiceImpl {
 
                         let commit_fn = {
                             let meta_chain =
-                                self.metadata_repo.get_metadata_chain(&dataset_ref).unwrap();
+                                self.dataset_reg.get_metadata_chain(&dataset_ref).unwrap();
                             let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
-                            let dataset_handle = self
-                                .metadata_repo
-                                .resolve_dataset_ref(&dataset_ref)
-                                .unwrap();
+                            let dataset_handle =
+                                self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
                             let dataset_layout =
                                 DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
@@ -813,7 +808,7 @@ impl TransformService for TransformServiceImpl {
     ) -> Result<VerificationResult, VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
-        let dataset_handle = self.metadata_repo.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
 
         let span = info_span!("Replaying dataset transformations", %dataset_handle, ?block_range);
         let _span_guard = span.enter();

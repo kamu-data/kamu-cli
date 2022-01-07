@@ -12,7 +12,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use kamu::domain::MetadataRepository;
+use kamu::domain::DatasetRegistry;
 use kamu::infra::*;
 use kamu_cli::CLIError;
 use opendatafabric::serde::yaml::*;
@@ -71,9 +71,9 @@ impl Kamu {
     }
 
     pub fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
-        let metadata_repo = MetadataRepositoryImpl::new(Arc::new(self.workspace_layout.clone()));
+        let dataset_reg = DatasetRegistryImpl::new(Arc::new(self.workspace_layout.clone()));
 
-        let part_file = metadata_repo
+        let part_file = dataset_reg
             .get_metadata_chain(&dataset_name.as_local_ref())
             .unwrap()
             .iter_blocks()

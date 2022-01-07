@@ -19,7 +19,7 @@ use std::path;
 use std::sync::Arc;
 
 pub struct CompleteCommand {
-    metadata_repo: Option<Arc<dyn MetadataRepository>>,
+    dataset_reg: Option<Arc<dyn DatasetRegistry>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
@@ -32,7 +32,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new(
-        metadata_repo: Option<Arc<dyn MetadataRepository>>,
+        dataset_reg: Option<Arc<dyn DatasetRegistry>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
@@ -41,7 +41,7 @@ impl CompleteCommand {
         current: usize,
     ) -> Self {
         Self {
-            metadata_repo,
+            dataset_reg,
             remote_repo_reg,
             remote_alias_reg,
             config_service,
@@ -64,7 +64,7 @@ impl CompleteCommand {
     }
 
     fn complete_dataset(&self, prefix: &str) {
-        if let Some(repo) = self.metadata_repo.as_ref() {
+        if let Some(repo) = self.dataset_reg.as_ref() {
             for dataset_handle in repo.get_all_datasets() {
                 if dataset_handle.name.starts_with(prefix) {
                     println!("{}", dataset_handle.name);
@@ -84,7 +84,7 @@ impl CompleteCommand {
     }
 
     fn complete_alias(&self, prefix: &str) {
-        if let Some(repo) = self.metadata_repo.as_ref() {
+        if let Some(repo) = self.dataset_reg.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
                 for dataset_handle in repo.get_all_datasets() {
                     let aliases = reg
