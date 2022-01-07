@@ -9,6 +9,7 @@
 
 use super::*;
 use crate::domain::*;
+use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
 use chrono::Utc;

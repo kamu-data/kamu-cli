@@ -15,3 +15,6 @@ pub use derivations_generated::*;
 
 mod serdes;
 pub use serdes::*;
+
+mod manifest;
+pub use manifest::*;

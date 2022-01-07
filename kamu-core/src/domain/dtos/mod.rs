@@ -9,6 +9,3 @@
 
 mod dataset_summary;
 pub use dataset_summary::*;
-
-mod manifest;
-pub use manifest::*;

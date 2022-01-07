@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::{DatasetSummary, Manifest};
+use kamu::domain::DatasetSummary;
+use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
 use chrono::prelude::*;

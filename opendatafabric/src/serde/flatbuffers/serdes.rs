@@ -9,10 +9,10 @@
 
 use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
-pub use crate::serde::{Buffer, Error, MetadataBlockDeserializer, MetadataBlockSerializer};
-use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
-use crate::Multicodec;
-use crate::{ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
+use crate::dtos::*;
+use crate::formats::Multicodec;
+pub use crate::serde::*;
+use ::flatbuffers;
 
 ///////////////////////////////////////////////////////////////////////////////
 // FlatbuffersMetadataBlockSerializer

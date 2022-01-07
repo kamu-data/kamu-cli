@@ -8,38 +8,26 @@
 // by the Apache License, Version 2.0.
 
 use super::derivations_generated::*;
-pub use crate::serde::{
-    Buffer, DatasetSnapshotDeserializer, DatasetSnapshotSerializer, Error,
-    MetadataBlockDeserializer, MetadataBlockSerializer,
-};
-use crate::{
-    serde::{EngineProtocolDeserializer, EngineProtocolSerializer},
-    ExecuteQueryRequest, ExecuteQueryResponse, Multicodec,
-};
-use crate::{DatasetSnapshot, MetadataBlock};
+use super::Manifest;
+use crate::dtos::*;
+pub use crate::serde::*;
 use ::serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
-// ManifestDef
+// Wrapeprs
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct ManifestDefMetadataBlock {
-    pub kind: Multicodec,
-    pub version: i32,
-    #[serde(with = "MetadataBlockDef")]
-    pub content: MetadataBlock,
-}
+struct MetadataBlockWrapper(#[serde(with = "MetadataBlockDef")] MetadataBlock);
 
 #[derive(Deserialize, Serialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct ManifestDefDatasetSnapshot {
-    pub kind: Multicodec,
-    pub version: i32,
-    #[serde(with = "DatasetSnapshotDef")]
-    pub content: DatasetSnapshot,
-}
+struct DatasetSnapshotWrapper(#[serde(with = "DatasetSnapshotDef")] DatasetSnapshot);
+
+#[derive(Serialize, Deserialize)]
+struct ExecuteQueryRequestWrapper(#[serde(with = "ExecuteQueryRequestDef")] ExecuteQueryRequest);
+
+#[derive(Serialize, Deserialize)]
+struct ExecuteQueryResponseWrapper(#[serde(with = "ExecuteQueryResponseDef")] ExecuteQueryResponse);
 
 ///////////////////////////////////////////////////////////////////////////////
 // YamlMetadataBlockSerializer
@@ -55,10 +43,10 @@ impl YamlMetadataBlockSerializer {}
 
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
-        let manifest = ManifestDefMetadataBlock {
+        let manifest = Manifest {
             version: 1,
-            kind: Multicodec::ODFMetadataBlock,
-            content: block.clone(),
+            kind: "MetadataBlock".to_owned(),
+            content: MetadataBlockWrapper(block.clone()),
         };
 
         let buf = serde_yaml::to_vec(&manifest).map_err(|e| Error::serde(e))?;
@@ -80,14 +68,14 @@ impl YamlMetadataBlockDeserializer {}
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        let manifest: ManifestDefMetadataBlock =
+        let manifest: Manifest<MetadataBlockWrapper> =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         // TODO: Handle conversions?
+        assert_eq!(manifest.kind, "MetadataBlock");
         assert_eq!(manifest.version, 1);
-        assert_eq!(manifest.kind, Multicodec::ODFMetadataBlock);
 
-        Ok(manifest.content)
+        Ok(manifest.content.0)
     }
 }
 
@@ -99,10 +87,10 @@ pub struct YamlDatasetSnapshotSerializer;
 
 impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
     fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error> {
-        let manifest = ManifestDefDatasetSnapshot {
+        let manifest = Manifest {
             version: 1,
-            kind: Multicodec::ODFDatasetSnapshot,
-            content: snapshot.clone(),
+            kind: "DatasetSnapshot".to_owned(),
+            content: DatasetSnapshotWrapper(snapshot.clone()),
         };
 
         let buf = serde_yaml::to_vec(&manifest).map_err(|e| Error::serde(e))?;
@@ -118,14 +106,14 @@ pub struct YamlDatasetSnapshotDeserializer;
 
 impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<DatasetSnapshot, Error> {
-        let manifest: ManifestDefDatasetSnapshot =
+        let manifest: Manifest<DatasetSnapshotWrapper> =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         // TODO: Handle conversions?
+        assert_eq!(manifest.kind, "DatasetSnapshot");
         assert_eq!(manifest.version, 1);
-        assert_eq!(manifest.kind, Multicodec::ODFDatasetSnapshot);
 
-        Ok(manifest.content)
+        Ok(manifest.content.0)
     }
 }
 
@@ -134,12 +122,6 @@ impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct YamlEngineProtocol;
-
-#[derive(Serialize, Deserialize)]
-struct ExecuteQueryRequestWrapper(#[serde(with = "ExecuteQueryRequestDef")] ExecuteQueryRequest);
-
-#[derive(Serialize, Deserialize)]
-struct ExecuteQueryResponseWrapper(#[serde(with = "ExecuteQueryResponseDef")] ExecuteQueryResponse);
 
 impl EngineProtocolSerializer for YamlEngineProtocol {
     fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error> {

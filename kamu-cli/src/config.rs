@@ -11,8 +11,8 @@ use core::panic;
 use std::path::{Path, PathBuf};
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use kamu::domain::Manifest;
 use kamu::infra::WorkspaceLayout;
+use opendatafabric::serde::yaml::Manifest;
 
 use dill::*;
 use duration_string::DurationString;

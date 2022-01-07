@@ -58,9 +58,7 @@ impl std::str::FromStr for Multicodec {
             "ed25519-pub" => Ok(Multicodec::Ed25519Pub),
             "arrow0-sha3-256" => Ok(Multicodec::Arrow0_Sha3_256),
             "odf-metadata-block" => Ok(Multicodec::ODFMetadataBlock),
-            "MetadataBlock" => Ok(Multicodec::ODFMetadataBlock),
             "odf-dataset-snapshot" => Ok(Multicodec::ODFDatasetSnapshot),
-            "DatasetSnapshot" => Ok(Multicodec::ODFDatasetSnapshot),
             _ => Err(InvalidValue::new(s)),
         }
     }
@@ -75,8 +73,8 @@ impl std::fmt::Display for Multicodec {
             Multicodec::Sha3_256 => "sha3-256",
             Multicodec::Ed25519Pub => "ed25519-pub",
             Multicodec::Arrow0_Sha3_256 => "arrow0-sha3-256",
-            Multicodec::ODFMetadataBlock => "MetadataBlock",
-            Multicodec::ODFDatasetSnapshot => "DatasetSnapshot",
+            Multicodec::ODFMetadataBlock => "odf-metadata-block",
+            Multicodec::ODFDatasetSnapshot => "odf-dataset-snapshot",
         };
         write!(f, "{}", s)
     }
