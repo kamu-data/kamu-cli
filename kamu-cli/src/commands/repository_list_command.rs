@@ -14,17 +14,17 @@ use kamu::domain::*;
 use std::sync::Arc;
 
 pub struct RepositoryListCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
 }
 
 impl RepositoryListCommand {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            metadata_repo,
+            remote_repo_reg,
             output_config,
         }
     }
@@ -33,14 +33,14 @@ impl RepositoryListCommand {
     fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
-        let mut repos: Vec<_> = self.metadata_repo.get_all_repositories().collect();
+        let mut repos: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
         repos.sort();
 
         let mut out = std::io::stdout();
         write!(out, "Name,URL\n")?;
 
         for name in repos {
-            let repo = self.metadata_repo.get_repository(&name)?;
+            let repo = self.remote_repo_reg.get_repository(&name)?;
             write!(out, "{},\"{}\"\n", name, repo.url)?;
         }
         Ok(())
@@ -49,7 +49,7 @@ impl RepositoryListCommand {
     fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut repos: Vec<_> = self.metadata_repo.get_all_repositories().collect();
+        let mut repos: Vec<_> = self.remote_repo_reg.get_all_repositories().collect();
         repos.sort();
 
         let mut table = Table::new();
@@ -58,7 +58,7 @@ impl RepositoryListCommand {
         table.set_titles(row![bc->"Name", bc->"URL"]);
 
         for name in repos.iter() {
-            let repo = self.metadata_repo.get_repository(&name)?;
+            let repo = self.remote_repo_reg.get_repository(&name)?;
             table.add_row(Row::new(vec![
                 Cell::new(&name),
                 Cell::new(&repo.url.to_string()),

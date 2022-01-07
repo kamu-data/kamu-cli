@@ -15,7 +15,7 @@ use chrono::DateTime;
 use std::sync::Arc;
 
 pub struct SetWatermarkCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
     refs: Vec<DatasetRefAny>,
     all: bool,
@@ -25,7 +25,7 @@ pub struct SetWatermarkCommand {
 
 impl SetWatermarkCommand {
     pub fn new<I, R, S>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         pull_svc: Arc<dyn PullService>,
         refs: I,
         all: bool,
@@ -39,7 +39,7 @@ impl SetWatermarkCommand {
         <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            remote_alias_reg,
             pull_svc,
             refs: refs.map(|s| s.try_into().unwrap()).collect(),
             all,
@@ -72,13 +72,14 @@ impl Command for SetWatermarkCommand {
             .as_local_ref()
             .ok_or_else(|| CLIError::usage_error("Expected a local dataset reference"))?;
 
-        let aliases = self.metadata_repo.get_remote_aliases(&dataset_ref)?;
+        let aliases = self.remote_alias_reg.get_remote_aliases(&dataset_ref)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.as_str())
             .collect();
 
         if !pull_aliases.is_empty() {
+            // TODO: Should this check be performed at domain model level?
             return Err(CLIError::usage_error(format!(
                     "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
                     pull_aliases.join("\n- ")

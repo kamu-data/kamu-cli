@@ -9,7 +9,7 @@
 
 use super::{CLIError, Command};
 use crate::{output::*, records_writers::TableWriter};
-use kamu::{domain::*, infra::DatasetSummary};
+use kamu::domain::*;
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 pub struct ListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
@@ -25,11 +26,13 @@ pub struct ListCommand {
 impl ListCommand {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
         Self {
             metadata_repo,
+            remote_alias_reg,
             output_config,
             detail_level,
         }
@@ -173,7 +176,7 @@ impl ListCommand {
         summary: &DatasetSummary,
     ) -> Result<String, DomainError> {
         let is_remote = self
-            .metadata_repo
+            .remote_alias_reg
             .get_remote_aliases(&handle.as_local_ref())?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()

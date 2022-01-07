@@ -163,6 +163,7 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
 fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
     repo: Arc<MetadataRepositoryImpl>,
+    reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetName, Vec<DatasetName>)>,
     to_import: Vec<DatasetName>,
 ) {
@@ -171,13 +172,18 @@ fn create_graph_remote(
 
     let tmp_repo_name = RepositoryName::new_unchecked("tmp");
 
-    repo.add_repository(
+    reg.add_repository(
         &tmp_repo_name,
         url::Url::from_file_path(tmp_repo_dir.path()).unwrap(),
     )
     .unwrap();
 
-    let sync_service = SyncServiceImpl::new(ws, repo.clone(), Arc::new(RepositoryFactory::new()));
+    let sync_service = SyncServiceImpl::new(
+        ws,
+        repo.clone(),
+        reg.clone(),
+        Arc::new(RepositoryFactory::new()),
+    );
 
     for name in &to_import {
         sync_service
@@ -289,6 +295,7 @@ fn test_pull_batching_complex_with_remote() {
     create_graph_remote(
         harness.workspace_layout.clone(),
         harness.metadata_repo.clone(),
+        harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -308,7 +315,7 @@ fn test_pull_batching_complex_with_remote() {
 
     // Add remote pull alias to E
     harness
-        .metadata_repo
+        .remote_alias_reg
         .get_remote_aliases(&rl!("e"))
         .unwrap()
         .add(
@@ -405,7 +412,7 @@ fn test_sync_from() {
     let harness = PullTestHarness::new(tmp_ws_dir.path());
 
     harness
-        .metadata_repo
+        .remote_repo_reg
         .add_repository(
             &RepositoryName::new_unchecked("myrepo"),
             url::Url::parse("file:///tmp/nowhere").unwrap(),
@@ -427,7 +434,7 @@ fn test_sync_from() {
     );
 
     let aliases = harness
-        .metadata_repo
+        .remote_alias_reg
         .get_remote_aliases(&rl!("bar"))
         .unwrap();
     let pull_aliases: Vec<_> = aliases
@@ -510,6 +517,8 @@ struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     workspace_layout: Arc<WorkspaceLayout>,
     metadata_repo: Arc<MetadataRepositoryImpl>,
+    remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
+    remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
     pull_svc: PullServiceImpl,
 }
 
@@ -518,16 +527,28 @@ impl PullTestHarness {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
         let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
+        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
+            metadata_repo.clone(),
+            workspace_layout.clone(),
+        ));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), metadata_repo.clone()));
-        let pull_svc =
-            PullServiceImpl::new(metadata_repo.clone(), ingest_svc, transform_svc, sync_svc);
+        let pull_svc = PullServiceImpl::new(
+            metadata_repo.clone(),
+            remote_alias_reg.clone(),
+            ingest_svc,
+            transform_svc,
+            sync_svc,
+        );
 
         Self {
             calls,
             workspace_layout,
             metadata_repo,
+            remote_repo_reg,
+            remote_alias_reg,
             pull_svc,
         }
     }

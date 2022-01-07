@@ -15,14 +15,20 @@ use std::sync::Arc;
 
 pub struct PushServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     sync_svc: Arc<dyn SyncService>,
 }
 
 #[component(pub)]
 impl PushServiceImpl {
-    pub fn new(metadata_repo: Arc<dyn MetadataRepository>, sync_svc: Arc<dyn SyncService>) -> Self {
+    pub fn new(
+        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        sync_svc: Arc<dyn SyncService>,
+    ) -> Self {
         Self {
             metadata_repo,
+            remote_alias_reg,
             sync_svc,
         }
     }
@@ -49,7 +55,7 @@ impl PushServiceImpl {
             let local_handle = self.metadata_repo.resolve_dataset_ref(&local_ref)?;
 
             let remote_aliases = self
-                .metadata_repo
+                .remote_alias_reg
                 .get_remote_aliases(&local_handle.as_local_ref())?;
 
             let mut push_aliases: Vec<_> =
@@ -78,7 +84,7 @@ impl PushServiceImpl {
             // TODO: avoid traversing all datasets for every alias
             for dataset_handle in self.metadata_repo.get_all_datasets() {
                 if self
-                    .metadata_repo
+                    .remote_alias_reg
                     .get_remote_aliases(&dataset_handle.as_local_ref())?
                     .contains(&remote_name, RemoteAliasKind::Push)
                 {

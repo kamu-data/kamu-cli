@@ -19,6 +19,7 @@ use std::sync::Arc;
 pub struct SyncServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     repository_factory: Arc<RepositoryFactory>,
 }
 
@@ -27,11 +28,13 @@ impl SyncServiceImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
         metadata_repo: Arc<dyn MetadataRepository>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         repository_factory: Arc<RepositoryFactory>,
     ) -> Self {
         Self {
             workspace_layout,
             metadata_repo,
+            remote_repo_reg,
             repository_factory,
         }
     }
@@ -54,7 +57,7 @@ impl SyncServiceImpl {
         let repo_name = remote_name.repository();
 
         let repo = self
-            .metadata_repo
+            .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
@@ -209,7 +212,7 @@ impl SyncServiceImpl {
         let repo_name = remote_name.repository();
 
         let repo = self
-            .metadata_repo
+            .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
@@ -400,7 +403,7 @@ impl SyncService for SyncServiceImpl {
         let repo_name = remote_ref.repository();
 
         let repo = self
-            .metadata_repo
+            .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },

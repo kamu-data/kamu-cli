@@ -14,7 +14,8 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct AliasAddCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset: DatasetRefLocal,
     alias: RemoteDatasetName,
     pull: bool,
@@ -23,7 +24,8 @@ pub struct AliasAddCommand {
 
 impl AliasAddCommand {
     pub fn new<R, N>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset: R,
         alias: N,
         pull: bool,
@@ -36,7 +38,8 @@ impl AliasAddCommand {
         <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            remote_repo_reg,
+            remote_alias_reg,
             dataset: dataset.try_into().unwrap(),
             alias: alias.try_into().unwrap(),
             pull,
@@ -53,9 +56,9 @@ impl Command for AliasAddCommand {
             ));
         }
 
-        self.metadata_repo
+        self.remote_repo_reg
             .get_repository(&self.alias.repository())?;
-        let mut aliases = self.metadata_repo.get_remote_aliases(&self.dataset)?;
+        let mut aliases = self.remote_alias_reg.get_remote_aliases(&self.dataset)?;
 
         if self.pull {
             if aliases.add(&self.alias, RemoteAliasKind::Pull)? {

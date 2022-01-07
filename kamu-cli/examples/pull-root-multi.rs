@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
-use kamu::infra::MetadataRepositoryNull;
+use kamu::infra::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
@@ -21,6 +21,7 @@ fn main() {
     let mut cmd = PullCommand::new(
         pull_svc,
         Arc::new(MetadataRepositoryNull),
+        Arc::new(RemoteAliasesRegistryNull),
         Arc::new(OutputConfig::default()),
         ["a"],
         false,

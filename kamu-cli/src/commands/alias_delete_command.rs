@@ -14,7 +14,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct AliasDeleteCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset: DatasetRefLocal,
     alias: Option<RemoteDatasetName>,
     all: bool,
@@ -24,7 +24,7 @@ pub struct AliasDeleteCommand {
 
 impl AliasDeleteCommand {
     pub fn new<R, N>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset: R,
         alias: Option<N>,
         all: bool,
@@ -38,7 +38,7 @@ impl AliasDeleteCommand {
         <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            remote_alias_reg,
             dataset: dataset.try_into().unwrap(),
             alias: alias.map(|s| s.try_into().unwrap()),
             all,
@@ -50,7 +50,7 @@ impl AliasDeleteCommand {
 
 impl Command for AliasDeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
-        let mut aliases = self.metadata_repo.get_remote_aliases(&self.dataset)?;
+        let mut aliases = self.remote_alias_reg.get_remote_aliases(&self.dataset)?;
 
         let mut count = 0;
 

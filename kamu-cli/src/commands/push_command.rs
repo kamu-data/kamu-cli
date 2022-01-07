@@ -22,7 +22,7 @@ use std::sync::Arc;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct PushCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     push_svc: Arc<dyn PushService>,
     refs: Vec<DatasetRefAny>,
     all: bool,
@@ -33,7 +33,7 @@ pub struct PushCommand {
 
 impl PushCommand {
     pub fn new<I, R, S>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         push_svc: Arc<dyn PushService>,
         refs: I,
         all: bool,
@@ -49,7 +49,7 @@ impl PushCommand {
         <S as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo,
+            remote_alias_reg,
             push_svc,
             refs: refs.map(|s| s.try_into().unwrap()).collect(),
             all,
@@ -119,7 +119,7 @@ impl Command for PushCommand {
                 }
             };
 
-            self.metadata_repo
+            self.remote_alias_reg
                 .get_remote_aliases(&local_ref)?
                 .add(remote_name, RemoteAliasKind::Push)?
         } else {
@@ -151,7 +151,7 @@ impl Command for PushCommand {
 
         if alias_added && errors != 0 {
             // This is a bit ugly, but we don't want alias to stay unless the first push is successful
-            self.metadata_repo
+            self.remote_alias_reg
                 .get_remote_aliases(&self.refs[0].as_local_ref().unwrap())?
                 .delete(self.as_name.as_ref().unwrap(), RemoteAliasKind::Push)?;
         }

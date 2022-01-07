@@ -9,8 +9,22 @@
 
 // Data structures
 
+pub mod dtos;
+pub use dtos::*;
+
 mod error;
 pub use error::*;
+
+// Repositories
+
+mod metadata_repository;
+pub use metadata_repository::*;
+
+mod remote_aliases_registry;
+pub use remote_aliases_registry::*;
+
+mod remote_repository_registry;
+pub use remote_repository_registry::*;
 
 // Services
 
@@ -25,9 +39,6 @@ pub use ingest_service::*;
 
 mod metadata_chain;
 pub use metadata_chain::*;
-
-mod metadata_repository;
-pub use metadata_repository::*;
 
 mod provenance_service;
 pub use provenance_service::*;

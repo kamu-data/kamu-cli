@@ -15,20 +15,20 @@ use std::sync::Arc;
 use url::Url;
 
 pub struct RepositoryAddCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     name: RepositoryName,
     url: String,
 }
 
 impl RepositoryAddCommand {
-    pub fn new<N, S>(metadata_repo: Arc<dyn MetadataRepository>, name: N, url: S) -> Self
+    pub fn new<N, S>(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>, name: N, url: S) -> Self
     where
         N: TryInto<RepositoryName>,
         <N as TryInto<RepositoryName>>::Error: std::fmt::Debug,
         S: Into<String>,
     {
         Self {
-            metadata_repo: metadata_repo,
+            remote_repo_reg,
             name: name.try_into().unwrap(),
             url: url.into(),
         }
@@ -42,7 +42,7 @@ impl Command for RepositoryAddCommand {
             CLIError::Aborted
         })?;
 
-        self.metadata_repo.add_repository(&self.name, url)?;
+        self.remote_repo_reg.add_repository(&self.name, url)?;
 
         eprintln!("{}: {}", console::style("Added").green(), &self.name);
         Ok(())

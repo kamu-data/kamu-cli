@@ -29,6 +29,7 @@ type GenericPullResult = Result<Vec<(DatasetRefAny, Result<PullResult, PullError
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
     all: bool,
@@ -42,6 +43,7 @@ impl PullCommand {
     pub fn new<I, R, S, SS>(
         pull_svc: Arc<dyn PullService>,
         metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
         all: bool,
@@ -61,6 +63,7 @@ impl PullCommand {
         Self {
             pull_svc,
             metadata_repo,
+            remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
             all: all,
@@ -110,7 +113,7 @@ impl PullCommand {
         }
 
         let aliases = self
-            .metadata_repo
+            .remote_alias_reg
             .get_remote_aliases(&dataset_handle.as_local_ref())?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)

@@ -11,7 +11,7 @@ use core::panic;
 use std::path::{Path, PathBuf};
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use kamu::infra::Manifest;
+use kamu::domain::Manifest;
 use kamu::infra::WorkspaceLayout;
 
 use dill::*;

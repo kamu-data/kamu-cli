@@ -20,6 +20,8 @@ use std::sync::Arc;
 
 pub struct CompleteCommand {
     metadata_repo: Option<Arc<dyn MetadataRepository>>,
+    remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
+    remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
     app: clap::App<'static>,
     input: String,
@@ -31,6 +33,8 @@ pub struct CompleteCommand {
 impl CompleteCommand {
     pub fn new(
         metadata_repo: Option<Arc<dyn MetadataRepository>>,
+        remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
+        remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
         app: clap::App<'static>,
         input: String,
@@ -38,6 +42,8 @@ impl CompleteCommand {
     ) -> Self {
         Self {
             metadata_repo,
+            remote_repo_reg,
+            remote_alias_reg,
             config_service,
             app,
             input,
@@ -68,8 +74,8 @@ impl CompleteCommand {
     }
 
     fn complete_repository(&self, prefix: &str) {
-        if let Some(repo) = self.metadata_repo.as_ref() {
-            for repo_id in repo.get_all_repositories() {
+        if let Some(reg) = self.remote_repo_reg.as_ref() {
+            for repo_id in reg.get_all_repositories() {
                 if repo_id.starts_with(prefix) {
                     println!("{}", repo_id);
                 }
@@ -79,18 +85,20 @@ impl CompleteCommand {
 
     fn complete_alias(&self, prefix: &str) {
         if let Some(repo) = self.metadata_repo.as_ref() {
-            for dataset_handle in repo.get_all_datasets() {
-                let aliases = repo
-                    .get_remote_aliases(&dataset_handle.as_local_ref())
-                    .unwrap();
-                for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                    if alias.starts_with(prefix) {
-                        println!("{}", alias);
+            if let Some(reg) = self.remote_alias_reg.as_ref() {
+                for dataset_handle in repo.get_all_datasets() {
+                    let aliases = reg
+                        .get_remote_aliases(&dataset_handle.as_local_ref())
+                        .unwrap();
+                    for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
+                        if alias.starts_with(prefix) {
+                            println!("{}", alias);
+                        }
                     }
-                }
-                for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                    if alias.starts_with(prefix) {
-                        println!("{}", alias);
+                    for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
+                        if alias.starts_with(prefix) {
+                            println!("{}", alias);
+                        }
                     }
                 }
             }

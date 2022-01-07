@@ -19,6 +19,7 @@ use tracing::info;
 
 pub struct PullServiceImpl {
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
@@ -28,12 +29,14 @@ pub struct PullServiceImpl {
 impl PullServiceImpl {
     pub fn new(
         metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {
         Self {
             metadata_repo,
+            remote_alias_reg,
             ingest_svc,
             transform_svc,
             sync_svc,
@@ -150,7 +153,7 @@ impl PullServiceImpl {
             .resolve_dataset_ref(&remote_name.dataset().as_local_ref())
         {
             if let Ok(aliases) = self
-                .metadata_repo
+                .remote_alias_reg
                 .get_remote_aliases(&local_hdl.as_local_ref())
             {
                 if aliases.contains(&remote_name, RemoteAliasKind::Pull) {
@@ -163,7 +166,7 @@ impl PullServiceImpl {
         // TODO: Avoid iterating all datasets for every remote reference
         for local_hdl in self.metadata_repo.get_all_datasets() {
             let aliases = self
-                .metadata_repo
+                .remote_alias_reg
                 .get_remote_aliases(&local_hdl.as_local_ref())
                 .unwrap();
 
@@ -183,7 +186,7 @@ impl PullServiceImpl {
         local_ref: &DatasetRefLocal,
     ) -> Result<Option<RemoteDatasetName>, PullError> {
         let mut pull_aliases: Vec<_> = self
-            .metadata_repo
+            .remote_alias_reg
             .get_remote_aliases(local_ref)?
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.clone())
@@ -302,7 +305,7 @@ impl PullService for PullServiceImpl {
                                     DatasetRefRemote::RemoteName(name) => name,
                                     DatasetRefRemote::RemoteHandle(h) => &h.name,
                                 };
-                                self.metadata_repo
+                                self.remote_alias_reg
                                     .get_remote_aliases(&local_name.as_local_ref())
                                     .unwrap()
                                     .add(remote_name, RemoteAliasKind::Pull)
@@ -354,7 +357,7 @@ impl PullService for PullServiceImpl {
         };
 
         if res.is_ok() && options.create_remote_aliases {
-            self.metadata_repo
+            self.remote_alias_reg
                 .get_remote_aliases(&local_name.as_local_ref())?
                 .add(&remote_name, RemoteAliasKind::Pull)?;
         }
@@ -370,7 +373,7 @@ impl PullService for PullServiceImpl {
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError> {
         if !self
-            .metadata_repo
+            .remote_alias_reg
             .get_remote_aliases(dataset_ref)?
             .is_empty(RemoteAliasKind::Pull)
         {
@@ -391,7 +394,7 @@ impl PullService for PullServiceImpl {
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, PullError> {
         if !self
-            .metadata_repo
+            .remote_alias_reg
             .get_remote_aliases(dataset_ref)?
             .is_empty(RemoteAliasKind::Pull)
         {

@@ -29,6 +29,16 @@ pub fn get_command(
             } else {
                 None
             },
+            if in_workspace(catalog.get_one()?) {
+                Some(catalog.get_one()?)
+            } else {
+                None
+            },
+            if in_workspace(catalog.get_one()?) {
+                Some(catalog.get_one()?)
+            } else {
+                None
+            },
             catalog.get_one()?,
             crate::cli_parser::cli(),
             submatches.value_of("input").unwrap().into(),
@@ -102,6 +112,7 @@ pub fn get_command(
         Some(("list", submatches)) => Box::new(ListCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
+            catalog.get_one()?,
             submatches.occurrences_of("wide") as u8,
         )),
         Some(("log", submatches)) => Box::new(LogCommand::new(
@@ -138,6 +149,7 @@ pub fn get_command(
                 ))
             } else {
                 Box::new(PullCommand::new(
+                    catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
@@ -178,6 +190,7 @@ pub fn get_command(
             Some(("alias", alias_matches)) => match alias_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(AliasAddCommand::new(
                     catalog.get_one()?,
+                    catalog.get_one()?,
                     add_matches.value_of("dataset").unwrap(),
                     add_matches.value_of("alias").unwrap(),
                     add_matches.is_present("pull"),
@@ -192,6 +205,7 @@ pub fn get_command(
                     delete_matches.is_present("push"),
                 )),
                 Some(("list", list_matches)) => Box::new(AliasListCommand::new(
+                    catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
                     list_matches.value_of("dataset"),

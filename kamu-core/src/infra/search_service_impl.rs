@@ -13,25 +13,22 @@ use dill::*;
 use opendatafabric::*;
 use tracing::info;
 
-use crate::domain::{
-    DomainError, MetadataRepository, SearchError, SearchOptions, SearchResult, SearchService,
-};
-
 use super::RepositoryFactory;
+use crate::domain::*;
 
 pub struct SearchServiceImpl {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     repo_factory: Arc<RepositoryFactory>,
 }
 
 #[component(pub)]
 impl SearchServiceImpl {
     pub fn new(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         repo_factory: Arc<RepositoryFactory>,
     ) -> Self {
         Self {
-            metadata_repo,
+            remote_repo_reg,
             repo_factory,
         }
     }
@@ -42,7 +39,7 @@ impl SearchServiceImpl {
         repo_name: &RepositoryName,
     ) -> Result<SearchResult, SearchError> {
         let repo = self
-            .metadata_repo
+            .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
                 DomainError::DoesNotExist { .. } => SearchError::RepositoryDoesNotExist {
@@ -86,7 +83,7 @@ impl SearchService for SearchServiceImpl {
         let repo_names = if !options.repository_names.is_empty() {
             options.repository_names
         } else {
-            self.metadata_repo.get_all_repositories().collect()
+            self.remote_repo_reg.get_all_repositories().collect()
         };
 
         itertools::process_results(

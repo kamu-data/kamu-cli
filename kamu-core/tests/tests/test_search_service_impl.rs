@@ -26,17 +26,21 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let metadata_repo = Arc::new(MetadataRepositoryImpl::new(workspace_layout.clone()));
+    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let repository_factory = Arc::new(RepositoryFactory::new());
     let sync_svc = SyncServiceImpl::new(
         workspace_layout.clone(),
         metadata_repo.clone(),
+        remote_repo_reg.clone(),
         repository_factory.clone(),
     );
 
-    let search_svc = SearchServiceImpl::new(metadata_repo.clone(), repository_factory.clone());
+    let search_svc = SearchServiceImpl::new(remote_repo_reg.clone(), repository_factory.clone());
 
     // Add repository
-    metadata_repo.add_repository(&repo_name, repo_url).unwrap();
+    remote_repo_reg
+        .add_repository(&repo_name, repo_url)
+        .unwrap();
 
     // Add and sync dataset
     metadata_repo

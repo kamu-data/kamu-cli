@@ -89,6 +89,12 @@ fn configure_catalog() -> Result<Catalog, InjectionError> {
     catalog.add::<MetadataRepositoryImpl>();
     catalog.bind::<dyn MetadataRepository, MetadataRepositoryImpl>()?;
 
+    catalog.add::<RemoteRepositoryRegistryImpl>();
+    catalog.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()?;
+
+    catalog.add::<RemoteAliasesRegistryImpl>();
+    catalog.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>()?;
+
     catalog.add::<ResourceLoaderImpl>();
     catalog.bind::<dyn ResourceLoader, ResourceLoaderImpl>()?;
 

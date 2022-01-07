@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 pub struct AliasListCommand {
     metadata_repo: Arc<dyn MetadataRepository>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     dataset_ref: Option<DatasetRefLocal>,
 }
@@ -23,6 +24,7 @@ pub struct AliasListCommand {
 impl AliasListCommand {
     pub fn new<R>(
         metadata_repo: Arc<dyn MetadataRepository>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         dataset_ref: Option<R>,
     ) -> Self
@@ -32,6 +34,7 @@ impl AliasListCommand {
     {
         Self {
             metadata_repo,
+            remote_alias_reg,
             output_config,
             dataset_ref: dataset_ref.map(|s| s.try_into().unwrap()),
         }
@@ -52,7 +55,9 @@ impl AliasListCommand {
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         for ds in &datasets {
-            let aliases = self.metadata_repo.get_remote_aliases(&ds.as_local_ref())?;
+            let aliases = self
+                .remote_alias_reg
+                .get_remote_aliases(&ds.as_local_ref())?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                 write!(out, "{},{},{}\n", &ds.name, "pull", &alias)?;
@@ -82,7 +87,9 @@ impl AliasListCommand {
         table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
 
         for ds in &datasets {
-            let aliases = self.metadata_repo.get_remote_aliases(&ds.as_local_ref())?;
+            let aliases = self
+                .remote_alias_reg
+                .get_remote_aliases(&ds.as_local_ref())?;
             let mut pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
             let mut push_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Push).collect();
             pull_aliases.sort();

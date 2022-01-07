@@ -14,7 +14,7 @@ use opendatafabric::RepositoryName;
 use std::sync::Arc;
 
 pub struct RepositoryDeleteCommand {
-    metadata_repo: Arc<dyn MetadataRepository>,
+    remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     names: Vec<RepositoryName>,
     all: bool,
     no_confirmation: bool,
@@ -22,7 +22,7 @@ pub struct RepositoryDeleteCommand {
 
 impl RepositoryDeleteCommand {
     pub fn new<I, N>(
-        metadata_repo: Arc<dyn MetadataRepository>,
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         names: I,
         all: bool,
         no_confirmation: bool,
@@ -33,7 +33,7 @@ impl RepositoryDeleteCommand {
         <N as TryInto<RepositoryName>>::Error: std::fmt::Debug,
     {
         Self {
-            metadata_repo: metadata_repo,
+            remote_repo_reg,
             names: names.map(|s| s.try_into().unwrap()).collect(),
             all: all,
             no_confirmation: no_confirmation,
@@ -62,7 +62,7 @@ impl RepositoryDeleteCommand {
 impl Command for RepositoryDeleteCommand {
     fn run(&mut self) -> Result<(), CLIError> {
         let repo_names: Vec<_> = if self.all {
-            self.metadata_repo.get_all_repositories().collect()
+            self.remote_repo_reg.get_all_repositories().collect()
         } else {
             self.names.clone()
         };
@@ -92,7 +92,7 @@ impl Command for RepositoryDeleteCommand {
         }
 
         for name in &repo_names {
-            self.metadata_repo.delete_repository(name)?;
+            self.remote_repo_reg.delete_repository(name)?;
         }
 
         eprintln!(
