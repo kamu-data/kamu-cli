@@ -29,26 +29,30 @@ impl ReadService {
     }
 
     // TODO: Don't use engine for anything but preprocessing
-    pub fn read(
-        &self,
-        dataset_handle: &DatasetHandle,
-        dataset_layout: &DatasetLayout,
-        source: &SetPollingSource,
+    pub async fn read<'a, 'b>(
+        &'a self,
+        dataset_handle: &'b DatasetHandle,
+        dataset_layout: &'b DatasetLayout,
+        source: &'b SetPollingSource,
         prev_checkpoint: Option<Multihash>,
-        vocab: &DatasetVocabulary,
+        vocab: &'b DatasetVocabulary,
         system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
         offset: i64,
-        out_data_path: &Path,
-        out_checkpoint_dir: &Path,
+        out_data_path: &'b Path,
+        out_checkpoint_dir: &'b Path,
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
-        src_path: &Path,
+        src_path: &'b Path,
         listener: Arc<dyn IngestListener>,
-    ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError> {
+    ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError>
+    where
+        'a: 'b,
+    {
         let engine = self
             .engine_provisioner
-            .provision_ingest_engine(listener.get_engine_provisioning_listener())?;
+            .provision_ingest_engine(listener.get_engine_provisioning_listener())
+            .await?;
 
         // Clean up previous state leftovers
         if out_data_path.exists() {
@@ -75,7 +79,7 @@ impl ReadService {
             new_checkpoint_dir: out_checkpoint_dir.to_owned(),
         };
 
-        let mut response = engine.ingest(request)?;
+        let mut response = engine.ingest(request).await?;
 
         if let Some(data_interval) = &mut response.data_interval {
             if data_interval.end < data_interval.start || data_interval.start != offset {

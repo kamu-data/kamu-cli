@@ -35,8 +35,9 @@ impl RepositoryAddCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for RepositoryAddCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let url = Url::parse(&self.url).map_err(|e| {
             eprintln!("{}: {}", console::style("Invalid URL").red(), e);
             CLIError::Aborted

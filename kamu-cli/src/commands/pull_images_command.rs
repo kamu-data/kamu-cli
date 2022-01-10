@@ -33,12 +33,13 @@ impl PullImagesCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for PullImagesCommand {
     fn needs_workspace(&self) -> bool {
         false
     }
 
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let mut images = vec![
             docker_images::SPARK,
             docker_images::FLINK,

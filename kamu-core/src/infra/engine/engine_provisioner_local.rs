@@ -19,7 +19,6 @@ use container_runtime::{ContainerRuntime, NullPullImageListener};
 use dill::*;
 use std::collections::HashSet;
 use std::process::Stdio;
-use std::sync::Condvar;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tracing::info_span;
@@ -35,7 +34,7 @@ pub struct EngineProvisionerLocal {
     flink_engine: Arc<dyn Engine>,
     container_runtime: ContainerRuntime,
     state: Mutex<State>,
-    condvar: Condvar,
+    notify: tokio::sync::Notify,
 }
 
 struct State {
@@ -79,15 +78,18 @@ impl EngineProvisionerLocal {
                 outstanding_handles: 0,
                 known_images: HashSet::new(),
             }),
-            condvar: Condvar::new(),
+            notify: tokio::sync::Notify::new(),
         }
     }
 
-    fn ensure_image(
-        &self,
-        image: &str,
+    async fn ensure_image<'a, 'b>(
+        &'a self,
+        image: &'b str,
         listener: Arc<dyn EngineProvisioningListener>,
-    ) -> Result<(), EngineProvisioningError> {
+    ) -> Result<(), EngineProvisioningError>
+    where
+        'a: 'b,
+    {
         let pull_image = {
             let mut state = self.state.lock().unwrap();
             if state.known_images.contains(image) {
@@ -109,18 +111,23 @@ impl EngineProvisionerLocal {
                 .unwrap_or_else(|| Arc::new(NullPullImageListener));
             image_listener.begin(image);
 
-            // TODO: Return better errors
-            self.container_runtime
-                .pull_cmd(image)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .map_err(|e| EngineProvisioningError::internal(e))?
-                .exit_ok()
-                .map_err(|e| {
-                    error!(image_name = image, error = ?e, "Failed to pull engine image");
-                    EngineProvisioningError::image_not_found(image)
-                })?;
+            let container_runtime = self.container_runtime.clone();
+            let image_name = image.to_owned();
+            tokio::task::spawn_blocking(move ||
+                // TODO: Return better errors
+                container_runtime
+                    .pull_cmd(&image_name)
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .map_err(|e| EngineProvisioningError::internal(e))?
+                    .exit_ok()
+                    .map_err(|e| {
+                        error!(%image_name, error = ?e, "Failed to pull engine image");
+                        EngineProvisioningError::image_not_found(&image_name)
+                    }))
+            .await
+            .unwrap()?;
 
             info!(image_name = image, "Successfully pulled engine image");
             image_listener.success();
@@ -134,20 +141,31 @@ impl EngineProvisionerLocal {
         Ok(())
     }
 
-    fn wait_for_max_concurrency(&self) {
-        let mut state = self.state.lock().unwrap();
-        let mut max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
+    async fn wait_for_max_concurrency(&self) {
+        let mut logged = false;
 
-        while state.outstanding_handles == max_concurrency {
-            info!(
-                "Reached maximum concurrency of {} - waiting for an engine to be released",
-                max_concurrency
-            );
-            state = self.condvar.wait(state).unwrap();
-            max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
+        loop {
+            // Lock
+            {
+                let mut state = self.state.lock().unwrap();
+                let max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
+
+                if state.outstanding_handles < max_concurrency {
+                    state.outstanding_handles += 1;
+                    break;
+                }
+
+                if !logged {
+                    info!(
+                        "Reached maximum concurrency of {} - waiting for an engine to be released",
+                        max_concurrency
+                    );
+                    logged = true;
+                }
+            } // Unlock
+
+            self.notify.notified().await;
         }
-
-        state.outstanding_handles += 1;
     }
 
     fn get_dynamic_max_concurrency(&self, outstanding_handles: u32) -> u32 {
@@ -168,16 +186,18 @@ impl EngineProvisionerLocal {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl EngineProvisioner for EngineProvisionerLocal {
-    fn provision_ingest_engine(
+    async fn provision_ingest_engine(
         &self,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<IngestEngineHandle, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
-        self.ensure_image(docker_images::SPARK, listener.clone())?;
+        self.ensure_image(docker_images::SPARK, listener.clone())
+            .await?;
 
         listener.begin("spark-ingest");
-        self.wait_for_max_concurrency();
+        self.wait_for_max_concurrency().await;
         listener.success();
 
         Ok(IngestEngineHandle::new(
@@ -186,7 +206,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         ))
     }
 
-    fn provision_engine(
+    async fn provision_engine(
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
@@ -205,10 +225,10 @@ impl EngineProvisioner for EngineProvisionerLocal {
             _ => Err(EngineProvisioningError::image_not_found(engine_id)),
         }?;
 
-        self.ensure_image(image, listener.clone())?;
+        self.ensure_image(image, listener.clone()).await?;
 
         listener.begin(engine_id);
-        self.wait_for_max_concurrency();
+        self.wait_for_max_concurrency().await;
         listener.success();
 
         Ok(EngineHandle::new(self, engine))
@@ -220,7 +240,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         {
             let mut state = self.state.lock().unwrap();
             state.outstanding_handles -= 1;
-            self.condvar.notify_one();
+            self.notify.notify_one();
         }
     }
 
@@ -230,7 +250,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         {
             let mut state = self.state.lock().unwrap();
             state.outstanding_handles -= 1;
-            self.condvar.notify_one();
+            self.notify.notify_one();
         }
     }
 }
@@ -266,8 +286,9 @@ impl Default for EngineProvisionerLocalConfig {
 
 pub struct EngineProvisionerNull;
 
+#[async_trait::async_trait(?Send)]
 impl EngineProvisioner for EngineProvisionerNull {
-    fn provision_engine(
+    async fn provision_engine(
         &self,
         engine_id: &str,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
@@ -275,7 +296,7 @@ impl EngineProvisioner for EngineProvisionerNull {
         Err(EngineProvisioningError::image_not_found(engine_id))
     }
 
-    fn provision_ingest_engine(
+    async fn provision_ingest_engine(
         &self,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<IngestEngineHandle, EngineProvisioningError> {

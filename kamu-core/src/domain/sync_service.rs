@@ -17,8 +17,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait SyncService: Send + Sync {
-    fn sync_from(
+    async fn sync_from(
         &self,
         remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -26,7 +27,7 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    fn sync_from_multi(
+    async fn sync_from_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
         options: SyncOptions,
@@ -36,7 +37,7 @@ pub trait SyncService: Send + Sync {
         Result<SyncResult, SyncError>,
     )>;
 
-    fn sync_to(
+    async fn sync_to(
         &self,
         local_ref: &DatasetRefLocal,
         remote_name: &RemoteDatasetName,
@@ -44,7 +45,7 @@ pub trait SyncService: Send + Sync {
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    fn sync_to_multi(
+    async fn sync_to_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
         options: SyncOptions,
@@ -57,7 +58,7 @@ pub trait SyncService: Send + Sync {
     /// Deletes a dataset from a remote repository.
     ///
     /// Note: Some repos may not permit this operation.
-    fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError>;
+    async fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError>;
 }
 
 #[derive(Debug, Clone)]

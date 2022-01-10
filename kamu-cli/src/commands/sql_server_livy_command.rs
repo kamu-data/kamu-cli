@@ -46,8 +46,9 @@ impl SqlServerLivyCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SqlServerLivyCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let livy_server = LivyServerImpl::new(self.container_runtime.clone());
 
         let spinner = if self.output_config.is_tty

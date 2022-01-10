@@ -72,8 +72,9 @@ impl LogCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for LogCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let id_to_name_lookup: BTreeMap<_, _> = self
             .dataset_reg
             .get_all_datasets()

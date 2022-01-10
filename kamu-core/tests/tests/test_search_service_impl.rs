@@ -19,7 +19,7 @@ use std::sync::Arc;
 use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches
-fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
+async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_local_name = DatasetName::new_unchecked("foo");
     let repo_name = RepositoryName::new_unchecked("repo");
     let dataset_remote_name = RemoteDatasetName::new_unchecked("repo/bar");
@@ -60,35 +60,36 @@ fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
             SyncOptions::default(),
             None,
         )
+        .await
         .unwrap();
 
     // Search!
     assert_matches!(
-        search_svc.search(None, SearchOptions::default()),
+        search_svc.search(None, SearchOptions::default()).await,
         Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
     );
     assert_matches!(
-        search_svc.search(Some("bar"), SearchOptions::default()),
+        search_svc.search(Some("bar"), SearchOptions::default()).await,
         Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
     );
     assert_matches!(
-        search_svc.search(Some("foo"), SearchOptions::default()),
+        search_svc.search(Some("foo"), SearchOptions::default()).await,
         Ok(SearchResult { datasets }) if datasets.is_empty()
     );
 }
 
-#[test]
-fn test_search_local_fs() {
+#[tokio::test]
+async fn test_search_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    do_test_search(tmp_workspace_dir.path(), repo_url);
+    do_test_search(tmp_workspace_dir.path(), repo_url).await;
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_search_s3() {
+async fn test_search_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
@@ -108,5 +109,5 @@ fn test_search_s3() {
     ))
     .unwrap();
 
-    do_test_search(tmp_workspace_dir.path(), repo_url);
+    do_test_search(tmp_workspace_dir.path(), repo_url).await;
 }

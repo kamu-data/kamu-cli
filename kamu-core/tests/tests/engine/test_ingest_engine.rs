@@ -22,9 +22,9 @@ use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_ingest_with_engine() {
+async fn test_ingest_with_engine() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
@@ -82,7 +82,9 @@ fn test_ingest_with_engine() {
 
     dataset_reg.add_dataset(dataset_snapshot).unwrap();
 
-    let res = ingest_svc.ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None);
+    let res = ingest_svc
+        .ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None)
+        .await;
     assert_matches!(res, Ok(IngestResult::Updated { .. }));
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);

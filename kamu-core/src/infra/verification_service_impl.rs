@@ -148,8 +148,9 @@ impl VerificationServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl VerificationService for VerificationServiceImpl {
-    fn verify(
+    async fn verify(
         &self,
         dataset_ref: &DatasetRefLocal,
         block_range: (Option<Multihash>, Option<Multihash>),
@@ -180,12 +181,14 @@ impl VerificationService for VerificationServiceImpl {
             }
 
             if dataset_kind == DatasetKind::Derivative && options.replay_transformations {
-                self.transform_service.verify_transform(
-                    &dataset_handle.as_local_ref(),
-                    block_range.clone(),
-                    options,
-                    Some(listener.clone()),
-                )?;
+                self.transform_service
+                    .verify_transform(
+                        &dataset_handle.as_local_ref(),
+                        block_range.clone(),
+                        options,
+                        Some(listener.clone()),
+                    )
+                    .await?;
             }
 
             VerificationResult::Valid
@@ -199,7 +202,7 @@ impl VerificationService for VerificationServiceImpl {
         res
     }
 
-    fn verify_multi(
+    async fn verify_multi(
         &self,
         _requests: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,

@@ -74,26 +74,29 @@ impl PullCommand {
         }
     }
 
-    fn sync_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn sync_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         let local_name = self.as_name.as_ref().unwrap();
         let remote_ref = self.refs[0].as_remote_ref().ok_or_else(|| {
             CLIError::usage_error("When using --as reference should point to a remote dataset")
         })?;
 
-        let res = self.pull_svc.sync_from(
-            &remote_ref,
-            &local_name,
-            PullOptions {
-                create_remote_aliases: true,
-                ..PullOptions::default()
-            },
-            listener.and_then(|p| p.begin_sync(&local_name.as_local_ref(), &remote_ref)),
-        );
+        let res = self
+            .pull_svc
+            .sync_from(
+                &remote_ref,
+                &local_name,
+                PullOptions {
+                    create_remote_aliases: true,
+                    ..PullOptions::default()
+                },
+                listener.and_then(|p| p.begin_sync(&local_name.as_local_ref(), &remote_ref)),
+            )
+            .await;
 
         Ok(vec![(remote_ref.into(), res)])
     }
 
-    fn ingest_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn ingest_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         let dataset_handle = {
             let dataset_ref = self.refs[0].as_local_ref().ok_or_else(|| {
                 CLIError::usage_error(
@@ -147,44 +150,50 @@ impl PullCommand {
             cache: None,
         });
 
-        let res = self.pull_svc.ingest_from(
-            &dataset_handle.as_local_ref(),
-            fetch_step,
-            PullOptions {
-                ingest_options: IngestOptions {
-                    force_uncacheable: self.force_uncacheable,
-                    exhaust_sources: true,
+        let res = self
+            .pull_svc
+            .ingest_from(
+                &dataset_handle.as_local_ref(),
+                fetch_step,
+                PullOptions {
+                    ingest_options: IngestOptions {
+                        force_uncacheable: self.force_uncacheable,
+                        exhaust_sources: true,
+                    },
+                    ..PullOptions::default()
                 },
-                ..PullOptions::default()
-            },
-            listener.and_then(|p| p.begin_ingest(&dataset_handle)),
-        );
+                listener.and_then(|p| p.begin_ingest(&dataset_handle)),
+            )
+            .await;
 
         Ok(vec![(dataset_handle.into(), res)])
     }
 
-    fn pull_multi(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
-        Ok(self.pull_svc.pull_multi(
-            &mut self.refs.iter().cloned(),
-            PullOptions {
-                recursive: self.recursive,
-                all: self.all,
-                create_remote_aliases: true,
-                ingest_options: IngestOptions {
-                    force_uncacheable: self.force_uncacheable,
-                    exhaust_sources: true,
+    async fn pull_multi(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+        Ok(self
+            .pull_svc
+            .pull_multi(
+                &mut self.refs.iter().cloned(),
+                PullOptions {
+                    recursive: self.recursive,
+                    all: self.all,
+                    create_remote_aliases: true,
+                    ingest_options: IngestOptions {
+                        force_uncacheable: self.force_uncacheable,
+                        exhaust_sources: true,
+                    },
+                    sync_options: SyncOptions::default(),
                 },
-                sync_options: SyncOptions::default(),
-            },
-            listener.clone().map(|v| v as Arc<dyn IngestMultiListener>),
-            listener
-                .clone()
-                .map(|v| v as Arc<dyn TransformMultiListener>),
-            listener.map(|v| v as Arc<dyn SyncMultiListener>),
-        ))
+                listener.clone().map(|v| v as Arc<dyn IngestMultiListener>),
+                listener
+                    .clone()
+                    .map(|v| v as Arc<dyn TransformMultiListener>),
+                listener.map(|v| v as Arc<dyn SyncMultiListener>),
+            )
+            .await)
     }
 
-    fn pull_with_progress(&self) -> GenericPullResult {
+    async fn pull_with_progress(&self) -> GenericPullResult {
         let pull_progress = PrettyPullProgress::new();
         let listener = Arc::new(pull_progress.clone());
 
@@ -192,7 +201,7 @@ impl PullCommand {
             pull_progress.draw();
         });
 
-        let results = self.pull(Some(listener.clone()));
+        let results = self.pull(Some(listener.clone())).await;
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -200,19 +209,20 @@ impl PullCommand {
         results
     }
 
-    fn pull(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn pull(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
         if self.as_name.is_some() {
-            self.sync_from(listener)
+            self.sync_from(listener).await
         } else if self.fetch.is_some() {
-            self.ingest_from(listener)
+            self.ingest_from(listener).await
         } else {
-            self.pull_multi(listener)
+            self.pull_multi(listener).await
         }
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         match (self.recursive, self.all, &self.as_name, &self.fetch) {
             (false, false, _, _) if self.refs.is_empty() => {
                 Err(CLIError::usage_error("Specify a dataset or pass --all"))
@@ -230,9 +240,9 @@ impl Command for PullCommand {
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
-            self.pull_with_progress()?
+            self.pull_with_progress().await?
         } else {
-            self.pull(None)?
+            self.pull(None).await?
         };
 
         let mut updated = 0;

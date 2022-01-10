@@ -33,7 +33,7 @@ impl SearchServiceImpl {
         }
     }
 
-    fn search_in_repo(
+    async fn search_in_repo(
         &self,
         query: Option<&str>,
         repo_name: &RepositoryName,
@@ -55,7 +55,7 @@ impl SearchServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SearchError::InternalError(e.into()))?;
 
-        let resp = repo_client.lock().unwrap().search(query)?;
+        let resp = repo_client.search(query).await?;
 
         // TODO: Avoid rewriting remote name to prefix with the local name of a repo
         Ok(SearchResult {
@@ -74,8 +74,9 @@ impl SearchServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl SearchService for SearchServiceImpl {
-    fn search(
+    async fn search(
         &self,
         query: Option<&str>,
         options: SearchOptions,
@@ -86,11 +87,12 @@ impl SearchService for SearchServiceImpl {
             self.remote_repo_reg.get_all_repositories().collect()
         };
 
-        itertools::process_results(
-            repo_names
-                .iter()
-                .map(|repo| self.search_in_repo(query, repo)),
-            |it| it.fold(SearchResult::default(), |a, b| a.merge(b)),
-        )
+        let mut result = SearchResult::default();
+        for repo in &repo_names {
+            let repo_result = self.search_in_repo(query, repo).await?;
+            result = result.merge(repo_result);
+        }
+
+        Ok(result)
     }
 }

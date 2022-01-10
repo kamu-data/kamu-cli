@@ -51,8 +51,9 @@ impl DeleteCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for DeleteCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if self.dataset_refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
@@ -90,7 +91,7 @@ impl Command for DeleteCommand {
                 None => match r.as_remote_ref() {
                     Some(DatasetRefRemote::RemoteName(name)) => self
                         .sync_svc
-                        .delete(&name)
+                        .delete(&name).await
                         .map_err(|e| CLIError::failure(e))?,
                     _ => unimplemented!(),
                 },

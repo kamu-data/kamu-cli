@@ -50,6 +50,7 @@ rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
 
 # Utils
 async-trait = "*"
+async-recursion = "*"
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for glob fetch
 rand = "^0.8"

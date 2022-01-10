@@ -18,8 +18,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait PushService: Send + Sync {
-    fn push_multi(
+    async fn push_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PushOptions,

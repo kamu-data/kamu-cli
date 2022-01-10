@@ -95,7 +95,7 @@ impl SparkEngine {
         PathBuf::from(unix_path)
     }
 
-    fn ingest_impl(
+    async fn ingest_impl(
         &self,
         run_info: RunInfo,
         request: IngestRequest,
@@ -161,11 +161,14 @@ impl SparkEngine {
 
         info!(command = ?cmd, "Running Spark job");
 
-        let status = cmd
-            .stdout(std::process::Stdio::from(stdout_file))
-            .stderr(std::process::Stdio::from(stderr_file))
-            .status()
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+        let status = tokio::task::spawn_blocking(move || {
+            cmd.stdout(std::process::Stdio::from(stdout_file))
+                .stderr(std::process::Stdio::from(stderr_file))
+                .status()
+        })
+        .await
+        .map_err(|e| EngineError::internal(e, run_info.log_files()))?
+        .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         if response_path.exists() {
             let data = std::fs::read_to_string(&response_path)?;
@@ -200,8 +203,12 @@ impl SparkEngine {
     }
 }
 
+#[async_trait::async_trait]
 impl IngestEngine for SparkEngine {
-    fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError> {
+    async fn ingest(
+        &self,
+        request: IngestRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
@@ -218,6 +225,6 @@ impl IngestEngine for SparkEngine {
             ..request
         };
 
-        self.ingest_impl(run_info, request_adj)
+        self.ingest_impl(run_info, request_adj).await
     }
 }

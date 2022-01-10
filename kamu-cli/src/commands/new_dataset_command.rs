@@ -151,13 +151,14 @@ impl NewDatasetCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for NewDatasetCommand {
     fn needs_workspace(&self) -> bool {
         false
     }
 
     // TODO: link to documentation
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {
             let mut p = PathBuf::from(self.name.as_str());
             p.set_extension("yaml");

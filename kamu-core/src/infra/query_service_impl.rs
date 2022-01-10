@@ -62,8 +62,9 @@ impl QueryServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl QueryService for QueryServiceImpl {
-    fn tail(
+    async fn tail(
         &self,
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
@@ -87,7 +88,7 @@ impl QueryService for QueryServiceImpl {
         // See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
-        let schema = self.get_schema(&dataset_handle.as_local_ref())?;
+        let schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
         let fields: Vec<String> = match schema {
             Type::GroupType { fields, .. } => fields
                 .iter()
@@ -138,9 +139,10 @@ impl QueryService for QueryServiceImpl {
                 }],
             },
         )
+        .await
     }
 
-    fn sql_statement(
+    async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
@@ -166,7 +168,7 @@ impl QueryService for QueryServiceImpl {
         Ok(ctx.sql(statement)?)
     }
 
-    fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
+    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
         let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
         let metadata_chain = self
             .dataset_reg

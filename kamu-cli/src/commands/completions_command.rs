@@ -36,12 +36,13 @@ impl CompletionsCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for CompletionsCommand {
     fn needs_workspace(&self) -> bool {
         false
     }
 
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: Remove once clap allows to programmatically complete values
         // See: https://github.com/clap-rs/clap/issues/568
         let bin_name = self.app.get_name().to_owned();

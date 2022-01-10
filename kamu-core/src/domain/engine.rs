@@ -21,16 +21,21 @@ use thiserror::Error;
 // Engine
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
 pub trait Engine: Send + Sync {
-    fn transform(
+    async fn transform(
         &self,
         request: ExecuteQueryRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
 // TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
+#[async_trait::async_trait]
 pub trait IngestEngine: Send + Sync {
-    fn ingest(&self, request: IngestRequest) -> Result<ExecuteQueryResponseSuccess, EngineError>;
+    async fn ingest(
+        &self,
+        request: IngestRequest,
+    ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

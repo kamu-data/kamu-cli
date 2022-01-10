@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 use crate::utils::{FtpServer, HttpServer};
 
@@ -23,8 +25,8 @@ use url::Url;
 // URL: file
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_fetch_url_file() {
+#[tokio::test]
+async fn test_fetch_url_file() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let src_path = tempdir.path().join("data.csv");
@@ -40,7 +42,7 @@ fn test_fetch_url_file() {
 
     // No file to fetch
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
@@ -61,6 +63,7 @@ fn test_fetch_url_file() {
     // Normal fetch
     let res = fetch_svc
         .fetch(&fetch_step, None, &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res.was_up_to_date, false);
     assert!(target_path.exists());
@@ -68,6 +71,7 @@ fn test_fetch_url_file() {
     // No modifications
     let res2 = fetch_svc
         .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res2.was_up_to_date, true);
 
@@ -75,6 +79,7 @@ fn test_fetch_url_file() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(&fetch_step, Some(res2.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res3.was_up_to_date, false);
 }
@@ -83,8 +88,8 @@ fn test_fetch_url_file() {
 // URL: http
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_fetch_url_http_unreachable() {
+#[tokio::test]
+async fn test_fetch_url_http_unreachable() {
     let tempdir = tempfile::tempdir().unwrap();
     let target_path = tempdir.path().join("fetched.bin");
 
@@ -97,15 +102,15 @@ fn test_fetch_url_http_unreachable() {
     let fetch_svc = FetchService::new();
 
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
         Err(IngestError::Unreachable { .. })
     );
     assert!(!target_path.exists());
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_fetch_url_http_not_found() {
+async fn test_fetch_url_http_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
     let target_path = tempdir.path().join("fetched.bin");
 
@@ -120,15 +125,15 @@ fn test_fetch_url_http_not_found() {
     let fetch_svc = FetchService::new();
 
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_fetch_url_http_ok() {
+async fn test_fetch_url_http_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
@@ -155,17 +160,18 @@ fn test_fetch_url_http_ok() {
     });
 
     let fetch_svc = FetchService::new();
-    let mut listener = TestListener::new();
+    let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(&mut listener))
+        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .await
         .unwrap();
 
     assert!(!res.was_up_to_date);
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
     assert_eq!(
-        listener.last_progress,
+        listener.get_last_progress(),
         Some(FetchProgress {
             total_bytes: 37,
             fetched_bytes: 37
@@ -178,6 +184,7 @@ fn test_fetch_url_http_ok() {
     };
     let res_repeat_last_mod = fetch_svc
         .fetch(&fetch_step, Some(cp_last_mod), &target_path, None)
+        .await
         .unwrap();
 
     assert!(res_repeat_last_mod.was_up_to_date);
@@ -189,6 +196,7 @@ fn test_fetch_url_http_ok() {
     };
     let res_repeat_etag = fetch_svc
         .fetch(&fetch_step, Some(cp_etag), &target_path, None)
+        .await
         .unwrap();
 
     assert!(res_repeat_etag.was_up_to_date);
@@ -197,6 +205,7 @@ fn test_fetch_url_http_ok() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res_touch = fetch_svc
         .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .await
         .unwrap();
 
     assert!(!res_touch.was_up_to_date);
@@ -204,7 +213,9 @@ fn test_fetch_url_http_ok() {
 
     std::fs::remove_file(&src_path).unwrap();
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, Some(res_touch.checkpoint), &target_path, None),
+        fetch_svc
+            .fetch(&fetch_step, Some(res_touch.checkpoint), &target_path, None)
+            .await,
         Err(IngestError::NotFound { .. })
     );
 
@@ -215,9 +226,9 @@ fn test_fetch_url_http_ok() {
 // URL: ftp
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_fetch_url_ftp_ok() {
+async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
@@ -244,17 +255,18 @@ fn test_fetch_url_ftp_ok() {
     });
 
     let fetch_svc = FetchService::new();
-    let mut listener = TestListener::new();
+    let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(&mut listener))
+        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .await
         .unwrap();
 
     assert!(!res.was_up_to_date);
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
     assert_eq!(
-        listener.last_progress,
+        listener.get_last_progress(),
         Some(FetchProgress {
             total_bytes: 37,
             fetched_bytes: 37
@@ -266,8 +278,8 @@ fn test_fetch_url_ftp_ok() {
 // FilesGlob
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test]
-fn test_fetch_files_glob() {
+#[tokio::test]
+async fn test_fetch_files_glob() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let src_path_1 = tempdir.path().join("data-2020-10-01.csv");
@@ -292,7 +304,7 @@ fn test_fetch_files_glob() {
 
     // No file to fetch
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None),
+        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
@@ -313,6 +325,7 @@ fn test_fetch_files_glob() {
     // Normal fetch
     let res = fetch_svc
         .fetch(&fetch_step, None, &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res.was_up_to_date, false);
     assert!(target_path.exists());
@@ -328,6 +341,7 @@ fn test_fetch_files_glob() {
     // No modifications
     let res2 = fetch_svc
         .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res2.was_up_to_date, true);
 
@@ -335,6 +349,7 @@ fn test_fetch_files_glob() {
     filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(&fetch_step, Some(res2.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res3.was_up_to_date, true);
 
@@ -355,6 +370,7 @@ fn test_fetch_files_glob() {
 
     let res4 = fetch_svc
         .fetch(&fetch_step, Some(res3.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res4.was_up_to_date, true);
     assert_eq!(
@@ -389,6 +405,7 @@ fn test_fetch_files_glob() {
 
     let res5 = fetch_svc
         .fetch(&fetch_step, Some(res4.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res5.was_up_to_date, false);
     assert!(target_path.exists());
@@ -403,6 +420,7 @@ fn test_fetch_files_glob() {
 
     let res6 = fetch_svc
         .fetch(&fetch_step, Some(res5.checkpoint), &target_path, None)
+        .await
         .unwrap();
     assert_eq!(res6.was_up_to_date, false);
     assert!(target_path.exists());
@@ -421,19 +439,23 @@ fn test_fetch_files_glob() {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct TestListener {
-    last_progress: Option<FetchProgress>,
+    last_progress: Mutex<Option<FetchProgress>>,
 }
 
 impl TestListener {
     fn new() -> Self {
         Self {
-            last_progress: None,
+            last_progress: Mutex::new(None),
         }
+    }
+
+    fn get_last_progress(&self) -> Option<FetchProgress> {
+        self.last_progress.lock().unwrap().clone()
     }
 }
 
 impl FetchProgressListener for TestListener {
-    fn on_progress(&mut self, progress: &FetchProgress) {
-        self.last_progress = Some(progress.clone());
+    fn on_progress(&self, progress: &FetchProgress) {
+        *self.last_progress.lock().unwrap() = Some(progress.clone());
     }
 }

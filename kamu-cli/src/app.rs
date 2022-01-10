@@ -33,7 +33,7 @@ const VERBOSE_LOGGING_CONFIG: &str = "debug";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn run(
+pub async fn run(
     workspace_layout: WorkspaceLayout,
     local_volume_layout: VolumeLayout,
     matches: clap::ArgMatches,
@@ -61,7 +61,7 @@ pub fn run(
     let result = if command.needs_workspace() && !in_workspace(catalog.get_one().unwrap()) {
         Err(CLIError::usage_error_from(NotInWorkspace))
     } else {
-        command.run()
+        command.run().await
     };
 
     match result {

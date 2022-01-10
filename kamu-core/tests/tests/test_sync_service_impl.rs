@@ -95,7 +95,7 @@ fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
     path
 }
 
-fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
+async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_name_2 = DatasetName::new_unchecked("bar");
@@ -123,22 +123,26 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(
-            &dataset_name.as_local_ref(),
-            &remote_dataset_name,
-            SyncOptions::default(),
-            None,
-        ),
+        sync_svc
+            .sync_to(
+                &dataset_name.as_local_ref(),
+                &remote_dataset_name,
+                SyncOptions::default(),
+                None,
+            )
+            .await,
         Err(SyncError::LocalDatasetDoesNotExist { .. })
     );
 
     assert_matches!(
-        sync_svc.sync_from(
-            &remote_dataset_name.as_remote_ref(),
-            &dataset_name_2,
-            SyncOptions::default(),
-            None,
-        ),
+        sync_svc
+            .sync_from(
+                &remote_dataset_name.as_remote_ref(),
+                &dataset_name_2,
+                SyncOptions::default(),
+                None,
+            )
+            .await,
         Err(SyncError::RemoteDatasetDoesNotExist { .. })
     );
 
@@ -153,7 +157,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name,  SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name,  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -162,7 +166,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -202,13 +206,13 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     .unwrap();
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged { local_head, remote_head})
         if local_head == b3 && remote_head == b1
     );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -217,7 +221,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None),
+        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -229,22 +233,26 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(
-            &dataset_name.as_local_ref(),
-            &remote_dataset_name,
-            SyncOptions::default(),
-            None
-        ),
+        sync_svc
+            .sync_to(
+                &dataset_name.as_local_ref(),
+                &remote_dataset_name,
+                SyncOptions::default(),
+                None
+            )
+            .await,
         Ok(SyncResult::UpToDate)
     );
 
     assert_matches!(
-        sync_svc.sync_from(
-            &remote_dataset_name.as_remote_ref(),
-            &dataset_name_2,
-            SyncOptions::default(),
-            None
-        ),
+        sync_svc
+            .sync_from(
+                &remote_dataset_name.as_remote_ref(),
+                &dataset_name_2,
+                SyncOptions::default(),
+                None
+            )
+            .await,
         Ok(SyncResult::UpToDate)
     );
 
@@ -263,7 +271,7 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -273,24 +281,24 @@ fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None),
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged { local_head, remote_head })
         if local_head == b3 && remote_head == diverged_head
     );
 }
 
-#[test]
-fn test_sync_to_from_local_fs() {
+#[tokio::test]
+async fn test_sync_to_from_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url);
+    do_test_sync(tmp_workspace_dir.path(), repo_url).await;
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_sync_to_from_s3() {
+async fn test_sync_to_from_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
@@ -310,5 +318,5 @@ fn test_sync_to_from_s3() {
     ))
     .unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url);
+    do_test_sync(tmp_workspace_dir.path(), repo_url).await;
 }

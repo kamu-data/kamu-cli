@@ -39,7 +39,7 @@ impl SyncServiceImpl {
         }
     }
 
-    fn do_sync_from(
+    async fn do_sync_from(
         &self,
         remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -69,10 +69,9 @@ impl SyncServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
-        let cl = client.lock().unwrap();
-
-        let remote_head = match cl
+        let remote_head = match client
             .read_ref(remote_name)
+            .await
             .map_err(|e| SyncError::ProtocolError(e.into()))?
         {
             Some(hash) => hash,
@@ -104,8 +103,9 @@ impl SyncServiceImpl {
         let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
         let dataset_layout = DatasetLayout::new(&volume_layout, &local_name);
 
-        let read_result = cl
+        let read_result = client
             .read(&remote_name, &remote_head, &local_head, &tmp_dir)
+            .await
             .map_err(|e| match e {
                 RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
                     dataset_ref: remote_ref.clone(),
@@ -193,7 +193,7 @@ impl SyncServiceImpl {
         })
     }
 
-    fn do_sync_to(
+    async fn do_sync_to(
         &self,
         local_ref: &DatasetRefLocal,
         remote_name: &RemoteDatasetName,
@@ -224,9 +224,7 @@ impl SyncServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
-        let mut cl = client.lock().unwrap();
-
-        let remote_head = cl.read_ref(remote_name)?;
+        let remote_head = client.read_ref(remote_name).await?;
 
         let chain = self
             .dataset_reg
@@ -281,14 +279,16 @@ impl SyncServiceImpl {
 
         let num_blocks = blocks_to_sync.len();
 
-        cl.write(
-            remote_name,
-            &remote_head,
-            &local_head,
-            &mut blocks_to_sync.into_iter(),
-            &mut data_files_to_sync.iter().map(|e| e as &Path),
-            &dataset_layout.checkpoints_dir,
-        )?;
+        client
+            .write(
+                remote_name,
+                &remote_head,
+                &local_head,
+                &mut blocks_to_sync.into_iter(),
+                &mut data_files_to_sync.iter().map(|e| e as &Path),
+                &dataset_layout.checkpoints_dir,
+            )
+            .await?;
 
         Ok(SyncResult::Updated {
             old_head: remote_head,
@@ -298,8 +298,9 @@ impl SyncServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl SyncService for SyncServiceImpl {
-    fn sync_from(
+    async fn sync_from(
         &self,
         remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -309,7 +310,7 @@ impl SyncService for SyncServiceImpl {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.do_sync_from(remote_ref, local_name, options) {
+        match self.do_sync_from(remote_ref, local_name, options).await {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -322,7 +323,7 @@ impl SyncService for SyncServiceImpl {
     }
 
     // TODO: Parallelism
-    fn sync_from_multi(
+    async fn sync_from_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
         options: SyncOptions,
@@ -334,14 +335,16 @@ impl SyncService for SyncServiceImpl {
         let mut results = Vec::new();
 
         for (remote_ref, local_name) in datasets {
-            let res = self.sync_from(
-                &remote_ref,
-                &local_name,
-                options.clone(),
-                listener
-                    .as_ref()
-                    .and_then(|l| l.begin_sync(&local_name.as_local_ref(), &remote_ref)),
-            );
+            let res = self
+                .sync_from(
+                    &remote_ref,
+                    &local_name,
+                    options.clone(),
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.begin_sync(&local_name.as_local_ref(), &remote_ref)),
+                )
+                .await;
 
             results.push(((remote_ref, local_name), res));
         }
@@ -349,7 +352,7 @@ impl SyncService for SyncServiceImpl {
         results
     }
 
-    fn sync_to(
+    async fn sync_to(
         &self,
         local_ref: &DatasetRefLocal,
         remote_name: &RemoteDatasetName,
@@ -359,7 +362,7 @@ impl SyncService for SyncServiceImpl {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.do_sync_to(local_ref, remote_name, options) {
+        match self.do_sync_to(local_ref, remote_name, options).await {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -372,7 +375,7 @@ impl SyncService for SyncServiceImpl {
     }
 
     // TODO: Parallelism
-    fn sync_to_multi(
+    async fn sync_to_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
         options: SyncOptions,
@@ -384,14 +387,16 @@ impl SyncService for SyncServiceImpl {
         let mut results = Vec::new();
 
         for (local_ref, remote_name) in datasets {
-            let res = self.sync_to(
-                &local_ref,
-                &remote_name,
-                options.clone(),
-                listener
-                    .as_ref()
-                    .and_then(|l| l.begin_sync(&local_ref, &remote_name.as_remote_ref())),
-            );
+            let res = self
+                .sync_to(
+                    &local_ref,
+                    &remote_name,
+                    options.clone(),
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.begin_sync(&local_ref, &remote_name.as_remote_ref())),
+                )
+                .await;
 
             results.push(((local_ref, remote_name), res));
         }
@@ -399,7 +404,7 @@ impl SyncService for SyncServiceImpl {
         results
     }
 
-    fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
+    async fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
         let repo_name = remote_ref.repository();
 
         let repo = self
@@ -415,7 +420,7 @@ impl SyncService for SyncServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
-        client.lock().unwrap().delete(remote_ref)?;
+        client.delete(remote_ref).await?;
 
         Ok(())
     }

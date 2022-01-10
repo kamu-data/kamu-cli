@@ -17,7 +17,7 @@ use super::DomainError;
 pub trait ProvenanceService: Sync + Send {
     /// Passes the visitor through the dependency graph of a dataset
     /// Some predefined visitors are available.
-    fn get_dataset_lineage<'a>(
+    fn get_dataset_lineage(
         &self,
         dataset_ref: &DatasetRefLocal,
         visitor: &mut dyn LineageVisitor,

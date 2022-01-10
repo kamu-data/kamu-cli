@@ -49,8 +49,9 @@ impl SetWatermarkCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SetWatermarkCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Only one dataset can be provided when setting a watermark",
@@ -87,7 +88,11 @@ impl Command for SetWatermarkCommand {
             );
         }
 
-        match self.pull_svc.set_watermark(&dataset_ref, watermark.into()) {
+        match self
+            .pull_svc
+            .set_watermark(&dataset_ref, watermark.into())
+            .await
+        {
             Ok(PullResult::UpToDate) => {
                 eprintln!("{}", console::style("Watermark was up-to-date").yellow());
                 Ok(())

@@ -23,8 +23,8 @@ use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
 
-#[test]
-fn test_verify_data_consistency() {
+#[tokio::test]
+async fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let dataset_name = DatasetName::new_unchecked("bar");
@@ -61,15 +61,17 @@ fn test_verify_data_consistency() {
         .unwrap();
 
     assert_matches!(
-        verification_svc.verify(
-            &dataset_name.as_local_ref(),
-            (None, None),
-            VerificationOptions {
-                check_integrity: true,
-                replay_transformations: false
-            },
-            None,
-        ),
+        verification_svc
+            .verify(
+                &dataset_name.as_local_ref(),
+                (None, None),
+                VerificationOptions {
+                    check_integrity: true,
+                    replay_transformations: false
+                },
+                None,
+            )
+            .await,
         Ok(VerificationResult::Valid)
     );
 
@@ -107,15 +109,17 @@ fn test_verify_data_consistency() {
     std::fs::rename(data_path, dataset_layout.data_dir.join(head.to_string())).unwrap();
 
     assert_matches!(
-        verification_svc.verify(
-            &dataset_name.as_local_ref(),
-            (None, None),
-            VerificationOptions {
-                check_integrity: true,
-                replay_transformations: false
-            },
-            None,
-        ),
+        verification_svc
+            .verify(
+                &dataset_name.as_local_ref(),
+                (None, None),
+                VerificationOptions {
+                    check_integrity: true,
+                    replay_transformations: false
+                },
+                None,
+            )
+            .await,
         Ok(VerificationResult::Valid)
     );
 
@@ -135,7 +139,7 @@ fn test_verify_data_consistency() {
             (None, None),
             VerificationOptions {check_integrity: true, replay_transformations: false},
             None,
-        ),
+        ).await,
         Err(VerificationError::DataDoesNotMatchMetadata(
             DataDoesNotMatchMetadata {
                 block_hash,

@@ -67,7 +67,10 @@ impl VerifyCommand {
         }
     }
 
-    fn verify_with_progress(&self, options: VerificationOptions) -> GenericVerificationResult {
+    async fn verify_with_progress(
+        &self,
+        options: VerificationOptions,
+    ) -> GenericVerificationResult {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
 
@@ -75,7 +78,7 @@ impl VerifyCommand {
             progress.draw();
         });
 
-        let results = self.verify(options, Some(listener.clone()));
+        let results = self.verify(options, Some(listener.clone())).await;
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -83,7 +86,7 @@ impl VerifyCommand {
         results
     }
 
-    fn verify(
+    async fn verify(
         &self,
         options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
@@ -94,19 +97,23 @@ impl VerifyCommand {
 
         let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
 
-        let res = self.verification_svc.verify(
-            &dataset_handle.as_local_ref(),
-            (None, None),
-            options,
-            listener,
-        );
+        let res = self
+            .verification_svc
+            .verify(
+                &dataset_handle.as_local_ref(),
+                (None, None),
+                options,
+                listener,
+            )
+            .await;
 
         Ok(vec![(dataset_handle.into(), res)])
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for VerifyCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Verifying multiple datasets at once is not yet supported",
@@ -135,9 +142,9 @@ impl Command for VerifyCommand {
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
-            self.verify_with_progress(options)?
+            self.verify_with_progress(options).await?
         } else {
-            self.verify(options, None)?
+            self.verify(options, None).await?
         };
 
         let mut valid = 0;

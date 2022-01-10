@@ -16,22 +16,23 @@ use thiserror::Error;
 
 use super::DomainError;
 
+#[async_trait::async_trait(?Send)]
 pub trait QueryService: Send + Sync {
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`
-    fn tail(
+    async fn tail(
         &self,
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
     ) -> Result<Arc<dyn DataFrame>, QueryError>;
 
-    fn sql_statement(
+    async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
     ) -> Result<Arc<dyn DataFrame>, QueryError>;
 
-    fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError>;
+    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

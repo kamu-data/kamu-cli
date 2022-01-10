@@ -98,18 +98,20 @@ pub use tail_command::*;
 mod verify_command;
 pub use verify_command::*;
 
+#[async_trait::async_trait(?Send)]
 pub trait Command {
     fn needs_workspace(&self) -> bool {
         true
     }
 
-    fn run(&mut self) -> Result<(), CLIError>;
+    async fn run(&mut self) -> Result<(), CLIError>;
 }
 
 pub struct NoOpCommand;
 
+#[async_trait::async_trait(?Send)]
 impl Command for NoOpCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         Ok(())
     }
 }

@@ -151,12 +151,13 @@ impl CompleteCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
     fn needs_workspace(&self) -> bool {
         false
     }
 
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let mut args = match shlex::split(&self.input) {
             Some(v) => v,
             _ => return Ok(()),

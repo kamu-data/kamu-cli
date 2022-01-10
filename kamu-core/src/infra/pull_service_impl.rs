@@ -229,8 +229,9 @@ impl PullServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl PullService for PullServiceImpl {
-    fn pull_multi(
+    async fn pull_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PullOptions,
@@ -278,11 +279,13 @@ impl PullService for PullServiceImpl {
                         options.ingest_options.clone(),
                         ingest_listener.clone(),
                     )
+                    .await
                     .into_iter()
                     .map(|(dr, res)| (dr.into(), Self::result_into(res)))
                     .collect()
             } else if depth == 0 && is_remote {
-                self.sync_svc
+                let sync_results = self
+                    .sync_svc
                     .sync_from_multi(
                         &mut batch.iter().map(|pi| {
                             (
@@ -293,27 +296,31 @@ impl PullService for PullServiceImpl {
                         options.sync_options.clone(),
                         sync_listener.clone(),
                     )
-                    .into_iter()
-                    .map(|((remote_ref, local_name), res)| {
-                        // Associate newly-synced datasets with remotes
-                        if options.create_remote_aliases {
-                            if let Ok(SyncResult::Updated { old_head: None, .. }) = res {
-                                let remote_name = match &remote_ref {
-                                    DatasetRefRemote::ID(_) => unimplemented!(
-                                        "Referring to remote datasets by ID is not yet supported"
-                                    ),
-                                    DatasetRefRemote::RemoteName(name) => name,
-                                    DatasetRefRemote::RemoteHandle(h) => &h.name,
-                                };
-                                self.remote_alias_reg
-                                    .get_remote_aliases(&local_name.as_local_ref())
-                                    .unwrap()
-                                    .add(remote_name, RemoteAliasKind::Pull)
-                                    .unwrap();
-                            }
+                    .await;
+
+                // Associate newly-synced datasets with remotes
+                if options.create_remote_aliases {
+                    for ((remote_ref, local_name), res) in &sync_results {
+                        if let Ok(SyncResult::Updated { old_head: None, .. }) = res {
+                            let remote_name = match &remote_ref {
+                                DatasetRefRemote::ID(_) => unimplemented!(
+                                    "Referring to remote datasets by ID is not yet supported"
+                                ),
+                                DatasetRefRemote::RemoteName(name) => name,
+                                DatasetRefRemote::RemoteHandle(h) => &h.name,
+                            };
+                            self.remote_alias_reg
+                                .get_remote_aliases(&local_name.as_local_ref())
+                                .unwrap()
+                                .add(remote_name, RemoteAliasKind::Pull)
+                                .unwrap();
                         }
-                        (local_name.into(), Self::result_into(res))
-                    })
+                    }
+                }
+
+                sync_results
+                    .into_iter()
+                    .map(|((_, local_name), res)| (local_name.into(), Self::result_into(res)))
                     .collect()
             } else {
                 self.transform_svc
@@ -321,6 +328,7 @@ impl PullService for PullServiceImpl {
                         &mut batch.iter().map(|pi| pi.local_name.as_local_ref()),
                         transform_listener.clone(),
                     )
+                    .await
                     .into_iter()
                     .map(|(dr, res)| (dr.into(), Self::result_into(res)))
                     .collect()
@@ -336,7 +344,7 @@ impl PullService for PullServiceImpl {
         results
     }
 
-    fn sync_from(
+    async fn sync_from(
         &self,
         remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -345,7 +353,8 @@ impl PullService for PullServiceImpl {
     ) -> Result<PullResult, PullError> {
         let res = self
             .sync_svc
-            .sync_from(remote_ref, local_name, options.sync_options, listener);
+            .sync_from(remote_ref, local_name, options.sync_options, listener)
+            .await;
 
         // TODO: REMOTE ID
         let remote_name = match remote_ref {
@@ -365,7 +374,7 @@ impl PullService for PullServiceImpl {
         Self::result_into(res)
     }
 
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
@@ -383,12 +392,13 @@ impl PullService for PullServiceImpl {
 
         let res = self
             .ingest_svc
-            .ingest_from(dataset_ref, fetch, options.ingest_options, listener);
+            .ingest_from(dataset_ref, fetch, options.ingest_options, listener)
+            .await;
 
         Self::result_into(res)
     }
 
-    fn set_watermark(
+    async fn set_watermark(
         &self,
         dataset_ref: &DatasetRefLocal,
         watermark: DateTime<Utc>,

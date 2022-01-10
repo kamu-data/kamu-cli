@@ -24,8 +24,9 @@ use std::sync::Arc;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait PullService: Send + Sync {
-    fn pull_multi(
+    async fn pull_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PullOptions,
@@ -35,7 +36,7 @@ pub trait PullService: Send + Sync {
     ) -> Vec<(DatasetRefAny, Result<PullResult, PullError>)>;
 
     /// A special version of pull that can rename dataset when syncing it from a repository
-    fn sync_from(
+    async fn sync_from(
         &self,
         remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -44,7 +45,7 @@ pub trait PullService: Send + Sync {
     ) -> Result<PullResult, PullError>;
 
     /// A special version of pull that allows overriding the fetch source on root datasets (e.g. to pull data from a specific file)
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
@@ -52,7 +53,7 @@ pub trait PullService: Send + Sync {
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<PullResult, PullError>;
 
-    fn set_watermark(
+    async fn set_watermark(
         &self,
         dataset_ref: &DatasetRefLocal,
         watermark: DateTime<Utc>,

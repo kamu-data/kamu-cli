@@ -24,8 +24,9 @@ impl RepositoryLocalFS {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl RepositoryClient for RepositoryLocalFS {
-    fn read_ref(
+    async fn read_ref(
         &self,
         dataset_ref: &RemoteDatasetName,
     ) -> Result<Option<Multihash>, RepositoryError> {
@@ -50,8 +51,8 @@ impl RepositoryClient for RepositoryLocalFS {
     }
 
     // TODO: Locking
-    fn write(
-        &mut self,
+    async fn write(
+        &self,
         dataset_ref: &RemoteDatasetName,
         expected_head: &Option<Multihash>,
         new_head: &Multihash,
@@ -59,7 +60,7 @@ impl RepositoryClient for RepositoryLocalFS {
         data_files: &mut dyn Iterator<Item = &Path>,
         checkpoint_dir: &Path,
     ) -> Result<(), RepositoryError> {
-        if self.read_ref(dataset_ref)? != *expected_head {
+        if self.read_ref(dataset_ref).await? != *expected_head {
             return Err(RepositoryError::UpdatedConcurrently);
         }
 
@@ -116,7 +117,7 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(())
     }
 
-    fn read(
+    async fn read(
         &self,
         dataset_ref: &RemoteDatasetName,
         expected_head: &Multihash,
@@ -198,7 +199,7 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(result)
     }
 
-    fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
         let dataset_dir = self.path.join(dataset_ref.dataset());
         if !dataset_dir.exists() {
             return Err(RepositoryError::DoesNotExist);
@@ -209,7 +210,7 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(())
     }
 
-    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
+    async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
         // TODO: Find a way to avoid this
         let repo_name = RepositoryName::try_from("undefined").unwrap();
 

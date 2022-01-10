@@ -16,8 +16,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait SearchService: Send + Sync {
-    fn search(
+    async fn search(
         &self,
         query: Option<&str>,
         options: SearchOptions,

@@ -22,9 +22,9 @@ use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_transform_with_engine_spark() {
+async fn test_transform_with_engine_spark() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
@@ -93,6 +93,7 @@ fn test_transform_with_engine_spark() {
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .await
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -122,6 +123,7 @@ fn test_transform_with_engine_spark() {
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
+        .await
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
@@ -200,10 +202,12 @@ fn test_transform_with_engine_spark() {
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .await
         .unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
+        .await
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
@@ -234,19 +238,21 @@ fn test_transform_with_engine_spark() {
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_svc.verify_transform(
-        &deriv_name.as_local_ref(),
-        (None, None),
-        VerificationOptions::default(),
-        None,
-    );
+    let verify_result = transform_svc
+        .verify_transform(
+            &deriv_name.as_local_ref(),
+            (None, None),
+            VerificationOptions::default(),
+            None,
+        )
+        .await;
 
     assert_matches!(verify_result, Ok(VerificationResult::Valid));
 }
 
-#[test]
+#[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_transform_with_engine_flink() {
+async fn test_transform_with_engine_flink() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
@@ -315,6 +321,7 @@ fn test_transform_with_engine_flink() {
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .await
         .unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
@@ -344,6 +351,7 @@ fn test_transform_with_engine_flink() {
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
+        .await
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
@@ -422,10 +430,12 @@ fn test_transform_with_engine_flink() {
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .await
         .unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
+        .await
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
@@ -456,12 +466,14 @@ fn test_transform_with_engine_flink() {
     // Verify
     ///////////////////////////////////////////////////////////////////////////
 
-    let verify_result = transform_svc.verify_transform(
-        &deriv_name.as_local_ref(),
-        (None, None),
-        VerificationOptions::default(),
-        None,
-    );
+    let verify_result = transform_svc
+        .verify_transform(
+            &deriv_name.as_local_ref(),
+            (None, None),
+            VerificationOptions::default(),
+            None,
+        )
+        .await;
 
     assert_matches!(verify_result, Ok(VerificationResult::Valid));
 }

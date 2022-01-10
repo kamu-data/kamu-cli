@@ -95,16 +95,14 @@ impl SqlShellCommand {
         Ok(())
     }
 
-    fn run_datafusion_command(&self) -> Result<(), CLIError> {
+    async fn run_datafusion_command(&self) -> Result<(), CLIError> {
         let df = self
             .query_svc
             .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
+            .await
             .map_err(|e| CLIError::failure(e))?;
 
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        let records = runtime
-            .block_on(df.collect())
-            .map_err(|e| CLIError::failure(e))?;
+        let records = df.collect().await.map_err(|e| CLIError::failure(e))?;
 
         let mut writer = self.output_config.get_records_writer();
         writer.write_batches(&records)?;
@@ -114,14 +112,15 @@ impl SqlShellCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         match (
             self.engine.as_ref().map(|s| s.as_str()),
             &self.command,
             &self.url,
         ) {
-            (Some("datafusion"), Some(_), None) => self.run_datafusion_command(),
+            (Some("datafusion"), Some(_), None) => self.run_datafusion_command().await,
             (Some("datafusion"), _, _) => Err(CLIError::usage_error("DataFusion engine currently doesn't have a shell and only supports single command execution")),
             (Some("spark") | None, _, _) => self.run_spark_shell(),
             _ => unreachable!(),

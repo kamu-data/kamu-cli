@@ -19,20 +19,21 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait TransformService: Send + Sync {
-    fn transform(
+    async fn transform(
         &self,
         dataset_ref: &DatasetRefLocal,
         listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError>;
 
-    fn transform_multi(
+    async fn transform_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)>;
 
-    fn verify_transform(
+    async fn verify_transform(
         &self,
         dataset_ref: &DatasetRefLocal,
         block_range: (Option<Multihash>, Option<Multihash>),
@@ -40,7 +41,7 @@ pub trait TransformService: Send + Sync {
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 
-    fn verify_transform_multi(
+    async fn verify_transform_multi(
         &self,
         datasets: &mut dyn Iterator<Item = VerificationRequest>,
         options: VerificationOptions,

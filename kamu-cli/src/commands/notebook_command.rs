@@ -59,8 +59,9 @@ impl NotebookCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for NotebookCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
 
         let environment_vars = self

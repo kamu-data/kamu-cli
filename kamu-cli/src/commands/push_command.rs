@@ -59,19 +59,21 @@ impl PushCommand {
         }
     }
 
-    fn push_quiet(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
-        self.push_svc.push_multi(
-            &mut self.refs.iter().cloned(),
-            PushOptions {
-                all: self.all,
-                recursive: self.recursive,
-                sync_options: SyncOptions::default(),
-            },
-            None,
-        )
+    async fn push_quiet(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
+        self.push_svc
+            .push_multi(
+                &mut self.refs.iter().cloned(),
+                PushOptions {
+                    all: self.all,
+                    recursive: self.recursive,
+                    sync_options: SyncOptions::default(),
+                },
+                None,
+            )
+            .await
     }
 
-    fn push_with_progress(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
+    async fn push_with_progress(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
         let progress = PrettyPushProgress::new();
         let listener = Arc::new(progress.clone());
 
@@ -79,15 +81,18 @@ impl PushCommand {
             progress.draw();
         });
 
-        let results = self.push_svc.push_multi(
-            &mut self.refs.iter().cloned(),
-            PushOptions {
-                all: self.all,
-                recursive: self.recursive,
-                sync_options: SyncOptions::default(),
-            },
-            Some(listener.clone()),
-        );
+        let results = self
+            .push_svc
+            .push_multi(
+                &mut self.refs.iter().cloned(),
+                PushOptions {
+                    all: self.all,
+                    recursive: self.recursive,
+                    sync_options: SyncOptions::default(),
+                },
+                Some(listener.clone()),
+            )
+            .await;
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -96,8 +101,9 @@ impl PushCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.len() == 0 && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
@@ -130,9 +136,9 @@ impl Command for PushCommand {
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
-            self.push_with_progress()
+            self.push_with_progress().await
         } else {
-            self.push_quiet()
+            self.push_quiet().await
         };
 
         let mut updated = 0;

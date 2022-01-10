@@ -23,14 +23,15 @@ pub struct Repository {
     pub url: Url,
 }
 
+#[async_trait::async_trait(?Send)]
 pub trait RepositoryClient {
-    fn read_ref(
+    async fn read_ref(
         &self,
         dataset_ref: &RemoteDatasetName,
     ) -> Result<Option<Multihash>, RepositoryError>;
 
-    fn write(
-        &mut self,
+    async fn write(
+        &self,
         dataset_ref: &RemoteDatasetName,
         expected_head: &Option<Multihash>,
         new_head: &Multihash,
@@ -39,7 +40,7 @@ pub trait RepositoryClient {
         checkpoint_dir: &Path,
     ) -> Result<(), RepositoryError>;
 
-    fn read(
+    async fn read(
         &self,
         dataset_ref: &RemoteDatasetName,
         expected_head: &Multihash,
@@ -50,9 +51,9 @@ pub trait RepositoryClient {
     /// Deletes a dataset from the repository.
     ///
     /// Note: Some repos may not permit this operation.
-    fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError>;
+    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError>;
 
-    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError>;
+    async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError>;
 }
 
 pub struct RepositoryReadResult {

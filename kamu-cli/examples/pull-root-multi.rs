@@ -16,7 +16,8 @@ use opendatafabric::*;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
@@ -30,7 +31,7 @@ fn main() {
         None as Option<&str>,
         None as Option<&str>,
     );
-    cmd.run().unwrap();
+    cmd.run().await.unwrap();
 }
 
 fn rand_hash() -> Multihash {
@@ -134,8 +135,9 @@ impl TestPullService {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl PullService for TestPullService {
-    fn pull_multi(
+    async fn pull_multi(
         &self,
         _dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         _options: PullOptions,
@@ -189,7 +191,7 @@ impl PullService for TestPullService {
         results
     }
 
-    fn sync_from(
+    async fn sync_from(
         &self,
         _remote_ref: &DatasetRefRemote,
         _local_name: &DatasetName,
@@ -199,7 +201,7 @@ impl PullService for TestPullService {
         unimplemented!()
     }
 
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _fetch: FetchStep,
@@ -209,7 +211,7 @@ impl PullService for TestPullService {
         unimplemented!()
     }
 
-    fn set_watermark(
+    async fn set_watermark(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _watermark: DateTime<Utc>,

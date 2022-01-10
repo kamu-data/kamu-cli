@@ -19,8 +19,9 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait VerificationService: Send + Sync {
-    fn verify(
+    async fn verify(
         &self,
         dataset_ref: &DatasetRefLocal,
         block_range: (Option<Multihash>, Option<Multihash>),
@@ -28,7 +29,7 @@ pub trait VerificationService: Send + Sync {
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 
-    fn verify_multi(
+    async fn verify_multi(
         &self,
         requests: &mut dyn Iterator<Item = VerificationRequest>,
         options: VerificationOptions,

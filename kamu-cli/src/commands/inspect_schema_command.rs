@@ -98,11 +98,13 @@ impl InspectSchemaCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let schema = self
             .query_svc
             .get_schema(&self.dataset_ref)
+            .await
             .map_err(|e| match e {
                 QueryError::DomainError(e) => CLIError::usage_error_from(e),
                 e @ QueryError::DataFusionError(_) => CLIError::failure(e),

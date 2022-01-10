@@ -14,7 +14,7 @@ use super::repository_s3::*;
 
 use dill::*;
 use std::backtrace::Backtrace;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::info;
 use url::Url;
@@ -30,11 +30,11 @@ impl RepositoryFactory {
     pub fn get_repository_client(
         &self,
         repo: &Repository,
-    ) -> Result<Arc<Mutex<dyn RepositoryClient>>, RepositoryFactoryError> {
+    ) -> Result<Arc<dyn RepositoryClient>, RepositoryFactoryError> {
         match repo.url.scheme() {
-            "file" => Ok(Arc::new(Mutex::new(RepositoryLocalFS::new(
+            "file" => Ok(Arc::new(RepositoryLocalFS::new(
                 repo.url.to_file_path().unwrap(),
-            )))),
+            ))),
             "s3" => self.get_s3_client(&repo.url),
             "s3+http" => self.get_s3_client(&repo.url),
             "s3+https" => self.get_s3_client(&repo.url),
@@ -45,7 +45,7 @@ impl RepositoryFactory {
     fn get_s3_client(
         &self,
         url: &Url,
-    ) -> Result<Arc<Mutex<dyn RepositoryClient>>, RepositoryFactoryError> {
+    ) -> Result<Arc<dyn RepositoryClient>, RepositoryFactoryError> {
         // TODO: Support virtual hosted style URLs once rusoto supports them
         // See: https://github.com/rusoto/rusoto/issues/1482
         let (endpoint, bucket): (Option<String>, String) =
@@ -68,7 +68,7 @@ impl RepositoryFactory {
 
         let bucket = bucket.trim_start_matches("/").to_owned();
         info!(endpoint = ?endpoint, bucket = bucket.as_str(), "Creating S3 client");
-        Ok(Arc::new(Mutex::new(RepositoryS3::new(endpoint, bucket))))
+        Ok(Arc::new(RepositoryS3::new(endpoint, bucket)))
     }
 }
 

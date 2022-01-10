@@ -49,6 +49,7 @@ tracing-log = "*"
 tracing-bunyan-formatter = "*"
 
 # Utils
+async-trait = "*"
 chrono = "*"
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions

@@ -20,8 +20,9 @@ use super::engine::{Engine, IngestEngine};
 // EngineProvisioner
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait EngineProvisioner: Send + Sync {
-    fn provision_engine(
+    async fn provision_engine(
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
@@ -31,7 +32,7 @@ pub trait EngineProvisioner: Send + Sync {
     fn release_engine(&self, engine: &dyn Engine);
 
     /// TODO: Will be removed
-    fn provision_ingest_engine(
+    async fn provision_ingest_engine(
         &self,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<IngestEngineHandle, EngineProvisioningError>;

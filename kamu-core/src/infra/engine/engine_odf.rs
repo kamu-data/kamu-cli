@@ -138,8 +138,9 @@ impl ODFEngine {
     }
 }
 
+#[async_trait::async_trait]
 impl Engine for ODFEngine {
-    fn transform(
+    async fn transform(
         &self,
         request: ExecuteQueryRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
@@ -167,9 +168,7 @@ impl Engine for ODFEngine {
 
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
 
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let response = rt.block_on(self.transform_impl(run_info, request_adj))?;
-        Ok(response)
+        self.transform_impl(run_info, request_adj).await
     }
 }
 

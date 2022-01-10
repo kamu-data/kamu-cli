@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.76.0] - 2022-01-XX
+### Changed
+- Maintenance release - no user-facing changes expected.
+- Migrated from explicit threading to async.
+- Better architectural layer separation.
+
 ## [0.75.1] - 2022-01-05
 ### Fixed
 - Added more validation on events that appear in `DatasetSnapshot`s.

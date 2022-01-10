@@ -189,8 +189,9 @@ impl ListCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: replace with formatters
         match self.output_config.format {
             OutputFormat::Table => self.print_pretty()?,

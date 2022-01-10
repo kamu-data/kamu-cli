@@ -15,7 +15,6 @@ use bytes::BytesMut;
 use futures::TryStreamExt;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::*;
-use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncReadExt;
@@ -25,7 +24,6 @@ use tracing::{info, info_span};
 pub struct RepositoryS3 {
     s3: S3Client,
     bucket: String,
-    runtime: RefCell<tokio::runtime::Runtime>,
 }
 
 impl RepositoryS3 {
@@ -40,159 +38,7 @@ impl RepositoryS3 {
         Self {
             s3: S3Client::new(region),
             bucket: bucket,
-            runtime: RefCell::new(tokio::runtime::Runtime::new().unwrap()),
         }
-    }
-
-    async fn read_ref_async(
-        &self,
-        dataset_ref: &RemoteDatasetName,
-    ) -> Result<Option<Multihash>, RepositoryError> {
-        if let Some(body) = self
-            .read_object_buf(format!("{}/meta/refs/head", dataset_ref.dataset()))
-            .await?
-        {
-            let s = std::str::from_utf8(&body).expect("Non-utf8 string in ref");
-            Ok(Some(
-                Multihash::from_multibase_str(s.trim())
-                    .map_err(|e| RepositoryError::protocol(e.into()))?,
-            ))
-        } else {
-            Ok(None)
-        }
-    }
-
-    // TODO: Locking
-    async fn write_async(
-        &self,
-        dataset_ref: &RemoteDatasetName,
-        expected_head: &Option<Multihash>,
-        new_head: &Multihash,
-        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
-        data_files: &mut dyn Iterator<Item = &Path>,
-        checkpoint_dir: &Path,
-    ) -> Result<(), RepositoryError> {
-        if self.read_ref_async(dataset_ref).await? != *expected_head {
-            return Err(RepositoryError::UpdatedConcurrently);
-        }
-
-        for data_file in data_files {
-            self.upload_object_file(
-                format!(
-                    "{}/data/{}",
-                    dataset_ref.dataset(),
-                    data_file.file_name().unwrap().to_str().unwrap()
-                ),
-                data_file,
-                IfExists::Skip, // TODO: Should raise error
-            )
-            .await?;
-        }
-
-        for (hash, data) in blocks {
-            self.upload_object_buf(
-                format!("{}/meta/blocks/{}", dataset_ref.dataset(), hash.to_string()),
-                data,
-                IfExists::Fail,
-            )
-            .await?;
-        }
-
-        // TODO: This is really bad but we need to
-        // establish proper checkpoint naming and rotation first
-        self.delete_objects(format!("{}/checkpoint/", dataset_ref.dataset()))
-            .await?;
-
-        if checkpoint_dir.exists() {
-            self.upload_objects_dir(
-                checkpoint_dir,
-                format!("{}/checkpoint/", dataset_ref.dataset()),
-                IfExists::Overwrite,
-            )
-            .await?;
-        }
-
-        let new_head_hash = new_head.to_string();
-        self.upload_object_buf(
-            format!("{}/meta/refs/head", dataset_ref.dataset()),
-            Vec::from(new_head_hash.as_bytes()),
-            IfExists::Overwrite,
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    async fn read_async(
-        &self,
-        dataset_ref: &RemoteDatasetName,
-        expected_head: &Multihash,
-        last_seen_block: &Option<Multihash>,
-        tmp_dir: &Path,
-    ) -> Result<RepositoryReadResult, RepositoryError> {
-        let mut result = RepositoryReadResult {
-            blocks: Vec::new(),
-            data_files: Vec::new(),
-            checkpoint_dir: tmp_dir.join("checkpoint"),
-        };
-
-        if self.read_ref_async(dataset_ref).await? != Some(expected_head.clone()) {
-            return Err(RepositoryError::UpdatedConcurrently);
-        }
-
-        // Sync blocks
-        let mut current_hash = Some(expected_head.clone());
-        while current_hash.is_some() && current_hash != *last_seen_block {
-            let block_hash = current_hash.unwrap();
-
-            let buf = self
-                .read_object_buf(format!(
-                    "{}/meta/blocks/{}",
-                    dataset_ref.dataset(),
-                    block_hash
-                ))
-                .await?
-                .ok_or_else(|| {
-                    RepositoryError::corrupted(format!("Block {} is missing", block_hash))
-                })?;
-
-            // TODO: Avoid double-parsing
-            let block = FlatbuffersMetadataBlockDeserializer
-                .read_manifest(&buf)
-                .map_err(|e| {
-                    RepositoryError::corrupted_from(
-                        "Cannot deserialize metadata block".to_owned(),
-                        e,
-                    )
-                })?;
-
-            result.blocks.push((block_hash, buf));
-            current_hash = block.prev_block_hash;
-        }
-
-        if current_hash != *last_seen_block {
-            return Err(RepositoryError::Diverged {
-                remote_head: expected_head.clone(),
-                local_head: last_seen_block.clone().unwrap(),
-            });
-        }
-
-        // Sync data
-        result.data_files = self
-            .read_objects_to_dir(
-                format!("{}/data/", dataset_ref.dataset()),
-                &tmp_dir.join("data"),
-            )
-            .await?;
-
-        // Sync checkpoints
-        self.read_objects_to_dir(
-            format!("{}/checkpoint/", dataset_ref.dataset()),
-            &result.checkpoint_dir,
-        )
-        .await?;
-
-        Ok(result)
     }
 
     async fn read_object_buf(&self, key: String) -> Result<Option<Vec<u8>>, RepositoryError> {
@@ -483,17 +329,168 @@ impl RepositoryS3 {
             Err(_) => Ok(false), // return Err(e.into()),
         }
     }
+}
 
-    async fn delete_async(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+#[async_trait::async_trait(?Send)]
+impl RepositoryClient for RepositoryS3 {
+    async fn read_ref(
+        &self,
+        dataset_ref: &RemoteDatasetName,
+    ) -> Result<Option<Multihash>, RepositoryError> {
+        if let Some(body) = self
+            .read_object_buf(format!("{}/meta/refs/head", dataset_ref.dataset()))
+            .await?
+        {
+            let s = std::str::from_utf8(&body).expect("Non-utf8 string in ref");
+            Ok(Some(
+                Multihash::from_multibase_str(s.trim())
+                    .map_err(|e| RepositoryError::protocol(e.into()))?,
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // TODO: Locking
+    async fn write(
+        &self,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Option<Multihash>,
+        new_head: &Multihash,
+        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
+        data_files: &mut dyn Iterator<Item = &Path>,
+        checkpoint_dir: &Path,
+    ) -> Result<(), RepositoryError> {
+        if self.read_ref(dataset_ref).await? != *expected_head {
+            return Err(RepositoryError::UpdatedConcurrently);
+        }
+
+        for data_file in data_files {
+            self.upload_object_file(
+                format!(
+                    "{}/data/{}",
+                    dataset_ref.dataset(),
+                    data_file.file_name().unwrap().to_str().unwrap()
+                ),
+                data_file,
+                IfExists::Skip, // TODO: Should raise error
+            )
+            .await?;
+        }
+
+        for (hash, data) in blocks {
+            self.upload_object_buf(
+                format!("{}/meta/blocks/{}", dataset_ref.dataset(), hash.to_string()),
+                data,
+                IfExists::Fail,
+            )
+            .await?;
+        }
+
+        // TODO: This is really bad but we need to
+        // establish proper checkpoint naming and rotation first
+        self.delete_objects(format!("{}/checkpoint/", dataset_ref.dataset()))
+            .await?;
+
+        if checkpoint_dir.exists() {
+            self.upload_objects_dir(
+                checkpoint_dir,
+                format!("{}/checkpoint/", dataset_ref.dataset()),
+                IfExists::Overwrite,
+            )
+            .await?;
+        }
+
+        let new_head_hash = new_head.to_string();
+        self.upload_object_buf(
+            format!("{}/meta/refs/head", dataset_ref.dataset()),
+            Vec::from(new_head_hash.as_bytes()),
+            IfExists::Overwrite,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    async fn read(
+        &self,
+        dataset_ref: &RemoteDatasetName,
+        expected_head: &Multihash,
+        last_seen_block: &Option<Multihash>,
+        tmp_dir: &Path,
+    ) -> Result<RepositoryReadResult, RepositoryError> {
+        let mut result = RepositoryReadResult {
+            blocks: Vec::new(),
+            data_files: Vec::new(),
+            checkpoint_dir: tmp_dir.join("checkpoint"),
+        };
+
+        if self.read_ref(dataset_ref).await? != Some(expected_head.clone()) {
+            return Err(RepositoryError::UpdatedConcurrently);
+        }
+
+        // Sync blocks
+        let mut current_hash = Some(expected_head.clone());
+        while current_hash.is_some() && current_hash != *last_seen_block {
+            let block_hash = current_hash.unwrap();
+
+            let buf = self
+                .read_object_buf(format!(
+                    "{}/meta/blocks/{}",
+                    dataset_ref.dataset(),
+                    block_hash
+                ))
+                .await?
+                .ok_or_else(|| {
+                    RepositoryError::corrupted(format!("Block {} is missing", block_hash))
+                })?;
+
+            // TODO: Avoid double-parsing
+            let block = FlatbuffersMetadataBlockDeserializer
+                .read_manifest(&buf)
+                .map_err(|e| {
+                    RepositoryError::corrupted_from(
+                        "Cannot deserialize metadata block".to_owned(),
+                        e,
+                    )
+                })?;
+
+            result.blocks.push((block_hash, buf));
+            current_hash = block.prev_block_hash;
+        }
+
+        if current_hash != *last_seen_block {
+            return Err(RepositoryError::Diverged {
+                remote_head: expected_head.clone(),
+                local_head: last_seen_block.clone().unwrap(),
+            });
+        }
+
+        // Sync data
+        result.data_files = self
+            .read_objects_to_dir(
+                format!("{}/data/", dataset_ref.dataset()),
+                &tmp_dir.join("data"),
+            )
+            .await?;
+
+        // Sync checkpoints
+        self.read_objects_to_dir(
+            format!("{}/checkpoint/", dataset_ref.dataset()),
+            &result.checkpoint_dir,
+        )
+        .await?;
+
+        Ok(result)
+    }
+
+    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
         self.delete_objects(format!("{}/", dataset_ref.dataset()))
             .await?;
         Ok(())
     }
 
-    async fn search_async(
-        &self,
-        query: Option<&str>,
-    ) -> Result<RepositorySearchResult, RepositoryError> {
+    async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
         let query = query.unwrap_or_default();
 
         let list_objects_resp = self
@@ -538,62 +535,6 @@ impl RepositoryS3 {
         }
 
         Ok(RepositorySearchResult { datasets })
-    }
-}
-
-impl RepositoryClient for RepositoryS3 {
-    fn read_ref(
-        &self,
-        dataset_ref: &RemoteDatasetName,
-    ) -> Result<Option<Multihash>, RepositoryError> {
-        self.runtime
-            .borrow_mut()
-            .block_on(self.read_ref_async(dataset_ref))
-    }
-
-    // TODO: Locking
-    fn write(
-        &mut self,
-        dataset_ref: &RemoteDatasetName,
-        expected_head: &Option<Multihash>,
-        new_head: &Multihash,
-        blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
-        data_files: &mut dyn Iterator<Item = &Path>,
-        checkpoint_dir: &Path,
-    ) -> Result<(), RepositoryError> {
-        self.runtime.borrow_mut().block_on(self.write_async(
-            dataset_ref,
-            expected_head,
-            new_head,
-            blocks,
-            data_files,
-            checkpoint_dir,
-        ))
-    }
-
-    fn read(
-        &self,
-        dataset_ref: &RemoteDatasetName,
-        expected_head: &Multihash,
-        last_seen_block: &Option<Multihash>,
-        tmp_dir: &Path,
-    ) -> Result<RepositoryReadResult, RepositoryError> {
-        self.runtime.borrow_mut().block_on(self.read_async(
-            dataset_ref,
-            expected_head,
-            last_seen_block,
-            tmp_dir,
-        ))
-    }
-
-    fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
-        self.runtime
-            .borrow_mut()
-            .block_on(self.delete_async(dataset_ref))
-    }
-
-    fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
-        self.runtime.borrow_mut().block_on(self.search_async(query))
     }
 }
 

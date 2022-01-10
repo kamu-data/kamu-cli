@@ -166,8 +166,9 @@ impl InspectQueryCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for InspectQueryCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {

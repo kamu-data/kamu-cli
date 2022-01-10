@@ -46,7 +46,7 @@ impl TransformServiceImpl {
     }
 
     // Note: Can be called from multiple threads
-    fn do_transform(
+    async fn do_transform(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         operation: TransformOperation,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
@@ -58,7 +58,9 @@ impl TransformServiceImpl {
 
         listener.begin();
 
-        match Self::do_transform_inner(engine_provisioner, operation, commit_fn, listener.clone()) {
+        match Self::do_transform_inner(engine_provisioner, operation, commit_fn, listener.clone())
+            .await
+        {
             Ok(res) => {
                 info!("Transform successful");
                 listener.success(&res);
@@ -73,7 +75,7 @@ impl TransformServiceImpl {
     }
 
     // Note: Can be called from multiple threads
-    fn do_transform_inner(
+    async fn do_transform_inner(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         operation: TransformOperation,
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
@@ -84,14 +86,16 @@ impl TransformServiceImpl {
         let out_data_path = PathBuf::from(&operation.request.out_data_path);
         let offset = operation.request.offset;
 
-        let engine = engine_provisioner.provision_engine(
-            match operation.request.transform {
-                Transform::Sql(ref sql) => &sql.engine,
-            },
-            listener.clone().get_engine_provisioning_listener(),
-        )?;
+        let engine = engine_provisioner
+            .provision_engine(
+                match operation.request.transform {
+                    Transform::Sql(ref sql) => &sql.engine,
+                },
+                listener.clone().get_engine_provisioning_listener(),
+            )
+            .await?;
 
-        let response = engine.transform(operation.request)?;
+        let response = engine.transform(operation.request).await?;
 
         let output_data = if let Some(data_interval) = response.data_interval {
             // TODO: Move out this to validation
@@ -652,22 +656,15 @@ impl TransformServiceImpl {
 
         Ok(plan)
     }
-}
 
-impl TransformService for TransformServiceImpl {
-    fn transform(
+    async fn transform_impl(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: DatasetRefLocal,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        let listener = maybe_listener.unwrap_or(Arc::new(NullTransformListener {}));
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
 
-        info!(
-            dataset_ref = ?dataset_ref,
-            "Transforming a single dataset"
-        );
-
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref)?;
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
@@ -679,8 +676,8 @@ impl TransformService for TransformServiceImpl {
 
             let meta_chain = self
                 .dataset_reg
-                .get_metadata_chain(&dataset_handle.as_local_ref())
-                .unwrap();
+                .get_metadata_chain(&dataset_handle.as_local_ref())?;
+
             let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
 
             Self::do_transform(
@@ -699,107 +696,60 @@ impl TransformService for TransformServiceImpl {
                 },
                 listener,
             )
+            .await
         } else {
             listener.begin();
             listener.success(&TransformResult::UpToDate);
             Ok(TransformResult::UpToDate)
         }
     }
+}
 
-    fn transform_multi(
+#[async_trait::async_trait(?Send)]
+impl TransformService for TransformServiceImpl {
+    async fn transform(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+        maybe_listener: Option<Arc<dyn TransformListener>>,
+    ) -> Result<TransformResult, TransformError> {
+        info!(
+            dataset_ref = ?dataset_ref,
+            "Transforming a single dataset"
+        );
+
+        self.transform_impl(dataset_ref.clone(), maybe_listener)
+            .await
+    }
+
+    async fn transform_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)> {
-        let null_multi_listener = Arc::new(NullTransformMultiListener {});
-        let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
+        let multi_listener =
+            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
         let dataset_refs: Vec<_> = dataset_refs.collect();
         info!(?dataset_refs, "Transforming multiple datasets");
 
-        // TODO: handle errors without crashing
-        let requests: Vec<_> = dataset_refs
-            .into_iter()
+        let futures: Vec<_> = dataset_refs
+            .iter()
             .map(|dataset_ref| {
-                let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
-
-                let listener = multi_listener
-                    .begin_transform(&dataset_handle)
-                    .unwrap_or(Arc::new(NullTransformListener {}));
-
-                // TODO: Inject time source
-                let next_op = self
-                    .get_next_operation(&dataset_handle, Utc::now())
-                    .map_err(|e| TransformError::internal(e))
-                    .unwrap();
-
-                (dataset_ref, next_op, listener)
+                match self.dataset_reg.resolve_dataset_ref(dataset_ref) {
+                    Ok(hdl) => {
+                        let maybe_listener = multi_listener.begin_transform(&hdl);
+                        self.transform_impl(hdl.into(), maybe_listener)
+                    }
+                    Err(_) => self.transform_impl(dataset_ref.clone(), None), // Relying on this call to fail to avoid boxing the futures
+                }
             })
             .collect();
 
-        let mut results: Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)> =
-            Vec::with_capacity(requests.len());
-
-        let thread_handles: Vec<_> = requests
-            .into_iter()
-            .filter_map(
-                |(dataset_ref, maybe_request, listener)| match maybe_request {
-                    None => {
-                        listener.begin();
-                        listener.success(&TransformResult::UpToDate);
-                        results.push((dataset_ref, Ok(TransformResult::UpToDate)));
-                        None
-                    }
-                    Some(request) => {
-                        let engine_provisioner = self.engine_provisioner.clone();
-
-                        let commit_fn = {
-                            let meta_chain =
-                                self.dataset_reg.get_metadata_chain(&dataset_ref).unwrap();
-                            let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
-                            let dataset_handle =
-                                self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
-                            let dataset_layout =
-                                DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
-
-                            move |new_block, new_data_path: &Path, new_checkpoint_path: &Path| {
-                                Self::commit_transform(
-                                    meta_chain,
-                                    dataset_handle,
-                                    dataset_layout,
-                                    head,
-                                    new_block,
-                                    new_data_path,
-                                    new_checkpoint_path,
-                                )
-                            }
-                        };
-
-                        let thread_handle = std::thread::Builder::new()
-                            .name("transform_multi".to_owned())
-                            .spawn(move || {
-                                let res = Self::do_transform(
-                                    engine_provisioner,
-                                    request,
-                                    commit_fn,
-                                    listener,
-                                );
-                                (dataset_ref, res)
-                            })
-                            .unwrap();
-
-                        Some(thread_handle)
-                    }
-                },
-            )
-            .collect();
-
-        results.extend(thread_handles.into_iter().map(|h| h.join().unwrap()));
-
-        results
+        let results = futures::future::join_all(futures).await;
+        dataset_refs.into_iter().zip(results).collect()
     }
 
-    fn verify_transform(
+    async fn verify_transform(
         &self,
         dataset_ref: &DatasetRefLocal,
         block_range: (Option<Multihash>, Option<Multihash>),
@@ -890,7 +840,8 @@ impl TransformService for TransformServiceImpl {
                     })
                 },
                 transform_listener,
-            )?;
+            )
+            .await?;
 
             let actual_block = actual_block.unwrap();
             let actual_block_hash = actual_block_hash.unwrap();
@@ -922,7 +873,7 @@ impl TransformService for TransformServiceImpl {
         Ok(VerificationResult::Valid)
     }
 
-    fn verify_transform_multi(
+    async fn verify_transform_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,

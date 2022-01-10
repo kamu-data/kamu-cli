@@ -91,8 +91,9 @@ impl AddCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let load_results = if !self.recursive {
             self.load_specific()
         } else {

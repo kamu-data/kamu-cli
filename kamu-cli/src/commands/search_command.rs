@@ -97,8 +97,9 @@ impl SearchCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SearchCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let result = self
             .search_svc
             .search(
@@ -107,6 +108,7 @@ impl Command for SearchCommand {
                     repository_names: self.repository_names.clone(),
                 },
             )
+            .await
             .map_err(|e| CLIError::failure(e))?;
 
         // TODO: replace with formatters

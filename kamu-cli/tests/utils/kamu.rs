@@ -41,7 +41,7 @@ impl Kamu {
         }
     }
 
-    pub fn new_workspace_tmp() -> Self {
+    pub async fn new_workspace_tmp() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let inst = Self::new(temp_dir.path());
         let inst = Self {
@@ -49,10 +49,11 @@ impl Kamu {
             ..inst
         };
 
-        inst.execute(["init"]).unwrap();
+        inst.execute(["init"]).await.unwrap();
 
         // TODO: Remove when podman is the default
         inst.execute(["config", "set", "engine.runtime", "podman"])
+            .await
             .unwrap();
 
         inst
@@ -89,7 +90,7 @@ impl Kamu {
         ParquetHelper::open(&part_file)
     }
 
-    pub fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
+    pub async fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
     where
         I: IntoIterator<Item = S>,
         S: Into<OsString>,
@@ -105,13 +106,14 @@ impl Kamu {
             self.volume_layout.clone(),
             matches,
         )
+        .await
         .map_err(|e| CommandError {
             cmd: full_cmd,
             error: e,
         })
     }
 
-    pub fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) -> Result<(), CommandError> {
+    pub async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) -> Result<(), CommandError> {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
             .unwrap();
@@ -119,7 +121,7 @@ impl Kamu {
         f.as_file().write(&content).unwrap();
         f.flush().unwrap();
 
-        self.execute(["add".as_ref(), f.path().as_os_str()])
+        self.execute(["add".as_ref(), f.path().as_os_str()]).await
     }
 }
 

@@ -48,8 +48,9 @@ impl AliasAddCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for AliasAddCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if !self.pull && !self.push {
             return Err(CLIError::usage_error(
                 "Specify either --pull or --push or both",

@@ -121,8 +121,9 @@ impl PushServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl PushService for PushServiceImpl {
-    fn push_multi(
+    async fn push_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PushOptions,
@@ -149,16 +150,19 @@ impl PushService for PushServiceImpl {
             }
         };
 
-        let sync_results = self.sync_svc.sync_to_multi(
-            &mut sync_plan.iter().map(|pi| {
-                (
-                    pi.local_handle.as_ref().unwrap().into(),
-                    pi.remote_handle.as_ref().unwrap().name.clone(),
-                )
-            }),
-            options.sync_options,
-            sync_listener,
-        );
+        let sync_results = self
+            .sync_svc
+            .sync_to_multi(
+                &mut sync_plan.iter().map(|pi| {
+                    (
+                        pi.local_handle.as_ref().unwrap().into(),
+                        pi.remote_handle.as_ref().unwrap().name.clone(),
+                    )
+                }),
+                options.sync_options,
+                sync_listener,
+            )
+            .await;
 
         assert_eq!(sync_plan.len(), sync_results.len());
 

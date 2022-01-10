@@ -111,14 +111,14 @@ impl IngestTask {
         }
     }
 
-    pub fn ingest(&mut self) -> Result<IngestResult, IngestError> {
+    pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         let span = info_span!("Ingesting data", dataset_handle = %self.dataset_handle);
         let _span_guard = span.enter();
         info!(source = ?self.source, prev_checkpoint = ?self.prev_checkpoint, vocab = ?self.vocab, "Ingest details");
 
         self.listener.begin();
 
-        match self.ingest_inner() {
+        match self.ingest_inner().await {
             Ok(res) => {
                 info!("Ingest successful");
                 self.listener.success(&res);
@@ -132,31 +132,33 @@ impl IngestTask {
         }
     }
 
-    pub fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
+    pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
         self.listener
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
 
         let prev_hash = self.meta_chain.borrow().read_ref(&BlockRef::Head).unwrap();
 
-        let fetch_result = self.maybe_fetch()?;
+        let fetch_result = self.maybe_fetch().await?;
         let has_more = fetch_result.checkpoint.has_more;
         let cacheable = fetch_result.checkpoint.is_cacheable();
         let source_event_time = fetch_result.checkpoint.source_event_time.clone();
 
         self.listener.on_stage_progress(IngestStage::Prepare, 0, 1);
 
-        let prepare_result = self.maybe_prepare(fetch_result.clone())?;
+        let prepare_result = self.maybe_prepare(fetch_result.clone()).await?;
 
         self.listener.on_stage_progress(IngestStage::Read, 0, 1);
 
-        let read_result = self.maybe_read(prepare_result, source_event_time)?;
+        let read_result = self.maybe_read(prepare_result, source_event_time).await?;
 
         self.listener
             .on_stage_progress(IngestStage::Preprocess, 0, 1);
         self.listener.on_stage_progress(IngestStage::Merge, 0, 1);
         self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
-        let commit_result = self.maybe_commit(fetch_result, read_result, prev_hash.clone())?;
+        let commit_result = self
+            .maybe_commit(fetch_result, read_result, prev_hash.clone())
+            .await?;
 
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
             IngestResult::UpToDate {
@@ -175,7 +177,7 @@ impl IngestTask {
         Ok(res)
     }
 
-    fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    async fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("fetch.yaml");
 
         let commit_checkpoint_path = self.layout.cache_dir.join("commit.yaml");
@@ -188,7 +190,7 @@ impl IngestTask {
             .execute(
                 &checkpoint_path,
                 "FetchCheckpoint",
-                |old_checkpoint: Option<FetchCheckpoint>| {
+                |old_checkpoint: Option<FetchCheckpoint>| async {
                     // Ingesting from overridden source?
                     if let Some(fetch_override) = &self.fetch_override {
                         info!(fetch = ?fetch_override, "Fetching the overridden source");
@@ -199,10 +201,11 @@ impl IngestTask {
                                 fetch_override,
                                 None,
                                 &self.layout.cache_dir.join("fetched.bin"),
-                                Some(&mut FetchProgressListenerBridge {
+                                Some(Arc::new(FetchProgressListenerBridge {
                                     listener: self.listener.clone(),
-                                }),
+                                })),
                             )
+                            .await
                             .map(|r| ExecutionResult {
                                 // Cache data for overridden source may influence future normal runs, so we filter it
                                 checkpoint: FetchCheckpoint {
@@ -242,21 +245,24 @@ impl IngestTask {
                     let span = info_span!("Fetching the data");
                     let _span_guard = span.enter();
 
-                    self.fetch_service.fetch(
-                        &self.source.fetch,
-                        old_checkpoint,
-                        &self.layout.cache_dir.join("fetched.bin"),
-                        Some(&mut FetchProgressListenerBridge {
-                            listener: self.listener.clone(),
-                        }),
-                    )
+                    self.fetch_service
+                        .fetch(
+                            &self.source.fetch,
+                            old_checkpoint,
+                            &self.layout.cache_dir.join("fetched.bin"),
+                            Some(Arc::new(FetchProgressListenerBridge {
+                                listener: self.listener.clone(),
+                            })),
+                        )
+                        .await
                 },
             )
+            .await
             .map_err(|e| IngestError::internal(e))?
     }
 
     // TODO: PERF: Skip the copying if there are no prep steps
-    fn maybe_prepare(
+    async fn maybe_prepare(
         &mut self,
         fetch_result: ExecutionResult<FetchCheckpoint>,
     ) -> Result<ExecutionResult<PrepCheckpoint>, IngestError> {
@@ -266,7 +272,7 @@ impl IngestTask {
             .execute(
                 &checkpoint_path,
                 "PrepCheckpoint",
-                |old_checkpoint: Option<PrepCheckpoint>| {
+                |old_checkpoint: Option<PrepCheckpoint>| async {
                     if let Some(ref cp) = old_checkpoint {
                         if cp.for_fetched_at == fetch_result.checkpoint.last_fetched {
                             return Ok(ExecutionResult {
@@ -291,10 +297,11 @@ impl IngestTask {
                     )
                 },
             )
+            .await
             .map_err(|e| IngestError::internal(e))?
     }
 
-    fn maybe_read(
+    async fn maybe_read(
         &mut self,
         prep_result: ExecutionResult<PrepCheckpoint>,
         source_event_time: Option<DateTime<Utc>>,
@@ -305,7 +312,7 @@ impl IngestTask {
             .execute(
                 &checkpoint_path,
                 "ReadCheckpoint",
-                |old_checkpoint: Option<ReadCheckpoint>| {
+                |old_checkpoint: Option<ReadCheckpoint>| async {
                     if let Some(ref cp) = old_checkpoint {
                         if cp.for_prepared_at == prep_result.checkpoint.last_prepared {
                             return Ok(ExecutionResult {
@@ -318,29 +325,32 @@ impl IngestTask {
                     let span = info_span!("Reading the data");
                     let _span_guard = span.enter();
 
-                    self.read_service.read(
-                        &self.dataset_handle,
-                        &self.layout,
-                        &self.source,
-                        self.prev_checkpoint.clone(),
-                        &self.vocab,
-                        Utc::now(), // TODO: inject
-                        source_event_time,
-                        self.next_offset,
-                        &self.layout.cache_dir.join("read.bin"),
-                        &self.layout.cache_dir.join("read.checkpoint"),
-                        prep_result.checkpoint.last_prepared,
-                        old_checkpoint,
-                        &self.layout.cache_dir.join("prepared.bin"),
-                        self.listener.clone(),
-                    )
+                    self.read_service
+                        .read(
+                            &self.dataset_handle,
+                            &self.layout,
+                            &self.source,
+                            self.prev_checkpoint.clone(),
+                            &self.vocab,
+                            Utc::now(), // TODO: inject
+                            source_event_time,
+                            self.next_offset,
+                            &self.layout.cache_dir.join("read.bin"),
+                            &self.layout.cache_dir.join("read.checkpoint"),
+                            prep_result.checkpoint.last_prepared,
+                            old_checkpoint,
+                            &self.layout.cache_dir.join("prepared.bin"),
+                            self.listener.clone(),
+                        )
+                        .await
                 },
             )
+            .await
             .map_err(|e| IngestError::internal(e))?
     }
 
     // TODO: Atomicity
-    fn maybe_commit(
+    async fn maybe_commit(
         &mut self,
         fetch_result: ExecutionResult<FetchCheckpoint>,
         read_result: ExecutionResult<ReadCheckpoint>,
@@ -352,7 +362,7 @@ impl IngestTask {
             .execute(
                 &checkpoint_path,
                 "CommitCheckpoint",
-                |old_checkpoint: Option<CommitCheckpoint>| {
+                |old_checkpoint: Option<CommitCheckpoint>| async {
                     if let Some(ref cp) = old_checkpoint {
                         if cp.for_read_at == read_result.checkpoint.last_read {
                             return Ok(ExecutionResult {
@@ -451,7 +461,7 @@ impl IngestTask {
                         },
                     })
                 },
-            )
+            ).await
             .map_err(|e| IngestError::internal(e))?
     }
 }
@@ -461,7 +471,7 @@ struct FetchProgressListenerBridge {
 }
 
 impl FetchProgressListener for FetchProgressListenerBridge {
-    fn on_progress(&mut self, progress: &FetchProgress) {
+    fn on_progress(&self, progress: &FetchProgress) {
         self.listener.on_stage_progress(
             IngestStage::Fetch,
             progress.fetched_bytes,

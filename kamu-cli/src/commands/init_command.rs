@@ -24,12 +24,13 @@ impl InitCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for InitCommand {
     fn needs_workspace(&self) -> bool {
         false
     }
 
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.kamu_root_dir.is_dir() {
             return Err(CLIError::usage_error_from(AlreadyInWorkspace));
         }

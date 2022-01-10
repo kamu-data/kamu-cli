@@ -160,7 +160,7 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
 // We cannot add a local dataset and then add a pull alias without adding all of its dependencies too.
 // So instead we're creating a repository based on temp dir and syncing it into the main workspace.
 // TODO: Add simpler way to import remote dataset
-fn create_graph_remote(
+async fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
     repo: Arc<DatasetRegistryImpl>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
@@ -193,12 +193,13 @@ fn create_graph_remote(
                 SyncOptions::default(),
                 None,
             )
+            .await
             .unwrap();
     }
 }
 
-#[test]
-fn test_pull_batching_chain() {
+#[tokio::test]
+async fn test_pull_batching_chain() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
@@ -213,12 +214,12 @@ fn test_pull_batching_chain() {
     );
 
     assert_eq!(
-        harness.pull(refs!["c"], PullOptions::default()),
+        harness.pull(refs!["c"], PullOptions::default()).await,
         vec![PullBatch::Transform(refs!["c"])]
     );
 
     assert_eq!(
-        harness.pull(refs!["c", "a"], PullOptions::default()),
+        harness.pull(refs!["c", "a"], PullOptions::default()).await,
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["c"])
@@ -226,13 +227,15 @@ fn test_pull_batching_chain() {
     );
 
     assert_eq!(
-        harness.pull(
-            refs!["c"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["c"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["b"]),
@@ -241,8 +244,8 @@ fn test_pull_batching_chain() {
     );
 }
 
-#[test]
-fn test_pull_batching_complex() {
+#[tokio::test]
+async fn test_pull_batching_complex() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
@@ -263,18 +266,20 @@ fn test_pull_batching_complex() {
     );
 
     assert_eq!(
-        harness.pull(refs!["e"], PullOptions::default()),
+        harness.pull(refs!["e"], PullOptions::default()).await,
         vec![PullBatch::Transform(refs!["e"])]
     );
 
     assert_eq!(
-        harness.pull(
-            refs!["e"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["e"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![
             PullBatch::Ingest(refs!["a", "b"]),
             PullBatch::Transform(refs!["c", "d"]),
@@ -283,8 +288,8 @@ fn test_pull_batching_complex() {
     );
 }
 
-#[test]
-fn test_pull_batching_complex_with_remote() {
+#[tokio::test]
+async fn test_pull_batching_complex_with_remote() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
@@ -302,7 +307,8 @@ fn test_pull_batching_complex_with_remote() {
             (n!("e"), names!["a", "b"]),
         ],
         names!("e"),
-    );
+    )
+    .await;
     create_graph(
         harness.dataset_reg.as_ref(),
         vec![
@@ -326,13 +332,15 @@ fn test_pull_batching_complex_with_remote() {
 
     // Pulling E results in a sync
     assert_eq!(
-        harness.pull(
-            refs!["e"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["e"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![PullBatch::SyncFrom(vec![(
             rr!("kamu.dev/anonymous/e"),
             n!("e")
@@ -341,13 +349,15 @@ fn test_pull_batching_complex_with_remote() {
 
     // Explicit remote reference associates with E
     assert_eq!(
-        harness.pull(
-            refs!["kamu.dev/anonymous/e"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["kamu.dev/anonymous/e"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![PullBatch::SyncFrom(vec![(
             rr!("kamu.dev/anonymous/e"),
             n!("e")
@@ -356,13 +366,15 @@ fn test_pull_batching_complex_with_remote() {
 
     // Remote is recursed onto
     assert_eq!(
-        harness.pull(
-            refs!["g"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["g"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![
             PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
@@ -373,13 +385,15 @@ fn test_pull_batching_complex_with_remote() {
 
     // Remote is recursed onto while also specified explicitly (via local ID)
     assert_eq!(
-        harness.pull(
-            refs!["g", "e"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["g", "e"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![
             PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
@@ -390,13 +404,15 @@ fn test_pull_batching_complex_with_remote() {
 
     // Remote is recursed onto while also specified explicitly (via remote ref)
     assert_eq!(
-        harness.pull(
-            refs!["g", "kamu.dev/anonymous/e"],
-            PullOptions {
-                recursive: true,
-                ..PullOptions::default()
-            }
-        ),
+        harness
+            .pull(
+                refs!["g", "kamu.dev/anonymous/e"],
+                PullOptions {
+                    recursive: true,
+                    ..PullOptions::default()
+                }
+            )
+            .await,
         vec![
             PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
             PullBatch::Ingest(refs!("c", "d")),
@@ -406,8 +422,8 @@ fn test_pull_batching_complex_with_remote() {
     );
 }
 
-#[test]
-fn test_sync_from() {
+#[tokio::test]
+async fn test_sync_from() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path());
 
@@ -419,10 +435,10 @@ fn test_sync_from() {
         )
         .unwrap();
 
-    let res =
-        harness
-            .pull_svc
-            .sync_from(&rr!("myrepo/foo"), &n!("bar"), PullOptions::default(), None);
+    let res = harness
+        .pull_svc
+        .sync_from(&rr!("myrepo/foo"), &n!("bar"), PullOptions::default(), None)
+        .await;
 
     assert_matches!(
         res,
@@ -448,8 +464,8 @@ fn test_sync_from() {
     );
 }
 
-#[test]
-fn test_set_watermark() {
+#[tokio::test]
+async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
@@ -475,37 +491,49 @@ fn test_set_watermark() {
     assert_eq!(num_blocks(), 1);
 
     assert!(matches!(
-        harness.pull_svc.set_watermark(
-            &dataset_name.as_local_ref(),
-            Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
-        ),
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_name.as_local_ref(),
+                Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+            )
+            .await,
         Ok(PullResult::Updated { .. })
     ));
     assert_eq!(num_blocks(), 2);
 
     assert!(matches!(
-        harness.pull_svc.set_watermark(
-            &dataset_name.as_local_ref(),
-            Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
-        ),
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_name.as_local_ref(),
+                Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+            )
+            .await,
         Ok(PullResult::Updated { .. })
     ));
     assert_eq!(num_blocks(), 3);
 
     assert!(matches!(
-        harness.pull_svc.set_watermark(
-            &dataset_name.as_local_ref(),
-            Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
-        ),
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_name.as_local_ref(),
+                Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+            )
+            .await,
         Ok(PullResult::UpToDate)
     ));
     assert_eq!(num_blocks(), 3);
 
     assert!(matches!(
-        harness.pull_svc.set_watermark(
-            &dataset_name.as_local_ref(),
-            Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
-        ),
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_name.as_local_ref(),
+                Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+            )
+            .await,
         Ok(PullResult::UpToDate)
     ));
     assert_eq!(num_blocks(), 3);
@@ -559,9 +587,10 @@ impl PullTestHarness {
         calls
     }
 
-    fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
+    async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
         self.pull_svc
-            .pull_multi(&mut refs.into_iter(), options, None, None, None);
+            .pull_multi(&mut refs.into_iter(), options, None, None, None)
+            .await;
         self.collect_calls()
     }
 }
@@ -585,8 +614,9 @@ impl TestIngestService {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl IngestService for TestIngestService {
-    fn ingest(
+    async fn ingest(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _ingest_options: IngestOptions,
@@ -595,7 +625,7 @@ impl IngestService for TestIngestService {
         unimplemented!();
     }
 
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _fetch: FetchStep,
@@ -605,7 +635,7 @@ impl IngestService for TestIngestService {
         unimplemented!()
     }
 
-    fn ingest_multi(
+    async fn ingest_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         _ingest_options: IngestOptions,
@@ -635,8 +665,9 @@ impl TestTransformService {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl TransformService for TestTransformService {
-    fn transform(
+    async fn transform(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _maybe_listener: Option<Arc<dyn TransformListener>>,
@@ -644,7 +675,7 @@ impl TransformService for TestTransformService {
         unimplemented!();
     }
 
-    fn transform_multi(
+    async fn transform_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
@@ -660,7 +691,7 @@ impl TransformService for TestTransformService {
         results
     }
 
-    fn verify_transform(
+    async fn verify_transform(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _block_range: (Option<Multihash>, Option<Multihash>),
@@ -670,7 +701,7 @@ impl TransformService for TestTransformService {
         unimplemented!()
     }
 
-    fn verify_transform_multi(
+    async fn verify_transform_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = VerificationRequest>,
         _options: VerificationOptions,
@@ -693,8 +724,9 @@ impl TestSyncService {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl SyncService for TestSyncService {
-    fn sync_from(
+    async fn sync_from(
         &self,
         _remote_ref: &DatasetRefRemote,
         local_name: &DatasetName,
@@ -711,7 +743,7 @@ impl SyncService for TestSyncService {
         })
     }
 
-    fn sync_from_multi(
+    async fn sync_from_multi(
         &self,
         datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
         _options: SyncOptions,
@@ -730,7 +762,7 @@ impl SyncService for TestSyncService {
         results
     }
 
-    fn sync_to(
+    async fn sync_to(
         &self,
         _local_ref: &DatasetRefLocal,
         _remote_name: &RemoteDatasetName,
@@ -740,7 +772,7 @@ impl SyncService for TestSyncService {
         unimplemented!()
     }
 
-    fn sync_to_multi(
+    async fn sync_to_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
         _options: SyncOptions,
@@ -752,7 +784,7 @@ impl SyncService for TestSyncService {
         unimplemented!()
     }
 
-    fn delete(&self, _remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
+    async fn delete(&self, _remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
         unimplemented!()
     }
 }

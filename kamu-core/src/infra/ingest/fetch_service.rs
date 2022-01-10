@@ -17,68 +17,84 @@ use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::info;
 use url::Url;
 
 pub struct FetchService {}
 
+// TODO: Reimplement with async libraries
 impl FetchService {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn fetch(
+    pub async fn fetch(
         &self,
         fetch_step: &FetchStep,
         old_checkpoint: Option<FetchCheckpoint>,
         target: &Path,
-        maybe_listener: Option<&mut dyn FetchProgressListener>,
+        maybe_listener: Option<Arc<dyn FetchProgressListener>>,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
-        let mut null_listener = NullFetchProgressListener {};
-        let listener = maybe_listener.unwrap_or(&mut null_listener);
+        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
+        let fetch_step = fetch_step.clone();
+        let target = target.to_owned();
+
+        tokio::task::spawn_blocking(move || {
+            Self::fetch_impl(&fetch_step, old_checkpoint, &target, listener)
+        })
+        .await
+        .unwrap()
+    }
+
+    fn fetch_impl(
+        fetch_step: &FetchStep,
+        old_checkpoint: Option<FetchCheckpoint>,
+        target: &Path,
+        listener: Arc<dyn FetchProgressListener>,
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         match fetch_step {
             FetchStep::Url(ref furl) => {
                 let url = Url::parse(&furl.url).map_err(|e| IngestError::internal(e))?;
                 match url.scheme() {
-                    "file" => self.fetch_file(
+                    "file" => Self::fetch_file(
                         &url.to_file_path()
                             .map_err(|_| BadUrlError::new(&furl.url))?,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
-                        listener,
+                        listener.as_ref(),
                     ),
-                    "http" | "https" => self.fetch_http(
+                    "http" | "https" => Self::fetch_http(
                         &furl.url,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
-                        listener,
+                        listener.as_ref(),
                     ),
-                    "ftp" => self.fetch_ftp(
+                    "ftp" => Self::fetch_ftp(
                         &furl.url,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
-                        listener,
+                        listener.as_ref(),
                     ),
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
             FetchStep::FilesGlob(ref fglob) => {
-                self.fetch_files_glob(fglob, old_checkpoint, target, listener)
+                Self::fetch_files_glob(fglob, old_checkpoint, target, listener.as_ref())
             }
         }
     }
 
     fn fetch_files_glob(
-        &self,
         fglob: &FetchStepFilesGlob,
         old_checkpoint: Option<FetchCheckpoint>,
         target: &Path,
-        listener: &mut dyn FetchProgressListener,
+        listener: &dyn FetchProgressListener,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         match &fglob.order {
             None => (),
@@ -140,7 +156,7 @@ impl FetchService {
         }
 
         let (first_filename, first_path) = matched_files.pop().unwrap();
-        let res = self.fetch_file(
+        let res = Self::fetch_file(
             &first_path,
             fglob.event_time.as_ref(),
             None,
@@ -150,7 +166,7 @@ impl FetchService {
 
         let event_time = match event_time_source {
             None => None,
-            Some(src) => Some(self.extract_event_time(&first_filename, &src)?),
+            Some(src) => Some(Self::extract_event_time(&first_filename, &src)?),
         };
 
         match res {
@@ -172,12 +188,11 @@ impl FetchService {
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
     fn fetch_file(
-        &self,
         path: &Path,
         _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
-        listener: &mut dyn FetchProgressListener,
+        listener: &dyn FetchProgressListener,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         use fs_extra::file::*;
 
@@ -236,12 +251,11 @@ impl FetchService {
     }
 
     fn fetch_http(
-        &self,
         url: &str,
         _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
-        listener: &mut dyn FetchProgressListener,
+        listener: &dyn FetchProgressListener,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let target_path_tmp = target_path.with_extension("tmp");
 
@@ -275,10 +289,10 @@ impl FetchService {
 
             transfer.header_function(|header| {
                 let s = std::str::from_utf8(header).unwrap();
-                if let Some((name, val)) = self.split_header(s) {
+                if let Some((name, val)) = Self::split_header(s) {
                     match &name.to_lowercase()[..] {
                         "last-modified" => {
-                            last_modified = Some(self.parse_http_date_time(val));
+                            last_modified = Some(Self::parse_http_date_time(val));
                         }
                         "etag" => {
                             etag = Some(val.to_owned());
@@ -359,12 +373,11 @@ impl FetchService {
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
     fn fetch_ftp(
-        &self,
         url: &str,
         _event_time_source: Option<&EventTimeSource>,
         _old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
-        listener: &mut dyn FetchProgressListener,
+        listener: &dyn FetchProgressListener,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let target_path_tmp = target_path.with_extension("tmp");
 
@@ -424,7 +437,7 @@ impl FetchService {
         })
     }
 
-    fn split_header<'a>(&self, h: &'a str) -> Option<(&'a str, &'a str)> {
+    fn split_header<'a>(h: &'a str) -> Option<(&'a str, &'a str)> {
         if let Some(sep) = h.find(':') {
             let (name, tail) = h.split_at(sep);
             let val = tail[1..].trim();
@@ -434,14 +447,13 @@ impl FetchService {
         }
     }
 
-    fn parse_http_date_time(&self, val: &str) -> DateTime<Utc> {
+    fn parse_http_date_time(val: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc2822(val)
             .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {}: {}", val, e))
             .into()
     }
 
     fn extract_event_time(
-        &self,
         filename: &str,
         src: &EventTimeSourceFromPath,
     ) -> Result<DateTime<Utc>, IngestError> {
@@ -506,8 +518,8 @@ pub struct FetchProgress {
     pub fetched_bytes: u64,
 }
 
-pub trait FetchProgressListener {
-    fn on_progress(&mut self, _progress: &FetchProgress) {}
+pub trait FetchProgressListener: Send + Sync {
+    fn on_progress(&self, _progress: &FetchProgress) {}
 }
 
 struct NullFetchProgressListener;

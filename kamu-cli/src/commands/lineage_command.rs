@@ -89,8 +89,9 @@ impl LineageCommand {
 }
 
 // TODO: Support temporality and evolution
+#[async_trait::async_trait(?Send)]
 impl Command for LineageCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
             self.dataset_reg.get_all_datasets().collect()
         } else {

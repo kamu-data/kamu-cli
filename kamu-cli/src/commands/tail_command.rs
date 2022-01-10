@@ -42,17 +42,16 @@ impl TailCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for TailCommand {
-    fn run(&mut self) -> Result<(), CLIError> {
+    async fn run(&mut self) -> Result<(), CLIError> {
         let df = self
             .query_svc
             .tail(&self.dataset_ref, self.num_records)
+            .await
             .map_err(|e| CLIError::failure(e))?;
 
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        let record_batches = runtime
-            .block_on(df.collect())
-            .map_err(|e| CLIError::failure(e))?;
+        let record_batches = df.collect().await.map_err(|e| CLIError::failure(e))?;
 
         let mut writer = self.output_cfg.get_records_writer();
         writer.write_batches(&record_batches)?;

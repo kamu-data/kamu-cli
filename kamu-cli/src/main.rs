@@ -21,7 +21,12 @@ fn main() {
     let local_volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let matches = kamu_cli::cli().get_matches();
 
-    let result = kamu_cli::run(workspace_layout, local_volume_layout, matches);
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let result = runtime.block_on(kamu_cli::run(
+        workspace_layout,
+        local_volume_layout,
+        matches,
+    ));
 
     match result {
         Ok(_) => (),

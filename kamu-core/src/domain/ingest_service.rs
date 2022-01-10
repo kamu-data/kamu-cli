@@ -19,15 +19,16 @@ use thiserror::Error;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait IngestService: Send + Sync {
-    fn ingest(
+    async fn ingest(
         &self,
         dataset_ref: &DatasetRefLocal,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
@@ -35,7 +36,7 @@ pub trait IngestService: Send + Sync {
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
-    fn ingest_multi(
+    async fn ingest_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         options: IngestOptions,

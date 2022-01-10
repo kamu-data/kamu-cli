@@ -16,10 +16,10 @@ use url::Url;
 
 use crate::utils::Kamu;
 
-#[test_log::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_pull_ingest_from_file() {
-    let kamu = Kamu::new_workspace_tmp();
+async fn test_pull_ingest_from_file() {
+    let kamu = Kamu::new_workspace_tmp().await;
 
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
@@ -47,6 +47,7 @@ fn test_pull_ingest_from_file() {
             }),
         })],
     })
+    .await
     .unwrap();
 
     {
@@ -63,7 +64,7 @@ fn test_pull_ingest_from_file() {
         )
         .unwrap();
 
-        kamu.execute(["pull", "population"]).unwrap();
+        kamu.execute(["pull", "population"]).await.unwrap();
 
         let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));
         assert_eq!(
@@ -95,6 +96,7 @@ fn test_pull_ingest_from_file() {
         .unwrap();
 
         kamu.execute(["pull", "population", "--fetch", path(&data_path)])
+            .await
             .unwrap();
 
         let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));

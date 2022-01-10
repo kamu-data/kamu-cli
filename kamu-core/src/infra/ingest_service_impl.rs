@@ -83,162 +83,111 @@ impl IngestServiceImpl {
         unreachable!()
     }
 
-    // TODO: Improve error handling
-    fn spawn_ingest_task(
+    async fn do_ingest(
         &self,
         dataset_ref: &DatasetRefLocal,
         options: IngestOptions,
-        multi_listener: &Arc<dyn IngestMultiListener>,
-    ) -> std::thread::JoinHandle<Result<IngestResult, IngestError>> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref).unwrap();
+        fetch_override: Option<FetchStep>,
+        get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError> {
+        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref)?;
 
         let layout = self.get_dataset_layout(&dataset_handle);
 
         let meta_chain = self
             .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())
-            .unwrap();
+            .get_metadata_chain(&dataset_handle.as_local_ref())?;
 
         let engine_provisioner = self.engine_provisioner.clone();
 
-        let null_listener = Arc::new(NullIngestListener {});
-        let listener = multi_listener
-            .begin_ingest(&dataset_handle)
-            .unwrap_or(null_listener);
+        let listener =
+            get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
-        let thread_handle = std::thread::Builder::new()
-            .name("ingest_multi".to_owned())
-            .spawn(move || {
-                let exhaust_sources = options.exhaust_sources;
+        let ingest_task = IngestTask::new(
+            dataset_handle.clone(),
+            options.clone(),
+            layout,
+            meta_chain,
+            fetch_override,
+            listener,
+            engine_provisioner,
+        );
 
-                let mut ingest_task = IngestTask::new(
-                    dataset_handle.clone(),
-                    options,
-                    layout,
-                    meta_chain,
-                    None,
-                    listener,
-                    engine_provisioner,
-                );
+        Self::poll_until_exhausted(ingest_task, options).await
+    }
 
-                let mut combined_result = None;
-                loop {
-                    match ingest_task.ingest() {
-                        Ok(res) => {
-                            combined_result = Some(Self::merge_results(combined_result, res));
+    async fn poll_until_exhausted(
+        mut task: IngestTask,
+        options: IngestOptions,
+    ) -> Result<IngestResult, IngestError> {
+        let mut combined_result = None;
 
-                            if let Some(IngestResult::Updated { has_more, .. }) = combined_result {
-                                if has_more && exhaust_sources {
-                                    continue;
-                                }
-                            }
+        loop {
+            match task.ingest().await {
+                Ok(res) => {
+                    combined_result = Some(Self::merge_results(combined_result, res));
+
+                    if let Some(IngestResult::Updated { has_more, .. }) = combined_result {
+                        if has_more && options.exhaust_sources {
+                            continue;
                         }
-                        Err(e) => return Err(e),
                     }
-                    break;
                 }
-                Ok(combined_result.unwrap())
-            })
-            .unwrap();
-
-        thread_handle
+                Err(e) => return Err(e),
+            }
+            break;
+        }
+        Ok(combined_result.unwrap())
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl IngestService for IngestServiceImpl {
-    fn ingest(
+    async fn ingest(
         &self,
         dataset_ref: &DatasetRefLocal,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let null_listener = Arc::new(NullIngestListener {});
-        let listener = maybe_listener.unwrap_or(null_listener);
-
         info!(%dataset_ref, "Ingesting single dataset");
-
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
-        let meta_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())
-            .unwrap();
-
-        let layout = self.get_dataset_layout(&dataset_handle);
-
-        let mut ingest_task = IngestTask::new(
-            dataset_handle,
-            options,
-            layout,
-            meta_chain,
-            None,
-            listener,
-            self.engine_provisioner.clone(),
-        );
-
-        ingest_task.ingest()
+        self.do_ingest(dataset_ref, options, None, |_| maybe_listener)
+            .await
     }
 
-    fn ingest_from(
+    async fn ingest_from(
         &self,
         dataset_ref: &DatasetRefLocal,
         fetch: FetchStep,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let null_listener = Arc::new(NullIngestListener {});
-        let listener = maybe_listener.unwrap_or(null_listener);
-
         info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
-
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
-        let meta_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())
-            .unwrap();
-
-        let layout = self.get_dataset_layout(&dataset_handle);
-
-        let mut ingest_task = IngestTask::new(
-            dataset_handle,
-            options,
-            layout,
-            meta_chain,
-            Some(fetch),
-            listener,
-            self.engine_provisioner.clone(),
-        );
-
-        ingest_task.ingest()
+        self.do_ingest(dataset_ref, options, Some(fetch), |_| maybe_listener)
+            .await
     }
 
-    fn ingest_multi(
+    async fn ingest_multi(
         &self,
         dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
-        let null_multi_listener: Arc<dyn IngestMultiListener> =
-            Arc::new(NullIngestMultiListener {});
-        let multi_listener = maybe_multi_listener.unwrap_or(null_multi_listener);
+        let multi_listener =
+            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
 
         let dataset_refs: Vec<_> = dataset_refs.collect();
         info!(datasets = ?dataset_refs, "Ingesting multiple datasets");
 
-        let thread_handles: Vec<_> = dataset_refs
-            .into_iter()
+        let futures: Vec<_> = dataset_refs
+            .iter()
             .map(|dataset_ref| {
-                (
-                    dataset_ref.clone(),
-                    self.spawn_ingest_task(&dataset_ref, options.clone(), &multi_listener),
-                )
+                self.do_ingest(dataset_ref, options.clone(), None, |hdl| {
+                    multi_listener.begin_ingest(hdl)
+                })
             })
             .collect();
 
-        let results: Vec<_> = thread_handles
-            .into_iter()
-            .map(|(r, h)| (r, h.join().unwrap()))
-            .collect();
-
-        results
+        let results = futures::future::join_all(futures).await;
+        dataset_refs.into_iter().zip(results).collect()
     }
 }

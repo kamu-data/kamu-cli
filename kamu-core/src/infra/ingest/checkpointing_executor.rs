@@ -26,7 +26,7 @@ impl CheckpointingExecutor {
         Self {}
     }
 
-    pub fn execute<C, F, E>(
+    pub async fn execute<C, F, Fut, E>(
         &self,
         checkpoint_path: &Path,
         checkpoint_kind: &str,
@@ -34,12 +34,13 @@ impl CheckpointingExecutor {
     ) -> Result<Result<ExecutionResult<C>, E>, CheckpointingError>
     where
         C: Clone + serde::de::DeserializeOwned + serde::ser::Serialize,
-        F: FnOnce(Option<C>) -> Result<ExecutionResult<C>, E>,
+        F: FnOnce(Option<C>) -> Fut,
+        Fut: std::future::Future<Output = Result<ExecutionResult<C>, E>>,
         E: std::error::Error,
     {
         let old_checkpoint = self.read_checkpoint(checkpoint_path, checkpoint_kind)?;
 
-        match fun(old_checkpoint) {
+        match fun(old_checkpoint).await {
             Ok(exec_res) => {
                 if !exec_res.was_up_to_date {
                     self.write_checkpoint(
