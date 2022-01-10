@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.76.0] - 2022-01-XX
 ### Changed
-- Maintenance release - no user-facing changes expected.
-- Migrated from explicit threading to async.
-- Better architectural layer separation.
+- Maintenance release - no user-facing changes.
+- Migrated from explicit threading to `tokio` async.
+- Better separation of architectural layers.
 
 ## [0.75.1] - 2022-01-05
 ### Fixed

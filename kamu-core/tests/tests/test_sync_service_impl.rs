@@ -116,7 +116,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Add repository
     let repo_name = RepositoryName::new_unchecked("remote");
-    let remote_dataset_name = RemoteDatasetName::new(&repo_name, None, &dataset_name);
+    let remote_dataset_name = RemoteDatasetName::new(repo_name.clone(), None, dataset_name.clone());
     remote_repo_reg
         .add_repository(&repo_name, repo_url)
         .unwrap();

@@ -22,7 +22,7 @@ use url::Url;
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_local_name = DatasetName::new_unchecked("foo");
     let repo_name = RepositoryName::new_unchecked("repo");
-    let dataset_remote_name = RemoteDatasetName::new_unchecked("repo/bar");
+    let dataset_remote_name = RemoteDatasetName::try_from("repo/bar").unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));

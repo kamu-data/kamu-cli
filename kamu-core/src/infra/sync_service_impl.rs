@@ -55,12 +55,15 @@ impl SyncServiceImpl {
         };
 
         let repo_name = remote_name.repository();
+        let dataset_name = remote_name.as_name_with_owner();
 
         let repo = self
             .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_name: repo_name.clone(),
+                },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
@@ -70,7 +73,7 @@ impl SyncServiceImpl {
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
         let remote_head = match client
-            .read_ref(remote_name)
+            .read_ref(&dataset_name)
             .await
             .map_err(|e| SyncError::ProtocolError(e.into()))?
         {
@@ -104,7 +107,7 @@ impl SyncServiceImpl {
         let dataset_layout = DatasetLayout::new(&volume_layout, &local_name);
 
         let read_result = client
-            .read(&remote_name, &remote_head, &local_head, &tmp_dir)
+            .read(&dataset_name, &remote_head, &local_head, &tmp_dir)
             .await
             .map_err(|e| match e {
                 RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
@@ -210,12 +213,15 @@ impl SyncServiceImpl {
                 })?;
 
         let repo_name = remote_name.repository();
+        let dataset_name = remote_name.as_name_with_owner();
 
         let repo = self
             .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_name: repo_name.clone(),
+                },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
@@ -224,7 +230,7 @@ impl SyncServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
-        let remote_head = client.read_ref(remote_name).await?;
+        let remote_head = client.read_ref(&dataset_name).await?;
 
         let chain = self
             .dataset_reg
@@ -281,7 +287,7 @@ impl SyncServiceImpl {
 
         client
             .write(
-                remote_name,
+                &dataset_name,
                 &remote_head,
                 &local_head,
                 &mut blocks_to_sync.into_iter(),
@@ -411,7 +417,9 @@ impl SyncService for SyncServiceImpl {
             .remote_repo_reg
             .get_repository(&repo_name)
             .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist { repo_name },
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_name: repo_name.clone(),
+                },
                 _ => SyncError::InternalError(e.into()),
             })?;
 
@@ -420,7 +428,7 @@ impl SyncService for SyncServiceImpl {
             .get_repository_client(&repo)
             .map_err(|e| SyncError::InternalError(e.into()))?;
 
-        client.delete(remote_ref).await?;
+        client.delete(&remote_ref.as_name_with_owner()).await?;
 
         Ok(())
     }

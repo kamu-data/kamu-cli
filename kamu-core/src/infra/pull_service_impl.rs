@@ -177,7 +177,7 @@ impl PullServiceImpl {
 
         // This must be a new dataset - we will use dataset name from the remote reference
         // TODO: Handle conflicts early?
-        remote_name.dataset()
+        remote_name.dataset().clone()
     }
 
     /// Given a local dataset tries to inver where to pull data from using remote aliases

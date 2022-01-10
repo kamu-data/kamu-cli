@@ -56,7 +56,13 @@ fn test_dataset_name_validation() {
 
 #[test]
 fn test_remote_dataset_name_validation() {
-    assert_matches!(RemoteDatasetName::try_from("repo.name/local.id"), Ok(s) if s == "repo.name/local.id");
+    assert_matches!(
+        RemoteDatasetName::try_from("repo.name/local.id")
+            .unwrap()
+            .to_string()
+            .as_ref(),
+        "repo.name/local.id"
+    );
 
     let dr = RemoteDatasetName::try_from("repo.name/local.id").unwrap();
     assert_eq!(dr.dataset(), "local.id");
@@ -66,7 +72,13 @@ fn test_remote_dataset_name_validation() {
     assert_matches!(RemoteDatasetName::try_from("repo.name/.invalid"), Err(_));
     assert_matches!(RemoteDatasetName::try_from(".invalid/local.id"), Err(_));
 
-    assert_matches!(RemoteDatasetName::try_from("repo.name/user-name/local.id"), Ok(s) if s == "repo.name/user-name/local.id");
+    assert_matches!(
+        RemoteDatasetName::try_from("repo.name/user-name/local.id")
+            .unwrap()
+            .to_string()
+            .as_ref(),
+        "repo.name/user-name/local.id"
+    );
 
     let dr = RemoteDatasetName::try_from("repo.name/user-name/local.id").unwrap();
     assert_eq!(dr.dataset(), "local.id");
@@ -85,6 +97,32 @@ fn test_remote_dataset_name_validation() {
         RemoteDatasetName::try_from(".invalid/user-name/local.id"),
         Err(_)
     );
+}
+
+#[test]
+fn test_dataset_name_with_owner_validation() {
+    assert_matches!(
+        DatasetNameWithOwner::try_from("local.id")
+            .unwrap()
+            .to_string()
+            .as_ref(),
+        "local.id"
+    );
+
+    let dr = DatasetNameWithOwner::try_from("local.id").unwrap();
+    assert_eq!(dr.dataset(), "local.id");
+    assert_eq!(dr.account(), None);
+
+    let dr = DatasetNameWithOwner::try_from("user-name/local.id").unwrap();
+    assert_eq!(dr.dataset(), "local.id");
+    assert_matches!(dr.account(), Some(id) if id == "user-name");
+
+    assert_matches!(
+        DatasetNameWithOwner::try_from("repo.name/user-name/blah"),
+        Err(_)
+    );
+    assert_matches!(DatasetNameWithOwner::try_from("user-name/.invalid"), Err(_));
+    assert_matches!(DatasetNameWithOwner::try_from("user.name/local.id"), Err(_));
 }
 
 #[test]
@@ -108,15 +146,15 @@ fn test_dataset_refs() {
 
     takes_ref_remote(DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_remote(&DatasetID::from_pub_key_ed25519(b"key"));
-    takes_ref_remote(RemoteDatasetName::new_unchecked("foo/bar"));
-    takes_ref_remote(&RemoteDatasetName::new_unchecked("foo/bar"));
+    takes_ref_remote(RemoteDatasetName::try_from("foo/bar").unwrap());
+    takes_ref_remote(&RemoteDatasetName::try_from("foo/bar").unwrap());
 
     takes_ref_any(DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_any(&DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_any(DatasetName::new_unchecked("bar"));
     takes_ref_any(&DatasetName::new_unchecked("baz"));
-    takes_ref_any(RemoteDatasetName::new_unchecked("foo/bar"));
-    takes_ref_any(&RemoteDatasetName::new_unchecked("foo/bar"));
+    takes_ref_any(RemoteDatasetName::try_from("foo/bar").unwrap());
+    takes_ref_any(&RemoteDatasetName::try_from("foo/bar").unwrap());
     takes_ref_any(DatasetHandle {
         id: DatasetID::from_pub_key_ed25519(b"key"),
         name: DatasetName::new_unchecked("bar"),

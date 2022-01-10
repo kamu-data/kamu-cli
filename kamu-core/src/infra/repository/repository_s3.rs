@@ -335,8 +335,10 @@ impl RepositoryS3 {
 impl RepositoryClient for RepositoryS3 {
     async fn read_ref(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
     ) -> Result<Option<Multihash>, RepositoryError> {
+        assert!(!dataset_ref.is_multitenant());
+
         if let Some(body) = self
             .read_object_buf(format!("{}/meta/refs/head", dataset_ref.dataset()))
             .await?
@@ -354,7 +356,7 @@ impl RepositoryClient for RepositoryS3 {
     // TODO: Locking
     async fn write(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Option<Multihash>,
         new_head: &Multihash,
         blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
@@ -414,7 +416,7 @@ impl RepositoryClient for RepositoryS3 {
 
     async fn read(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Multihash,
         last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
@@ -484,7 +486,7 @@ impl RepositoryClient for RepositoryS3 {
         Ok(result)
     }
 
-    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+    async fn delete(&self, dataset_ref: &DatasetNameWithOwner) -> Result<(), RepositoryError> {
         self.delete_objects(format!("{}/", dataset_ref.dataset()))
             .await?;
         Ok(())
@@ -508,9 +510,6 @@ impl RepositoryClient for RepositoryS3 {
             "Cannot handle truncated response"
         );
 
-        // TODO: Find a way to avoid this
-        let repo_name = RepositoryName::try_from("undefined").unwrap();
-
         let mut datasets = Vec::new();
 
         for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
@@ -530,7 +529,7 @@ impl RepositoryClient for RepositoryS3 {
             })?;
 
             if query.is_empty() || name.contains(query) {
-                datasets.push(RemoteDatasetName::new(&repo_name, None, &name));
+                datasets.push(DatasetNameWithOwner::new(None, name));
             }
         }
 

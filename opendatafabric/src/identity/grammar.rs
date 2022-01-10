@@ -121,26 +121,43 @@ impl Grammar {
         Self::match_hostname(s)
     }
 
+    // TenantDatasetName = (AccountName "/")? DatasetName
+    pub fn match_dataset_name_with_owner(s: &str) -> Option<(Option<&str>, &str, &str)> {
+        match s.split_once('/') {
+            None => {
+                let (ds, tail) = Self::match_dataset_name(s)?;
+                Some((None, ds, tail))
+            }
+            Some((acc, ds)) => match Self::match_account_name(acc) {
+                Some((acc, "")) => {
+                    let (ds, tail) = Self::match_dataset_name(ds)?;
+                    Some((Some(acc), ds, tail))
+                }
+                _ => None,
+            },
+        }
+    }
+
     // RemoteDatasetName = RepositoryName "/" (AccountName "/")? DatasetName
-    pub fn match_remote_dataset_name(s: &str) -> Option<(&str, &str)> {
-        // TODO: Should not be eagerly counting?
-        let seps = s.chars().filter(|c| *c == '/').count();
-        match seps {
-            1 => {
-                let (rh, rt) = Self::match_repository_name(s)?;
-                let (_, st) = Self::match_char(rt, '/')?;
-                let (ih, it) = Self::match_dataset_name(st)?;
-                Some((&s[0..rh.len() + 1 + ih.len()], it))
-            }
-            2 => {
-                let (rh, rt) = Self::match_repository_name(s)?;
-                let (_, s1t) = Self::match_char(rt, '/')?;
-                let (uh, ut) = Self::match_account_name(s1t)?;
-                let (_, s2t) = Self::match_char(ut, '/')?;
-                let (ih, it) = Self::match_dataset_name(s2t)?;
-                Some((&s[0..rh.len() + 1 + uh.len() + 1 + ih.len()], it))
-            }
-            _ => None,
+    pub fn match_remote_dataset_name(s: &str) -> Option<(&str, Option<&str>, &str, &str)> {
+        match s.split_once('/') {
+            None => None,
+            Some((repo, rest)) => match Self::match_repository_name(repo) {
+                Some((repo, "")) => match rest.split_once('/') {
+                    Some((acc, rest)) => match Self::match_account_name(acc) {
+                        Some((acc, "")) => {
+                            let (ds, tail) = Self::match_dataset_name(rest)?;
+                            Some((repo, Some(acc), ds, tail))
+                        }
+                        _ => None,
+                    },
+                    None => {
+                        let (ds, tail) = Self::match_dataset_name(rest)?;
+                        Some((repo, None, ds, tail))
+                    }
+                },
+                _ => None,
+            },
         }
     }
 }

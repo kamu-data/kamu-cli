@@ -57,18 +57,11 @@ impl SearchServiceImpl {
 
         let resp = repo_client.search(query).await?;
 
-        // TODO: Avoid rewriting remote name to prefix with the local name of a repo
         Ok(SearchResult {
             datasets: resp
                 .datasets
                 .into_iter()
-                .map(|remote_name| {
-                    RemoteDatasetName::new(
-                        repo_name,
-                        remote_name.account().as_ref(),
-                        &remote_name.dataset(),
-                    )
-                })
+                .map(|name| name.as_remote_name(repo_name))
                 .collect(),
         })
     }

@@ -91,12 +91,12 @@ impl CompleteCommand {
                         .get_remote_aliases(&dataset_handle.as_local_ref())
                         .unwrap();
                     for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                        if alias.starts_with(prefix) {
+                        if alias.to_string().starts_with(prefix) {
                             println!("{}", alias);
                         }
                     }
                     for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                        if alias.starts_with(prefix) {
+                        if alias.to_string().starts_with(prefix) {
                             println!("{}", alias);
                         }
                     }

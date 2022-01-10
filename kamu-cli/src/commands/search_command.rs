@@ -59,7 +59,7 @@ impl SearchCommand {
 
         for name in &search_result.datasets {
             table.add_row(Row::new(vec![
-                Cell::new(name),
+                Cell::new(&name.to_string()),
                 Cell::new("-"),
                 Cell::new("-"),
                 Cell::new("-"),

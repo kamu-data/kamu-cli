@@ -188,8 +188,8 @@ async fn create_graph_remote(
     for name in &to_import {
         sync_service
             .sync_from(
-                &RemoteDatasetName::new(&tmp_repo_name, None, name).as_remote_ref(),
-                &name,
+                &RemoteDatasetName::new(tmp_repo_name.clone(), None, name.clone()).as_remote_ref(),
+                name,
                 SyncOptions::default(),
                 None,
             )
@@ -460,7 +460,7 @@ async fn test_sync_from() {
 
     assert_eq!(
         pull_aliases,
-        vec![RemoteDatasetName::new_unchecked("myrepo/foo")]
+        vec![RemoteDatasetName::try_from("myrepo/foo").unwrap()]
     );
 }
 

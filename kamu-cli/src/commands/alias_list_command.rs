@@ -100,7 +100,7 @@ impl AliasListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&ds.name),
                     Cell::new("Pull"),
-                    Cell::new(&alias),
+                    Cell::new(&alias.to_string()),
                 ]));
             }
 
@@ -109,7 +109,7 @@ impl AliasListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&ds.name),
                     Cell::new("Push"),
-                    Cell::new(&alias),
+                    Cell::new(&alias.to_string()),
                 ]));
             }
         }

@@ -60,12 +60,46 @@ macro_rules! impl_try_from_str {
 
 pub(crate) use impl_try_from_str;
 
-macro_rules! newtype_str {
-    ($buf_type:ident, $parse:expr) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct $buf_type(Arc<str>);
+////////////////////////////////////////////////////////////////////////////////
 
-        impl $buf_type {
+macro_rules! impl_serde {
+    ($typ:ident, $visitor:ident) => {
+        impl serde::Serialize for $typ {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.collect_str(self)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for $typ {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                deserializer.deserialize_string($visitor)
+            }
+        }
+
+        struct $visitor;
+
+        impl<'de> serde::de::Visitor<'de> for $visitor {
+            type Value = $typ;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "a {} string", stringify!($typ))
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                $typ::try_from(v).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! newtype_str {
+    ($typ:ident, $parse:expr, $visitor:ident) => {
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub struct $typ(Arc<str>);
+
+        impl $typ {
             pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
                 Self(Arc::from(s.as_ref()))
             }
@@ -75,26 +109,26 @@ macro_rules! newtype_str {
             }
         }
 
-        impl From<&$buf_type> for $buf_type {
-            fn from(v: &$buf_type) -> Self {
+        impl From<&$typ> for $typ {
+            fn from(v: &$typ) -> Self {
                 v.clone()
             }
         }
 
-        impl Into<String> for $buf_type {
+        impl Into<String> for $typ {
             fn into(self) -> String {
                 (*self.0).into()
             }
         }
 
-        impl Into<String> for &$buf_type {
+        impl Into<String> for &$typ {
             fn into(self) -> String {
                 (*self.0).into()
             }
         }
 
-        impl std::str::FromStr for $buf_type {
-            type Err = InvalidValue<$buf_type>;
+        impl std::str::FromStr for $typ {
+            type Err = InvalidValue<$typ>;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match $parse(s) {
                     Some((_, "")) => Ok(Self::new_unchecked(s)),
@@ -103,9 +137,7 @@ macro_rules! newtype_str {
             }
         }
 
-        impl_try_from_str!($buf_type);
-
-        impl ops::Deref for $buf_type {
+        impl ops::Deref for $typ {
             type Target = str;
 
             fn deref(&self) -> &str {
@@ -113,31 +145,41 @@ macro_rules! newtype_str {
             }
         }
 
-        impl AsRef<str> for $buf_type {
+        impl AsRef<str> for $typ {
             fn as_ref(&self) -> &str {
                 self.0.as_ref()
             }
         }
 
-        impl AsRef<std::path::Path> for $buf_type {
+        impl AsRef<std::path::Path> for $typ {
             fn as_ref(&self) -> &std::path::Path {
                 (*self.0).as_ref()
             }
         }
 
-        impl cmp::PartialEq<&str> for $buf_type {
+        impl cmp::PartialEq<&str> for $typ {
             fn eq(&self, other: &&str) -> bool {
                 *self.0 == **other
             }
         }
 
-        impl fmt::Display for $buf_type {
+        impl cmp::PartialEq<&str> for &$typ {
+            fn eq(&self, other: &&str) -> bool {
+                *self.0 == **other
+            }
+        }
+
+        impl fmt::Display for $typ {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 write!(f, "{}", &self.0)
             }
         }
 
-        impl_invalid_value!($buf_type);
+        impl_try_from_str!($typ);
+
+        impl_serde!($typ, $visitor);
+
+        impl_invalid_value!($typ);
     };
 }
 
@@ -222,6 +264,10 @@ impl std::str::FromStr for DatasetID {
 
 impl_try_from_str!(DatasetID);
 
+impl_serde!(DatasetID, DatasetIDSerdeVisitor);
+
+impl_invalid_value!(DatasetID);
+
 impl fmt::Debug for DatasetID {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DatasetID")
@@ -236,47 +282,13 @@ impl fmt::Display for DatasetID {
     }
 }
 
-impl fmt::Debug for InvalidValue<DatasetID> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "InvalidValue<DatasetID>({:?})", self.value)
-    }
-}
-
-impl fmt::Display for InvalidValue<DatasetID> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Invalid DatasetID: {}", self.value)
-    }
-}
-
-impl serde::Serialize for DatasetID {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_did_string())
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for DatasetID {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(DatasetIDSerdeVisitor)
-    }
-}
-
-struct DatasetIDSerdeVisitor;
-
-impl<'de> serde::de::Visitor<'de> for DatasetIDSerdeVisitor {
-    type Value = DatasetID;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a DatasetID string")
-    }
-
-    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        DatasetID::from_did_string(v).map_err(serde::de::Error::custom)
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(DatasetName, Grammar::match_dataset_name);
+newtype_str!(
+    DatasetName,
+    Grammar::match_dataset_name,
+    DatasetNameSerdeVisitor
+);
 
 impl DatasetName {
     pub fn as_local_ref(&self) -> DatasetRefLocal {
@@ -288,90 +300,127 @@ impl DatasetName {
     }
 }
 
-impl serde::Serialize for DatasetName {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self)
-    }
-}
+////////////////////////////////////////////////////////////////////////////////
 
-impl<'de> serde::Deserialize<'de> for DatasetName {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(DatasetNameSerdeVisitor)
-    }
-}
-
-struct DatasetNameSerdeVisitor;
-
-impl<'de> serde::de::Visitor<'de> for DatasetNameSerdeVisitor {
-    type Value = DatasetName;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a DatasetName string")
-    }
-
-    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        DatasetName::try_from(v).map_err(serde::de::Error::custom)
-    }
-}
+newtype_str!(
+    AccountName,
+    Grammar::match_account_name,
+    AccountNameSerdeVisitor
+);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(AccountName, Grammar::match_account_name);
+newtype_str!(
+    RepositoryName,
+    Grammar::match_repository_name,
+    RepositoryNameSerdeVisitor
+);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(RepositoryName, Grammar::match_repository_name);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DatasetNameWithOwner {
+    account_name: Option<AccountName>,
+    dataset_name: DatasetName,
+}
 
-////////////////////////////////////////////////////////////////////////////////
-
-newtype_str!(RemoteDatasetName, Grammar::match_remote_dataset_name);
-
-impl RemoteDatasetName {
-    pub fn new(
-        repo: &RepositoryName,
-        account: Option<&AccountName>,
-        dataset: &DatasetName,
-    ) -> Self {
-        let mut s = String::new();
-        s.push_str(repo);
-        s.push('/');
-        if let Some(acc) = account {
-            s.push_str(acc);
-            s.push('/');
+impl DatasetNameWithOwner {
+    pub fn new(account_name: Option<AccountName>, dataset_name: DatasetName) -> Self {
+        Self {
+            account_name,
+            dataset_name,
         }
-        s.push_str(dataset);
-        Self::new_unchecked(&s)
     }
 
     pub fn is_multitenant(&self) -> bool {
-        self.0.chars().filter(|c| *c == '/').count() == 2
+        self.account_name.is_some()
     }
 
-    pub fn dataset(&self) -> DatasetName {
-        DatasetName::new_unchecked(self.0.rsplit('/').next().unwrap())
+    pub fn dataset(&self) -> &DatasetName {
+        &self.dataset_name
     }
 
-    pub fn account(&self) -> Option<AccountName> {
-        let mut split = self.0.rsplit('/');
-        split.next();
-        let acc_or_repo = split.next();
-        let maybe_repo = split.next();
-        if maybe_repo.is_some() {
-            acc_or_repo.map(|s| AccountName::new_unchecked(s))
-        } else {
-            None
+    pub fn account(&self) -> Option<&AccountName> {
+        self.account_name.as_ref()
+    }
+
+    pub fn as_remote_name(&self, repository_name: &RepositoryName) -> RemoteDatasetName {
+        RemoteDatasetName::new(
+            repository_name.clone(),
+            self.account_name.clone(),
+            self.dataset_name.clone(),
+        )
+    }
+}
+
+impl std::str::FromStr for DatasetNameWithOwner {
+    type Err = InvalidValue<DatasetNameWithOwner>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match Grammar::match_dataset_name_with_owner(s) {
+            Some((acc, ds, "")) => Ok(Self::new(
+                acc.map(|s| AccountName::new_unchecked(s)),
+                DatasetName::new_unchecked(ds),
+            )),
+            _ => Err(InvalidValue::new(s)),
+        }
+    }
+}
+
+impl fmt::Display for DatasetNameWithOwner {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(acc) = &self.account_name {
+            write!(f, "{}/", acc)?;
+        }
+        write!(f, "{}", self.dataset_name)
+    }
+}
+
+impl_try_from_str!(DatasetNameWithOwner);
+
+impl_invalid_value!(DatasetNameWithOwner);
+
+impl_serde!(DatasetNameWithOwner, DatasetNameWithOwnerSerdeVisitor);
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RemoteDatasetName {
+    repository_name: RepositoryName,
+    account_name: Option<AccountName>,
+    dataset_name: DatasetName,
+}
+
+impl RemoteDatasetName {
+    pub fn new(
+        repository_name: RepositoryName,
+        account_name: Option<AccountName>,
+        dataset_name: DatasetName,
+    ) -> Self {
+        Self {
+            repository_name,
+            account_name,
+            dataset_name,
         }
     }
 
-    pub fn repository(&self) -> RepositoryName {
-        let mut split = self.0.rsplit('/');
-        split.next();
-        let acc_or_repo = split.next();
-        if let Some(repo) = split.next() {
-            RepositoryName::new_unchecked(repo)
-        } else {
-            RepositoryName::new_unchecked(acc_or_repo.unwrap())
-        }
+    pub fn is_multitenant(&self) -> bool {
+        self.account_name.is_some()
+    }
+
+    pub fn dataset(&self) -> &DatasetName {
+        &self.dataset_name
+    }
+
+    pub fn account(&self) -> Option<&AccountName> {
+        self.account_name.as_ref()
+    }
+
+    pub fn repository(&self) -> &RepositoryName {
+        &self.repository_name
+    }
+
+    pub fn as_name_with_owner(&self) -> DatasetNameWithOwner {
+        DatasetNameWithOwner::new(self.account_name.clone(), self.dataset_name.clone())
     }
 
     pub fn as_remote_ref(&self) -> DatasetRefRemote {
@@ -383,28 +432,32 @@ impl RemoteDatasetName {
     }
 }
 
-impl serde::Serialize for RemoteDatasetName {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self)
+impl std::str::FromStr for RemoteDatasetName {
+    type Err = InvalidValue<RemoteDatasetName>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match Grammar::match_remote_dataset_name(s) {
+            Some((repo, acc, ds, "")) => Ok(Self::new(
+                RepositoryName::new_unchecked(repo),
+                acc.map(|s| AccountName::new_unchecked(s)),
+                DatasetName::new_unchecked(ds),
+            )),
+            _ => Err(InvalidValue::new(s)),
+        }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for RemoteDatasetName {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_string(RemoteDatasetNameSerdeVisitor)
+impl fmt::Display for RemoteDatasetName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/", self.repository_name)?;
+        if let Some(acc) = &self.account_name {
+            write!(f, "{}/", acc)?;
+        }
+        write!(f, "{}", self.dataset_name)
     }
 }
 
-struct RemoteDatasetNameSerdeVisitor;
+impl_try_from_str!(RemoteDatasetName);
 
-impl<'de> serde::de::Visitor<'de> for RemoteDatasetNameSerdeVisitor {
-    type Value = RemoteDatasetName;
+impl_invalid_value!(RemoteDatasetName);
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a RemoteDatasetName string")
-    }
-
-    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
-        RemoteDatasetName::try_from(v).map_err(serde::de::Error::custom)
-    }
-}
+impl_serde!(RemoteDatasetName, RemoteDatasetNameSerdeVisitor);

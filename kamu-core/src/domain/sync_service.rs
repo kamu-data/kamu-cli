@@ -170,7 +170,9 @@ impl From<RepositoryError> for SyncError {
             RepositoryError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
             RepositoryError::ProtocolError { .. } => SyncError::ProtocolError(Box::new(e)),
             RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
-                dataset_ref: RemoteDatasetName::new_unchecked("unknown/unknown").into(),
+                dataset_ref: RemoteDatasetName::try_from("unknown/unknown")
+                    .unwrap()
+                    .into(),
             },
             RepositoryError::UpdatedConcurrently => SyncError::UpdatedConcurrently(Box::new(e)),
             RepositoryError::IOError { .. } => SyncError::IOError(Box::new(e)),

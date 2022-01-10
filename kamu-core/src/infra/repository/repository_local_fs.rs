@@ -28,8 +28,10 @@ impl RepositoryLocalFS {
 impl RepositoryClient for RepositoryLocalFS {
     async fn read_ref(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
     ) -> Result<Option<Multihash>, RepositoryError> {
+        assert!(!dataset_ref.is_multitenant());
+
         let ref_path: PathBuf = [
             self.path.as_ref() as &OsStr,
             OsStr::new(dataset_ref.dataset().as_str()),
@@ -53,7 +55,7 @@ impl RepositoryClient for RepositoryLocalFS {
     // TODO: Locking
     async fn write(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Option<Multihash>,
         new_head: &Multihash,
         blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
@@ -119,7 +121,7 @@ impl RepositoryClient for RepositoryLocalFS {
 
     async fn read(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Multihash,
         last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
@@ -199,7 +201,7 @@ impl RepositoryClient for RepositoryLocalFS {
         Ok(result)
     }
 
-    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError> {
+    async fn delete(&self, dataset_ref: &DatasetNameWithOwner) -> Result<(), RepositoryError> {
         let dataset_dir = self.path.join(dataset_ref.dataset());
         if !dataset_dir.exists() {
             return Err(RepositoryError::DoesNotExist);
@@ -211,17 +213,16 @@ impl RepositoryClient for RepositoryLocalFS {
     }
 
     async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
-        // TODO: Find a way to avoid this
-        let repo_name = RepositoryName::try_from("undefined").unwrap();
-
         let query = query.unwrap_or_default();
         let mut datasets = Vec::new();
 
         for entry in std::fs::read_dir(&self.path)? {
             if let Some(file_name) = entry?.file_name().to_str() {
                 if query.is_empty() || file_name.contains(query) {
-                    let dataset_name = DatasetName::try_from(file_name).unwrap();
-                    datasets.push(RemoteDatasetName::new(&repo_name, None, &dataset_name));
+                    datasets.push(DatasetNameWithOwner::new(
+                        None,
+                        DatasetName::try_from(file_name).unwrap(),
+                    ));
                 }
             }
         }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{Multihash, RemoteDatasetName};
+use opendatafabric::{DatasetNameWithOwner, Multihash};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -27,12 +27,12 @@ pub struct Repository {
 pub trait RepositoryClient {
     async fn read_ref(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
     ) -> Result<Option<Multihash>, RepositoryError>;
 
     async fn write(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Option<Multihash>,
         new_head: &Multihash,
         blocks: &mut dyn Iterator<Item = (Multihash, Vec<u8>)>,
@@ -42,7 +42,7 @@ pub trait RepositoryClient {
 
     async fn read(
         &self,
-        dataset_ref: &RemoteDatasetName,
+        dataset_ref: &DatasetNameWithOwner,
         expected_head: &Multihash,
         last_seen_block: &Option<Multihash>,
         tmp_dir: &Path,
@@ -51,7 +51,7 @@ pub trait RepositoryClient {
     /// Deletes a dataset from the repository.
     ///
     /// Note: Some repos may not permit this operation.
-    async fn delete(&self, dataset_ref: &RemoteDatasetName) -> Result<(), RepositoryError>;
+    async fn delete(&self, dataset_ref: &DatasetNameWithOwner) -> Result<(), RepositoryError>;
 
     async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError>;
 }
@@ -64,7 +64,7 @@ pub struct RepositoryReadResult {
 
 pub struct RepositorySearchResult {
     // TODO: REMOTE ID: Should be a RemoteDatasetHandle
-    pub datasets: Vec<RemoteDatasetName>,
+    pub datasets: Vec<DatasetNameWithOwner>,
 }
 
 type BoxedError = Box<dyn std::error::Error + Send + Sync>;

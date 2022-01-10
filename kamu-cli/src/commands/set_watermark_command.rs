@@ -76,7 +76,7 @@ impl Command for SetWatermarkCommand {
         let aliases = self.remote_alias_reg.get_remote_aliases(&dataset_ref)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.as_str())
+            .map(|r| r.to_string())
             .collect();
 
         if !pull_aliases.is_empty() {

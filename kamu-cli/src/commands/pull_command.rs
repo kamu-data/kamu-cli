@@ -120,7 +120,7 @@ impl PullCommand {
             .get_remote_aliases(&dataset_handle.as_local_ref())?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.as_str())
+            .map(|r| r.to_string())
             .collect();
 
         if !pull_aliases.is_empty() {
