@@ -6,11 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.76.0] - 2022-01-XX
+## [0.76.0] - 2022-01-14
 ### Changed
 - Maintenance release - no user-facing changes.
 - Migrated from explicit threading to `tokio` async.
 - Better separation of architectural layers.
+- Improved error handling.
 
 ## [0.75.1] - 2022-01-05
 ### Fixed

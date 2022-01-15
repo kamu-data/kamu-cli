@@ -38,11 +38,7 @@ pub async fn run(
     local_volume_layout: VolumeLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
-    // Cleanup run info dir
-    if workspace_layout.run_info_dir.exists() {
-        std::fs::remove_dir_all(&workspace_layout.run_info_dir).unwrap();
-        std::fs::create_dir(&workspace_layout.run_info_dir).unwrap();
-    }
+    prepare_run_dir(&workspace_layout.run_info_dir);
 
     let mut catalog = configure_catalog().unwrap();
     catalog.add_value(workspace_layout.clone());
@@ -52,7 +48,11 @@ pub async fn run(
     catalog.add_value(output_format.clone());
 
     let _guard = configure_logging(&output_format, &workspace_layout);
-    info!(version = VERSION, args = ?std::env::args().collect::<Vec<_>>(), "Initializing kamu-cli");
+    info!(
+        version = VERSION,
+        args = ?std::env::args().collect::<Vec<_>>(),
+        "Initializing kamu-cli"
+    );
 
     load_config(&mut catalog);
 
@@ -200,6 +200,25 @@ pub(crate) fn in_workspace(workspace_layout: Arc<WorkspaceLayout>) -> bool {
 /////////////////////////////////////////////////////////////////////////////////////////
 // Logging
 /////////////////////////////////////////////////////////////////////////////////////////
+
+fn prepare_run_dir(run_dir: &Path) {
+    if run_dir.exists() {
+        std::fs::remove_dir_all(run_dir).unwrap_or_else(|e| {
+            panic!(
+                "Unable to clean up run directory {}: {}",
+                run_dir.display(),
+                e
+            )
+        });
+        std::fs::create_dir(run_dir).unwrap_or_else(|e| {
+            panic!(
+                "Unable to create run directory {}: {}",
+                run_dir.display(),
+                e
+            )
+        });
+    }
+}
 
 fn configure_logging(
     output_config: &OutputConfig,
