@@ -29,15 +29,15 @@ impl RepositoryFactory {
 
     pub fn get_repository_client(
         &self,
-        repo: &Repository,
+        repo_info: &RepositoryAccessInfo,
     ) -> Result<Arc<dyn RepositoryClient>, RepositoryFactoryError> {
-        match repo.url.scheme() {
+        match repo_info.url.scheme() {
             "file" => Ok(Arc::new(RepositoryLocalFS::new(
-                repo.url.to_file_path().unwrap(),
+                repo_info.url.to_file_path().unwrap(),
             ))),
-            "s3" => self.get_s3_client(&repo.url),
-            "s3+http" => self.get_s3_client(&repo.url),
-            "s3+https" => self.get_s3_client(&repo.url),
+            "s3" => self.get_s3_client(&repo_info.url),
+            "s3+http" => self.get_s3_client(&repo_info.url),
+            "s3+https" => self.get_s3_client(&repo_info.url),
             s @ _ => Err(RepositoryFactoryError::unsupported_protocol(s)),
         }
     }

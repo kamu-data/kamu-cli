@@ -19,7 +19,7 @@ use thiserror::Error;
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct Repository {
+pub struct RepositoryAccessInfo {
     pub url: Url,
 }
 

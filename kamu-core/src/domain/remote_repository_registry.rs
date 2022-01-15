@@ -15,7 +15,10 @@ use url::Url;
 pub trait RemoteRepositoryRegistry: Send + Sync {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's>;
 
-    fn get_repository(&self, repo_name: &RepositoryName) -> Result<Repository, DomainError>;
+    fn get_repository(
+        &self,
+        repo_name: &RepositoryName,
+    ) -> Result<RepositoryAccessInfo, DomainError>;
 
     fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), DomainError>;
 

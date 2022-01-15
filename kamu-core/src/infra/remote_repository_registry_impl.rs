@@ -48,7 +48,10 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         }))
     }
 
-    fn get_repository(&self, repo_name: &RepositoryName) -> Result<Repository, DomainError> {
+    fn get_repository(
+        &self,
+        repo_name: &RepositoryName,
+    ) -> Result<RepositoryAccessInfo, DomainError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if !file_path.exists() {
@@ -66,13 +69,14 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
             )
         });
 
-        let manifest: Manifest<Repository> = serde_yaml::from_reader(&file).unwrap_or_else(|e| {
-            panic!(
-                "Failed to deserialize the Repository at {}: {}",
-                file_path.display(),
-                e
-            )
-        });
+        let manifest: Manifest<RepositoryAccessInfo> = serde_yaml::from_reader(&file)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to deserialize the Repository at {}: {}",
+                    file_path.display(),
+                    e
+                )
+            });
 
         assert_eq!(manifest.kind, "Repository");
         Ok(manifest.content)
@@ -91,7 +95,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         let manifest = Manifest {
             kind: "Repository".to_owned(),
             version: 1,
-            content: Repository { url: url },
+            content: RepositoryAccessInfo { url: url },
         };
 
         let file = std::fs::File::create(&file_path).map_err(|e| InfraError::from(e).into())?;
@@ -125,7 +129,10 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
         Box::new(std::iter::empty())
     }
 
-    fn get_repository(&self, repo_name: &RepositoryName) -> Result<Repository, DomainError> {
+    fn get_repository(
+        &self,
+        repo_name: &RepositoryName,
+    ) -> Result<RepositoryAccessInfo, DomainError> {
         Err(DomainError::does_not_exist(
             ResourceKind::Repository,
             repo_name.to_string(),
