@@ -2,6 +2,7 @@
 members = [
     "opendatafabric",
     "kamu-core",
+    "kamu-adapter-graphql",
     "kamu-cli",
     "tools",
     "utils/container-runtime",
