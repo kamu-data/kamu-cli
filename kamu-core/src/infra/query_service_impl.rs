@@ -62,7 +62,7 @@ impl QueryServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,

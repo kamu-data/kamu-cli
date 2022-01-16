@@ -868,11 +868,13 @@ pub fn cli() -> App<'static> {
                         .args(&[
                             Arg::new("address")
                                 .long("address")
+                                .validator(validate_ip_addr)
                                 .default_value("127.0.0.1")
                                 .help("Expose JDBC server on specific network interface"),
                             Arg::new("port")
                                 .long("port")
                                 .default_value("10000")
+                                .validator(validate_port)
                                 .help("Expose JDBC server on specific port"),
                             Arg::new("livy")
                                 .long("livy")
@@ -932,9 +934,56 @@ pub fn cli() -> App<'static> {
                     "
                 ))
             ),
+            App::new("system")
+                .about("Command group for system-level functionality")
+                .subcommands([
+                    App::new("api-server")
+                        .about("Run HTTP + GraphQL server")
+                        .subcommands([
+                            App::new("gql-query")
+                                .about("Executes the GraphQL query and prints out the result")
+                                .args([
+                                    Arg::new("full")
+                                        .long("full")
+                                        .help("Display the full result including extensions"),
+                                    Arg::new("query").index(1).required(true),
+                                ]),
+                                App::new("gql-schema")
+                                .about("Prints the GraphQL schema"),
+                        ])
+                        .args([
+                            Arg::new("address")
+                                .long("address")
+                                .takes_value(true)
+                                .validator(validate_ip_addr)
+                                .help("Expose JDBC server on specific network interface"),
+                            Arg::new("http-port")
+                                .long("http-port")
+                                .takes_value(true)
+                                .validator(validate_port)
+                                .help("Expose HTTP server on specific port"),
+                        ])
+                        .after_help(indoc::indoc!(
+                            r#"
+                            ### Examples ###
+
+                            Run API server on a specified port:
+
+                                kamu system api-server --http-port 12312
+                            
+                            Execute a single GraphQL query and print result to stdout:
+
+                                kamu system api-server gql-query '{ apiVersion }'
+
+                            Print out GraphQL API schema:
+
+                                kamu system api-server gql-schema
+                            "#
+                        )),
+                ]),
             tabular_output_params(App::new("tail")
                 .about("Displays a sample of most recent records in a dataset")
-                .args(&[
+                .args([
                     Arg::new("dataset")
                         .required(true)
                         .index(1)
@@ -956,6 +1005,30 @@ pub fn cli() -> App<'static> {
                     "#
                 ))
             ),
+            // App::new("ui")
+            //     .about("Opens browser-based user interface")
+            //     .args([
+            //         Arg::new("http-port")
+            //             .long("http-port")
+            //             .takes_value(true)
+            //             .validator(validate_port)
+            //             .help("Which port to run HTTP server on"),
+            //     ])
+            //     .after_help(indoc::indoc!(
+            //         r"
+            //         Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
+
+            //         ### Examples ###
+
+            //         Starts server and opens UI in your default browser:
+
+            //             kamu ui
+
+            //         Start server on a specific port:
+
+            //             kamu ui --http-port 12345
+            //         "
+            //     )),
             App::new("verify")
                 .about("Verifies the validity of a dataset")
                 .args(&[
@@ -1003,6 +1076,20 @@ pub fn cli() -> App<'static> {
                     "
                 )),
         ])
+}
+
+fn validate_port(s: &str) -> Result<(), String> {
+    match str::parse::<u16>(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!("Value {} is not a valid port number", s)),
+    }
+}
+
+fn validate_ip_addr(s: &str) -> Result<(), String> {
+    match str::parse::<std::net::IpAddr>(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!("Value {} is not a valid IPv4 or IPv6", s)),
+    }
 }
 
 fn validate_dataset_name(s: &str) -> Result<(), String> {

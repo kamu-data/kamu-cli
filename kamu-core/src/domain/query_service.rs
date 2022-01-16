@@ -16,7 +16,7 @@ use thiserror::Error;
 
 use super::DomainError;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`

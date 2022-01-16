@@ -254,6 +254,26 @@ pub fn get_command(
             }
             _ => return Err(CommandInterpretationFailed.into()),
         },
+        Some(("system", submatches)) => match submatches.subcommand() {
+            Some(("api-server", server_matches)) => match server_matches.subcommand() {
+                None => Box::new(APIServerRunCommand::new(
+                    catalog.clone(), // TODO: Currently very expensive!
+                    catalog.get_one()?,
+                    server_matches.value_of_t("address").ok(),
+                    server_matches.value_of_t("http-port").ok(),
+                )),
+                Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
+                    catalog.clone(), // TODO: Currently very expensive!
+                    query_matches.value_of("query").unwrap(),
+                    query_matches.is_present("full"),
+                )),
+                Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand::new(
+                    catalog.clone(), // TODO: Currently very expensive
+                )),
+                _ => return Err(CommandInterpretationFailed.into()),
+            },
+            _ => return Err(CommandInterpretationFailed.into()),
+        },
         Some(("tail", submatches)) => Box::new(TailCommand::new(
             catalog.get_one()?,
             submatches.value_of("dataset").unwrap(),

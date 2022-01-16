@@ -15,11 +15,12 @@ categories = ["command-line-utilities"]
 skip_docker_tests = []
 
 [dependencies]
-container-runtime = { path = "../utils/container-runtime" }
-opendatafabric = { path = "../opendatafabric" }
-kamu = { path = "../kamu-core" }
 dill = { version = "~0.2.0" }
 # dill = { path = "../../dill" }
+opendatafabric = { path = "../opendatafabric" }
+kamu = { path = "../kamu-core" }
+kamu-adapter-graphql = { path = "../kamu-adapter-graphql" }
+container-runtime = { path = "../utils/container-runtime" }
 
 # UI
 read_input = "*"  # Basic user input
@@ -33,6 +34,16 @@ minus = { version = "=4.0.1", features = ["static_output", "search"] }  # Termin
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser
+
+# Web API & UI
+http = "*"
+hyper = "*"
+tower = { version = "*" }
+tower-http = { version = "*", features = ["trace", "cors"] }
+axum = "*"
+async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
+async-graphql-axum = "*"
+serde_json = "*"
 
 # Config
 merge = "*"

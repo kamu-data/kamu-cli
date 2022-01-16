@@ -95,6 +95,15 @@ pub use sql_shell_command::*;
 mod tail_command;
 pub use tail_command::*;
 
+mod system_api_server_gql_query_command;
+pub use system_api_server_gql_query_command::*;
+
+mod system_api_server_gql_schema_command;
+pub use system_api_server_gql_schema_command::*;
+
+mod system_api_server_run_command;
+pub use system_api_server_run_command::*;
+
 mod verify_command;
 pub use verify_command::*;
 

@@ -1,0 +1,294 @@
+type AccessToken {
+	accessToken: String!
+	scope: String!
+	tokenType: String!
+}
+interface Account {
+	id: AccountID!
+	name: String!
+}
+scalar AccountID
+type AccountInfo {
+	login: String!
+	name: String!
+	email: String
+	avatarUrl: String
+	gravatarId: String
+}
+type Accounts {
+	"""
+	Returns account by its ID
+	"""
+	byId(accountId: AccountID!): Account
+	"""
+	Returns account by its name
+	"""
+	byName(name: String!): Account
+}
+type Auth {
+	githubLogin(code: String!): LoginResponse!
+	accountInfo(accessToken: String!): AccountInfo!
+}
+type BlockRef {
+	name: String!
+	blockHash: Multihash!
+}
+type DataSchema {
+	format: DataSchemaFormat!
+	content: String!
+}
+enum DataSchemaFormat {
+	PARQUET
+	PARQUET_JSON
+}
+type DataSlice {
+	format: DataSliceFormat!
+	content: String!
+}
+enum DataSliceFormat {
+	JSON
+	JSON_LD
+	JSON_SO_A
+	CSV
+}
+type Dataset {
+	"""
+	Unique identifier of the dataset
+	"""
+	id: DatasetID!
+	"""
+	Returns the user or organization that owns this dataset
+	"""
+	owner: Account!
+	"""
+	Symbolic name of the dataset.
+	Name can change over the dataset's lifetime. For unique identifier use `id()`.
+	"""
+	name: String!
+	"""
+	Returns the kind of a dataset (Root or Derivative)
+	"""
+	kind: DatasetKind!
+	"""
+	Access to the data of the dataset
+	"""
+	data: DatasetData!
+	"""
+	Access to the metadata of the dataset
+	"""
+	metadata: DatasetMetadata!
+	"""
+	Creation time of the first metadata block in the chain
+	"""
+	createdAt: DateTime!
+	"""
+	Creation time of the most recent metadata block in the chain
+	"""
+	lastUpdatedAt: DateTime!
+}
+type DatasetConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [Dataset!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [DatasetEdge!]!
+}
+type DatasetData {
+	datasetId: DatasetID!
+	"""
+	Total number of records in this dataset
+	"""
+	numRecordsTotal: Int!
+	"""
+	An estimated size of data on disk not accounting for replication or caching
+	"""
+	estimatedSize: Int!
+	"""
+	Returns the specified number of the latest records in the dataset
+	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
+	"""
+	tail(numRecords: Int, format: DataSliceFormat): DataSlice!
+}
+type DatasetEdge {
+	node: Dataset!
+}
+scalar DatasetID
+enum DatasetKind {
+	ROOT
+	DERIVATIVE
+}
+type DatasetMetadata {
+	datasetId: DatasetID!
+	"""
+	Access to the temporal metadata chain of the dataset
+	"""
+	chain: MetadataChain!
+	"""
+	Last recorded watermark
+	"""
+	currentWatermark: DateTime
+	"""
+	Latest data schema
+	"""
+	currentSchema(format: DataSchemaFormat): DataSchema!
+	"""
+	Current upstream dependencies of a dataset
+	"""
+	currentUpstreamDependencies: [Dataset!]!
+	"""
+	Current downstream dependencies of a dataset
+	"""
+	currentDownstreamDependencies: [Dataset!]!
+}
+type Datasets {
+	"""
+	Returns dataset by its ID
+	"""
+	byId(datasetId: DatasetID!): Dataset
+	"""
+	Returns datasets belonging to the specified account
+	"""
+	byAccountId(accountId: AccountID!, page: Int, perPage: Int! = 15): DatasetConnection!
+}
+"""
+Implement the DateTime<Utc> scalar
+
+The input/output is a string in RFC3339 format.
+"""
+scalar DateTime
+type LoginResponse {
+	token: AccessToken!
+	accountInfo: AccountInfo!
+}
+type MetadataBlock {
+	blockHash: Multihash!
+	prevBlockHash: Multihash
+	systemTime: DateTime!
+	outputWatermark: DateTime
+}
+type MetadataBlockConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [MetadataBlock!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [MetadataBlockEdge!]!
+}
+type MetadataBlockEdge {
+	node: MetadataBlock!
+}
+type MetadataChain {
+	"""
+	Returns all named metadata block references
+	"""
+	refs: [BlockRef!]!
+	"""
+	Returns a metadata block corresponding to the specified hash
+	"""
+	blockByHash(hash: Multihash!): MetadataBlock
+	"""
+	Iterates all metadata blocks in the reverse chronological order
+	"""
+	blocks(page: Int, perPage: Int! = 20): MetadataBlockConnection!
+}
+scalar Multihash
+type Mutation {
+	auth: Auth!
+}
+type Organization implements Account {
+	"""
+	Unique identifier of this organization account
+	"""
+	id: AccountID!
+	"""
+	Symbolic name
+	"""
+	name: String!
+}
+type PageBasedInfo {
+	"""
+	When paginating backwards, are there more items?
+	"""
+	hasPreviousPage: Boolean!
+	"""
+	When paginating forwards, are there more items?
+	"""
+	hasNextPage: Boolean!
+	"""
+	Approximate number of total pages assuming number of nodes per page stays the same
+	"""
+	totalPages: Int
+}
+type Query {
+	"""
+	Returns the version of the GQL API
+	"""
+	apiVersion: String!
+	"""
+	Dataset-related functionality group
+	"""
+	datasets: Datasets!
+	"""
+	Account-related functionality group
+	"""
+	accounts: Accounts!
+	"""
+	Search-related functionality group
+	"""
+	search: Search!
+}
+type Search {
+	"""
+	Perform search across all resources
+	"""
+	query(query: String!, page: Int, perPage: Int! = 15): SearchResultConnection!
+}
+union SearchResult = | Dataset
+type SearchResultConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [SearchResult!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [SearchResultEdge!]!
+}
+type SearchResultEdge {
+	node: SearchResult!
+}
+type User implements Account {
+	"""
+	Unique identifier of this user account
+	"""
+	accountId: AccountID!
+	id: AccountID!
+	"""
+	Symbolic name
+	"""
+	name: String!
+}
+schema {
+	query: Query
+	mutation: Mutation
+}

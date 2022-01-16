@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod api_server;
+pub use api_server::*;
+
 mod livy_server_impl;
 pub use livy_server_impl::*;
 

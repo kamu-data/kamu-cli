@@ -30,13 +30,14 @@ pub struct Kamu {
 }
 
 impl Kamu {
-    pub fn new(workspace_path: &Path) -> Self {
-        let workspace_layout = WorkspaceLayout::new(workspace_path);
+    pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
+        let workspace_path = workspace_path.into();
+        let workspace_layout = WorkspaceLayout::new(&workspace_path);
         let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
         Self {
             workspace_layout,
             volume_layout,
-            workspace_path: workspace_path.to_owned(),
+            workspace_path,
             _temp_dir: None,
         }
     }
