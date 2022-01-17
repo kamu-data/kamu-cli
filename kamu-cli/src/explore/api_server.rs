@@ -27,13 +27,16 @@ impl APIServer {
                 "/graphql",
                 axum::routing::get(graphql_playground).post(graphql_handler),
             )
-            .layer(tower_http::trace::TraceLayer::new_for_http())
             .layer(
-                tower_http::cors::CorsLayer::new()
-                    .allow_methods(vec![http::Method::GET, http::Method::POST])
-                    .allow_origin(tower_http::cors::any()),
-            )
-            .layer(axum::AddExtensionLayer::new(gql_schema));
+                tower::ServiceBuilder::new()
+                    .layer(tower_http::trace::TraceLayer::new_for_http())
+                    .layer(
+                        tower_http::cors::CorsLayer::new()
+                            .allow_methods(vec![http::Method::GET, http::Method::POST])
+                            .allow_origin(tower_http::cors::any()),
+                    )
+                    .layer(axum::AddExtensionLayer::new(gql_schema)),
+            );
 
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
