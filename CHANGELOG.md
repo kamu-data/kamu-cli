@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.77.0] - 2022-01-16
+### Added
+- New crate `kamu-adapter-graphql` provides GraphQL interface for ODF repositories.
+- New command `kamu system api-server` runs HTTP + GraphQL server over current Kamu workspace with built-in GQL Playground UI.
+- New command `kamu system api-server gql-query` executes single GraphQL query and writes JSON output to stdout.
+- New command `kamu system api-server gql-schema` dumps GraphQL API schema to stdout.
+
 ## [0.76.0] - 2022-01-14
 ### Changed
 - Maintenance release - no user-facing changes.

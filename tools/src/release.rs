@@ -53,7 +53,7 @@ fn main() {
 
     eprintln!("New version: {}", new_version);
 
-    for cr in &crates {
+    for cr in crates.iter().rev() {
         eprintln!("Bumping version in: {}", cr.name);
         set_version(&cr.cargo_toml_path, &new_version);
     }

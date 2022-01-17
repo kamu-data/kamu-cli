@@ -20,6 +20,8 @@ jobs:
       - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
       - run: cargo run --bin kamu-cli -- init --pull-test-images
       - run: cargo test --verbose
+      - run: git diff
+      - run: git diff-index --quiet HEAD  # Ensure all generated files are up-to-date
   test_macos:
     name: Test / MacOS
     runs-on: macos-latest

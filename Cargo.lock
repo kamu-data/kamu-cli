@@ -415,9 +415,9 @@ dependencies = [
 
 [[package]]
 name = "brotli"
-version = "3.3.2"
+version = "3.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71cb90ade945043d3d53597b2fc359bb063db8ade2bcffe7997351d0756e9d50"
+checksum = "f838e47a451d5a8fa552371f80024dd6ace9b7acdf25c4c3d0f9bc6816fb1c39"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
@@ -561,9 +561,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "3.0.3"
+version = "3.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fff450c061c4de8162fd6fa0a7a73f70f10c211869a34897724823ed9ec0046"
+checksum = "d044e9db8cd0f68191becdeb5246b7462e4cf0c069b19ae00d1bf3fa9889498d"
 dependencies = [
  "clap",
 ]
@@ -601,7 +601,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "container-runtime"
-version = "0.76.0"
+version = "0.77.0"
 dependencies = [
  "dill",
  "regex",
@@ -1606,7 +1606,7 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "kamu"
-version = "0.76.0"
+version = "0.77.0"
 dependencies = [
  "arrow-digest",
  "async-recursion",
@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.1.0"
+version = "0.77.0"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -1674,7 +1674,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.76.0"
+version = "0.77.0"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2222,7 +2222,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.76.0"
+version = "0.77.0"
 dependencies = [
  "bs58",
  "byteorder",
@@ -3095,9 +3095,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework"
-version = "2.4.2"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "525bc1abfda2e1998d152c45cf13e696f76d0a4972310b22fac1658b05df7c87"
+checksum = "d09d3c15d814eda1d6a836f2f2b56a6abc1446c8a34351cb3180d3db92ffe4ce"
 dependencies = [
  "bitflags",
  "core-foundation",
@@ -3108,9 +3108,9 @@ dependencies = [
 
 [[package]]
 name = "security-framework-sys"
-version = "2.4.2"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9dd14d83160b528b7bfd66439110573efcfbe281b17fc2ca9f39f550d619c7e"
+checksum = "e90dd10c41c6bfc633da6e0c659bd25d31e0791e5974ac42970267d59eba87f7"
 dependencies = [
  "core-foundation-sys",
  "libc",
@@ -3144,9 +3144,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.74"
+version = "1.0.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee2bb9cd061c5865d345bb02ca49fcef1391741b672b54a0bf7b679badec3142"
+checksum = "c059c05b48c5c0067d4b4b2b4f0732dd65feb52daf7e0ea09cd87e7dadc1af79"
 dependencies = [
  "indexmap",
  "itoa 1.0.1",
