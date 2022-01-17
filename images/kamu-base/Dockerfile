@@ -2,7 +2,6 @@ FROM ubuntu:focal
 
 ARG KAMU_VERSION
 
-
 # Podman
 # Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
 RUN apt-get update && \
@@ -39,6 +38,11 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     rm -rf aws*
 
 
+# Tini
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /usr/bin/tini
+RUN chmod +x /usr/bin/tini
+
+
 # Kamu
 RUN wget https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSION/kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
     tar -xf kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
@@ -51,3 +55,5 @@ COPY .kamuconfig /.kamuconfig
 
 RUN mkdir -p /opt/kamu/workspace
 WORKDIR /opt/kamu/workspace
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["bash"]
