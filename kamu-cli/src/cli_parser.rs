@@ -429,6 +429,7 @@ pub fn cli() -> App<'static> {
                 .about("List all datasets in the workspace")
                 .args(&[
                     Arg::new("wide")
+                    .long("wide")
                     .short('w')
                     .multiple_occurrences(true)
                     .help("Show more details (repeat for more)"),
@@ -936,6 +937,7 @@ pub fn cli() -> App<'static> {
             ),
             App::new("system")
                 .about("Command group for system-level functionality")
+                .setting(AppSettings::SubcommandRequiredElseHelp)
                 .subcommands([
                     App::new("api-server")
                         .about("Run HTTP + GraphQL server")

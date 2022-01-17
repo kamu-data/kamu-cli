@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.77.1] - 2022-01-17
+### Fixed
+- CORS policy was too strict not allowing any headers
+- Small CLI parsing tweaks
+
 ## [0.77.0] - 2022-01-16
 ### Added
 - New crate `kamu-adapter-graphql` provides GraphQL interface for ODF repositories.
