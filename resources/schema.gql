@@ -15,6 +15,7 @@ type AccountInfo {
 	avatarUrl: String
 	gravatarId: String
 }
+scalar AccountName
 type Accounts {
 	"""
 	Returns account by its ID
@@ -28,6 +29,10 @@ type Accounts {
 type Auth {
 	githubLogin(code: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
+}
+type BlockInterval {
+	start: Multihash!
+	end: Multihash!
 }
 type BlockRef {
 	name: String!
@@ -51,20 +56,25 @@ enum DataSliceFormat {
 	JSON_SO_A
 	CSV
 }
+type DataSliceMetadata {
+	logicalHash: Multihash!
+	physicalHash: Multihash!
+	interval: OffsetInterval!
+}
 type Dataset {
 	"""
 	Unique identifier of the dataset
 	"""
 	id: DatasetID!
 	"""
-	Returns the user or organization that owns this dataset
-	"""
-	owner: Account!
-	"""
 	Symbolic name of the dataset.
 	Name can change over the dataset's lifetime. For unique identifier use `id()`.
 	"""
-	name: String!
+	name: DatasetName!
+	"""
+	Returns the user or organization that owns this dataset
+	"""
+	owner: Account!
 	"""
 	Returns the kind of a dataset (Root or Derivative)
 	"""
@@ -102,7 +112,6 @@ type DatasetConnection {
 	edges: [DatasetEdge!]!
 }
 type DatasetData {
-	datasetId: DatasetID!
 	"""
 	Total number of records in this dataset
 	"""
@@ -126,7 +135,6 @@ enum DatasetKind {
 	DERIVATIVE
 }
 type DatasetMetadata {
-	datasetId: DatasetID!
 	"""
 	Access to the temporal metadata chain of the dataset
 	"""
@@ -148,15 +156,24 @@ type DatasetMetadata {
 	"""
 	currentDownstreamDependencies: [Dataset!]!
 }
+scalar DatasetName
 type Datasets {
 	"""
 	Returns dataset by its ID
 	"""
 	byId(datasetId: DatasetID!): Dataset
 	"""
+	Returns dataset by its owner and name
+	"""
+	byOwnerAndName(accountName: AccountName!, datasetName: DatasetName!): Dataset
+	"""
 	Returns datasets belonging to the specified account
 	"""
 	byAccountId(accountId: AccountID!, page: Int, perPage: Int! = 15): DatasetConnection!
+	"""
+	Returns datasets belonging to the specified account
+	"""
+	byAccountName(accountName: AccountName!, page: Int, perPage: Int! = 15): DatasetConnection!
 }
 """
 Implement the DateTime<Utc> scalar
@@ -164,15 +181,20 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+type InputSliceMetadata {
+	datasetId: DatasetID!
+	blockInterval: BlockInterval
+	dataInterval: OffsetInterval
+}
 type LoginResponse {
 	token: AccessToken!
 	accountInfo: AccountInfo!
 }
 type MetadataBlock {
+	systemTime: DateTime!
 	blockHash: Multihash!
 	prevBlockHash: Multihash
-	systemTime: DateTime!
-	outputWatermark: DateTime
+	event: MetadataEvent!
 }
 type MetadataBlockConnection {
 	"""
@@ -206,17 +228,56 @@ type MetadataChain {
 	"""
 	blocks(page: Int, perPage: Int! = 20): MetadataBlockConnection!
 }
+interface MetadataEvent {
+	dummy: String!
+}
+type MetadataEventAddData implements MetadataEvent {
+	dummy: String!
+	outputData: DataSliceMetadata!
+	outputWatermark: DateTime
+}
+type MetadataEventExecuteQuery implements MetadataEvent {
+	dummy: String!
+	inputSlices: [InputSliceMetadata!]!
+	outputData: DataSliceMetadata
+	outputWatermark: DateTime
+}
+type MetadataEventSeed implements MetadataEvent {
+	dummy: String!
+	datasetId: DatasetID!
+	datasetKind: DatasetKind!
+}
+type MetadataEventSetPollingSource implements MetadataEvent {
+	dummy: String!
+}
+type MetadataEventSetTransform implements MetadataEvent {
+	dummy: String!
+}
+type MetadataEventSetVocab implements MetadataEvent {
+	dummy: String!
+}
+type MetadataEventSetWatermark implements MetadataEvent {
+	dummy: String!
+	outputWatermark: DateTime!
+}
+type MetadataEventUnsupported implements MetadataEvent {
+	dummy: String!
+}
 scalar Multihash
 type Mutation {
 	auth: Auth!
 }
+type OffsetInterval {
+	start: Int!
+	end: Int!
+}
 type Organization implements Account {
 	"""
-	Unique identifier of this organization account
+	Unique and stable identitfier of this organization account
 	"""
 	id: AccountID!
 	"""
-	Symbolic name
+	Symbolic account name
 	"""
 	name: String!
 }
@@ -279,12 +340,11 @@ type SearchResultEdge {
 }
 type User implements Account {
 	"""
-	Unique identifier of this user account
+	Unique and stable identitfier of this user account
 	"""
-	accountId: AccountID!
 	id: AccountID!
 	"""
-	Symbolic name
+	Symbolic account name
 	"""
 	name: String!
 }
