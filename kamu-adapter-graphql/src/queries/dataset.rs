@@ -14,58 +14,61 @@ use crate::utils::*;
 use async_graphql::*;
 use chrono::prelude::*;
 use kamu::domain;
+use opendatafabric as odf;
 
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
+#[derive(Debug, Clone)]
 pub(crate) struct Dataset {
-    #[graphql(skip)]
-    account_id: AccountID,
-
-    /// Unique identifier of the dataset
-    id: DatasetID,
+    account: Account,
+    dataset_handle: odf::DatasetHandle,
 }
 
-#[ComplexObject]
+#[Object]
 impl Dataset {
     #[graphql(skip)]
-    pub fn new(account_id: AccountID, id: DatasetID) -> Self {
-        Self { account_id, id }
+    pub fn new(account: Account, dataset_handle: odf::DatasetHandle) -> Self {
+        Self {
+            account,
+            dataset_handle,
+        }
     }
 
     #[graphql(skip)]
     fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.id.as_local_ref())?)
+        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
     }
 
-    /// Returns the user or organization that owns this dataset
-    async fn owner(&self) -> Account {
-        Account::User(User::new(self.account_id.clone()))
+    /// Unique identifier of the dataset
+    async fn id(&self) -> DatasetID {
+        self.dataset_handle.id.clone().into()
     }
 
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use `id()`.
-    async fn name(&self, ctx: &Context<'_>) -> Result<String> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let hdl = dataset_reg.resolve_dataset_ref(&self.id.as_local_ref())?;
-        Ok(hdl.name.into())
+    async fn name(&self) -> DatasetName {
+        self.dataset_handle.name.clone().into()
+    }
+
+    /// Returns the user or organization that owns this dataset
+    async fn owner(&self) -> &Account {
+        &self.account
     }
 
     /// Returns the kind of a dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.id.as_local_ref())?;
+        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
         Ok(summary.kind.into())
     }
 
     /// Access to the data of the dataset
     async fn data(&self) -> DatasetData {
-        DatasetData::new(self.id.clone())
+        DatasetData::new(self.dataset_handle.clone())
     }
 
     /// Access to the metadata of the dataset
     async fn metadata(&self) -> DatasetMetadata {
-        DatasetMetadata::new(self.id.clone())
+        DatasetMetadata::new(self.dataset_handle.clone())
     }
 
     // TODO: Performance

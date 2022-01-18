@@ -7,5 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod types;
-pub(crate) use types::*;
+mod account;
+pub(crate) use account::*;
+
+mod multihash;
+pub(crate) use multihash::*;
+
+mod pagination;
+pub(crate) use pagination::*;
+
+mod dataset;
+pub(crate) use dataset::*;

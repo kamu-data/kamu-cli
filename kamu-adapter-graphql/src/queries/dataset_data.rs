@@ -12,32 +12,31 @@ use crate::utils::*;
 
 use async_graphql::*;
 use kamu::domain;
+use opendatafabric as odf;
 
-#[derive(SimpleObject)]
-#[graphql(complex)]
 pub(crate) struct DatasetData {
-    pub dataset_id: DatasetID,
+    dataset_handle: odf::DatasetHandle,
 }
 
-#[ComplexObject]
+#[Object]
 impl DatasetData {
     #[graphql(skip)]
-    pub fn new(dataset_id: DatasetID) -> Self {
-        Self { dataset_id }
+    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+        Self { dataset_handle }
     }
 
     /// Total number of records in this dataset
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_id.as_local_ref())?;
+        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
         Ok(summary.num_records)
     }
 
     /// An estimated size of data on disk not accounting for replication or caching
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_id.as_local_ref())?;
+        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
         Ok(summary.data_size)
     }
 
@@ -53,7 +52,10 @@ impl DatasetData {
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let df = query_svc
-            .tail(&self.dataset_id.as_local_ref(), num_records.unwrap_or(20))
+            .tail(
+                &self.dataset_handle.as_local_ref(),
+                num_records.unwrap_or(20),
+            )
             .await?;
         let records = df.collect().await?;
 

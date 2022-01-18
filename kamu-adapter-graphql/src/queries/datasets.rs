@@ -23,21 +23,40 @@ impl Datasets {
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
-        match dataset_reg.get_metadata_chain(&dataset_id.as_local_ref()) {
-            Ok(_) => Ok(Some(Dataset::new(AccountID::mock(), dataset_id))),
+        match dataset_reg.resolve_dataset_ref(&dataset_id.as_local_ref()) {
+            Ok(hdl) => Ok(Some(Dataset::new(Account::mock(), hdl))),
             Err(domain::DomainError::DoesNotExist { .. }) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
     // TODO: Multitenancy
-    /// Returns datasets belonging to the specified account
-    async fn by_account_id(
+    /// Returns dataset by its owner and name
+    #[allow(unused_variables)]
+    async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
+        account_name: AccountName,
+        dataset_name: DatasetName,
+    ) -> Result<Option<Dataset>> {
+        let account = Account::mock();
+        let cat = ctx.data::<dill::Catalog>().unwrap();
+        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+        match dataset_reg.resolve_dataset_ref(&dataset_name.as_local_ref()) {
+            Ok(hdl) => Ok(Some(Dataset::new(Account::mock(), hdl))),
+            Err(domain::DomainError::DoesNotExist { .. }) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    // TODO: Multitenancy
+    #[graphql(skip)]
+    async fn by_account_impl(
+        &self,
+        ctx: &Context<'_>,
+        account: Account,
         page: Option<usize>,
-        #[graphql(default = 15)] per_page: usize,
+        per_page: usize,
     ) -> Result<DatasetConnection> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
@@ -48,7 +67,7 @@ impl Datasets {
             .get_all_datasets()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| Dataset::new(account_id.clone(), hdl.id.into()))
+            .map(|hdl| Dataset::new(account.clone(), hdl))
             .collect();
 
         // TODO: Slow but temporary
@@ -60,6 +79,32 @@ impl Datasets {
             per_page,
             Some(total_count),
         ))
+    }
+
+    /// Returns datasets belonging to the specified account
+    #[allow(unused_variables)]
+    async fn by_account_id(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        page: Option<usize>,
+        #[graphql(default = 15)] per_page: usize,
+    ) -> Result<DatasetConnection> {
+        let account = Account::mock();
+        self.by_account_impl(ctx, account, page, per_page).await
+    }
+
+    /// Returns datasets belonging to the specified account
+    #[allow(unused_variables)]
+    async fn by_account_name(
+        &self,
+        ctx: &Context<'_>,
+        account_name: AccountName,
+        page: Option<usize>,
+        #[graphql(default = 15)] per_page: usize,
+    ) -> Result<DatasetConnection> {
+        let account = Account::mock();
+        self.by_account_impl(ctx, account, page, per_page).await
     }
 }
 

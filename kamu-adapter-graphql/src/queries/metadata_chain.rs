@@ -58,20 +58,20 @@ pub(crate) struct BlockRef {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct MetadataChain {
-    dataset_id: DatasetID,
+    dataset_handle: odf::DatasetHandle,
 }
 
 #[Object]
 impl MetadataChain {
     #[graphql(skip)]
-    pub fn new(dataset_id: DatasetID) -> Self {
-        Self { dataset_id }
+    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+        Self { dataset_handle }
     }
 
     #[graphql(skip)]
     fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.dataset_id.as_local_ref())?)
+        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
     }
 
     /// Returns all named metadata block references

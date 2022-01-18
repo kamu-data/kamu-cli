@@ -10,6 +10,7 @@
 use crate::scalars::*;
 
 use async_graphql::*;
+use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -23,53 +24,71 @@ pub(crate) enum Account {
     Organization(Organization),
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub(crate) struct User {
-    /// Unique identifier of this user account
-    account_id: AccountID,
+impl Account {
+    // TODO: MOCK
+    pub(crate) fn mock() -> Self {
+        Self::User(User::new(
+            AccountID::from("1"),
+            odf::AccountName::try_from("anonymous").unwrap().into(),
+        ))
+    }
 }
 
-#[ComplexObject]
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub(crate) struct User {
+    account_id: AccountID,
+    account_name: AccountName,
+}
+
+#[Object]
 impl User {
     #[graphql(skip)]
-    pub fn new(id: AccountID) -> Self {
-        Self { account_id: id }
+    pub fn new(account_id: AccountID, account_name: AccountName) -> Self {
+        Self {
+            account_id,
+            account_name,
+        }
     }
 
+    /// Unique and stable identitfier of this user account
     async fn id(&self) -> &AccountID {
         &self.account_id
     }
 
-    // TODO: UNMOCK
-    /// Symbolic name
+    /// Symbolic account name
     async fn name(&self) -> &str {
-        "anonymous"
+        &self.account_name
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
+#[derive(Debug, Clone)]
 pub(crate) struct Organization {
-    /// Unique identifier of this organization account
-    id: AccountID,
+    account_id: AccountID,
+    account_name: AccountName,
 }
 
-#[ComplexObject]
+#[Object]
 impl Organization {
     #[allow(dead_code)]
     #[graphql(skip)]
-    pub fn new(id: AccountID) -> Self {
-        Self { id }
+    pub fn new(account_id: AccountID, account_name: AccountName) -> Self {
+        Self {
+            account_id,
+            account_name,
+        }
     }
 
-    // TODO: UNMOCK
-    /// Symbolic name
+    /// Unique and stable identitfier of this organization account
+    async fn id(&self) -> &AccountID {
+        &self.account_id
+    }
+
+    /// Symbolic account name
     async fn name(&self) -> &str {
-        "anonymous"
+        &self.account_name
     }
 }

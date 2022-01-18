@@ -39,7 +39,7 @@ impl Search {
             .filter(|hdl| hdl.name.contains(&query))
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| SearchResult::Dataset(Dataset::new(AccountID::mock(), hdl.id.into())))
+            .map(|hdl| SearchResult::Dataset(Dataset::new(Account::mock(), hdl)))
             .collect();
 
         // TODO: Slow but temporary

@@ -18,28 +18,26 @@ use kamu::infra;
 use opendatafabric as odf;
 use opendatafabric::IntoDataStreamBlock;
 
-#[derive(SimpleObject)]
-#[graphql(complex)]
 pub(crate) struct DatasetMetadata {
-    pub dataset_id: DatasetID,
+    dataset_handle: odf::DatasetHandle,
 }
 
-#[ComplexObject]
+#[Object]
 impl DatasetMetadata {
     #[graphql(skip)]
-    pub fn new(dataset_id: DatasetID) -> Self {
-        Self { dataset_id }
+    pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
+        Self { dataset_handle }
     }
 
     #[graphql(skip)]
     fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.dataset_id.as_local_ref())?)
+        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
     }
 
     /// Access to the temporal metadata chain of the dataset
     async fn chain(&self) -> MetadataChain {
-        MetadataChain::new(self.dataset_id.clone())
+        MetadataChain::new(self.dataset_handle.clone())
     }
 
     /// Last recorded watermark
@@ -59,7 +57,7 @@ impl DatasetMetadata {
     ) -> Result<DataSchema> {
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let schema = query_svc
-            .get_schema(&self.dataset_id.as_local_ref())
+            .get_schema(&self.dataset_handle.as_local_ref())
             .await?;
 
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
@@ -84,31 +82,34 @@ impl DatasetMetadata {
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_id.as_local_ref())?;
+        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
         Ok(summary
             .dependencies
             .into_iter()
-            .map(|i| Dataset::new(AccountID::mock(), i.id.unwrap().into()))
+            .map(|i| {
+                Dataset::new(
+                    Account::mock(),
+                    odf::DatasetHandle::new(i.id.unwrap(), i.name),
+                )
+            })
             .collect())
     }
 
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dataset_id: odf::DatasetID = self.dataset_id.clone().into();
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
         // TODO: This is really slow
         Ok(dataset_reg
             .get_all_datasets()
-            .filter(|hdl| hdl.id != dataset_id)
+            .filter(|hdl| hdl.id != self.dataset_handle.id)
             .map(|hdl| dataset_reg.get_summary(&hdl.as_local_ref()).unwrap())
             .filter(|sum| {
                 sum.dependencies
                     .iter()
-                    .any(|i| i.id.as_ref() == Some(&dataset_id))
+                    .any(|i| i.id.as_ref() == Some(&self.dataset_handle.id))
             })
-            .map(|sum| sum.id)
-            .map(|id| Dataset::new(AccountID::mock(), id.into()))
+            .map(|sum| Dataset::new(Account::mock(), odf::DatasetHandle::new(sum.id, sum.name)))
             .collect())
     }
 }
