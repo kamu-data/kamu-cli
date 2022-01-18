@@ -7,41 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::queries::*;
 use crate::scalars::*;
 use crate::utils::*;
 
 use async_graphql::*;
-use chrono::prelude::*;
 use kamu::domain;
 use opendatafabric as odf;
-
-////////////////////////////////////////////////////////////////////////////////////////
-// MetadataBlock
-////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub(crate) struct MetadataBlock {
-    block_hash: Multihash,
-    prev_block_hash: Option<Multihash>,
-    system_time: DateTime<Utc>,
-    //pub output_slice: Option<DataSlice>,
-    output_watermark: Option<DateTime<Utc>>,
-    //pub input_slices: Option<Vec<DataSlice>>,
-    //pub source: Option<DatasetSource>,
-    //pub vocab: Option<DatasetVocabulary>,
-}
-
-impl MetadataBlock {
-    pub fn new(hash: odf::Multihash, block: odf::MetadataBlock) -> Self {
-        Self {
-            block_hash: hash.into(),
-            prev_block_hash: block.prev_block_hash.map(|v| v.into()),
-            system_time: block.system_time,
-            // TODO
-            output_watermark: None,
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef

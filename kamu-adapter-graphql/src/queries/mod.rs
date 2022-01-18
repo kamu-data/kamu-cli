@@ -25,6 +25,9 @@ pub(crate) use dataset::*;
 mod datasets;
 pub(crate) use datasets::*;
 
+mod metadata_block;
+pub(crate) use metadata_block::*;
+
 mod metadata_chain;
 pub(crate) use metadata_chain::*;
 

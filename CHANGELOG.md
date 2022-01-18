@@ -6,10 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.78.0] - 2022-01-17
+### Added
+- Evolving the GraphQL API to support multiple `MetadataEvent` types.
+
 ## [0.77.1] - 2022-01-17
 ### Fixed
-- CORS policy was too strict not allowing any headers
-- Small CLI parsing tweaks
+- CORS policy was too strict not allowing any headers.
+- Small CLI parsing tweaks.
 
 ## [0.77.0] - 2022-01-16
 ### Added
