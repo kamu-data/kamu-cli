@@ -1,6 +1,6 @@
 [package]
 name = "container-runtime"
-version = "0.78.0"
+version = "0.78.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../../LICENSE.txt"
@@ -9,7 +9,7 @@ license-file = "../../LICENSE.txt"
 skip_docker_tests = []
 
 [dependencies]
-dill = { version = "~0.2.0" }
+dill = "~0.3"
 regex = "*"
 serde = { version = "*", features = ["derive"] }
 thiserror = "*"

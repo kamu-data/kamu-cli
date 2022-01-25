@@ -1,12 +1,12 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.78.0"
+version = "0.78.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 
 [dependencies]
 # Kamu
-dill = "^0.2"
+dill = "~0.3"
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 

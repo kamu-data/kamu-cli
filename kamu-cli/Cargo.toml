@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.78.0"
+version = "0.78.1"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -15,7 +15,7 @@ categories = ["command-line-utilities"]
 skip_docker_tests = []
 
 [dependencies]
-dill = { version = "~0.2.0" }
+dill = "~0.3"
 # dill = { path = "../../dill" }
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }

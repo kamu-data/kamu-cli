@@ -20,11 +20,11 @@ async fn query() {
 
     let workspace_layout = infra::WorkspaceLayout::create(tempdir.path()).unwrap();
 
-    let mut cat = dill::Catalog::new();
-    cat.add_value(workspace_layout);
-    cat.add::<infra::DatasetRegistryImpl>();
-    cat.bind::<dyn DatasetRegistry, infra::DatasetRegistryImpl>()
-        .unwrap();
+    let cat = dill::CatalogBuilder::new()
+        .add_value(workspace_layout)
+        .add::<infra::DatasetRegistryImpl>()
+        .bind::<dyn DatasetRegistry, infra::DatasetRegistryImpl>()
+        .build();
 
     let dataset_reg = cat.get_one::<dyn DatasetRegistry>().unwrap();
     dataset_reg

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.78.1] - 2022-01-24
+### Changed
+- Upgraded to latest version of `dill` and other dependencies.
+
 ## [0.78.0] - 2022-01-17
 ### Added
 - Evolving the GraphQL API to support multiple `MetadataEvent` types.

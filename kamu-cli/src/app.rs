@@ -40,21 +40,26 @@ pub async fn run(
 ) -> Result<(), CLIError> {
     prepare_run_dir(&workspace_layout.run_info_dir);
 
-    let mut catalog = configure_catalog().unwrap();
-    catalog.add_value(workspace_layout.clone());
-    catalog.add_value(local_volume_layout.clone());
+    // Configure application
+    let catalog = {
+        let mut catalog_builder = configure_catalog();
+        catalog_builder.add_value(workspace_layout.clone());
+        catalog_builder.add_value(local_volume_layout.clone());
 
-    let output_format = configure_output_format(&matches);
-    catalog.add_value(output_format.clone());
+        let output_format = configure_output_format(&matches);
+        catalog_builder.add_value(output_format.clone());
 
-    let _guard = configure_logging(&output_format, &workspace_layout);
-    info!(
-        version = VERSION,
-        args = ?std::env::args().collect::<Vec<_>>(),
-        "Initializing kamu-cli"
-    );
+        let _guard = configure_logging(&output_format, &workspace_layout);
+        info!(
+            version = VERSION,
+            args = ?std::env::args().collect::<Vec<_>>(),
+            "Initializing kamu-cli"
+        );
 
-    load_config(&mut catalog);
+        load_config(&workspace_layout, &mut catalog_builder);
+
+        catalog_builder.build()
+    };
 
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
 
@@ -80,65 +85,65 @@ pub async fn run(
 // Catalog
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_catalog() -> Result<Catalog, InjectionError> {
-    let mut catalog = Catalog::new();
+fn configure_catalog() -> CatalogBuilder {
+    let mut b = CatalogBuilder::new();
 
-    catalog.add::<ConfigService>();
-    catalog.add::<ContainerRuntime>();
+    b.add::<ConfigService>();
+    b.add::<ContainerRuntime>();
 
-    catalog.add::<DatasetRegistryImpl>();
-    catalog.bind::<dyn DatasetRegistry, DatasetRegistryImpl>()?;
+    b.add::<DatasetRegistryImpl>();
+    b.bind::<dyn DatasetRegistry, DatasetRegistryImpl>();
 
-    catalog.add::<RemoteRepositoryRegistryImpl>();
-    catalog.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()?;
+    b.add::<RemoteRepositoryRegistryImpl>();
+    b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
-    catalog.add::<RemoteAliasesRegistryImpl>();
-    catalog.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>()?;
+    b.add::<RemoteAliasesRegistryImpl>();
+    b.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
-    catalog.add::<ResourceLoaderImpl>();
-    catalog.bind::<dyn ResourceLoader, ResourceLoaderImpl>()?;
+    b.add::<ResourceLoaderImpl>();
+    b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
-    catalog.add::<IngestServiceImpl>();
-    catalog.bind::<dyn IngestService, IngestServiceImpl>()?;
+    b.add::<IngestServiceImpl>();
+    b.bind::<dyn IngestService, IngestServiceImpl>();
 
-    catalog.add::<TransformServiceImpl>();
-    catalog.bind::<dyn TransformService, TransformServiceImpl>()?;
+    b.add::<TransformServiceImpl>();
+    b.bind::<dyn TransformService, TransformServiceImpl>();
 
-    catalog.add::<VerificationServiceImpl>();
-    catalog.bind::<dyn VerificationService, VerificationServiceImpl>()?;
+    b.add::<VerificationServiceImpl>();
+    b.bind::<dyn VerificationService, VerificationServiceImpl>();
 
-    catalog.add::<SearchServiceImpl>();
-    catalog.bind::<dyn SearchService, SearchServiceImpl>()?;
+    b.add::<SearchServiceImpl>();
+    b.bind::<dyn SearchService, SearchServiceImpl>();
 
-    catalog.add::<SyncServiceImpl>();
-    catalog.bind::<dyn SyncService, SyncServiceImpl>()?;
+    b.add::<SyncServiceImpl>();
+    b.bind::<dyn SyncService, SyncServiceImpl>();
 
-    catalog.add::<PullServiceImpl>();
-    catalog.bind::<dyn PullService, PullServiceImpl>()?;
+    b.add::<PullServiceImpl>();
+    b.bind::<dyn PullService, PullServiceImpl>();
 
-    catalog.add::<PushServiceImpl>();
-    catalog.bind::<dyn PushService, PushServiceImpl>()?;
+    b.add::<PushServiceImpl>();
+    b.bind::<dyn PushService, PushServiceImpl>();
 
-    catalog.add::<ProvenanceServiceImpl>();
-    catalog.bind::<dyn ProvenanceService, ProvenanceServiceImpl>()?;
+    b.add::<ProvenanceServiceImpl>();
+    b.bind::<dyn ProvenanceService, ProvenanceServiceImpl>();
 
-    catalog.add::<QueryServiceImpl>();
-    catalog.bind::<dyn QueryService, QueryServiceImpl>()?;
+    b.add::<QueryServiceImpl>();
+    b.bind::<dyn QueryService, QueryServiceImpl>();
 
-    catalog.add::<RepositoryFactory>();
+    b.add::<RepositoryFactory>();
 
-    catalog.add::<EngineProvisionerLocal>();
-    catalog.bind::<dyn EngineProvisioner, EngineProvisionerLocal>()?;
+    b.add::<EngineProvisionerLocal>();
+    b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
-    Ok(catalog)
+    b
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Config
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn load_config(catalog: &mut Catalog) {
-    let config_svc = catalog.get_one::<ConfigService>().unwrap();
+fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder) {
+    let config_svc = ConfigService::new(workspace_layout);
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
     info!(config = ?config, "Loaded configuration");

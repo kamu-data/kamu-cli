@@ -16,10 +16,11 @@ use opendatafabric::*;
 
 #[tokio::test]
 async fn dataset_by_id_does_not_exist() {
-    let mut cat = dill::Catalog::new();
-    cat.add_value(infra::DatasetRegistryNull);
-    cat.bind::<dyn DatasetRegistry, infra::DatasetRegistryNull>()
-        .unwrap();
+    let cat = dill::CatalogBuilder::new()
+        .add_value(infra::DatasetRegistryNull)
+        .bind::<dyn DatasetRegistry, infra::DatasetRegistryNull>()
+        .build();
+
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema 
         .execute("{ datasets { byId (datasetId: \"did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM\") { name } } }")
@@ -40,11 +41,11 @@ async fn dataset_by_id() {
 
     let workspace_layout = infra::WorkspaceLayout::create(tempdir.path()).unwrap();
 
-    let mut cat = dill::Catalog::new();
-    cat.add_value(workspace_layout);
-    cat.add::<infra::DatasetRegistryImpl>();
-    cat.bind::<dyn DatasetRegistry, infra::DatasetRegistryImpl>()
-        .unwrap();
+    let cat = dill::CatalogBuilder::new()
+        .add_value(workspace_layout)
+        .add::<infra::DatasetRegistryImpl>()
+        .bind::<dyn DatasetRegistry, infra::DatasetRegistryImpl>()
+        .build();
 
     let dataset_reg = cat.get_one::<dyn DatasetRegistry>().unwrap();
     let (dataset_handle, _) = dataset_reg
