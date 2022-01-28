@@ -33,7 +33,7 @@ macro_rules! page_based_connection {
             #[graphql(skip)]
             pub fn new(
                 nodes: Vec<$node_type>,
-                page: usize,
+                current_page: usize,
                 per_page: usize,
                 total_count: Option<usize>,
             ) -> Self {
@@ -42,7 +42,7 @@ macro_rules! page_based_connection {
                     Some(0) => (Some(0), false),
                     Some(tc) => (
                         Some(tc.unstable_div_ceil(per_page)),
-                        (tc.unstable_div_ceil(per_page) - 1) > page,
+                        (tc.unstable_div_ceil(per_page) - 1) > current_page,
                     ),
                 };
 
@@ -50,8 +50,9 @@ macro_rules! page_based_connection {
                     nodes,
                     total_count,
                     page_info: crate::scalars::PageBasedInfo {
-                        has_previous_page: page > 0,
+                        has_previous_page: current_page > 0,
                         has_next_page,
+                        current_page,
                         total_pages,
                     },
                 }
@@ -81,6 +82,9 @@ pub(crate) struct PageBasedInfo {
 
     /// When paginating forwards, are there more items?
     pub has_next_page: bool,
+
+    /// Index of the current page
+    pub current_page: usize,
 
     /// Approximate number of total pages assuming number of nodes per page stays the same
     pub total_pages: Option<usize>,
