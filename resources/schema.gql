@@ -291,6 +291,10 @@ type PageBasedInfo {
 	"""
 	hasNextPage: Boolean!
 	"""
+	Index of the current page
+	"""
+	currentPage: Int!
+	"""
 	Approximate number of total pages assuming number of nodes per page stays the same
 	"""
 	totalPages: Int
