@@ -13,25 +13,21 @@ use datafusion::parquet::{
     schema::types::Type,
 };
 use datafusion::{
-    arrow::datatypes::Schema,
     catalog::{catalog::CatalogProvider, schema::SchemaProvider},
-    datasource::{
-        datasource::{Statistics, TableProviderFilterPushDown},
-        TableProvider, TableType,
-    },
-    error::DataFusionError,
-    logical_plan::combine_filters,
-    physical_plan::{parquet::ParquetExec, ExecutionPlan},
+    datasource::TableProvider,
     prelude::*,
 };
 use dill::*;
 use opendatafabric::*;
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tracing::info_span;
 
 use crate::domain::*;
 
-use super::{DatasetLayout, VolumeLayout};
+use super::{utils::datafusion_hacks::ListingTableOfFiles, DatasetLayout, VolumeLayout};
 
 pub struct QueryServiceImpl {
     dataset_reg: Arc<dyn DatasetRegistry>,
@@ -45,20 +41,6 @@ impl QueryServiceImpl {
             dataset_reg,
             volume_layout,
         }
-    }
-
-    // Unfortunately there are some deficiencies in datafusion/arrow that we have to work around in this nasty way
-    fn catch_panic<F: FnOnce() -> R + std::panic::UnwindSafe, R>(
-        f: F,
-    ) -> Result<R, Box<dyn std::any::Any + Send + 'static>> {
-        let old_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| ()));
-
-        // TODO: This is necessary because datafusion currently panics on schemas with nesting
-        let res = std::panic::catch_unwind(f);
-
-        std::panic::set_hook(old_hook);
-        res
     }
 }
 
@@ -165,7 +147,7 @@ impl QueryService for QueryServiceImpl {
             )),
         );
 
-        Ok(ctx.sql(statement)?)
+        Ok(ctx.sql(statement).await?)
     }
 
     async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
@@ -259,14 +241,18 @@ impl KamuSchema {
     fn has_data(&self, dataset_handle: &DatasetHandle) -> bool {
         let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
         let files = self.collect_data_files(dataset_handle, limit);
+
         if files.is_empty() {
             return false;
         }
 
-        // TODO: DataFusion currently panics on schemas with nesting
-        QueryServiceImpl::catch_panic(|| DatasetTable::try_new(files).is_ok())
-            .ok()
-            .unwrap_or(false)
+        !Self::is_nested(files.first().unwrap())
+    }
+
+    fn is_nested(file: &Path) -> bool {
+        let reader = SerializedFileReader::new(std::fs::File::open(file).unwrap()).unwrap();
+        let schema = reader.metadata().file_metadata().schema();
+        schema.get_fields().iter().any(|f| f.is_group())
     }
 
     fn collect_data_files(
@@ -348,96 +334,23 @@ impl SchemaProvider for KamuSchema {
         if files.is_empty() {
             None
         } else {
-            // TODO: Have to unwrap as no way to return error, should we read schema lazily?
-            Some(Arc::new(DatasetTable::try_new(files).unwrap()))
+            // TODO: Datafusion made it difficult to lazily create table providers,
+            // so we have to resort to spawning a thread to call an async function
+            // See: https://github.com/apache/arrow-datafusion/issues/1792
+            let table = std::thread::spawn(move || {
+                let runtime = tokio::runtime::Runtime::new().unwrap();
+                runtime.block_on(ListingTableOfFiles::new_with_defaults(
+                    files
+                        .into_iter()
+                        .map(|p| p.to_string_lossy().into())
+                        .collect(),
+                ))
+            })
+            .join()
+            .unwrap()
+            .unwrap();
+
+            Some(Arc::new(table))
         }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// Based heavily on datafusion::ParquetTable
-// TODO: Migrate to ParquetTable once it supports explicit filenames
-struct DatasetTable {
-    files: Vec<PathBuf>,
-    schema: Arc<Schema>,
-    statistics: Statistics,
-    max_concurrency: usize,
-    enable_pruning: bool,
-}
-
-impl DatasetTable {
-    fn try_new(files: Vec<PathBuf>) -> Result<Self, DataFusionError> {
-        let max_concurrency = 1;
-        let files_ref: Vec<&str> = files.iter().map(|p| p.to_str().unwrap()).collect();
-        let parquet_exec =
-            ParquetExec::try_from_files(&files_ref, None, None, 0, max_concurrency, None)?;
-        let schema = parquet_exec.schema();
-        let statistics = parquet_exec.statistics().clone();
-        Ok(Self {
-            files,
-            schema,
-            statistics,
-            max_concurrency,
-            enable_pruning: true,
-        })
-    }
-}
-
-impl TableProvider for DatasetTable {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn schema(&self) -> datafusion::arrow::datatypes::SchemaRef {
-        self.schema.clone()
-    }
-
-    fn scan(
-        &self,
-        projection: &Option<Vec<usize>>,
-        batch_size: usize,
-        filters: &[datafusion::logical_plan::Expr],
-        limit: Option<usize>,
-    ) -> datafusion::error::Result<Arc<dyn datafusion::physical_plan::ExecutionPlan>> {
-        let files_ref: Vec<&str> = self.files.iter().map(|s| s.to_str().unwrap()).collect();
-
-        // If enable pruning then combine the filters to build the predicate.
-        // If disable pruning then set the predicate to None, thus readers
-        // will not prune data based on the statistics.
-        let predicate = if self.enable_pruning {
-            combine_filters(filters)
-        } else {
-            None
-        };
-        Ok(Arc::new(ParquetExec::try_from_files(
-            &files_ref,
-            projection.clone(),
-            predicate,
-            limit
-                .map(|l| std::cmp::min(l, batch_size))
-                .unwrap_or(batch_size),
-            self.max_concurrency,
-            limit,
-        )?))
-    }
-
-    fn statistics(&self) -> Statistics {
-        self.statistics.clone()
-    }
-
-    fn table_type(&self) -> TableType {
-        TableType::Base
-    }
-
-    fn has_exact_statistics(&self) -> bool {
-        true
-    }
-
-    fn supports_filter_pushdown(
-        &self,
-        _filter: &datafusion::logical_plan::Expr,
-    ) -> datafusion::error::Result<TableProviderFilterPushDown> {
-        Ok(TableProviderFilterPushDown::Inexact)
     }
 }

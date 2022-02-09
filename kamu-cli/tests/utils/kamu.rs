@@ -12,13 +12,13 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use datafusion::parquet::file::reader::FileReader;
+use datafusion::parquet::file::serialized_reader::SerializedFileReader;
 use kamu::domain::DatasetRegistry;
 use kamu::infra::*;
 use kamu_cli::CLIError;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
-use parquet::file::reader::FileReader;
-use parquet::file::serialized_reader::SerializedFileReader;
 use thiserror::Error;
 
 // Test wrapper on top of CLI library
@@ -164,7 +164,7 @@ impl ParquetHelper {
     pub fn records<F, R>(&self, row_mapper: F) -> Vec<R>
     where
         R: Ord,
-        F: Fn(parquet::record::Row) -> R,
+        F: Fn(datafusion::parquet::record::Row) -> R,
     {
         let mut records: Vec<_> = self
             .reader

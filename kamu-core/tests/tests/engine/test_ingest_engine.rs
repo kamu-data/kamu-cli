@@ -14,7 +14,7 @@ use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
-use parquet::{
+use datafusion::parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };

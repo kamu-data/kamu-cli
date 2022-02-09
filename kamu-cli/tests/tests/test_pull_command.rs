@@ -9,9 +9,9 @@
 
 use std::path::Path;
 
+use datafusion::parquet::record::RowAccessor;
 use indoc::indoc;
 use opendatafabric::*;
-use parquet::record::RowAccessor;
 use url::Url;
 
 use crate::utils::Kamu;

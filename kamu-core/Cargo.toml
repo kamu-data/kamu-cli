@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.78.2"
+version = "0.79.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -34,9 +34,8 @@ zip = "*"
 ringbuf = "*"
 
 # Data
-arrow-digest = { version = "*", default-features = false, features = ["use-arrow-5"] }  # Data hashing (in-house library)
-datafusion = "^5"  # Reading data + SQL
-parquet = "*"
+arrow-digest = "*"  # Data hashing (in-house library)
+datafusion = "*"  # Reading data + SQL
 digest = "*"
 sha3 = "*"
 
