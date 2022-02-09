@@ -96,6 +96,14 @@ impl InspectSchemaCommand {
         kamu::infra::utils::schema_utils::write_schema_parquet(&mut std::io::stdout(), schema)?;
         Ok(())
     }
+
+    fn print_schema_json(&self, schema: &Type) -> Result<(), CLIError> {
+        kamu::infra::utils::schema_utils::write_schema_parquet_json(
+            &mut std::io::stdout(),
+            schema,
+        )?;
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -114,6 +122,7 @@ impl Command for InspectSchemaCommand {
         match self.output_format.as_ref().map(|s| s.as_str()) {
             None | Some("ddl") => self.print_schema_ddl(&schema),
             Some("parquet") => self.print_schema_parquet(&schema)?,
+            Some("json") => self.print_schema_json(&schema)?,
             _ => unreachable!(),
         }
 

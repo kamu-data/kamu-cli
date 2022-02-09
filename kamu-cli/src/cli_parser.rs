@@ -405,7 +405,9 @@ pub fn cli() -> App<'static> {
                                 .takes_value(true)
                                 .value_name("FMT")
                                 .possible_values(&[
-                                    "ddl", "parquet"
+                                    "ddl",
+                                    "parquet",
+                                    "json",
                                 ])
                                 .help("Format of an output"),
                         ])
