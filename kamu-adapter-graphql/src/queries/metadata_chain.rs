@@ -35,6 +35,8 @@ pub(crate) struct MetadataChain {
 
 #[Object]
 impl MetadataChain {
+    const DEFAULT_BLOCKS_PER_PAGE: usize = 20;
+
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self { dataset_handle }
@@ -74,11 +76,12 @@ impl MetadataChain {
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
-        #[graphql(default = 20)] per_page: usize,
+        per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
         let chain = self.get_chain(ctx)?;
 
         let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
         let nodes: Vec<_> = chain
             .iter_blocks()

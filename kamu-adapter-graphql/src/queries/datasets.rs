@@ -19,6 +19,8 @@ pub(crate) struct Datasets;
 
 #[Object]
 impl Datasets {
+    const DEFAULT_PER_PAGE: usize = 15;
+
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
@@ -56,12 +58,13 @@ impl Datasets {
         ctx: &Context<'_>,
         account: Account,
         page: Option<usize>,
-        per_page: usize,
+        per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
 
         let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
         let nodes: Vec<_> = dataset_reg
             .get_all_datasets()
@@ -88,7 +91,7 @@ impl Datasets {
         ctx: &Context<'_>,
         account_id: AccountID,
         page: Option<usize>,
-        #[graphql(default = 15)] per_page: usize,
+        per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
         let account = Account::mock();
         self.by_account_impl(ctx, account, page, per_page).await
@@ -101,7 +104,7 @@ impl Datasets {
         ctx: &Context<'_>,
         account_name: AccountName,
         page: Option<usize>,
-        #[graphql(default = 15)] per_page: usize,
+        per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
         let account = Account::mock();
         self.by_account_impl(ctx, account, page, per_page).await

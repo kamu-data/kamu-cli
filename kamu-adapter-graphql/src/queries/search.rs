@@ -21,18 +21,21 @@ pub(crate) struct Search;
 
 #[Object]
 impl Search {
+    const DEFAULT_RESULTS_PER_PAGE: usize = 15;
+
     /// Perform search across all resources
     async fn query(
         &self,
         ctx: &Context<'_>,
         query: String,
         page: Option<usize>,
-        #[graphql(default = 15)] per_page: usize,
+        per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
 
         let page = page.unwrap_or(0);
+        let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let nodes: Vec<_> = dataset_reg
             .get_all_datasets()

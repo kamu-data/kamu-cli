@@ -169,11 +169,11 @@ type Datasets {
 	"""
 	Returns datasets belonging to the specified account
 	"""
-	byAccountId(accountId: AccountID!, page: Int, perPage: Int! = 15): DatasetConnection!
+	byAccountId(accountId: AccountID!, page: Int, perPage: Int): DatasetConnection!
 	"""
 	Returns datasets belonging to the specified account
 	"""
-	byAccountName(accountName: AccountName!, page: Int, perPage: Int! = 15): DatasetConnection!
+	byAccountName(accountName: AccountName!, page: Int, perPage: Int): DatasetConnection!
 }
 """
 Implement the DateTime<Utc> scalar
@@ -226,7 +226,7 @@ type MetadataChain {
 	"""
 	Iterates all metadata blocks in the reverse chronological order
 	"""
-	blocks(page: Int, perPage: Int! = 20): MetadataBlockConnection!
+	blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
 interface MetadataEvent {
 	dummy: String!
@@ -321,7 +321,7 @@ type Search {
 	"""
 	Perform search across all resources
 	"""
-	query(query: String!, page: Int, perPage: Int! = 15): SearchResultConnection!
+	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
 }
 union SearchResult = | Dataset
 type SearchResultConnection {
