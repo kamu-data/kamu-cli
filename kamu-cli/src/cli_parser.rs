@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::{App, AppSettings, Arg};
+use clap::{Arg, Command};
 use opendatafabric::*;
 
-fn tabular_output_params<'a>(app: App<'a>) -> App<'a> {
+fn tabular_output_params<'a>(app: Command<'a>) -> Command<'a> {
     app.args(&[
         Arg::new("output-format")
             .long("output-format")
@@ -18,12 +18,12 @@ fn tabular_output_params<'a>(app: App<'a>) -> App<'a> {
             .takes_value(true)
             .value_name("FMT")
             .possible_values(&[
-                "table", // "vertical",
-                "csv",
+                "table", "csv", "json", "json-ld",
+                "json-soa",
+                // "vertical",
                 // "tsv",
                 // "xmlattrs",
                 // "xmlelements",
-                "json", "json-ld", "json-soa",
             ])
             .help("Format to display the results in"),
         /*Arg::new("no-color")
@@ -78,9 +78,10 @@ fn tabular_output_params<'a>(app: App<'a>) -> App<'a> {
     ])
 }
 
-pub fn cli() -> App<'static> {
-    App::new(crate::BINARY_NAME)
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+pub fn cli() -> Command<'static> {
+    Command::new(crate::BINARY_NAME)
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .version(crate::VERSION)
         .args(&[
             Arg::new("verbose")
@@ -100,7 +101,7 @@ pub fn cli() -> App<'static> {
             "
         ))
         .subcommands([
-            App::new("add")
+            Command::new("add")
                 .about("Add a new dataset or modify an existing one")
                 .args(&[
                     Arg::new("recursive")
@@ -141,9 +142,9 @@ pub fn cli() -> App<'static> {
                     To add dataset from a repository see `kamu pull` command.
                     "
                 )),
-            App::new("complete")
+            Command::new("complete")
                 .about("Completes a command in the shell")
-                .setting(AppSettings::Hidden)
+                .hide(true)
                 .arg(Arg::new("input").required(true).index(1))
                 .arg(Arg::new("current").required(true).index(2))
                 .after_help(indoc::indoc!(
@@ -161,7 +162,7 @@ pub fn cli() -> App<'static> {
                         kamu complete "kamu new --de" 2
                     "#
                 )),
-            App::new("completions")
+            Command::new("completions")
                 .about("Generate tab-completion scripts for your shell")
                 .after_help(indoc::indoc!(
                     r"
@@ -194,11 +195,12 @@ pub fn cli() -> App<'static> {
                         .required(true)
                         .possible_values(clap_complete::Shell::possible_values()),
                 ),
-            App::new("config")
+            Command::new("config")
                 .about("Get or set configuration options")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand_required(true)
+                .arg_required_else_help(true)
                 .subcommands([
-                    App::new("list")
+                    Command::new("list")
                         .about("Display current configuration combined from all config files")
                         .args(&[
                             Arg::new("user")
@@ -208,7 +210,7 @@ pub fn cli() -> App<'static> {
                                 .long("with-defaults")
                                 .help("Show configuration with all default values applied"),
                         ]),
-                    App::new("get")
+                    Command::new("get")
                         .about("Get current configuration value")
                         .args(&[
                             Arg::new("user")
@@ -222,7 +224,7 @@ pub fn cli() -> App<'static> {
                                 .index(1)
                                 .help("Path to the config option"),
                         ]),
-                    App::new("set")
+                    Command::new("set")
                         .about("Set or unset configuration value")
                         .args(&[
                             Arg::new("user")
@@ -239,8 +241,8 @@ pub fn cli() -> App<'static> {
                 ])
                 .after_help(indoc::indoc!(
                     r"
-                    Configuration in `kamu` is managed very similarly to `git`. Starting with your current workspace and going up the directory tree you can have multiple `.kamuconfig` YAML files which are all merged together to get the resulting config. 
-                    
+                    Configuration in `kamu` is managed very similarly to `git`. Starting with your current workspace and going up the directory tree you can have multiple `.kamuconfig` YAML files which are all merged together to get the resulting config.
+
                     Most commonly you will have a workspace-scoped config inside the `.kamu` directory and the user-scoped config residing in your home directory.
 
                     ### Examples ###
@@ -256,7 +258,7 @@ pub fn cli() -> App<'static> {
                     Set configuration value in workspace scope:
 
                         kamu config set engine.runtime podman
-                    
+
                     Set configuration value in user scope:
 
                         kamu config set --user engine.runtime podman
@@ -266,7 +268,7 @@ pub fn cli() -> App<'static> {
                         kamu config set --user engine.runtime
                     "
                 )),
-            App::new("delete")
+            Command::new("delete")
                 .about("Delete a dataset")
                 .args(&[
                     Arg::new("all")
@@ -306,7 +308,7 @@ pub fn cli() -> App<'static> {
                         kamu delete kamu.dev/my.dataset
                     "
                 )),
-            App::new("init")
+            Command::new("init")
                 .about("Initialize an empty workspace in the current directory")
                 .args(&[
                     Arg::new("pull-images")
@@ -332,11 +334,12 @@ pub fn cli() -> App<'static> {
                         .kamu.local - a local data volume where all raw data is stored
                     "
                 )),
-            App::new("inspect")
+            Command::new("inspect")
                 .about("Group of commands for exploring dataset metadata")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand_required(true)
+                .arg_required_else_help(true)
                 .subcommands([
-                    App::new("lineage")
+                    Command::new("lineage")
                         .about("Shows the dependency tree of a dataset")
                         .args(&[
                             Arg::new("output-format")
@@ -371,13 +374,13 @@ pub fn cli() -> App<'static> {
                             Show lineage graph of all datasets in a browser:
 
                                 kamu inspect lineage -b
-                            
+
                             Render the lineage graph into a png image (needs graphviz installed):
 
                                 kamu inspect lineage -o dot | dot -Tpng > depgraph.png
                             "
                         )),
-                    App::new("query")
+                    Command::new("query")
                         .about("Shows the transformations used by a derivative dataset")
                         .args(&[
                             Arg::new("dataset")
@@ -391,7 +394,7 @@ pub fn cli() -> App<'static> {
                             This command allows you to audit the transformations performed by a derivative dataset and their evolution. Such audit is an important step in validating the trustworthiness of data (see `kamu verify` command).
                             "
                         )),
-                    App::new("schema")
+                    Command::new("schema")
                         .about("Shows the dataset schema")
                         .args(&[
                             Arg::new("dataset")
@@ -427,7 +430,7 @@ pub fn cli() -> App<'static> {
                             "
                         )),
                 ]),
-            tabular_output_params(App::new("list")
+            tabular_output_params(Command::new("list")
                 .about("List all datasets in the workspace")
                 .args(&[
                     Arg::new("wide")
@@ -454,7 +457,7 @@ pub fn cli() -> App<'static> {
                     "
                 ))
             ),
-            App::new("log")
+            Command::new("log")
                 .about("Shows dataset metadata history")
                 .args(&[
                     Arg::new("dataset")
@@ -504,7 +507,7 @@ pub fn cli() -> App<'static> {
                         kamu log -o yaml --filter source org.example.data
                     "
                 )),
-            App::new("new")
+            Command::new("new")
                 .about("Creates a new dataset manifest from a template")
                 .args(&[
                     Arg::new("root")
@@ -530,7 +533,7 @@ pub fn cli() -> App<'static> {
                         kamu new org.example.data --root
                     "
                 )),
-            App::new("notebook")
+            Command::new("notebook")
                 .about("Starts the notebook server for exploring the data in the workspace")
                 .after_help(indoc::indoc!(
                     r"
@@ -550,7 +553,7 @@ pub fn cli() -> App<'static> {
                         .multiple_occurrences(true)
                         .help("Pass specified environment variable into the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                 ),
-            App::new("pull")
+            Command::new("pull")
                 .about("Pull new data into the datasets")
                 .args(&[
                     Arg::new("all")
@@ -612,7 +615,7 @@ pub fn cli() -> App<'static> {
                     Fetch dataset from a repository:
 
                         kamu pull kamu.dev/foobar/org.example.data
-                    
+
                     Fetch dataset from a repository using a different local name:
 
                         kamu pull kamu.dev/foobar/org.example.data --as my.data
@@ -627,7 +630,7 @@ pub fn cli() -> App<'static> {
                         kamu pull org.example.data --fetch https://example.com/data.csv
                     "
                 )),
-            App::new("push")
+            Command::new("push")
                 .about("Push local data into a repository")
                 .args(&[
                     Arg::new("all")
@@ -667,7 +670,7 @@ pub fn cli() -> App<'static> {
                         kamu push org.example.data
                     "
                 )),
-            /*App::new("reset")
+            /*Command::new("reset")
                 .about("Revert the dataset back to the specified state")
                 .args(&[
                     Arg::new("dataset")
@@ -691,14 +694,15 @@ pub fn cli() -> App<'static> {
                     Keep in mind that blocks that were already pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back.
                     "
                 )),*/
-            App::new("repo")
+            Command::new("repo")
                 .about("Manage set of tracked repositories")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand_required(true)
+                .arg_required_else_help(true)
                 .subcommands([
-                    tabular_output_params(App::new("list")
+                    tabular_output_params(Command::new("list")
                         .about("Lists known repositories")
                     ),
-                    App::new("add")
+                    Command::new("add")
                         .about("Adds a repository")
                         .after_help(indoc::indoc!(r"
                             For Local Filesystem basic repository use following URL formats:
@@ -721,7 +725,7 @@ pub fn cli() -> App<'static> {
                                 .index(2)
                                 .help("URL of the repository"),
                         ]),
-                    App::new("delete")
+                    Command::new("delete")
                         .about("Deletes a reference to repository")
                         .args(&[
                             Arg::new("all")
@@ -738,14 +742,15 @@ pub fn cli() -> App<'static> {
                                 .long("yes")
                                 .help("Don't ask for confirmation"),
                         ]),
-                    tabular_output_params(App::new("list")
+                    tabular_output_params(Command::new("list")
                         .about("Lists known repositories")
                     ),
-                    App::new("alias")
+                    Command::new("alias")
                         .about("Manage set of remote aliases associated with datasets")
-                        .setting(AppSettings::SubcommandRequiredElseHelp)
+                        .subcommand_required(true)
+                        .arg_required_else_help(true)
                         .subcommands([
-                            tabular_output_params(App::new("list")
+                            tabular_output_params(Command::new("list")
                                 .about("Lists remote aliases")
                                 .args(&[
                                     Arg::new("dataset")
@@ -754,7 +759,7 @@ pub fn cli() -> App<'static> {
                                         .help("Local dataset reference"),
                                 ])
                             ),
-                            App::new("add")
+                            Command::new("add")
                                 .about("Adds a remote alias to a dataset")
                                 .args(&[
                                     Arg::new("dataset")
@@ -774,7 +779,7 @@ pub fn cli() -> App<'static> {
                                         .long("pull")
                                         .help("Add a pull alias"),
                                 ]),
-                            App::new("delete")
+                            Command::new("delete")
                                 .about("Deletes a remote alias associated with a dataset")
                                 .args(&[
                                     Arg::new("all")
@@ -833,7 +838,7 @@ pub fn cli() -> App<'static> {
                         kamu repo add example-repo s3://bucket.my-company.example
                     "
                 )),
-                tabular_output_params(App::new("search")
+            tabular_output_params(Command::new("search")
                 .about("Searches for datasets in the registered repositories")
                 .args(&[
                     Arg::new("query")
@@ -863,10 +868,10 @@ pub fn cli() -> App<'static> {
                     "
                 ))
             ),
-            tabular_output_params(App::new("sql")
+            tabular_output_params(Command::new("sql")
                 .about("Executes an SQL query or drops you into an SQL shell")
                 .subcommand(
-                    App::new("server")
+                    Command::new("server")
                         .about("Run JDBC server only")
                         .args(&[
                             Arg::new("address")
@@ -937,14 +942,15 @@ pub fn cli() -> App<'static> {
                     "
                 ))
             ),
-            App::new("system")
+            Command::new("system")
                 .about("Command group for system-level functionality")
-                .setting(AppSettings::SubcommandRequiredElseHelp)
+                .subcommand_required(true)
+                .arg_required_else_help(true)
                 .subcommands([
-                    App::new("api-server")
+                    Command::new("api-server")
                         .about("Run HTTP + GraphQL server")
                         .subcommands([
-                            App::new("gql-query")
+                            Command::new("gql-query")
                                 .about("Executes the GraphQL query and prints out the result")
                                 .args([
                                     Arg::new("full")
@@ -952,7 +958,7 @@ pub fn cli() -> App<'static> {
                                         .help("Display the full result including extensions"),
                                     Arg::new("query").index(1).required(true),
                                 ]),
-                                App::new("gql-schema")
+                                Command::new("gql-schema")
                                 .about("Prints the GraphQL schema"),
                         ])
                         .args([
@@ -974,7 +980,7 @@ pub fn cli() -> App<'static> {
                             Run API server on a specified port:
 
                                 kamu system api-server --http-port 12312
-                            
+
                             Execute a single GraphQL query and print result to stdout:
 
                                 kamu system api-server gql-query '{ apiVersion }'
@@ -985,7 +991,7 @@ pub fn cli() -> App<'static> {
                             "#
                         )),
                 ]),
-            tabular_output_params(App::new("tail")
+            tabular_output_params(Command::new("tail")
                 .about("Displays a sample of most recent records in a dataset")
                 .args([
                     Arg::new("dataset")
@@ -1009,31 +1015,31 @@ pub fn cli() -> App<'static> {
                     "#
                 ))
             ),
-            // App::new("ui")
-            //     .about("Opens browser-based user interface")
-            //     .args([
-            //         Arg::new("http-port")
-            //             .long("http-port")
-            //             .takes_value(true)
-            //             .validator(validate_port)
-            //             .help("Which port to run HTTP server on"),
-            //     ])
-            //     .after_help(indoc::indoc!(
-            //         r"
-            //         Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
+            /*Command::new("ui")
+                .about("Opens browser-based user interface")
+                .args([
+                    Arg::new("http-port")
+                        .long("http-port")
+                        .takes_value(true)
+                        .validator(validate_port)
+                        .help("Which port to run HTTP server on"),
+                ])
+                .after_help(indoc::indoc!(
+                    r"
+                    Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
 
-            //         ### Examples ###
+                    ### Examples ###
 
-            //         Starts server and opens UI in your default browser:
+                    Starts server and opens UI in your default browser:
 
-            //             kamu ui
+                        kamu ui
 
-            //         Start server on a specific port:
+                    Start server on a specific port:
 
-            //             kamu ui --http-port 12345
-            //         "
-            //     )),
-            App::new("verify")
+                        kamu ui --http-port 12345
+                    "
+                )),*/
+            Command::new("verify")
                 .about("Verifies the validity of a dataset")
                 .args(&[
                     Arg::new("recursive")

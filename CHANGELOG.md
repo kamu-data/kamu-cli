@@ -6,11 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.80.0] - 2022-02-19
+### Added
+- GQL API now supports executing arbitrary SQL queries (using `datafusion` engine).
+### Changed
+- Removed use of default values from GQL schema.
+- Upgraded to latest `arrow` and `datafusion`.
+
 ## [0.79.0] - 2022-02-08
 ### Added
-- `kamu inspect schema` now supports JSON output
+- `kamu inspect schema` now supports JSON output.
 ### Changed
-- Upgraded to `datafusion` version 6
+- Upgraded to `datafusion` version 6.
 
 ## [0.78.2] - 2022-01-27
 ### Added

@@ -323,6 +323,16 @@ impl SchemaProvider for KamuSchema {
         }
     }
 
+    fn table_exist(&self, name: &str) -> bool {
+        let dataset_handle: Option<DatasetHandle> = try {
+            let dataset_name = DatasetName::try_from(name).ok()?;
+            self.dataset_reg
+                .resolve_dataset_ref(&dataset_name.into())
+                .ok()?
+        };
+        dataset_handle.is_some()
+    }
+
     fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         let dataset_handle = self
             .dataset_reg

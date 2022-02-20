@@ -38,6 +38,17 @@ type BlockRef {
 	name: String!
 	blockHash: Multihash!
 }
+type DataQueries {
+	"""
+	Executes a specified query and returns its result
+	"""
+	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataSliceFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
+}
+type DataQueryResult {
+	schema: DataSchema!
+	data: DataSlice!
+	limit: Int!
+}
 type DataSchema {
 	format: DataSchemaFormat!
 	content: String!
@@ -49,11 +60,12 @@ enum DataSchemaFormat {
 type DataSlice {
 	format: DataSliceFormat!
 	content: String!
+	numRecords: Int!
 }
 enum DataSliceFormat {
 	JSON
 	JSON_LD
-	JSON_SO_A
+	JSON_SOA
 	CSV
 }
 type DataSliceMetadata {
@@ -316,6 +328,13 @@ type Query {
 	Search-related functionality group
 	"""
 	search: Search!
+	"""
+	Querying and data manipulations
+	"""
+	data: DataQueries!
+}
+enum QueryDialect {
+	DATA_FUSION
 }
 type Search {
 	"""

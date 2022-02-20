@@ -332,7 +332,7 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
 
 fn get_output_format_recursive<'a>(
     matches: &'a clap::ArgMatches,
-    cmd: &clap::App<'_>,
+    cmd: &clap::Command<'_>,
 ) -> Option<&'a str> {
     if let Some((subcommand_name, submatches)) = matches.subcommand() {
         let subcommand = cmd
@@ -341,7 +341,7 @@ fn get_output_format_recursive<'a>(
             .unwrap();
         let has_output_format = subcommand
             .get_opts()
-            .find(|opt| opt.get_name() == "output-format")
+            .find(|opt| opt.get_id() == "output-format")
             .is_some();
 
         if has_output_format {

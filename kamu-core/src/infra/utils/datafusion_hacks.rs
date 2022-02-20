@@ -21,7 +21,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     logical_plan::Expr,
-    physical_plan::{empty::EmptyExec, file_format::PhysicalPlanConfig, ExecutionPlan, Statistics},
+    physical_plan::{empty::EmptyExec, file_format::FileScanConfig, ExecutionPlan, Statistics},
 };
 use futures::StreamExt;
 
@@ -129,7 +129,6 @@ impl TableProvider for ListingTableOfFiles {
     async fn scan(
         &self,
         projection: &Option<Vec<usize>>,
-        batch_size: usize,
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
@@ -138,12 +137,8 @@ impl TableProvider for ListingTableOfFiles {
         // if no files need to be read, return an `EmptyExec`
         if partitioned_file_lists.is_empty() {
             let schema = self.schema();
-            let projected_schema = match &projection {
-                None => schema,
-                Some(p) => Arc::new(Schema::new(
-                    p.iter().map(|i| schema.field(*i).clone()).collect(),
-                )),
-            };
+            let projected_schema =
+                datafusion::physical_plan::project_schema(&schema, projection.as_ref())?;
             return Ok(Arc::new(EmptyExec::new(false, projected_schema)));
         }
 
@@ -151,13 +146,12 @@ impl TableProvider for ListingTableOfFiles {
         self.options
             .format
             .create_physical_plan(
-                PhysicalPlanConfig {
+                FileScanConfig {
                     object_store: Arc::clone(&self.object_store),
                     file_schema: Arc::clone(&self.file_schema),
                     file_groups: partitioned_file_lists,
                     statistics,
                     projection: projection.clone(),
-                    batch_size,
                     limit,
                     table_partition_cols: self.options.table_partition_cols.clone(),
                 },

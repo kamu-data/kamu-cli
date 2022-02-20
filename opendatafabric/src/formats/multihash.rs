@@ -54,7 +54,7 @@ impl<const S: usize> MultihashGeneric<S> {
 
     pub fn from_digest<D: digest::Digest>(code: Multicodec, data: &[u8]) -> Self {
         assert!(
-            D::output_size() <= S,
+            <D as digest::Digest>::output_size() <= S,
             "Digest length is greater than max length"
         );
         let digest = D::digest(data);

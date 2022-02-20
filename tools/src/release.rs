@@ -19,7 +19,7 @@ use semver::Version;
 const CHANGE_DATE_YEARS: i32 = 4;
 
 fn main() {
-    let matches = clap::App::new("release")
+    let matches = clap::Command::new("release")
         .args(&[
             clap::Arg::new("version")
                 .long("version")

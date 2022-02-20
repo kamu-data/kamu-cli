@@ -23,16 +23,13 @@ complete -F _kamu_ kamu
 ";
 
 pub struct CompletionsCommand {
-    app: clap::App<'static>,
+    cli: clap::Command<'static>,
     shell: clap_complete::Shell,
 }
 
 impl CompletionsCommand {
-    pub fn new(app: clap::App<'static>, shell: clap_complete::Shell) -> Self {
-        Self {
-            app: app,
-            shell: shell,
-        }
+    pub fn new(cli: clap::Command<'static>, shell: clap_complete::Shell) -> Self {
+        Self { cli, shell }
     }
 }
 
@@ -45,11 +42,11 @@ impl Command for CompletionsCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: Remove once clap allows to programmatically complete values
         // See: https://github.com/clap-rs/clap/issues/568
-        let bin_name = self.app.get_name().to_owned();
+        let bin_name = self.cli.get_name().to_owned();
         match self.shell {
             clap_complete::Shell::Bash => print!("{}", BASH_COMPLETIONS),
             _ => {
-                clap_complete::generate(self.shell, &mut self.app, bin_name, &mut std::io::stdout())
+                clap_complete::generate(self.shell, &mut self.cli, bin_name, &mut std::io::stdout())
             }
         };
         Ok(())

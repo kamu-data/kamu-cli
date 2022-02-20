@@ -32,9 +32,9 @@ impl APIServer {
                     .layer(tower_http::trace::TraceLayer::new_for_http())
                     .layer(
                         tower_http::cors::CorsLayer::new()
-                            .allow_origin(tower_http::cors::any())
+                            .allow_origin(tower_http::cors::Any)
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
-                            .allow_headers(tower_http::cors::any()),
+                            .allow_headers(tower_http::cors::Any),
                     )
                     .layer(axum::AddExtensionLayer::new(gql_schema)),
             );

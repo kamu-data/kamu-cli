@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::io::Write;
+use std::sync::Arc;
 
+use datafusion::logical_plan::DFSchema;
 use datafusion::parquet::basic::Type as PhysicalType;
 use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit};
 use datafusion::parquet::schema::types::Type;
@@ -27,6 +29,13 @@ pub fn write_schema_parquet_json(
     let mut writer = ParquetJsonSchemaWriter::new(output);
     writer.write(schema)?;
     Ok(())
+}
+
+pub fn dataframe_schema_to_parquet_schema(df_schema: &DFSchema) -> Arc<Type> {
+    let arrow_schema: datafusion::arrow::datatypes::Schema = df_schema.into();
+    let parquet_schema =
+        datafusion::parquet::arrow::arrow_to_parquet_schema(&arrow_schema).unwrap();
+    parquet_schema.root_schema_ptr()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

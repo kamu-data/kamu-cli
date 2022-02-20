@@ -17,7 +17,7 @@ use std::{
 };
 
 fn main() {
-    let matches = clap::App::new("create-test-workspace")
+    let matches = clap::Command::new("create-test-workspace")
         .args(&[clap::Arg::new("force").long("force").short('f')])
         .get_matches();
 

@@ -23,7 +23,7 @@ pub struct CompleteCommand {
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
-    app: clap::App<'static>,
+    cli: clap::Command<'static>,
     input: String,
     current: usize,
 }
@@ -36,7 +36,7 @@ impl CompleteCommand {
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
-        app: clap::App<'static>,
+        cli: clap::Command<'static>,
         input: String,
         current: usize,
     ) -> Self {
@@ -45,7 +45,7 @@ impl CompleteCommand {
             remote_repo_reg,
             remote_alias_reg,
             config_service,
-            app,
+            cli,
             input,
             current,
         }
@@ -165,7 +165,7 @@ impl Command for CompleteCommand {
 
         args.truncate(self.current + 1);
 
-        let mut last_cmd = &self.app;
+        let mut last_cmd = &self.cli;
 
         // Establish command context
         for arg in args[1..].iter() {
@@ -184,7 +184,7 @@ impl Command for CompleteCommand {
         if prev.starts_with("--") {
             for opt in last_cmd.get_opts() {
                 let full_name = format!("--{}", opt.get_long().unwrap_or_default());
-                if full_name == *prev && opt.is_set(clap::ArgSettings::TakesValue) {
+                if full_name == *prev && opt.is_takes_value_set() {
                     if let Some(val_names) = opt.get_value_names() {
                         for name in val_names {
                             match *name {
@@ -210,14 +210,14 @@ impl Command for CompleteCommand {
 
         // Complete commands
         for s in last_cmd.get_subcommands() {
-            if !s.is_set(clap::AppSettings::Hidden) && s.get_name().starts_with(to_complete) {
+            if !s.is_hide_set() && s.get_name().starts_with(to_complete) {
                 println!("{}", s.get_name());
             }
         }
 
         // Complete positionals
         for pos in last_cmd.get_positionals() {
-            match pos.get_name() {
+            match pos.get_id() {
                 "dataset" => self.complete_dataset(to_complete),
                 "repository" => self.complete_repository(to_complete),
                 "alias" => self.complete_alias(to_complete),

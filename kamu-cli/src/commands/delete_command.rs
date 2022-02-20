@@ -89,10 +89,12 @@ impl Command for DeleteCommand {
             match r.as_local_ref() {
                 Some(local_ref) => self.dataset_reg.delete_dataset(&local_ref)?,
                 None => match r.as_remote_ref() {
-                    Some(DatasetRefRemote::RemoteName(name)) => self
-                        .sync_svc
-                        .delete(&name).await
-                        .map_err(|e| CLIError::failure(e))?,
+                    Some(DatasetRefRemote::RemoteName(name)) => {
+                        self.sync_svc
+                            .delete(&name)
+                            .await
+                            .map_err(|e| CLIError::failure(e))?
+                    }
                     _ => unimplemented!(),
                 },
             }
