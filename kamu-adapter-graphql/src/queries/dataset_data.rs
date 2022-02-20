@@ -47,19 +47,28 @@ impl DatasetData {
     async fn tail(
         &self,
         ctx: &Context<'_>,
-        num_records: Option<u64>,
-        format: Option<DataSliceFormat>,
-    ) -> Result<DataSlice> {
+        limit: Option<u64>,
+        data_format: Option<DataSliceFormat>,
+        schema_format: Option<DataSchemaFormat>,
+    ) -> Result<DataQueryResult> {
         // TODO: Default to JsonSoA format once implemented
-        let format = format.unwrap_or(DataSliceFormat::Json);
-        let num_records = num_records.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
+        let data_format = data_format.unwrap_or(DataSliceFormat::Json);
+        let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
+        let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let df = query_svc
-            .tail(&self.dataset_handle.as_local_ref(), num_records)
+            .tail(&self.dataset_handle.as_local_ref(), limit)
             .await?;
 
         let record_batches = df.collect().await?;
-        Ok(DataSlice::from_records(&record_batches, format)?)
+        let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
+        let data = DataSlice::from_records(&record_batches, data_format)?;
+
+        Ok(DataQueryResult {
+            schema,
+            data,
+            limit,
+        })
     }
 }

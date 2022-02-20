@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.81.0] - 2022-02-19
+### Changed
+- GQL `tail` query will now return `DataQueryResult` containing schema information instead of raw `DataSlice`.
+
 ## [0.80.0] - 2022-02-19
 ### Added
 - GQL API now supports executing arbitrary SQL queries (using `datafusion` engine).
