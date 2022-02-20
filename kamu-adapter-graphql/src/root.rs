@@ -39,6 +39,11 @@ impl Query {
     async fn search(&self) -> Search {
         Search
     }
+
+    /// Querying and data manipulations
+    async fn data(&self) -> DataQueries {
+        DataQueries
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

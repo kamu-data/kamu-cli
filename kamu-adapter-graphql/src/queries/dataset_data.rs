@@ -20,6 +20,8 @@ pub(crate) struct DatasetData {
 
 #[Object]
 impl DatasetData {
+    const DEFAULT_TAIL_LIMIT: u64 = 20;
+
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self { dataset_handle }
@@ -48,41 +50,16 @@ impl DatasetData {
         num_records: Option<u64>,
         format: Option<DataSliceFormat>,
     ) -> Result<DataSlice> {
-        use kamu::infra::utils::records_writers::*;
+        // TODO: Default to JsonSoA format once implemented
+        let format = format.unwrap_or(DataSliceFormat::Json);
+        let num_records = num_records.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let df = query_svc
-            .tail(
-                &self.dataset_handle.as_local_ref(),
-                num_records.unwrap_or(20),
-            )
+            .tail(&self.dataset_handle.as_local_ref(), num_records)
             .await?;
-        let records = df.collect().await?;
 
-        let mut buf = Vec::new();
-
-        // TODO: Default to JsonSoA format once implemented
-        let format = format.unwrap_or(DataSliceFormat::Json);
-
-        {
-            let mut writer: Box<dyn RecordsWriter> = match format {
-                DataSliceFormat::Csv => {
-                    Box::new(CsvWriterBuilder::new().has_headers(true).build(&mut buf))
-                }
-                DataSliceFormat::Json => Box::new(JsonArrayWriter::new(&mut buf)),
-                DataSliceFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
-                DataSliceFormat::JsonSoA => {
-                    unimplemented!("SoA Json format is not yet implemented")
-                }
-            };
-
-            writer.write_batches(&records)?;
-            writer.finish()?;
-        }
-
-        Ok(DataSlice {
-            format,
-            content: String::from_utf8(buf).unwrap(),
-        })
+        let record_batches = df.collect().await?;
+        Ok(DataSlice::from_records(&record_batches, format)?)
     }
 }

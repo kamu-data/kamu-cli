@@ -14,7 +14,6 @@ use crate::utils::*;
 use async_graphql::*;
 use chrono::prelude::*;
 use kamu::domain;
-use kamu::infra;
 use opendatafabric as odf;
 use opendatafabric::IntoDataStreamBlock;
 
@@ -55,28 +54,14 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<DataSchema> {
+        let format = format.unwrap_or(DataSchemaFormat::Parquet);
+
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let schema = query_svc
             .get_schema(&self.dataset_handle.as_local_ref())
             .await?;
 
-        let format = format.unwrap_or(DataSchemaFormat::Parquet);
-        let mut buf = Vec::new();
-
-        match format {
-            DataSchemaFormat::Parquet => {
-                infra::utils::schema_utils::write_schema_parquet(&mut buf, &schema)
-            }
-            DataSchemaFormat::ParquetJson => {
-                infra::utils::schema_utils::write_schema_parquet_json(&mut buf, &schema)
-            }
-        }
-        .unwrap();
-
-        Ok(DataSchema {
-            format,
-            content: String::from_utf8(buf).unwrap(),
-        })
+        Ok(DataSchema::from_parquet_schema(&schema, format)?)
     }
 
     /// Current upstream dependencies of a dataset

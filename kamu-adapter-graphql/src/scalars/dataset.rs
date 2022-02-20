@@ -143,6 +143,38 @@ pub(crate) struct DataSchema {
     pub content: String,
 }
 
+impl DataSchema {
+    pub fn from_data_frame_schema(
+        schema: &datafusion::logical_plan::DFSchema,
+        format: DataSchemaFormat,
+    ) -> Result<DataSchema> {
+        let parquet_schema =
+            kamu::infra::utils::schema_utils::dataframe_schema_to_parquet_schema(schema);
+        Self::from_parquet_schema(parquet_schema.as_ref(), format)
+    }
+
+    // TODO: Unify everything around Arrow schema
+    pub fn from_parquet_schema(
+        schema: &datafusion::parquet::schema::types::Type,
+        format: DataSchemaFormat,
+    ) -> Result<DataSchema> {
+        use kamu::infra::utils::schema_utils;
+
+        let mut buf = Vec::new();
+        match format {
+            DataSchemaFormat::Parquet => schema_utils::write_schema_parquet(&mut buf, &schema),
+            DataSchemaFormat::ParquetJson => {
+                schema_utils::write_schema_parquet_json(&mut buf, &schema)
+            }
+        }?;
+
+        Ok(DataSchema {
+            format,
+            content: String::from_utf8(buf).unwrap(),
+        })
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -151,7 +183,7 @@ pub(crate) struct DataSchema {
 pub(crate) enum DataSliceFormat {
     Json,
     JsonLD,
-    JsonSoA,
+    JsonSOA,
     Csv,
 }
 
@@ -159,4 +191,59 @@ pub(crate) enum DataSliceFormat {
 pub(crate) struct DataSlice {
     pub format: DataSliceFormat,
     pub content: String,
+    pub num_records: u64,
+}
+
+impl DataSlice {
+    pub fn from_records(
+        record_batches: &Vec<datafusion::arrow::record_batch::RecordBatch>,
+        format: DataSliceFormat,
+    ) -> Result<DataSlice> {
+        use kamu::infra::utils::records_writers::*;
+
+        let num_records: usize = record_batches.iter().map(|b| b.num_rows()).sum();
+
+        let mut buf = Vec::new();
+        {
+            let mut writer: Box<dyn RecordsWriter> = match format {
+                DataSliceFormat::Csv => {
+                    Box::new(CsvWriterBuilder::new().has_headers(true).build(&mut buf))
+                }
+                DataSliceFormat::Json => Box::new(JsonArrayWriter::new(&mut buf)),
+                DataSliceFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
+                DataSliceFormat::JsonSOA => {
+                    unimplemented!("SoA Json format is not yet implemented")
+                }
+            };
+
+            writer.write_batches(record_batches)?;
+            writer.finish()?;
+        }
+
+        Ok(DataSlice {
+            format,
+            content: String::from_utf8(buf).unwrap(),
+            num_records: num_records as u64,
+        })
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// DataQueryResult
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub(crate) struct DataQueryResult {
+    pub schema: DataSchema,
+    pub data: DataSlice,
+    pub limit: u64,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// QueryDialect
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum QueryDialect {
+    DataFusion,
 }

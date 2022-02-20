@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.79.0"
+version = "0.80.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 
@@ -19,6 +19,7 @@ async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] 
 
 # Utils
 chrono = "*"
+datafusion = "*"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 serde = "*"
 serde_json = "*"
 # tokio = { version = "*", features = ["macros"] }
