@@ -41,8 +41,7 @@ impl MetadataBlock {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: eventName field is unnecessary, but we can't have an empty interface
-#[derive(Interface, Debug, Clone)]
-#[graphql(field(name = "_dummy", type = "&str"))]
+#[derive(Union, Debug, Clone)]
 pub(crate) enum MetadataEvent {
     AddData(MetadataEventAddData),
     ExecuteQuery(MetadataEventExecuteQuery),
@@ -87,10 +86,6 @@ pub(crate) struct MetadataEventAddData(odf::AddData);
 
 #[Object]
 impl MetadataEventAddData {
-    async fn _dummy(&self) -> &str {
-        ""
-    }
-
     async fn output_data(&self) -> DataSliceMetadata {
         self.0.output_data.clone().into()
     }
@@ -107,10 +102,6 @@ pub(crate) struct MetadataEventExecuteQuery(odf::ExecuteQuery);
 
 #[Object]
 impl MetadataEventExecuteQuery {
-    async fn _dummy(&self) -> &str {
-        ""
-    }
-
     async fn input_slices(&self) -> Vec<InputSliceMetadata> {
         self.0
             .input_slices
@@ -136,10 +127,6 @@ pub(crate) struct MetadataEventSeed(odf::Seed);
 
 #[Object]
 impl MetadataEventSeed {
-    async fn _dummy(&self) -> &str {
-        ""
-    }
-
     async fn dataset_id(&self) -> DatasetID {
         self.0.dataset_id.clone().into()
     }
@@ -168,8 +155,18 @@ pub(crate) struct MetadataEventSetTransform(odf::SetTransform);
 
 #[Object]
 impl MetadataEventSetTransform {
-    async fn _dummy(&self) -> &str {
-        ""
+    async fn inputs(&self) -> Vec<TransformInput> {
+        self.0.inputs.iter().cloned().map(|i| i.into()).collect()
+    }
+
+    async fn transform(&self) -> Transform {
+        self.0.transform.clone().into()
+    }
+}
+
+impl From<odf::SetTransform> for MetadataEventSetTransform {
+    fn from(v: odf::SetTransform) -> Self {
+        Self(v)
     }
 }
 
@@ -192,10 +189,6 @@ pub(crate) struct MetadataEventSetWatermark(odf::SetWatermark);
 
 #[Object]
 impl MetadataEventSetWatermark {
-    async fn _dummy(&self) -> &str {
-        ""
-    }
-
     async fn output_watermark(&self) -> DateTime<Utc> {
         self.0.output_watermark
     }

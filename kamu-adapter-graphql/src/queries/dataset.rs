@@ -33,6 +33,14 @@ impl Dataset {
     }
 
     #[graphql(skip)]
+    pub fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRefLocal) -> Result<Dataset> {
+        let cat = ctx.data::<dill::Catalog>().unwrap();
+        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+        let hdl = dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        Ok(Dataset::new(Account::mock(), hdl))
+    }
+
+    #[graphql(skip)]
     fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
         Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)

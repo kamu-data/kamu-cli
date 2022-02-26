@@ -98,6 +98,21 @@ impl DatasetMetadata {
             .collect())
     }
 
+    /// Current transformation used by the derivative dataset
+    async fn current_transform(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<MetadataEventSetTransform>> {
+        use opendatafabric::AsTypedBlock;
+
+        Ok(self
+            .get_chain(ctx)?
+            .iter_blocks_ref(&domain::BlockRef::Head)
+            .filter_map(|(_, b)| b.into_typed::<odf::SetTransform>())
+            .next()
+            .map(|t| t.event.into()))
+    }
+
     // TODO: MOCK
     async fn current_summary(&self) -> String {
         match self.dataset_handle.name.as_str() {
