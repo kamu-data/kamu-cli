@@ -36,7 +36,7 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(axum::AddExtensionLayer::new(gql_schema)),
+                    .layer(axum::extract::Extension(gql_schema)),
             );
 
         let addr = SocketAddr::from((

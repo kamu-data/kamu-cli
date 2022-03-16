@@ -103,7 +103,10 @@ pub enum PullResult {
 impl From<IngestResult> for PullResult {
     fn from(other: IngestResult) -> Self {
         match other {
-            IngestResult::UpToDate { uncacheable: _ } => PullResult::UpToDate,
+            IngestResult::UpToDate {
+                uncacheable: _,
+                has_more: _,
+            } => PullResult::UpToDate,
             IngestResult::Updated {
                 old_head,
                 new_head,

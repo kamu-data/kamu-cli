@@ -523,7 +523,10 @@ impl IngestListener for PrettyIngestProgress {
         let mut state = self.state.lock().unwrap();
 
         match result {
-            IngestResult::UpToDate { uncacheable } => {
+            IngestResult::UpToDate {
+                uncacheable,
+                has_more,
+            } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
@@ -535,8 +538,10 @@ impl IngestListener for PrettyIngestProgress {
                                     .to_owned(),
                             )
                             .yellow()
-                        } else {
+                        } else if !has_more {
                             console::style("Dataset is up-to-date".to_owned()).yellow()
+                        } else {
+                            console::style("No new data ingested".to_owned()).yellow()
                         },
                     ));
             }

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.81.1] - 2022-03-16
+### Fixed
+- Upgrading Spark engine that fixes merge strategies producing unnecessary updates.
+- Fixed `filesGlob` entering infinite loop when last file does not result in a commit (no new data to ingest).
+
 ## [0.81.0] - 2022-02-19
 ### Changed
 - GQL `tail` query will now return `DataQueryResult` containing schema information instead of raw `DataSlice`.

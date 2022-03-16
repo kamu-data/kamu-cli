@@ -66,6 +66,7 @@ impl Default for IngestOptions {
 pub enum IngestResult {
     UpToDate {
         uncacheable: bool,
+        has_more: bool,
     },
     Updated {
         old_head: Multihash,

@@ -120,7 +120,7 @@ impl IngestTask {
 
         match self.ingest_inner().await {
             Ok(res) => {
-                info!("Ingest successful");
+                info!(result = ?res, "Ingest successful");
                 self.listener.success(&res);
                 Ok(res)
             }
@@ -163,13 +163,14 @@ impl IngestTask {
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
             IngestResult::UpToDate {
                 uncacheable: !cacheable,
+                has_more,
             }
         } else {
             IngestResult::Updated {
                 old_head: prev_hash,
                 new_head: commit_result.checkpoint.last_hash.unwrap(),
                 num_blocks: 1,
-                has_more: has_more,
+                has_more,
                 uncacheable: !cacheable,
             }
         };

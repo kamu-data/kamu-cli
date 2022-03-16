@@ -644,7 +644,15 @@ impl IngestService for TestIngestService {
         let dataset_refs: Vec<_> = dataset_refs.collect();
         let results = dataset_refs
             .iter()
-            .map(|r| (r.clone(), Ok(IngestResult::UpToDate { uncacheable: false })))
+            .map(|r| {
+                (
+                    r.clone(),
+                    Ok(IngestResult::UpToDate {
+                        uncacheable: false,
+                        has_more: false,
+                    }),
+                )
+            })
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
             dataset_refs.into_iter().map(|i| i.into()).collect(),

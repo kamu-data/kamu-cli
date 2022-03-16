@@ -46,41 +46,48 @@ impl IngestServiceImpl {
         combined_result: Option<IngestResult>,
         new_result: IngestResult,
     ) -> IngestResult {
-        if let None = combined_result {
-            return new_result;
-        }
-
-        if let IngestResult::UpToDate { .. } = new_result {
-            return combined_result.unwrap();
-        }
-
-        if let Some(IngestResult::Updated {
-            old_head: prev_old_head,
-            new_head: _,
-            num_blocks: prev_num_blocks,
-            has_more: _,
-            uncacheable: _,
-        }) = combined_result
-        {
-            if let IngestResult::Updated {
-                old_head: _,
-                new_head: new_new_head,
-                num_blocks: new_num_blocks,
-                has_more: new_has_more,
-                uncacheable: new_uncacheable,
-            } = new_result
-            {
-                return IngestResult::Updated {
+        match (combined_result, new_result) {
+            (None, n) => n,
+            (Some(IngestResult::UpToDate { .. }), n) => n,
+            (
+                Some(IngestResult::Updated {
+                    old_head,
+                    new_head,
+                    num_blocks,
+                    ..
+                }),
+                IngestResult::UpToDate {
+                    has_more,
+                    uncacheable,
+                },
+            ) => IngestResult::Updated {
+                old_head,
+                new_head,
+                num_blocks,
+                has_more,
+                uncacheable,
+            },
+            (
+                Some(IngestResult::Updated {
                     old_head: prev_old_head,
-                    new_head: new_new_head,
-                    num_blocks: prev_num_blocks + new_num_blocks,
-                    has_more: new_has_more,
-                    uncacheable: new_uncacheable,
-                };
-            }
+                    num_blocks: prev_num_blocks,
+                    ..
+                }),
+                IngestResult::Updated {
+                    new_head,
+                    num_blocks,
+                    has_more,
+                    uncacheable,
+                    ..
+                },
+            ) => IngestResult::Updated {
+                old_head: prev_old_head,
+                new_head,
+                num_blocks: num_blocks + prev_num_blocks,
+                has_more,
+                uncacheable,
+            },
         }
-
-        unreachable!()
     }
 
     async fn do_ingest(
@@ -127,15 +134,18 @@ impl IngestServiceImpl {
                 Ok(res) => {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
-                    if let Some(IngestResult::Updated { has_more, .. }) = combined_result {
-                        if has_more && options.exhaust_sources {
-                            continue;
-                        }
+                    let has_more = match combined_result {
+                        Some(IngestResult::UpToDate { has_more, .. }) => has_more,
+                        Some(IngestResult::Updated { has_more, .. }) => has_more,
+                        None => unreachable!(),
+                    };
+
+                    if !has_more || !options.exhaust_sources {
+                        break;
                     }
                 }
                 Err(e) => return Err(e),
             }
-            break;
         }
         Ok(combined_result.unwrap())
     }
