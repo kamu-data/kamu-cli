@@ -1,9 +1,16 @@
 sparkmagic
+
 pandas
+geopandas
+geojson
+xarray
+netcdf4
+dask
+
 bokeh
 pandas-bokeh
 folium
 altair
 mapboxgl
 shapely
-geojson
+hvplot
