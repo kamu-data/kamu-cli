@@ -116,22 +116,22 @@ impl DatasetMetadata {
     // TODO: MOCK
     async fn current_summary(&self) -> String {
         match self.dataset_handle.name.as_str() {
-            "ca.ontario.data.covid19.case-details" => {
-                "Confirmed positive cases of COVID-19 in Ontario."
+            "alberta.case-details" | "alberta.case-details.hm" => {
+                "Confirmed positive cases of COVID-19 in Alberta."
             }
-            "ca.ontario.data.covid19.daily-cases" => {
-                "Daily aggregate count of confirmed positive cases of COVID-19 in Ontario."
-            }
-            "ca.bccdc.covid19.case-details" => {
+            "british-columbia.case-details" | "british-columbia.case-details.hm" => {
                 "British Columbia COVID-19 case data updated regularly from the B.C. Centre for Disease Control, Provincial Health Services Authority and the B.C. Ministry of Health."
             }
-            "ca.bccdc.covid19.daily-cases" => {
-                "British Columbia COVID-19 aggregated daily case counts updated regularly from the B.C. Centre for Disease Control, Provincial Health Services Authority and the B.C. Ministry of Health."
+            "ontario.case-details" | "ontario.case-details.hm" => {
+                "Confirmed positive cases of COVID-19 in Ontario."
             }
-            "ca.covid19.case-details" => {
+            "quebec.case-details" | "quebec.case-details.hm" => {
+                "Confirmed positive cases of COVID-19 in Quebec."
+            }
+            "canada.case-details" => {
                 "Pan-Canadian COVID-19 case data combined from variety of official provincial and municipal data sources."
             }
-            "ca.covid19.daily-cases" => {
+            "canada.daily-cases" => {
                 "Pan-Canadian COVID-19 daily case counts on per Health Region level of aggregation."
             }
             _ => "Default summary",
@@ -142,31 +142,31 @@ impl DatasetMetadata {
     // TODO: MOCK
     async fn current_topics(&self) -> Vec<String> {
         match self.dataset_handle.name.as_str() {
-            "ca.ontario.data.covid19.case-details" => {
+            "alberta.case-details" => {
                 vec![
                     "Healthcare".to_string(),
                     "Epidemiology".to_string(),
                     "COVID-19".to_string(),
-                    "Testing".to_string(),
+                    "Pandemic".to_string(),
                     "Disaggregated".to_string(),
                     "Anonymized".to_string(),
-                    "Ontario".to_string(),
+                    "Alberta".to_string(),
                     "Canada".to_string(),
                     "Official".to_string(),
                 ]
             }
-            "ca.ontario.data.covid19.daily-cases" => {
+            "alberta.case-details.hm"
+            | "british-columbia.case-details.hm"
+            | "ontario.case-details.hm"
+            | "quebec.case-details.hm" => {
                 vec![
-                    "Healthcare".to_string(),
-                    "Epidemiology".to_string(),
                     "COVID-19".to_string(),
-                    "Testing".to_string(),
-                    "Aggregated".to_string(),
-                    "Ontario".to_string(),
-                    "Canada".to_string(),
+                    "Pandemic".to_string(),
+                    "Disaggregated".to_string(),
+                    "Harmonized".to_string(),
                 ]
             }
-            "ca.bccdc.covid19.case-details" => {
+            "british-columbia.case-details" => {
                 vec![
                     "Healthcare".to_string(),
                     "Epidemiology".to_string(),
@@ -179,18 +179,31 @@ impl DatasetMetadata {
                     "Official".to_string(),
                 ]
             }
-            "ca.bccdc.covid19.daily-cases" => {
+            "ontario.case-details" => {
                 vec![
                     "Healthcare".to_string(),
                     "Epidemiology".to_string(),
                     "COVID-19".to_string(),
-                    "Pandemic".to_string(),
-                    "Aggregated".to_string(),
-                    "British Columbia".to_string(),
+                    "Disaggregated".to_string(),
+                    "Anonymized".to_string(),
+                    "Ontario".to_string(),
                     "Canada".to_string(),
+                    "Official".to_string(),
                 ]
             }
-            "ca.covid19.case-details" => {
+            "quebec.case-details" => {
+                vec![
+                    "Healthcare".to_string(),
+                    "Epidemiology".to_string(),
+                    "COVID-19".to_string(),
+                    "Disaggregated".to_string(),
+                    "Anonymized".to_string(),
+                    "Quebec".to_string(),
+                    "Canada".to_string(),
+                    "Official".to_string(),
+                ]
+            }
+            "canada.case-details" => {
                 vec![
                     "Collection".to_string(),
                     "Healthcare".to_string(),
@@ -202,7 +215,7 @@ impl DatasetMetadata {
                     "Canada".to_string(),
                 ]
             }
-            "ca.covid19.daily-cases" => {
+            "canada.daily-cases" => {
                 vec![
                     "Collection".to_string(),
                     "Healthcare".to_string(),
@@ -224,9 +237,9 @@ impl DatasetMetadata {
     // TODO: MOCK
     async fn current_readme(&self) -> String {
         match self.dataset_handle.name.as_str() {
-            "ca.ontario.data.covid19.case-details" => indoc::indoc!(
+            "alberta.case-details" => indoc::indoc!(
                 r#"
-                # Confirmed positive cases of COVID-19 in Ontario
+                # Confirmed positive cases of COVID-19 in Alberta
 
                 This dataset compiles daily snapshots of publicly reported data on 2019 Novel Coronavirus (COVID-19) testing in Ontario.
 
@@ -244,19 +257,19 @@ impl DatasetMetadata {
                 This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
 
                 **Related dataset(s)**:
-                - [Daily aggregate count of confirmed positive cases of COVID-19 in Ontario](#foo)
+                - [Daily aggregate count of confirmed positive cases of COVID-19 in Alberta](#foo)
                 "#
             ),
-            "ca.ontario.data.covid19.daily-cases" => indoc::indoc!(
+            "alberta.case-details.hm" => indoc::indoc!(
                 r#"
-                # Daily aggregate count of confirmed positive cases of COVID-19 in Ontario
-                
-                This dataset compiles the aggregate number of daily cases of COVID-19 registered in Ontario.
+                # Harmonized COVID-19 case data from Alberta
 
-                The dataset is based on [ca.ontario.data.covid19.case-details](#) dataset, refer to it for the explanation of the data and licensing terms.
+                See [original dataset](#foo).
+
+                See [harmonization schema and semantics](#foo).
                 "#
             ),
-            "ca.bccdc.covid19.case-details" => indoc::indoc!(
+            "british-columbia.case-details" => indoc::indoc!(
                 r#"
                 # Confirmed positive cases of COVID-19 in British Columbia
 
@@ -347,7 +360,80 @@ impl DatasetMetadata {
                 © Province of British Columbia 
                 "#
             ),
-            "ca.bccdc.covid19.daily-cases" => indoc::indoc!(
+            "british-columbia.case-details.hm" => indoc::indoc!(
+                r#"
+                # Harmonized COVID-19 case data from British Columbia
+
+                See [original dataset](#foo).
+
+                See [harmonization schema and semantics](#foo).
+                "#
+            ),
+            "ontario.case-details" => indoc::indoc!(
+                r#"
+                # Confirmed positive cases of COVID-19 in Ontario
+
+                This dataset compiles daily snapshots of publicly reported data on 2019 Novel Coronavirus (COVID-19) testing in Ontario.
+
+                [Learn how the Government of Ontario is helping to keep Ontarians safe during the 2019 Novel Coronavirus outbreak.](#foo)
+
+                Data includes:
+                - approximation of onset date
+                - age group
+                - patient gender
+                - case acquisition information
+                - patient outcome
+                - reporting Public Health Unit (PHU)
+                - postal code, website, longitude, and latitude of PHU
+
+                This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
+
+                **Related dataset(s)**:
+                - [Daily aggregate count of confirmed positive cases of COVID-19 in Ontario](#foo)
+                "#
+            ),
+            "ontario.case-details.hm" => indoc::indoc!(
+                r#"
+                # Harmonized COVID-19 case data from Ontario
+
+                See [original dataset](#foo).
+
+                See [harmonization schema and semantics](#foo).
+                "#
+            ),
+            "quebec.case-details" => indoc::indoc!(
+                r#"
+                # Confirmed positive cases of COVID-19 in Quebec
+
+                This dataset compiles daily snapshots of publicly reported data on 2019 Novel Coronavirus (COVID-19) testing in Ontario.
+
+                [Learn how the Government of Ontario is helping to keep Ontarians safe during the 2019 Novel Coronavirus outbreak.](#foo)
+
+                Data includes:
+                - approximation of onset date
+                - age group
+                - patient gender
+                - case acquisition information
+                - patient outcome
+                - reporting Public Health Unit (PHU)
+                - postal code, website, longitude, and latitude of PHU
+
+                This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
+
+                **Related dataset(s)**:
+                - [Daily aggregate count of confirmed positive cases of COVID-19 in Quebec](#foo)
+                "#
+            ),
+            "quebec.case-details.hm" => indoc::indoc!(
+                r#"
+                # Harmonized COVID-19 case data from Quebec
+
+                See [original dataset](#foo).
+
+                See [harmonization schema and semantics](#foo).
+                "#
+            ),
+            "canada.daily-cases" => indoc::indoc!(
                 r#"
                 # Daily aggregate count of confirmed positive cases of COVID-19 in British Columbia
                 
@@ -356,7 +442,7 @@ impl DatasetMetadata {
                 The dataset is based on [ca.bccdc.covid19.case-details](#) dataset, refer to it for the explanation of the data and licensing terms.
                 "#
             ),
-            "ca.covid19.case-details" | "ca.covid19.daily-cases" => indoc::indoc!(
+            "canada.case-details" | "ca.covid19.daily-cases" => indoc::indoc!(
                 r#"
                 # Epidemiological Data from the COVID-19 Outbreak in Canada
 
