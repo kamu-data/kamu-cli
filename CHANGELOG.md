@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.82.0] - 2022-03-22
+### Added
+- Added more libraries into Jupyter image (including `xarray`, `netcdf4`, and `hvplot`).
+- Improved examples and demo environment.
+
 ## [0.81.1] - 2022-03-16
 ### Fixed
 - Upgrading Spark engine that fixes merge strategies producing unnecessary updates.
