@@ -1,15 +1,15 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: ca.covid19.case-details
+  name: canada.case-details
   kind: derivative
   # List of metadata events that get dataset into its initial state
   metadata:
     - kind: setTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - name: ca.bccdc.covid19.case-details
-        - name: ca.ontario.data.covid19.case-details
+        - name: british-columbia.case-details
+        - name: ontario.case-details
       # Transformation that will be applied to produce new data
       transform:
         kind: sql
@@ -20,7 +20,7 @@ content:
             id,
             reported_date,
             sex as gender,
-            Case when age_group = '<10' then '<20'
+            case when age_group = '<10' then '<20'
                  when age_group = '10-19' then '<20' 
                  when age_group = '20-29' then '20s'
                  when age_group = '30-39' then '30s'
@@ -31,19 +31,18 @@ content:
                  when age_group = '80-89' then '80s'
                  when age_group = '90+' then '90+'
                  else 'UNKNOWN' end as age_group,
-              ha as location
-            FROM `ca.bccdc.covid19.case-details`
-          UNION
+            ha as location
+            FROM `british-columbia.case-details`
+          UNION ALL
           SELECT
             "ON" as province,
             id,
             case_reported_date as reported_date,
-            Case when lower(gender) = 'male' then 'M' 
+            case when lower(gender) = 'male' then 'M' 
                  when lower(gender) = 'female' then 'F' 
                  else 'U' end as gender,
             age_group,
             city as location
-            FROM `ca.ontario.data.covid19.case-details`
+            FROM `ontario.case-details`
     - kind: setVocab
       eventTimeColumn: reported_date
-

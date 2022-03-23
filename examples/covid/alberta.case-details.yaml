@@ -1,0 +1,35 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: alberta.case-details
+  kind: root
+  metadata:
+    # Specifies the source of data that can be periodically polled to refresh the dataset
+    # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+    - kind: setPollingSource
+      # Where to fetch the data from.
+      fetch:
+        kind: url
+        url: https://www.alberta.ca/data/stats/covid-19-alberta-statistics-data.csv
+      # How to interpret the data.
+      read:
+        kind: csv
+        header: true
+        inferSchema: false
+        enforceSchema: true
+        schema:
+          - id BIGINT
+          - date_reported TIMESTAMP
+          - zone STRING
+          - gender STRING
+          - age_group STRING
+          - case_status STRING
+          - case_type STRING
+      # How to combine newly-ingested data with data that is already in the dataset
+      merge:
+        kind: ledger
+        primaryKey:
+          - id
+    # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
+    - kind: setVocab
+      eventTimeColumn: date_reported

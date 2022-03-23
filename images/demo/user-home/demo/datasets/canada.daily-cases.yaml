@@ -1,21 +1,21 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: ca.bccdc.covid19.daily-cases
+  name: canada.daily-cases
   kind: derivative
   metadata:
     - kind: setTransform
       inputs:
-        - name: ca.bccdc.covid19.case-details
+        - name: canada.case-details
       transform:
         kind: sql
         engine: flink
         query: >
           SELECT
             TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
+            `province`,
             COUNT(*) as `total_daily`
-          FROM `ca.bccdc.covid19.case-details`
-          GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY)
+          FROM `canada.case-details`
+          GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
     - kind: setVocab
       eventTimeColumn: reported_date
-

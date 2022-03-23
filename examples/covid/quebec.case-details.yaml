@@ -1,0 +1,43 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: quebec.case-details
+  kind: root
+  metadata:
+    # Specifies the source of data that can be periodically polled to refresh the dataset
+    # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
+    - kind: setPollingSource
+      # Where to fetch the data from.
+      fetch:
+        kind: url
+        # Source: https://resources-covid19canada.hub.arcgis.com/pages/open-data
+        url: https://opendata.arcgis.com/api/v3/datasets/4dabb4afab874804ba121536efaaacb4_0/downloads/data?format=csv&spatialRefId=4326
+      # How to interpret the data.
+      read:
+        kind: csv
+        header: true
+        #inferSchema: false
+        #enforceSchema: true
+        timestampFormat: "yyyy/MM/dd HH:mm:ssx"
+        schema:
+          - ObjectId BIGINT
+          - row_id BIGINT
+          - date_reported TIMESTAMP
+          - health_region STRING
+          - age_group STRING
+          - gender STRING
+          - exposure STRING
+          - case_status STRING
+          - latitude FLOAT
+          - longitude FLOAT
+          - province STRING
+          - province_abbr STRING
+          - hr_uid INT
+      # How to combine newly-ingested data with data that is already in the dataset
+      merge:
+        kind: ledger
+        primaryKey:
+          - row_id
+    # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
+    - kind: setVocab
+      eventTimeColumn: date_reported

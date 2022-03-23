@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: ca.bccdc.covid19.case-details
+  name: british-columbia.case-details
   kind: root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
@@ -14,27 +14,27 @@ content:
       # How to interpret the data.
       read:
         kind: csv
-        separator: ','
+        separator: ","
         header: true
-        nullValue: ''
+        nullValue: ""
       # Pre-processing query that shapes the data (optional)
       preprocess:
-          kind: sql
-          engine: spark
-          query: >
-            SELECT
-              CAST(UNIX_TIMESTAMP(Reported_Date, "yyyy-MM-dd") as TIMESTAMP) as reported_date,
-              Classification_Reported as classification,
-              ROW_NUMBER() OVER (ORDER BY (Reported_Date, HA)) as id,
-              ha,
-              sex,
-              age_group
-            FROM input
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            CAST(UNIX_TIMESTAMP(Reported_Date, "yyyy-MM-dd") as TIMESTAMP) as reported_date,
+            Classification_Reported as classification,
+            ROW_NUMBER() OVER (ORDER BY (Reported_Date, HA)) as id,
+            ha,
+            sex,
+            age_group
+          FROM input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: ledger
         primaryKey:
-        - id
+          - id
     # Tells kamu to use `reported_date` column as event time intead of the default `event_tume`
     - kind: setVocab
       eventTimeColumn: reported_date

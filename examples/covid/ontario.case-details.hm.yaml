@@ -1,0 +1,27 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: ontario.case-details.hm
+  kind: derivative
+  # List of metadata events that get dataset into its initial state
+  metadata:
+    - kind: setTransform
+      # References the datasets that will be used as sources of data.
+      inputs:
+        - name: ontario.case-details
+      # Transformation that will be applied to produce new data
+      transform:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            id,
+            case_reported_date as reported_date,
+            case when lower(gender) = 'male' then 'M' 
+                 when lower(gender) = 'female' then 'F' 
+                 else 'U' end as gender,
+            age_group,
+            city as location
+            FROM `ontario.case-details`
+    - kind: setVocab
+      eventTimeColumn: reported_date

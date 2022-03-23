@@ -1,0 +1,52 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: canada.case-details
+  kind: derivative
+  # List of metadata events that get dataset into its initial state
+  metadata:
+    - kind: setTransform
+      # References the datasets that will be used as sources of data.
+      inputs:
+        - name: alberta.case-details.hm
+        - name: british-columbia.case-details.hm
+        - name: ontario.case-details.hm
+        - name: quebec.case-details.hm
+      # Transformation that will be applied to produce new data
+      transform:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            "AB" as province,
+            id,
+            reported_date,
+            gender,
+            location
+            FROM `alberta.case-details.hm`
+          UNION ALL
+          SELECT
+            "BC" as province,
+            id,
+            reported_date,
+            gender,
+            location
+            FROM `british-columbia.case-details.hm`
+          UNION ALL
+          SELECT
+            "ON" as province,
+            id,
+            reported_date,
+            gender,
+            location
+            FROM `ontario.case-details.hm`
+          UNION ALL
+          SELECT
+            "QC" as province,
+            id,
+            reported_date,
+            gender,
+            location
+            FROM `quebec.case-details.hm`
+    - kind: setVocab
+      eventTimeColumn: reported_date

@@ -28,15 +28,19 @@ fn main() {
     // BC dataset does not contain unique IDs so it's a pain to slice and we pull it whole
     Command::new("kamu")
         .current_dir(&work_dir)
-        .args(&["pull", "ca.bccdc.covid19.case-details"])
+        .args(&[
+            "pull",
+            "alberta.case-details",
+            "british-columbia.case-details",
+            "quebec.case-details",
+        ])
         .status()
         .unwrap()
         .exit_ok()
         .unwrap();
 
-    let source_data = download_source_data(&work_dir, &["ca.ontario.data.covid19.case-details"]);
+    let source_data = download_source_data(&work_dir, &["ontario.case-details"]);
 
-    // TODO: Split input into many batches
     for (dataset_id, data_path) in source_data {
         for data_slice_path in slice_data_file(data_path.as_ref(), 50, true) {
             let data_url = url::Url::from_file_path(&data_slice_path)

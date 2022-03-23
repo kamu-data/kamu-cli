@@ -1,0 +1,38 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: alberta.case-details.hm
+  kind: derivative
+  # List of metadata events that get dataset into its initial state
+  metadata:
+    - kind: setTransform
+      # References the datasets that will be used as sources of data.
+      inputs:
+        - name: alberta.case-details
+      # Transformation that will be applied to produce new data
+      transform:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            id,
+            date_reported as reported_date,
+            case when lower(gender) = 'male' then 'M' 
+                 when lower(gender) = 'female' then 'F' 
+                 else 'U' end as gender,
+            case when age_group = 'Under 1 year' then '<20'
+                 when age_group = '1-4 years' then '<20'
+                 when age_group = '5-9 years' then '<20'
+                 when age_group = '10-19 years' then '<20'
+                 when age_group = '20-29 years' then '20s'
+                 when age_group = '30-39 years' then '30s'
+                 when age_group = '40-49 years' then '40s'
+                 when age_group = '50-59 years' then '50s'
+                 when age_group = '60-69 years' then '60s'
+                 when age_group = '70-79 years' then '70s'
+                 when age_group = '80+ years' then '80s'
+                 else 'UNKNOWN' end as age_group,
+            zone as location
+            FROM `alberta.case-details`
+    - kind: setVocab
+      eventTimeColumn: reported_date
