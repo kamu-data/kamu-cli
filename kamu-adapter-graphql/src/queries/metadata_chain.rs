@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::queries::*;
 use crate::scalars::*;
 use crate::utils::*;
 
@@ -20,7 +19,7 @@ use opendatafabric as odf;
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub(crate) struct BlockRef {
+pub struct BlockRef {
     name: String,
     block_hash: Multihash,
 }
@@ -29,7 +28,7 @@ pub(crate) struct BlockRef {
 // MetadataChain
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct MetadataChain {
+pub struct MetadataChain {
     dataset_handle: odf::DatasetHandle,
 }
 
@@ -62,11 +61,11 @@ impl MetadataChain {
         &self,
         ctx: &Context<'_>,
         hash: Multihash,
-    ) -> Result<Option<MetadataBlock>> {
+    ) -> Result<Option<MetadataBlockHashed>> {
         let chain = self.get_chain(ctx)?;
         Ok(chain
             .get_block(&hash)
-            .map(|b| MetadataBlock::new(hash.into(), b)))
+            .map(|b| MetadataBlockHashed::new(hash, b)))
     }
 
     // TODO: Add ref parameter (defaulting to "head")
@@ -87,7 +86,7 @@ impl MetadataChain {
             .iter_blocks()
             .skip(page * per_page)
             .take(per_page)
-            .map(|(hash, block)| MetadataBlock::new(hash, block))
+            .map(|(hash, block)| MetadataBlockHashed::new(hash, block))
             .collect();
 
         // TODO: Slow but temporary
@@ -102,4 +101,8 @@ impl MetadataChain {
     }
 }
 
-page_based_connection!(MetadataBlock, MetadataBlockConnection, MetadataBlockEdge);
+page_based_connection!(
+    MetadataBlockHashed,
+    MetadataBlockConnection,
+    MetadataBlockEdge
+);

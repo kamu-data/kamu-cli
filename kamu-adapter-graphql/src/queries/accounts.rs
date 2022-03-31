@@ -14,7 +14,7 @@ use async_graphql::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct Accounts;
+pub struct Accounts;
 
 #[Object]
 impl Accounts {

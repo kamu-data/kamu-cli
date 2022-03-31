@@ -8,44 +8,45 @@
 // by the Apache License, Version 2.0.
 
 use std::ops::Deref;
+use std::path::PathBuf;
+use std::str::FromStr;
 
 use async_graphql::*;
-use opendatafabric as odf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Multihash(odf::Multihash);
+pub struct OSPath(PathBuf);
 
-impl From<odf::Multihash> for Multihash {
-    fn from(value: odf::Multihash) -> Self {
-        Multihash(value)
+impl From<PathBuf> for OSPath {
+    fn from(v: PathBuf) -> Self {
+        Self(v)
     }
 }
 
-impl Into<odf::Multihash> for Multihash {
-    fn into(self) -> odf::Multihash {
+impl Into<PathBuf> for OSPath {
+    fn into(self) -> PathBuf {
         self.0
     }
 }
 
-impl Deref for Multihash {
-    type Target = odf::Multihash;
+impl Deref for OSPath {
+    type Target = PathBuf;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 #[Scalar]
-impl ScalarType for Multihash {
+impl ScalarType for OSPath {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            let sha = odf::Multihash::from_multibase_str(value.as_str())?;
-            Ok(sha.into())
+            let v = PathBuf::from_str(value.as_str()).unwrap();
+            Ok(v.into())
         } else {
             Err(InputValueError::expected_type(value))
         }
     }
 
     fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
+        Value::String(self.0.to_str().unwrap().to_owned())
     }
 }

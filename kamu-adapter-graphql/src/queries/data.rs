@@ -15,7 +15,7 @@ use kamu::domain;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct DataQueries;
+pub struct DataQueries;
 
 #[Object]
 impl DataQueries {
@@ -27,12 +27,12 @@ impl DataQueries {
         ctx: &Context<'_>,
         query: String,
         query_dialect: QueryDialect,
-        data_format: Option<DataSliceFormat>,
+        data_format: Option<DataBatchFormat>,
         schema_format: Option<DataSchemaFormat>,
         limit: Option<u64>,
     ) -> Result<DataQueryResult> {
         // TODO: Default to JsonSoA format once implemented
-        let data_format = data_format.unwrap_or(DataSliceFormat::Json);
+        let data_format = data_format.unwrap_or(DataBatchFormat::Json);
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
         let limit = limit.unwrap_or(Self::DEFAULT_QUERY_LIMIT);
 
@@ -49,7 +49,7 @@ impl DataQueries {
 
         let record_batches = df.collect().await?;
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
-        let data = DataSlice::from_records(&record_batches, data_format)?;
+        let data = DataBatch::from_records(&record_batches, data_format)?;
 
         Ok(DataQueryResult {
             schema,

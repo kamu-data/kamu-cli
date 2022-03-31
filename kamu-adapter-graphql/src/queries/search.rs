@@ -17,7 +17,7 @@ use kamu::domain;
 // Search
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct Search;
+pub struct Search;
 
 #[Object]
 impl Search {
@@ -63,7 +63,7 @@ impl Search {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug, Clone)]
-pub(crate) enum SearchResult {
+pub enum SearchResult {
     Dataset(Dataset),
     // Account,
     // Organization,

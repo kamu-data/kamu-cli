@@ -15,7 +15,7 @@ use kamu::domain;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct Datasets;
+pub struct Datasets;
 
 #[Object]
 impl Datasets {

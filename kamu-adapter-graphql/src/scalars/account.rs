@@ -17,7 +17,7 @@ use opendatafabric as odf;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AccountID(String);
+pub struct AccountID(String);
 
 impl From<&str> for AccountID {
     fn from(value: &str) -> Self {
@@ -63,7 +63,7 @@ impl ScalarType for AccountID {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AccountName(odf::AccountName);
+pub struct AccountName(odf::AccountName);
 
 impl From<odf::AccountName> for AccountName {
     fn from(value: odf::AccountName) -> Self {

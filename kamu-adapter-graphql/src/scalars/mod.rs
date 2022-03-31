@@ -8,16 +8,22 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-pub(crate) use account::*;
+pub use account::*;
 
 mod multihash;
-pub(crate) use multihash::*;
+pub use multihash::*;
 
 mod pagination;
-pub(crate) use pagination::*;
+pub use pagination::*;
 
 mod dataset;
-pub(crate) use dataset::*;
+pub use dataset::*;
 
-mod transform;
-pub(crate) use transform::*;
+mod metadata;
+pub use metadata::*;
+
+mod odf_generated;
+pub use odf_generated::*;
+
+mod os_path;
+pub use os_path::*;

@@ -8,31 +8,28 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-pub(crate) use account::*;
+pub use account::*;
 
 mod accounts;
-pub(crate) use accounts::*;
+pub use accounts::*;
 
 mod data;
-pub(crate) use data::*;
+pub use data::*;
 
 mod dataset_data;
-pub(crate) use dataset_data::*;
+pub use dataset_data::*;
 
 mod dataset_metadata;
-pub(crate) use dataset_metadata::*;
+pub use dataset_metadata::*;
 
 mod dataset;
-pub(crate) use dataset::*;
+pub use dataset::*;
 
 mod datasets;
-pub(crate) use datasets::*;
-
-mod metadata_block;
-pub(crate) use metadata_block::*;
+pub use datasets::*;
 
 mod metadata_chain;
-pub(crate) use metadata_chain::*;
+pub use metadata_chain::*;
 
 mod search;
-pub(crate) use search::*;
+pub use search::*;

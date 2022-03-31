@@ -26,6 +26,10 @@ type Accounts {
 	"""
 	byName(name: String!): Account
 }
+type AddData {
+	outputData: DataSlice!
+	outputWatermark: DateTime
+}
 type Auth {
 	githubLogin(code: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
@@ -38,15 +42,30 @@ type BlockRef {
 	name: String!
 	blockHash: Multihash!
 }
+enum CompressionFormat {
+	GZIP
+	ZIP
+}
+type DataBatch {
+	format: DataBatchFormat!
+	content: String!
+	numRecords: Int!
+}
+enum DataBatchFormat {
+	JSON
+	JSON_LD
+	JSON_SOA
+	CSV
+}
 type DataQueries {
 	"""
 	Executes a specified query and returns its result
 	"""
-	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataSliceFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
+	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
 }
 type DataQueryResult {
 	schema: DataSchema!
-	data: DataSlice!
+	data: DataBatch!
 	limit: Int!
 }
 type DataSchema {
@@ -58,17 +77,6 @@ enum DataSchemaFormat {
 	PARQUET_JSON
 }
 type DataSlice {
-	format: DataSliceFormat!
-	content: String!
-	numRecords: Int!
-}
-enum DataSliceFormat {
-	JSON
-	JSON_LD
-	JSON_SOA
-	CSV
-}
-type DataSliceMetadata {
 	logicalHash: Multihash!
 	physicalHash: Multihash!
 	interval: OffsetInterval!
@@ -136,7 +144,7 @@ type DatasetData {
 	Returns the specified number of the latest records in the dataset
 	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
 	"""
-	tail(limit: Int, dataFormat: DataSliceFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
+	tail(limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
 }
 type DatasetEdge {
 	node: Dataset!
@@ -167,6 +175,17 @@ type DatasetMetadata {
 	Current downstream dependencies of a dataset
 	"""
 	currentDownstreamDependencies: [Dataset!]!
+	"""
+	Current source used by the root dataset
+	"""
+	currentSource: SetPollingSource
+	"""
+	Current transformation used by the derivative dataset
+	"""
+	currentTransform: SetTransform
+	currentSummary: String
+	currentTopics: [String!]!
+	currentReadme: String
 }
 scalar DatasetName
 type Datasets {
@@ -193,7 +212,32 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
-type InputSliceMetadata {
+union EventTimeSource = | EventTimeSourceFromMetadata | EventTimeSourceFromPath
+type EventTimeSourceFromMetadata {
+	dummy: String
+}
+type EventTimeSourceFromPath {
+	pattern: String!
+	timestampFormat: String
+}
+type ExecuteQuery {
+	inputSlices: [InputSlice!]!
+	outputData: DataSlice
+	outputWatermark: DateTime
+}
+union FetchStep = | FetchStepUrl | FetchStepFilesGlob
+type FetchStepFilesGlob {
+	path: String!
+	eventTime: EventTimeSource
+	cache: SourceCaching
+	order: SourceOrdering
+}
+type FetchStepUrl {
+	url: String!
+	eventTime: EventTimeSource
+	cache: SourceCaching
+}
+type InputSlice {
 	datasetId: DatasetID!
 	blockInterval: BlockInterval
 	dataInterval: OffsetInterval
@@ -202,17 +246,26 @@ type LoginResponse {
 	token: AccessToken!
 	accountInfo: AccountInfo!
 }
-type MetadataBlock {
-	systemTime: DateTime!
-	blockHash: Multihash!
-	prevBlockHash: Multihash
-	event: MetadataEvent!
+union MergeStrategy = | MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
+type MergeStrategyAppend {
+	dummy: String
+}
+type MergeStrategyLedger {
+	primaryKey: [String!]!
+}
+type MergeStrategySnapshot {
+	primaryKey: [String!]!
+	compareColumns: [String!]
+	observationColumn: String
+	obsvAdded: String
+	obsvChanged: String
+	obsvRemoved: String
 }
 type MetadataBlockConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MetadataBlock!]!
+	nodes: [MetadataBlockHashed!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -224,7 +277,13 @@ type MetadataBlockConnection {
 	edges: [MetadataBlockEdge!]!
 }
 type MetadataBlockEdge {
-	node: MetadataBlock!
+	node: MetadataBlockHashed!
+}
+type MetadataBlockHashed {
+	blockHash: Multihash!
+	systemTime: DateTime!
+	prevBlockHash: Multihash
+	event: MetadataEvent!
 }
 type MetadataChain {
 	"""
@@ -234,47 +293,13 @@ type MetadataChain {
 	"""
 	Returns a metadata block corresponding to the specified hash
 	"""
-	blockByHash(hash: Multihash!): MetadataBlock
+	blockByHash(hash: Multihash!): MetadataBlockHashed
 	"""
 	Iterates all metadata blocks in the reverse chronological order
 	"""
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
-interface MetadataEvent {
-	dummy: String!
-}
-type MetadataEventAddData implements MetadataEvent {
-	dummy: String!
-	outputData: DataSliceMetadata!
-	outputWatermark: DateTime
-}
-type MetadataEventExecuteQuery implements MetadataEvent {
-	dummy: String!
-	inputSlices: [InputSliceMetadata!]!
-	outputData: DataSliceMetadata
-	outputWatermark: DateTime
-}
-type MetadataEventSeed implements MetadataEvent {
-	dummy: String!
-	datasetId: DatasetID!
-	datasetKind: DatasetKind!
-}
-type MetadataEventSetPollingSource implements MetadataEvent {
-	dummy: String!
-}
-type MetadataEventSetTransform implements MetadataEvent {
-	dummy: String!
-}
-type MetadataEventSetVocab implements MetadataEvent {
-	dummy: String!
-}
-type MetadataEventSetWatermark implements MetadataEvent {
-	dummy: String!
-	outputWatermark: DateTime!
-}
-type MetadataEventUnsupported implements MetadataEvent {
-	dummy: String!
-}
+union MetadataEvent = | AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark
 scalar Multihash
 type Mutation {
 	auth: Auth!
@@ -311,6 +336,14 @@ type PageBasedInfo {
 	"""
 	totalPages: Int
 }
+union PrepStep = | PrepStepDecompress | PrepStepPipe
+type PrepStepDecompress {
+	format: CompressionFormat!
+	subPath: String
+}
+type PrepStepPipe {
+	command: [String!]!
+}
 type Query {
 	"""
 	Returns the version of the GQL API
@@ -336,6 +369,43 @@ type Query {
 enum QueryDialect {
 	DATA_FUSION
 }
+union ReadStep = | ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile
+type ReadStepCsv {
+	schema: [String!]
+	separator: String
+	encoding: String
+	quote: String
+	escape: String
+	comment: String
+	header: Boolean
+	enforceSchema: Boolean
+	inferSchema: Boolean
+	ignoreLeadingWhiteSpace: Boolean
+	ignoreTrailingWhiteSpace: Boolean
+	nullValue: String
+	emptyValue: String
+	nanValue: String
+	positiveInf: String
+	negativeInf: String
+	dateFormat: String
+	timestampFormat: String
+	multiLine: Boolean
+}
+type ReadStepEsriShapefile {
+	schema: [String!]
+	subPath: String
+}
+type ReadStepGeoJson {
+	schema: [String!]
+}
+type ReadStepJsonLines {
+	schema: [String!]
+	dateFormat: String
+	encoding: String
+	multiLine: Boolean
+	primitivesAsString: Boolean
+	timestampFormat: String
+}
 type Search {
 	"""
 	Perform search across all resources
@@ -360,6 +430,57 @@ type SearchResultConnection {
 }
 type SearchResultEdge {
 	node: SearchResult!
+}
+type Seed {
+	datasetId: DatasetID!
+	datasetKind: DatasetKind!
+}
+type SetPollingSource {
+	fetch: FetchStep!
+	prepare: [PrepStep!]
+	read: ReadStep!
+	preprocess: Transform
+	merge: MergeStrategy!
+}
+type SetTransform {
+	inputs: [TransformInput!]!
+	transform: Transform!
+}
+type SetVocab {
+	systemTimeColumn: String
+	eventTimeColumn: String
+	offsetColumn: String
+}
+type SetWatermark {
+	outputWatermark: DateTime!
+}
+union SourceCaching = | SourceCachingForever
+type SourceCachingForever {
+	dummy: String
+}
+enum SourceOrdering {
+	BY_EVENT_TIME
+	BY_NAME
+}
+type SqlQueryStep {
+	alias: String
+	query: String!
+}
+type TemporalTable {
+	name: String!
+	primaryKey: [String!]!
+}
+union Transform = | TransformSql
+type TransformInput {
+	id: DatasetID
+	name: DatasetName!
+	dataset: Dataset!
+}
+type TransformSql {
+	engine: String!
+	version: String
+	queries: [SqlQueryStep!]!
+	temporalTables: [TemporalTable!]
 }
 type User implements Account {
 	"""

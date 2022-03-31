@@ -17,7 +17,7 @@ use opendatafabric as odf;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct DatasetID(odf::DatasetID);
+pub struct DatasetID(odf::DatasetID);
 
 impl From<odf::DatasetID> for DatasetID {
     fn from(value: odf::DatasetID) -> Self {
@@ -65,7 +65,7 @@ impl ScalarType for DatasetID {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct DatasetName(odf::DatasetName);
+pub struct DatasetName(odf::DatasetName);
 
 impl From<odf::DatasetName> for DatasetName {
     fn from(value: odf::DatasetName) -> Self {
@@ -109,36 +109,17 @@ impl ScalarType for DatasetName {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// DatasetKind
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DatasetKind {
-    Root,
-    Derivative,
-}
-
-impl From<odf::DatasetKind> for DatasetKind {
-    fn from(v: odf::DatasetKind) -> Self {
-        match v {
-            odf::DatasetKind::Root => DatasetKind::Root,
-            odf::DatasetKind::Derivative => DatasetKind::Derivative,
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DataSchemaFormat {
+pub enum DataSchemaFormat {
     Parquet,
     ParquetJson,
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct DataSchema {
+pub struct DataSchema {
     pub format: DataSchemaFormat,
     pub content: String,
 }
@@ -176,11 +157,11 @@ impl DataSchema {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// DataSlice
+// DataBatch
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DataSliceFormat {
+pub enum DataBatchFormat {
     Json,
     JsonLD,
     JsonSOA,
@@ -188,17 +169,17 @@ pub(crate) enum DataSliceFormat {
 }
 
 #[derive(SimpleObject)]
-pub(crate) struct DataSlice {
-    pub format: DataSliceFormat,
+pub struct DataBatch {
+    pub format: DataBatchFormat,
     pub content: String,
     pub num_records: u64,
 }
 
-impl DataSlice {
+impl DataBatch {
     pub fn from_records(
         record_batches: &Vec<datafusion::arrow::record_batch::RecordBatch>,
-        format: DataSliceFormat,
-    ) -> Result<DataSlice> {
+        format: DataBatchFormat,
+    ) -> Result<DataBatch> {
         use kamu::infra::utils::records_writers::*;
 
         let num_records: usize = record_batches.iter().map(|b| b.num_rows()).sum();
@@ -206,12 +187,12 @@ impl DataSlice {
         let mut buf = Vec::new();
         {
             let mut writer: Box<dyn RecordsWriter> = match format {
-                DataSliceFormat::Csv => {
+                DataBatchFormat::Csv => {
                     Box::new(CsvWriterBuilder::new().has_headers(true).build(&mut buf))
                 }
-                DataSliceFormat::Json => Box::new(JsonArrayWriter::new(&mut buf)),
-                DataSliceFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
-                DataSliceFormat::JsonSOA => {
+                DataBatchFormat::Json => Box::new(JsonArrayWriter::new(&mut buf)),
+                DataBatchFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
+                DataBatchFormat::JsonSOA => {
                     unimplemented!("SoA Json format is not yet implemented")
                 }
             };
@@ -220,7 +201,7 @@ impl DataSlice {
             writer.finish()?;
         }
 
-        Ok(DataSlice {
+        Ok(DataBatch {
             format,
             content: String::from_utf8(buf).unwrap(),
             num_records: num_records as u64,
@@ -233,9 +214,9 @@ impl DataSlice {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub(crate) struct DataQueryResult {
+pub struct DataQueryResult {
     pub schema: DataSchema,
-    pub data: DataSlice,
+    pub data: DataBatch,
     pub limit: u64,
 }
 
@@ -244,6 +225,6 @@ pub(crate) struct DataQueryResult {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum QueryDialect {
+pub enum QueryDialect {
     DataFusion,
 }

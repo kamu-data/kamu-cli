@@ -17,7 +17,7 @@ use kamu::domain;
 use opendatafabric as odf;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Dataset {
+pub struct Dataset {
     account: Account,
     dataset_handle: odf::DatasetHandle,
 }
@@ -36,6 +36,8 @@ impl Dataset {
     pub fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRefLocal) -> Result<Dataset> {
         let cat = ctx.data::<dill::Catalog>().unwrap();
         let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+
+        // TODO: Should we resolve reference at this point or allow unresolved and fail later?
         let hdl = dataset_reg.resolve_dataset_ref(dataset_ref)?;
         Ok(Dataset::new(Account::mock(), hdl))
     }

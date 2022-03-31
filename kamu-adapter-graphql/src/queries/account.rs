@@ -19,7 +19,7 @@ use opendatafabric as odf;
     field(name = "id", method = "id", type = "&AccountID"),
     field(name = "name", type = "&str")
 )]
-pub(crate) enum Account {
+pub enum Account {
     User(User),
     Organization(Organization),
 }
@@ -37,7 +37,7 @@ impl Account {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub(crate) struct User {
+pub struct User {
     account_id: AccountID,
     account_name: AccountName,
 }
@@ -66,7 +66,7 @@ impl User {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub(crate) struct Organization {
+pub struct Organization {
     account_id: AccountID,
     account_name: AccountName,
 }

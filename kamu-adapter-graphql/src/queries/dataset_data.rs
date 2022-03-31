@@ -14,7 +14,7 @@ use async_graphql::*;
 use kamu::domain;
 use opendatafabric as odf;
 
-pub(crate) struct DatasetData {
+pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
 }
 
@@ -48,11 +48,11 @@ impl DatasetData {
         &self,
         ctx: &Context<'_>,
         limit: Option<u64>,
-        data_format: Option<DataSliceFormat>,
+        data_format: Option<DataBatchFormat>,
         schema_format: Option<DataSchemaFormat>,
     ) -> Result<DataQueryResult> {
         // TODO: Default to JsonSoA format once implemented
-        let data_format = data_format.unwrap_or(DataSliceFormat::Json);
+        let data_format = data_format.unwrap_or(DataBatchFormat::Json);
         let schema_format = schema_format.unwrap_or(DataSchemaFormat::Parquet);
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
@@ -63,7 +63,7 @@ impl DatasetData {
 
         let record_batches = df.collect().await?;
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
-        let data = DataSlice::from_records(&record_batches, data_format)?;
+        let data = DataBatch::from_records(&record_batches, data_format)?;
 
         Ok(DataQueryResult {
             schema,

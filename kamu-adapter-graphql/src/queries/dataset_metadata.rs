@@ -17,7 +17,7 @@ use kamu::domain;
 use opendatafabric as odf;
 use opendatafabric::IntoDataStreamBlock;
 
-pub(crate) struct DatasetMetadata {
+pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
 }
 
@@ -98,11 +98,20 @@ impl DatasetMetadata {
             .collect())
     }
 
+    /// Current source used by the root dataset
+    async fn current_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
+        use opendatafabric::AsTypedBlock;
+
+        Ok(self
+            .get_chain(ctx)?
+            .iter_blocks_ref(&domain::BlockRef::Head)
+            .filter_map(|(_, b)| b.into_typed::<odf::SetPollingSource>())
+            .next()
+            .map(|t| t.event.into()))
+    }
+
     /// Current transformation used by the derivative dataset
-    async fn current_transform(
-        &self,
-        ctx: &Context<'_>,
-    ) -> Result<Option<MetadataEventSetTransform>> {
+    async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
         use opendatafabric::AsTypedBlock;
 
         Ok(self
@@ -114,29 +123,29 @@ impl DatasetMetadata {
     }
 
     // TODO: MOCK
-    async fn current_summary(&self) -> String {
+    async fn current_summary(&self) -> Option<String> {
         match self.dataset_handle.name.as_str() {
             "alberta.case-details" | "alberta.case-details.hm" => {
-                "Confirmed positive cases of COVID-19 in Alberta."
+                Some("Confirmed positive cases of COVID-19 in Alberta.")
             }
             "british-columbia.case-details" | "british-columbia.case-details.hm" => {
-                "British Columbia COVID-19 case data updated regularly from the B.C. Centre for Disease Control, Provincial Health Services Authority and the B.C. Ministry of Health."
+                Some("British Columbia COVID-19 case data updated regularly from the B.C. Centre for Disease Control, Provincial Health Services Authority and the B.C. Ministry of Health.")
             }
             "ontario.case-details" | "ontario.case-details.hm" => {
-                "Confirmed positive cases of COVID-19 in Ontario."
+                Some("Confirmed positive cases of COVID-19 in Ontario.")
             }
             "quebec.case-details" | "quebec.case-details.hm" => {
-                "Confirmed positive cases of COVID-19 in Quebec."
+                Some("Confirmed positive cases of COVID-19 in Quebec.")
             }
             "canada.case-details" => {
-                "Pan-Canadian COVID-19 case data combined from variety of official provincial and municipal data sources."
+                Some("Pan-Canadian COVID-19 case data combined from variety of official provincial and municipal data sources.")
             }
             "canada.daily-cases" => {
-                "Pan-Canadian COVID-19 daily case counts on per Health Region level of aggregation."
+                Some("Pan-Canadian COVID-19 daily case counts on per Health Region level of aggregation.")
             }
-            _ => "Default summary",
+            _ => None,
         }
-        .to_string()
+        .map(|s| s.to_string())
     }
 
     // TODO: MOCK
@@ -226,18 +235,14 @@ impl DatasetMetadata {
                     "Canada".to_string(),
                 ]
             }
-            _ => vec![
-                "Dataset".to_string(),
-                "Open Data".to_string(),
-                "Research".to_string(),
-            ],
+            _ => Vec::new(),
         }
     }
 
     // TODO: MOCK
-    async fn current_readme(&self) -> String {
+    async fn current_readme(&self) -> Option<String> {
         match self.dataset_handle.name.as_str() {
-            "alberta.case-details" => indoc::indoc!(
+            "alberta.case-details" => Some(indoc::indoc!(
                 r#"
                 # Confirmed positive cases of COVID-19 in Alberta
 
@@ -259,8 +264,8 @@ impl DatasetMetadata {
                 **Related dataset(s)**:
                 - [Daily aggregate count of confirmed positive cases of COVID-19 in Alberta](#foo)
                 "#
-            ),
-            "alberta.case-details.hm" => indoc::indoc!(
+            )),
+            "alberta.case-details.hm" => Some(indoc::indoc!(
                 r#"
                 # Harmonized COVID-19 case data from Alberta
 
@@ -268,8 +273,8 @@ impl DatasetMetadata {
 
                 See [harmonization schema and semantics](#foo).
                 "#
-            ),
-            "british-columbia.case-details" => indoc::indoc!(
+            )),
+            "british-columbia.case-details" => Some(indoc::indoc!(
                 r#"
                 # Confirmed positive cases of COVID-19 in British Columbia
 
@@ -359,8 +364,8 @@ impl DatasetMetadata {
 
                 © Province of British Columbia 
                 "#
-            ),
-            "british-columbia.case-details.hm" => indoc::indoc!(
+            )),
+            "british-columbia.case-details.hm" => Some(indoc::indoc!(
                 r#"
                 # Harmonized COVID-19 case data from British Columbia
 
@@ -368,8 +373,8 @@ impl DatasetMetadata {
 
                 See [harmonization schema and semantics](#foo).
                 "#
-            ),
-            "ontario.case-details" => indoc::indoc!(
+            )),
+            "ontario.case-details" => Some(indoc::indoc!(
                 r#"
                 # Confirmed positive cases of COVID-19 in Ontario
 
@@ -391,8 +396,8 @@ impl DatasetMetadata {
                 **Related dataset(s)**:
                 - [Daily aggregate count of confirmed positive cases of COVID-19 in Ontario](#foo)
                 "#
-            ),
-            "ontario.case-details.hm" => indoc::indoc!(
+            )),
+            "ontario.case-details.hm" => Some(indoc::indoc!(
                 r#"
                 # Harmonized COVID-19 case data from Ontario
 
@@ -400,8 +405,8 @@ impl DatasetMetadata {
 
                 See [harmonization schema and semantics](#foo).
                 "#
-            ),
-            "quebec.case-details" => indoc::indoc!(
+            )),
+            "quebec.case-details" => Some(indoc::indoc!(
                 r#"
                 # Confirmed positive cases of COVID-19 in Quebec
 
@@ -423,8 +428,8 @@ impl DatasetMetadata {
                 **Related dataset(s)**:
                 - [Daily aggregate count of confirmed positive cases of COVID-19 in Quebec](#foo)
                 "#
-            ),
-            "quebec.case-details.hm" => indoc::indoc!(
+            )),
+            "quebec.case-details.hm" => Some(indoc::indoc!(
                 r#"
                 # Harmonized COVID-19 case data from Quebec
 
@@ -432,8 +437,8 @@ impl DatasetMetadata {
 
                 See [harmonization schema and semantics](#foo).
                 "#
-            ),
-            "canada.daily-cases" => indoc::indoc!(
+            )),
+            "canada.daily-cases" => Some(indoc::indoc!(
                 r#"
                 # Daily aggregate count of confirmed positive cases of COVID-19 in British Columbia
                 
@@ -441,8 +446,8 @@ impl DatasetMetadata {
 
                 The dataset is based on [ca.bccdc.covid19.case-details](#) dataset, refer to it for the explanation of the data and licensing terms.
                 "#
-            ),
-            "canada.case-details" | "ca.covid19.daily-cases" => indoc::indoc!(
+            )),
+            "canada.case-details" | "ca.covid19.daily-cases" => Some(indoc::indoc!(
                 r#"
                 # Epidemiological Data from the COVID-19 Outbreak in Canada
 
@@ -552,9 +557,9 @@ impl DatasetMetadata {
                 You can learn more about the COVID-19 Canada Open Data Working Group at [our website](https://opencovid.ca/) and reach out to us via our [contact page](https://opencovid.ca/contact-us/).
 
                 "#
-            ),
-            _ => "Default readme",
+            )),
+            _ => None,
         }
-        .to_string()
+        .map(|s| s.to_string())
     }
 }

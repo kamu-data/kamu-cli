@@ -17,7 +17,7 @@ macro_rules! page_based_connection {
     ($node_type:ident, $connection_type:ident, $edge_type:ident) => {
         #[derive(SimpleObject)]
         #[graphql(complex)]
-        pub(crate) struct $connection_type {
+        pub struct $connection_type {
             /// A shorthand for `edges { node { ... } }`
             pub nodes: Vec<$node_type>,
 
@@ -67,7 +67,7 @@ macro_rules! page_based_connection {
         }
 
         #[derive(SimpleObject)]
-        pub(crate) struct $edge_type {
+        pub struct $edge_type {
             pub node: $node_type,
         }
     };
@@ -76,7 +76,7 @@ macro_rules! page_based_connection {
 pub(crate) use page_based_connection;
 
 #[derive(SimpleObject)]
-pub(crate) struct PageBasedInfo {
+pub struct PageBasedInfo {
     /// When paginating backwards, are there more items?
     pub has_previous_page: bool,
 

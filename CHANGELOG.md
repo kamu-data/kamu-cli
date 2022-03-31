@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.83.0] - 2022-03-30
+### Added
+- Using code generation for GQL wrappers around ODF types
+- Extended GQL API with root source metadata
+
 ## [0.82.0] - 2022-03-22
 ### Added
 - Added more libraries into Jupyter image (including `xarray`, `netcdf4`, and `hvplot`).
