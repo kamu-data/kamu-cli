@@ -40,10 +40,9 @@ minio-data:
 		kamu init && \
 		kamu repo add kamu-hub file:///$(shell pwd)/minio-data/kamu-hub && \
 		kamu repo list && \
-		kamu add ../user-home/demo/datasets/ca.ontario.data.covid19.case-details.yaml ../user-home/demo/datasets/ca.ontario.data.covid19.daily-cases.yaml && \
+		kamu add ../user-home/demo/datasets/ontario.case-details.yaml && \
 		kamu pull --all && \
-		kamu push ca.ontario.data.covid19.case-details --as kamu-hub/ca.ontario.data.covid19.case-details && \
-		kamu push ca.ontario.data.covid19.daily-cases --as kamu-hub/ca.ontario.data.covid19.daily-cases && \
+		kamu push ontario.case-details --as kamu-hub/covid19.ontario.case-details && \
 		kamu search && \
 		cd .. && \
 		rm -rf tmp
