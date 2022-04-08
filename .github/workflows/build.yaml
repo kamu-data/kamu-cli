@@ -24,7 +24,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo
       - run: cargo build
       - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman # Podman is default for tests but not for runtime yet
       - run: cargo run --bin kamu-cli -- init --pull-test-images
@@ -47,7 +47,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo
       - run: cargo test --verbose --features skip_docker_tests
   test_windows:
     name: Test / Windows
@@ -65,5 +65,5 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo
       - run: cargo test --verbose --features skip_docker_tests
