@@ -172,9 +172,11 @@ impl Command for InspectQueryCommand {
         let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
-            let mut pager = minus::Pager::new().unwrap();
-            pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-            pager.set_prompt(&dataset_handle.name);
+            let mut pager = minus::Pager::new();
+            pager
+                .set_exit_strategy(minus::ExitStrategy::PagerQuit)
+                .unwrap();
+            pager.set_prompt(&dataset_handle.name).unwrap();
 
             self.render(&mut WritePager(&mut pager), &dataset_handle)?;
             minus::page_all(pager).unwrap();

@@ -356,9 +356,11 @@ impl MetadataRenderer for PagedAsciiRenderer {
         dataset_handle: &DatasetHandle,
         blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
-        let mut pager = minus::Pager::new().unwrap();
-        pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-        pager.set_prompt(&dataset_handle.name);
+        let mut pager = minus::Pager::new();
+        pager
+            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
+            .unwrap();
+        pager.set_prompt(&dataset_handle.name).unwrap();
 
         let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone());
         renderer.render_blocks(&mut WritePager(&mut pager), blocks)?;
@@ -440,9 +442,11 @@ impl MetadataRenderer for PagedYamlRenderer {
         dataset_handle: &DatasetHandle,
         blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
     ) -> Result<(), CLIError> {
-        let mut pager = minus::Pager::new().unwrap();
-        pager.set_exit_strategy(minus::ExitStrategy::PagerQuit);
-        pager.set_prompt(&dataset_handle.name);
+        let mut pager = minus::Pager::new();
+        pager
+            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
+            .unwrap();
+        pager.set_prompt(&dataset_handle.name).unwrap();
 
         YamlRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
         minus::page_all(pager).unwrap();
