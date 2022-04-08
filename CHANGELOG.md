@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.84.1] - 2022-04-08
+### Added
+- Web UI embedding into MacOS build
+
 ## [0.84.0] - 2022-04-08
 ### Added
 - Early Web UI prototype is now available via `kamu ui` command
