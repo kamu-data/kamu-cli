@@ -18,3 +18,8 @@ pub use notebook_server_impl::*;
 
 mod sql_shell_impl;
 pub use sql_shell_impl::*;
+
+#[cfg(feature = "web-ui")]
+mod web_ui_server;
+#[cfg(feature = "web-ui")]
+pub use web_ui_server::*;

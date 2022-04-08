@@ -280,6 +280,12 @@ pub fn get_command(
             submatches.value_of_t_or_exit("num-records"),
             catalog.get_one()?,
         )),
+        Some(("ui", submatches)) => Box::new(UICommand::new(
+            catalog.clone(), // TODO: Currently very expensive!
+            catalog.get_one()?,
+            submatches.value_of_t("address").ok(),
+            submatches.value_of_t("http-port").ok(),
+        )),
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,

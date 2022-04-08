@@ -966,7 +966,7 @@ pub fn cli() -> Command<'static> {
                                 .long("address")
                                 .takes_value(true)
                                 .validator(validate_ip_addr)
-                                .help("Expose JDBC server on specific network interface"),
+                                .help("Expose HTTP server on specific network interface"),
                             Arg::new("http-port")
                                 .long("http-port")
                                 .takes_value(true)
@@ -1015,9 +1015,14 @@ pub fn cli() -> Command<'static> {
                     "#
                 ))
             ),
-            /*Command::new("ui")
-                .about("Opens browser-based user interface")
+            Command::new("ui")
+                .about("Opens web interface")
                 .args([
+                    Arg::new("address")
+                        .long("address")
+                        .takes_value(true)
+                        .validator(validate_ip_addr)
+                        .help("Expose HTTP server on specific network interface"),
                     Arg::new("http-port")
                         .long("http-port")
                         .takes_value(true)
@@ -1038,7 +1043,7 @@ pub fn cli() -> Command<'static> {
 
                         kamu ui --http-port 12345
                     "
-                )),*/
+                )),
             Command::new("verify")
                 .about("Verifies the validity of a dataset")
                 .args(&[

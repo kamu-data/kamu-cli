@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.84.0] - 2022-04-08
+### Added
+- Early Web UI prototype is now available via `kamu ui` command
+
 ## [0.83.0] - 2022-03-30
 ### Added
 - Using code generation for GQL wrappers around ODF types
