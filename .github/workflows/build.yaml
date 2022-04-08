@@ -13,30 +13,57 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo build
-      - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman  # Podman is default for tests but not for runtime yet
+      - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman # Podman is default for tests but not for runtime yet
       - run: cargo run --bin kamu-cli -- init --pull-test-images
       - run: cargo test --verbose
       - run: git diff
-      - run: git diff-index --quiet HEAD  # Ensure all generated files are up-to-date
+      - run: git diff-index --quiet HEAD # Ensure all generated files are up-to-date
   test_macos:
     name: Test / MacOS
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test --verbose --features skip_docker_tests
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test --verbose --features skip_docker_tests
