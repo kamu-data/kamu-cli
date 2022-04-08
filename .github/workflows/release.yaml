@@ -6,6 +6,7 @@ on:
 env:
   PACKAGE_NAME: kamu-cli
   BINARY_NAME: kamu
+  KAMU_WEB_UI_VERSION: "0.1.1"
 jobs:
   build_linux:
     name: Build / Linux
@@ -17,16 +18,22 @@ jobs:
           - x86_64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
           target: ${{ matrix.target }}
           override: true
+      - name: Fetch web UI artifacts # TODO: Add target without UI
+        run: |
+          wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
+          tar -xf kamu-web-ui-any.tar.gz
       - uses: actions-rs/cargo@v1
+        env:
+          KAMU_WEB_UI_DIR: "../kamu-web-ui-any"
         with:
           use-cross: true
           command: build
-          args: --release --target=${{ matrix.target }}
+          args: --release --target=${{ matrix.target }} --features kamu-cli/web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
       - uses: actions/upload-artifact@v2
@@ -43,7 +50,7 @@ jobs:
           - x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
       - run: cargo build --release --target=${{ matrix.target }}
@@ -63,7 +70,7 @@ jobs:
           - x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1  # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
       - run: cargo build --release --target=${{ matrix.target }}

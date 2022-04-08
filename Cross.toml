@@ -1,0 +1,4 @@
+[build.env]
+passthrough = [
+    "KAMU_WEB_UI_DIR",
+]
