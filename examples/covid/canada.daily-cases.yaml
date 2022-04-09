@@ -19,3 +19,27 @@ content:
           GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
     - kind: setVocab
       eventTimeColumn: reported_date
+    - kind: setInfo
+      description: Pan-Canadian COVID-19 daily case counts on per Health Region level of aggregation.
+      keywords:
+        - Healthcare
+        - Epidemiology
+        - COVID-19
+        - SARS-CoV-2
+        - Aggregated
+        - Canada
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # Daily aggregate count of confirmed positive cases of COVID-19 in Canada
+                
+              This dataset compiles the aggregate number of daily cases of COVID-19 registered in Canada.
+
+              The dataset is based on [canada.case-details](#) dataset, refer to it for the explanation of the data and licensing terms.
+    - kind: setLicense
+      shortName: OGL-Ontario
+      name: Open Government Licence - Ontario
+      websiteUrl: https://www.ontario.ca/page/open-government-licence-ontario

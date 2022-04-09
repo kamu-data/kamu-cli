@@ -25,3 +25,30 @@ content:
             FROM `ontario.case-details`
     - kind: setVocab
       eventTimeColumn: reported_date
+    - kind: setInfo
+      description: Confirmed positive cases of COVID-19 in Ontario (harmonized).
+      keywords:
+        - Healthcare
+        - Epidemiology
+        - COVID-19
+        - SARS-CoV-2
+        - Disaggregated
+        - Anonymized
+        - Ontario
+        - Canada
+        - Harmonized
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # Harmonized COVID-19 case data from Ontario
+
+              See [original dataset](#todo).
+
+              See [harmonization schema and semantics](#todo).
+    - kind: setLicense
+      shortName: OGL-Ontario
+      name: Open Government Licence - Ontario
+      websiteUrl: https://www.ontario.ca/page/open-government-licence-ontario

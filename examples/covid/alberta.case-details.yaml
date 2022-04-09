@@ -10,6 +10,7 @@ content:
       # Where to fetch the data from.
       fetch:
         kind: url
+        # Source: https://www.alberta.ca/stats/covid-19-alberta-statistics.htm
         url: https://www.alberta.ca/data/stats/covid-19-alberta-statistics-data.csv
       # How to interpret the data.
       read:
@@ -33,3 +34,42 @@ content:
     # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
     - kind: setVocab
       eventTimeColumn: date_reported
+    - kind: setInfo
+      description: Confirmed positive cases of COVID-19 in Alberta.
+      keywords:
+        - Healthcare
+        - Epidemiology
+        - COVID-19
+        - SARS-CoV-2
+        - Disaggregated
+        - Anonymized
+        - Alberta
+        - Canada
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # Confirmed positive cases of COVID-19 in Alberta
+
+              This dataset compiles daily snapshots of publicly reported data on 2019 Novel Coronavirus (COVID-19) testing in Alberta.
+
+              Data includes:
+              - approximation of onset date
+              - age group
+              - patient gender
+              - case acquisition information
+              - patient outcome
+              - reporting Public Health Unit (PHU)
+              - postal code, website, longitude, and latitude of PHU
+
+              This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
+
+              **Related dataset(s)**:
+              - [Daily aggregate count of confirmed positive cases of COVID-19 in Alberta](#todo)
+    - kind: setLicense
+      shortName: OGL-Canada-2.0
+      spdxId: OGL-Canada-2.0
+      name: Open Government Licence - Canada
+      websiteUrl: https://open.canada.ca/en/open-government-licence-canada

@@ -35,3 +35,43 @@ content:
           - id
     - kind: setVocab
       eventTimeColumn: case_reported_date
+    - kind: setInfo
+      description: Confirmed positive cases of COVID-19 in Ontario.
+      keywords:
+        - Healthcare
+        - Epidemiology
+        - COVID-19
+        - SARS-CoV-2
+        - Disaggregated
+        - Anonymized
+        - Ontario
+        - Canada
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # Confirmed positive cases of COVID-19 in Ontario
+
+              This dataset compiles daily snapshots of publicly reported data on 2019 Novel Coronavirus (COVID-19) testing in Ontario.
+
+              [Learn how the Government of Ontario is helping to keep Ontarians safe during the 2019 Novel Coronavirus outbreak.](#todo)
+
+              Data includes:
+              - approximation of onset date
+              - age group
+              - patient gender
+              - case acquisition information
+              - patient outcome
+              - reporting Public Health Unit (PHU)
+              - postal code, website, longitude, and latitude of PHU
+
+              This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
+
+              **Related dataset(s)**:
+              - [Daily aggregate count of confirmed positive cases of COVID-19 in Ontario](#todo)
+    - kind: setLicense
+      shortName: OGL-Ontario
+      name: Open Government Licence - Ontario
+      websiteUrl: https://www.ontario.ca/page/open-government-licence-ontario

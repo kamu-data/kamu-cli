@@ -33,3 +33,31 @@ content:
             FROM `quebec.case-details`
     - kind: setVocab
       eventTimeColumn: reported_date
+    - kind: setInfo
+      description: Confirmed positive cases of COVID-19 in Quebec (harmonized).
+      keywords:
+        - Healthcare
+        - Epidemiology
+        - COVID-19
+        - SARS-CoV-2
+        - Disaggregated
+        - Anonymized
+        - Quebec
+        - Canada
+        - Harmonized
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # Harmonized COVID-19 case data from Quebec
+
+              See [original dataset](#todo).
+
+              See [harmonization schema and semantics](#todo).
+    - kind: setLicense
+      shortName: OGL-Canada-2.0
+      spdxId: OGL-Canada-2.0
+      name: Open Government Licence - Canada
+      websiteUrl: https://open.canada.ca/en/open-government-licence-canada
