@@ -30,6 +30,14 @@ type AddData {
 	outputData: DataSlice!
 	outputWatermark: DateTime
 }
+type AttachmentEmbedded {
+	path: String!
+	content: String!
+}
+union Attachments = | AttachmentsEmbedded
+type AttachmentsEmbedded {
+	items: [AttachmentEmbedded!]!
+}
 type Auth {
 	githubLogin(code: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
@@ -183,9 +191,18 @@ type DatasetMetadata {
 	Current transformation used by the derivative dataset
 	"""
 	currentTransform: SetTransform
-	currentSummary: String
-	currentTopics: [String!]!
+	"""
+	Current descriptive information about the dataset
+	"""
+	currentInfo: SetInfo!
+	"""
+	Current readme file as discovered from attachments associated with the dataset
+	"""
 	currentReadme: String
+	"""
+	Current license associated with the dataset
+	"""
+	currentLicense: SetLicense
 }
 scalar DatasetName
 type Datasets {
@@ -299,7 +316,7 @@ type MetadataChain {
 	"""
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
-union MetadataEvent = | AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark
+union MetadataEvent = | AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
 scalar Multihash
 type Mutation {
 	auth: Auth!
@@ -434,6 +451,19 @@ type SearchResultEdge {
 type Seed {
 	datasetId: DatasetID!
 	datasetKind: DatasetKind!
+}
+type SetAttachments {
+	attachments: Attachments!
+}
+type SetInfo {
+	description: String
+	keywords: [String!]
+}
+type SetLicense {
+	shortName: String!
+	name: String!
+	spdxId: String
+	websiteUrl: String!
 }
 type SetPollingSource {
 	fetch: FetchStep!

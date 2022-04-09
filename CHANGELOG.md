@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.85.0] - 2022-04-09
+### Changed
+- Updated to latest ODF schemas
+- Unhacked dataset descriptions in GQL
+- Updated Web UI
+
 ## [0.84.1] - 2022-04-08
 ### Added
 - Web UI embedding into MacOS build
