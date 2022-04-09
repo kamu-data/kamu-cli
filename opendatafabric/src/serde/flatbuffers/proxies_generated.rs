@@ -19,6 +19,100 @@ use self::flatbuffers::{EndianScalar, Follow};
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
+pub const ENUM_MIN_ATTACHMENTS: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_ATTACHMENTS: u8 = 1;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_ATTACHMENTS: [Attachments; 2] =
+    [Attachments::NONE, Attachments::AttachmentsEmbedded];
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct Attachments(pub u8);
+#[allow(non_upper_case_globals)]
+impl Attachments {
+    pub const NONE: Self = Self(0);
+    pub const AttachmentsEmbedded: Self = Self(1);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 1;
+    pub const ENUM_VALUES: &'static [Self] = &[Self::NONE, Self::AttachmentsEmbedded];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::AttachmentsEmbedded => Some("AttachmentsEmbedded"),
+            _ => None,
+        }
+    }
+}
+impl std::fmt::Debug for Attachments {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for Attachments {
+    type Inner = Self;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = unsafe { flatbuffers::read_scalar_at::<u8>(buf, loc) };
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for Attachments {
+    type Output = Attachments;
+    #[inline]
+    fn push(&self, dst: &mut [u8], _rest: &[u8]) {
+        unsafe {
+            flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        }
+    }
+}
+
+impl flatbuffers::EndianScalar for Attachments {
+    #[inline]
+    fn to_little_endian(self) -> Self {
+        let b = u8::to_le(self.0);
+        Self(b)
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(self) -> Self {
+        let b = u8::from_le(self.0);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for Attachments {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for Attachments {}
+pub struct AttachmentsUnionTableOffset {}
+
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
 pub const ENUM_MIN_DATASET_KIND: i32 = 0;
 #[deprecated(
     since = "2.0.0",
@@ -1011,13 +1105,13 @@ pub const ENUM_MIN_METADATA_EVENT: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_METADATA_EVENT: u8 = 7;
+pub const ENUM_MAX_METADATA_EVENT: u8 = 10;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 8] = [
+pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 11] = [
     MetadataEvent::NONE,
     MetadataEvent::AddData,
     MetadataEvent::ExecuteQuery,
@@ -1026,6 +1120,9 @@ pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 8] = [
     MetadataEvent::SetTransform,
     MetadataEvent::SetVocab,
     MetadataEvent::SetWatermark,
+    MetadataEvent::SetAttachments,
+    MetadataEvent::SetInfo,
+    MetadataEvent::SetLicense,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1043,9 +1140,12 @@ impl MetadataEvent {
     pub const SetTransform: Self = Self(5);
     pub const SetVocab: Self = Self(6);
     pub const SetWatermark: Self = Self(7);
+    pub const SetAttachments: Self = Self(8);
+    pub const SetInfo: Self = Self(9);
+    pub const SetLicense: Self = Self(10);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 7;
+    pub const ENUM_MAX: u8 = 10;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::AddData,
@@ -1055,6 +1155,9 @@ impl MetadataEvent {
         Self::SetTransform,
         Self::SetVocab,
         Self::SetWatermark,
+        Self::SetAttachments,
+        Self::SetInfo,
+        Self::SetLicense,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -1067,6 +1170,9 @@ impl MetadataEvent {
             Self::SetTransform => Some("SetTransform"),
             Self::SetVocab => Some("SetVocab"),
             Self::SetWatermark => Some("SetWatermark"),
+            Self::SetAttachments => Some("SetAttachments"),
+            Self::SetInfo => Some("SetInfo"),
+            Self::SetLicense => Some("SetLicense"),
             _ => None,
         }
     }
@@ -1822,6 +1928,242 @@ impl std::fmt::Debug for AddData<'_> {
         let mut ds = f.debug_struct("AddData");
         ds.field("output_data", &self.output_data());
         ds.field("output_watermark", &self.output_watermark());
+        ds.finish()
+    }
+}
+pub enum AttachmentEmbeddedOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct AttachmentEmbedded<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for AttachmentEmbedded<'a> {
+    type Inner = AttachmentEmbedded<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> AttachmentEmbedded<'a> {
+    pub const VT_PATH: flatbuffers::VOffsetT = 4;
+    pub const VT_CONTENT: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        AttachmentEmbedded { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args AttachmentEmbeddedArgs<'args>,
+    ) -> flatbuffers::WIPOffset<AttachmentEmbedded<'bldr>> {
+        let mut builder = AttachmentEmbeddedBuilder::new(_fbb);
+        if let Some(x) = args.content {
+            builder.add_content(x);
+        }
+        if let Some(x) = args.path {
+            builder.add_path(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn path(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(AttachmentEmbedded::VT_PATH, None)
+    }
+    #[inline]
+    pub fn content(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(AttachmentEmbedded::VT_CONTENT, None)
+    }
+}
+
+impl flatbuffers::Verifiable for AttachmentEmbedded<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("path", Self::VT_PATH, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("content", Self::VT_CONTENT, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct AttachmentEmbeddedArgs<'a> {
+    pub path: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub content: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for AttachmentEmbeddedArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        AttachmentEmbeddedArgs {
+            path: None,
+            content: None,
+        }
+    }
+}
+pub struct AttachmentEmbeddedBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> AttachmentEmbeddedBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_path(&mut self, path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AttachmentEmbedded::VT_PATH, path);
+    }
+    #[inline]
+    pub fn add_content(&mut self, content: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AttachmentEmbedded::VT_CONTENT, content);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> AttachmentEmbeddedBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        AttachmentEmbeddedBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<AttachmentEmbedded<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for AttachmentEmbedded<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("AttachmentEmbedded");
+        ds.field("path", &self.path());
+        ds.field("content", &self.content());
+        ds.finish()
+    }
+}
+pub enum AttachmentsEmbeddedOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct AttachmentsEmbedded<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for AttachmentsEmbedded<'a> {
+    type Inner = AttachmentsEmbedded<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> AttachmentsEmbedded<'a> {
+    pub const VT_ITEMS: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        AttachmentsEmbedded { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args AttachmentsEmbeddedArgs<'args>,
+    ) -> flatbuffers::WIPOffset<AttachmentsEmbedded<'bldr>> {
+        let mut builder = AttachmentsEmbeddedBuilder::new(_fbb);
+        if let Some(x) = args.items {
+            builder.add_items(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn items(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttachmentEmbedded<'a>>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttachmentEmbedded>>,
+        >>(AttachmentsEmbedded::VT_ITEMS, None)
+    }
+}
+
+impl flatbuffers::Verifiable for AttachmentsEmbedded<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<AttachmentEmbedded>>,
+            >>("items", Self::VT_ITEMS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct AttachmentsEmbeddedArgs<'a> {
+    pub items: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttachmentEmbedded<'a>>>,
+        >,
+    >,
+}
+impl<'a> Default for AttachmentsEmbeddedArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        AttachmentsEmbeddedArgs { items: None }
+    }
+}
+pub struct AttachmentsEmbeddedBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> AttachmentsEmbeddedBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_items(
+        &mut self,
+        items: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<AttachmentEmbedded<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AttachmentsEmbedded::VT_ITEMS, items);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> AttachmentsEmbeddedBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        AttachmentsEmbeddedBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<AttachmentsEmbedded<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for AttachmentsEmbedded<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("AttachmentsEmbedded");
+        ds.field("items", &self.items());
         ds.finish()
     }
 }
@@ -6636,6 +6978,470 @@ impl std::fmt::Debug for SetWatermark<'_> {
         ds.finish()
     }
 }
+pub enum SetAttachmentsOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SetAttachments<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SetAttachments<'a> {
+    type Inner = SetAttachments<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> SetAttachments<'a> {
+    pub const VT_ATTACHMENTS_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_ATTACHMENTS: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SetAttachments { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SetAttachmentsArgs,
+    ) -> flatbuffers::WIPOffset<SetAttachments<'bldr>> {
+        let mut builder = SetAttachmentsBuilder::new(_fbb);
+        if let Some(x) = args.attachments {
+            builder.add_attachments(x);
+        }
+        builder.add_attachments_type(args.attachments_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn attachments_type(&self) -> Attachments {
+        self._tab
+            .get::<Attachments>(SetAttachments::VT_ATTACHMENTS_TYPE, Some(Attachments::NONE))
+            .unwrap()
+    }
+    #[inline]
+    pub fn attachments(&self) -> Option<flatbuffers::Table<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                SetAttachments::VT_ATTACHMENTS,
+                None,
+            )
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn attachments_as_attachments_embedded(&self) -> Option<AttachmentsEmbedded<'a>> {
+        if self.attachments_type() == Attachments::AttachmentsEmbedded {
+            self.attachments().map(AttachmentsEmbedded::init_from_table)
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for SetAttachments<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_union::<Attachments, _>(
+                "attachments_type",
+                Self::VT_ATTACHMENTS_TYPE,
+                "attachments",
+                Self::VT_ATTACHMENTS,
+                false,
+                |key, v, pos| match key {
+                    Attachments::AttachmentsEmbedded => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<AttachmentsEmbedded>>(
+                            "Attachments::AttachmentsEmbedded",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SetAttachmentsArgs {
+    pub attachments_type: Attachments,
+    pub attachments: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for SetAttachmentsArgs {
+    #[inline]
+    fn default() -> Self {
+        SetAttachmentsArgs {
+            attachments_type: Attachments::NONE,
+            attachments: None,
+        }
+    }
+}
+pub struct SetAttachmentsBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SetAttachmentsBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_attachments_type(&mut self, attachments_type: Attachments) {
+        self.fbb_.push_slot::<Attachments>(
+            SetAttachments::VT_ATTACHMENTS_TYPE,
+            attachments_type,
+            Attachments::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_attachments(
+        &mut self,
+        attachments: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetAttachments::VT_ATTACHMENTS,
+            attachments,
+        );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetAttachmentsBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SetAttachmentsBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SetAttachments<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for SetAttachments<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("SetAttachments");
+        ds.field("attachments_type", &self.attachments_type());
+        match self.attachments_type() {
+            Attachments::AttachmentsEmbedded => {
+                if let Some(x) = self.attachments_as_attachments_embedded() {
+                    ds.field("attachments", &x)
+                } else {
+                    ds.field(
+                        "attachments",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("attachments", &x)
+            }
+        };
+        ds.finish()
+    }
+}
+pub enum SetInfoOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SetInfo<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SetInfo<'a> {
+    type Inner = SetInfo<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> SetInfo<'a> {
+    pub const VT_DESCRIPTION: flatbuffers::VOffsetT = 4;
+    pub const VT_KEYWORDS: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SetInfo { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SetInfoArgs<'args>,
+    ) -> flatbuffers::WIPOffset<SetInfo<'bldr>> {
+        let mut builder = SetInfoBuilder::new(_fbb);
+        if let Some(x) = args.keywords {
+            builder.add_keywords(x);
+        }
+        if let Some(x) = args.description {
+            builder.add_description(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn description(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetInfo::VT_DESCRIPTION, None)
+    }
+    #[inline]
+    pub fn keywords(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+        >>(SetInfo::VT_KEYWORDS, None)
+    }
+}
+
+impl flatbuffers::Verifiable for SetInfo<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "description",
+                Self::VT_DESCRIPTION,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("keywords", Self::VT_KEYWORDS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SetInfoArgs<'a> {
+    pub description: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub keywords: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+}
+impl<'a> Default for SetInfoArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SetInfoArgs {
+            description: None,
+            keywords: None,
+        }
+    }
+}
+pub struct SetInfoBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SetInfoBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_description(&mut self, description: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetInfo::VT_DESCRIPTION, description);
+    }
+    #[inline]
+    pub fn add_keywords(
+        &mut self,
+        keywords: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetInfo::VT_KEYWORDS, keywords);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetInfoBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SetInfoBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SetInfo<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for SetInfo<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("SetInfo");
+        ds.field("description", &self.description());
+        ds.field("keywords", &self.keywords());
+        ds.finish()
+    }
+}
+pub enum SetLicenseOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SetLicense<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SetLicense<'a> {
+    type Inner = SetLicense<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> SetLicense<'a> {
+    pub const VT_SHORT_NAME: flatbuffers::VOffsetT = 4;
+    pub const VT_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_SPDX_ID: flatbuffers::VOffsetT = 8;
+    pub const VT_WEBSITE_URL: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SetLicense { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SetLicenseArgs<'args>,
+    ) -> flatbuffers::WIPOffset<SetLicense<'bldr>> {
+        let mut builder = SetLicenseBuilder::new(_fbb);
+        if let Some(x) = args.website_url {
+            builder.add_website_url(x);
+        }
+        if let Some(x) = args.spdx_id {
+            builder.add_spdx_id(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.short_name {
+            builder.add_short_name(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn short_name(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetLicense::VT_SHORT_NAME, None)
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetLicense::VT_NAME, None)
+    }
+    #[inline]
+    pub fn spdx_id(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetLicense::VT_SPDX_ID, None)
+    }
+    #[inline]
+    pub fn website_url(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(SetLicense::VT_WEBSITE_URL, None)
+    }
+}
+
+impl flatbuffers::Verifiable for SetLicense<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "short_name",
+                Self::VT_SHORT_NAME,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("spdx_id", Self::VT_SPDX_ID, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "website_url",
+                Self::VT_WEBSITE_URL,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SetLicenseArgs<'a> {
+    pub short_name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub spdx_id: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub website_url: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for SetLicenseArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SetLicenseArgs {
+            short_name: None,
+            name: None,
+            spdx_id: None,
+            website_url: None,
+        }
+    }
+}
+pub struct SetLicenseBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SetLicenseBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_short_name(&mut self, short_name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetLicense::VT_SHORT_NAME, short_name);
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetLicense::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_spdx_id(&mut self, spdx_id: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetLicense::VT_SPDX_ID, spdx_id);
+    }
+    #[inline]
+    pub fn add_website_url(&mut self, website_url: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SetLicense::VT_WEBSITE_URL, website_url);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetLicenseBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SetLicenseBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SetLicense<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for SetLicense<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("SetLicense");
+        ds.field("short_name", &self.short_name());
+        ds.field("name", &self.name());
+        ds.field("spdx_id", &self.spdx_id());
+        ds.field("website_url", &self.website_url());
+        ds.finish()
+    }
+}
 pub enum DatasetVocabularyOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -8559,6 +9365,36 @@ impl<'a> MetadataBlock<'a> {
             None
         }
     }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn event_as_set_attachments(&self) -> Option<SetAttachments<'a>> {
+        if self.event_type() == MetadataEvent::SetAttachments {
+            self.event().map(SetAttachments::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn event_as_set_info(&self) -> Option<SetInfo<'a>> {
+        if self.event_type() == MetadataEvent::SetInfo {
+            self.event().map(SetInfo::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn event_as_set_license(&self) -> Option<SetLicense<'a>> {
+        if self.event_type() == MetadataEvent::SetLicense {
+            self.event().map(SetLicense::init_from_table)
+        } else {
+            None
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for MetadataBlock<'_> {
@@ -8615,6 +9451,21 @@ impl flatbuffers::Verifiable for MetadataBlock<'_> {
                     MetadataEvent::SetWatermark => v
                         .verify_union_variant::<flatbuffers::ForwardsUOffset<SetWatermark>>(
                             "MetadataEvent::SetWatermark",
+                            pos,
+                        ),
+                    MetadataEvent::SetAttachments => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<SetAttachments>>(
+                            "MetadataEvent::SetAttachments",
+                            pos,
+                        ),
+                    MetadataEvent::SetInfo => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<SetInfo>>(
+                            "MetadataEvent::SetInfo",
+                            pos,
+                        ),
+                    MetadataEvent::SetLicense => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<SetLicense>>(
+                            "MetadataEvent::SetLicense",
                             pos,
                         ),
                     _ => Ok(()),
@@ -8758,6 +9609,36 @@ impl std::fmt::Debug for MetadataBlock<'_> {
             }
             MetadataEvent::SetWatermark => {
                 if let Some(x) = self.event_as_set_watermark() {
+                    ds.field("event", &x)
+                } else {
+                    ds.field(
+                        "event",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MetadataEvent::SetAttachments => {
+                if let Some(x) = self.event_as_set_attachments() {
+                    ds.field("event", &x)
+                } else {
+                    ds.field(
+                        "event",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MetadataEvent::SetInfo => {
+                if let Some(x) = self.event_as_set_info() {
+                    ds.field("event", &x)
+                } else {
+                    ds.field(
+                        "event",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            MetadataEvent::SetLicense => {
+                if let Some(x) = self.event_as_set_license() {
                     ds.field("event", &x)
                 } else {
                     ds.field(

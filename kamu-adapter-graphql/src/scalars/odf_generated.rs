@@ -40,6 +40,57 @@ impl From<odf::AddData> for AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentEmbedded {
+    pub path: String,
+    pub content: String,
+}
+
+impl From<odf::AttachmentEmbedded> for AttachmentEmbedded {
+    fn from(v: odf::AttachmentEmbedded) -> Self {
+        Self {
+            path: v.path.into(),
+            content: v.content.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum Attachments {
+    Embedded(AttachmentsEmbedded),
+}
+
+impl From<odf::Attachments> for Attachments {
+    fn from(v: odf::Attachments) -> Self {
+        match v {
+            odf::Attachments::Embedded(v) => Self::Embedded(v.into()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct AttachmentsEmbedded {
+    pub items: Vec<AttachmentEmbedded>,
+}
+
+impl From<odf::AttachmentsEmbedded> for AttachmentsEmbedded {
+    fn from(v: odf::AttachmentsEmbedded) -> Self {
+        Self {
+            items: v.items.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -543,6 +594,9 @@ pub enum MetadataEvent {
     SetTransform(SetTransform),
     SetVocab(SetVocab),
     SetWatermark(SetWatermark),
+    SetAttachments(SetAttachments),
+    SetInfo(SetInfo),
+    SetLicense(SetLicense),
 }
 
 impl From<odf::MetadataEvent> for MetadataEvent {
@@ -555,6 +609,9 @@ impl From<odf::MetadataEvent> for MetadataEvent {
             odf::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
             odf::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
             odf::MetadataEvent::SetWatermark(v) => Self::SetWatermark(v.into()),
+            odf::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
+            odf::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
+            odf::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
         }
     }
 }
@@ -782,6 +839,68 @@ impl From<odf::Seed> for Seed {
         Self {
             dataset_id: v.dataset_id.into(),
             dataset_kind: v.dataset_kind.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetAttachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct SetAttachments {
+    pub attachments: Attachments,
+}
+
+impl From<odf::SetAttachments> for SetAttachments {
+    fn from(v: odf::SetAttachments) -> Self {
+        Self {
+            attachments: v.attachments.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetInfo
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct SetInfo {
+    pub description: Option<String>,
+    pub keywords: Option<Vec<String>>,
+}
+
+impl From<odf::SetInfo> for SetInfo {
+    fn from(v: odf::SetInfo) -> Self {
+        Self {
+            description: v.description.map(Into::into),
+            keywords: v.keywords.map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetLicense
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct SetLicense {
+    pub short_name: String,
+    pub name: String,
+    pub spdx_id: Option<String>,
+    pub website_url: String,
+}
+
+impl From<odf::SetLicense> for SetLicense {
+    fn from(v: odf::SetLicense) -> Self {
+        Self {
+            short_name: v.short_name.into(),
+            name: v.name.into(),
+            spdx_id: v.spdx_id.map(Into::into),
+            website_url: v.website_url.into(),
         }
     }
 }

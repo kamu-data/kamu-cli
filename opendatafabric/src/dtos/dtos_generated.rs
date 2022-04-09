@@ -29,6 +29,32 @@ pub struct AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AttachmentEmbedded {
+    pub path: String,
+    pub content: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Attachments {
+    Embedded(AttachmentsEmbedded),
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AttachmentsEmbedded {
+    pub items: Vec<AttachmentEmbedded>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -277,6 +303,9 @@ pub enum MetadataEvent {
     SetTransform(SetTransform),
     SetVocab(SetVocab),
     SetWatermark(SetWatermark),
+    SetAttachments(SetAttachments),
+    SetInfo(SetInfo),
+    SetLicense(SetLicense),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -384,6 +413,40 @@ pub struct ReadStepEsriShapefile {
 pub struct Seed {
     pub dataset_id: DatasetID,
     pub dataset_kind: DatasetKind,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetAttachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetAttachments {
+    pub attachments: Attachments,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetInfo
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetInfo {
+    pub description: Option<String>,
+    pub keywords: Option<Vec<String>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetLicense
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetLicense {
+    pub short_name: String,
+    pub name: String,
+    pub spdx_id: Option<String>,
+    pub website_url: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

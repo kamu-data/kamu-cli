@@ -233,9 +233,12 @@ impl DatasetRegistryImpl {
                             (output_data.interval.end - output_data.interval.start + 1) as u64;
                     }
                 }
-                MetadataEvent::SetPollingSource(_)
+                MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
                 | MetadataEvent::SetWatermark(_)
-                | MetadataEvent::SetVocab(_) => (),
+                | MetadataEvent::SetVocab(_)
+                | MetadataEvent::SetPollingSource(_) => (),
             }
         }
 
@@ -324,7 +327,10 @@ impl DatasetRegistry for DatasetRegistryImpl {
                         Ok(())
                     }
                 }
-                MetadataEvent::SetVocab(_) => Ok(()),
+                MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
+                | MetadataEvent::SetVocab(_) => Ok(()),
                 MetadataEvent::AddData(_)
                 | MetadataEvent::ExecuteQuery(_)
                 | MetadataEvent::SetWatermark(_) => Err(DomainError::bad_input(format!(

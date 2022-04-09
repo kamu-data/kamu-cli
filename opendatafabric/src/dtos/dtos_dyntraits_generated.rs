@@ -50,6 +50,77 @@ impl Into<dtos::AddData> for &dyn AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait AttachmentEmbedded {
+    fn path(&self) -> &str;
+    fn content(&self) -> &str;
+}
+
+impl AttachmentEmbedded for dtos::AttachmentEmbedded {
+    fn path(&self) -> &str {
+        self.path.as_ref()
+    }
+    fn content(&self) -> &str {
+        self.content.as_ref()
+    }
+}
+
+impl Into<dtos::AttachmentEmbedded> for &dyn AttachmentEmbedded {
+    fn into(self) -> dtos::AttachmentEmbedded {
+        dtos::AttachmentEmbedded {
+            path: self.path().to_owned(),
+            content: self.content().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum Attachments<'a> {
+    Embedded(&'a dyn AttachmentsEmbedded),
+}
+
+impl<'a> From<&'a dtos::Attachments> for Attachments<'a> {
+    fn from(other: &'a dtos::Attachments) -> Self {
+        match other {
+            dtos::Attachments::Embedded(v) => Attachments::Embedded(v),
+        }
+    }
+}
+
+impl Into<dtos::Attachments> for Attachments<'_> {
+    fn into(self) -> dtos::Attachments {
+        match self {
+            Attachments::Embedded(v) => dtos::Attachments::Embedded(v.into()),
+        }
+    }
+}
+
+pub trait AttachmentsEmbedded {
+    fn items(&self) -> Box<dyn Iterator<Item = &dyn AttachmentEmbedded> + '_>;
+}
+
+impl AttachmentsEmbedded for dtos::AttachmentsEmbedded {
+    fn items(&self) -> Box<dyn Iterator<Item = &dyn AttachmentEmbedded> + '_> {
+        Box::new(self.items.iter().map(|i| -> &dyn AttachmentEmbedded { i }))
+    }
+}
+
+impl Into<dtos::AttachmentsEmbedded> for &dyn AttachmentsEmbedded {
+    fn into(self) -> dtos::AttachmentsEmbedded {
+        dtos::AttachmentsEmbedded {
+            items: self.items().map(|i| i.into()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -784,6 +855,9 @@ pub enum MetadataEvent<'a> {
     SetTransform(&'a dyn SetTransform),
     SetVocab(&'a dyn SetVocab),
     SetWatermark(&'a dyn SetWatermark),
+    SetAttachments(&'a dyn SetAttachments),
+    SetInfo(&'a dyn SetInfo),
+    SetLicense(&'a dyn SetLicense),
 }
 
 impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
@@ -796,6 +870,9 @@ impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
             dtos::MetadataEvent::SetTransform(v) => MetadataEvent::SetTransform(v),
             dtos::MetadataEvent::SetVocab(v) => MetadataEvent::SetVocab(v),
             dtos::MetadataEvent::SetWatermark(v) => MetadataEvent::SetWatermark(v),
+            dtos::MetadataEvent::SetAttachments(v) => MetadataEvent::SetAttachments(v),
+            dtos::MetadataEvent::SetInfo(v) => MetadataEvent::SetInfo(v),
+            dtos::MetadataEvent::SetLicense(v) => MetadataEvent::SetLicense(v),
         }
     }
 }
@@ -810,6 +887,9 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
             MetadataEvent::SetTransform(v) => dtos::MetadataEvent::SetTransform(v.into()),
             MetadataEvent::SetVocab(v) => dtos::MetadataEvent::SetVocab(v.into()),
             MetadataEvent::SetWatermark(v) => dtos::MetadataEvent::SetWatermark(v.into()),
+            MetadataEvent::SetAttachments(v) => dtos::MetadataEvent::SetAttachments(v.into()),
+            MetadataEvent::SetInfo(v) => dtos::MetadataEvent::SetInfo(v.into()),
+            MetadataEvent::SetLicense(v) => dtos::MetadataEvent::SetLicense(v.into()),
         }
     }
 }
@@ -1185,6 +1265,99 @@ impl Into<dtos::Seed> for &dyn Seed {
         dtos::Seed {
             dataset_id: self.dataset_id().clone(),
             dataset_kind: self.dataset_kind().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetAttachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SetAttachments {
+    fn attachments(&self) -> Attachments;
+}
+
+impl SetAttachments for dtos::SetAttachments {
+    fn attachments(&self) -> Attachments {
+        (&self.attachments).into()
+    }
+}
+
+impl Into<dtos::SetAttachments> for &dyn SetAttachments {
+    fn into(self) -> dtos::SetAttachments {
+        dtos::SetAttachments {
+            attachments: self.attachments().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetInfo
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SetInfo {
+    fn description(&self) -> Option<&str>;
+    fn keywords(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
+}
+
+impl SetInfo for dtos::SetInfo {
+    fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn keywords(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
+        self.keywords
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
+                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
+            })
+    }
+}
+
+impl Into<dtos::SetInfo> for &dyn SetInfo {
+    fn into(self) -> dtos::SetInfo {
+        dtos::SetInfo {
+            description: self.description().map(|v| v.to_owned()),
+            keywords: self.keywords().map(|v| v.map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetLicense
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SetLicense {
+    fn short_name(&self) -> &str;
+    fn name(&self) -> &str;
+    fn spdx_id(&self) -> Option<&str>;
+    fn website_url(&self) -> &str;
+}
+
+impl SetLicense for dtos::SetLicense {
+    fn short_name(&self) -> &str {
+        self.short_name.as_ref()
+    }
+    fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    fn spdx_id(&self) -> Option<&str> {
+        self.spdx_id.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn website_url(&self) -> &str {
+        self.website_url.as_ref()
+    }
+}
+
+impl Into<dtos::SetLicense> for &dyn SetLicense {
+    fn into(self) -> dtos::SetLicense {
+        dtos::SetLicense {
+            short_name: self.short_name().to_owned(),
+            name: self.name().to_owned(),
+            spdx_id: self.spdx_id().map(|v| v.to_owned()),
+            website_url: self.website_url().to_owned(),
         }
     }
 }

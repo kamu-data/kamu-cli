@@ -239,6 +239,37 @@ impl AsciiRenderer {
                 self.render_property(output, 0, "DatasetKind", format!("{:?}", e.dataset_kind))?;
                 self.render_property(output, 0, "DatasetID", &e.dataset_id)?;
             }
+            MetadataEvent::SetAttachments(e) => {
+                self.render_property(output, 0, "Kind", "SetAttachments")?;
+                match &e.attachments {
+                    Attachments::Embedded(e) => {
+                        self.render_section(output, 0, "Embedded")?;
+                        for (i, item) in e.items.iter().enumerate() {
+                            self.render_section(output, 1, &format!("Item[{}]", i))?;
+                            self.render_property(output, 2, "Path", &item.path)?;
+                            self.render_property(output, 2, "Content", "...")?;
+                        }
+                    }
+                }
+            }
+            MetadataEvent::SetInfo(e) => {
+                self.render_property(output, 0, "Kind", "SetInfo")?;
+                if let Some(description) = &e.description {
+                    self.render_property(output, 0, "Description", description)?;
+                }
+                if let Some(keywords) = &e.keywords {
+                    self.render_property(output, 0, "Keywords", keywords.join(", "))?;
+                }
+            }
+            MetadataEvent::SetLicense(e) => {
+                self.render_property(output, 0, "Kind", "SetLicense")?;
+                self.render_property(output, 0, "ShortName", &e.short_name)?;
+                self.render_property(output, 0, "Name", &e.name)?;
+                if let Some(spdx_id) = &e.spdx_id {
+                    self.render_property(output, 0, "SPDXID", spdx_id)?;
+                }
+                self.render_property(output, 0, "WebsiteURL", &e.website_url)?;
+            }
             MetadataEvent::SetPollingSource(_) => {
                 self.render_property(output, 0, "Kind", "SetPollingSource")?;
                 self.render_property(output, 0, "Source", "...")?

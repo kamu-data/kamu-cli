@@ -74,8 +74,11 @@ impl IngestTask {
                 MetadataEvent::SetVocab(set_vocab) => {
                     vocab = Some(set_vocab.into());
                 }
-                MetadataEvent::ExecuteQuery(_)
-                | MetadataEvent::Seed(_)
+                MetadataEvent::ExecuteQuery(_) => unreachable!(),
+                MetadataEvent::Seed(_)
+                | MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
                 | MetadataEvent::SetTransform(_)
                 | MetadataEvent::SetWatermark(_) => (),
             }

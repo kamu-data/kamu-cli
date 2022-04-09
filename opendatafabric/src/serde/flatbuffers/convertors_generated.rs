@@ -74,6 +74,94 @@ impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::AttachmentEmbedded {
+    type OffsetT = WIPOffset<fb::AttachmentEmbedded<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let path_offset = { fb.create_string(&self.path) };
+        let content_offset = { fb.create_string(&self.content) };
+        let mut builder = fb::AttachmentEmbeddedBuilder::new(fb);
+        builder.add_path(path_offset);
+        builder.add_content(content_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::AttachmentEmbedded<'fb>> for odf::AttachmentEmbedded {
+    fn deserialize(proxy: fb::AttachmentEmbedded<'fb>) -> Self {
+        odf::AttachmentEmbedded {
+            path: proxy.path().map(|v| v.to_owned()).unwrap(),
+            content: proxy.content().map(|v| v.to_owned()).unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersEnumSerializable<'fb, fb::Attachments> for odf::Attachments {
+    fn serialize(
+        &self,
+        fb: &mut FlatBufferBuilder<'fb>,
+    ) -> (fb::Attachments, WIPOffset<UnionWIPOffset>) {
+        match self {
+            odf::Attachments::Embedded(v) => (
+                fb::Attachments::AttachmentsEmbedded,
+                v.serialize(fb).as_union_value(),
+            ),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::Attachments> for odf::Attachments {
+    fn deserialize(table: flatbuffers::Table<'fb>, t: fb::Attachments) -> Self {
+        match t {
+            fb::Attachments::AttachmentsEmbedded => {
+                odf::Attachments::Embedded(odf::AttachmentsEmbedded::deserialize(
+                    fb::AttachmentsEmbedded::init_from_table(table),
+                ))
+            }
+            _ => panic!("Invalid enum value: {}", t.0),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::AttachmentsEmbedded {
+    type OffsetT = WIPOffset<fb::AttachmentsEmbedded<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let items_offset = {
+            let offsets: Vec<_> = self.items.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        };
+        let mut builder = fb::AttachmentsEmbeddedBuilder::new(fb);
+        builder.add_items(items_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::AttachmentsEmbedded<'fb>> for odf::AttachmentsEmbedded {
+    fn deserialize(proxy: fb::AttachmentsEmbedded<'fb>) -> Self {
+        odf::AttachmentsEmbedded {
+            items: proxy
+                .items()
+                .map(|v| {
+                    v.iter()
+                        .map(|i| odf::AttachmentEmbedded::deserialize(i))
+                        .collect()
+                })
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -957,6 +1045,17 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MetadataEvent> for odf::MetadataE
                 fb::MetadataEvent::SetWatermark,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::MetadataEvent::SetAttachments(v) => (
+                fb::MetadataEvent::SetAttachments,
+                v.serialize(fb).as_union_value(),
+            ),
+            odf::MetadataEvent::SetInfo(v) => {
+                (fb::MetadataEvent::SetInfo, v.serialize(fb).as_union_value())
+            }
+            odf::MetadataEvent::SetLicense(v) => (
+                fb::MetadataEvent::SetLicense,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -984,6 +1083,15 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::Metadat
             ),
             fb::MetadataEvent::SetWatermark => odf::MetadataEvent::SetWatermark(
                 odf::SetWatermark::deserialize(fb::SetWatermark::init_from_table(table)),
+            ),
+            fb::MetadataEvent::SetAttachments => odf::MetadataEvent::SetAttachments(
+                odf::SetAttachments::deserialize(fb::SetAttachments::init_from_table(table)),
+            ),
+            fb::MetadataEvent::SetInfo => odf::MetadataEvent::SetInfo(odf::SetInfo::deserialize(
+                fb::SetInfo::init_from_table(table),
+            )),
+            fb::MetadataEvent::SetLicense => odf::MetadataEvent::SetLicense(
+                odf::SetLicense::deserialize(fb::SetLicense::init_from_table(table)),
             ),
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -1356,6 +1464,99 @@ impl<'fb> FlatbuffersDeserializable<fb::Seed<'fb>> for odf::Seed {
                 .map(|v| odf::DatasetID::from_bytes(v).unwrap())
                 .unwrap(),
             dataset_kind: proxy.dataset_kind().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetAttachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetAttachments {
+    type OffsetT = WIPOffset<fb::SetAttachments<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let attachments_offset = { self.attachments.serialize(fb) };
+        let mut builder = fb::SetAttachmentsBuilder::new(fb);
+        builder.add_attachments_type(attachments_offset.0);
+        builder.add_attachments(attachments_offset.1);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetAttachments<'fb>> for odf::SetAttachments {
+    fn deserialize(proxy: fb::SetAttachments<'fb>) -> Self {
+        odf::SetAttachments {
+            attachments: proxy
+                .attachments()
+                .map(|v| odf::Attachments::deserialize(v, proxy.attachments_type()))
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetInfo
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetInfo {
+    type OffsetT = WIPOffset<fb::SetInfo<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let description_offset = self.description.as_ref().map(|v| fb.create_string(&v));
+        let keywords_offset = self.keywords.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let mut builder = fb::SetInfoBuilder::new(fb);
+        description_offset.map(|off| builder.add_description(off));
+        keywords_offset.map(|off| builder.add_keywords(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetInfo<'fb>> for odf::SetInfo {
+    fn deserialize(proxy: fb::SetInfo<'fb>) -> Self {
+        odf::SetInfo {
+            description: proxy.description().map(|v| v.to_owned()),
+            keywords: proxy
+                .keywords()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetLicense
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SetLicense {
+    type OffsetT = WIPOffset<fb::SetLicense<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let short_name_offset = { fb.create_string(&self.short_name) };
+        let name_offset = { fb.create_string(&self.name) };
+        let spdx_id_offset = self.spdx_id.as_ref().map(|v| fb.create_string(&v));
+        let website_url_offset = { fb.create_string(&self.website_url) };
+        let mut builder = fb::SetLicenseBuilder::new(fb);
+        builder.add_short_name(short_name_offset);
+        builder.add_name(name_offset);
+        spdx_id_offset.map(|off| builder.add_spdx_id(off));
+        builder.add_website_url(website_url_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SetLicense<'fb>> for odf::SetLicense {
+    fn deserialize(proxy: fb::SetLicense<'fb>) -> Self {
+        odf::SetLicense {
+            short_name: proxy.short_name().map(|v| v.to_owned()).unwrap(),
+            name: proxy.name().map(|v| v.to_owned()).unwrap(),
+            spdx_id: proxy.spdx_id().map(|v| v.to_owned()),
+            website_url: proxy.website_url().map(|v| v.to_owned()).unwrap(),
         }
     }
 }

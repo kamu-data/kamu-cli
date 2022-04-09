@@ -564,7 +564,11 @@ impl TransformServiceImpl {
                     }
                 }
                 MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => unreachable!(),
-                MetadataEvent::Seed(_) | MetadataEvent::SetWatermark(_) => (),
+                MetadataEvent::Seed(_)
+                | MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
+                | MetadataEvent::SetWatermark(_) => (),
             }
 
             if !finished_range && Some(&block_hash) == start_block.as_ref() {

@@ -70,6 +70,58 @@ pub struct AddDataDef {
 implement_serde_as!(AddData, AddDataDef, "AddDataDef");
 
 ////////////////////////////////////////////////////////////////////////////////
+// AttachmentEmbedded
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "AttachmentEmbedded")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AttachmentEmbeddedDef {
+    pub path: String,
+    pub content: String,
+}
+
+implement_serde_as!(
+    AttachmentEmbedded,
+    AttachmentEmbeddedDef,
+    "AttachmentEmbeddedDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// Attachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "Attachments")]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+pub enum AttachmentsDef {
+    #[serde(rename_all = "camelCase")]
+    Embedded(#[serde_as(as = "AttachmentsEmbeddedDef")] AttachmentsEmbedded),
+}
+
+implement_serde_as!(Attachments, AttachmentsDef, "AttachmentsDef");
+implement_serde_as!(
+    AttachmentsEmbedded,
+    AttachmentsEmbeddedDef,
+    "AttachmentsEmbeddedDef"
+);
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "AttachmentsEmbedded")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AttachmentsEmbeddedDef {
+    #[serde_as(as = "Vec<AttachmentEmbeddedDef>")]
+    pub items: Vec<AttachmentEmbedded>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -546,6 +598,12 @@ pub enum MetadataEventDef {
     SetVocab(#[serde_as(as = "SetVocabDef")] SetVocab),
     #[serde(rename_all = "camelCase")]
     SetWatermark(#[serde_as(as = "SetWatermarkDef")] SetWatermark),
+    #[serde(rename_all = "camelCase")]
+    SetAttachments(#[serde_as(as = "SetAttachmentsDef")] SetAttachments),
+    #[serde(rename_all = "camelCase")]
+    SetInfo(#[serde_as(as = "SetInfoDef")] SetInfo),
+    #[serde(rename_all = "camelCase")]
+    SetLicense(#[serde_as(as = "SetLicenseDef")] SetLicense),
 }
 
 implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
@@ -737,6 +795,59 @@ pub struct SeedDef {
 }
 
 implement_serde_as!(Seed, SeedDef, "SeedDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetAttachments
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setattachments-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetAttachments")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetAttachmentsDef {
+    #[serde_as(as = "AttachmentsDef")]
+    pub attachments: Attachments,
+}
+
+implement_serde_as!(SetAttachments, SetAttachmentsDef, "SetAttachmentsDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetInfo
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetInfo")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetInfoDef {
+    pub description: Option<String>,
+    pub keywords: Option<Vec<String>>,
+}
+
+implement_serde_as!(SetInfo, SetInfoDef, "SetInfoDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SetLicense
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setlicense-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetLicense")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetLicenseDef {
+    pub short_name: String,
+    pub name: String,
+    pub spdx_id: Option<String>,
+    pub website_url: String,
+}
+
+implement_serde_as!(SetLicense, SetLicenseDef, "SetLicenseDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // SetPollingSource

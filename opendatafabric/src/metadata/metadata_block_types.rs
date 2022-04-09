@@ -108,6 +108,9 @@ impl IntoDataStreamBlock for MetadataBlock {
             MetadataEvent::ExecuteQuery(e) => (e.output_data, e.output_watermark),
             MetadataEvent::SetWatermark(e) => (None, Some(e.output_watermark)),
             MetadataEvent::Seed(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
             | MetadataEvent::SetPollingSource(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_) => return None,
@@ -128,6 +131,9 @@ impl IntoDataStreamBlock for MetadataBlock {
             MetadataEvent::ExecuteQuery(e) => (e.output_data.as_ref(), e.output_watermark.as_ref()),
             MetadataEvent::SetWatermark(e) => (None, Some(&e.output_watermark)),
             MetadataEvent::Seed(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_)
             | MetadataEvent::SetPollingSource(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_) => return None,
