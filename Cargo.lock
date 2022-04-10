@@ -668,7 +668,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "container-runtime"
-version = "0.85.0"
+version = "0.85.1"
 dependencies = [
  "dill",
  "regex",
@@ -1779,7 +1779,7 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "kamu"
-version = "0.85.0"
+version = "0.85.1"
 dependencies = [
  "arrow-digest",
  "async-recursion",
@@ -1830,7 +1830,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.85.0"
+version = "0.85.1"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -1848,7 +1848,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.85.0"
+version = "0.85.1"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2518,7 +2518,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.85.0"
+version = "0.85.1"
 dependencies = [
  "bs58",
  "byteorder",
@@ -4221,9 +4221,9 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.32"
+version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1bdf54a7c28a2bbf701e1d2233f6c77f473486b94bee4f9678da5a148dca7f"
+checksum = "80b9fa4360528139bc96100c160b7ae879f5567f49f1782b0b02035b0358ebf3"
 dependencies = [
  "cfg-if",
  "log",
@@ -4304,9 +4304,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9df98b037d039d03400d9dd06b0f8ce05486b5f25e9a2d7d36196e142ebbc52"
+checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
 dependencies = [
  "ansi_term",
  "lazy_static",

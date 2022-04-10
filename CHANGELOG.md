@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.85.1] - 2022-04-09
+### Fixed
+- Don't panic in `kamu ui` when there is no default browser set
+
 ## [0.85.0] - 2022-04-09
 ### Changed
 - Updated to latest ODF schemas

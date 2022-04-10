@@ -63,7 +63,7 @@ impl Command for UICommand {
             eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
         }
 
-        webbrowser::open(&url::Url::from_str(&web_server_url).unwrap().to_string()).unwrap();
+        let _ = webbrowser::open(&web_server_url);
 
         web_server.run().await.map_err(|e| CLIError::critical(e))?;
 
