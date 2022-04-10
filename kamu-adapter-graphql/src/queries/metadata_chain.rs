@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::queries::Account;
 use crate::scalars::*;
 use crate::utils::*;
 
@@ -61,11 +62,11 @@ impl MetadataChain {
         &self,
         ctx: &Context<'_>,
         hash: Multihash,
-    ) -> Result<Option<MetadataBlockHashed>> {
+    ) -> Result<Option<MetadataBlockExtended>> {
         let chain = self.get_chain(ctx)?;
         Ok(chain
             .get_block(&hash)
-            .map(|b| MetadataBlockHashed::new(hash, b)))
+            .map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
     }
 
     // TODO: Add ref parameter (defaulting to "head")
@@ -86,10 +87,10 @@ impl MetadataChain {
             .iter_blocks()
             .skip(page * per_page)
             .take(per_page)
-            .map(|(hash, block)| MetadataBlockHashed::new(hash, block))
+            .map(|(hash, block)| MetadataBlockExtended::new(hash, block, Account::mock()))
             .collect();
 
-        // TODO: Slow but temporary
+        // TODO: PERF: Slow but temporary
         let total_count = chain.iter_blocks().count();
 
         Ok(MetadataBlockConnection::new(
@@ -102,7 +103,7 @@ impl MetadataChain {
 }
 
 page_based_connection!(
-    MetadataBlockHashed,
+    MetadataBlockExtended,
     MetadataBlockConnection,
     MetadataBlockEdge
 );

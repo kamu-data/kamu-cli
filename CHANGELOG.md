@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated to latest ODF schemas
 - Unhacked dataset descriptions in GQL
 - Updated Web UI
+- Extended GQL metadata block type with mock author information
 
 ## [0.84.1] - 2022-04-08
 ### Added

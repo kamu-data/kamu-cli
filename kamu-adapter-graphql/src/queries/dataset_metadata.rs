@@ -80,11 +80,12 @@ impl DatasetMetadata {
             .collect())
     }
 
+    // TODO: Convert to collection
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
-        // TODO: This is really slow
+        // TODO: PERF: This is really slow
         Ok(dataset_reg
             .get_all_datasets()
             .filter(|hdl| hdl.id != self.dataset_handle.id)

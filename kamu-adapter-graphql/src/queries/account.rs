@@ -14,7 +14,7 @@ use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Debug, Clone, PartialEq, Eq)]
 #[graphql(
     field(name = "id", method = "id", type = "&AccountID"),
     field(name = "name", type = "&str")
@@ -36,7 +36,7 @@ impl Account {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct User {
     account_id: AccountID,
     account_name: AccountName,
@@ -65,7 +65,7 @@ impl User {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Organization {
     account_id: AccountID,
     account_name: AccountName,

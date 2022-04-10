@@ -282,7 +282,7 @@ type MetadataBlockConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
 	"""
-	nodes: [MetadataBlockHashed!]!
+	nodes: [MetadataBlockExtended!]!
 	"""
 	Approximate number of total nodes
 	"""
@@ -294,12 +294,13 @@ type MetadataBlockConnection {
 	edges: [MetadataBlockEdge!]!
 }
 type MetadataBlockEdge {
-	node: MetadataBlockHashed!
+	node: MetadataBlockExtended!
 }
-type MetadataBlockHashed {
+type MetadataBlockExtended {
 	blockHash: Multihash!
-	systemTime: DateTime!
 	prevBlockHash: Multihash
+	systemTime: DateTime!
+	author: Account!
 	event: MetadataEvent!
 }
 type MetadataChain {
@@ -310,7 +311,7 @@ type MetadataChain {
 	"""
 	Returns a metadata block corresponding to the specified hash
 	"""
-	blockByHash(hash: Multihash!): MetadataBlockHashed
+	blockByHash(hash: Multihash!): MetadataBlockExtended
 	"""
 	Iterates all metadata blocks in the reverse chronological order
 	"""
