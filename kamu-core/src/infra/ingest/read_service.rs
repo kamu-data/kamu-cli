@@ -40,7 +40,7 @@ impl ReadService {
         source_event_time: Option<DateTime<Utc>>,
         offset: i64,
         out_data_path: &'b Path,
-        out_checkpoint_dir: &'b Path,
+        out_checkpoint_path: &'b Path,
         for_prepared_at: DateTime<Utc>,
         _old_checkpoint: Option<ReadCheckpoint>,
         src_path: &'b Path,
@@ -58,10 +58,9 @@ impl ReadService {
         if out_data_path.exists() {
             std::fs::remove_file(&out_data_path).map_err(|e| IngestError::internal(e))?;
         }
-        if out_checkpoint_dir.exists() {
-            std::fs::remove_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
+        if out_checkpoint_path.exists() {
+            std::fs::remove_file(&out_checkpoint_path).map_err(|e| IngestError::internal(e))?;
         }
-        std::fs::create_dir_all(out_checkpoint_dir).map_err(|e| IngestError::internal(e))?;
 
         let request = IngestRequest {
             dataset_id: dataset_handle.id.clone(),
@@ -72,11 +71,10 @@ impl ReadService {
             offset,
             source: source.clone(),
             dataset_vocab: vocab.clone(),
-            prev_checkpoint_dir: prev_checkpoint
-                .map(|hash| dataset_layout.checkpoints_dir.join(hash.to_string())),
+            prev_checkpoint_path: prev_checkpoint.map(|cp| dataset_layout.checkpoint_path(&cp)),
             data_dir: dataset_layout.data_dir.clone(),
             out_data_path: out_data_path.to_owned(),
-            new_checkpoint_dir: out_checkpoint_dir.to_owned(),
+            new_checkpoint_path: out_checkpoint_path.to_owned(),
         };
 
         let mut response = engine.ingest(request).await?;

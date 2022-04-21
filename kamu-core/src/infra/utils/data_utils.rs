@@ -37,11 +37,11 @@ pub fn get_parquet_logical_hash(
     Ok(Multihash::new(Multicodec::Arrow0_Sha3_256, &digest))
 }
 
-pub fn get_parquet_physical_hash(data_path: &Path) -> Result<Multihash, std::io::Error> {
+pub fn get_file_physical_hash(file_path: &Path) -> Result<Multihash, std::io::Error> {
     use digest::Digest;
     use std::io::Read;
 
-    let mut file = std::fs::File::open(data_path)?;
+    let mut file = std::fs::File::open(file_path)?;
     let mut buffer = [0; 2048];
     let mut hasher = sha3::Sha3_256::new();
 

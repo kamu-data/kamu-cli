@@ -69,23 +69,18 @@ impl DatasetBuilderFSInitial {
     }
 }
 
+#[allow(dead_code)]
 pub struct DatasetBuilderFSContinued {
     meta_chain: MetadataChainImpl,
     dataset_path: PathBuf,
 }
 
 impl DatasetBuilderFSContinued {
-    pub fn append(mut self, mut block: MetadataBlock, data: Option<&[u8]>) -> Self {
+    pub fn append(mut self, mut block: MetadataBlock) -> Self {
         let old_head = self.meta_chain.read_ref(&BlockRef::Head);
         block.prev_block_hash = old_head;
 
-        let new_head = self.meta_chain.append(block);
-        if let Some(data) = data {
-            let data_path = self.dataset_path.join("data");
-            std::fs::create_dir_all(&data_path).unwrap();
-            let part_path = data_path.join(new_head.to_string());
-            std::fs::write(part_path, data).unwrap();
-        }
+        self.meta_chain.append(block);
         self
     }
 }

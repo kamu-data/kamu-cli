@@ -126,10 +126,11 @@ impl SparkEngine {
             if #[cfg(unix)] {
                 let chown = if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
                     format!(
-                        "; chown -R {}:{} {}",
+                        "; chown -R {}:{} {} {}",
                         users::get_current_uid(),
                         users::get_current_gid(),
-                        self.volume_dir_in_container().display()
+                        self.volume_dir_in_container().display(),
+                        self.in_out_dir_in_container().display()
                     )
                 } else {
                     "".to_owned()
@@ -201,6 +202,33 @@ impl SparkEngine {
             ))
         }
     }
+
+    fn unpack_checkpoint(
+        prev_checkpoint_path: &Path,
+        target_dir: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        info!(
+            ?prev_checkpoint_path,
+            ?target_dir,
+            "Unpacking previous checkpoint"
+        );
+        std::fs::create_dir(target_dir)?;
+        let mut archive = tar::Archive::new(std::fs::File::open(prev_checkpoint_path)?);
+        archive.unpack(target_dir)?;
+        Ok(())
+    }
+
+    fn pack_checkpoint(
+        source_dir: &Path,
+        new_checkpoint_path: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        info!(?source_dir, ?new_checkpoint_path, "Packing new checkpoint");
+        let mut ar = tar::Builder::new(std::fs::File::create(new_checkpoint_path)?);
+        ar.follow_symlinks(false);
+        ar.append_dir_all(".", source_dir)?;
+        ar.finish()?;
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -214,17 +242,48 @@ impl IngestEngine for SparkEngine {
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
 
+        // Checkpoints are required to be files but for now Spark engine uses directories
+        // So we untar old checkpoints before processing and pack new ones after
+        let new_checkpoint_path_unpacked = run_info.in_out_dir.join("new-checkpoint");
+        let prev_checkpoint_path_unpacked = if let Some(p) = &request.prev_checkpoint_path {
+            let target_dir = run_info.in_out_dir.join("prev-checkpoint");
+            Self::unpack_checkpoint(p, &target_dir).expect("Failed to untar previous checkpoint");
+            Some(target_dir)
+        } else {
+            None
+        };
+
         let request_adj = IngestRequest {
             ingest_path: self.to_container_path(&request.ingest_path),
-            prev_checkpoint_dir: request
-                .prev_checkpoint_dir
-                .map(|p| self.to_container_path(&p)),
-            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            prev_checkpoint_path: prev_checkpoint_path_unpacked
+                .as_ref()
+                .map(|_| self.in_out_dir_in_container().join("prev-checkpoint")),
+            new_checkpoint_path: self.in_out_dir_in_container().join("new-checkpoint"),
             data_dir: self.to_container_path(&request.data_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
             ..request
         };
 
-        self.ingest_impl(run_info, request_adj).await
+        let response = self.ingest_impl(run_info, request_adj).await;
+
+        if response.is_ok() {
+            // Pack checkpoints and clean up
+            if new_checkpoint_path_unpacked.exists()
+                && new_checkpoint_path_unpacked
+                    .read_dir()
+                    .unwrap()
+                    .next()
+                    .is_some()
+            {
+                Self::pack_checkpoint(&new_checkpoint_path_unpacked, &request.new_checkpoint_path)
+                    .expect("Failed to tar new checkpoint");
+                std::fs::remove_dir_all(new_checkpoint_path_unpacked)?;
+            }
+            if let Some(prev) = prev_checkpoint_path_unpacked {
+                std::fs::remove_dir_all(prev)?;
+            }
+        }
+
+        response
     }
 }

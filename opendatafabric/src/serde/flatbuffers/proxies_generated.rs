@@ -1805,6 +1805,120 @@ impl std::fmt::Debug for DataSlice<'_> {
         ds.finish()
     }
 }
+pub enum CheckpointOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct Checkpoint<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Checkpoint<'a> {
+    type Inner = Checkpoint<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> Checkpoint<'a> {
+    pub const VT_PHYSICAL_HASH: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        Checkpoint { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args CheckpointArgs<'args>,
+    ) -> flatbuffers::WIPOffset<Checkpoint<'bldr>> {
+        let mut builder = CheckpointBuilder::new(_fbb);
+        if let Some(x) = args.physical_hash {
+            builder.add_physical_hash(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn physical_hash(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                Checkpoint::VT_PHYSICAL_HASH,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+}
+
+impl flatbuffers::Verifiable for Checkpoint<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "physical_hash",
+                Self::VT_PHYSICAL_HASH,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct CheckpointArgs<'a> {
+    pub physical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+}
+impl<'a> Default for CheckpointArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        CheckpointArgs {
+            physical_hash: None,
+        }
+    }
+}
+pub struct CheckpointBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> CheckpointBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_physical_hash(
+        &mut self,
+        physical_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            Checkpoint::VT_PHYSICAL_HASH,
+            physical_hash,
+        );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> CheckpointBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        CheckpointBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Checkpoint<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for Checkpoint<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("Checkpoint");
+        ds.field("physical_hash", &self.physical_hash());
+        ds.finish()
+    }
+}
 pub enum AddDataOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -1825,8 +1939,10 @@ impl<'a> flatbuffers::Follow<'a> for AddData<'a> {
 }
 
 impl<'a> AddData<'a> {
-    pub const VT_OUTPUT_DATA: flatbuffers::VOffsetT = 4;
-    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 6;
+    pub const VT_INPUT_CHECKPOINT: flatbuffers::VOffsetT = 4;
+    pub const VT_OUTPUT_DATA: flatbuffers::VOffsetT = 6;
+    pub const VT_OUTPUT_CHECKPOINT: flatbuffers::VOffsetT = 8;
+    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -1841,16 +1957,36 @@ impl<'a> AddData<'a> {
         if let Some(x) = args.output_watermark {
             builder.add_output_watermark(x);
         }
+        if let Some(x) = args.output_checkpoint {
+            builder.add_output_checkpoint(x);
+        }
         if let Some(x) = args.output_data {
             builder.add_output_data(x);
+        }
+        if let Some(x) = args.input_checkpoint {
+            builder.add_input_checkpoint(x);
         }
         builder.finish()
     }
 
     #[inline]
+    pub fn input_checkpoint(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                AddData::VT_INPUT_CHECKPOINT,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
     pub fn output_data(&self) -> Option<DataSlice<'a>> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<DataSlice>>(AddData::VT_OUTPUT_DATA, None)
+    }
+    #[inline]
+    pub fn output_checkpoint(&self) -> Option<Checkpoint<'a>> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<Checkpoint>>(AddData::VT_OUTPUT_CHECKPOINT, None)
     }
     #[inline]
     pub fn output_watermark(&self) -> Option<&'a Timestamp> {
@@ -1867,9 +2003,19 @@ impl flatbuffers::Verifiable for AddData<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "input_checkpoint",
+                Self::VT_INPUT_CHECKPOINT,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<DataSlice>>(
                 "output_data",
                 Self::VT_OUTPUT_DATA,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<Checkpoint>>(
+                "output_checkpoint",
+                Self::VT_OUTPUT_CHECKPOINT,
                 false,
             )?
             .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
@@ -1878,14 +2024,18 @@ impl flatbuffers::Verifiable for AddData<'_> {
     }
 }
 pub struct AddDataArgs<'a> {
+    pub input_checkpoint: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub output_data: Option<flatbuffers::WIPOffset<DataSlice<'a>>>,
+    pub output_checkpoint: Option<flatbuffers::WIPOffset<Checkpoint<'a>>>,
     pub output_watermark: Option<&'a Timestamp>,
 }
 impl<'a> Default for AddDataArgs<'a> {
     #[inline]
     fn default() -> Self {
         AddDataArgs {
+            input_checkpoint: None,
             output_data: None,
+            output_checkpoint: None,
             output_watermark: None,
         }
     }
@@ -1896,11 +2046,32 @@ pub struct AddDataBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> AddDataBuilder<'a, 'b> {
     #[inline]
+    pub fn add_input_checkpoint(
+        &mut self,
+        input_checkpoint: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            AddData::VT_INPUT_CHECKPOINT,
+            input_checkpoint,
+        );
+    }
+    #[inline]
     pub fn add_output_data(&mut self, output_data: flatbuffers::WIPOffset<DataSlice<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<DataSlice>>(
                 AddData::VT_OUTPUT_DATA,
                 output_data,
+            );
+    }
+    #[inline]
+    pub fn add_output_checkpoint(
+        &mut self,
+        output_checkpoint: flatbuffers::WIPOffset<Checkpoint<'b>>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<Checkpoint>>(
+                AddData::VT_OUTPUT_CHECKPOINT,
+                output_checkpoint,
             );
     }
     #[inline]
@@ -1926,7 +2097,9 @@ impl<'a: 'b, 'b> AddDataBuilder<'a, 'b> {
 impl std::fmt::Debug for AddData<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("AddData");
+        ds.field("input_checkpoint", &self.input_checkpoint());
         ds.field("output_data", &self.output_data());
+        ds.field("output_checkpoint", &self.output_checkpoint());
         ds.field("output_watermark", &self.output_watermark());
         ds.finish()
     }
@@ -2488,8 +2661,10 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQuery<'a> {
 
 impl<'a> ExecuteQuery<'a> {
     pub const VT_INPUT_SLICES: flatbuffers::VOffsetT = 4;
-    pub const VT_OUTPUT_DATA: flatbuffers::VOffsetT = 6;
-    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 8;
+    pub const VT_INPUT_CHECKPOINT: flatbuffers::VOffsetT = 6;
+    pub const VT_OUTPUT_DATA: flatbuffers::VOffsetT = 8;
+    pub const VT_OUTPUT_CHECKPOINT: flatbuffers::VOffsetT = 10;
+    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -2504,8 +2679,14 @@ impl<'a> ExecuteQuery<'a> {
         if let Some(x) = args.output_watermark {
             builder.add_output_watermark(x);
         }
+        if let Some(x) = args.output_checkpoint {
+            builder.add_output_checkpoint(x);
+        }
         if let Some(x) = args.output_data {
             builder.add_output_data(x);
+        }
+        if let Some(x) = args.input_checkpoint {
+            builder.add_input_checkpoint(x);
         }
         if let Some(x) = args.input_slices {
             builder.add_input_slices(x);
@@ -2522,9 +2703,25 @@ impl<'a> ExecuteQuery<'a> {
         >>(ExecuteQuery::VT_INPUT_SLICES, None)
     }
     #[inline]
+    pub fn input_checkpoint(&self) -> Option<&'a [u8]> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                ExecuteQuery::VT_INPUT_CHECKPOINT,
+                None,
+            )
+            .map(|v| v.safe_slice())
+    }
+    #[inline]
     pub fn output_data(&self) -> Option<DataSlice<'a>> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<DataSlice>>(ExecuteQuery::VT_OUTPUT_DATA, None)
+    }
+    #[inline]
+    pub fn output_checkpoint(&self) -> Option<Checkpoint<'a>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<Checkpoint>>(
+            ExecuteQuery::VT_OUTPUT_CHECKPOINT,
+            None,
+        )
     }
     #[inline]
     pub fn output_watermark(&self) -> Option<&'a Timestamp> {
@@ -2544,9 +2741,19 @@ impl flatbuffers::Verifiable for ExecuteQuery<'_> {
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<InputSlice>>,
             >>("input_slices", Self::VT_INPUT_SLICES, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "input_checkpoint",
+                Self::VT_INPUT_CHECKPOINT,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<DataSlice>>(
                 "output_data",
                 Self::VT_OUTPUT_DATA,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<Checkpoint>>(
+                "output_checkpoint",
+                Self::VT_OUTPUT_CHECKPOINT,
                 false,
             )?
             .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
@@ -2560,7 +2767,9 @@ pub struct ExecuteQueryArgs<'a> {
             flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<InputSlice<'a>>>,
         >,
     >,
+    pub input_checkpoint: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub output_data: Option<flatbuffers::WIPOffset<DataSlice<'a>>>,
+    pub output_checkpoint: Option<flatbuffers::WIPOffset<Checkpoint<'a>>>,
     pub output_watermark: Option<&'a Timestamp>,
 }
 impl<'a> Default for ExecuteQueryArgs<'a> {
@@ -2568,7 +2777,9 @@ impl<'a> Default for ExecuteQueryArgs<'a> {
     fn default() -> Self {
         ExecuteQueryArgs {
             input_slices: None,
+            input_checkpoint: None,
             output_data: None,
+            output_checkpoint: None,
             output_watermark: None,
         }
     }
@@ -2591,11 +2802,32 @@ impl<'a: 'b, 'b> ExecuteQueryBuilder<'a, 'b> {
         );
     }
     #[inline]
+    pub fn add_input_checkpoint(
+        &mut self,
+        input_checkpoint: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ExecuteQuery::VT_INPUT_CHECKPOINT,
+            input_checkpoint,
+        );
+    }
+    #[inline]
     pub fn add_output_data(&mut self, output_data: flatbuffers::WIPOffset<DataSlice<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<DataSlice>>(
                 ExecuteQuery::VT_OUTPUT_DATA,
                 output_data,
+            );
+    }
+    #[inline]
+    pub fn add_output_checkpoint(
+        &mut self,
+        output_checkpoint: flatbuffers::WIPOffset<Checkpoint<'b>>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<Checkpoint>>(
+                ExecuteQuery::VT_OUTPUT_CHECKPOINT,
+                output_checkpoint,
             );
     }
     #[inline]
@@ -2622,7 +2854,9 @@ impl std::fmt::Debug for ExecuteQuery<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQuery");
         ds.field("input_slices", &self.input_slices());
+        ds.field("input_checkpoint", &self.input_checkpoint());
         ds.field("output_data", &self.output_data());
+        ds.field("output_checkpoint", &self.output_checkpoint());
         ds.field("output_watermark", &self.output_watermark());
         ds.finish()
     }
@@ -8034,8 +8268,8 @@ impl<'a> ExecuteQueryRequest<'a> {
     pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 14;
     pub const VT_TRANSFORM: flatbuffers::VOffsetT = 16;
     pub const VT_INPUTS: flatbuffers::VOffsetT = 18;
-    pub const VT_PREV_CHECKPOINT_DIR: flatbuffers::VOffsetT = 20;
-    pub const VT_NEW_CHECKPOINT_DIR: flatbuffers::VOffsetT = 22;
+    pub const VT_PREV_CHECKPOINT_PATH: flatbuffers::VOffsetT = 20;
+    pub const VT_NEW_CHECKPOINT_PATH: flatbuffers::VOffsetT = 22;
     pub const VT_OUT_DATA_PATH: flatbuffers::VOffsetT = 24;
 
     #[inline]
@@ -8052,11 +8286,11 @@ impl<'a> ExecuteQueryRequest<'a> {
         if let Some(x) = args.out_data_path {
             builder.add_out_data_path(x);
         }
-        if let Some(x) = args.new_checkpoint_dir {
-            builder.add_new_checkpoint_dir(x);
+        if let Some(x) = args.new_checkpoint_path {
+            builder.add_new_checkpoint_path(x);
         }
-        if let Some(x) = args.prev_checkpoint_dir {
-            builder.add_prev_checkpoint_dir(x);
+        if let Some(x) = args.prev_checkpoint_path {
+            builder.add_prev_checkpoint_path(x);
         }
         if let Some(x) = args.inputs {
             builder.add_inputs(x);
@@ -8139,16 +8373,16 @@ impl<'a> ExecuteQueryRequest<'a> {
         >>(ExecuteQueryRequest::VT_INPUTS, None)
     }
     #[inline]
-    pub fn prev_checkpoint_dir(&self) -> Option<&'a str> {
+    pub fn prev_checkpoint_path(&self) -> Option<&'a str> {
         self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-            ExecuteQueryRequest::VT_PREV_CHECKPOINT_DIR,
+            ExecuteQueryRequest::VT_PREV_CHECKPOINT_PATH,
             None,
         )
     }
     #[inline]
-    pub fn new_checkpoint_dir(&self) -> Option<&'a str> {
+    pub fn new_checkpoint_path(&self) -> Option<&'a str> {
         self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-            ExecuteQueryRequest::VT_NEW_CHECKPOINT_DIR,
+            ExecuteQueryRequest::VT_NEW_CHECKPOINT_PATH,
             None,
         )
     }
@@ -8212,13 +8446,13 @@ impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<ExecuteQueryInput>>,
             >>("inputs", Self::VT_INPUTS, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "prev_checkpoint_dir",
-                Self::VT_PREV_CHECKPOINT_DIR,
+                "prev_checkpoint_path",
+                Self::VT_PREV_CHECKPOINT_PATH,
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "new_checkpoint_dir",
-                Self::VT_NEW_CHECKPOINT_DIR,
+                "new_checkpoint_path",
+                Self::VT_NEW_CHECKPOINT_PATH,
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
@@ -8243,8 +8477,8 @@ pub struct ExecuteQueryRequestArgs<'a> {
             flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryInput<'a>>>,
         >,
     >,
-    pub prev_checkpoint_dir: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub new_checkpoint_dir: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub prev_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub new_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
     pub out_data_path: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for ExecuteQueryRequestArgs<'a> {
@@ -8259,8 +8493,8 @@ impl<'a> Default for ExecuteQueryRequestArgs<'a> {
             transform_type: Transform::NONE,
             transform: None,
             inputs: None,
-            prev_checkpoint_dir: None,
-            new_checkpoint_dir: None,
+            prev_checkpoint_path: None,
+            new_checkpoint_path: None,
             out_data_path: None,
         }
     }
@@ -8334,20 +8568,23 @@ impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
             .push_slot_always::<flatbuffers::WIPOffset<_>>(ExecuteQueryRequest::VT_INPUTS, inputs);
     }
     #[inline]
-    pub fn add_prev_checkpoint_dir(
+    pub fn add_prev_checkpoint_path(
         &mut self,
-        prev_checkpoint_dir: flatbuffers::WIPOffset<&'b str>,
+        prev_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_PREV_CHECKPOINT_DIR,
-            prev_checkpoint_dir,
+            ExecuteQueryRequest::VT_PREV_CHECKPOINT_PATH,
+            prev_checkpoint_path,
         );
     }
     #[inline]
-    pub fn add_new_checkpoint_dir(&mut self, new_checkpoint_dir: flatbuffers::WIPOffset<&'b str>) {
+    pub fn add_new_checkpoint_path(
+        &mut self,
+        new_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
+    ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_NEW_CHECKPOINT_DIR,
-            new_checkpoint_dir,
+            ExecuteQueryRequest::VT_NEW_CHECKPOINT_PATH,
+            new_checkpoint_path,
         );
     }
     #[inline]
@@ -8400,8 +8637,8 @@ impl std::fmt::Debug for ExecuteQueryRequest<'_> {
             }
         };
         ds.field("inputs", &self.inputs());
-        ds.field("prev_checkpoint_dir", &self.prev_checkpoint_dir());
-        ds.field("new_checkpoint_dir", &self.new_checkpoint_dir());
+        ds.field("prev_checkpoint_path", &self.prev_checkpoint_path());
+        ds.field("new_checkpoint_path", &self.new_checkpoint_path());
         ds.field("out_data_path", &self.out_data_path());
         ds.finish()
     }

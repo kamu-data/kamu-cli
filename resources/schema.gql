@@ -27,7 +27,9 @@ type Accounts {
 	byName(name: String!): Account
 }
 type AddData {
+	inputCheckpoint: Multihash
 	outputData: DataSlice!
+	outputCheckpoint: Checkpoint
 	outputWatermark: DateTime
 }
 type AttachmentEmbedded {
@@ -49,6 +51,9 @@ type BlockInterval {
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
+}
+type Checkpoint {
+	physicalHash: Multihash!
 }
 enum CompressionFormat {
 	GZIP
@@ -239,7 +244,9 @@ type EventTimeSourceFromPath {
 }
 type ExecuteQuery {
 	inputSlices: [InputSlice!]!
+	inputCheckpoint: Multihash
 	outputData: DataSlice
+	outputCheckpoint: Checkpoint
 	outputWatermark: DateTime
 }
 union FetchStep = | FetchStepUrl | FetchStepFilesGlob

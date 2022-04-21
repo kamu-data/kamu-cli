@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::VolumeLayout;
-use opendatafabric::DatasetName;
+use opendatafabric::{DataSlice, DatasetName, Multihash};
 use std::path::PathBuf;
 
 /// Describes the layout of the dataset on disk
@@ -40,5 +40,15 @@ impl DatasetLayout {
         std::fs::create_dir_all(&dl.checkpoints_dir)?;
         std::fs::create_dir_all(&dl.cache_dir)?;
         Ok(dl)
+    }
+
+    pub fn data_slice_path(&self, slice: &DataSlice) -> PathBuf {
+        self.data_dir
+            .join(slice.physical_hash.to_multibase_string())
+    }
+
+    pub fn checkpoint_path(&self, physical_hash: &Multihash) -> PathBuf {
+        self.checkpoints_dir
+            .join(physical_hash.to_multibase_string())
     }
 }

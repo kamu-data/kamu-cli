@@ -153,6 +153,8 @@ pub enum VerificationError {
     DataDoesNotMatchMetadata(DataDoesNotMatchMetadata),
     #[error("Data is not reproducible: {0}")]
     DataNotReproducible(DataNotReproducible),
+    #[error("Checkpoint doesn't match metadata: {0}")]
+    CheckpointDoesNotMatchMetadata(CheckpointDoesNotMatchMetadata),
     #[error("Tranform error: {0}")]
     TransformError(#[from] TransformError),
     #[error("Domain error: {0}")]
@@ -179,13 +181,13 @@ impl Display for DataDoesNotMatchMetadata {
         if let Some(logical) = &self.logical_hash {
             write!(
                 f,
-                "Logical data hash for block {} is expected to be {} but actual {}",
+                "Data's logical hash for block {} is expected to be {} but actual {}",
                 self.block_hash, logical.expected, logical.actual
             )
         } else if let Some(physical) = &self.physical_hash {
             write!(
                 f,
-                "Physical data hash for block {} is expected to be {} but actual {}",
+                "Data's physical hash for block {} is expected to be {} but actual {}",
                 self.block_hash, physical.expected, physical.actual
             )
         } else {
@@ -213,6 +215,24 @@ impl Display for DataNotReproducible {
             self.expected_block_hash,
             self.actual_block,
             self.actual_block_hash
+        )
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct CheckpointDoesNotMatchMetadata {
+    pub block_hash: Multihash,
+    pub physical_hash: HashMismatch,
+}
+
+impl Display for CheckpointDoesNotMatchMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Checkpoint's physical hash for block {} is expected to be {} but actual {}",
+            self.block_hash, self.physical_hash.expected, self.physical_hash.actual
         )
     }
 }

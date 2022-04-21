@@ -145,10 +145,10 @@ impl Engine for ODFEngine {
         request: ExecuteQueryRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let request_adj = ExecuteQueryRequest {
-            prev_checkpoint_dir: request
-                .prev_checkpoint_dir
+            prev_checkpoint_path: request
+                .prev_checkpoint_path
                 .map(|p| self.to_container_path(&p)),
-            new_checkpoint_dir: self.to_container_path(&request.new_checkpoint_dir),
+            new_checkpoint_path: self.to_container_path(&request.new_checkpoint_path),
             out_data_path: self.to_container_path(&request.out_data_path),
             inputs: request
                 .inputs

@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.86.0] - 2022-04-23
+### Changed
+- **Breaking:** Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes.
+- **Breaking:** Data files are now named and stored accodring to their physical hashes, as per ODF spec.
+### Fixed
+- Truncation of `kamu.log` in visual mode
+
 ## [0.85.1] - 2022-04-09
 ### Fixed
 - Don't panic in `kamu ui` when there is no default browser set
@@ -95,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.75.0] - 2022-01-04
 ### Changed
-- Implements [ODF RFC-004](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/004-metadata-extensibility.md).
+- Implements [ODF RFC-004](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/004-metadata-extensibility.md).
 - Breaking: Workspaces will need to be re-created. This is the last major metadata format change - we will be working on stabilizing metadata now.
 - Breaking: Some manifest formats have changed and will need to be updated.
   - `DatasetSnapshot` needs to specify `kind` field (`root` or `derivative`)
@@ -103,7 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.74.0] - 2021-12-28
 ### Changed
-- Implements [ODF RFC-003](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/003-content-addressability.md).
+- Implements [ODF RFC-003](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/003-content-addressability.md).
 - Breaking: Workspaces will need to be re-created. Sorry again!
 - Breaking: Some manifest formats have changed and will need to be updated.
   - `Manifest.apiVersion` renamed to `version`
@@ -117,7 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.73.0] - 2021-12-11
 ### Changed
-- Implements [ODF RFC-002](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/002-logical-data-hashes.md).
+- Implements [ODF RFC-002](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/002-logical-data-hashes.md).
 - Breaking change - workspaces will need to be re-created. Sorry again!
 - Engines are no longer responsible for data hashing - a stable hash algorithm is implemented in `kamu`
 - Pending data part files and checkpoints will be stored in `cache` directory along with other ingest artifacts
@@ -128,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.72.0] - 2021-12-07
 ### Changed
 - Breaking change - workspaces will need to be re-created. Sorry!
-- Implements [ODF RFC-001](https://github.com/kamu-data/open-data-fabric/blob/master/rfcs/001-record-offsets.md) that adds record offset system column.
+- Implements [ODF RFC-001](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/001-record-offsets.md) that adds record offset system column.
 
 ## [0.71.0] - 2021-11-29
 ### Changed

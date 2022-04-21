@@ -32,6 +32,7 @@ curl = { version = "*", features = ["http2", "protocol-ftp", "static-curl", "sta
 curl-sys = "*"
 zip = "*"
 ringbuf = "*"
+tar = "*"  # Checkpoint archival
 
 # Data
 arrow-digest = "*"  # Data hashing (in-house library)

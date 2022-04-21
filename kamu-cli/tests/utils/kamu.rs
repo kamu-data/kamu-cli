@@ -79,12 +79,9 @@ impl Kamu {
             .get_metadata_chain(&dataset_name.as_local_ref())
             .unwrap()
             .iter_blocks()
-            .map(|(h, _)| {
-                self.dataset_layout(dataset_name)
-                    .data_dir
-                    .join(h.to_string())
-            })
-            .filter(|p| p.is_file())
+            .filter_map(|(_, b)| b.into_data_stream_block())
+            .filter_map(|b| b.event.output_data)
+            .map(|slice| self.dataset_layout(dataset_name).data_slice_path(&slice))
             .next()
             .expect("Data file not found");
 

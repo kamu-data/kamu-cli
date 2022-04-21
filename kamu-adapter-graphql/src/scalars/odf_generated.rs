@@ -26,14 +26,18 @@ use opendatafabric as odf;
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
+    pub input_checkpoint: Option<Multihash>,
     pub output_data: DataSlice,
+    pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
 impl From<odf::AddData> for AddData {
     fn from(v: odf::AddData) -> Self {
         Self {
+            input_checkpoint: v.input_checkpoint.map(Into::into),
             output_data: v.output_data.into(),
+            output_checkpoint: v.output_checkpoint.map(Into::into),
             output_watermark: v.output_watermark.map(Into::into),
         }
     }
@@ -106,6 +110,24 @@ impl From<odf::BlockInterval> for BlockInterval {
         Self {
             start: v.start.into(),
             end: v.end.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct Checkpoint {
+    pub physical_hash: Multihash,
+}
+
+impl From<odf::Checkpoint> for Checkpoint {
+    fn from(v: odf::Checkpoint) -> Self {
+        Self {
+            physical_hash: v.physical_hash.into(),
         }
     }
 }
@@ -246,7 +268,9 @@ impl From<odf::EventTimeSourceFromPath> for EventTimeSourceFromPath {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQuery {
     pub input_slices: Vec<InputSlice>,
+    pub input_checkpoint: Option<Multihash>,
     pub output_data: Option<DataSlice>,
+    pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
@@ -254,7 +278,9 @@ impl From<odf::ExecuteQuery> for ExecuteQuery {
     fn from(v: odf::ExecuteQuery) -> Self {
         Self {
             input_slices: v.input_slices.into_iter().map(Into::into).collect(),
+            input_checkpoint: v.input_checkpoint.map(Into::into),
             output_data: v.output_data.map(Into::into),
+            output_checkpoint: v.output_checkpoint.map(Into::into),
             output_watermark: v.output_watermark.map(Into::into),
         }
     }
@@ -304,8 +330,8 @@ pub struct ExecuteQueryRequest {
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
     pub inputs: Vec<ExecuteQueryInput>,
-    pub prev_checkpoint_dir: Option<OSPath>,
-    pub new_checkpoint_dir: OSPath,
+    pub prev_checkpoint_path: Option<OSPath>,
+    pub new_checkpoint_path: OSPath,
     pub out_data_path: OSPath,
 }
 
@@ -319,8 +345,8 @@ impl From<odf::ExecuteQueryRequest> for ExecuteQueryRequest {
             vocab: v.vocab.into(),
             transform: v.transform.into(),
             inputs: v.inputs.into_iter().map(Into::into).collect(),
-            prev_checkpoint_dir: v.prev_checkpoint_dir.map(Into::into),
-            new_checkpoint_dir: v.new_checkpoint_dir.into(),
+            prev_checkpoint_path: v.prev_checkpoint_path.map(Into::into),
+            new_checkpoint_path: v.new_checkpoint_path.into(),
             out_data_path: v.out_data_path.into(),
         }
     }

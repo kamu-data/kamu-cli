@@ -48,7 +48,7 @@ fn append_data_block(
     dataset_reg: &DatasetRegistryImpl,
     name: &DatasetName,
     records: i64,
-) -> (Multihash, MetadataBlock) {
+) -> (Multihash, MetadataBlockTyped<AddData>) {
     let mut chain = dataset_reg
         .get_metadata_chain(&name.as_local_ref())
         .unwrap();
@@ -69,7 +69,7 @@ fn append_data_block(
     .build();
 
     let block_hash = chain.append(block.clone());
-    (block_hash, block)
+    (block_hash, block.into_typed::<AddData>().unwrap())
 }
 
 #[test]
@@ -95,7 +95,8 @@ fn test_get_next_operation() {
         None
     );
 
-    let (foo_hash, foo_block) = append_data_block(&dataset_reg, &foo.name, 10);
+    let (_, foo_block) = append_data_block(&dataset_reg, &foo.name, 10);
+    let data_path = foo_layout.data_slice_path(&foo_block.event.output_data);
 
     assert!(matches!(
         transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
@@ -106,8 +107,8 @@ fn test_get_next_operation() {
             dataset_name: foo.name.clone(),
             vocab: DatasetVocabulary::default(),
             data_interval: Some(OffsetInterval {start: 0, end: 9}),
-            data_paths: vec![foo_layout.data_dir.join(foo_hash.to_string())],
-            schema_file: foo_layout.data_dir.join(foo_hash.to_string()),
+            data_paths: vec![data_path.clone()],
+            schema_file: data_path,
             explicit_watermarks: vec![Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.ymd(2020, 1, 1).and_hms(10, 0, 0),
@@ -183,11 +184,13 @@ fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .append(
             MetadataFactory::metadata_block(AddData {
+                input_checkpoint: None,
                 output_data: DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     interval: OffsetInterval { start: 0, end: 99 },
                 },
+                output_checkpoint: None,
                 output_watermark: Some(t0),
             })
             .system_time(t1)
@@ -219,11 +222,13 @@ fn test_get_verification_plan_one_to_one() {
                     }),
                     data_interval: Some(OffsetInterval { start: 0, end: 99 }),
                 }],
+                input_checkpoint: None,
                 output_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     interval: OffsetInterval { start: 0, end: 99 },
                 }),
+                output_checkpoint: None,
                 output_watermark: Some(t0),
             })
             .system_time(t2)
@@ -238,6 +243,7 @@ fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .append(
             MetadataFactory::metadata_block(AddData {
+                input_checkpoint: None,
                 output_data: DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
@@ -246,6 +252,7 @@ fn test_get_verification_plan_one_to_one() {
                         end: 109,
                     },
                 },
+                output_checkpoint: None,
                 output_watermark: Some(t2),
             })
             .system_time(t3)
@@ -280,6 +287,7 @@ fn test_get_verification_plan_one_to_one() {
                         end: 109,
                     }),
                 }],
+                input_checkpoint: None,
                 output_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
@@ -288,6 +296,7 @@ fn test_get_verification_plan_one_to_one() {
                         end: 109,
                     },
                 }),
+                output_checkpoint: None,
                 output_watermark: Some(t2),
             })
             .system_time(t4)
@@ -328,6 +337,7 @@ fn test_get_verification_plan_one_to_one() {
                     }),
                     data_interval: None,
                 }],
+                input_checkpoint: None,
                 output_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
@@ -336,6 +346,7 @@ fn test_get_verification_plan_one_to_one() {
                         end: 119,
                     },
                 }),
+                output_checkpoint: None,
                 output_watermark: Some(t4),
             })
             .system_time(t6)

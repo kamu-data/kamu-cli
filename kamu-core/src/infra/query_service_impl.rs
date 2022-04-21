@@ -159,9 +159,9 @@ impl QueryService for QueryServiceImpl {
 
         let last_data_file = metadata_chain
             .iter_blocks()
-            .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
-            .filter(|(_, b)| b.event.output_data.is_some())
-            .map(|(block_hash, _)| dataset_layout.data_dir.join(block_hash.to_string()))
+            .filter_map(|(_, b)| b.into_data_stream_block())
+            .filter_map(|b| b.event.output_data)
+            .map(|slice| dataset_layout.data_slice_path(&slice))
             .next()
             .expect("Obtaining schema from datasets with no data is not yet supported");
 
@@ -269,13 +269,13 @@ impl KamuSchema {
             let mut files = Vec::new();
             let mut num_records = 0;
 
-            for (block_hash, slice) in metadata_chain
+            for slice in metadata_chain
                 .iter_blocks()
-                .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
-                .filter_map(|(h, b)| b.event.output_data.map(|s| (h, s)))
+                .filter_map(|(_, b)| b.into_data_stream_block())
+                .filter_map(|b| b.event.output_data)
             {
                 num_records += slice.interval.end - slice.interval.start + 1;
-                files.push(dataset_layout.data_dir.join(block_hash.to_string()));
+                files.push(dataset_layout.data_slice_path(&slice));
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;
                 }

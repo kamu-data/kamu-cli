@@ -55,7 +55,7 @@ impl IngestTask {
         let mut vocab = None;
         let mut next_offset = 0;
 
-        for (block_hash, block) in meta_chain.iter_blocks() {
+        for (_, block) in meta_chain.iter_blocks() {
             match block.event {
                 MetadataEvent::AddData(add_data) => {
                     if next_offset == 0 {
@@ -63,7 +63,7 @@ impl IngestTask {
                     }
                     // TODO: Keep track of other types of blocks that may produce checkpoints
                     if prev_checkpoint.is_none() {
-                        prev_checkpoint = Some(block_hash);
+                        prev_checkpoint = add_data.output_checkpoint.map(|cp| cp.physical_hash);
                     }
                 }
                 MetadataEvent::SetPollingSource(src) => {
@@ -377,7 +377,7 @@ impl IngestTask {
                     }
 
                     let data_path = self.layout.cache_dir.join("read.bin");
-                    let checkpoint_dir = self.layout.cache_dir.join("read.checkpoint");
+                    let new_checkpoint_path = self.layout.cache_dir.join("read.checkpoint");
                     let data_interval = read_result.checkpoint.engine_response.data_interval;
                     let output_watermark = read_result.checkpoint.engine_response.output_watermark;
 
@@ -387,26 +387,52 @@ impl IngestTask {
                         let span = info_span!("Computing data hashes");
                         let _span_guard = span.enter();
 
-                        // TODO: Move out into common data commit procedure of sorts
-                        let data_logical_hash =
-                            crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
-                                .map_err(|e| IngestError::internal(e))?;
-
-                        let data_physical_hash =
-                            crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
-                                .map_err(|e| IngestError::internal(e))?;
-
                         // Advance offset for the next run
                         self.next_offset = data_interval.end + 1;
 
-                        MetadataEvent::AddData(AddData{
-                            output_data: DataSlice {
-                            logical_hash: data_logical_hash,
-                            physical_hash: data_physical_hash,
+                        // TODO: Move out into common data commit procedure of sorts
+                        let output_data = DataSlice {
+                            logical_hash: 
+                                crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+                                .map_err(|e| IngestError::internal(e))?,
+                            physical_hash: 
+                                crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
+                                .map_err(|e| IngestError::internal(e))?,
                             interval: data_interval,
-                        },
-                        output_watermark,
-                    })
+                        };
+
+                        // Commit checkpoint
+                        let output_checkpoint = if new_checkpoint_path.exists() {
+                            let physical_hash = 
+                                crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
+                                    .map_err(|e| IngestError::internal(e))?;
+                            
+                            std::fs::create_dir_all(&self.layout.checkpoints_dir).map_err(|e| IngestError::internal(e))?;
+                            std::fs::rename(
+                                &new_checkpoint_path,
+                                self.layout.checkpoint_path(&physical_hash),
+                            )
+                            .map_err(|e| IngestError::internal(e))?;
+                            
+                            Some(Checkpoint { physical_hash })
+                        } else {
+                            None
+                        };
+
+                        // Commit data
+                        std::fs::create_dir_all(&self.layout.data_dir).map_err(|e| IngestError::internal(e))?;
+                        std::fs::rename(
+                            &data_path,
+                            self.layout.data_slice_path(&output_data),
+                        )
+                        .map_err(|e| IngestError::internal(e))?;
+
+                        MetadataEvent::AddData(AddData {
+                            input_checkpoint: self.prev_checkpoint.clone(),
+                            output_data,
+                            output_checkpoint,
+                            output_watermark,
+                        })
                     } else {
                         let prev_watermark = self.meta_chain.borrow()
                             .iter_blocks()
@@ -425,6 +451,7 @@ impl IngestTask {
                                 },
                             })
                         }
+
                         MetadataEvent::SetWatermark(SetWatermark{
                             output_watermark: output_watermark.unwrap(),
                         })
@@ -435,25 +462,10 @@ impl IngestTask {
                         prev_block_hash: Some(prev_hash),
                         event: metadata_event,
                     };
+                    info!(?new_block, "Committing new block");
 
                     let new_head = self.meta_chain.borrow_mut().append(new_block);
                     info!(%new_head, "Committed new block");
-
-                    std::fs::create_dir_all(&self.layout.data_dir).map_err(|e| IngestError::internal(e))?;
-
-                    // TODO: ACID: Data should be moved before writing block file
-                    std::fs::rename(
-                        &data_path,
-                        self.layout.data_dir.join(new_head.to_string()),
-                    )
-                    .map_err(|e| IngestError::internal(e))?;
-
-                    // TODO: ACID: Checkpoint should be moved before writing block file
-                    std::fs::rename(
-                        &checkpoint_dir,
-                        self.layout.checkpoints_dir.join(new_head.to_string()),
-                    )
-                    .map_err(|e| IngestError::internal(e))?;
 
                     Ok(ExecutionResult {
                         was_up_to_date: false,
@@ -494,5 +506,6 @@ pub struct CommitCheckpoint {
     pub for_read_at: DateTime<Utc>,
     #[serde(with = "datetime_rfc3339")]
     pub for_fetched_at: DateTime<Utc>,
+    // Contains either last block's hash or None if no data was produced by last ingest
     pub last_hash: Option<Multihash>,
 }

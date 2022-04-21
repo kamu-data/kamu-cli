@@ -41,7 +41,7 @@ pub async fn run(
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
-    let catalog = {
+    let (_log_thread, catalog) = {
         let mut catalog_builder = configure_catalog();
         catalog_builder.add_value(workspace_layout.clone());
         catalog_builder.add_value(local_volume_layout.clone());
@@ -49,7 +49,7 @@ pub async fn run(
         let output_format = configure_output_format(&matches);
         catalog_builder.add_value(output_format.clone());
 
-        let _guard = configure_logging(&output_format, &workspace_layout);
+        let _log_thread = configure_logging(&output_format, &workspace_layout);
         info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
@@ -58,7 +58,7 @@ pub async fn run(
 
         load_config(&workspace_layout, &mut catalog_builder);
 
-        catalog_builder.build()
+        (_log_thread, catalog_builder.build())
     };
 
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;

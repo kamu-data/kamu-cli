@@ -22,6 +22,24 @@ use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
+fn get_data_of_block(
+    metadata_chain: &dyn MetadataChain,
+    dataset_layout: &DatasetLayout,
+    block_hash: &Multihash,
+) -> SerializedFileReader<File> {
+    let part_file = dataset_layout.data_slice_path(
+        metadata_chain
+            .get_block(&block_hash)
+            .unwrap()
+            .as_data_stream_block()
+            .unwrap()
+            .event
+            .output_data
+            .unwrap(),
+    );
+    SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap()
+}
+
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_transform_with_engine_spark() {
@@ -141,8 +159,14 @@ async fn test_transform_with_engine_spark() {
         3
     );
 
-    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
-    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let parquet_reader = get_data_of_block(
+        dataset_reg
+            .get_metadata_chain(&deriv_name.as_local_ref())
+            .unwrap()
+            .as_ref(),
+        &dataset_layout,
+        &block_hash,
+    );
     let columns: Vec<_> = parquet_reader
         .metadata()
         .file_metadata()
@@ -214,9 +238,14 @@ async fn test_transform_with_engine_spark() {
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
-
-    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let parquet_reader = get_data_of_block(
+        dataset_reg
+            .get_metadata_chain(&deriv_name.as_local_ref())
+            .unwrap()
+            .as_ref(),
+        &dataset_layout,
+        &block_hash,
+    );
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
@@ -369,8 +398,14 @@ async fn test_transform_with_engine_flink() {
         3
     );
 
-    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
-    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let parquet_reader = get_data_of_block(
+        dataset_reg
+            .get_metadata_chain(&deriv_name.as_local_ref())
+            .unwrap()
+            .as_ref(),
+        &dataset_layout,
+        &block_hash,
+    );
     let columns: Vec<_> = parquet_reader
         .metadata()
         .file_metadata()
@@ -442,9 +477,14 @@ async fn test_transform_with_engine_flink() {
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let part_file = dataset_layout.data_dir.join(block_hash.to_string());
-
-    let parquet_reader = SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap();
+    let parquet_reader = get_data_of_block(
+        dataset_reg
+            .get_metadata_chain(&deriv_name.as_local_ref())
+            .unwrap()
+            .as_ref(),
+        &dataset_layout,
+        &block_hash,
+    );
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()

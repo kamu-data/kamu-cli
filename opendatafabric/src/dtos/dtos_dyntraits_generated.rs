@@ -25,13 +25,23 @@ use std::path::Path;
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait AddData {
+    fn input_checkpoint(&self) -> Option<&Multihash>;
     fn output_data(&self) -> &dyn DataSlice;
+    fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
 impl AddData for dtos::AddData {
+    fn input_checkpoint(&self) -> Option<&Multihash> {
+        self.input_checkpoint.as_ref().map(|v| -> &Multihash { v })
+    }
     fn output_data(&self) -> &dyn DataSlice {
         &self.output_data
+    }
+    fn output_checkpoint(&self) -> Option<&dyn Checkpoint> {
+        self.output_checkpoint
+            .as_ref()
+            .map(|v| -> &dyn Checkpoint { v })
     }
     fn output_watermark(&self) -> Option<DateTime<Utc>> {
         self.output_watermark
@@ -43,7 +53,9 @@ impl AddData for dtos::AddData {
 impl Into<dtos::AddData> for &dyn AddData {
     fn into(self) -> dtos::AddData {
         dtos::AddData {
+            input_checkpoint: self.input_checkpoint().map(|v| v.clone()),
             output_data: self.output_data().into(),
+            output_checkpoint: self.output_checkpoint().map(|v| v.into()),
             output_watermark: self.output_watermark().map(|v| v),
         }
     }
@@ -144,6 +156,29 @@ impl Into<dtos::BlockInterval> for &dyn BlockInterval {
         dtos::BlockInterval {
             start: self.start().clone(),
             end: self.end().clone(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait Checkpoint {
+    fn physical_hash(&self) -> &Multihash;
+}
+
+impl Checkpoint for dtos::Checkpoint {
+    fn physical_hash(&self) -> &Multihash {
+        &self.physical_hash
+    }
+}
+
+impl Into<dtos::Checkpoint> for &dyn Checkpoint {
+    fn into(self) -> dtos::Checkpoint {
+        dtos::Checkpoint {
+            physical_hash: self.physical_hash().clone(),
         }
     }
 }
@@ -316,7 +351,9 @@ impl Into<dtos::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
 
 pub trait ExecuteQuery {
     fn input_slices(&self) -> Box<dyn Iterator<Item = &dyn InputSlice> + '_>;
+    fn input_checkpoint(&self) -> Option<&Multihash>;
     fn output_data(&self) -> Option<&dyn DataSlice>;
+    fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
@@ -324,8 +361,16 @@ impl ExecuteQuery for dtos::ExecuteQuery {
     fn input_slices(&self) -> Box<dyn Iterator<Item = &dyn InputSlice> + '_> {
         Box::new(self.input_slices.iter().map(|i| -> &dyn InputSlice { i }))
     }
+    fn input_checkpoint(&self) -> Option<&Multihash> {
+        self.input_checkpoint.as_ref().map(|v| -> &Multihash { v })
+    }
     fn output_data(&self) -> Option<&dyn DataSlice> {
         self.output_data.as_ref().map(|v| -> &dyn DataSlice { v })
+    }
+    fn output_checkpoint(&self) -> Option<&dyn Checkpoint> {
+        self.output_checkpoint
+            .as_ref()
+            .map(|v| -> &dyn Checkpoint { v })
     }
     fn output_watermark(&self) -> Option<DateTime<Utc>> {
         self.output_watermark
@@ -338,7 +383,9 @@ impl Into<dtos::ExecuteQuery> for &dyn ExecuteQuery {
     fn into(self) -> dtos::ExecuteQuery {
         dtos::ExecuteQuery {
             input_slices: self.input_slices().map(|i| i.into()).collect(),
+            input_checkpoint: self.input_checkpoint().map(|v| v.clone()),
             output_data: self.output_data().map(|v| v.into()),
+            output_checkpoint: self.output_checkpoint().map(|v| v.into()),
             output_watermark: self.output_watermark().map(|v| v),
         }
     }
@@ -416,8 +463,8 @@ pub trait ExecuteQueryRequest {
     fn vocab(&self) -> &dyn DatasetVocabulary;
     fn transform(&self) -> Transform;
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_>;
-    fn prev_checkpoint_dir(&self) -> Option<&Path>;
-    fn new_checkpoint_dir(&self) -> &Path;
+    fn prev_checkpoint_path(&self) -> Option<&Path>;
+    fn new_checkpoint_path(&self) -> &Path;
     fn out_data_path(&self) -> &Path;
 }
 
@@ -443,13 +490,13 @@ impl ExecuteQueryRequest for dtos::ExecuteQueryRequest {
     fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_> {
         Box::new(self.inputs.iter().map(|i| -> &dyn ExecuteQueryInput { i }))
     }
-    fn prev_checkpoint_dir(&self) -> Option<&Path> {
-        self.prev_checkpoint_dir
+    fn prev_checkpoint_path(&self) -> Option<&Path> {
+        self.prev_checkpoint_path
             .as_ref()
             .map(|v| -> &Path { v.as_ref() })
     }
-    fn new_checkpoint_dir(&self) -> &Path {
-        self.new_checkpoint_dir.as_ref()
+    fn new_checkpoint_path(&self) -> &Path {
+        self.new_checkpoint_path.as_ref()
     }
     fn out_data_path(&self) -> &Path {
         self.out_data_path.as_ref()
@@ -466,8 +513,8 @@ impl Into<dtos::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
             vocab: self.vocab().into(),
             transform: self.transform().into(),
             inputs: self.inputs().map(|i| i.into()).collect(),
-            prev_checkpoint_dir: self.prev_checkpoint_dir().map(|v| v.to_owned()),
-            new_checkpoint_dir: self.new_checkpoint_dir().to_owned(),
+            prev_checkpoint_path: self.prev_checkpoint_path().map(|v| v.to_owned()),
+            new_checkpoint_path: self.new_checkpoint_path().to_owned(),
             out_data_path: self.out_data_path().to_owned(),
         }
     }

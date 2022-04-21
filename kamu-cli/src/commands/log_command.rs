@@ -157,28 +157,38 @@ impl AsciiRenderer {
 
         match &block.event {
             MetadataEvent::AddData(AddData {
+                input_checkpoint,
                 output_data,
+                output_checkpoint,
                 output_watermark,
             }) => {
                 self.render_property(output, 0, "Kind", "AddData")?;
-                self.render_section(output, 0, "Event")?;
 
-                self.render_section(output, 1, "Data")?;
-                self.render_property(output, 2, "Offset.Start", &output_data.interval.start)?;
-                self.render_property(output, 2, "Offset.End", &output_data.interval.end)?;
+                if let Some(icp) = input_checkpoint {
+                    self.render_property(output, 0, "InputCheckpoint", &icp)?;
+                }
+
+                self.render_section(output, 0, "Data")?;
+                self.render_property(output, 1, "Offset.Start", &output_data.interval.start)?;
+                self.render_property(output, 1, "Offset.End", &output_data.interval.end)?;
                 self.render_property(
                     output,
-                    2,
+                    1,
                     "Records",
                     &(output_data.interval.end - output_data.interval.start + 1),
                 )?;
-                self.render_property(output, 2, "LogicalHash", &output_data.logical_hash)?;
-                self.render_property(output, 2, "PhysicalHash", &output_data.physical_hash)?;
+                self.render_property(output, 1, "LogicalHash", &output_data.logical_hash)?;
+                self.render_property(output, 1, "PhysicalHash", &output_data.physical_hash)?;
+
+                if let Some(ocp) = output_checkpoint {
+                    self.render_section(output, 0, "OutputCheckpoint")?;
+                    self.render_property(output, 1, "PhysicalHash", &ocp.physical_hash)?;
+                }
 
                 if let Some(wm) = output_watermark {
                     self.render_property(
                         output,
-                        1,
+                        0,
                         "Watermark",
                         wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                     )?;
@@ -186,7 +196,9 @@ impl AsciiRenderer {
             }
             MetadataEvent::ExecuteQuery(ExecuteQuery {
                 input_slices,
+                input_checkpoint,
                 output_data,
+                output_checkpoint,
                 output_watermark,
             }) => {
                 self.render_property(output, 0, "Kind", "ExecuteQuery")?;
@@ -211,6 +223,10 @@ impl AsciiRenderer {
                     }
                 }
 
+                if let Some(icp) = input_checkpoint {
+                    self.render_property(output, 0, "InputCheckpoint", &icp)?;
+                }
+
                 if let Some(output_data) = output_data {
                     self.render_section(output, 0, "Data")?;
                     self.render_property(output, 1, "Offset.Start", &output_data.interval.start)?;
@@ -225,10 +241,15 @@ impl AsciiRenderer {
                     self.render_property(output, 1, "PhysicalHash", &output_data.physical_hash)?;
                 }
 
+                if let Some(ocp) = output_checkpoint {
+                    self.render_section(output, 0, "OutputCheckpoint")?;
+                    self.render_property(output, 1, "PhysicalHash", &ocp.physical_hash)?;
+                }
+
                 if let Some(wm) = output_watermark {
                     self.render_property(
                         output,
-                        1,
+                        0,
                         "Watermark",
                         wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                     )?;

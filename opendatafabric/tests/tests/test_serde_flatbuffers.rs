@@ -95,11 +95,13 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                         data_interval: None,
                     },
                 ],
+                input_checkpoint: None,
                 output_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     interval: OffsetInterval { start: 10, end: 20 },
                 }),
+                output_checkpoint: None,
                 output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             }),
         },

@@ -39,7 +39,7 @@ impl VerificationServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<(Multihash, DataSlice)>, VerificationError> {
+    ) -> Result<Vec<(Multihash, MetadataBlockDataStream)>, VerificationError> {
         let metadata_chain = self
             .dataset_reg
             .get_metadata_chain(&dataset_handle.as_local_ref())?;
@@ -49,18 +49,25 @@ impl VerificationServiceImpl {
             .1
             .unwrap_or_else(|| metadata_chain.read_ref(&BlockRef::Head).unwrap());
 
-        let plan: Vec<_> = metadata_chain
+        let mut plan = Vec::new();
+
+        let mut start_block_found = false;
+
+        for (hash, block) in metadata_chain
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
-            .take_while(|(hash, _)| Some(hash) != start_block.as_ref())
             .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
-            .filter_map(|(h, b)| b.event.output_data.map(|s| (h, s)))
-            .collect();
+        {
+            plan.push((hash.clone(), block));
 
-        if let Some(start_block) = start_block {
-            if start_block != plan[plan.len() - 1].0 {
-                return Err(VerificationError::NoSuchBlock(start_block));
+            if Some(&hash) == start_block.as_ref() {
+                start_block_found = true;
+                break;
             }
+        }
+
+        if start_block.is_some() && !start_block_found {
+            return Err(VerificationError::NoSuchBlock(start_block.unwrap()));
         }
 
         Ok(plan)
@@ -83,7 +90,7 @@ impl VerificationServiceImpl {
 
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
 
-        for (block_index, (block_hash, output_slice)) in plan.into_iter().enumerate() {
+        for (block_index, (block_hash, block)) in plan.into_iter().enumerate() {
             listener.begin_block(
                 &block_hash,
                 block_index,
@@ -91,43 +98,65 @@ impl VerificationServiceImpl {
                 VerificationPhase::DataIntegrity,
             );
 
-            let data_path = dataset_layout.data_dir.join(block_hash.to_string());
+            if let Some(output_slice) = &block.event.output_data {
+                let data_path = dataset_layout.data_slice_path(&output_slice);
 
-            // Do a fast pass using physical hash
-            let physical_hash_actual =
-                crate::infra::utils::data_utils::get_parquet_physical_hash(&data_path)
-                    .map_err(|e| DomainError::InfraError(e.into()))?;
+                // Do a fast pass using physical hash
+                let physical_hash_actual =
+                    crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
+                        .map_err(|e| DomainError::InfraError(e.into()))?;
 
-            if physical_hash_actual != output_slice.physical_hash {
-                // Root data files are non-reproducible by definition, so
-                // if physical hashes don't match - we can give up right away.
-                if dataset_kind == DatasetKind::Root {
-                    return Err(VerificationError::DataDoesNotMatchMetadata(
-                        DataDoesNotMatchMetadata {
-                            block_hash,
-                            logical_hash: None,
-                            physical_hash: Some(HashMismatch {
-                                expected: output_slice.physical_hash.clone(),
-                                actual: physical_hash_actual,
-                            }),
-                        },
-                    ));
-                } else {
-                    // Derivative data may be replayed and produce different binary file
-                    // but data must have same logical hash to be valid.
-                    let logical_hash_actual =
-                        crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
-                            .map_err(|e| DomainError::InfraError(e.into()))?;
-
-                    if logical_hash_actual != output_slice.logical_hash {
+                if physical_hash_actual != output_slice.physical_hash {
+                    // Root data files are non-reproducible by definition, so
+                    // if physical hashes don't match - we can give up right away.
+                    if dataset_kind == DatasetKind::Root {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
                                 block_hash,
-                                logical_hash: Some(HashMismatch {
-                                    expected: output_slice.logical_hash.clone(),
-                                    actual: logical_hash_actual,
+                                logical_hash: None,
+                                physical_hash: Some(HashMismatch {
+                                    expected: output_slice.physical_hash.clone(),
+                                    actual: physical_hash_actual,
                                 }),
-                                physical_hash: None,
+                            },
+                        ));
+                    } else {
+                        // Derivative data may be replayed and produce different binary file
+                        // but data must have same logical hash to be valid.
+                        let logical_hash_actual =
+                            crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+                                .map_err(|e| DomainError::InfraError(e.into()))?;
+
+                        if logical_hash_actual != output_slice.logical_hash {
+                            return Err(VerificationError::DataDoesNotMatchMetadata(
+                                DataDoesNotMatchMetadata {
+                                    block_hash,
+                                    logical_hash: Some(HashMismatch {
+                                        expected: output_slice.logical_hash.clone(),
+                                        actual: logical_hash_actual,
+                                    }),
+                                    physical_hash: None,
+                                },
+                            ));
+                        }
+                    }
+                }
+
+                if let Some(checkpoint) = block.event.output_checkpoint {
+                    let physical_hash_actual =
+                        crate::infra::utils::data_utils::get_file_physical_hash(
+                            &dataset_layout.checkpoint_path(&checkpoint.physical_hash),
+                        )
+                        .map_err(|e| DomainError::InfraError(e.into()))?;
+
+                    if physical_hash_actual != checkpoint.physical_hash {
+                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                            CheckpointDoesNotMatchMetadata {
+                                block_hash,
+                                physical_hash: HashMismatch {
+                                    expected: checkpoint.physical_hash,
+                                    actual: physical_hash_actual,
+                                },
                             },
                         ));
                     }

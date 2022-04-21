@@ -231,11 +231,13 @@ impl AddDataBuilder {
     fn new() -> Self {
         Self {
             v: AddData {
+                input_checkpoint: None,
                 output_data: DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     interval: OffsetInterval { start: 0, end: 9 },
                 },
+                output_checkpoint: None,
                 output_watermark: Some(Utc::now()),
             },
         }

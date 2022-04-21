@@ -61,8 +61,12 @@ macro_rules! implement_serde_as {
 #[serde(remote = "AddData")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddDataDef {
+    pub input_checkpoint: Option<Multihash>,
     #[serde_as(as = "DataSliceDef")]
     pub output_data: DataSlice,
+    #[serde_as(as = "Option<CheckpointDef>")]
+    #[serde(default)]
+    pub output_checkpoint: Option<Checkpoint>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub output_watermark: Option<DateTime<Utc>>,
 }
@@ -137,6 +141,22 @@ pub struct BlockIntervalDef {
 }
 
 implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "Checkpoint")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct CheckpointDef {
+    pub physical_hash: Multihash,
+}
+
+implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // DataSlice
@@ -260,9 +280,13 @@ pub struct EventTimeSourceFromPathDef {
 pub struct ExecuteQueryDef {
     #[serde_as(as = "Vec<InputSliceDef>")]
     pub input_slices: Vec<InputSlice>,
+    pub input_checkpoint: Option<Multihash>,
     #[serde_as(as = "Option<DataSliceDef>")]
     #[serde(default)]
     pub output_data: Option<DataSlice>,
+    #[serde_as(as = "Option<CheckpointDef>")]
+    #[serde(default)]
+    pub output_checkpoint: Option<Checkpoint>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub output_watermark: Option<DateTime<Utc>>,
 }
@@ -323,8 +347,8 @@ pub struct ExecuteQueryRequestDef {
     pub transform: Transform,
     #[serde_as(as = "Vec<ExecuteQueryInputDef>")]
     pub inputs: Vec<ExecuteQueryInput>,
-    pub prev_checkpoint_dir: Option<PathBuf>,
-    pub new_checkpoint_dir: PathBuf,
+    pub prev_checkpoint_path: Option<PathBuf>,
+    pub new_checkpoint_path: PathBuf,
     pub out_data_path: PathBuf,
 }
 

@@ -131,7 +131,6 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
                 .append(
                     MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
                         .build(),
-                    None,
                 );
         } else {
             ds_builder
@@ -150,7 +149,6 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
                             .build(),
                     )
                     .build(),
-                    None,
                 );
         }
     }

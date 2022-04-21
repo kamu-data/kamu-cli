@@ -81,7 +81,7 @@ impl TransformServiceImpl {
         commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError> {
-        let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_dir);
+        let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_path);
         let system_time = operation.request.system_time.clone();
         let out_data_path = PathBuf::from(&operation.request.out_data_path);
         let offset = operation.request.offset;
@@ -113,6 +113,13 @@ impl TransformServiceImpl {
                 )
                 .into());
             }
+            if out_data_path.is_symlink() || !out_data_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote data not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
 
             let span = info_span!("Computing data hashes");
             let _span_guard = span.enter();
@@ -123,7 +130,7 @@ impl TransformServiceImpl {
                     .map_err(|e| TransformError::internal(e))?;
 
             let data_physical_hash =
-                crate::infra::utils::data_utils::get_parquet_physical_hash(&out_data_path)
+                crate::infra::utils::data_utils::get_file_physical_hash(&out_data_path)
                     .map_err(|e| TransformError::internal(e))?;
 
             Some(DataSlice {
@@ -141,12 +148,32 @@ impl TransformServiceImpl {
             None
         };
 
+        let output_checkpoint = if new_checkpoint_path.exists() {
+            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote checkpoint not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
+
+            let physical_hash =
+                crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
+                    .map_err(|e| TransformError::internal(e))?;
+
+            Some(Checkpoint { physical_hash })
+        } else {
+            None
+        };
+
         let metadata_block = MetadataBlock {
             system_time,
             prev_block_hash: None, // Filled out at commit
             event: MetadataEvent::ExecuteQuery(ExecuteQuery {
                 input_slices: operation.input_slices,
+                input_checkpoint: operation.input_checkpoint,
                 output_data,
+                output_checkpoint,
                 output_watermark: response.output_watermark,
             }),
         };
@@ -173,31 +200,24 @@ impl TransformServiceImpl {
             prev_block_hash: Some(prev_block_hash.clone()),
             ..new_block
         };
+        let new_block_t = new_block.as_typed::<ExecuteQuery>().unwrap();
 
-        let has_data = match &new_block.event {
-            MetadataEvent::ExecuteQuery(eq) => eq.output_data.is_some(),
-            _ => unreachable!(),
-        };
+        // Commit data
+        if let Some(data_slice) = &new_block_t.event.output_data {
+            std::fs::rename(&new_data_path, dataset_layout.data_slice_path(data_slice))
+                .map_err(|e| TransformError::internal(e))?;
+        }
 
-        let new_block_hash = meta_chain.append(new_block);
-
-        // TODO: Data should be moved before writing block file
-        if has_data {
+        // Commit checkpoint
+        if let Some(checkpoint) = &new_block_t.event.output_checkpoint {
             std::fs::rename(
-                &new_data_path,
-                dataset_layout.data_dir.join(new_block_hash.to_string()),
+                &new_checkpoint_path,
+                dataset_layout.checkpoint_path(&checkpoint.physical_hash),
             )
             .map_err(|e| TransformError::internal(e))?;
         }
 
-        // TODO: Checkpoint should be moved before writing block file
-        std::fs::rename(
-            &new_checkpoint_path,
-            dataset_layout
-                .checkpoints_dir
-                .join(new_block_hash.to_string()),
-        )
-        .map_err(|e| TransformError::internal(e))?;
+        let new_block_hash = meta_chain.append(new_block);
 
         info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
 
@@ -273,8 +293,8 @@ impl TransformServiceImpl {
         // TODO: Checkpoint hash should be contained in metadata explicitly, not inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter(|(_, b)| b.event.is_variant::<ExecuteQuery>())
-            .map(|(h, _)| h)
+            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .filter_map(|b| b.output_checkpoint)
             .next();
 
         let data_offset_end = output_chain
@@ -286,22 +306,24 @@ impl TransformServiceImpl {
 
         let output_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
         let out_data_path = output_layout.data_dir.join(".pending");
-        let new_checkpoint_dir = output_layout.checkpoints_dir.join(".pending");
+        let prev_checkpoint_path = prev_checkpoint
+            .as_ref()
+            .map(|cp| output_layout.checkpoint_path(&cp.physical_hash));
+        let new_checkpoint_path = output_layout.checkpoints_dir.join(".pending");
 
         // Clean up previous state leftovers
         if out_data_path.exists() {
             std::fs::remove_file(&out_data_path).map_err(|e| DomainError::InfraError(e.into()))?;
         }
-        if new_checkpoint_dir.exists() {
-            std::fs::remove_dir_all(&new_checkpoint_dir)
+        if new_checkpoint_path.exists() {
+            std::fs::remove_file(&new_checkpoint_path)
                 .map_err(|e| DomainError::InfraError(e.into()))?;
         }
-        std::fs::create_dir_all(&new_checkpoint_dir)
-            .map_err(|e| DomainError::InfraError(e.into()))?;
 
         Ok(Some(TransformOperation {
             dataset_handle: dataset_handle.clone(),
             input_slices,
+            input_checkpoint: prev_checkpoint.map(|cp| cp.physical_hash),
             request: ExecuteQueryRequest {
                 dataset_id: dataset_handle.id.clone(),
                 dataset_name: dataset_handle.name.clone(),
@@ -310,9 +332,8 @@ impl TransformServiceImpl {
                 vocab: self.get_vocab(&dataset_handle.as_local_ref())?,
                 transform: source.transform,
                 inputs: query_inputs,
-                prev_checkpoint_dir: prev_checkpoint
-                    .map(|hash| output_layout.checkpoints_dir.join(hash.to_string())),
-                new_checkpoint_dir,
+                prev_checkpoint_path,
+                new_checkpoint_path,
                 out_data_path,
             },
         }))
@@ -431,14 +452,14 @@ impl TransformServiceImpl {
                 .expect("Starting block of the interval not found")
                 .prev_block_hash;
 
-            for (block_hash, block) in input_chain
+            for block in input_chain
                 .iter_blocks_starting(&block_interval.end)
                 .unwrap()
                 .take_while(|(block_hash, _)| Some(block_hash) != hash_to_stop_at.as_ref())
-                .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
+                .filter_map(|(_, b)| b.into_data_stream_block())
             {
-                if block.event.output_data.is_some() {
-                    data_paths.push(input_layout.data_dir.join(block_hash.to_multibase_string()));
+                if let Some(slice) = &block.event.output_data {
+                    data_paths.push(input_layout.data_slice_path(slice));
                 }
 
                 if let Some(wm) = block.event.output_watermark {
@@ -530,11 +551,11 @@ impl TransformServiceImpl {
             .unwrap_or_else(|| metadata_chain.read_ref(&BlockRef::Head).unwrap());
 
         let mut source = None;
-        let mut prev_checkpoint = None;
         let mut vocab = None;
         let mut blocks = Vec::new();
         let mut finished_range = false;
 
+        // TODO: This can be simplified
         for (block_hash, block) in metadata_chain
             .iter_blocks_starting(&end_block)
             .ok_or(VerificationError::NoSuchBlock(end_block))?
@@ -558,9 +579,6 @@ impl TransformServiceImpl {
                 MetadataEvent::ExecuteQuery(_) => {
                     if !finished_range {
                         blocks.push((block_hash.clone(), block));
-                    } else {
-                        // TODO: this might be incorrect - test with specific start_block
-                        prev_checkpoint = Some(block_hash.clone());
                     }
                 }
                 MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => unreachable!(),
@@ -576,7 +594,10 @@ impl TransformServiceImpl {
             }
         }
 
-        // TODO: missing validation of whether start_block was found
+        // Ensure start_block was found if specified
+        if start_block.is_some() && !finished_range {
+            return Err(VerificationError::NoSuchBlock(start_block.unwrap()));
+        }
 
         let source = source.ok_or(VerificationError::NotDerivative)?;
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
@@ -592,7 +613,7 @@ impl TransformServiceImpl {
             })
             .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-        let mut plan: Vec<_> = blocks
+        let plan: Vec<_> = blocks
             .into_iter()
             .rev()
             .map(
@@ -603,6 +624,7 @@ impl TransformServiceImpl {
                         operation: TransformOperation {
                             dataset_handle: dataset_handle.clone(),
                             input_slices: block_t.event.input_slices.clone(),
+                            input_checkpoint: block_t.event.input_checkpoint.clone(),
                             request: ExecuteQueryRequest {
                                 dataset_id: dataset_handle.id.clone(),
                                 dataset_name: dataset_handle.name.clone(),
@@ -631,8 +653,14 @@ impl TransformServiceImpl {
                                         )
                                     })
                                     .collect::<Result<_, _>>()?,
-                                prev_checkpoint_dir: None, // Filled out below
-                                new_checkpoint_dir: dataset_layout.checkpoints_dir.join(".pending"),
+                                prev_checkpoint_path: block_t
+                                    .event
+                                    .input_checkpoint
+                                    .as_ref()
+                                    .map(|cp| dataset_layout.checkpoint_path(cp)),
+                                new_checkpoint_path: dataset_layout
+                                    .checkpoints_dir
+                                    .join(".pending"),
                                 out_data_path: dataset_layout.data_dir.join(".pending"),
                             },
                         },
@@ -644,19 +672,6 @@ impl TransformServiceImpl {
                 },
             )
             .collect::<Result<_, _>>()?;
-
-        // Populate prev checkpoints
-        for i in 1..plan.len() {
-            plan[i].operation.request.prev_checkpoint_dir = Some(
-                dataset_layout
-                    .checkpoints_dir
-                    .join(plan[i - 1].expected_hash.to_string()),
-            )
-        }
-        if !plan.is_empty() {
-            plan[0].operation.request.prev_checkpoint_dir =
-                prev_checkpoint.map(|h| dataset_layout.checkpoints_dir.join(h.to_string()));
-        }
 
         Ok(plan)
     }
@@ -809,8 +824,10 @@ impl TransformService for TransformServiceImpl {
                         std::fs::remove_file(new_data_path)
                             .map_err(|e| TransformError::internal(e))?;
                     }
-                    std::fs::remove_dir_all(new_checkpoint_path)
-                        .map_err(|e| TransformError::internal(e))?;
+                    if new_block_t.event.output_checkpoint.is_some() {
+                        std::fs::remove_file(new_checkpoint_path)
+                            .map_err(|e| TransformError::internal(e))?;
+                    }
 
                     // We overwrite the physical hash with the expected one because Parquet format is non-reproducible
                     // We rely only on logical hash for equivalence test
@@ -822,6 +839,15 @@ impl TransformService for TransformServiceImpl {
                             .map(|s| &s.physical_hash)
                         {
                             slice.physical_hash = expected_physical_hash.clone();
+                        }
+                    }
+
+                    // We're not considering checkpoints in equivalence checks.
+                    if let Some(actual_checkpoint) = &mut new_block_t.event.output_checkpoint {
+                        if let Some(expected_checkpoint) = &expected_block_t.event.output_checkpoint
+                        {
+                            actual_checkpoint.physical_hash =
+                                expected_checkpoint.physical_hash.clone();
                         }
                     }
 
@@ -893,6 +919,7 @@ impl TransformService for TransformServiceImpl {
 pub struct TransformOperation {
     pub dataset_handle: DatasetHandle,
     pub input_slices: Vec<InputSlice>,
+    pub input_checkpoint: Option<Multihash>,
     pub request: ExecuteQueryRequest,
 }
 

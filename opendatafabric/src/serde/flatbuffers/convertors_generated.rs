@@ -52,9 +52,16 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
     type OffsetT = WIPOffset<fb::AddData<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let input_checkpoint_offset = self
+            .input_checkpoint
+            .as_ref()
+            .map(|v| fb.create_vector(&v.to_bytes()));
         let output_data_offset = { self.output_data.serialize(fb) };
+        let output_checkpoint_offset = self.output_checkpoint.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::AddDataBuilder::new(fb);
+        input_checkpoint_offset.map(|off| builder.add_input_checkpoint(off));
         builder.add_output_data(output_data_offset);
+        output_checkpoint_offset.map(|off| builder.add_output_checkpoint(off));
         self.output_watermark
             .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
         builder.finish()
@@ -64,10 +71,16 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
 impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
     fn deserialize(proxy: fb::AddData<'fb>) -> Self {
         odf::AddData {
+            input_checkpoint: proxy
+                .input_checkpoint()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap()),
             output_data: proxy
                 .output_data()
                 .map(|v| odf::DataSlice::deserialize(v))
                 .unwrap(),
+            output_checkpoint: proxy
+                .output_checkpoint()
+                .map(|v| odf::Checkpoint::deserialize(v)),
             output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
         }
     }
@@ -188,6 +201,33 @@ impl<'fb> FlatbuffersDeserializable<fb::BlockInterval<'fb>> for odf::BlockInterv
                 .unwrap(),
             end: proxy
                 .end()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::Checkpoint {
+    type OffsetT = WIPOffset<fb::Checkpoint<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let physical_hash_offset = { fb.create_vector(&self.physical_hash.to_bytes()) };
+        let mut builder = fb::CheckpointBuilder::new(fb);
+        builder.add_physical_hash(physical_hash_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::Checkpoint<'fb>> for odf::Checkpoint {
+    fn deserialize(proxy: fb::Checkpoint<'fb>) -> Self {
+        odf::Checkpoint {
+            physical_hash: proxy
+                .physical_hash()
                 .map(|v| odf::Multihash::from_bytes(v).unwrap())
                 .unwrap(),
         }
@@ -367,10 +407,17 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQuery {
             let offsets: Vec<_> = self.input_slices.iter().map(|i| i.serialize(fb)).collect();
             fb.create_vector(&offsets)
         };
+        let input_checkpoint_offset = self
+            .input_checkpoint
+            .as_ref()
+            .map(|v| fb.create_vector(&v.to_bytes()));
         let output_data_offset = self.output_data.as_ref().map(|v| v.serialize(fb));
+        let output_checkpoint_offset = self.output_checkpoint.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::ExecuteQueryBuilder::new(fb);
         builder.add_input_slices(input_slices_offset);
+        input_checkpoint_offset.map(|off| builder.add_input_checkpoint(off));
         output_data_offset.map(|off| builder.add_output_data(off));
+        output_checkpoint_offset.map(|off| builder.add_output_checkpoint(off));
         self.output_watermark
             .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
         builder.finish()
@@ -384,7 +431,13 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQuery<'fb>> for odf::ExecuteQuery
                 .input_slices()
                 .map(|v| v.iter().map(|i| odf::InputSlice::deserialize(i)).collect())
                 .unwrap(),
+            input_checkpoint: proxy
+                .input_checkpoint()
+                .map(|v| odf::Multihash::from_bytes(v).unwrap()),
             output_data: proxy.output_data().map(|v| odf::DataSlice::deserialize(v)),
+            output_checkpoint: proxy
+                .output_checkpoint()
+                .map(|v| odf::Checkpoint::deserialize(v)),
             output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
         }
     }
@@ -480,12 +533,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
             let offsets: Vec<_> = self.inputs.iter().map(|i| i.serialize(fb)).collect();
             fb.create_vector(&offsets)
         };
-        let prev_checkpoint_dir_offset = self
-            .prev_checkpoint_dir
+        let prev_checkpoint_path_offset = self
+            .prev_checkpoint_path
             .as_ref()
             .map(|v| fb.create_string(v.to_str().unwrap()));
-        let new_checkpoint_dir_offset =
-            { fb.create_string(self.new_checkpoint_dir.to_str().unwrap()) };
+        let new_checkpoint_path_offset =
+            { fb.create_string(self.new_checkpoint_path.to_str().unwrap()) };
         let out_data_path_offset = { fb.create_string(self.out_data_path.to_str().unwrap()) };
         let mut builder = fb::ExecuteQueryRequestBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
@@ -496,8 +549,8 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
         builder.add_transform_type(transform_offset.0);
         builder.add_transform(transform_offset.1);
         builder.add_inputs(inputs_offset);
-        prev_checkpoint_dir_offset.map(|off| builder.add_prev_checkpoint_dir(off));
-        builder.add_new_checkpoint_dir(new_checkpoint_dir_offset);
+        prev_checkpoint_path_offset.map(|off| builder.add_prev_checkpoint_path(off));
+        builder.add_new_checkpoint_path(new_checkpoint_path_offset);
         builder.add_out_data_path(out_data_path_offset);
         builder.finish()
     }
@@ -532,9 +585,9 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
                         .collect()
                 })
                 .unwrap(),
-            prev_checkpoint_dir: proxy.prev_checkpoint_dir().map(|v| PathBuf::from(v)),
-            new_checkpoint_dir: proxy
-                .new_checkpoint_dir()
+            prev_checkpoint_path: proxy.prev_checkpoint_path().map(|v| PathBuf::from(v)),
+            new_checkpoint_path: proxy
+                .new_checkpoint_path()
                 .map(|v| PathBuf::from(v))
                 .unwrap(),
             out_data_path: proxy.out_data_path().map(|v| PathBuf::from(v)).unwrap(),

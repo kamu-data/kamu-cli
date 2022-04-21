@@ -76,11 +76,13 @@ impl AsTypedBlock for MetadataBlock {
 
 pub struct MetadataEventDataStream {
     pub output_data: Option<DataSlice>,
+    pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
 pub struct MetadataEventDataStreamRef<'a> {
     pub output_data: Option<&'a DataSlice>,
+    pub output_checkpoint: Option<&'a Checkpoint>,
     pub output_watermark: Option<&'a DateTime<Utc>>,
 }
 
@@ -103,10 +105,14 @@ pub trait IntoDataStreamBlock {
 
 impl IntoDataStreamBlock for MetadataBlock {
     fn into_data_stream_block(self) -> Option<MetadataBlockDataStream> {
-        let (output_data, output_watermark) = match self.event {
-            MetadataEvent::AddData(e) => (Some(e.output_data), e.output_watermark),
-            MetadataEvent::ExecuteQuery(e) => (e.output_data, e.output_watermark),
-            MetadataEvent::SetWatermark(e) => (None, Some(e.output_watermark)),
+        let (output_data, output_checkpoint, output_watermark) = match self.event {
+            MetadataEvent::AddData(e) => {
+                (Some(e.output_data), e.output_checkpoint, e.output_watermark)
+            }
+            MetadataEvent::ExecuteQuery(e) => {
+                (e.output_data, e.output_checkpoint, e.output_watermark)
+            }
+            MetadataEvent::SetWatermark(e) => (None, None, Some(e.output_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
@@ -120,16 +126,25 @@ impl IntoDataStreamBlock for MetadataBlock {
             prev_block_hash: self.prev_block_hash,
             event: MetadataEventDataStream {
                 output_data,
+                output_checkpoint,
                 output_watermark,
             },
         })
     }
 
     fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>> {
-        let (output_data, output_watermark) = match &self.event {
-            MetadataEvent::AddData(e) => (Some(&e.output_data), e.output_watermark.as_ref()),
-            MetadataEvent::ExecuteQuery(e) => (e.output_data.as_ref(), e.output_watermark.as_ref()),
-            MetadataEvent::SetWatermark(e) => (None, Some(&e.output_watermark)),
+        let (output_data, output_checkpoint, output_watermark) = match &self.event {
+            MetadataEvent::AddData(e) => (
+                Some(&e.output_data),
+                e.output_checkpoint.as_ref(),
+                e.output_watermark.as_ref(),
+            ),
+            MetadataEvent::ExecuteQuery(e) => (
+                e.output_data.as_ref(),
+                e.output_checkpoint.as_ref(),
+                e.output_watermark.as_ref(),
+            ),
+            MetadataEvent::SetWatermark(e) => (None, None, Some(&e.output_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
@@ -143,6 +158,7 @@ impl IntoDataStreamBlock for MetadataBlock {
             prev_block_hash: self.prev_block_hash.as_ref(),
             event: MetadataEventDataStreamRef {
                 output_data,
+                output_checkpoint,
                 output_watermark,
             },
         })

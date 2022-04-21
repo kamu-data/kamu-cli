@@ -32,12 +32,23 @@ table DataSlice {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table Checkpoint {
+  physical_hash: [ubyte];
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AddData
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 table AddData {
+  input_checkpoint: [ubyte];
   output_data: DataSlice;
+  output_checkpoint: Checkpoint;
   output_watermark: Timestamp;
 }
 
@@ -102,7 +113,9 @@ table InputSlice {
 
 table ExecuteQuery {
   input_slices: [InputSlice];
+  input_checkpoint: [ubyte];
   output_data: DataSlice;
+  output_checkpoint: Checkpoint;
   output_watermark: Timestamp;
 }
 
@@ -467,8 +480,8 @@ table ExecuteQueryRequest {
   vocab: DatasetVocabulary;
   transform: Transform;
   inputs: [ExecuteQueryInput];
-  prev_checkpoint_dir: string;
-  new_checkpoint_dir: string;
+  prev_checkpoint_path: string;
+  new_checkpoint_path: string;
   out_data_path: string;
 }
 

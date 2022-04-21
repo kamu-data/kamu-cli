@@ -88,7 +88,7 @@ async fn test_verify_data_consistency() {
 
     write_record_batch_to_parquet(&data_path, &record_batch).unwrap();
     let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
-    let data_physical_hash = data_utils::get_parquet_physical_hash(&data_path).unwrap();
+    let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
 
     // "Commit" data
     let mut metadata_chain = dataset_reg
@@ -96,17 +96,25 @@ async fn test_verify_data_consistency() {
         .unwrap();
     let head = metadata_chain.append(
         MetadataFactory::metadata_block(AddData {
+            input_checkpoint: None,
             output_data: DataSlice {
                 logical_hash: data_logical_hash.clone(),
-                physical_hash: data_physical_hash,
+                physical_hash: data_physical_hash.clone(),
                 interval: OffsetInterval { start: 0, end: 0 },
             },
+            output_checkpoint: None,
             output_watermark: None,
         })
         .prev(&head)
         .build(),
     );
-    std::fs::rename(data_path, dataset_layout.data_dir.join(head.to_string())).unwrap();
+    std::fs::rename(
+        data_path,
+        dataset_layout
+            .data_dir
+            .join(data_physical_hash.to_multibase_string()),
+    )
+    .unwrap();
 
     assert_matches!(
         verification_svc
@@ -128,7 +136,9 @@ async fn test_verify_data_consistency() {
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
     write_record_batch_to_parquet(
-        &dataset_layout.data_dir.join(head.to_string()),
+        &dataset_layout
+            .data_dir
+            .join(data_physical_hash.to_multibase_string()),
         &record_batch,
     )
     .unwrap();

@@ -24,7 +24,9 @@ use std::path::PathBuf;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddData {
+    pub input_checkpoint: Option<Multihash>,
     pub output_data: DataSlice,
+    pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
@@ -63,6 +65,16 @@ pub struct AttachmentsEmbedded {
 pub struct BlockInterval {
     pub start: Multihash,
     pub end: Multihash,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Checkpoint
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Checkpoint {
+    pub physical_hash: Multihash,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,7 +149,9 @@ pub struct EventTimeSourceFromPath {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQuery {
     pub input_slices: Vec<InputSlice>,
+    pub input_checkpoint: Option<Multihash>,
     pub output_data: Option<DataSlice>,
+    pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
@@ -171,8 +185,8 @@ pub struct ExecuteQueryRequest {
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
     pub inputs: Vec<ExecuteQueryInput>,
-    pub prev_checkpoint_dir: Option<PathBuf>,
-    pub new_checkpoint_dir: PathBuf,
+    pub prev_checkpoint_path: Option<PathBuf>,
+    pub new_checkpoint_path: PathBuf,
     pub out_data_path: PathBuf,
 }
 
