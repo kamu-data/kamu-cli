@@ -66,36 +66,39 @@ impl PullServiceImpl {
         dataset_ref: &DatasetRefAny,
         visited: &mut HashMap<DatasetName, PullInfo>,
     ) -> Result<i32, (DatasetRefAny, PullError)> {
-        let (dataset_id, local_name, remote_name) = if let Some(id) = dataset_ref.id() {
-            if let Ok(local_hdl) = self.dataset_reg.resolve_dataset_ref(&id.as_local_ref()) {
+        let (dataset_id, local_name, remote_name) = match dataset_ref {
+            DatasetRefAny::ID(id) => {
+                match self.dataset_reg.resolve_dataset_ref(&id.as_local_ref()) {
+                    Ok(local_hdl) => {
+                        let remote_name = self
+                            .resolve_local_to_remote_alias(&local_hdl.as_local_ref())
+                            .map_err(|e| (dataset_ref.clone(), e))?;
+                        (Some(id.clone()), local_hdl.name, remote_name)
+                    }
+                    Err(_) => {
+                        // TODO: REMOTE ID
+                        unimplemented!("Pulling via remote ID is not yet supported")
+                    }
+                }
+            }
+            DatasetRefAny::Name(_) | DatasetRefAny::Handle(_) => {
+                let local_hdl = self
+                    .dataset_reg
+                    .resolve_dataset_ref(&dataset_ref.as_local_ref().unwrap())
+                    .map_err(|e| (dataset_ref.clone(), e.into()))?;
+
                 let remote_name = self
                     .resolve_local_to_remote_alias(&local_hdl.as_local_ref())
                     .map_err(|e| (dataset_ref.clone(), e))?;
-                (Some(id.clone()), local_hdl.name, remote_name)
-            } else {
-                // TODO: REMOTE ID
-                unimplemented!("Pulling via remote ID is not yet supported")
+
+                (Some(local_hdl.id), local_hdl.name, remote_name)
             }
-        } else if let Some(local_ref) = dataset_ref.as_local_ref() {
-            let local_hdl = self
-                .dataset_reg
-                .resolve_dataset_ref(&local_ref)
-                .map_err(|e| (dataset_ref.clone(), e.into()))?;
-
-            let remote_name = self
-                .resolve_local_to_remote_alias(&local_hdl.as_local_ref())
-                .map_err(|e| (dataset_ref.clone(), e))?;
-
-            (Some(local_hdl.id), local_hdl.name, remote_name)
-        } else {
-            let remote_name = match dataset_ref.as_remote_ref().unwrap() {
-                DatasetRefRemote::ID(_) => unreachable!(), // Covered above
-                DatasetRefRemote::RemoteName(name) => name,
-                DatasetRefRemote::RemoteHandle(hdl) => hdl.name,
-            };
-
-            let local_name = self.resolve_remote_name_to_local(&remote_name);
-            (None, local_name, Some(remote_name))
+            DatasetRefAny::RemoteName(name)
+            | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
+                let local_name = self.resolve_remote_name_to_local(&name);
+                (None, local_name, Some(name.clone()))
+            }
+            DatasetRefAny::Url(_) => unimplemented!("Pulling via URL is not yet supported"),
         };
 
         // Already visited?
@@ -302,18 +305,20 @@ impl PullService for PullServiceImpl {
                 if options.create_remote_aliases {
                     for ((remote_ref, local_name), res) in &sync_results {
                         if let Ok(SyncResult::Updated { old_head: None, .. }) = res {
-                            let remote_name = match &remote_ref {
-                                DatasetRefRemote::ID(_) => unimplemented!(
-                                    "Referring to remote datasets by ID is not yet supported"
-                                ),
-                                DatasetRefRemote::RemoteName(name) => name,
-                                DatasetRefRemote::RemoteHandle(h) => &h.name,
+                            match &remote_ref {
+                                DatasetRefRemote::RemoteName(name)
+                                | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle {
+                                    name,
+                                    ..
+                                }) => {
+                                    self.remote_alias_reg
+                                        .get_remote_aliases(&local_name.as_local_ref())
+                                        .unwrap()
+                                        .add(name, RemoteAliasKind::Pull)
+                                        .unwrap();
+                                }
+                                _ => {}
                             };
-                            self.remote_alias_reg
-                                .get_remote_aliases(&local_name.as_local_ref())
-                                .unwrap()
-                                .add(remote_name, RemoteAliasKind::Pull)
-                                .unwrap();
                         }
                     }
                 }
@@ -356,19 +361,16 @@ impl PullService for PullServiceImpl {
             .sync_from(remote_ref, local_name, options.sync_options, listener)
             .await;
 
-        // TODO: REMOTE ID
-        let remote_name = match remote_ref {
-            DatasetRefRemote::ID(_) => {
-                unimplemented!("Referring to remote datasets by ID is not yet supported")
-            }
-            DatasetRefRemote::RemoteName(name) => name,
-            DatasetRefRemote::RemoteHandle(hdl) => &hdl.name,
-        };
-
         if res.is_ok() && options.create_remote_aliases {
-            self.remote_alias_reg
-                .get_remote_aliases(&local_name.as_local_ref())?
-                .add(&remote_name, RemoteAliasKind::Pull)?;
+            match &remote_ref {
+                DatasetRefRemote::RemoteName(name)
+                | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
+                    self.remote_alias_reg
+                        .get_remote_aliases(&local_name.as_local_ref())?
+                        .add(name, RemoteAliasKind::Pull)?;
+                }
+                _ => {}
+            }
         }
 
         Self::result_into(res)
@@ -464,6 +466,7 @@ impl PullInfo {
             | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
                 Some(name) == self.remote_name.as_ref()
             }
+            DatasetRefAny::Url(_) => unimplemented!(),
         }
     }
 }

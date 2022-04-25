@@ -54,22 +54,46 @@ impl Grammar {
         }
     }
 
+    fn match_predicate(s: &str, pred: impl FnMut(&u8) -> bool) -> Option<(&str, &str)> {
+        let matched = s.bytes().take_while(pred).count();
+        if matched == 0 {
+            None
+        } else {
+            Some((&s[0..matched], &s[matched..]))
+        }
+    }
+
     #[allow(dead_code)]
     // Multibase = [a-zA-Z0-9+/=]+
     fn match_multibase(s: &str) -> Option<(&str, &str)> {
-        let chars = s
-            .bytes()
-            .take_while(|b| match b {
-                b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'+' | b'/' | b'=' => true,
-                _ => false,
-            })
-            .count();
+        Self::match_predicate(s, |b| match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'+' | b'/' | b'=' => true,
+            _ => false,
+        })
+    }
 
-        if chars == 0 {
-            None
-        } else {
-            Some((&s[0..chars], &s[chars..]))
-        }
+    fn match_scheme(s: &str) -> Option<(&str, &str)> {
+        let (h, t) = Self::match_predicate(s, |b| match b {
+            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => true,
+            _ => false,
+        })?;
+
+        let (hh, tt) = Self::match_zero_or_many(t, |s| {
+            let (_, t) = Self::match_char(s, '+')?;
+            let (h, tt) = Self::match_predicate(t, |b| match b {
+                b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => true,
+                _ => false,
+            })?;
+            Some((&s[0..h.len() + 1], tt))
+        })?;
+
+        Some((&s[0..h.len() + hh.len()], tt))
+    }
+
+    pub fn match_url(s: &str) -> Option<(&str, &str)> {
+        let (scheme, t) = Self::match_scheme(s)?;
+        let (_, _) = Self::match_str(t, "://")?;
+        Some((scheme, s))
     }
 
     #[allow(dead_code)]

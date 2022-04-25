@@ -52,6 +52,9 @@ impl SyncServiceImpl {
             }
             DatasetRefRemote::RemoteName(name) => name,
             DatasetRefRemote::RemoteHandle(hdl) => &hdl.name,
+            DatasetRefRemote::Url(_) => {
+                unimplemented!("Syncing remote dataset by Url is not yet supported")
+            }
         };
 
         let repo_name = remote_name.repository();

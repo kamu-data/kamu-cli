@@ -9,7 +9,55 @@
 
 use opendatafabric::*;
 
-use std::{assert_matches::assert_matches, convert::TryFrom};
+use std::sync::Arc;
+use std::{assert_matches::assert_matches, convert::TryFrom, str::FromStr};
+use url::Url;
+
+#[test]
+fn test_dataset_refs() {
+    assert_eq!(
+        DatasetRefAny::from_str("dataset").unwrap(),
+        DatasetRefAny::Name(DatasetName::new_unchecked("dataset"))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("repo/dataset").unwrap(),
+        DatasetRefAny::RemoteName(RemoteDatasetName::new(
+            RepositoryName::new_unchecked("repo"),
+            None,
+            DatasetName::new_unchecked("dataset")
+        ))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("repo/account/dataset").unwrap(),
+        DatasetRefAny::RemoteName(RemoteDatasetName::new(
+            RepositoryName::new_unchecked("repo"),
+            Some(AccountName::new_unchecked("account")),
+            DatasetName::new_unchecked("dataset")
+        ))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("did:odf:z4k88e8eonGq3xrTzEVyvb4s7Fy3orT7npgW4w3juneJLohqCRs")
+            .unwrap(),
+        DatasetRefAny::ID(DatasetID::from_pub_key_ed25519(b"key"))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("https://opendata.ca/odf/census-2016-population/").unwrap(),
+        DatasetRefAny::Url(Arc::new(
+            Url::from_str("https://opendata.ca/odf/census-2016-population/").unwrap()
+        ))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str(
+            "ipfs://bafkreie3hfshd4ikinnbio3kewo2hvj6doh5jp3p23iwk2evgo2un5g7km/"
+        )
+        .unwrap(),
+        DatasetRefAny::Url(Arc::new(
+            Url::from_str("ipfs://bafkreie3hfshd4ikinnbio3kewo2hvj6doh5jp3p23iwk2evgo2un5g7km/")
+                .unwrap()
+        ))
+    );
+    assert_matches!(DatasetRefAny::from_str("foo:bar"), Err(_));
+}
 
 #[test]
 fn test_dataset_name_newtype() {
@@ -126,7 +174,7 @@ fn test_dataset_name_with_owner_validation() {
 }
 
 #[test]
-fn test_dataset_refs() {
+fn test_dataset_refs_conversions() {
     fn takes_ref_local<R: Into<DatasetRefLocal>>(_: R) {}
     fn takes_ref_remote<R: Into<DatasetRefRemote>>(_: R) {}
     fn takes_ref_any<R: Into<DatasetRefAny>>(_: R) {}

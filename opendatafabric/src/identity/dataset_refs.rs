@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::fmt;
+use std::sync::Arc;
+use url::Url;
 
 use super::dataset_identity::*;
+use super::grammar::Grammar;
 use crate::formats::InvalidValue;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -134,6 +137,7 @@ pub enum DatasetRefRemote {
     ID(DatasetID),
     RemoteName(RemoteDatasetName),
     RemoteHandle(RemoteDatasetHandle),
+    Url(Arc<Url>),
 }
 
 impl std::str::FromStr for DatasetRefRemote {
@@ -144,9 +148,21 @@ impl std::str::FromStr for DatasetRefRemote {
             Ok(id) => Ok(id.into()),
             Err(_) => match RemoteDatasetName::from_str(s) {
                 Ok(name) => Ok(name.into()),
-                Err(_) => Err(Self::Err::new(s)),
+                Err(_) => match Grammar::match_url(s) {
+                    Some(_) => match Url::from_str(s) {
+                        Ok(url) => Ok(url.into()),
+                        Err(_) => Err(Self::Err::new(s)),
+                    },
+                    None => Err(Self::Err::new(s)),
+                },
             },
         }
+    }
+}
+
+impl From<Url> for DatasetRefRemote {
+    fn from(v: Url) -> Self {
+        Self::Url(Arc::new(v))
     }
 }
 
@@ -160,6 +176,7 @@ impl fmt::Display for DatasetRefRemote {
             DatasetRefRemote::ID(v) => write!(f, "{}", v),
             DatasetRefRemote::RemoteName(v) => write!(f, "{}", v),
             DatasetRefRemote::RemoteHandle(v) => write!(f, "{}", v),
+            DatasetRefRemote::Url(v) => write!(f, "{}", v),
         }
     }
 }
@@ -174,6 +191,7 @@ pub enum DatasetRefAny {
     Handle(DatasetHandle),
     RemoteName(RemoteDatasetName),
     RemoteHandle(RemoteDatasetHandle),
+    Url(Arc<Url>),
 }
 
 impl DatasetRefAny {
@@ -184,6 +202,7 @@ impl DatasetRefAny {
             DatasetRefAny::Handle(DatasetHandle { id, .. }) => Some(id),
             DatasetRefAny::RemoteName(_) => None,
             DatasetRefAny::RemoteHandle(RemoteDatasetHandle { id, .. }) => Some(id),
+            DatasetRefAny::Url(_) => None,
         }
     }
 
@@ -194,6 +213,7 @@ impl DatasetRefAny {
             DatasetRefAny::Handle(v) => Some(DatasetRefLocal::Handle(v.clone())),
             DatasetRefAny::RemoteName(_) => None,
             DatasetRefAny::RemoteHandle(_) => None,
+            DatasetRefAny::Url(_) => None,
         }
     }
 
@@ -204,6 +224,7 @@ impl DatasetRefAny {
             DatasetRefAny::Handle(_) => None,
             DatasetRefAny::RemoteName(v) => Some(DatasetRefRemote::RemoteName(v.clone())),
             DatasetRefAny::RemoteHandle(v) => Some(DatasetRefRemote::RemoteHandle(v.clone())),
+            DatasetRefAny::Url(v) => Some(DatasetRefRemote::Url(v.clone())),
         }
     }
 }
@@ -218,10 +239,22 @@ impl std::str::FromStr for DatasetRefAny {
                 Ok(name) => Ok(name.into()),
                 Err(_) => match RemoteDatasetName::from_str(s) {
                     Ok(name) => Ok(name.into()),
-                    Err(_) => Err(Self::Err::new(s)),
+                    Err(_) => match Grammar::match_url(s) {
+                        Some(_) => match Url::from_str(s) {
+                            Ok(url) => Ok(url.into()),
+                            Err(_) => Err(Self::Err::new(s)),
+                        },
+                        None => Err(Self::Err::new(s)),
+                    },
                 },
             },
         }
+    }
+}
+
+impl From<Url> for DatasetRefAny {
+    fn from(v: Url) -> Self {
+        Self::Url(Arc::new(v))
     }
 }
 
@@ -237,6 +270,7 @@ impl fmt::Display for DatasetRefAny {
             DatasetRefAny::Handle(v) => write!(f, "{}", v),
             DatasetRefAny::RemoteName(v) => write!(f, "{}", v),
             DatasetRefAny::RemoteHandle(v) => write!(f, "{}", v),
+            DatasetRefAny::Url(v) => write!(f, "{}", v),
         }
     }
 }
@@ -411,6 +445,7 @@ impl From<DatasetRefRemote> for DatasetRefAny {
             DatasetRefRemote::ID(v) => DatasetRefAny::ID(v),
             DatasetRefRemote::RemoteName(v) => DatasetRefAny::RemoteName(v),
             DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v),
+            DatasetRefRemote::Url(v) => DatasetRefAny::Url(v),
         }
     }
 }
@@ -421,6 +456,7 @@ impl From<&DatasetRefRemote> for DatasetRefAny {
             DatasetRefRemote::ID(v) => DatasetRefAny::ID(v.clone()),
             DatasetRefRemote::RemoteName(v) => DatasetRefAny::RemoteName(v.clone()),
             DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v.clone()),
+            DatasetRefRemote::Url(v) => DatasetRefAny::Url(v.clone()),
         }
     }
 }

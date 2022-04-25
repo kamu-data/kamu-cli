@@ -2540,6 +2540,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "unsigned-varint",
+ "url",
 ]
 
 [[package]]

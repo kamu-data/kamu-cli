@@ -79,6 +79,7 @@ impl PushServiceImpl {
                 DatasetRefRemote::ID(_) => unreachable!(),
                 DatasetRefRemote::RemoteName(name) => name,
                 DatasetRefRemote::RemoteHandle(hdl) => hdl.name,
+                DatasetRefRemote::Url(_) => unimplemented!("Push by URL is not yet supported"),
             };
 
             // TODO: avoid traversing all datasets for every alias

@@ -15,6 +15,7 @@ bs58 = "*"  # base58 codec
 digest = "*"
 sha3 = "*"
 unsigned-varint = "*"
+url = "*"
 
 # Crypto
 rand = "0.7"  # TODO: Pinned for ed25519-dalek compatibility
