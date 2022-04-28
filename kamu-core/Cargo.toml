@@ -43,10 +43,12 @@ sha3 = "*"
 # Repositories
 bytes = "*"
 futures = "*"
-tokio = { version = "*", features=["fs"]}
-tokio-util = { version = "*", features=["codec"]}
-rusoto_core = {version = "*", default_features = false, features=["rustls"]}
-rusoto_s3 = {version = "*", default_features = false, features=["rustls"]}
+async-stream = "*"
+tokio = { version = "*", features=["fs"] }
+tokio-stream = { version = "*" }
+tokio-util = { version = "*", features=["codec"] }
+rusoto_core = {version = "*", default_features = false, features=["rustls"] }
+rusoto_s3 = {version = "*", default_features = false, features=["rustls"] }
 
 # Utils
 async-trait = "*"
@@ -72,3 +74,11 @@ filetime = "*"
 env_logger = "*"
 test-log = { version = "*", features = ["trace"] }
 tracing-subscriber = { version = "*", features = ["env-filter"] }
+
+# Http file server
+http = "*"
+hyper = "*"
+tower = { version = "*" }
+tower-http = { version = "*", features = ["fs", "trace"] }
+axum = { version = "*" }
+reqwest = { version  = "*", features = ["rustls-tls", "gzip", "deflate"] }
