@@ -28,8 +28,8 @@ pub trait Dataset {
 
 #[derive(Clone, Debug)]
 pub struct CommitResult {
-    new_head: Multihash,
-    old_head: Multihash,
+    pub new_head: Multihash,
+    pub old_head: Multihash,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

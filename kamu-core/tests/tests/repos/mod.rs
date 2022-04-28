@@ -8,4 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_metadata_chain_impl;
+mod test_object_repository_http;
 mod test_object_repository_local_fs;
+mod test_reference_repository_http;
+mod test_reference_repository_local_fs;

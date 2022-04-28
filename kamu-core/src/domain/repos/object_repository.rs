@@ -10,6 +10,7 @@
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 
@@ -23,7 +24,7 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 pub trait ObjectRepository {
     async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError>;
 
-    async fn get_bytes(&self, hash: &Multihash) -> Result<Vec<u8>, GetError>;
+    async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError>;
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;
 

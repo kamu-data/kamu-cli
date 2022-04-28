@@ -13,7 +13,7 @@ use kamu::infra::utils::docker_images;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-// TODO: Consider replacing with in-process server for speed
+// TODO: Implement caching headers in `HttpFileServer` so we could get rid of this class
 pub struct HttpServer {
     container_runtime: ContainerRuntime,
     pub container_name: String,

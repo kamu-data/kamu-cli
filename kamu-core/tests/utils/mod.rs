@@ -13,5 +13,8 @@ pub use ftp_server::*;
 mod http_server;
 pub use http_server::*;
 
+mod http_file_server;
+pub use http_file_server::*;
+
 mod minio_server;
 pub use minio_server::*;

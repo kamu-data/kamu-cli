@@ -14,12 +14,16 @@ use opendatafabric::*;
 use std::assert_matches::assert_matches;
 
 #[tokio::test]
-async fn test_object_repo_lfs_insert_bytes() {
+async fn test_insert_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let hash_foo = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"foo");
-    let hash_bar = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"bar");
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
+    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+
+    assert!(!repo.contains(&hash_foo).await.unwrap());
+    assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)),);
+
     assert_eq!(
         repo.insert_bytes(b"foo", InsertOpts::default())
             .await
@@ -39,18 +43,25 @@ async fn test_object_repo_lfs_insert_bytes() {
         }
     );
 
-    assert_eq!(repo.get_bytes(&hash_foo).await.unwrap(), b"foo");
-    assert_eq!(repo.get_bytes(&hash_bar).await.unwrap(), b"bar");
+    assert!(repo.contains(&hash_foo).await.unwrap());
+    assert!(repo.contains(&hash_bar).await.unwrap());
+    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
+    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"bar");
 }
 
 #[tokio::test]
-async fn test_object_repo_lfs_insert_stream() {
+async fn test_insert_stream() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let hash_foobar = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"foobar");
+    let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
-    let mut cursor = std::io::Cursor::new(b"foobar");
 
+    assert_matches!(
+        repo.get_stream(&hash_foobar).await.err().unwrap(),
+        GetError::NotFound(_),
+    );
+
+    let mut cursor = std::io::Cursor::new(b"foobar");
     assert_eq!(
         repo.insert_stream(&mut cursor, InsertOpts::default())
             .await
@@ -61,13 +72,18 @@ async fn test_object_repo_lfs_insert_stream() {
         }
     );
 
-    assert_eq!(repo.get_bytes(&hash_foobar).await.unwrap(), b"foobar");
+    use tokio::io::AsyncReadExt;
+    let mut stream = repo.get_stream(&hash_foobar).await.unwrap();
+    let mut data = Vec::new();
+    stream.read_to_end(&mut data).await.unwrap();
+
+    assert_eq!(data, b"foobar");
 }
 
 #[tokio::test]
-async fn test_object_repo_lfs_delete() {
+async fn test_delete() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let hash_foo = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"foo");
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     assert_eq!(
@@ -80,7 +96,7 @@ async fn test_object_repo_lfs_delete() {
         }
     );
 
-    assert_eq!(repo.get_bytes(&hash_foo).await.unwrap(), b"foo");
+    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
 
     assert_eq!(
         repo.insert_bytes(b"foo", InsertOpts::default())
@@ -92,7 +108,7 @@ async fn test_object_repo_lfs_delete() {
         }
     );
 
-    assert_eq!(repo.get_bytes(&hash_foo).await.unwrap(), b"foo");
+    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
 
     repo.delete(&hash_foo).await.unwrap();
 
@@ -103,10 +119,10 @@ async fn test_object_repo_lfs_delete() {
 }
 
 #[tokio::test]
-async fn test_object_repo_lfs_insert_precomputed() {
+async fn test_insert_precomputed() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let hash_foo = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"foo");
-    let hash_bar = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"bar");
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
+    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
 
@@ -125,15 +141,15 @@ async fn test_object_repo_lfs_insert_precomputed() {
             already_existed: false
         }
     );
-    assert_eq!(repo.get_bytes(&hash_bar).await.unwrap(), b"foo");
+    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"foo");
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)));
 }
 
 #[tokio::test]
-async fn test_object_repo_lfs_insert_expect() {
+async fn test_insert_expect() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let hash_foo = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"foo");
-    let hash_bar = Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, b"bar");
+    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
+    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
 
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
 
@@ -152,7 +168,7 @@ async fn test_object_repo_lfs_insert_expect() {
             already_existed: false
         }
     );
-    assert_eq!(repo.get_bytes(&hash_foo).await.unwrap(), b"foo");
+    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
 
     assert_matches!(
         repo.insert_bytes(

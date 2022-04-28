@@ -12,6 +12,7 @@ use crate::domain::*;
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use std::{
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -99,7 +100,7 @@ where
         Ok(path.exists())
     }
 
-    async fn get_bytes(&self, hash: &Multihash) -> Result<Vec<u8>, GetError> {
+    async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let path = self.get_path(hash);
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
@@ -109,7 +110,8 @@ where
         let data = tokio::fs::read(path)
             .await
             .map_err(|e| GetError::Internal(e.into()))?;
-        Ok(data)
+
+        Ok(Bytes::from(data))
     }
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
@@ -220,14 +222,6 @@ where
             already_existed: false,
         })
     }
-
-    // async fn insert_file(
-    //     &self,
-    //     file: &Path,
-    //     options: InsertOpts,
-    // ) -> Result<Multihash, InsertError> {
-    //     todo!()
-    // }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), InternalError> {
         let path = self.get_path(hash);

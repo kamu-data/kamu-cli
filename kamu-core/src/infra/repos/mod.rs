@@ -10,8 +10,14 @@
 mod object_repository_local_fs;
 pub use object_repository_local_fs::*;
 
+mod object_repository_http;
+pub use object_repository_http::*;
+
 mod reference_repository_local_fs;
 pub use reference_repository_local_fs::*;
+
+mod reference_repository_http;
+pub use reference_repository_http::*;
 
 mod metadata_chain_impl;
 pub use metadata_chain_impl::*;
