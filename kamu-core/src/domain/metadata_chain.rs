@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::repos::metadata_chain::BlockRef;
 use opendatafabric::{MetadataBlock, Multihash};
 
-#[derive(Debug)]
-pub enum BlockRef {
-    Head,
-}
+/////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Error handling
 // TODO: Separate mutable and immutable traits

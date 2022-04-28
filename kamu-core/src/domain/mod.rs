@@ -17,6 +17,9 @@ pub use error::*;
 
 // Repositories
 
+pub mod repos;
+pub use repos::*;
+
 mod dataset_registry;
 pub use dataset_registry::*;
 
