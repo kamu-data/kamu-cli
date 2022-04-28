@@ -10,6 +10,9 @@
 mod engine;
 pub use engine::*;
 
+mod repos;
+pub use repos::*;
+
 mod repository;
 pub use repository::*;
 

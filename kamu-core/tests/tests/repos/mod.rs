@@ -7,16 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod engine;
-mod ingest;
-mod repos;
-mod test_dataset_registry_impl;
 mod test_metadata_chain_impl;
-mod test_pull_service_impl;
-mod test_resource_loader_impl;
-mod test_schema_utils;
-mod test_search_service_impl;
-mod test_serde_yaml;
-mod test_sync_service_impl;
-mod test_transform_service_impl;
-mod test_verification_service_impl;
+mod test_object_repository_local_fs;
