@@ -11,85 +11,10 @@ use std::fmt;
 use std::sync::Arc;
 use url::Url;
 
+use super::dataset_handles::*;
 use super::dataset_identity::*;
 use super::grammar::Grammar;
 use crate::formats::InvalidValue;
-
-////////////////////////////////////////////////////////////////////////////////
-
-/// A resolved handle to the local dataset
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct DatasetHandle {
-    pub id: DatasetID,
-    pub name: DatasetName,
-}
-
-impl DatasetHandle {
-    pub fn new(id: DatasetID, name: DatasetName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn as_local_ref(&self) -> DatasetRefLocal {
-        DatasetRefLocal::Handle(self.clone())
-    }
-
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::Handle(self.clone())
-    }
-}
-
-impl fmt::Display for DatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
-    }
-}
-
-impl fmt::Debug for DatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("DatasetHandle")
-            .field(&self.id)
-            .field(&self.name)
-            .finish()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-/// A resolved handle to the remote dataset
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RemoteDatasetHandle {
-    pub id: DatasetID,
-    pub name: RemoteDatasetName,
-}
-
-impl RemoteDatasetHandle {
-    pub fn new(id: DatasetID, name: RemoteDatasetName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn as_remote_ref(&self) -> DatasetRefRemote {
-        DatasetRefRemote::RemoteHandle(self.clone())
-    }
-
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::RemoteHandle(self.clone())
-    }
-}
-
-impl fmt::Display for RemoteDatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
-    }
-}
-
-impl fmt::Debug for RemoteDatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("RemoteDatasetHandle")
-            .field(&self.id)
-            .field(&self.name)
-            .finish()
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -99,6 +24,63 @@ pub enum DatasetRefLocal {
     ID(DatasetID),
     Name(DatasetName),
     Handle(DatasetHandle),
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// References remote dataset by ID or by qualified name
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DatasetRefRemote {
+    ID(DatasetID),
+    RemoteName(RemoteDatasetName),
+    RemoteHandle(RemoteDatasetHandle),
+    Url(Arc<Url>),
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// References any dataset, local or remote
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum DatasetRefAny {
+    ID(DatasetID),
+    Name(DatasetName),
+    Handle(DatasetHandle),
+    RemoteName(RemoteDatasetName),
+    RemoteHandle(RemoteDatasetHandle),
+    Url(Arc<Url>),
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+/// References a dataset located inside a repository
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum RepoDatasetRef {
+    ID(DatasetID),
+    Name(DatasetNameWithOwner),
+    Url(Arc<Url>),
+    Handle(RepoDatasetHandle),
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetRefLocal
+////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetRefLocal {
+    pub fn id(&self) -> Option<&DatasetID> {
+        match self {
+            DatasetRefLocal::ID(id) => Some(id),
+            DatasetRefLocal::Name(_) => None,
+            DatasetRefLocal::Handle(DatasetHandle { id, .. }) => Some(id),
+        }
+    }
+
+    pub fn name(&self) -> Option<&DatasetName> {
+        match self {
+            DatasetRefLocal::ID(_) => None,
+            DatasetRefLocal::Name(name) => Some(name),
+            DatasetRefLocal::Handle(DatasetHandle { name, .. }) => Some(name),
+        }
+    }
 }
 
 impl std::str::FromStr for DatasetRefLocal {
@@ -129,15 +111,64 @@ impl fmt::Display for DatasetRefLocal {
     }
 }
 
+impl From<DatasetID> for DatasetRefLocal {
+    fn from(v: DatasetID) -> Self {
+        Self::ID(v.clone())
+    }
+}
+
+impl From<&DatasetID> for DatasetRefLocal {
+    fn from(v: &DatasetID) -> Self {
+        Self::ID(v.clone())
+    }
+}
+
+impl From<DatasetName> for DatasetRefLocal {
+    fn from(v: DatasetName) -> Self {
+        Self::Name(v)
+    }
+}
+
+impl From<&DatasetName> for DatasetRefLocal {
+    fn from(v: &DatasetName) -> Self {
+        Self::Name(v.clone())
+    }
+}
+
+impl From<DatasetHandle> for DatasetRefLocal {
+    fn from(v: DatasetHandle) -> Self {
+        Self::Handle(v)
+    }
+}
+
+impl From<&DatasetHandle> for DatasetRefLocal {
+    fn from(v: &DatasetHandle) -> Self {
+        Self::Handle(v.clone())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetRefRemote
 ////////////////////////////////////////////////////////////////////////////////
 
-/// References remote dataset by ID or by qualified name
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DatasetRefRemote {
-    ID(DatasetID),
-    RemoteName(RemoteDatasetName),
-    RemoteHandle(RemoteDatasetHandle),
-    Url(Arc<Url>),
+impl DatasetRefRemote {
+    pub fn id(&self) -> Option<&DatasetID> {
+        match self {
+            DatasetRefRemote::ID(id) => Some(id),
+            DatasetRefRemote::RemoteName(_) => None,
+            DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { id, .. }) => Some(id),
+            DatasetRefRemote::Url(_) => None,
+        }
+    }
+
+    pub fn name(&self) -> Option<&RemoteDatasetName> {
+        match self {
+            DatasetRefRemote::ID(_) => None,
+            DatasetRefRemote::RemoteName(name) => Some(name),
+            DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => Some(name),
+            DatasetRefRemote::Url(_) => None,
+        }
+    }
 }
 
 impl std::str::FromStr for DatasetRefRemote {
@@ -160,12 +191,6 @@ impl std::str::FromStr for DatasetRefRemote {
     }
 }
 
-impl From<Url> for DatasetRefRemote {
-    fn from(v: Url) -> Self {
-        Self::Url(Arc::new(v))
-    }
-}
-
 super::dataset_identity::impl_try_from_str!(DatasetRefRemote);
 
 crate::formats::impl_invalid_value!(DatasetRefRemote);
@@ -181,18 +206,51 @@ impl fmt::Display for DatasetRefRemote {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
-/// References any dataset, local or remote
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DatasetRefAny {
-    ID(DatasetID),
-    Name(DatasetName),
-    Handle(DatasetHandle),
-    RemoteName(RemoteDatasetName),
-    RemoteHandle(RemoteDatasetHandle),
-    Url(Arc<Url>),
+impl From<DatasetID> for DatasetRefRemote {
+    fn from(v: DatasetID) -> Self {
+        Self::ID(v)
+    }
 }
+
+impl From<&DatasetID> for DatasetRefRemote {
+    fn from(v: &DatasetID) -> Self {
+        Self::ID(v.clone())
+    }
+}
+
+impl From<RemoteDatasetName> for DatasetRefRemote {
+    fn from(v: RemoteDatasetName) -> Self {
+        Self::RemoteName(v)
+    }
+}
+
+impl From<&RemoteDatasetName> for DatasetRefRemote {
+    fn from(v: &RemoteDatasetName) -> Self {
+        Self::RemoteName(v.clone())
+    }
+}
+
+impl From<RemoteDatasetHandle> for DatasetRefRemote {
+    fn from(v: RemoteDatasetHandle) -> Self {
+        Self::RemoteHandle(v)
+    }
+}
+
+impl From<&RemoteDatasetHandle> for DatasetRefRemote {
+    fn from(v: &RemoteDatasetHandle) -> Self {
+        Self::RemoteHandle(v.clone())
+    }
+}
+
+impl From<Url> for DatasetRefRemote {
+    fn from(v: Url) -> Self {
+        Self::Url(Arc::new(v))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetRefAny
+////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRefAny {
     pub fn id(&self) -> Option<&DatasetID> {
@@ -252,12 +310,6 @@ impl std::str::FromStr for DatasetRefAny {
     }
 }
 
-impl From<Url> for DatasetRefAny {
-    fn from(v: Url) -> Self {
-        Self::Url(Arc::new(v))
-    }
-}
-
 super::dataset_identity::impl_try_from_str!(DatasetRefAny);
 
 crate::formats::impl_invalid_value!(DatasetRefAny);
@@ -275,93 +327,9 @@ impl fmt::Display for DatasetRefAny {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DatasetRefLocal
-////////////////////////////////////////////////////////////////////////////////
-
-impl From<DatasetID> for DatasetRefLocal {
-    fn from(v: DatasetID) -> Self {
-        Self::ID(v.clone())
-    }
-}
-
-impl From<&DatasetID> for DatasetRefLocal {
-    fn from(v: &DatasetID) -> Self {
-        Self::ID(v.clone())
-    }
-}
-
-impl From<DatasetName> for DatasetRefLocal {
-    fn from(v: DatasetName) -> Self {
-        Self::Name(v)
-    }
-}
-
-impl From<&DatasetName> for DatasetRefLocal {
-    fn from(v: &DatasetName) -> Self {
-        Self::Name(v.clone())
-    }
-}
-
-impl From<DatasetHandle> for DatasetRefLocal {
-    fn from(v: DatasetHandle) -> Self {
-        Self::Handle(v)
-    }
-}
-
-impl From<&DatasetHandle> for DatasetRefLocal {
-    fn from(v: &DatasetHandle) -> Self {
-        Self::Handle(v.clone())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DatasetRefRemote
-////////////////////////////////////////////////////////////////////////////////
-
-impl From<DatasetID> for DatasetRefRemote {
-    fn from(v: DatasetID) -> Self {
-        Self::ID(v)
-    }
-}
-
-impl From<&DatasetID> for DatasetRefRemote {
-    fn from(v: &DatasetID) -> Self {
-        Self::ID(v.clone())
-    }
-}
-
-impl From<RemoteDatasetName> for DatasetRefRemote {
-    fn from(v: RemoteDatasetName) -> Self {
-        Self::RemoteName(v)
-    }
-}
-
-impl From<&RemoteDatasetName> for DatasetRefRemote {
-    fn from(v: &RemoteDatasetName) -> Self {
-        Self::RemoteName(v.clone())
-    }
-}
-
-impl From<RemoteDatasetHandle> for DatasetRefRemote {
-    fn from(v: RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v)
-    }
-}
-
-impl From<&RemoteDatasetHandle> for DatasetRefRemote {
-    fn from(v: &RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v.clone())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DatasetRefAny
-////////////////////////////////////////////////////////////////////////////////
-
 impl From<DatasetID> for DatasetRefAny {
     fn from(v: DatasetID) -> Self {
-        Self::ID(v.clone())
+        Self::ID(v)
     }
 }
 
@@ -458,5 +426,112 @@ impl From<&DatasetRefRemote> for DatasetRefAny {
             DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v.clone()),
             DatasetRefRemote::Url(v) => DatasetRefAny::Url(v.clone()),
         }
+    }
+}
+
+impl From<Url> for DatasetRefAny {
+    fn from(v: Url) -> Self {
+        Self::Url(Arc::new(v))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RepoDatasetRef
+////////////////////////////////////////////////////////////////////////////////
+
+impl RepoDatasetRef {
+    pub fn id(&self) -> Option<&DatasetID> {
+        match self {
+            RepoDatasetRef::ID(id) => Some(id),
+            RepoDatasetRef::Name(_) => None,
+            RepoDatasetRef::Handle(RepoDatasetHandle { id, .. }) => Some(id),
+            RepoDatasetRef::Url(_) => None,
+        }
+    }
+
+    pub fn name(&self) -> Option<&DatasetNameWithOwner> {
+        match self {
+            RepoDatasetRef::ID(_) => None,
+            RepoDatasetRef::Name(name) => Some(name),
+            RepoDatasetRef::Handle(RepoDatasetHandle { name, .. }) => Some(name),
+            RepoDatasetRef::Url(_) => None,
+        }
+    }
+}
+
+impl std::str::FromStr for RepoDatasetRef {
+    type Err = InvalidValue<RepoDatasetRef>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match DatasetID::from_str(s) {
+            Ok(id) => Ok(id.into()),
+            Err(_) => match DatasetNameWithOwner::from_str(s) {
+                Ok(name) => Ok(name.into()),
+                Err(_) => match Grammar::match_url(s) {
+                    Some(_) => match Url::from_str(s) {
+                        Ok(url) => Ok(url.into()),
+                        Err(_) => Err(Self::Err::new(s)),
+                    },
+                    None => Err(Self::Err::new(s)),
+                },
+            },
+        }
+    }
+}
+
+super::dataset_identity::impl_try_from_str!(RepoDatasetRef);
+
+crate::formats::impl_invalid_value!(RepoDatasetRef);
+
+impl fmt::Display for RepoDatasetRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RepoDatasetRef::ID(v) => write!(f, "{}", v),
+            RepoDatasetRef::Name(v) => write!(f, "{}", v),
+            RepoDatasetRef::Handle(v) => write!(f, "{}", v),
+            RepoDatasetRef::Url(v) => write!(f, "{}", v),
+        }
+    }
+}
+
+impl From<DatasetID> for RepoDatasetRef {
+    fn from(v: DatasetID) -> Self {
+        Self::ID(v)
+    }
+}
+
+impl From<&DatasetID> for RepoDatasetRef {
+    fn from(v: &DatasetID) -> Self {
+        Self::ID(v.clone())
+    }
+}
+
+impl From<DatasetNameWithOwner> for RepoDatasetRef {
+    fn from(v: DatasetNameWithOwner) -> Self {
+        Self::Name(v)
+    }
+}
+
+impl From<&DatasetNameWithOwner> for RepoDatasetRef {
+    fn from(v: &DatasetNameWithOwner) -> Self {
+        Self::Name(v.clone())
+    }
+}
+
+impl From<RepoDatasetHandle> for RepoDatasetRef {
+    fn from(v: RepoDatasetHandle) -> Self {
+        Self::Handle(v)
+    }
+}
+
+impl From<&RepoDatasetHandle> for RepoDatasetRef {
+    fn from(v: &RepoDatasetHandle) -> Self {
+        Self::Handle(v.clone())
+    }
+}
+
+impl From<Url> for RepoDatasetRef {
+    fn from(v: Url) -> Self {
+        Self::Url(Arc::new(v))
     }
 }

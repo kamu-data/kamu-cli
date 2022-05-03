@@ -219,6 +219,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::Checkpoint {
         let physical_hash_offset = { fb.create_vector(&self.physical_hash.to_bytes()) };
         let mut builder = fb::CheckpointBuilder::new(fb);
         builder.add_physical_hash(physical_hash_offset);
+        builder.add_size_(self.size);
         builder.finish()
     }
 }
@@ -230,6 +231,7 @@ impl<'fb> FlatbuffersDeserializable<fb::Checkpoint<'fb>> for odf::Checkpoint {
                 .physical_hash()
                 .map(|v| odf::Multihash::from_bytes(v).unwrap())
                 .unwrap(),
+            size: proxy.size_(),
         }
     }
 }
@@ -250,6 +252,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSlice {
         builder.add_logical_hash(logical_hash_offset);
         builder.add_physical_hash(physical_hash_offset);
         builder.add_interval(interval_offset);
+        builder.add_size_(self.size);
         builder.finish()
     }
 }
@@ -269,6 +272,7 @@ impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
                 .interval()
                 .map(|v| odf::OffsetInterval::deserialize(v))
                 .unwrap(),
+            size: proxy.size_(),
         }
     }
 }

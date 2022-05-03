@@ -190,7 +190,7 @@ macro_rules! newtype_str {
 /// Unique identifier of the dataset
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DatasetID {
-    cid: CID,
+    pub cid: CID,
 }
 
 impl DatasetID {

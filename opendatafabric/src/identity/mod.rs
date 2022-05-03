@@ -13,4 +13,7 @@ pub use dataset_identity::*;
 mod dataset_refs;
 pub use dataset_refs::*;
 
+mod dataset_handles;
+pub use dataset_handles::*;
+
 mod grammar;

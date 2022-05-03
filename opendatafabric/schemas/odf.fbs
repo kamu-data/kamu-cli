@@ -29,6 +29,7 @@ table DataSlice {
   logical_hash: [ubyte];
   physical_hash: [ubyte];
   interval: OffsetInterval;
+  size: int64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +39,7 @@ table DataSlice {
 
 table Checkpoint {
   physical_hash: [ubyte];
+  size: int64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

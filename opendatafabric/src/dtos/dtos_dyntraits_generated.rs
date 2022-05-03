@@ -167,11 +167,15 @@ impl Into<dtos::BlockInterval> for &dyn BlockInterval {
 
 pub trait Checkpoint {
     fn physical_hash(&self) -> &Multihash;
+    fn size(&self) -> i64;
 }
 
 impl Checkpoint for dtos::Checkpoint {
     fn physical_hash(&self) -> &Multihash {
         &self.physical_hash
+    }
+    fn size(&self) -> i64 {
+        self.size
     }
 }
 
@@ -179,6 +183,7 @@ impl Into<dtos::Checkpoint> for &dyn Checkpoint {
     fn into(self) -> dtos::Checkpoint {
         dtos::Checkpoint {
             physical_hash: self.physical_hash().clone(),
+            size: self.size(),
         }
     }
 }
@@ -192,6 +197,7 @@ pub trait DataSlice {
     fn logical_hash(&self) -> &Multihash;
     fn physical_hash(&self) -> &Multihash;
     fn interval(&self) -> &dyn OffsetInterval;
+    fn size(&self) -> i64;
 }
 
 impl DataSlice for dtos::DataSlice {
@@ -204,6 +210,9 @@ impl DataSlice for dtos::DataSlice {
     fn interval(&self) -> &dyn OffsetInterval {
         &self.interval
     }
+    fn size(&self) -> i64 {
+        self.size
+    }
 }
 
 impl Into<dtos::DataSlice> for &dyn DataSlice {
@@ -212,6 +221,7 @@ impl Into<dtos::DataSlice> for &dyn DataSlice {
             logical_hash: self.logical_hash().clone(),
             physical_hash: self.physical_hash().clone(),
             interval: self.interval().into(),
+            size: self.size(),
         }
     }
 }

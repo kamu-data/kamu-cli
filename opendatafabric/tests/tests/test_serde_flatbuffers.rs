@@ -100,6 +100,7 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                     interval: OffsetInterval { start: 10, end: 20 },
+                    size: 10,
                 }),
                 output_checkpoint: None,
                 output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
@@ -166,7 +167,7 @@ fn serializer_hashes_are_stable_root() {
 fn serializer_hashes_are_stable_deriv() {
     let expected_hashes = vec![
         "a99f2128da758d9bb08395438ab8b4aec6acc53bee0dd8b1965443d5aa1e1fc7",
-        "44668be7c6d8c4eed253d8b38c228452dfde2ad80b39256c5a6a40943ed1511d",
+        "ed0ea782486888d336d69973c8a6209aae7ddcb88e3782f8e76acd2d1d4afc9d",
     ];
 
     for (block, expected_hash) in get_block_deriv().iter().zip(expected_hashes) {

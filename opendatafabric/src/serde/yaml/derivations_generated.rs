@@ -154,6 +154,7 @@ implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CheckpointDef {
     pub physical_hash: Multihash,
+    pub size: i64,
 }
 
 implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
@@ -173,6 +174,7 @@ pub struct DataSliceDef {
     pub physical_hash: Multihash,
     #[serde_as(as = "OffsetIntervalDef")]
     pub interval: OffsetInterval,
+    pub size: i64,
 }
 
 implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");

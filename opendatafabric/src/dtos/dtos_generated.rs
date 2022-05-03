@@ -75,6 +75,7 @@ pub struct BlockInterval {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Checkpoint {
     pub physical_hash: Multihash,
+    pub size: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -87,6 +88,7 @@ pub struct DataSlice {
     pub logical_hash: Multihash,
     pub physical_hash: Multihash,
     pub interval: OffsetInterval,
+    pub size: i64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

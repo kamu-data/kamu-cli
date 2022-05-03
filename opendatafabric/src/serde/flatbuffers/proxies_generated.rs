@@ -1658,6 +1658,7 @@ impl<'a> DataSlice<'a> {
     pub const VT_LOGICAL_HASH: flatbuffers::VOffsetT = 4;
     pub const VT_PHYSICAL_HASH: flatbuffers::VOffsetT = 6;
     pub const VT_INTERVAL: flatbuffers::VOffsetT = 8;
+    pub const VT_SIZE_: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -1669,6 +1670,7 @@ impl<'a> DataSlice<'a> {
         args: &'args DataSliceArgs<'args>,
     ) -> flatbuffers::WIPOffset<DataSlice<'bldr>> {
         let mut builder = DataSliceBuilder::new(_fbb);
+        builder.add_size_(args.size_);
         if let Some(x) = args.interval {
             builder.add_interval(x);
         }
@@ -1704,6 +1706,10 @@ impl<'a> DataSlice<'a> {
         self._tab
             .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(DataSlice::VT_INTERVAL, None)
     }
+    #[inline]
+    pub fn size_(&self) -> i64 {
+        self._tab.get::<i64>(DataSlice::VT_SIZE_, Some(0)).unwrap()
+    }
 }
 
 impl flatbuffers::Verifiable for DataSlice<'_> {
@@ -1729,6 +1735,7 @@ impl flatbuffers::Verifiable for DataSlice<'_> {
                 Self::VT_INTERVAL,
                 false,
             )?
+            .visit_field::<i64>("size_", Self::VT_SIZE_, false)?
             .finish();
         Ok(())
     }
@@ -1737,6 +1744,7 @@ pub struct DataSliceArgs<'a> {
     pub logical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub physical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+    pub size_: i64,
 }
 impl<'a> Default for DataSliceArgs<'a> {
     #[inline]
@@ -1745,6 +1753,7 @@ impl<'a> Default for DataSliceArgs<'a> {
             logical_hash: None,
             physical_hash: None,
             interval: None,
+            size_: 0,
         }
     }
 }
@@ -1782,6 +1791,10 @@ impl<'a: 'b, 'b> DataSliceBuilder<'a, 'b> {
             );
     }
     #[inline]
+    pub fn add_size_(&mut self, size_: i64) {
+        self.fbb_.push_slot::<i64>(DataSlice::VT_SIZE_, size_, 0);
+    }
+    #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> DataSliceBuilder<'a, 'b> {
         let start = _fbb.start_table();
         DataSliceBuilder {
@@ -1802,6 +1815,7 @@ impl std::fmt::Debug for DataSlice<'_> {
         ds.field("logical_hash", &self.logical_hash());
         ds.field("physical_hash", &self.physical_hash());
         ds.field("interval", &self.interval());
+        ds.field("size_", &self.size_());
         ds.finish()
     }
 }
@@ -1826,6 +1840,7 @@ impl<'a> flatbuffers::Follow<'a> for Checkpoint<'a> {
 
 impl<'a> Checkpoint<'a> {
     pub const VT_PHYSICAL_HASH: flatbuffers::VOffsetT = 4;
+    pub const VT_SIZE_: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -1837,6 +1852,7 @@ impl<'a> Checkpoint<'a> {
         args: &'args CheckpointArgs<'args>,
     ) -> flatbuffers::WIPOffset<Checkpoint<'bldr>> {
         let mut builder = CheckpointBuilder::new(_fbb);
+        builder.add_size_(args.size_);
         if let Some(x) = args.physical_hash {
             builder.add_physical_hash(x);
         }
@@ -1851,6 +1867,10 @@ impl<'a> Checkpoint<'a> {
                 None,
             )
             .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn size_(&self) -> i64 {
+        self._tab.get::<i64>(Checkpoint::VT_SIZE_, Some(0)).unwrap()
     }
 }
 
@@ -1867,18 +1887,21 @@ impl flatbuffers::Verifiable for Checkpoint<'_> {
                 Self::VT_PHYSICAL_HASH,
                 false,
             )?
+            .visit_field::<i64>("size_", Self::VT_SIZE_, false)?
             .finish();
         Ok(())
     }
 }
 pub struct CheckpointArgs<'a> {
     pub physical_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub size_: i64,
 }
 impl<'a> Default for CheckpointArgs<'a> {
     #[inline]
     fn default() -> Self {
         CheckpointArgs {
             physical_hash: None,
+            size_: 0,
         }
     }
 }
@@ -1896,6 +1919,10 @@ impl<'a: 'b, 'b> CheckpointBuilder<'a, 'b> {
             Checkpoint::VT_PHYSICAL_HASH,
             physical_hash,
         );
+    }
+    #[inline]
+    pub fn add_size_(&mut self, size_: i64) {
+        self.fbb_.push_slot::<i64>(Checkpoint::VT_SIZE_, size_, 0);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> CheckpointBuilder<'a, 'b> {
@@ -1916,6 +1943,7 @@ impl std::fmt::Debug for Checkpoint<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("Checkpoint");
         ds.field("physical_hash", &self.physical_hash());
+        ds.field("size_", &self.size_());
         ds.finish()
     }
 }

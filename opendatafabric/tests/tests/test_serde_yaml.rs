@@ -201,6 +201,7 @@ fn serde_metadata_block() {
               interval:
                 start: 10
                 end: 20
+              size: 10
             outputWatermark: \"2020-01-01T12:00:00Z\"\n"
     );
 
@@ -231,6 +232,7 @@ fn serde_metadata_block() {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                 interval: OffsetInterval { start: 10, end: 20 },
+                size: 10,
             }),
             output_checkpoint: None,
             output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
