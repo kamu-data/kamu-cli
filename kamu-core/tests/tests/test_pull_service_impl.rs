@@ -112,14 +112,16 @@ fn create_graph(repo: &DatasetRegistryImpl, datasets: Vec<(DatasetName, Vec<Data
 }
 
 // TODO: Rewrite this abomination
-fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
-    let repo_factory = RepositoryFactoryFS::new(repo_path);
-
+async fn create_graph_in_repository(
+    repo_path: &Path,
+    datasets: Vec<(DatasetName, Vec<DatasetName>)>,
+) {
     for (dataset_name, deps) in &datasets {
-        let ds_builder = repo_factory.new_dataset().name(dataset_name);
+        let ds = DatasetRepoFactory::create_local_fs(repo_path.join(&dataset_name)).unwrap();
+        let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {
-            ds_builder
+            let head = chain
                 .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::seed(DatasetKind::Root)
@@ -127,13 +129,21 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
                             .build(),
                     )
                     .build(),
+                    AppendOpts::default(),
                 )
+                .await
+                .unwrap();
+            chain
                 .append(
                     MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
+                        .prev(&head)
                         .build(),
-                );
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
         } else {
-            ds_builder
+            let head = chain
                 .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::seed(DatasetKind::Derivative)
@@ -141,15 +151,24 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
                             .build(),
                     )
                     .build(),
+                    AppendOpts::default(),
                 )
+                .await
+                .unwrap();
+
+            chain
                 .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::set_transform(deps)
                             .input_ids_from_names()
                             .build(),
                     )
+                    .prev(&head)
                     .build(),
-                );
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
         }
     }
 }
@@ -160,13 +179,12 @@ fn create_graph_in_repository(repo_path: &Path, datasets: Vec<(DatasetName, Vec<
 // TODO: Add simpler way to import remote dataset
 async fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
-    repo: Arc<DatasetRegistryImpl>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetName, Vec<DatasetName>)>,
     to_import: Vec<DatasetName>,
 ) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    create_graph_in_repository(tmp_repo_dir.path(), datasets);
+    create_graph_in_repository(tmp_repo_dir.path(), datasets).await;
 
     let tmp_repo_name = RepositoryName::new_unchecked("tmp");
 
@@ -177,10 +195,8 @@ async fn create_graph_remote(
     .unwrap();
 
     let sync_service = SyncServiceImpl::new(
-        ws,
-        repo.clone(),
         reg.clone(),
-        Arc::new(RepositoryFactory::new()),
+        Arc::new(DatasetRepositoryLocalFS::new(ws.clone())),
     );
 
     for name in &to_import {
@@ -297,7 +313,6 @@ async fn test_pull_batching_complex_with_remote() {
     // D -----------/
     create_graph_remote(
         harness.workspace_layout.clone(),
-        harness.dataset_reg.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -787,10 +802,6 @@ impl SyncService for TestSyncService {
         (DatasetRefLocal, RemoteDatasetName),
         Result<SyncResult, SyncError>,
     )> {
-        unimplemented!()
-    }
-
-    async fn delete(&self, _remote_ref: &RemoteDatasetName) -> Result<(), SyncError> {
         unimplemented!()
     }
 }

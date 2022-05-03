@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::MinioServer;
+use crate::utils::{HttpFileServer, MinioServer};
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
@@ -15,6 +15,7 @@ use opendatafabric::*;
 
 use std::assert_matches::assert_matches;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 
@@ -82,20 +83,35 @@ fn assert_in_sync(
     assert_eq!(head_1, head_2);
 }
 
-fn create_fake_data_file(dataset_layout: &DatasetLayout) -> PathBuf {
+async fn create_random_file(root: &Path) -> (Multihash, usize) {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut data);
-    let hash = Multihash::from_digest_sha3_256(&data);
 
-    std::fs::create_dir_all(&dataset_layout.data_dir).unwrap();
-    let path = dataset_layout.data_dir.join(hash.to_multibase_string());
-    std::fs::write(&path, &data).unwrap();
-    path
+    std::fs::create_dir_all(root).unwrap();
+
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(root);
+    let hash = repo
+        .insert_bytes(&data, InsertOpts::default())
+        .await
+        .unwrap()
+        .hash;
+
+    (hash, data.len())
 }
 
-async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
+async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
+    let (d_hash, d_size) = create_random_file(&dataset_layout.data_dir).await;
+    let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
+    MetadataFactory::add_data()
+        .data_physical_hash(d_hash)
+        .data_size(d_size as i64)
+        .checkpoint_physical_hash(c_hash)
+        .checkpoint_size(c_size as i64)
+}
+
+async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_url: Url) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_name_2 = DatasetName::new_unchecked("bar");
@@ -103,22 +119,25 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
+    let dataset_layout_2 = DatasetLayout::new(&volume_layout, &dataset_name_2);
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let repository_factory = Arc::new(RepositoryFactory::new());
+    let local_repo = Arc::new(DatasetRepositoryLocalFS::new(workspace_layout.clone()));
 
-    let sync_svc = SyncServiceImpl::new(
-        workspace_layout.clone(),
-        dataset_reg.clone(),
-        remote_repo_reg.clone(),
-        repository_factory.clone(),
-    );
+    let sync_svc = SyncServiceImpl::new(remote_repo_reg.clone(), local_repo);
 
-    // Add repository
-    let repo_name = RepositoryName::new_unchecked("remote");
-    let remote_dataset_name = RemoteDatasetName::new(repo_name.clone(), None, dataset_name.clone());
+    // Add repositories
+    let push_repo_name = RepositoryName::new_unchecked("remote-push");
+    let pull_repo_name = RepositoryName::new_unchecked("remote-pull");
+    let push_remote_dataset_name =
+        RemoteDatasetName::new(push_repo_name.clone(), None, dataset_name.clone());
+    let pull_remote_dataset_name =
+        RemoteDatasetName::new(pull_repo_name.clone(), None, dataset_name.clone());
     remote_repo_reg
-        .add_repository(&repo_name, repo_url)
+        .add_repository(&push_repo_name, push_repo_url.clone())
+        .unwrap();
+    remote_repo_reg
+        .add_repository(&pull_repo_name, pull_repo_url.clone())
         .unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
@@ -126,24 +145,24 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         sync_svc
             .sync_to(
                 &dataset_name.as_local_ref(),
-                &remote_dataset_name,
+                &push_remote_dataset_name,
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::LocalDatasetDoesNotExist { .. })
+        Err(SyncError::SourceDatasetDoesNotExist { .. })
     );
 
     assert_matches!(
         sync_svc
             .sync_from(
-                &remote_dataset_name.as_remote_ref(),
+                &pull_remote_dataset_name.as_remote_ref(),
                 &dataset_name_2,
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::RemoteDatasetDoesNotExist { .. })
+        Err(SyncError::SourceDatasetDoesNotExist { .. })
     );
 
     // Add dataset
@@ -157,7 +176,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name,  SyncOptions::default(), None).await,
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name,  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -166,7 +185,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
+        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -177,42 +196,32 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    create_fake_data_file(&dataset_layout);
     let b2 = dataset_reg
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+            MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
                 .prev(&b1)
                 .build(),
         );
 
-    create_fake_data_file(&dataset_layout);
     let b3 = dataset_reg
         .get_metadata_chain(&dataset_name.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+            MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
                 .prev(&b2)
                 .build(),
         );
 
-    let checkpoint_dir = dataset_layout.checkpoints_dir.join(b3.to_string());
-    std::fs::create_dir_all(&checkpoint_dir).unwrap();
-    std::fs::write(
-        &checkpoint_dir.join("checkpoint_data.bin"),
-        "<data>".as_bytes(),
-    )
-    .unwrap();
-
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged { local_head, remote_head})
-        if local_head == b3 && remote_head == b1
+        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged { src_head, dst_head })
+        if src_head == b1 && dst_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -221,7 +230,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 
     assert_matches!(
-        sync_svc.sync_from(&remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
+        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -236,7 +245,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         sync_svc
             .sync_to(
                 &dataset_name.as_local_ref(),
-                &remote_dataset_name,
+                &push_remote_dataset_name,
                 SyncOptions::default(),
                 None
             )
@@ -247,7 +256,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
     assert_matches!(
         sync_svc
             .sync_from(
-                &remote_dataset_name.as_remote_ref(),
+                &pull_remote_dataset_name.as_remote_ref(),
                 &dataset_name_2,
                 SyncOptions::default(),
                 None
@@ -265,13 +274,13 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
         .get_metadata_chain(&dataset_name_2.as_local_ref())
         .unwrap()
         .append(
-            MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+            MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
                 .prev(&b3)
                 .build(),
         );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
+        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -281,22 +290,22 @@ async fn do_test_sync(tmp_workspace_dir: &Path, repo_url: Url) {
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &remote_dataset_name, SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged { local_head, remote_head })
-        if local_head == b3 && remote_head == diverged_head
+        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged { src_head, dst_head })
+        if src_head == b3 && dst_head == diverged_head
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_sync_to_from_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url).await;
+    do_test_sync(tmp_workspace_dir.path(), repo_url.clone(), repo_url).await;
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_sync_to_from_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
@@ -311,12 +320,25 @@ async fn test_sync_to_from_s3() {
 
     let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key);
 
-    use std::str::FromStr;
     let repo_url = Url::from_str(&format!(
         "s3+http://{}:{}/{}",
         minio.address, minio.host_port, bucket
     ))
     .unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url).await;
+    do_test_sync(tmp_workspace_dir.path(), repo_url.clone(), repo_url).await;
+}
+
+#[test_log::test(tokio::test)]
+async fn test_sync_from_http() {
+    let tmp_workspace_dir = tempfile::tempdir().unwrap();
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let push_repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
+
+    let server = HttpFileServer::new(tmp_repo_dir.path());
+    let pull_repo_url = Url::from_str(&format!("http://{}/", server.local_addr())).unwrap();
+
+    let _server_hdl = tokio::spawn(server.run());
+
+    do_test_sync(tmp_workspace_dir.path(), push_repo_url, pull_repo_url).await;
 }

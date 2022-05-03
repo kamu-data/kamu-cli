@@ -12,11 +12,47 @@ use kamu::infra::*;
 use opendatafabric::*;
 
 use std::assert_matches::assert_matches;
+use url::Url;
+
+use crate::utils::MinioServer;
+
+#[allow(dead_code)]
+struct S3 {
+    tmp_dir: tempfile::TempDir,
+    minio: MinioServer,
+    url: Url,
+}
+
+fn run_s3_server() -> S3 {
+    let access_key = "AKIAIOSFODNN7EXAMPLE";
+    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
+    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let bucket = "test-bucket";
+    std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
+
+    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key);
+
+    let url = Url::parse(&format!(
+        "s3+http://{}:{}/{}",
+        minio.address, minio.host_port, bucket
+    ))
+    .unwrap();
+
+    S3 {
+        tmp_dir,
+        minio,
+        url,
+    }
+}
 
 #[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
@@ -50,9 +86,36 @@ async fn test_insert_bytes() {
 }
 
 #[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_insert_bytes_long() {
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
+
+    use rand::RngCore;
+
+    let mut data = [0u8; 16000];
+    rand::thread_rng().fill_bytes(&mut data);
+
+    let hash = Multihash::from_digest_sha3_256(&data);
+
+    assert_eq!(
+        repo.insert_bytes(&data, InsertOpts::default())
+            .await
+            .unwrap(),
+        InsertResult {
+            hash: hash.clone(),
+            already_existed: false,
+        }
+    );
+
+    assert_eq!(&repo.get_bytes(&hash).await.unwrap()[..], data);
+}
+
+#[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
@@ -63,9 +126,16 @@ async fn test_insert_stream() {
 
     let cursor = std::io::Cursor::new(b"foobar");
     assert_eq!(
-        repo.insert_stream(Box::new(cursor), InsertOpts::default())
-            .await
-            .unwrap(),
+        repo.insert_stream(
+            Box::new(cursor),
+            InsertOpts {
+                precomputed_hash: Some(&hash_foobar),
+                size_hint: Some(6),
+                ..Default::default()
+            }
+        )
+        .await
+        .unwrap(),
         InsertResult {
             hash: hash_foobar.clone(),
             already_existed: false
@@ -81,9 +151,10 @@ async fn test_insert_stream() {
 }
 
 #[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
@@ -105,7 +176,7 @@ async fn test_delete() {
             .unwrap(),
         InsertResult {
             hash: hash_foo.clone(),
-            already_existed: true
+            already_existed: false // Note: S3's insert_bytes does not check for existence to save a roundtrip
         }
     );
 
@@ -120,9 +191,10 @@ async fn test_delete() {
 }
 
 #[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_precomputed() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
@@ -147,9 +219,10 @@ async fn test_insert_precomputed() {
 }
 
 #[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_expect() {
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");

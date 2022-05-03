@@ -9,3 +9,6 @@
 
 mod dataset_summary;
 pub use dataset_summary::*;
+
+mod dataset_repository_info;
+pub use dataset_repository_info::*;

@@ -486,12 +486,6 @@ impl RepositoryClient for RepositoryS3 {
         Ok(result)
     }
 
-    async fn delete(&self, dataset_ref: &DatasetNameWithOwner) -> Result<(), RepositoryError> {
-        self.delete_objects(format!("{}/", dataset_ref.dataset()))
-            .await?;
-        Ok(())
-    }
-
     async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError> {
         let query = query.unwrap_or_default();
 

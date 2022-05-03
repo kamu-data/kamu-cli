@@ -7,8 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_dataset_impl;
 mod test_metadata_chain_impl;
+mod test_named_object_repository_http;
+mod test_named_object_repository_local_fs;
+mod test_named_object_repository_s3;
 mod test_object_repository_http;
 mod test_object_repository_local_fs;
-mod test_reference_repository_http;
-mod test_reference_repository_local_fs;
+mod test_object_repository_s3;
+mod test_reference_repository_impl;

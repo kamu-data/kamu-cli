@@ -48,11 +48,6 @@ pub trait RepositoryClient {
         tmp_dir: &Path,
     ) -> Result<RepositoryReadResult, RepositoryError>;
 
-    /// Deletes a dataset from the repository.
-    ///
-    /// Note: Some repos may not permit this operation.
-    async fn delete(&self, dataset_ref: &DatasetNameWithOwner) -> Result<(), RepositoryError>;
-
     async fn search(&self, query: Option<&str>) -> Result<RepositorySearchResult, RepositoryError>;
 }
 
@@ -73,8 +68,6 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 pub enum RepositoryError {
     #[error("Dataset does not exist")]
     DoesNotExist,
-    #[error("Operation is not allowed")]
-    NotAllowed,
     #[error("Local and remote datasets have diverged. Local head: {local_head}, remote head {remote_head}")]
     Diverged {
         local_head: Multihash,

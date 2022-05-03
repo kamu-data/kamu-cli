@@ -23,7 +23,7 @@ fn init_chain(root: &Path) -> impl MetadataChain2 {
     std::fs::create_dir(&refs_dir).unwrap();
 
     let obj_repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir);
-    let ref_repo = ReferenceRepositoryLocalFS::new(refs_dir);
+    let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
 
     MetadataChain2Impl::new(obj_repo, ref_repo)
 }
@@ -104,6 +104,31 @@ async fn test_set_ref() {
 
     chain.set_ref(&BlockRef::Head, &hash_1).await.unwrap();
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+}
+
+#[tokio::test]
+async fn test_append_hash_mismatch() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block_1 =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+
+    let bad_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
+    assert_matches!(
+        chain
+            .append(
+                block_1,
+                AppendOpts {
+                    expected_hash: Some(&bad_hash),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::HashMismatch(_)
+        ))
+    );
 }
 
 #[tokio::test]

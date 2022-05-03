@@ -29,10 +29,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let repository_factory = Arc::new(RepositoryFactory::new());
     let sync_svc = SyncServiceImpl::new(
-        workspace_layout.clone(),
-        dataset_reg.clone(),
         remote_repo_reg.clone(),
-        repository_factory.clone(),
+        Arc::new(DatasetRepositoryLocalFS::new(workspace_layout.clone())),
     );
 
     let search_svc = SearchServiceImpl::new(remote_repo_reg.clone(), repository_factory.clone());

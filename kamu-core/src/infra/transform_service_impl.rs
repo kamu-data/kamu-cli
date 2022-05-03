@@ -97,9 +97,9 @@ impl TransformServiceImpl {
 
         let response = engine.transform(operation.request).await?;
 
-        let output_data = if let Some(data_interval) = response.data_interval {
+        let output_data = if let Some(interval) = response.data_interval {
             // TODO: Move out this to validation
-            if data_interval.end < data_interval.start || data_interval.start != offset {
+            if interval.end < interval.start || interval.start != offset {
                 return Err(EngineError::contract_error(
                     "Engine returned an output slice with invalid offset range",
                     Vec::new(),
@@ -125,18 +125,23 @@ impl TransformServiceImpl {
             let _span_guard = span.enter();
 
             // TODO: Move out into data commit procedure of sorts
-            let data_logical_hash =
+            let logical_hash =
                 crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
                     .map_err(|e| TransformError::internal(e))?;
 
-            let data_physical_hash =
+            let physical_hash =
                 crate::infra::utils::data_utils::get_file_physical_hash(&out_data_path)
                     .map_err(|e| TransformError::internal(e))?;
 
+            let size = std::fs::metadata(&new_checkpoint_path)
+                .map_err(|e| TransformError::internal(e))?
+                .len() as i64;
+
             Some(DataSlice {
-                logical_hash: data_logical_hash,
-                physical_hash: data_physical_hash,
-                interval: data_interval,
+                logical_hash,
+                physical_hash,
+                interval,
+                size,
             })
         } else if out_data_path.exists() {
             return Err(EngineError::contract_error(
@@ -161,7 +166,14 @@ impl TransformServiceImpl {
                 crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
                     .map_err(|e| TransformError::internal(e))?;
 
-            Some(Checkpoint { physical_hash })
+            let size = std::fs::metadata(&new_checkpoint_path)
+                .map_err(|e| TransformError::internal(e))?
+                .len() as i64;
+
+            Some(Checkpoint {
+                physical_hash,
+                size,
+            })
         } else {
             None
         };

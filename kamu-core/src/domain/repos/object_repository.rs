@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::InternalError;
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
@@ -20,6 +21,7 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents a content-addressable storage
 #[async_trait]
 pub trait ObjectRepository {
     async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError>;
@@ -36,7 +38,7 @@ pub trait ObjectRepository {
 
     async fn insert_stream<'a>(
         &'a self,
-        src: &'a mut AsyncReadObj,
+        src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError>;
 
@@ -67,14 +69,13 @@ pub struct InsertOpts<'a> {
 
     /// Insert will result in error if computed hash does not match this one.
     pub expected_hash: Option<&'a Multihash>,
+
+    /// Hints the size of an object
+    pub size_hint: Option<usize>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Errors
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub type InternalError = Box<dyn std::error::Error>;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
@@ -89,8 +90,8 @@ pub struct ObjectNotFoundError {
 pub enum GetError {
     #[error(transparent)]
     NotFound(#[from] ObjectNotFoundError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -108,6 +109,6 @@ pub struct HashMismatchError {
 pub enum InsertError {
     #[error(transparent)]
     HashMismatch(#[from] HashMismatchError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }

@@ -10,7 +10,64 @@
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("internal error")]
+pub struct InternalError {
+    source: BoxedError,
+    backtrace: Option<Backtrace>,
+}
+
+impl InternalError {
+    pub fn new<E: Into<BoxedError>>(e: E) -> Self {
+        let source = e.into();
+        let backtrace = if source.backtrace().is_some() {
+            None
+        } else {
+            Some(Backtrace::capture())
+        };
+
+        Self { source, backtrace }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ErrorIntoInternal {
+    fn into_internal_error(self) -> InternalError;
+}
+
+impl<E> ErrorIntoInternal for E
+where
+    E: Into<BoxedError>,
+{
+    fn into_internal_error(self) -> InternalError {
+        InternalError::new(self)
+    }
+}
+
+pub trait ResultIntoInternal<OK> {
+    fn into_internal_error(self) -> Result<OK, InternalError>;
+}
+
+impl<OK, E> ResultIntoInternal<OK> for Result<OK, E>
+where
+    E: Into<BoxedError>,
+{
+    fn into_internal_error(self) -> Result<OK, InternalError> {
+        match self {
+            Ok(ok) => Ok(ok),
+            Err(e) => Err(e.into_internal_error()),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub enum ResourceKind {

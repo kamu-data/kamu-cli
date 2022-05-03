@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use opendatafabric::{MetadataBlock, Multihash};
+use opendatafabric::Multihash;
 
 use async_trait::async_trait;
 use thiserror::Error;
@@ -16,12 +16,28 @@ use thiserror::Error;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait Dataset {
-    async fn commit(&self, block: MetadataBlock) -> Result<CommitResult, CommitError>;
+pub trait Dataset: Send + Sync {
+    /// Returns a brief summary of the dataset
+    async fn get_summary(&self, opts: SummaryOptions) -> Result<DatasetSummary, GetSummaryError>;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain2;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct SummaryOptions {
+    pub update_if_stale: bool,
+}
+
+impl Default for SummaryOptions {
+    fn default() -> Self {
+        Self {
+            update_if_stale: true,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -36,12 +52,27 @@ pub struct CommitResult {
 // Errors
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type InternalError = Box<dyn std::error::Error>;
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("expected object of type {expected} but got {actual}")]
+pub struct InvalidObjectKind {
+    pub expected: String,
+    pub actual: String,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetSummaryError {
+    #[error("Dataset is empty")]
+    EmptyDataset,
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum CommitError {
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }

@@ -7,15 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::object_repository::InternalError;
 use crate::domain::*;
-use futures::TryStreamExt;
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::Client;
 use tokio::io::AsyncRead;
+use tracing::debug;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -33,6 +32,12 @@ pub struct ObjectRepositoryHttp {
 
 impl ObjectRepositoryHttp {
     pub fn new(client: Client, base_url: Url) -> Self {
+        assert!(
+            !base_url.cannot_be_a_base()
+                && (base_url.path().is_empty() || base_url.path().ends_with('/')),
+            "Invalid base url: {}",
+            base_url
+        );
         Self { client, base_url }
     }
 }
@@ -42,14 +47,19 @@ impl ObjectRepositoryHttp {
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryHttp {
     async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
-        let url = self.base_url.join(&hash.to_multibase_string())?;
+        let url = self
+            .base_url
+            .join(&hash.to_multibase_string())
+            .into_internal_error()?;
 
-        let response = self.client.head(url).send().await?;
+        debug!(%url, "Checking for object");
+
+        let response = self.client.head(url).send().await.into_internal_error()?;
 
         match response.error_for_status() {
             Ok(_) => Ok(true),
             Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => Ok(false),
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e.into_internal_error().into()),
         }
     }
 
@@ -57,14 +67,11 @@ impl ObjectRepository for ObjectRepositoryHttp {
         let url = self
             .base_url
             .join(&hash.to_multibase_string())
-            .map_err(|e| GetError::Internal(e.into()))?;
+            .into_internal_error()?;
 
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| GetError::Internal(e.into()))?;
+        debug!(%url, "Reading object");
+
+        let response = self.client.get(url).send().await.into_internal_error()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -73,13 +80,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) => Err(GetError::Internal(e.into())),
+            Err(e) => Err(e.into_internal_error().into()),
         }?;
 
-        let data = response
-            .bytes()
-            .await
-            .map_err(|e| GetError::Internal(e.into()))?;
+        let data = response.bytes().await.into_internal_error()?;
 
         Ok(data)
     }
@@ -88,14 +92,11 @@ impl ObjectRepository for ObjectRepositoryHttp {
         let url = self
             .base_url
             .join(&hash.to_multibase_string())
-            .map_err(|e| GetError::Internal(e.into()))?;
+            .into_internal_error()?;
 
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| GetError::Internal(e.into()))?;
+        debug!(%url, "Reading object stream");
+
+        let response = self.client.get(url).send().await.into_internal_error()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -104,11 +105,12 @@ impl ObjectRepository for ObjectRepositoryHttp {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) => Err(GetError::Internal(e.into())),
+            Err(e) => Err(e.into_internal_error().into()),
         }?;
 
         let stream = response.bytes_stream();
 
+        use futures::TryStreamExt;
         use tokio_util::compat::FuturesAsyncReadCompatExt;
         let reader = stream
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
@@ -128,7 +130,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
     async fn insert_stream<'a>(
         &'a self,
-        _src: &'a mut AsyncReadObj,
+        _src: Box<AsyncReadObj>,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         panic!("Http object repository is read-only")

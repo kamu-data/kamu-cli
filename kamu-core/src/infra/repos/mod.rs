@@ -13,14 +13,29 @@ pub use object_repository_local_fs::*;
 mod object_repository_http;
 pub use object_repository_http::*;
 
-mod reference_repository_local_fs;
-pub use reference_repository_local_fs::*;
+mod object_repository_s3;
+pub use object_repository_s3::*;
 
-mod reference_repository_http;
-pub use reference_repository_http::*;
+mod named_object_repository_local_fs;
+pub use named_object_repository_local_fs::*;
+
+mod named_object_repository_http;
+pub use named_object_repository_http::*;
+
+mod named_object_repository_s3;
+pub use named_object_repository_s3::*;
+
+mod reference_repository_impl;
+pub use reference_repository_impl::*;
 
 mod metadata_chain_impl;
 pub use metadata_chain_impl::*;
 
 mod dataset_impl;
 pub use dataset_impl::*;
+
+mod dataset_repository_local_fs;
+pub use dataset_repository_local_fs::*;
+
+mod dataset_repo_factory;
+pub use dataset_repo_factory::*;

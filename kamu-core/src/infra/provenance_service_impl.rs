@@ -44,7 +44,7 @@ impl ProvenanceServiceImpl {
             .as_ref()
             .map(|s| NodeInfo::Local {
                 id: s.id.clone(),
-                name: s.name.clone(),
+                name: dataset_handle.name.clone(),
                 kind: s.kind,
                 dependencies: &s.dependencies,
             })

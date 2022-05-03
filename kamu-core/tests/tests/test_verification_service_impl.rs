@@ -101,6 +101,7 @@ async fn test_verify_data_consistency() {
                 logical_hash: data_logical_hash.clone(),
                 physical_hash: data_physical_hash.clone(),
                 interval: OffsetInterval { start: 0, end: 0 },
+                size: 10,
             },
             output_checkpoint: None,
             output_watermark: None,

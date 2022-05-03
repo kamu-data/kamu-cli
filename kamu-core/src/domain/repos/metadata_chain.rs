@@ -64,25 +64,37 @@ pub enum BlockRef {
     Head,
 }
 
+impl BlockRef {
+    pub fn as_str(&self) -> &str {
+        match self {
+            BlockRef::Head => "head",
+        }
+    }
+}
+
+impl AsRef<str> for BlockRef {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl std::fmt::Display for BlockRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BlockRef::Head => write!(f, "head"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type BlockStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>> + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Expand into bitflags to give fine control
 #[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum AppendValidations {
+pub enum AppendValidation {
     None,
     Full,
 }
@@ -90,32 +102,41 @@ pub enum AppendValidations {
 #[derive(Clone, Debug)]
 pub struct AppendOpts<'a> {
     /// Validations to perform on the newly appended block
-    pub validations: AppendValidations,
+    pub validation: AppendValidation,
+
     /// Update specified reference to the block after appending
     pub update_ref: Option<&'a BlockRef>,
+
     /// Validate that `update_ref` points to the same block as `block.prev_block_hash` (compare-and-swap)
     pub check_ref_is_prev_block: bool,
+
     /// Validate that `update_ref` points to the specified block (compare-and-swap)
     pub check_ref_is: Option<Option<&'a Multihash>>,
+
+    /// Append block using the provided hash computed elsewhere.
+    ///
+    /// Warning: Use only when you fully trust the source of the precomputed hash.
+    pub precomputed_hash: Option<&'a Multihash>,
+
+    /// Append will result in error if computed hash does not match this one.
+    pub expected_hash: Option<&'a Multihash>,
 }
 
 impl<'a> Default for AppendOpts<'a> {
     fn default() -> Self {
         Self {
-            validations: AppendValidations::Full,
+            validation: AppendValidation::Full,
             update_ref: Some(&BlockRef::Head),
             check_ref_is_prev_block: true,
             check_ref_is: None,
+            precomputed_hash: None,
+            expected_hash: None,
         }
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Errors
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub type InternalError = Box<dyn std::error::Error>;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -130,7 +151,7 @@ pub struct BlockNotFoundError {
 #[error("block is malformed: {hash}")]
 pub struct BlockMalformedError {
     pub hash: Multihash,
-    pub source: InternalError,
+    pub source: BoxedError,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -139,8 +160,8 @@ pub struct BlockMalformedError {
 pub enum GetBlockError {
     #[error(transparent)]
     NotFound(BlockNotFoundError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -148,28 +169,18 @@ pub enum GetBlockError {
 #[derive(Error, Debug)]
 pub enum IterBlocksError {
     #[error(transparent)]
-    RefNotFound(RefNotFoundError),
-    #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
     #[error(transparent)]
     InvalidInterval(InvalidIntervalError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 #[derive(Error, Debug)]
-#[error("interval's tail block was not reached: {tail}")]
+#[error("invalid block interval [{head}, {tail})")]
 pub struct InvalidIntervalError {
+    pub head: Multihash,
     pub tail: Multihash,
-}
-
-impl From<GetRefError> for IterBlocksError {
-    fn from(e: GetRefError) -> Self {
-        match e {
-            GetRefError::NotFound(r) => Self::RefNotFound(r),
-            GetRefError::Internal(i) => Self::Internal(i),
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -178,8 +189,8 @@ impl From<GetRefError> for IterBlocksError {
 pub enum SetRefError {
     #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -202,15 +213,17 @@ pub enum AppendError {
     RefCASFailed(RefCASError),
     #[error(transparent)]
     InvalidBlock(#[from] AppendValidationError),
-    #[error("internal error")]
-    Internal(InternalError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum AppendValidationError {
-    #[error("first block has to be a seed")]
+    #[error(transparent)]
+    HashMismatch(HashMismatchError),
+    #[error("first block has to be a seed, perhaps new block does not link to the previous")]
     FirstBlockMustBeSeed,
     #[error("attempt to append seed block to a non-empty chain")]
     AppendingSeedBlockToNonEmptyChain,

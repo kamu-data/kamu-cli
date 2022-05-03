@@ -7,24 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{BlockRef, InternalError};
-use opendatafabric::Multihash;
+use crate::domain::InternalError;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait ReferenceRepository {
+pub trait NamedObjectRepository {
     /// Resolves reference to the object hash it's pointing to
-    async fn get(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
+    async fn get(&self, name: &str) -> Result<Bytes, GetError>;
 
     /// Update referece to point at the specified object hash
-    async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), InternalError>;
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), InternalError>;
 
     /// Deletes specified reference
-    async fn delete(&self, r: &BlockRef) -> Result<(), InternalError>;
+    async fn delete(&self, name: &str) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,17 +32,17 @@ pub trait ReferenceRepository {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("reference does not exist: {block_ref:?}")]
-pub struct RefNotFoundError {
-    pub block_ref: BlockRef,
+#[error("object does not exist: {name}")]
+pub struct NotFoundError {
+    pub name: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetRefError {
+pub enum GetError {
     #[error(transparent)]
-    NotFound(RefNotFoundError),
+    NotFound(NotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

@@ -11,45 +11,39 @@ use kamu::domain::*;
 use kamu::infra::*;
 use opendatafabric::*;
 
-use crate::utils::HttpFileServer;
 use std::assert_matches::assert_matches;
 
 #[tokio::test]
 async fn test_basics() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let http_server = HttpFileServer::new(tmp_repo_dir.path());
-    let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
-    let _srv_handle = tokio::spawn(http_server.run());
-    let repo = ReferenceRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(tmp_repo_dir.path()));
 
     assert_matches!(
         repo.get(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
 
-    std::fs::write(
-        tmp_repo_dir.path().join("head"),
-        Multihash::from_digest_sha3_256(b"foo").to_multibase_string(),
-    )
-    .unwrap();
+    repo.set(&BlockRef::Head, &Multihash::from_digest_sha3_256(b"foo"))
+        .await
+        .unwrap();
     assert_eq!(
         repo.get(&BlockRef::Head).await.unwrap(),
         Multihash::from_digest_sha3_256(b"foo")
     );
 
-    std::fs::write(
-        tmp_repo_dir.path().join("head"),
-        Multihash::from_digest_sha3_256(b"bar").to_multibase_string(),
-    )
-    .unwrap();
+    repo.set(&BlockRef::Head, &Multihash::from_digest_sha3_256(b"bar"))
+        .await
+        .unwrap();
     assert_eq!(
         repo.get(&BlockRef::Head).await.unwrap(),
         Multihash::from_digest_sha3_256(b"bar")
     );
 
-    std::fs::remove_file(tmp_repo_dir.path().join("head")).unwrap();
+    repo.delete(&BlockRef::Head).await.unwrap();
     assert_matches!(
         repo.get(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
+
+    repo.delete(&BlockRef::Head).await.unwrap();
 }

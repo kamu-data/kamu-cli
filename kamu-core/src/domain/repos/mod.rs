@@ -10,6 +10,9 @@
 pub mod object_repository;
 pub use object_repository::*;
 
+pub mod named_object_repository;
+pub use named_object_repository::*;
+
 pub mod reference_repository;
 pub use reference_repository::*;
 
@@ -18,3 +21,6 @@ pub use metadata_chain::*;
 
 pub mod dataset;
 pub use dataset::*;
+
+pub mod dataset_repository;
+pub use dataset_repository::*;

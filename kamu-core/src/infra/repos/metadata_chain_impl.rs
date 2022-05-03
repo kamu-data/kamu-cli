@@ -125,31 +125,27 @@ where
 
         let block = FlatbuffersMetadataBlockDeserializer
             .read_manifest(&data)
-            .map_err(|e| {
-                GetBlockError::Internal(
-                    BlockMalformedError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }
-                    .into(),
-                )
-            })?;
+            .map_err(|e| BlockMalformedError {
+                hash: hash.clone(),
+                source: e.into(),
+            })
+            .into_internal_error()?;
 
         Ok(block)
     }
 
     fn iter_blocks_interval<'a, 'b>(
         &'a self,
-        head: &'b Multihash,
+        head_ref: &'b Multihash,
         tail: Option<&'b Multihash>,
     ) -> BlockStream<'a> {
         use async_stream::stream;
 
-        let head = head.clone();
+        let interval_head = head_ref.clone();
         let tail = tail.cloned();
 
         let s = stream! {
-            let mut head = Some(head);
+            let mut head = Some(interval_head.clone());
 
             while head.is_some() && head != tail {
                 head = match self.get_block(head.as_ref().unwrap()).await {
@@ -158,15 +154,19 @@ where
                         yield Ok((head.clone().unwrap(), block));
                         new_head
                     }
-                    _ => {
-                        yield Err(IterBlocksError::BlockNotFound(BlockNotFoundError { hash: head.clone().unwrap() }));
-                        None
+                    Err(GetBlockError::NotFound(e)) => {
+                        yield Err(IterBlocksError::BlockNotFound(e));
+                        break;
+                    }
+                    Err(GetBlockError::Internal(e)) => {
+                        yield Err(IterBlocksError::Internal(e));
+                        break;
                     }
                 };
             }
 
             if head.is_none() && tail.is_some() {
-                yield Err(IterBlocksError::InvalidInterval(InvalidIntervalError{ tail: tail.unwrap() }));
+                yield Err(IterBlocksError::InvalidInterval(InvalidIntervalError{ head: interval_head, tail: tail.unwrap() }));
             }
         };
 
@@ -208,10 +208,10 @@ where
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
-        // TODO: Smarter caching
+        // TODO: PERF: Add caching layer that persists between multiple append calls
         let mut block_cache = Vec::new();
 
-        if opts.validations == AppendValidations::Full {
+        if opts.validation == AppendValidation::Full {
             self.validate_append_prev_block_exists(&block, &mut block_cache)
                 .await?;
             self.validate_append_seed_block_order(&block, &mut block_cache)
@@ -243,14 +243,23 @@ where
 
         let data = FlatbuffersMetadataBlockSerializer
             .write_manifest(&block)
-            .map_err(|e| AppendError::Internal(e.into()))?;
+            .into_internal_error()?;
 
         let res = self
             .obj_repo
-            .insert_bytes(&data, InsertOpts::default())
+            .insert_bytes(
+                &data,
+                InsertOpts {
+                    precomputed_hash: opts.precomputed_hash,
+                    expected_hash: opts.expected_hash,
+                    ..Default::default()
+                },
+            )
             .await
             .map_err(|e| match e {
-                InsertError::HashMismatch(_) => unreachable!(),
+                InsertError::HashMismatch(e) => {
+                    AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))
+                }
                 InsertError::Internal(e) => AppendError::Internal(e),
             })?;
 

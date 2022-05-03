@@ -205,6 +205,8 @@ impl DatasetRegistryImpl {
         let mut dependencies = Vec::new();
         let mut last_pulled = None;
         let mut num_records = 0;
+        let mut data_size = 0;
+        let mut checkpoints_size = 0;
 
         for (_, block) in chain.iter_blocks() {
             match block.event {
@@ -223,6 +225,12 @@ impl DatasetRegistryImpl {
                     }
                     let iv = add_data.output_data.interval;
                     num_records += (iv.end - iv.start + 1) as u64;
+
+                    data_size += add_data.output_data.size as u64;
+
+                    if let Some(cp) = add_data.output_checkpoint {
+                        checkpoints_size += cp.size as u64;
+                    }
                 }
                 MetadataEvent::ExecuteQuery(execute_query) => {
                     if last_pulled.is_none() {
@@ -231,6 +239,11 @@ impl DatasetRegistryImpl {
                     if let Some(output_data) = execute_query.output_data {
                         num_records +=
                             (output_data.interval.end - output_data.interval.start + 1) as u64;
+
+                        data_size += output_data.size as u64;
+                    }
+                    if let Some(cp) = execute_query.output_checkpoint {
+                        checkpoints_size += cp.size as u64;
                     }
                 }
                 MetadataEvent::SetAttachments(_)
@@ -242,21 +255,15 @@ impl DatasetRegistryImpl {
             }
         }
 
-        // Calculate data size
-        let volume_layout = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
-        let layout = DatasetLayout::new(&volume_layout, dataset_name);
-        let data_size = fs_extra::dir::get_size(layout.data_dir).unwrap_or(0)
-            + fs_extra::dir::get_size(layout.checkpoints_dir).unwrap_or(0);
-
         Ok(DatasetSummary {
             id: id.unwrap(),
-            name: dataset_name.to_owned(),
             kind: kind.unwrap(),
             dependencies,
             last_block_hash,
             last_pulled,
             num_records,
             data_size,
+            checkpoints_size,
         })
     }
 }
@@ -275,20 +282,20 @@ impl DatasetRegistry for DatasetRegistryImpl {
                 let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir)
                     .map_err(|e| DomainError::InfraError(e.into()))?;
 
-                let summary = read_dir
+                let (summary, name) = read_dir
                     .map(|i| DatasetName::try_from(&i.unwrap().file_name()).unwrap())
-                    .map(|name| self.get_summary_impl(&name).unwrap())
-                    .filter(|s| s.id == *id)
+                    .map(|name| (self.get_summary_impl(&name).unwrap(), name))
+                    .filter(|(s, _)| s.id == *id)
                     .next()
                     .ok_or_else(|| {
                         DomainError::does_not_exist(ResourceKind::Dataset, id.to_did_string())
                     })?;
 
-                Ok(DatasetHandle::new(summary.id, summary.name))
+                Ok(DatasetHandle::new(summary.id, name))
             }
             DatasetRefLocal::Name(name) => {
                 let summary = self.get_summary_impl(&name)?;
-                Ok(DatasetHandle::new(summary.id, summary.name))
+                Ok(DatasetHandle::new(summary.id, name.clone()))
             }
             DatasetRefLocal::Handle(h) => Ok(h.clone()),
         }
@@ -430,22 +437,22 @@ impl DatasetRegistry for DatasetRegistryImpl {
             .get_all_datasets_impl()
             .unwrap()
             .filter(|hdl| hdl.id != dataset_handle.id)
-            .map(|hdl| self.get_summary(&hdl.into()).unwrap())
-            .filter(|s| {
+            .map(|hdl| (self.get_summary(&hdl.as_local_ref()).unwrap(), hdl))
+            .filter(|(s, _)| {
                 s.dependencies
                     .iter()
                     .filter(|d| d.id == Some(dataset_handle.id.clone()))
                     .next()
                     .is_some()
             })
-            .map(|s| s.name)
+            .map(|(_, hdl)| hdl)
             .collect();
 
         if dependents.len() > 0 {
             return Err(DomainError::dangling_reference(
                 dependents
                     .into_iter()
-                    .map(|name| (ResourceKind::Dataset, name.into()))
+                    .map(|hdl| (ResourceKind::Dataset, hdl.name.to_string()))
                     .collect(),
                 ResourceKind::Dataset,
                 dataset_handle.name.to_string(),

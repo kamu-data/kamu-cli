@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::HttpServer;
+use crate::utils::HttpFileServer;
 use kamu::domain::{ResourceError, ResourceLoader};
 use kamu::infra::ResourceLoaderImpl;
 use kamu::testing::*;
@@ -58,44 +58,48 @@ fn test_load_from_file_url() {
     assert_eq!(expected, actual2);
 }
 
-#[test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_load_from_http_url() {
+#[tokio::test]
+async fn test_load_from_http_url() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let path = tempdir.path().join("test.yaml");
     let expected = create_test_snapshot(&path);
 
-    let http_server = HttpServer::new(tempdir.path());
-    let url = url::Url::parse(&format!(
-        "http://{}:{}/test.yaml",
-        http_server.address, http_server.host_port,
-    ))
+    let http_server = HttpFileServer::new(tempdir.path());
+    let url = url::Url::parse(&format!("http://{}/test.yaml", http_server.local_addr())).unwrap();
+
+    let _server_hdl = tokio::spawn(http_server.run());
+
+    // TODO: make resource loader async
+    tokio::task::spawn_blocking(move || {
+        let loader = ResourceLoaderImpl::new();
+        let actual = loader.load_dataset_snapshot_from_url(&url).unwrap();
+        assert_eq!(expected, actual);
+
+        let actual2 = loader.load_dataset_snapshot_from_ref(url.as_str()).unwrap();
+        assert_eq!(expected, actual2);
+    })
+    .await
     .unwrap();
-
-    let loader = ResourceLoaderImpl::new();
-    let actual = loader.load_dataset_snapshot_from_url(&url).unwrap();
-    assert_eq!(expected, actual);
-
-    let actual2 = loader.load_dataset_snapshot_from_ref(url.as_str()).unwrap();
-    assert_eq!(expected, actual2);
 }
 
-#[test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-fn test_load_from_http_url_404() {
+#[tokio::test]
+async fn test_load_from_http_url_404() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let http_server = HttpServer::new(tempdir.path());
-    let url = url::Url::parse(&format!(
-        "http://{}:{}/test.yaml",
-        http_server.address, http_server.host_port,
-    ))
-    .unwrap();
+    let http_server = HttpFileServer::new(tempdir.path());
+    let url = url::Url::parse(&format!("http://{}/test.yaml", http_server.local_addr())).unwrap();
 
-    let loader = ResourceLoaderImpl::new();
-    assert!(matches!(
-        loader.load_dataset_snapshot_from_url(&url),
-        Err(ResourceError::NotFound { .. })
-    ));
+    let _server_hdl = tokio::spawn(http_server.run());
+
+    // TODO: make resource loader async
+    tokio::task::spawn_blocking(move || {
+        let loader = ResourceLoaderImpl::new();
+        assert!(matches!(
+            loader.load_dataset_snapshot_from_url(&url),
+            Err(ResourceError::NotFound { .. })
+        ));
+    })
+    .await
+    .unwrap();
 }

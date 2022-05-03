@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::object_repository::InternalError;
 use crate::domain::*;
 use opendatafabric::{Multicodec, Multihash};
 
@@ -18,6 +17,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
+use tracing::debug;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,10 +55,10 @@ where
         self.root.join(hash.to_multibase_string())
     }
 
-    async fn write_stream_with_digest(
-        &self,
-        path: &Path,
-        src: &mut AsyncReadObj,
+    async fn write_stream_with_digest<'a>(
+        &'a self,
+        path: &'a Path,
+        mut src: Box<AsyncReadObj>,
     ) -> std::io::Result<Multihash> {
         use tokio::io::AsyncReadExt;
 
@@ -97,34 +97,39 @@ where
 {
     async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
         let path = self.get_path(hash);
+
+        debug!(?path, "Checking for object");
+
         Ok(path.exists())
     }
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let path = self.get_path(hash);
+
+        debug!(?path, "Reading object");
+
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
                 hash: hash.clone(),
             }));
         }
-        let data = tokio::fs::read(path)
-            .await
-            .map_err(|e| GetError::Internal(e.into()))?;
+        let data = tokio::fs::read(path).await.into_internal_error()?;
 
         Ok(Bytes::from(data))
     }
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let path = self.get_path(&hash);
+
+        debug!(?path, "Reading object stream");
+
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
                 hash: hash.clone(),
             }));
         }
 
-        let file = tokio::fs::File::open(path)
-            .await
-            .map_err(|e| GetError::Internal(e.into()))?;
+        let file = tokio::fs::File::open(path).await.into_internal_error()?;
 
         Ok(Box::new(file))
     }
@@ -151,6 +156,8 @@ where
 
         let path = self.get_path(&hash);
 
+        debug!(?path, "Inserting object");
+
         if path.exists() {
             return Ok(InsertResult {
                 hash,
@@ -161,10 +168,10 @@ where
         // Write to staging file
         tokio::fs::write(&self.staging_path, data)
             .await
-            .map_err(|e| InsertError::Internal(e.into()))?;
+            .into_internal_error()?;
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).map_err(|e| InsertError::Internal(e.into()))?;
+        std::fs::rename(&self.staging_path, path).into_internal_error()?;
 
         Ok(InsertResult {
             hash,
@@ -174,13 +181,13 @@ where
 
     async fn insert_stream<'a>(
         &'a self,
-        src: &'a mut AsyncReadObj,
+        src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         let actual_hash = self
             .write_stream_with_digest(&self.staging_path, src)
             .await
-            .map_err(|e| InsertError::Internal(e.into()))?;
+            .into_internal_error()?;
 
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
@@ -192,7 +199,7 @@ where
             if *expected_hash != hash {
                 tokio::fs::remove_file(&self.staging_path)
                     .await
-                    .map_err(|e| InsertError::Internal(e.into()))?;
+                    .into_internal_error()?;
 
                 return Err(InsertError::HashMismatch(HashMismatchError {
                     expected: expected_hash.clone(),
@@ -203,10 +210,12 @@ where
 
         let path = self.get_path(&hash);
 
+        debug!(?path, "Inserting object stream");
+
         if path.exists() {
             tokio::fs::remove_file(&self.staging_path)
                 .await
-                .map_err(|e| InsertError::Internal(e.into()))?;
+                .into_internal_error()?;
 
             return Ok(InsertResult {
                 hash,
@@ -215,7 +224,7 @@ where
         }
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).map_err(|e| InsertError::Internal(e.into()))?;
+        std::fs::rename(&self.staging_path, path).into_internal_error()?;
 
         Ok(InsertResult {
             hash,
@@ -225,8 +234,11 @@ where
 
     async fn delete(&self, hash: &Multihash) -> Result<(), InternalError> {
         let path = self.get_path(hash);
+
+        debug!(?path, "Deleting object");
+
         if path.exists() {
-            tokio::fs::remove_file(&path).await?;
+            tokio::fs::remove_file(&path).await.into_internal_error()?;
         }
         Ok(())
     }

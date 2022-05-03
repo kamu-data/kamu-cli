@@ -54,11 +54,6 @@ pub trait SyncService: Send + Sync {
         (DatasetRefLocal, RemoteDatasetName),
         Result<SyncResult, SyncError>,
     )>;
-
-    /// Deletes a dataset from a remote repository.
-    ///
-    /// Note: Some repos may not permit this operation.
-    async fn delete(&self, remote_ref: &RemoteDatasetName) -> Result<(), SyncError>;
 }
 
 #[derive(Debug, Clone)]
@@ -114,23 +109,21 @@ type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Error)]
 pub enum SyncError {
-    #[error("Dataset {dataset_ref} does not exist locally")]
-    LocalDatasetDoesNotExist { dataset_ref: DatasetRefLocal },
-    #[error("Dataset {dataset_ref} does not exist in repository")]
-    RemoteDatasetDoesNotExist { dataset_ref: DatasetRefRemote },
+    #[error("Source dataset {dataset_ref} does not exist")]
+    SourceDatasetDoesNotExist { dataset_ref: DatasetRefAny },
+    #[error("Destination dataset {dataset_ref} does not exist")]
+    DestinationDatasetDoesNotExist { dataset_ref: DatasetRefAny },
     #[error("Repository {repo_name} does not exist")]
     RepositoryDoesNotExist { repo_name: RepositoryName },
     // TODO: Report divergence type (e.g. remote is ahead of local)
     //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
-    #[error("Local and remote datasets have diverged. Local head: {local_head}, remote head {remote_head}")]
+    #[error("Source and destination datasets have diverged. Source head: {src_head}, destination head {dst_head}")]
     DatasetsDiverged {
-        local_head: Multihash,
-        remote_head: Multihash,
+        src_head: Multihash,
+        dst_head: Multihash,
         //uncommon_blocks_in_local: usize,
         //uncommon_blocks_in_remote: usize,
     },
-    #[error("Repository does not allow this operation")]
-    NotAllowed,
     #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
         message: String,
@@ -152,13 +145,13 @@ pub enum SyncError {
 impl From<RepositoryError> for SyncError {
     fn from(e: RepositoryError) -> Self {
         match e {
-            RepositoryError::NotAllowed => SyncError::NotAllowed,
             RepositoryError::Diverged {
                 local_head,
                 remote_head,
             } => SyncError::DatasetsDiverged {
-                local_head,
-                remote_head,
+                // TODO: Revisit what is source and destination
+                src_head: local_head,
+                dst_head: remote_head,
             },
             RepositoryError::Corrupted {
                 ref message,
@@ -169,7 +162,8 @@ impl From<RepositoryError> for SyncError {
             },
             RepositoryError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
             RepositoryError::ProtocolError { .. } => SyncError::ProtocolError(Box::new(e)),
-            RepositoryError::DoesNotExist => SyncError::RemoteDatasetDoesNotExist {
+            // TODO: Revisit what is source and destination
+            RepositoryError::DoesNotExist => SyncError::DestinationDatasetDoesNotExist {
                 dataset_ref: RemoteDatasetName::try_from("unknown/unknown")
                     .unwrap()
                     .into(),

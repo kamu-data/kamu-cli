@@ -399,6 +399,10 @@ impl IngestTask {
                                 crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
                                 .map_err(|e| IngestError::internal(e))?,
                             interval: data_interval,
+                            size:
+                                std::fs::metadata(&new_checkpoint_path)
+                                .map_err(|e| IngestError::internal(e))?
+                                .len() as i64,
                         };
 
                         // Commit checkpoint
@@ -406,6 +410,10 @@ impl IngestTask {
                             let physical_hash = 
                                 crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
                                     .map_err(|e| IngestError::internal(e))?;
+
+                            let size = std::fs::metadata(&new_checkpoint_path)
+                                .map_err(|e| IngestError::internal(e))?
+                                .len() as i64;
                             
                             std::fs::create_dir_all(&self.layout.checkpoints_dir).map_err(|e| IngestError::internal(e))?;
                             std::fs::rename(
@@ -414,7 +422,7 @@ impl IngestTask {
                             )
                             .map_err(|e| IngestError::internal(e))?;
                             
-                            Some(Checkpoint { physical_hash })
+                            Some(Checkpoint { physical_hash, size })
                         } else {
                             None
                         };

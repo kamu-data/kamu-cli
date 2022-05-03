@@ -82,7 +82,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         Ok(manifest.content)
     }
 
-    fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), DomainError> {
+    fn add_repository(&self, repo_name: &RepositoryName, mut url: Url) -> Result<(), DomainError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if file_path.exists() {
@@ -90,6 +90,11 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
                 ResourceKind::Repository,
                 repo_name.to_string(),
             ));
+        }
+
+        // Ensure has trailing slash to properly handle relative links
+        if !url.path().ends_with('/') {
+            url.set_path(&format!("{}/", url.path()));
         }
 
         let manifest = Manifest {
