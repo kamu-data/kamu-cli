@@ -196,7 +196,7 @@ async fn create_graph_remote(
 
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        Arc::new(DatasetRepositoryLocalFS::new(ws.clone())),
+        Arc::new(LocalDatasetRepositoryImpl::new(ws.clone())),
     );
 
     for name in &to_import {

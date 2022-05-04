@@ -22,5 +22,5 @@ pub use metadata_chain::*;
 pub mod dataset;
 pub use dataset::*;
 
-pub mod dataset_repository;
-pub use dataset_repository::*;
+pub mod local_dataset_repository;
+pub use local_dataset_repository::*;

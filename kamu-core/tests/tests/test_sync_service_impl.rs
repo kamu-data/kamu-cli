@@ -122,7 +122,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let dataset_layout_2 = DatasetLayout::new(&volume_layout, &dataset_name_2);
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let local_repo = Arc::new(DatasetRepositoryLocalFS::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let sync_svc = SyncServiceImpl::new(remote_repo_reg.clone(), local_repo);
 

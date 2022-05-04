@@ -17,6 +17,22 @@ pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("{message}")]
+pub struct GenericError {
+    pub message: String,
+}
+
+impl GenericError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 #[error("internal error")]
 pub struct InternalError {
     source: BoxedError,

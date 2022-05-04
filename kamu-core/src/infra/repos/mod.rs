@@ -34,8 +34,8 @@ pub use metadata_chain_impl::*;
 mod dataset_impl;
 pub use dataset_impl::*;
 
-mod dataset_repository_local_fs;
-pub use dataset_repository_local_fs::*;
+mod local_dataset_repository_impl;
+pub use local_dataset_repository_impl::*;
 
 mod dataset_repo_factory;
 pub use dataset_repo_factory::*;

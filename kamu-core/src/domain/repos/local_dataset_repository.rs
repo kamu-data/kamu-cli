@@ -11,17 +11,21 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use async_trait::async_trait;
+use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
+use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait DatasetRepository: Sync + Send {
+pub trait LocalDatasetRepository: Sync + Send {
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
     ) -> Result<DatasetHandle, GetDatasetError>;
+
+    fn get_all_datasets<'s>(&'s self) -> DatasetListStream<'s>;
 
     async fn get_dataset(
         &self,
@@ -52,17 +56,32 @@ pub trait DatasetRepository: Sync + Send {
             Err(GetDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
         }
     }
+
+    async fn create_dataset_from_snapshot(
+        &self,
+        snapshot: DatasetSnapshot,
+    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>;
+
+    async fn create_datasets_from_snapshots(
+        &self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(
+        DatasetName,
+        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+    )>;
+
+    async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
+        -> Result<(), DeleteDatasetError>;
 }
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type DatasetListStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait LocalDatasetRepository: DatasetRepository {}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait DatasetBuilder {
+pub trait DatasetBuilder: Send + Sync {
     fn as_dataset(&self) -> &dyn Dataset;
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError>;
     async fn discard(&self) -> Result<(), InternalError>;
@@ -80,12 +99,20 @@ pub struct DatasetNotFoundError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-pub enum GetDatasetError {
-    #[error(transparent)]
-    NotFound(DatasetNotFoundError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("dataset {dataset_ref} is referencing non-existing inputs: {missing_inputs:?}")]
+pub struct MissingInputsError {
+    pub dataset_ref: DatasetRefLocal,
+    pub missing_inputs: Vec<DatasetRefLocal>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("dataset {dataset_handle} is referenced by: {children:?}")]
+pub struct DanglingReferenceError {
+    pub dataset_handle: DatasetHandle,
+    pub children: Vec<DatasetHandle>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +123,26 @@ pub struct CollisionError {
     pub new_dataset: DatasetHandle,
     pub existing_dataset: DatasetHandle,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("invalid snapshot: {reason}")]
+pub struct InvalidSnapshotError {
+    pub reason: String,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDatasetError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
 pub enum BeginCreateDatasetError {
@@ -108,9 +155,53 @@ pub enum CreateDatasetError {
     #[error("dataset is empty")]
     EmptyDataset,
     #[error(transparent)]
-    Collision(CollisionError),
+    Collision(#[from] CollisionError),
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
+pub enum CreateDatasetFromSnapshotError {
+    #[error(transparent)]
+    InvalidSnapshot(#[from] InvalidSnapshotError),
+    #[error(transparent)]
+    MissingInputs(#[from] MissingInputsError),
+    #[error(transparent)]
+    Collision(#[from] CollisionError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteDatasetError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    DanglingReference(#[from] DanglingReferenceError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<BeginCreateDatasetError> for CreateDatasetFromSnapshotError {
+    fn from(v: BeginCreateDatasetError) -> Self {
+        match v {
+            BeginCreateDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
+    fn from(v: CreateDatasetError) -> Self {
+        match v {
+            CreateDatasetError::EmptyDataset => unreachable!(),
+            CreateDatasetError::Collision(e) => Self::Collision(e),
+            CreateDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

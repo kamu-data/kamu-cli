@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_dataset_impl;
+mod test_local_dataset_repository_impl;
 mod test_metadata_chain_impl;
 mod test_named_object_repository_http;
 mod test_named_object_repository_local_fs;

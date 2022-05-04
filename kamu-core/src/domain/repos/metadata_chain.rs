@@ -18,7 +18,7 @@ use tokio_stream::Stream;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait MetadataChain2 {
+pub trait MetadataChain2: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
