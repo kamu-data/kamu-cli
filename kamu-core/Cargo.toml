@@ -48,8 +48,8 @@ async-stream = "*"
 tokio = { version = "*", features=["fs"] }
 tokio-stream = { version = "*" }
 tokio-util = { version = "*", features=["codec", "compat", "io"] }
-rusoto_core = {version = "*", default_features = false, features=["rustls"] }
-rusoto_s3 = {version = "*", default_features = false, features=["rustls"] }
+rusoto_core = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
+rusoto_s3 = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
 
 # Utils
 async-trait = "*"
