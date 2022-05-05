@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::RepositoryError;
+use super::{BoxedError, CreateDatasetError, GetDatasetError, InternalError};
 use opendatafabric::*;
 
 use std::sync::Arc;
 use thiserror::Error;
+use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -19,49 +20,38 @@ use thiserror::Error;
 
 #[async_trait::async_trait(?Send)]
 pub trait SyncService: Send + Sync {
-    async fn sync_from(
+    async fn sync(
         &self,
-        remote_ref: &DatasetRefRemote,
-        local_name: &DatasetName,
-        options: SyncOptions,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
+        opts: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
-    async fn sync_from_multi(
+    async fn sync_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
-        options: SyncOptions,
+        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
+        opts: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefRemote, DatasetName),
-        Result<SyncResult, SyncError>,
-    )>;
-
-    async fn sync_to(
-        &self,
-        local_ref: &DatasetRefLocal,
-        remote_name: &RemoteDatasetName,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError>;
-
-    async fn sync_to_multi(
-        &self,
-        datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefLocal, RemoteDatasetName),
-        Result<SyncResult, SyncError>,
-    )>;
+    ) -> Vec<SyncResultMulti>;
 }
 
 #[derive(Debug, Clone)]
-pub struct SyncOptions {}
+pub struct SyncOptions {
+    /// Whether the source of data can be assumed non-malicious to skip hash sum and other expensive checks.
+    /// Defaults to `true` when the source is local workspace.
+    pub trust_source: Option<bool>,
+
+    /// Whether destination dataset should be created if it does not exist
+    pub create_if_not_exist: bool,
+}
 
 impl Default for SyncOptions {
     fn default() -> Self {
-        Self {}
+        Self {
+            trust_source: None,
+            create_if_not_exist: true,
+        }
     }
 }
 
@@ -73,6 +63,13 @@ pub enum SyncResult {
         new_head: Multihash,
         num_blocks: usize,
     },
+}
+
+#[derive(Debug)]
+pub struct SyncResultMulti {
+    pub src: DatasetRefAny,
+    pub dst: DatasetRefAny,
+    pub result: Result<SyncResult, SyncError>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -91,8 +88,8 @@ impl SyncListener for NullSyncListener {}
 pub trait SyncMultiListener {
     fn begin_sync(
         &self,
-        _local_ref: &DatasetRefLocal,
-        _remote_ref: &DatasetRefRemote,
+        _src: &DatasetRefAny,
+        _dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         None
     }
@@ -105,83 +102,89 @@ impl SyncMultiListener for NullSyncMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum SyncError {
-    #[error("Source dataset {dataset_ref} does not exist")]
-    SourceDatasetDoesNotExist { dataset_ref: DatasetRefAny },
-    #[error("Destination dataset {dataset_ref} does not exist")]
-    DestinationDatasetDoesNotExist { dataset_ref: DatasetRefAny },
+    #[error(transparent)]
+    DatasetNotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    CreateDatasetFailed(#[from] CreateDatasetError),
+    #[error(transparent)]
+    UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error("Repository {repo_name} does not exist")]
     RepositoryDoesNotExist { repo_name: RepositoryName },
     // TODO: Report divergence type (e.g. remote is ahead of local)
     //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
-    #[error("Source and destination datasets have diverged. Source head: {src_head}, destination head {dst_head}")]
-    DatasetsDiverged {
-        src_head: Multihash,
-        dst_head: Multihash,
-        //uncommon_blocks_in_local: usize,
-        //uncommon_blocks_in_remote: usize,
-    },
-    #[error("Repository appears to have corrupted data: {message}")]
-    Corrupted {
-        message: String,
-        #[source]
-        source: Option<BoxedError>,
-    },
-    #[error("{0}")]
+    #[error(transparent)]
+    DatasetsDiverged(#[from] DatasetsDivergedError),
+    #[error(transparent)]
+    Corrupted(#[from] CorruptedSourceError),
+    #[error("dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
-    #[error("{0}")]
-    IOError(#[source] BoxedError),
-    #[error("{0}")]
-    CredentialsError(#[source] BoxedError),
-    #[error("{0}")]
-    ProtocolError(#[source] BoxedError),
-    #[error("{0}")]
-    InternalError(#[source] BoxedError),
+    //#[error("{0}")]
+    //Unauthorized(#[source] BoxedError),
+    //#[error("{0}")]
+    //ReadOnly(#[source] BoxedError),
+    //#[error("{0}")]
+    //ProtocolError(#[source] BoxedError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
-impl From<RepositoryError> for SyncError {
-    fn from(e: RepositoryError) -> Self {
-        match e {
-            RepositoryError::Diverged {
-                local_head,
-                remote_head,
-            } => SyncError::DatasetsDiverged {
-                // TODO: Revisit what is source and destination
-                src_head: local_head,
-                dst_head: remote_head,
-            },
-            RepositoryError::Corrupted {
-                ref message,
-                source: _,
-            } => SyncError::Corrupted {
-                message: message.clone(),
-                source: Some(Box::new(e)),
-            },
-            RepositoryError::CredentialsError { .. } => SyncError::CredentialsError(Box::new(e)),
-            RepositoryError::ProtocolError { .. } => SyncError::ProtocolError(Box::new(e)),
-            // TODO: Revisit what is source and destination
-            RepositoryError::DoesNotExist => SyncError::DestinationDatasetDoesNotExist {
-                dataset_ref: RemoteDatasetName::try_from("unknown/unknown")
-                    .unwrap()
-                    .into(),
-            },
-            RepositoryError::UpdatedConcurrently => SyncError::UpdatedConcurrently(Box::new(e)),
-            RepositoryError::IOError { .. } => SyncError::IOError(Box::new(e)),
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error("dataset {dataset_ref} not found")]
+pub struct DatasetNotFoundError {
+    pub dataset_ref: DatasetRefAny,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error("source and destination datasets have diverged, source head is {src_head}, destination head is {dst_head}")]
+pub struct DatasetsDivergedError {
+    pub src_head: Multihash,
+    pub dst_head: Multihash,
+    //uncommon_blocks_in_local: usize,
+    //uncommon_blocks_in_remote: usize,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("repository appears to have corrupted data: {message}")]
+pub struct CorruptedSourceError {
+    pub message: String,
+    #[source]
+    pub source: Option<BoxedError>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub struct UnsupportedProtocolError {
+    pub url: Url,
+}
+impl std::fmt::Display for UnsupportedProtocolError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "usupported protocol {} when accessing {}",
+            self.url.scheme(),
+            self.url
+        )
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl From<GetDatasetError> for SyncError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::DatasetNotFound(DatasetNotFoundError {
+                dataset_ref: e.dataset_ref.into(),
+            }),
+            GetDatasetError::Internal(e) => Self::Internal(e),
         }
-    }
-}
-
-impl From<std::io::Error> for SyncError {
-    fn from(e: std::io::Error) -> Self {
-        Self::InternalError(e.into())
-    }
-}
-
-impl From<fs_extra::error::Error> for SyncError {
-    fn from(e: fs_extra::error::Error) -> Self {
-        Self::InternalError(e.into())
     }
 }

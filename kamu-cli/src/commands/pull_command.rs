@@ -89,7 +89,8 @@ impl PullCommand {
                     create_remote_aliases: true,
                     ..PullOptions::default()
                 },
-                listener.and_then(|p| p.begin_sync(&local_name.as_local_ref(), &remote_ref)),
+                listener
+                    .and_then(|p| p.begin_sync(&remote_ref.as_any_ref(), &local_name.as_any_ref())),
             )
             .await;
 
@@ -376,12 +377,12 @@ impl TransformMultiListener for PrettyPullProgress {
 impl SyncMultiListener for PrettyPullProgress {
     fn begin_sync(
         &self,
-        local_ref: &DatasetRefLocal,
-        remote_ref: &DatasetRefRemote,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            local_ref.clone(),
-            remote_ref.clone(),
+            dst.as_local_ref().unwrap(),
+            src.as_remote_ref().unwrap(),
             self.multi_progress.clone(),
         )))
     }

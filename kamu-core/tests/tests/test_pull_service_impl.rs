@@ -201,9 +201,9 @@ async fn create_graph_remote(
 
     for name in &to_import {
         sync_service
-            .sync_from(
-                &RemoteDatasetName::new(tmp_repo_name.clone(), None, name.clone()).as_remote_ref(),
-                name,
+            .sync(
+                &RemoteDatasetName::new(tmp_repo_name.clone(), None, name.clone()).into(),
+                &name.into(),
                 SyncOptions::default(),
                 None,
             )
@@ -354,9 +354,9 @@ async fn test_pull_batching_complex_with_remote() {
                 }
             )
             .await,
-        vec![PullBatch::SyncFrom(vec![(
-            rr!("kamu.dev/anonymous/e"),
-            n!("e")
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/anonymous/e").into(),
+            n!("e").into()
         )])],
     );
 
@@ -371,9 +371,9 @@ async fn test_pull_batching_complex_with_remote() {
                 }
             )
             .await,
-        vec![PullBatch::SyncFrom(vec![(
-            rr!("kamu.dev/anonymous/e"),
-            n!("e")
+        vec![PullBatch::Sync(vec![(
+            rr!("kamu.dev/anonymous/e").into(),
+            n!("e").into()
         )])],
     );
 
@@ -389,7 +389,7 @@ async fn test_pull_batching_complex_with_remote() {
             )
             .await,
         vec![
-            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -408,7 +408,7 @@ async fn test_pull_batching_complex_with_remote() {
             )
             .await,
         vec![
-            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -427,7 +427,7 @@ async fn test_pull_batching_complex_with_remote() {
             )
             .await,
         vec![
-            PullBatch::SyncFrom(vec![(rr!("kamu.dev/anonymous/e"), n!("e"))]),
+            PullBatch::Sync(vec![(rr!("kamu.dev/anonymous/e").into(), n!("e").into())]),
             PullBatch::Ingest(refs!("c", "d")),
             PullBatch::Transform(refs!("f")),
             PullBatch::Transform(refs!("g")),
@@ -612,7 +612,7 @@ impl PullTestHarness {
 pub enum PullBatch {
     Ingest(Vec<DatasetRefAny>),
     Transform(Vec<DatasetRefAny>),
-    SyncFrom(Vec<(DatasetRefRemote, DatasetName)>),
+    Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -747,16 +747,22 @@ impl TestSyncService {
 
 #[async_trait::async_trait(?Send)]
 impl SyncService for TestSyncService {
-    async fn sync_from(
+    async fn sync(
         &self,
-        _remote_ref: &DatasetRefRemote,
-        local_name: &DatasetName,
+        _src: &DatasetRefAny,
+        dst: &DatasetRefAny,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
+        let local_name = match dst {
+            DatasetRefAny::Name(name) => name,
+            DatasetRefAny::Handle(DatasetHandle { name, .. }) => name,
+            _ => unreachable!(),
+        };
         self.dataset_reg
             .add_dataset(MetadataFactory::dataset_snapshot().name(local_name).build())
             .unwrap();
+
         Ok(SyncResult::Updated {
             old_head: None,
             new_head: Multihash::from_digest_sha3_256(b"boop"),
@@ -764,44 +770,23 @@ impl SyncService for TestSyncService {
         })
     }
 
-    async fn sync_from_multi(
+    async fn sync_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
+        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefRemote, DatasetName),
-        Result<SyncResult, SyncError>,
-    )> {
+    ) -> Vec<SyncResultMulti> {
         let mut call = Vec::new();
         let mut results = Vec::new();
-        for (rem, loc) in datasets {
-            call.push((rem.clone(), loc.clone()));
-            results.push(((rem.clone(), loc.clone()), Ok(SyncResult::UpToDate)));
+        for (src, dst) in src_dst {
+            call.push((src.clone(), dst.clone()));
+            results.push(SyncResultMulti {
+                src,
+                dst,
+                result: Ok(SyncResult::UpToDate),
+            });
         }
-        self.calls.lock().unwrap().push(PullBatch::SyncFrom(call));
+        self.calls.lock().unwrap().push(PullBatch::Sync(call));
         results
-    }
-
-    async fn sync_to(
-        &self,
-        _local_ref: &DatasetRefLocal,
-        _remote_name: &RemoteDatasetName,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
-        unimplemented!()
-    }
-
-    async fn sync_to_multi(
-        &self,
-        _datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
-        _options: SyncOptions,
-        _listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefLocal, RemoteDatasetName),
-        Result<SyncResult, SyncError>,
-    )> {
-        unimplemented!()
     }
 }

@@ -67,7 +67,7 @@ pub use resource_loader::*;
 mod search_service;
 pub use search_service::*;
 
-mod sync_service;
+pub(crate) mod sync_service;
 pub use sync_service::*;
 
 mod transform_service;

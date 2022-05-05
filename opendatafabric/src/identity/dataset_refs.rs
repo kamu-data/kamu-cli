@@ -81,6 +81,10 @@ impl DatasetRefLocal {
             DatasetRefLocal::Handle(DatasetHandle { name, .. }) => Some(name),
         }
     }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
+    }
 }
 
 impl std::str::FromStr for DatasetRefLocal {
@@ -168,6 +172,10 @@ impl DatasetRefRemote {
             DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => Some(name),
             DatasetRefRemote::Url(_) => None,
         }
+    }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
     }
 }
 

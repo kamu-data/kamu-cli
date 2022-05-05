@@ -253,12 +253,12 @@ impl PrettyPushProgress {
 impl SyncMultiListener for PrettyPushProgress {
     fn begin_sync(
         &self,
-        local_ref: &DatasetRefLocal,
-        remote_ref: &DatasetRefRemote,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            local_ref.clone(),
-            remote_ref.clone(),
+            src.as_local_ref().unwrap(),
+            dst.as_remote_ref().unwrap(),
             self.multi_progress.clone(),
         )))
     }

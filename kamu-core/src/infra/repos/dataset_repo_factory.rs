@@ -38,7 +38,7 @@ impl DatasetRepoFactory {
     pub fn get_local_fs_legacy(
         meta_dir: PathBuf,
         layout: DatasetLayout,
-    ) -> Result<impl Dataset, GetDatasetRepoError> {
+    ) -> Result<impl Dataset, InternalError> {
         let blocks_dir = meta_dir.join("blocks");
         let refs_dir = meta_dir.join("refs");
         Ok(DatasetImpl::new(
@@ -54,7 +54,7 @@ impl DatasetRepoFactory {
 
     pub fn get_or_create_local_fs<P: AsRef<Path>>(
         root: P,
-    ) -> Result<DatasetImplLocalFS, GetDatasetRepoError> {
+    ) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         if !root.exists() || root.read_dir().into_internal_error()?.next().is_none() {
             Self::create_local_fs(root)
@@ -65,7 +65,7 @@ impl DatasetRepoFactory {
 
     pub fn get_local_fs<P: AsRef<Path>>(
         root: P,
-    ) -> Result<DatasetImplLocalFS, GetDatasetRepoError> {
+    ) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         let blocks_dir = root.join("blocks");
         let refs_dir = root.join("refs");
@@ -86,7 +86,7 @@ impl DatasetRepoFactory {
 
     pub fn create_local_fs<P: AsRef<Path>>(
         root: P,
-    ) -> Result<DatasetImplLocalFS, GetDatasetRepoError> {
+    ) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         if !root.exists() {
             std::fs::create_dir(&root).into_internal_error()?;
@@ -118,7 +118,7 @@ impl DatasetRepoFactory {
         ))
     }
 
-    pub fn get_http(base_url: Url) -> Result<impl Dataset, GetDatasetRepoError> {
+    pub fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
             MetadataChain2Impl::new(
@@ -134,7 +134,7 @@ impl DatasetRepoFactory {
         ))
     }
 
-    pub fn get_s3(base_url: Url) -> Result<impl Dataset, GetDatasetRepoError> {
+    pub fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
         use rusoto_core::Region;
         use rusoto_s3::S3Client;
 

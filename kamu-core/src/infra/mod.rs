@@ -26,7 +26,7 @@ pub use error::*;
 // Manifests
 ///////////////////////////////////////////////////////////////////////////////
 
-mod dataset_config;
+pub mod dataset_config;
 pub use dataset_config::*;
 
 mod dataset_layout;

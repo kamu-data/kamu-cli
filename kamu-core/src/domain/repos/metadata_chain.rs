@@ -41,7 +41,12 @@ pub trait MetadataChain2: Send + Sync {
     async fn iter_blocks_ref<'a>(&'a self, r: &BlockRef) -> Result<BlockStream<'a>, GetRefError>;
 
     /// Update referece to point at the specified block
-    async fn set_ref(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError>;
+    async fn set_ref<'a>(
+        &'a self,
+        r: &BlockRef,
+        hash: &Multihash,
+        opts: SetRefOpts<'a>,
+    ) -> Result<(), SetRefError>;
 
     /// Appends the block to the chain
     async fn append<'a>(
@@ -91,6 +96,26 @@ pub type BlockStream<'a> =
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug)]
+pub struct SetRefOpts<'a> {
+    /// Ensure new value points to a valid block
+    pub validate_block_present: bool,
+
+    /// Validate that old reference still points to the specified block (compare-and-swap)
+    pub check_ref_is: Option<Option<&'a Multihash>>,
+}
+
+impl Default for SetRefOpts<'_> {
+    fn default() -> Self {
+        Self {
+            validate_block_present: true,
+            check_ref_is: None,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Expand into bitflags to give fine control
 #[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -122,7 +147,7 @@ pub struct AppendOpts<'a> {
     pub expected_hash: Option<&'a Multihash>,
 }
 
-impl<'a> Default for AppendOpts<'a> {
+impl Default for AppendOpts<'_> {
     fn default() -> Self {
         Self {
             validation: AppendValidation::Full,
@@ -190,6 +215,8 @@ pub enum SetRefError {
     #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
     #[error(transparent)]
+    CASFailed(#[from] RefCASError),
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -208,9 +235,9 @@ pub struct RefCASError {
 #[derive(Error, Debug)]
 pub enum AppendError {
     #[error(transparent)]
-    RefNotFound(RefNotFoundError),
+    RefNotFound(#[from] RefNotFoundError),
     #[error(transparent)]
-    RefCASFailed(RefCASError),
+    RefCASFailed(#[from] RefCASError),
     #[error(transparent)]
     InvalidBlock(#[from] AppendValidationError),
     #[error(transparent)]

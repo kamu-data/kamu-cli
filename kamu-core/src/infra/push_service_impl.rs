@@ -153,11 +153,11 @@ impl PushService for PushServiceImpl {
 
         let sync_results = self
             .sync_svc
-            .sync_to_multi(
+            .sync_multi(
                 &mut sync_plan.iter().map(|pi| {
                     (
                         pi.local_handle.as_ref().unwrap().into(),
-                        pi.remote_handle.as_ref().unwrap().name.clone(),
+                        pi.remote_handle.as_ref().unwrap().into(),
                     )
                 }),
                 options.sync_options,
@@ -168,7 +168,7 @@ impl PushService for PushServiceImpl {
         assert_eq!(sync_plan.len(), sync_results.len());
 
         std::iter::zip(sync_plan, sync_results)
-            .map(|(pi, (_, res))| (pi, Self::convert_sync_result(res)))
+            .map(|(pi, res)| (pi, Self::convert_sync_result(res.result)))
             .collect()
     }
 }

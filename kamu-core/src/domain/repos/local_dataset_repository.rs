@@ -212,7 +212,7 @@ struct NullDatasetBuilder {
 }
 
 impl NullDatasetBuilder {
-    fn new(hdl: DatasetHandle, dataset: Arc<dyn Dataset>) -> Self {
+    pub fn new(hdl: DatasetHandle, dataset: Arc<dyn Dataset>) -> Self {
         Self { hdl, dataset }
     }
 }

@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
+use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
+use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
@@ -38,9 +39,9 @@ impl SyncServiceImpl {
     async fn sync_with_simple_transfer_protocol(
         &self,
         src: &dyn Dataset,
-        src_ref: DatasetRefAny,
+        src_ref: &DatasetRefAny,
         dst: &dyn Dataset,
-        dst_ref: DatasetRefAny,
+        dst_ref: &DatasetRefAny,
         validation: AppendValidation,
         trust_source_hashes: bool,
     ) -> Result<SyncResult, SyncError> {
@@ -67,9 +68,9 @@ impl SyncServiceImpl {
     async fn sync_with_simple_transfer_protocol_impl(
         &self,
         src: &dyn Dataset,
-        src_ref: DatasetRefAny,
+        src_ref: &DatasetRefAny,
         dst: &dyn Dataset,
-        _dst_ref: DatasetRefAny,
+        _dst_ref: &DatasetRefAny,
         validation: AppendValidation,
         trust_source_hashes: bool,
     ) -> Result<SyncResult, SyncError> {
@@ -84,16 +85,17 @@ impl SyncServiceImpl {
 
         let src_head = match src_chain.get_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
-            Err(GetRefError::NotFound(_)) => Err(SyncError::SourceDatasetDoesNotExist {
-                dataset_ref: src_ref,
-            }),
-            Err(GetRefError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+            Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
+                dataset_ref: src_ref.clone(),
+            }
+            .into()),
+            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         let dst_head = match dst_chain.get_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
-            Err(GetRefError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         info!(?src_head, ?dst_head, "Resolved heads");
@@ -109,15 +111,17 @@ impl SyncServiceImpl {
             .await
         {
             Ok(v) => Ok(v),
-            Err(IterBlocksError::BlockNotFound(e)) => Err(SyncError::Corrupted {
+            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
                 message: "source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
-            }),
-            Err(IterBlocksError::InvalidInterval(e)) => Err(SyncError::DatasetsDiverged {
+            }
+            .into()),
+            Err(IterBlocksError::InvalidInterval(e)) => Err(DatasetsDivergedError {
                 src_head: e.head,
                 dst_head: e.tail,
-            }),
-            Err(IterBlocksError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+            }
+            .into()),
+            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         let num_blocks = blocks.len();
@@ -135,11 +139,12 @@ impl SyncServiceImpl {
 
                 let stream = match src_data.get_stream(&data_slice.physical_hash).await {
                     Ok(s) => Ok(s),
-                    Err(GetError::NotFound(e)) => Err(SyncError::Corrupted {
+                    Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source data file is missing".to_owned(),
                         source: Some(e.into()),
-                    }),
-                    Err(GetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+                    }
+                    .into()),
+                    Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
                 match dst_data
@@ -155,11 +160,11 @@ impl SyncServiceImpl {
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(InsertError::HashMismatch(e)) => Err(SyncError::Corrupted {
+                    Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
                         message: "Data file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
                         source: Some(e.into()),
-                    }),
-                    Err(InsertError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+                    }.into()),
+                    Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
             }
 
@@ -169,11 +174,12 @@ impl SyncServiceImpl {
 
                 let stream = match src_checkpoints.get_stream(&checkpoint.physical_hash).await {
                     Ok(s) => Ok(s),
-                    Err(GetError::NotFound(e)) => Err(SyncError::Corrupted {
+                    Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source checkpoint file is missing".to_owned(),
                         source: Some(e.into()),
-                    }),
-                    Err(GetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+                    }
+                    .into()),
+                    Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
                 match dst_checkpoints
@@ -189,11 +195,11 @@ impl SyncServiceImpl {
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(InsertError::HashMismatch(e)) => Err(SyncError::Corrupted {
+                    Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
                         message: "Checkpoint file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
                         source: Some(e.into()),
-                    }),
-                    Err(InsertError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+                    }.into()),
+                    Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
             }
         }
@@ -214,28 +220,40 @@ impl SyncServiceImpl {
             ).await {
                 Ok(_) => Ok(()),
                 Err(AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))) => {
-                    Err(SyncError::Corrupted {
+                    Err(CorruptedSourceError {
                         message: "Block hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
                         source: Some(e.into()),
-                    })
+                    }.into())
                 }
                 Err(AppendError::InvalidBlock(e)) => {
-                    Err(SyncError::Corrupted {
+                    Err(CorruptedSourceError {
                         message: "Source metadata chain is logically inconsistent".to_owned(),
                         source: Some(e.into()),
-                    })
+                    }.into())
                 }
-                Err(AppendError::Internal(e)) => Err(SyncError::InternalError(e.into())),
+                Err(AppendError::Internal(e)) => Err(SyncError::Internal(e.into())),
                 Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
             }?;
         }
 
         // Update reference, atomically commiting the sync operation
         // Any failures before this point may result in dangling files but will keep the destination dataset in its original logical state
-        dst_chain
-            .set_ref(&BlockRef::Head, &src_head)
+        match dst_chain
+            .set_ref(
+                &BlockRef::Head,
+                &src_head,
+                SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: Some(dst_head.as_ref()),
+                },
+            )
             .await
-            .map_err(|e| SyncError::InternalError(e.into()))?;
+        {
+            Ok(()) => Ok(()),
+            Err(SetRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
+            Err(SetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            Err(SetRefError::BlockNotFound(_)) => unreachable!(),
+        }?;
 
         Ok(SyncResult::Updated {
             old_head: dst_head,
@@ -244,26 +262,42 @@ impl SyncServiceImpl {
         })
     }
 
-    fn get_remote_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, SyncError> {
-        let ds: Arc<dyn Dataset> = match url.scheme() {
-            "file" => Arc::new(
-                DatasetRepoFactory::get_or_create_local_fs(url.to_file_path().unwrap())
-                    .map_err(|e| SyncError::InternalError(e.into()))?,
-            ),
-            "http" => Arc::new(
-                DatasetRepoFactory::get_http(url)
-                    .map_err(|e| SyncError::InternalError(e.into()))?,
-            ),
-            "s3" | "s3+http" | "s3+https" => Arc::new(
-                DatasetRepoFactory::get_s3(url).map_err(|e| SyncError::InternalError(e.into()))?,
-            ),
-            s => {
-                return Err(SyncError::InternalError(
-                    RepositoryFactoryError::unsupported_protocol(s).into(),
-                ))
+    async fn get_remote_dataset(
+        &self,
+        dataset_ref: &DatasetRefAny,
+        url: Url,
+        ensure_exists: bool,
+    ) -> Result<Arc<dyn Dataset>, SyncError> {
+        let dataset = match url.scheme() {
+            "file" => {
+                let ds = DatasetRepoFactory::get_or_create_local_fs(url.to_file_path().unwrap())?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-        };
-        Ok(ds)
+            "http" => {
+                let ds = DatasetRepoFactory::get_http(url)?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            "s3" | "s3+http" | "s3+https" => {
+                let ds = DatasetRepoFactory::get_s3(url)?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            _ => Err(SyncError::UnsupportedProtocol(UnsupportedProtocolError {
+                url,
+            })),
+        }?;
+
+        if ensure_exists {
+            match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+                Ok(_) => Ok(()),
+                Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
+                    dataset_ref: dataset_ref.clone(),
+                }
+                .into()),
+                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            }?;
+        }
+
+        Ok(dataset)
     }
 
     fn get_url_for_remote_dataset(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
@@ -288,7 +322,7 @@ impl SyncServiceImpl {
                 DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
                     repo_name: remote_name.repository().clone(),
                 },
-                _ => SyncError::InternalError(e.into()),
+                e => SyncError::Internal(e.into_internal_error()),
             })?;
 
         repo.url.ensure_trailing_slash();
@@ -300,95 +334,86 @@ impl SyncServiceImpl {
         Ok(dataset_url)
     }
 
-    async fn do_sync_from(
+    async fn sync_impl(
         &self,
-        remote_ref: &DatasetRefRemote,
-        local_name: &DatasetName,
-        _options: SyncOptions,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
+        opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        let local_dataset = match self
-            .local_repo
-            .get_or_create_dataset(&local_name.as_local_ref())
-            .await
-        {
-            Ok(ds) => Ok(ds),
-            Err(GetDatasetError::NotFound(e)) => Err(SyncError::DestinationDatasetDoesNotExist {
-                dataset_ref: e.dataset_ref.into(),
-            }),
-            Err(GetDatasetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
-        }?;
+        // Resolve source
+        let (src_dataset, src_is_local) = if let Some(local_ref) = src.as_local_ref() {
+            let dataset = self.local_repo.get_dataset(&local_ref).await?;
+            (dataset, true)
+        } else {
+            let remote_ref = src.as_remote_ref().unwrap();
+            let url = self.get_url_for_remote_dataset(&remote_ref)?;
+            let dataset = self.get_remote_dataset(src, url, true).await?;
+            (dataset, false)
+        };
 
-        let remote_dataset_url = self.get_url_for_remote_dataset(remote_ref)?;
-        let remote_dataset = self.get_remote_dataset(remote_dataset_url)?;
+        // Resolve destination
+        let dst_dataset_builder: Box<dyn DatasetBuilder> =
+            if let Some(local_ref) = dst.as_local_ref() {
+                if opts.create_if_not_exist {
+                    Box::new(WrapperDatasetBuilder::new(
+                        self.local_repo.get_or_create_dataset(&local_ref).await?,
+                    ))
+                } else {
+                    Box::new(NullDatasetBuilder::new(
+                        self.local_repo.get_dataset(&local_ref).await?,
+                    ))
+                }
+            } else {
+                let remote_ref = dst.as_remote_ref().unwrap();
+                let url = self.get_url_for_remote_dataset(&remote_ref)?;
+                let dataset = self
+                    .get_remote_dataset(dst, url, !opts.create_if_not_exist)
+                    .await?;
+                Box::new(NullDatasetBuilder::new(dataset))
+            };
+
+        let validation = if opts.trust_source.unwrap_or(src_is_local) {
+            AppendValidation::None
+        } else {
+            AppendValidation::Full
+        };
 
         match self
             .sync_with_simple_transfer_protocol(
-                remote_dataset.as_ref(),
-                remote_ref.into(),
-                local_dataset.as_dataset(),
-                local_name.into(),
-                AppendValidation::Full,
-                false,
+                src_dataset.as_ref(),
+                src,
+                dst_dataset_builder.as_dataset(),
+                dst,
+                validation,
+                opts.trust_source.unwrap_or(src_is_local),
             )
             .await
         {
-            Ok(res) => match local_dataset.finish().await {
-                Ok(_) => Ok(res),
-                Err(e) => Err(SyncError::InternalError(e.into())),
-            },
+            Ok(r) => {
+                dst_dataset_builder.finish().await?;
+                Ok(r)
+            }
             Err(e) => {
-                local_dataset
-                    .discard()
-                    .await
-                    .map_err(|e| SyncError::InternalError(e.into()))?;
+                dst_dataset_builder.discard().await?;
                 Err(e)
             }
         }
-    }
-
-    // TODO: Support sync to URL
-    async fn do_sync_to(
-        &self,
-        local_ref: &DatasetRefLocal,
-        remote_name: &RemoteDatasetName,
-        _options: SyncOptions,
-    ) -> Result<SyncResult, SyncError> {
-        let local_dataset = match self.local_repo.get_dataset(local_ref).await {
-            Ok(ds) => Ok(ds),
-            Err(GetDatasetError::NotFound(_)) => Err(SyncError::SourceDatasetDoesNotExist {
-                dataset_ref: local_ref.into(),
-            }),
-            Err(GetDatasetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
-        }?;
-
-        let remote_dataset_url = self.get_url_for_remote_dataset(&remote_name.as_remote_ref())?;
-        let remote_dataset = self.get_remote_dataset(remote_dataset_url)?;
-
-        self.sync_with_simple_transfer_protocol(
-            local_dataset.as_ref(),
-            local_ref.into(),
-            remote_dataset.as_ref(),
-            remote_name.into(),
-            AppendValidation::None,
-            true,
-        )
-        .await
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl SyncService for SyncServiceImpl {
-    async fn sync_from(
+    async fn sync(
         &self,
-        remote_ref: &DatasetRefRemote,
-        local_name: &DatasetName,
-        options: SyncOptions,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
+        opts: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.do_sync_from(remote_ref, local_name, options).await {
+        match self.sync_impl(src, dst, opts).await {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -401,87 +426,85 @@ impl SyncService for SyncServiceImpl {
     }
 
     // TODO: Parallelism
-    async fn sync_from_multi(
+    async fn sync_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = (DatasetRefRemote, DatasetName)>,
-        options: SyncOptions,
+        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
+        opts: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefRemote, DatasetName),
-        Result<SyncResult, SyncError>,
-    )> {
+    ) -> Vec<SyncResultMulti> {
         let mut results = Vec::new();
 
-        for (remote_ref, local_name) in datasets {
-            let res = self
-                .sync_from(
-                    &remote_ref,
-                    &local_name,
-                    options.clone(),
-                    listener
-                        .as_ref()
-                        .and_then(|l| l.begin_sync(&local_name.as_local_ref(), &remote_ref)),
-                )
-                .await;
-
-            results.push(((remote_ref, local_name), res));
-        }
-
-        results
-    }
-
-    async fn sync_to(
-        &self,
-        local_ref: &DatasetRefLocal,
-        remote_name: &RemoteDatasetName,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<SyncResult, SyncError> {
-        let listener = listener.unwrap_or(Arc::new(NullSyncListener));
-        listener.begin();
-
-        match self.do_sync_to(local_ref, remote_name, options).await {
-            Ok(result) => {
-                listener.success(&result);
-                Ok(result)
-            }
-            Err(err) => {
-                listener.error(&err);
-                Err(err)
-            }
-        }
-    }
-
-    // TODO: Parallelism
-    async fn sync_to_multi(
-        &self,
-        datasets: &mut dyn Iterator<Item = (DatasetRefLocal, RemoteDatasetName)>,
-        options: SyncOptions,
-        listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(
-        (DatasetRefLocal, RemoteDatasetName),
-        Result<SyncResult, SyncError>,
-    )> {
-        let mut results = Vec::new();
-
-        for (local_ref, remote_name) in datasets {
-            let res = self
-                .sync_to(
-                    &local_ref,
-                    &remote_name,
-                    options.clone(),
-                    listener
-                        .as_ref()
-                        .and_then(|l| l.begin_sync(&local_ref, &remote_name.as_remote_ref())),
-                )
-                .await;
-
-            results.push(((local_ref, remote_name), res));
+        for (src, dst) in src_dst {
+            let listener = listener.as_ref().and_then(|l| l.begin_sync(&src, &dst));
+            let result = self.sync(&src, &dst, opts.clone(), listener).await;
+            results.push(SyncResultMulti { src, dst, result });
         }
 
         results
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+trait DatasetBuilder {
+    fn as_dataset(&self) -> &dyn Dataset;
+    async fn finish(&self) -> Result<(), CreateDatasetError>;
+    async fn discard(&self) -> Result<(), InternalError>;
+}
+
+struct NullDatasetBuilder {
+    dataset: Arc<dyn Dataset>,
+}
+
+impl NullDatasetBuilder {
+    pub fn new(dataset: Arc<dyn Dataset>) -> Self {
+        Self { dataset }
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetBuilder for NullDatasetBuilder {
+    fn as_dataset(&self) -> &dyn Dataset {
+        self.dataset.as_ref()
+    }
+
+    async fn finish(&self) -> Result<(), CreateDatasetError> {
+        Ok(())
+    }
+
+    async fn discard(&self) -> Result<(), InternalError> {
+        Ok(())
+    }
+}
+
+struct WrapperDatasetBuilder {
+    builder: Box<dyn crate::domain::DatasetBuilder>,
+}
+
+impl WrapperDatasetBuilder {
+    fn new(builder: Box<dyn crate::domain::DatasetBuilder>) -> Self {
+        Self { builder }
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetBuilder for WrapperDatasetBuilder {
+    fn as_dataset(&self) -> &dyn Dataset {
+        self.builder.as_dataset()
+    }
+
+    async fn finish(&self) -> Result<(), CreateDatasetError> {
+        self.builder.finish().await?;
+        Ok(())
+    }
+
+    async fn discard(&self) -> Result<(), InternalError> {
+        self.builder.discard().await
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 trait UrlExt {
     fn ensure_trailing_slash(&mut self);

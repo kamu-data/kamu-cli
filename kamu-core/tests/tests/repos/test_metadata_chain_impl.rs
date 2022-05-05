@@ -96,13 +96,31 @@ async fn test_set_ref() {
         chain
             .set_ref(
                 &BlockRef::Head,
-                &Multihash::from_digest_sha3_256(b"does-not-exist")
+                &Multihash::from_digest_sha3_256(b"does-not-exist"),
+                SetRefOpts::default(),
             )
             .await,
         Err(SetRefError::BlockNotFound(_))
     );
 
-    chain.set_ref(&BlockRef::Head, &hash_1).await.unwrap();
+    assert_matches!(
+        chain
+            .set_ref(
+                &BlockRef::Head,
+                &hash_1,
+                SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: Some(Some(&Multihash::from_digest_sha3_256(b"does-not-exist"))),
+                }
+            )
+            .await,
+        Err(SetRefError::CASFailed(_))
+    );
+
+    chain
+        .set_ref(&BlockRef::Head, &hash_1, SetRefOpts::default())
+        .await
+        .unwrap();
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 

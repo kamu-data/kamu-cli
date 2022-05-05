@@ -289,11 +289,11 @@ impl PullService for PullServiceImpl {
             } else if depth == 0 && is_remote {
                 let sync_results = self
                     .sync_svc
-                    .sync_from_multi(
+                    .sync_multi(
                         &mut batch.iter().map(|pi| {
                             (
-                                pi.remote_name.as_ref().unwrap().as_remote_ref(),
-                                pi.local_name.clone(),
+                                pi.remote_name.as_ref().unwrap().into(),
+                                pi.local_name.as_any_ref(),
                             )
                         }),
                         options.sync_options.clone(),
@@ -303,16 +303,15 @@ impl PullService for PullServiceImpl {
 
                 // Associate newly-synced datasets with remotes
                 if options.create_remote_aliases {
-                    for ((remote_ref, local_name), res) in &sync_results {
-                        if let Ok(SyncResult::Updated { old_head: None, .. }) = res {
-                            match &remote_ref {
-                                DatasetRefRemote::RemoteName(name)
-                                | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle {
-                                    name,
-                                    ..
+                    for res in &sync_results {
+                        if let Ok(SyncResult::Updated { old_head: None, .. }) = res.result {
+                            match &res.src {
+                                DatasetRefAny::RemoteName(name)
+                                | DatasetRefAny::RemoteHandle(RemoteDatasetHandle {
+                                    name, ..
                                 }) => {
                                     self.remote_alias_reg
-                                        .get_remote_aliases(&local_name.as_local_ref())
+                                        .get_remote_aliases(&res.dst.as_local_ref().unwrap())
                                         .unwrap()
                                         .add(name, RemoteAliasKind::Pull)
                                         .unwrap();
@@ -325,7 +324,7 @@ impl PullService for PullServiceImpl {
 
                 sync_results
                     .into_iter()
-                    .map(|((_, local_name), res)| (local_name.into(), Self::result_into(res)))
+                    .map(|res| (res.dst, Self::result_into(res.result)))
                     .collect()
             } else {
                 self.transform_svc
@@ -358,7 +357,12 @@ impl PullService for PullServiceImpl {
     ) -> Result<PullResult, PullError> {
         let res = self
             .sync_svc
-            .sync_from(remote_ref, local_name, options.sync_options, listener)
+            .sync(
+                &remote_ref.into(),
+                &local_name.into(),
+                options.sync_options,
+                listener,
+            )
             .await;
 
         if res.is_ok() && options.create_remote_aliases {

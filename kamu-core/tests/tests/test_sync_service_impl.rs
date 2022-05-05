@@ -143,26 +143,28 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
         sync_svc
-            .sync_to(
-                &dataset_name.as_local_ref(),
-                &push_remote_dataset_name,
+            .sync(
+                &dataset_name.as_any_ref(),
+                &push_remote_dataset_name.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::SourceDatasetDoesNotExist { .. })
+        Err(SyncError::DatasetNotFound(e))
+        if e.dataset_ref == dataset_name.as_any_ref()
     );
 
     assert_matches!(
         sync_svc
-            .sync_from(
-                &pull_remote_dataset_name.as_remote_ref(),
-                &dataset_name_2,
+            .sync(
+                &pull_remote_dataset_name.as_any_ref(),
+                &dataset_name_2.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::SourceDatasetDoesNotExist { .. })
+        Err(SyncError::DatasetNotFound(e))
+        if e.dataset_ref == pull_remote_dataset_name.as_any_ref()
     );
 
     // Add dataset
@@ -176,7 +178,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name,  SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_remote_dataset_name.as_any_ref(),  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -185,7 +187,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     );
 
     assert_matches!(
-        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -215,13 +217,13 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
         );
 
     assert_matches!(
-        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name, SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged { src_head, dst_head })
+        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head }))
         if src_head == b1 && dst_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -230,7 +232,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     );
 
     assert_matches!(
-        sync_svc.sync_from(&pull_remote_dataset_name.as_remote_ref(), &dataset_name_2, SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -243,9 +245,9 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc
-            .sync_to(
-                &dataset_name.as_local_ref(),
-                &push_remote_dataset_name,
+            .sync(
+                &dataset_name.as_any_ref(),
+                &push_remote_dataset_name.as_any_ref(),
                 SyncOptions::default(),
                 None
             )
@@ -255,9 +257,9 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
 
     assert_matches!(
         sync_svc
-            .sync_from(
-                &pull_remote_dataset_name.as_remote_ref(),
-                &dataset_name_2,
+            .sync(
+                &pull_remote_dataset_name.as_any_ref(),
+                &dataset_name_2.as_any_ref(),
                 SyncOptions::default(),
                 None
             )
@@ -280,7 +282,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
         );
 
     assert_matches!(
-        sync_svc.sync_to(&dataset_name_2.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name_2.into(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -290,8 +292,8 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync_to(&dataset_name.as_local_ref(), &push_remote_dataset_name, SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged { src_head, dst_head })
+        sync_svc.sync(&dataset_name.into(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
         if src_head == b3 && dst_head == diverged_head
     );
 }

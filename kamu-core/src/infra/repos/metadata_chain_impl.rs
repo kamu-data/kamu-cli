@@ -183,16 +183,40 @@ where
         Ok(self.iter_blocks_interval(&head, None))
     }
 
-    async fn set_ref(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError> {
-        if !self
-            .obj_repo
-            .contains(hash)
-            .await
-            .map_err(|e| SetRefError::Internal(e))?
-        {
-            return Err(SetRefError::BlockNotFound(BlockNotFoundError {
-                hash: hash.clone(),
-            }));
+    async fn set_ref<'a>(
+        &'a self,
+        r: &BlockRef,
+        hash: &Multihash,
+        opts: SetRefOpts<'a>,
+    ) -> Result<(), SetRefError> {
+        if opts.validate_block_present {
+            if !self
+                .obj_repo
+                .contains(hash)
+                .await
+                .map_err(|e| SetRefError::Internal(e))?
+            {
+                return Err(SetRefError::BlockNotFound(BlockNotFoundError {
+                    hash: hash.clone(),
+                }));
+            }
+        }
+
+        // TODO: CONCURRENCY: Implement true CAS
+        if let Some(prev_expected) = opts.check_ref_is {
+            let prev_actual = match self.ref_repo.get(r).await {
+                Ok(r) => Ok(Some(r)),
+                Err(GetRefError::NotFound(_)) => Ok(None),
+                Err(GetRefError::Internal(e)) => Err(SetRefError::Internal(e)),
+            }?;
+            if prev_expected != prev_actual.as_ref() {
+                return Err(RefCASError {
+                    reference: r.clone(),
+                    expected: prev_expected.cloned(),
+                    actual: prev_actual,
+                }
+                .into());
+            }
         }
 
         self.ref_repo

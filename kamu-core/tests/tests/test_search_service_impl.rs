@@ -52,9 +52,9 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     sync_svc
-        .sync_to(
-            &dataset_local_name.as_local_ref(),
-            &dataset_remote_name,
+        .sync(
+            &dataset_local_name.as_any_ref(),
+            &dataset_remote_name.as_any_ref(),
             SyncOptions::default(),
             None,
         )
