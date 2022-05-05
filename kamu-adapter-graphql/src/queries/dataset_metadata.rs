@@ -81,22 +81,28 @@ impl DatasetMetadata {
     }
 
     // TODO: Convert to collection
+    // TODO: PERF: This is really slow
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
 
-        // TODO: PERF: This is really slow
-        Ok(dataset_reg
+        let mut downstream = Vec::new();
+
+        for hdl in dataset_reg
             .get_all_datasets()
             .filter(|hdl| hdl.id != self.dataset_handle.id)
-            .map(|hdl| dataset_reg.get_summary(&hdl.as_local_ref()).unwrap())
-            .filter(|sum| {
-                sum.dependencies
-                    .iter()
-                    .any(|i| i.id.as_ref() == Some(&self.dataset_handle.id))
-            })
-            .map(|sum| Dataset::new(Account::mock(), odf::DatasetHandle::new(sum.id, sum.name)))
-            .collect())
+        {
+            let summary = dataset_reg.get_summary(&hdl.as_local_ref()).unwrap();
+            if summary
+                .dependencies
+                .iter()
+                .any(|i| i.id.as_ref() == Some(&self.dataset_handle.id))
+            {
+                downstream.push(Dataset::new(Account::mock(), hdl))
+            }
+        }
+
+        Ok(downstream)
     }
 
     /// Current source used by the root dataset

@@ -16,8 +16,7 @@ use std::sync::Arc;
 
 pub struct DeleteCommand {
     dataset_reg: Arc<dyn DatasetRegistry>,
-    sync_svc: Arc<dyn SyncService>,
-    dataset_refs: Vec<DatasetRefAny>,
+    dataset_refs: Vec<DatasetRefLocal>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
@@ -26,7 +25,6 @@ pub struct DeleteCommand {
 impl DeleteCommand {
     pub fn new<I, R>(
         dataset_reg: Arc<dyn DatasetRegistry>,
-        sync_svc: Arc<dyn SyncService>,
         dataset_refs: I,
         all: bool,
         recursive: bool,
@@ -34,12 +32,11 @@ impl DeleteCommand {
     ) -> Self
     where
         I: IntoIterator<Item = R>,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+        R: TryInto<DatasetRefLocal>,
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
             dataset_reg,
-            sync_svc,
             dataset_refs: dataset_refs
                 .into_iter()
                 .map(|s| s.try_into().unwrap())
@@ -85,19 +82,8 @@ impl Command for DeleteCommand {
             return Err(CLIError::Aborted);
         }
 
-        for r in dataset_refs.iter() {
-            match r.as_local_ref() {
-                Some(local_ref) => self.dataset_reg.delete_dataset(&local_ref)?,
-                None => match r.as_remote_ref() {
-                    Some(DatasetRefRemote::RemoteName(name)) => {
-                        self.sync_svc
-                            .delete(&name)
-                            .await
-                            .map_err(|e| CLIError::failure(e))?
-                    }
-                    _ => unimplemented!(),
-                },
-            }
+        for dataset_ref in &dataset_refs {
+            self.dataset_reg.delete_dataset(dataset_ref)?;
         }
 
         eprintln!(

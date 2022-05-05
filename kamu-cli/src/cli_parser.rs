@@ -282,8 +282,8 @@ pub fn cli() -> Command<'static> {
                     Arg::new("dataset")
                         .multiple_occurrences(true)
                         .index(1)
-                        .validator(validate_dataset_ref_any)
-                        .help("Local or remote dataset reference(s)"),
+                        .validator(validate_dataset_ref_local)
+                        .help("Local dataset reference(s)"),
                     Arg::new("yes")
                         .short('y')
                         .long("yes")
@@ -295,17 +295,13 @@ pub fn cli() -> Command<'static> {
 
                     Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
 
-                    Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but will disrupt downstream consumers.
+                    Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
 
                     ### Examples ###
 
                     Delete a local dataset:
 
                         kamu delete my.dataset
-
-                    Delete a dataset in remote repository (some repos may not allow this):
-
-                        kamu delete kamu.dev/my.dataset
                     "
                 )),
             Command::new("init")

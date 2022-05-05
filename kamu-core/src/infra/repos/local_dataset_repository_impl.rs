@@ -14,6 +14,7 @@ use opendatafabric::*;
 
 use async_trait::async_trait;
 use chrono::Utc;
+use dill::*;
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::path::PathBuf;
@@ -28,6 +29,7 @@ pub struct LocalDatasetRepositoryImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl LocalDatasetRepositoryImpl {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
         let info_repo = NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);

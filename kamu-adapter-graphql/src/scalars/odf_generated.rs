@@ -122,12 +122,14 @@ impl From<odf::BlockInterval> for BlockInterval {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Checkpoint {
     pub physical_hash: Multihash,
+    pub size: i64,
 }
 
 impl From<odf::Checkpoint> for Checkpoint {
     fn from(v: odf::Checkpoint) -> Self {
         Self {
             physical_hash: v.physical_hash.into(),
+            size: v.size.into(),
         }
     }
 }
@@ -142,6 +144,7 @@ pub struct DataSlice {
     pub logical_hash: Multihash,
     pub physical_hash: Multihash,
     pub interval: OffsetInterval,
+    pub size: i64,
 }
 
 impl From<odf::DataSlice> for DataSlice {
@@ -150,6 +153,7 @@ impl From<odf::DataSlice> for DataSlice {
             logical_hash: v.logical_hash.into(),
             physical_hash: v.physical_hash.into(),
             interval: v.interval.into(),
+            size: v.size.into(),
         }
     }
 }

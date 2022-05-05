@@ -266,12 +266,7 @@ impl SyncServiceImpl {
         Ok(ds)
     }
 
-    async fn do_sync_from(
-        &self,
-        remote_ref: &DatasetRefRemote,
-        local_name: &DatasetName,
-        _options: SyncOptions,
-    ) -> Result<SyncResult, SyncError> {
+    fn get_url_for_remote_dataset(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
         // TODO: REMOTE ID
         let remote_name = match remote_ref {
             DatasetRefRemote::ID(_) => {
@@ -279,11 +274,38 @@ impl SyncServiceImpl {
             }
             DatasetRefRemote::RemoteName(name) => name,
             DatasetRefRemote::RemoteHandle(hdl) => &hdl.name,
-            DatasetRefRemote::Url(_) => {
-                unimplemented!("Syncing remote dataset by Url is not yet supported")
+            DatasetRefRemote::Url(url) => {
+                let mut dataset_url = url.as_ref().clone();
+                dataset_url.ensure_trailing_slash();
+                return Ok(dataset_url);
             }
         };
 
+        let mut repo = self
+            .remote_repo_reg
+            .get_repository(remote_name.repository())
+            .map_err(|e| match e {
+                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
+                    repo_name: remote_name.repository().clone(),
+                },
+                _ => SyncError::InternalError(e.into()),
+            })?;
+
+        repo.url.ensure_trailing_slash();
+        let dataset_url = repo
+            .url
+            .join(&format!("{}/", remote_name.as_name_with_owner()))
+            .unwrap();
+
+        Ok(dataset_url)
+    }
+
+    async fn do_sync_from(
+        &self,
+        remote_ref: &DatasetRefRemote,
+        local_name: &DatasetName,
+        _options: SyncOptions,
+    ) -> Result<SyncResult, SyncError> {
         let local_dataset = match self
             .local_repo
             .get_or_create_dataset(&local_name.as_local_ref())
@@ -296,26 +318,7 @@ impl SyncServiceImpl {
             Err(GetDatasetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
         }?;
 
-        let repo = self
-            .remote_repo_reg
-            .get_repository(remote_name.repository())
-            .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_name: remote_name.repository().clone(),
-                },
-                _ => SyncError::InternalError(e.into()),
-            })?;
-
-        assert!(
-            repo.url.path().ends_with('/'),
-            "Repo url does not have a trailing slash: {}",
-            repo.url
-        );
-        let remote_dataset_url = repo
-            .url
-            .join(&format!("{}/", remote_name.as_name_with_owner()))
-            .unwrap();
-
+        let remote_dataset_url = self.get_url_for_remote_dataset(remote_ref)?;
         let remote_dataset = self.get_remote_dataset(remote_dataset_url)?;
 
         match self
@@ -343,6 +346,7 @@ impl SyncServiceImpl {
         }
     }
 
+    // TODO: Support sync to URL
     async fn do_sync_to(
         &self,
         local_ref: &DatasetRefLocal,
@@ -357,26 +361,7 @@ impl SyncServiceImpl {
             Err(GetDatasetError::Internal(e)) => Err(SyncError::InternalError(e.into())),
         }?;
 
-        let repo = self
-            .remote_repo_reg
-            .get_repository(remote_name.repository())
-            .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_name: remote_name.repository().clone(),
-                },
-                _ => SyncError::InternalError(e.into()),
-            })?;
-
-        let remote_dataset_url = repo
-            .url
-            .join(&format!("{}/", remote_name.as_name_with_owner()))
-            .unwrap();
-
-        assert!(
-            repo.url.path().ends_with('/'),
-            "Repo url does not have a trailing slash: {}",
-            repo.url
-        );
+        let remote_dataset_url = self.get_url_for_remote_dataset(&remote_name.as_remote_ref())?;
         let remote_dataset = self.get_remote_dataset(remote_dataset_url)?;
 
         self.sync_with_simple_transfer_protocol(
@@ -495,5 +480,17 @@ impl SyncService for SyncServiceImpl {
         }
 
         results
+    }
+}
+
+trait UrlExt {
+    fn ensure_trailing_slash(&mut self);
+}
+
+impl UrlExt for Url {
+    fn ensure_trailing_slash(&mut self) {
+        if !self.path().ends_with('/') {
+            self.set_path(&format!("{}/", self.path()));
+        }
     }
 }

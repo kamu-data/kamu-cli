@@ -70,7 +70,6 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
-            catalog.get_one()?,
             submatches.values_of("dataset").unwrap_or_default(),
             submatches.is_present("all"),
             submatches.is_present("recursive"),
