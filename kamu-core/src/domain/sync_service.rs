@@ -7,12 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{BoxedError, CreateDatasetError, GetDatasetError, InternalError};
+use crate::domain::*;
 use opendatafabric::*;
 
 use std::sync::Arc;
 use thiserror::Error;
-use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -161,29 +160,22 @@ pub struct CorruptedSourceError {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-pub struct UnsupportedProtocolError {
-    pub url: Url,
-}
-impl std::fmt::Display for UnsupportedProtocolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "usupported protocol {} when accessing {}",
-            self.url.scheme(),
-            self.url
-        )
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 impl From<GetDatasetError> for SyncError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(DatasetNotFoundError {
                 dataset_ref: e.dataset_ref.into(),
             }),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<super::services::dataset_factory::GetDatasetError> for SyncError {
+    fn from(v: super::services::dataset_factory::GetDatasetError) -> Self {
+        use super::services::dataset_factory::GetDatasetError;
+        match v {
+            GetDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

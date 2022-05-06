@@ -20,6 +20,7 @@ use merge::Merge;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use std::fmt::Write;
+use url::Url;
 
 use crate::error::CLIError;
 use crate::NotInWorkspace;
@@ -35,13 +36,20 @@ const CONFIG_FILENAME: &str = ".kamuconfig";
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CLIConfig {
+    /// Engine configuration
     #[merge(strategy = merge_recursive)]
     pub engine: Option<EngineConfig>,
+    /// Network protocols configuration
+    #[merge(strategy = merge_recursive)]
+    pub protocol: Option<ProtocolConfig>,
 }
 
 impl CLIConfig {
     pub fn new() -> Self {
-        Self { engine: None }
+        Self {
+            engine: None,
+            protocol: None,
+        }
     }
 
     // TODO: Remove this workaround
@@ -51,6 +59,7 @@ impl CLIConfig {
     fn sample() -> Self {
         Self {
             engine: Some(EngineConfig::sample()),
+            protocol: Some(ProtocolConfig::sample()),
         }
     }
 }
@@ -59,6 +68,7 @@ impl Default for CLIConfig {
     fn default() -> Self {
         Self {
             engine: Some(EngineConfig::default()),
+            protocol: Some(ProtocolConfig::default()),
         }
     }
 }
@@ -108,6 +118,67 @@ impl Default for EngineConfig {
             network_ns: Some(NetworkNamespaceType::Private),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
             shutdown_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ProtocolConfig {
+    /// IPFS configuration
+    pub ipfs: Option<IpfsConfig>,
+}
+
+impl ProtocolConfig {
+    pub fn new() -> Self {
+        Self { ipfs: None }
+    }
+
+    fn sample() -> Self {
+        Self {
+            ipfs: Some(IpfsConfig::sample()),
+        }
+    }
+}
+
+impl Default for ProtocolConfig {
+    fn default() -> Self {
+        Self {
+            ipfs: Some(IpfsConfig::default()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct IpfsConfig {
+    /// HTTP Gateway URL to use for downloads.
+    /// For safety it defaults to `http://localhost:8080` which is where a local IPFS daemon would run.
+    /// If you don't have IPFS installed you can set this URL to one of the public gateways like `https://ipfs.io`.
+    /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
+    pub http_gateway: Option<Url>,
+}
+
+impl IpfsConfig {
+    pub fn new() -> Self {
+        Self { http_gateway: None }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+}
+
+impl Default for IpfsConfig {
+    fn default() -> Self {
+        Self {
+            http_gateway: Some(Url::parse("http://localhost:8080").unwrap()),
         }
     }
 }

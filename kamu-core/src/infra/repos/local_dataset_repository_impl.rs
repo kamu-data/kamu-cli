@@ -39,6 +39,7 @@ impl LocalDatasetRepositoryImpl {
         }
     }
 
+    // TODO: Make dataset factory (and thus the hashing algo) configurable
     fn get_dataset_impl(&self, dataset_name: &DatasetName) -> Result<impl Dataset, InternalError> {
         let path = self.workspace_layout.datasets_dir.join(&dataset_name);
 
@@ -47,7 +48,7 @@ impl LocalDatasetRepositoryImpl {
             dataset_name,
         );
 
-        Ok(DatasetRepoFactory::get_local_fs_legacy(path, layout).into_internal_error()?)
+        Ok(DatasetFactoryImpl::get_local_fs_legacy(path, layout).into_internal_error()?)
     }
 
     async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
@@ -256,7 +257,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         )
         .into_internal_error()?;
 
-        let dataset = DatasetRepoFactory::get_local_fs_legacy(tmp_path.clone(), layout)
+        let dataset = DatasetFactoryImpl::get_local_fs_legacy(tmp_path.clone(), layout)
             .into_internal_error()?;
 
         Ok(Box::new(DatasetBuilderImpl::new(

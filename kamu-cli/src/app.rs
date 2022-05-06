@@ -94,6 +94,9 @@ fn configure_catalog() -> CatalogBuilder {
     b.add::<LocalDatasetRepositoryImpl>();
     b.bind::<dyn LocalDatasetRepository, LocalDatasetRepositoryImpl>();
 
+    b.add::<DatasetFactoryImpl>();
+    b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
+
     b.add::<DatasetRegistryImpl>();
     b.bind::<dyn DatasetRegistry, DatasetRegistryImpl>();
 
@@ -174,6 +177,19 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
             .shutdown_timeout
             .unwrap()
             .into(),
+    });
+
+    catalog.add_value(IpfsGateway {
+        url: config
+            .protocol
+            .as_ref()
+            .unwrap()
+            .ipfs
+            .as_ref()
+            .unwrap()
+            .http_gateway
+            .clone()
+            .unwrap(),
     });
 }
 

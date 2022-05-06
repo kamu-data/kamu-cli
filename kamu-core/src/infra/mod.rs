@@ -55,6 +55,9 @@ pub use remote_repository_registry_impl::*;
 // Services
 ///////////////////////////////////////////////////////////////////////////////
 
+pub mod services;
+pub use services::*;
+
 mod ingest_service_impl;
 pub use ingest_service_impl::*;
 

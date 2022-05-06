@@ -117,7 +117,7 @@ async fn create_graph_in_repository(
     datasets: Vec<(DatasetName, Vec<DatasetName>)>,
 ) {
     for (dataset_name, deps) in &datasets {
-        let ds = DatasetRepoFactory::create_local_fs(repo_path.join(&dataset_name)).unwrap();
+        let ds = DatasetFactoryImpl::create_local_fs(repo_path.join(&dataset_name)).unwrap();
         let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {
@@ -197,6 +197,7 @@ async fn create_graph_remote(
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
         Arc::new(LocalDatasetRepositoryImpl::new(ws.clone())),
+        Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
     );
 
     for name in &to_import {

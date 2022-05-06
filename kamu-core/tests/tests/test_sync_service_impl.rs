@@ -123,8 +123,9 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new(IpfsGateway::default()));
 
-    let sync_svc = SyncServiceImpl::new(remote_repo_reg.clone(), local_repo);
+    let sync_svc = SyncServiceImpl::new(remote_repo_reg.clone(), local_repo, dataset_factory);
 
     // Add repositories
     let push_repo_name = RepositoryName::new_unchecked("remote-push");
@@ -150,8 +151,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
                 None,
             )
             .await,
-        Err(SyncError::DatasetNotFound(e))
-        if e.dataset_ref == dataset_name.as_any_ref()
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_name.as_any_ref()
     );
 
     assert_matches!(
@@ -163,8 +163,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
                 None,
             )
             .await,
-        Err(SyncError::DatasetNotFound(e))
-        if e.dataset_ref == pull_remote_dataset_name.as_any_ref()
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_remote_dataset_name.as_any_ref()
     );
 
     // Add dataset
@@ -177,6 +176,16 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let (_, b1) = dataset_reg.add_dataset(snapshot).unwrap();
 
     // Initial sync ///////////////////////////////////////////////////////////
+    assert_matches!(
+        sync_svc.sync(
+            &dataset_name.as_any_ref(),
+            &push_remote_dataset_name.as_any_ref(),
+            SyncOptions { create_if_not_exist: false, ..Default::default() },
+            None
+        ).await,
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_remote_dataset_name.as_any_ref()
+    );
+
     assert_matches!(
         sync_svc.sync(&dataset_name.as_any_ref(), &push_remote_dataset_name.as_any_ref(),  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {

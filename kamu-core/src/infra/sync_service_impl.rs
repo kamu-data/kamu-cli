@@ -9,7 +9,6 @@
 
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
-use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
@@ -21,6 +20,7 @@ use url::Url;
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     local_repo: Arc<dyn LocalDatasetRepository>,
+    dataset_factory: Arc<dyn DatasetFactory>,
 }
 
 #[component(pub)]
@@ -28,10 +28,12 @@ impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         local_repo: Arc<dyn LocalDatasetRepository>,
+        dataset_factory: Arc<dyn DatasetFactory>,
     ) -> Self {
         Self {
             remote_repo_reg,
             local_repo,
+            dataset_factory,
         }
     }
 
@@ -268,23 +270,7 @@ impl SyncServiceImpl {
         url: Url,
         ensure_exists: bool,
     ) -> Result<Arc<dyn Dataset>, SyncError> {
-        let dataset = match url.scheme() {
-            "file" => {
-                let ds = DatasetRepoFactory::get_or_create_local_fs(url.to_file_path().unwrap())?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
-            }
-            "http" => {
-                let ds = DatasetRepoFactory::get_http(url)?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
-            }
-            "s3" | "s3+http" | "s3+https" => {
-                let ds = DatasetRepoFactory::get_s3(url)?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
-            }
-            _ => Err(SyncError::UnsupportedProtocol(UnsupportedProtocolError {
-                url,
-            })),
-        }?;
+        let dataset = self.dataset_factory.get_dataset(url)?;
 
         if ensure_exists {
             match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {

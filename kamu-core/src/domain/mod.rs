@@ -31,6 +31,9 @@ pub use remote_repository_registry::*;
 
 // Services
 
+pub mod services;
+pub use services::*;
+
 mod engine;
 pub use engine::*;
 

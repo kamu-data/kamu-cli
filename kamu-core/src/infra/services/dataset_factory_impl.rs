@@ -7,47 +7,70 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::services::dataset_factory::GetDatasetError;
 use crate::domain::*;
 use crate::infra::*;
 
+use dill::*;
 use std::path::{Path, PathBuf};
-use thiserror::Error;
+use std::sync::Arc;
+use tracing::info;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetRepoFactory;
+pub struct DatasetFactoryImpl {
+    ipfs_gateway: IpfsGateway,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Pass hasher generic type into factory functions
-type ObjectStoreLocalFSDefault = ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>;
+#[derive(Clone, Debug)]
+pub struct IpfsGateway {
+    pub url: Url,
+}
+
+impl Default for IpfsGateway {
+    fn default() -> Self {
+        Self {
+            url: Url::parse("http://localhost:8080").unwrap(),
+        }
+    }
+}
+
+// TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
     MetadataChain2Impl<
-        ObjectStoreLocalFSDefault,
+        ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
         ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
-    ObjectStoreLocalFSDefault,
-    ObjectStoreLocalFSDefault,
+    ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
+    ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
     NamedObjectRepositoryLocalFS,
 >;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetRepoFactory {
+#[component(pub)]
+impl DatasetFactoryImpl {
+    pub fn new(ipfs_gateway: IpfsGateway) -> Self {
+        Self { ipfs_gateway }
+    }
+
+    // TODO: Eliminate
     pub fn get_local_fs_legacy(
         meta_dir: PathBuf,
         layout: DatasetLayout,
-    ) -> Result<impl Dataset, InternalError> {
+    ) -> Result<DatasetImplLocalFS, InternalError> {
         let blocks_dir = meta_dir.join("blocks");
         let refs_dir = meta_dir.join("refs");
         Ok(DatasetImpl::new(
             MetadataChain2Impl::new(
-                ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir),
+                ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(layout.data_dir),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(layout.checkpoints_dir),
+            ObjectRepositoryLocalFS::new(layout.data_dir),
+            ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(meta_dir),
         ))
     }
@@ -63,9 +86,7 @@ impl DatasetRepoFactory {
         }
     }
 
-    pub fn get_local_fs<P: AsRef<Path>>(
-        root: P,
-    ) -> Result<DatasetImplLocalFS, InternalError> {
+    pub fn get_local_fs<P: AsRef<Path>>(root: P) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         let blocks_dir = root.join("blocks");
         let refs_dir = root.join("refs");
@@ -75,18 +96,16 @@ impl DatasetRepoFactory {
 
         Ok(DatasetImpl::new(
             MetadataChain2Impl::new(
-                ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir),
+                ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(data_dir),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(checkpoints_dir),
+            ObjectRepositoryLocalFS::new(data_dir),
+            ObjectRepositoryLocalFS::new(checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(info_dir),
         ))
     }
 
-    pub fn create_local_fs<P: AsRef<Path>>(
-        root: P,
-    ) -> Result<DatasetImplLocalFS, InternalError> {
+    pub fn create_local_fs<P: AsRef<Path>>(root: P) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         if !root.exists() {
             std::fs::create_dir(&root).into_internal_error()?;
@@ -109,11 +128,11 @@ impl DatasetRepoFactory {
 
         Ok(DatasetImpl::new(
             MetadataChain2Impl::new(
-                ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir),
+                ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(data_dir),
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(checkpoints_dir),
+            ObjectRepositoryLocalFS::new(data_dir),
+            ObjectRepositoryLocalFS::new(checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(info_dir),
         ))
     }
@@ -188,11 +207,40 @@ impl DatasetRepoFactory {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// Errors
-/////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-pub enum GetDatasetRepoError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
+impl DatasetFactory for DatasetFactoryImpl {
+    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, GetDatasetError> {
+        match url.scheme() {
+            "file" => {
+                let ds = Self::get_or_create_local_fs(url.to_file_path().unwrap())?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            "http" | "https" => {
+                let ds = Self::get_http(url)?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            "s3" | "s3+http" | "s3+https" => {
+                let ds = Self::get_s3(url)?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            "ipfs" => {
+                let cid = match url.host() {
+                    Some(url::Host::Domain(cid)) => Ok(cid),
+                    _ => Err(GenericError::new("Malformed IPFS URL").into_internal_error()),
+                }?;
+
+                let gw_url = self
+                    .ipfs_gateway
+                    .url
+                    .join(&format!("ipfs/{}{}", cid, url.path()))
+                    .unwrap();
+
+                info!(ipfs_url = %url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
+
+                let ds = Self::get_http(gw_url)?;
+                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            }
+            _ => Err(UnsupportedProtocolError { url }.into()),
+        }
+    }
 }
