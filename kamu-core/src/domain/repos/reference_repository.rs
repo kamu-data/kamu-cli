@@ -32,7 +32,7 @@ pub trait ReferenceRepository {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("reference does not exist: {block_ref:?}")]
+#[error("Reference does not exist: {block_ref:?}")]
 pub struct RefNotFoundError {
     pub block_ref: BlockRef,
 }
@@ -44,5 +44,9 @@ pub enum GetRefError {
     #[error(transparent)]
     NotFound(RefNotFoundError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }

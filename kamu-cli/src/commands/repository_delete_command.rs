@@ -65,6 +65,9 @@ impl Command for RepositoryDeleteCommand {
         let repo_names: Vec<_> = if self.all {
             self.remote_repo_reg.get_all_repositories().collect()
         } else {
+            for name in &self.names {
+                self.remote_repo_reg.get_repository(name)?;
+            }
             self.names.clone()
         };
 

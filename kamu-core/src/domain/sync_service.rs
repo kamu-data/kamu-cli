@@ -117,7 +117,7 @@ pub enum SyncError {
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
-    #[error("dataset was updated concurrently")]
+    #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
     //#[error("{0}")]
     //Unauthorized(#[source] BoxedError),
@@ -126,13 +126,17 @@ pub enum SyncError {
     //#[error("{0}")]
     //ProtocolError(#[source] BoxedError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("dataset {dataset_ref} not found")]
+#[error("Dataset {dataset_ref} not found")]
 pub struct DatasetNotFoundError {
     pub dataset_ref: DatasetRefAny,
 }
@@ -140,7 +144,7 @@ pub struct DatasetNotFoundError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("source and destination datasets have diverged, source head is {src_head}, destination head is {dst_head}")]
+#[error("Source and destination datasets have diverged, source head is {src_head}, destination head is {dst_head}")]
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,
@@ -151,7 +155,7 @@ pub struct DatasetsDivergedError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("repository appears to have corrupted data: {message}")]
+#[error("Repository appears to have corrupted data: {message}")]
 pub struct CorruptedSourceError {
     pub message: String,
     #[source]

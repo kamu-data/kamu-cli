@@ -92,7 +92,7 @@ pub trait DatasetBuilder: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("dataset not found: {dataset_ref}")]
+#[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
     pub dataset_ref: DatasetRefLocal,
 }
@@ -100,7 +100,7 @@ pub struct DatasetNotFoundError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("dataset {dataset_ref} is referencing non-existing inputs: {missing_inputs:?}")]
+#[error("Dataset {dataset_ref} is referencing non-existing inputs: {missing_inputs:?}")]
 pub struct MissingInputsError {
     pub dataset_ref: DatasetRefLocal,
     pub missing_inputs: Vec<DatasetRefLocal>,
@@ -109,7 +109,7 @@ pub struct MissingInputsError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("dataset {dataset_handle} is referenced by: {children:?}")]
+#[error("Dataset {dataset_handle} is referenced by: {children:?}")]
 pub struct DanglingReferenceError {
     pub dataset_handle: DatasetHandle,
     pub children: Vec<DatasetHandle>,
@@ -118,7 +118,7 @@ pub struct DanglingReferenceError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("new dataset {new_dataset:?} collides with existing dataset {existing_dataset:?}")]
+#[error("New dataset {new_dataset:?} collides with existing dataset {existing_dataset:?}")]
 pub struct CollisionError {
     pub new_dataset: DatasetHandle,
     pub existing_dataset: DatasetHandle,
@@ -127,7 +127,7 @@ pub struct CollisionError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("invalid snapshot: {reason}")]
+#[error("Invalid snapshot: {reason}")]
 pub struct InvalidSnapshotError {
     pub reason: String,
 }
@@ -139,7 +139,11 @@ pub enum GetDatasetError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -147,17 +151,25 @@ pub enum GetDatasetError {
 #[derive(Error, Debug)]
 pub enum BeginCreateDatasetError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 #[derive(Error, Debug)]
 pub enum CreateDatasetError {
-    #[error("dataset is empty")]
+    #[error("Dataset is empty")]
     EmptyDataset,
     #[error(transparent)]
     Collision(#[from] CollisionError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 #[derive(Error, Debug)]
@@ -169,7 +181,11 @@ pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
     Collision(#[from] CollisionError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -181,7 +197,11 @@ pub enum DeleteDatasetError {
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

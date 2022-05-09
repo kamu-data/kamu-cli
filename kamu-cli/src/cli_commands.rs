@@ -167,7 +167,7 @@ pub fn get_command(
             push_matches.is_present("all"),
             push_matches.is_present("recursive"),
             !push_matches.is_present("no-alias"),
-            push_matches.value_of("as"),
+            push_matches.value_of("to"),
             catalog.get_one()?,
         )),
         Some(("repo", repo_matches)) => match repo_matches.subcommand() {

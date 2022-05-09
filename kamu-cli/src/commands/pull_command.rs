@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
 use opendatafabric::*;
 use url::Url;
 
-use std::backtrace::BacktraceStatus;
-use std::error::Error;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -277,43 +275,13 @@ impl Command for PullCommand {
             );
         }
         if errors != 0 {
-            eprintln!(
-                "{}\n\n{}:",
-                console::style(format!("{} dataset(s) had errors", errors))
-                    .red()
-                    .bold(),
-                console::style("Summary of errors")
-            );
-            pull_results
-                .into_iter()
-                .filter_map(|(id, res)| res.err().map(|e| (id, e)))
-                .for_each(|(id, err)| {
-                    eprintln!(
-                        "\n{}: {}",
-                        console::style(format!("{}", id)).red().bold(),
-                        err
-                    );
-                    if let Some(bt) = err.backtrace() {
-                        if bt.status() == BacktraceStatus::Captured {
-                            eprintln!("{}", console::style(bt).dim());
-                        }
-                    }
-
-                    let mut source = err.source();
-                    while source.is_some() {
-                        if let Some(bt) = source.unwrap().backtrace() {
-                            if bt.status() == BacktraceStatus::Captured {
-                                eprintln!("\nCaused by: {}", source.unwrap());
-                                eprintln!("{}", console::style(bt).dim());
-                            }
-                        }
-                        source = source.unwrap().source();
-                    }
-                });
-        }
-
-        if errors != 0 {
-            Err(CLIError::PartialFailure)
+            Err(BatchError::new(
+                format!("Failed to update {} dataset(s)", errors),
+                pull_results.into_iter().filter_map(|(dr, res)| {
+                    res.err().map(|e| (e, format!("Failed to pull {}", dr)))
+                }),
+            )
+            .into())
         } else {
             Ok(())
         }

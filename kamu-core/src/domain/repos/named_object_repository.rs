@@ -32,7 +32,7 @@ pub trait NamedObjectRepository {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("object does not exist: {name}")]
+#[error("Object does not exist: {name}")]
 pub struct NotFoundError {
     pub name: String,
 }
@@ -44,5 +44,9 @@ pub enum GetError {
     #[error(transparent)]
     NotFound(NotFoundError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }

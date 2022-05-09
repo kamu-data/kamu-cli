@@ -28,7 +28,11 @@ pub enum GetDatasetError {
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -42,7 +46,7 @@ impl std::fmt::Display for UnsupportedProtocolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "usupported protocol {} when accessing dataset at {}",
+            "Usupported protocol {} when accessing dataset at {}",
             self.url.scheme(),
             self.url
         )

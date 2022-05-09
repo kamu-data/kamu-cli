@@ -165,7 +165,7 @@ impl Default for AppendOpts<'_> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("block does not exist: {hash}")]
+#[error("Block does not exist: {hash}")]
 pub struct BlockNotFoundError {
     pub hash: Multihash,
 }
@@ -173,7 +173,7 @@ pub struct BlockNotFoundError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("block is malformed: {hash}")]
+#[error("Block is malformed: {hash}")]
 pub struct BlockMalformedError {
     pub hash: Multihash,
     pub source: BoxedError,
@@ -186,7 +186,11 @@ pub enum GetBlockError {
     #[error(transparent)]
     NotFound(BlockNotFoundError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -198,11 +202,15 @@ pub enum IterBlocksError {
     #[error(transparent)]
     InvalidInterval(InvalidIntervalError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 #[derive(Error, Debug)]
-#[error("invalid block interval [{head}, {tail})")]
+#[error("Invalid block interval [{head}, {tail})")]
 pub struct InvalidIntervalError {
     pub head: Multihash,
     pub tail: Multihash,
@@ -217,7 +225,11 @@ pub enum SetRefError {
     #[error(transparent)]
     CASFailed(#[from] RefCASError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -241,7 +253,11 @@ pub enum AppendError {
     #[error(transparent)]
     InvalidBlock(#[from] AppendValidationError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -250,12 +266,12 @@ pub enum AppendError {
 pub enum AppendValidationError {
     #[error(transparent)]
     HashMismatch(HashMismatchError),
-    #[error("first block has to be a seed, perhaps new block does not link to the previous")]
+    #[error("First block has to be a seed, perhaps new block does not link to the previous")]
     FirstBlockMustBeSeed,
-    #[error("attempt to append seed block to a non-empty chain")]
+    #[error("Attempt to append seed block to a non-empty chain")]
     AppendingSeedBlockToNonEmptyChain,
-    #[error("invalid previous block")]
+    #[error("Invalid previous block")]
     PrevBlockNotFound(BlockNotFoundError),
-    #[error("system time has to be monotonically non-decreasing")]
+    #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
 }

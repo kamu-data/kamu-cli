@@ -645,8 +645,8 @@ pub fn cli() -> Command<'static> {
                         .index(1)
                         .validator(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
-                    Arg::new("as")
-                        .long("as")
+                    Arg::new("to")
+                        .long("to")
                         .takes_value(true)
                         .validator(validate_dataset_ref_remote)
                         .value_name("REM")
@@ -662,7 +662,7 @@ pub fn cli() -> Command<'static> {
 
                     Push dataset to a repository and create an association between the two:
 
-                        kamu push org.example.data --as kamu.dev/me/org.example.data
+                        kamu push org.example.data --to kamu.dev/me/org.example.data
 
                     Push dataset previously associated with a repository:
 

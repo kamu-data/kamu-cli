@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::backtrace::BacktraceStatus;
-use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -27,7 +25,7 @@ pub struct PushCommand {
     all: bool,
     recursive: bool,
     add_aliases: bool,
-    as_ref: Option<DatasetRefRemote>,
+    to: Option<DatasetRefRemote>,
     output_config: Arc<OutputConfig>,
 }
 
@@ -38,7 +36,7 @@ impl PushCommand {
         all: bool,
         recursive: bool,
         add_aliases: bool,
-        as_ref: Option<RR>,
+        to: Option<RR>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
@@ -54,13 +52,13 @@ impl PushCommand {
             all,
             recursive,
             add_aliases,
-            as_ref: as_ref.map(|s| s.try_into().unwrap()),
+            to: to.map(|s| s.try_into().unwrap()),
             output_config,
         }
     }
 
     async fn do_push(&self, listener: Option<Arc<dyn SyncMultiListener>>) -> Vec<PushResponse> {
-        if let Some(remote_ref) = &self.as_ref {
+        if let Some(remote_ref) = &self.to {
             self.push_svc
                 .push_multi_ext(
                     &mut vec![PushRequest {
@@ -117,9 +115,9 @@ impl Command for PushCommand {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
 
-        if self.refs.len() > 1 && self.as_ref.is_some() {
+        if self.refs.len() > 1 && self.to.is_some() {
             return Err(CLIError::usage_error(
-                "Cannot specify multiple datasets with --as alias",
+                "Cannot specify multiple datasets when using --to",
             ));
         }
 
@@ -163,52 +161,22 @@ impl Command for PushCommand {
             );
         }
         if errors != 0 {
-            eprintln!(
-                "{}\n\n{}:",
-                console::style(format!("{} dataset(s) had errors", errors))
-                    .red()
-                    .bold(),
-                console::style("Summary of errors")
-            );
-
-            // TODO: Generic multi-error printing
-            push_results
-                .into_iter()
-                .filter(|res| res.result.is_err())
-                .for_each(|res| {
-                    let err = res.result.err().unwrap();
-
-                    let original_ref = res
-                        .original_request
-                        .local_ref
-                        .map(|r| r.as_any_ref())
-                        .unwrap_or_else(|| res.original_request.remote_ref.unwrap().as_any_ref());
-
-                    eprintln!(
-                        "\n{}: {}",
-                        console::style(format!("{}", original_ref)).red().bold(),
-                        err
-                    );
-                    if let Some(bt) = err.backtrace() {
-                        if bt.status() == BacktraceStatus::Captured {
-                            eprintln!("{}", console::style(bt).dim());
-                        }
-                    }
-
-                    let mut source = err.source();
-                    while source.is_some() {
-                        if let Some(bt) = source.unwrap().backtrace() {
-                            if bt.status() == BacktraceStatus::Captured {
-                                eprintln!("\nCaused by: {}", source.unwrap());
-                                eprintln!("{}", console::style(bt).dim());
-                            }
-                        }
-                        source = source.unwrap().source();
-                    }
-                });
+            Err(BatchError::new(
+                format!("Failed to push {} dataset(s)", errors),
+                push_results
+                    .into_iter()
+                    .filter(|res| res.result.is_err())
+                    .map(|res| {
+                        (
+                            res.result.err().unwrap(),
+                            format!("Failed to push {}", res.original_request),
+                        )
+                    }),
+            )
+            .into())
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 

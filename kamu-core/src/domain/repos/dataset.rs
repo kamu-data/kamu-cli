@@ -53,7 +53,7 @@ pub struct CommitResult {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("expected object of type {expected} but got {actual}")]
+#[error("Expected object of type {expected} but got {actual}")]
 pub struct InvalidObjectKind {
     pub expected: String,
     pub actual: String,
@@ -66,7 +66,11 @@ pub enum GetSummaryError {
     #[error("Dataset is empty")]
     EmptyDataset,
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -74,5 +78,9 @@ pub enum GetSummaryError {
 #[derive(Error, Debug)]
 pub enum CommitError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }

@@ -170,6 +170,10 @@ pub enum PullError {
     IngestError(#[from] IngestError),
     #[error("Transform error: {0}")]
     TransformError(#[from] TransformError),
-    #[error("Sync error: {0}")]
-    SyncError(#[from] SyncError),
+    #[error(transparent)]
+    SyncError(
+        #[from]
+        #[backtrace]
+        SyncError,
+    ),
 }

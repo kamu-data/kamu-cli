@@ -7,12 +7,177 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::DomainError;
-use std::{backtrace::Backtrace, fmt::Display};
+use kamu::domain::{BoxedError, DomainError};
+use std::backtrace::{Backtrace, BacktraceStatus};
+use std::error::Error;
+use std::fmt::Display;
 use thiserror::Error;
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
+///////////////////////////////////////////////////////////////////////////////
 
+pub fn display_cli_error(err: &CLIError) {
+    match err {
+        CLIError::CriticalFailure { .. } => {
+            eprintln!("{}: {}", console::style("Critical Error").red().bold(), err);
+            eprintln!(
+                "Help us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+            );
+        }
+        CLIError::BatchError(b) => print_batch_error(b),
+        e => print_error(e),
+    }
+
+    if let Some(bt) = err.backtrace() {
+        if bt.status() == BacktraceStatus::Captured {
+            eprintln!();
+            eprintln!("Backtrace:\n{}", console::style(bt).dim().bold());
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub fn print_error(error: &dyn Error) {
+    let mut error_chain = Vec::new();
+    let mut err_ref: Option<&dyn Error> = Some(error);
+    while let Some(e) = err_ref {
+        error_chain.push(e);
+        err_ref = e.source();
+    }
+
+    let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
+    unchain_error_messages(&mut error_messages);
+
+    eprintln!("{}:", console::style("Error").red().bold(),);
+
+    for (i, e) in error_messages.iter().enumerate() {
+        eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+    }
+
+    // Print the inner most backtrace
+    for e in error_chain.iter().rev() {
+        if let Some(bt) = e.backtrace() {
+            if bt.status() == BacktraceStatus::Captured {
+                eprintln!();
+                eprintln!("Backtrace:");
+                eprintln!("{}", console::style(bt).dim());
+                break;
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub fn print_batch_error(batch: &BatchError) {
+    eprintln!(
+        "{}: {}",
+        console::style("Error").red().bold(),
+        console::style(&batch.summary)
+    );
+    eprintln!();
+    eprintln!("Summary of individual errors:");
+
+    for (err, ctx) in &batch.errors_with_context {
+        eprintln!();
+        eprintln!(
+            "{} {}:",
+            console::style(">").green(),
+            console::style(ctx).bold()
+        );
+
+        let mut error_chain = Vec::new();
+
+        let mut err_ref: Option<&dyn Error> = Some(err.as_ref());
+        while let Some(e) = err_ref {
+            error_chain.push(e);
+            err_ref = e.source();
+        }
+
+        let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
+        unchain_error_messages(&mut error_messages);
+
+        for (i, e) in error_messages.iter().enumerate() {
+            eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+        }
+
+        // Print the inner most backtrace
+        for e in error_chain.iter().rev() {
+            if let Some(bt) = e.backtrace() {
+                if bt.status() == BacktraceStatus::Captured {
+                    eprintln!();
+                    eprintln!("Backtrace:");
+                    eprintln!("{}", console::style(bt).dim());
+                    break;
+                }
+            }
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Ugly workaround that deals with the fact that many libraries have errors that
+// format their messages as `{outer error message}: {inner error message}` that
+// results in a lot of duplication when printing the entire error chain.
+fn unchain_error_messages(errors: &mut Vec<String>) {
+    use itertools::Itertools;
+    for (first, second) in (0..errors.len()).tuple_windows() {
+        if errors[first] == errors[second] {
+            errors[first].truncate(0);
+        } else {
+            let suffix = format!(": {}", &errors[second]);
+            if errors[first].ends_with(&suffix) {
+                let new_len = errors[first].len() - suffix.len();
+                errors[first].truncate(new_len);
+            }
+        }
+    }
+    errors.retain(|s| !s.is_empty());
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct BatchError {
+    pub summary: String,
+    pub errors_with_context: Vec<(BoxedError, String)>,
+}
+
+impl BatchError {
+    pub fn new<S, I, C, E>(summary: S, errors_with_context: I) -> Self
+    where
+        S: Into<String>,
+        I: Iterator<Item = (E, C)>,
+        C: Into<String>,
+        E: Into<BoxedError>,
+    {
+        Self {
+            summary: summary.into(),
+            errors_with_context: errors_with_context
+                .map(|(e, c)| (e.into(), c.into()))
+                .collect(),
+        }
+    }
+}
+
+impl std::fmt::Display for BatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.summary)
+    }
+}
+
+impl std::error::Error for BatchError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
+    }
+
+    fn backtrace(&self) -> Option<&Backtrace> {
+        None
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
 #[derive(Error, Debug)]
 pub enum CLIError {
     #[error("{0}")]
@@ -33,6 +198,12 @@ pub enum CLIError {
         source: BoxedError,
         backtrace: Backtrace,
     },
+    #[error(transparent)]
+    BatchError(
+        #[from]
+        #[backtrace]
+        BatchError,
+    ),
 }
 
 impl CLIError {

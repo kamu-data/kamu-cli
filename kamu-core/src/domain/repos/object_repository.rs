@@ -79,7 +79,7 @@ pub struct InsertOpts<'a> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("object does not exist: {hash}")]
+#[error("Object does not exist: {hash}")]
 pub struct ObjectNotFoundError {
     pub hash: Multihash,
 }
@@ -91,13 +91,17 @@ pub enum GetError {
     #[error(transparent)]
     NotFound(#[from] ObjectNotFoundError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("expected hash {expected} but got {actual}")]
+#[error("Expected hash {expected} but got {actual}")]
 pub struct HashMismatchError {
     pub expected: Multihash,
     pub actual: Multihash,
@@ -110,5 +114,9 @@ pub enum InsertError {
     #[error(transparent)]
     HashMismatch(#[from] HashMismatchError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }

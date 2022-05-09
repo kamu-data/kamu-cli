@@ -33,9 +33,11 @@ impl GenericError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("internal error")]
+#[error("Internal error")]
 pub struct InternalError {
+    #[source]
     source: BoxedError,
+    #[backtrace]
     backtrace: Option<Backtrace>,
 }
 

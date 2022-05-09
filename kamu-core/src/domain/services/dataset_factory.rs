@@ -30,7 +30,11 @@ pub enum GetDatasetError {
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error(transparent)]
-    Internal(#[from] InternalError),
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
