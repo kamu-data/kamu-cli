@@ -136,7 +136,7 @@ impl RemoteAliases for RemoteAliasesImpl {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,
-    ) -> Box<dyn Iterator<Item = &'a RemoteDatasetName> + 'a> {
+    ) -> Box<dyn Iterator<Item = &'a DatasetRefRemote> + 'a> {
         let aliases = match kind {
             RemoteAliasKind::Pull => &self.config.pull_aliases,
             RemoteAliasKind::Push => &self.config.push_aliases,
@@ -144,7 +144,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         Box::new(aliases.iter())
     }
 
-    fn contains(&self, remote_ref: &RemoteDatasetName, kind: RemoteAliasKind) -> bool {
+    fn contains(&self, remote_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool {
         let aliases = match kind {
             RemoteAliasKind::Pull => &self.config.pull_aliases,
             RemoteAliasKind::Push => &self.config.push_aliases,
@@ -167,7 +167,7 @@ impl RemoteAliases for RemoteAliasesImpl {
 
     fn add(
         &mut self,
-        remote_ref: &RemoteDatasetName,
+        remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, DomainError> {
         let aliases = match kind {
@@ -188,7 +188,7 @@ impl RemoteAliases for RemoteAliasesImpl {
 
     fn delete(
         &mut self,
-        remote_ref: &RemoteDatasetName,
+        remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, DomainError> {
         let aliases = match kind {

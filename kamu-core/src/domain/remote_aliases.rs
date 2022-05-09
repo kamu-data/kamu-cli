@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::RemoteDatasetName;
+use opendatafabric::DatasetRefRemote;
 
 use super::DomainError;
 
@@ -21,21 +21,21 @@ pub trait RemoteAliases {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,
-    ) -> Box<dyn Iterator<Item = &'a RemoteDatasetName> + 'a>;
+    ) -> Box<dyn Iterator<Item = &'a DatasetRefRemote> + 'a>;
 
-    fn contains(&self, remore_name: &RemoteDatasetName, kind: RemoteAliasKind) -> bool;
+    fn contains(&self, remore_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool;
 
     fn is_empty(&self, kind: RemoteAliasKind) -> bool;
 
     fn add(
         &mut self,
-        remote_name: &RemoteDatasetName,
+        remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, DomainError>;
 
     fn delete(
         &mut self,
-        remote_name: &RemoteDatasetName,
+        remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, DomainError>;
 

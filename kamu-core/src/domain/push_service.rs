@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::sync_service::*;
-use crate::domain::DomainError;
-use opendatafabric::{DatasetHandle, DatasetRefAny, Multihash, RemoteDatasetHandle};
+use super::{sync_service::*, DatasetNotFoundError, GetDatasetError};
+use crate::domain::InternalError;
+use opendatafabric::*;
 
 use std::sync::Arc;
 use thiserror::Error;
@@ -25,7 +25,32 @@ pub trait PushService: Send + Sync {
         dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
         options: PushOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(PushInfo, Result<PushResult, PushError>)>;
+    ) -> Vec<PushResponse>;
+
+    async fn push_multi_ext(
+        &self,
+        items: &mut dyn Iterator<Item = PushRequest>,
+        options: PushOptions,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Vec<PushResponse>;
+}
+
+#[derive(Debug, Clone)]
+pub struct PushRequest {
+    pub local_ref: Option<DatasetRefLocal>,
+    pub remote_ref: Option<DatasetRefRemote>,
+}
+
+#[derive(Debug)]
+pub struct PushResponse {
+    /// Parameters passed into the call
+    pub original_request: PushRequest,
+    /// Local dataset handle, if resolved
+    pub local_handle: Option<DatasetHandle>,
+    /// Destination reference, if resolved
+    pub remote_ref: Option<DatasetRefRemote>,
+    /// Result of the push operation
+    pub result: Result<SyncResult, PushError>,
 }
 
 #[derive(Debug, Clone)]
@@ -34,6 +59,8 @@ pub struct PushOptions {
     pub recursive: bool,
     /// Push all known datasets
     pub all: bool,
+    /// Add remote aliases to datasets if they don't already exist
+    pub add_aliases: bool,
     /// Sync options
     pub sync_options: SyncOptions,
 }
@@ -43,26 +70,10 @@ impl Default for PushOptions {
         Self {
             recursive: false,
             all: false,
+            add_aliases: true,
             sync_options: SyncOptions::default(),
         }
     }
-}
-
-#[derive(Debug)]
-pub struct PushInfo {
-    pub original_ref: DatasetRefAny,
-    pub local_handle: Option<DatasetHandle>,
-    pub remote_handle: Option<RemoteDatasetHandle>,
-}
-
-#[derive(Debug)]
-pub enum PushResult {
-    UpToDate,
-    Updated {
-        old_head: Option<Multihash>,
-        new_head: Multihash,
-        num_blocks: usize,
-    },
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -71,12 +82,23 @@ pub enum PushResult {
 
 #[derive(Debug, Error)]
 pub enum PushError {
-    #[error("No associated push alias")]
+    #[error(transparent)]
+    SourceNotFound(#[from] DatasetNotFoundError),
+    #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
-    #[error("Sync error: {0}")]
+    #[error(transparent)]
     SyncError(#[from] SyncError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<GetDatasetError> for PushError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => e.into(),
+            GetDatasetError::Internal(e) => e.into(),
+        }
+    }
 }

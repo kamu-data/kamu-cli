@@ -115,6 +115,8 @@ impl fmt::Display for DatasetRefLocal {
     }
 }
 
+impl_serde!(DatasetRefLocal, DatasetRefLocalSerdeVisitor);
+
 impl From<DatasetID> for DatasetRefLocal {
     fn from(v: DatasetID) -> Self {
         Self::ID(v.clone())
@@ -213,6 +215,8 @@ impl fmt::Display for DatasetRefRemote {
         }
     }
 }
+
+impl_serde!(DatasetRefRemote, DatasetRefRemoteSerdeVisitor);
 
 impl From<DatasetID> for DatasetRefRemote {
     fn from(v: DatasetID) -> Self {
@@ -334,6 +338,8 @@ impl fmt::Display for DatasetRefAny {
         }
     }
 }
+
+impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
 
 impl From<DatasetID> for DatasetRefAny {
     fn from(v: DatasetID) -> Self {

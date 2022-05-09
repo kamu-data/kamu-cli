@@ -637,6 +637,9 @@ pub fn cli() -> Command<'static> {
                         .short('r')
                         .long("recursive")
                         .help("Also push all transitive dependencies of specified datasets"),
+                    Arg::new("no-alias")
+                        .long("no-alias")
+                        .help("Don't automatically add a remote push alias for this destination"),
                     Arg::new("dataset")
                         .multiple_occurrences(true)
                         .index(1)
@@ -645,9 +648,9 @@ pub fn cli() -> Command<'static> {
                     Arg::new("as")
                         .long("as")
                         .takes_value(true)
-                        .validator(validate_dataset_remote_name)
+                        .validator(validate_dataset_ref_remote)
                         .value_name("REM")
-                        .help("Remote alias to use when pushing"),
+                        .help("Remote alias or a URL to push to"),
                 ])
                 .after_help(indoc::indoc!(
                     r"
@@ -766,7 +769,7 @@ pub fn cli() -> Command<'static> {
                                     Arg::new("alias")
                                         .required(true)
                                         .index(2)
-                                        .validator(validate_dataset_remote_name)
+                                        .validator(validate_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push")
                                         .long("push")
@@ -789,7 +792,7 @@ pub fn cli() -> Command<'static> {
                                         .help("Local dataset reference"),
                                     Arg::new("alias")
                                         .index(2)
-                                        .validator(validate_dataset_remote_name)
+                                        .validator(validate_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push")
                                         .long("push")
@@ -1112,6 +1115,7 @@ fn validate_dataset_name(s: &str) -> Result<(), String> {
     }
 }
 
+#[allow(dead_code)]
 fn validate_dataset_remote_name(s: &str) -> Result<(), String> {
     match RemoteDatasetName::try_from(s) {
         Ok(_) => Ok(()),
@@ -1130,14 +1134,14 @@ fn validate_dataset_ref_local(s: &str) -> Result<(), String> {
     }
 }
 
-// fn validate_dataset_ref_remote(s: &str) -> Result<(), String> {
-//     match DatasetRefRemote::try_from(s) {
-//         Ok(_) => Ok(()),
-//         Err(_) => Err(format!(
-//             "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
-//         )),
-//     }
-// }
+fn validate_dataset_ref_remote(s: &str) -> Result<(), String> {
+    match DatasetRefRemote::try_from(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
+        )),
+    }
+}
 
 fn validate_dataset_ref_any(s: &str) -> Result<(), String> {
     match DatasetRefAny::try_from(s) {

@@ -66,7 +66,7 @@ impl PullServiceImpl {
         dataset_ref: &DatasetRefAny,
         visited: &mut HashMap<DatasetName, PullInfo>,
     ) -> Result<i32, (DatasetRefAny, PullError)> {
-        let (dataset_id, local_name, remote_name) = match dataset_ref {
+        let (dataset_id, local_name, remote_ref) = match dataset_ref {
             DatasetRefAny::ID(id) => {
                 match self.dataset_reg.resolve_dataset_ref(&id.as_local_ref()) {
                     Ok(local_hdl) => {
@@ -96,7 +96,7 @@ impl PullServiceImpl {
             DatasetRefAny::RemoteName(name)
             | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
                 let local_name = self.resolve_remote_name_to_local(&name);
-                (None, local_name, Some(name.clone()))
+                (None, local_name, Some(name.as_remote_ref()))
             }
             DatasetRefAny::Url(_) => unimplemented!("Pulling via URL is not yet supported"),
         };
@@ -107,14 +107,14 @@ impl PullServiceImpl {
         }
 
         // Pulling from repository has depth 0
-        if let Some(remote_name) = remote_name {
+        if let Some(remote_ref) = remote_ref {
             visited.insert(
                 local_name.clone(),
                 PullInfo {
                     depth: 0,
                     dataset_id,
                     local_name,
-                    remote_name: Some(remote_name),
+                    remote_ref: Some(remote_ref),
                 },
             );
             return Ok(0);
@@ -141,7 +141,7 @@ impl PullServiceImpl {
                 depth: max_dep_depth + 1,
                 dataset_id,
                 local_name,
-                remote_name: None,
+                remote_ref: None,
             },
         );
         Ok(max_dep_depth + 1)
@@ -159,7 +159,7 @@ impl PullServiceImpl {
                 .remote_alias_reg
                 .get_remote_aliases(&local_hdl.as_local_ref())
             {
-                if aliases.contains(&remote_name, RemoteAliasKind::Pull) {
+                if aliases.contains(&remote_name.as_remote_ref(), RemoteAliasKind::Pull) {
                     return local_hdl.name;
                 }
             }
@@ -173,7 +173,7 @@ impl PullServiceImpl {
                 .get_remote_aliases(&local_hdl.as_local_ref())
                 .unwrap();
 
-            if aliases.contains(&remote_name, RemoteAliasKind::Pull) {
+            if aliases.contains(&remote_name.as_remote_ref(), RemoteAliasKind::Pull) {
                 return local_hdl.name;
             }
         }
@@ -187,7 +187,7 @@ impl PullServiceImpl {
     fn resolve_local_to_remote_alias(
         &self,
         local_ref: &DatasetRefLocal,
-    ) -> Result<Option<RemoteDatasetName>, PullError> {
+    ) -> Result<Option<DatasetRefRemote>, PullError> {
         let mut pull_aliases: Vec<_> = self
             .remote_alias_reg
             .get_remote_aliases(local_ref)?
@@ -211,12 +211,12 @@ impl PullServiceImpl {
         let count = to_slice
             .iter()
             .take_while(|pi| {
-                pi.depth == first.depth && pi.remote_name.is_some() == first.remote_name.is_some()
+                pi.depth == first.depth && pi.remote_ref.is_some() == first.remote_ref.is_some()
             })
             .count();
         (
             first.depth,
-            first.remote_name.is_some(),
+            first.remote_ref.is_some(),
             &to_slice[..count],
             &to_slice[count..],
         )
@@ -292,7 +292,7 @@ impl PullService for PullServiceImpl {
                     .sync_multi(
                         &mut batch.iter().map(|pi| {
                             (
-                                pi.remote_name.as_ref().unwrap().into(),
+                                pi.remote_ref.as_ref().unwrap().into(),
                                 pi.local_name.as_any_ref(),
                             )
                         }),
@@ -305,19 +305,13 @@ impl PullService for PullServiceImpl {
                 if options.create_remote_aliases {
                     for res in &sync_results {
                         if let Ok(SyncResult::Updated { old_head: None, .. }) = res.result {
-                            match &res.src {
-                                DatasetRefAny::RemoteName(name)
-                                | DatasetRefAny::RemoteHandle(RemoteDatasetHandle {
-                                    name, ..
-                                }) => {
-                                    self.remote_alias_reg
-                                        .get_remote_aliases(&res.dst.as_local_ref().unwrap())
-                                        .unwrap()
-                                        .add(name, RemoteAliasKind::Pull)
-                                        .unwrap();
-                                }
-                                _ => {}
-                            };
+                            if let Some(remote_ref) = res.src.as_remote_ref() {
+                                self.remote_alias_reg
+                                    .get_remote_aliases(&res.dst.as_local_ref().unwrap())
+                                    .unwrap()
+                                    .add(&remote_ref, RemoteAliasKind::Pull)
+                                    .unwrap();
+                            }
                         }
                     }
                 }
@@ -366,15 +360,9 @@ impl PullService for PullServiceImpl {
             .await;
 
         if res.is_ok() && options.create_remote_aliases {
-            match &remote_ref {
-                DatasetRefRemote::RemoteName(name)
-                | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
-                    self.remote_alias_reg
-                        .get_remote_aliases(&local_name.as_local_ref())?
-                        .add(name, RemoteAliasKind::Pull)?;
-                }
-                _ => {}
-            }
+            self.remote_alias_reg
+                .get_remote_aliases(&local_name.as_local_ref())?
+                .add(remote_ref, RemoteAliasKind::Pull)?;
         }
 
         Self::result_into(res)
@@ -456,7 +444,7 @@ struct PullInfo {
     depth: i32,
     dataset_id: Option<DatasetID>,
     local_name: DatasetName,
-    remote_name: Option<RemoteDatasetName>,
+    remote_ref: Option<DatasetRefRemote>,
 }
 
 impl PullInfo {
@@ -468,7 +456,14 @@ impl PullInfo {
             }
             DatasetRefAny::RemoteName(name)
             | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
-                Some(name) == self.remote_name.as_ref()
+                match &self.remote_ref {
+                    Some(DatasetRefRemote::RemoteName(sname))
+                    | Some(DatasetRefRemote::RemoteHandle(RemoteDatasetHandle {
+                        name: sname,
+                        ..
+                    })) => sname == name,
+                    _ => false,
+                }
             }
             DatasetRefAny::Url(_) => unimplemented!(),
         }
@@ -488,8 +483,8 @@ impl Ord for PullInfo {
             return depth_ord;
         }
 
-        if self.remote_name.is_some() != other.remote_name.is_some() {
-            return if self.remote_name.is_some() {
+        if self.remote_ref.is_some() != other.remote_ref.is_some() {
+            return if self.remote_ref.is_some() {
                 Ordering::Less
             } else {
                 Ordering::Greater

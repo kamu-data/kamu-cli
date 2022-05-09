@@ -90,8 +90,14 @@ impl AliasListCommand {
             let aliases = self
                 .remote_alias_reg
                 .get_remote_aliases(&ds.as_local_ref())?;
-            let mut pull_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Pull).collect();
-            let mut push_aliases: Vec<_> = aliases.get_by_kind(RemoteAliasKind::Push).collect();
+            let mut pull_aliases: Vec<_> = aliases
+                .get_by_kind(RemoteAliasKind::Pull)
+                .map(|a| a.to_string())
+                .collect();
+            let mut push_aliases: Vec<_> = aliases
+                .get_by_kind(RemoteAliasKind::Push)
+                .map(|a| a.to_string())
+                .collect();
             pull_aliases.sort();
             push_aliases.sort();
 
@@ -100,7 +106,7 @@ impl AliasListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&ds.name),
                     Cell::new("Pull"),
-                    Cell::new(&alias.to_string()),
+                    Cell::new(&alias),
                 ]));
             }
 
@@ -109,7 +115,7 @@ impl AliasListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&ds.name),
                     Cell::new("Push"),
-                    Cell::new(&alias.to_string()),
+                    Cell::new(&alias),
                 ]));
             }
         }

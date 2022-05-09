@@ -17,7 +17,7 @@ pub struct AliasAddCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset: DatasetRefLocal,
-    alias: RemoteDatasetName,
+    alias: DatasetRefRemote,
     pull: bool,
     push: bool,
 }
@@ -34,8 +34,8 @@ impl AliasAddCommand {
     where
         R: TryInto<DatasetRefLocal>,
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-        N: TryInto<RemoteDatasetName>,
-        <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
+        N: TryInto<DatasetRefRemote>,
+        <N as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
     {
         Self {
             remote_repo_reg,
@@ -57,8 +57,10 @@ impl Command for AliasAddCommand {
             ));
         }
 
-        self.remote_repo_reg
-            .get_repository(&self.alias.repository())?;
+        if let DatasetRefRemote::RemoteName(name) = &self.alias {
+            self.remote_repo_reg.get_repository(name.repository())?;
+        }
+
         let mut aliases = self.remote_alias_reg.get_remote_aliases(&self.dataset)?;
 
         if self.pull {

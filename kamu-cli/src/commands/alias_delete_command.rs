@@ -16,7 +16,7 @@ use std::sync::Arc;
 pub struct AliasDeleteCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset: DatasetRefLocal,
-    alias: Option<RemoteDatasetName>,
+    alias: Option<DatasetRefRemote>,
     all: bool,
     pull: bool,
     push: bool,
@@ -34,8 +34,8 @@ impl AliasDeleteCommand {
     where
         R: TryInto<DatasetRefLocal>,
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-        N: TryInto<RemoteDatasetName>,
-        <N as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
+        N: TryInto<DatasetRefRemote>,
+        <N as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
     {
         Self {
             remote_alias_reg,

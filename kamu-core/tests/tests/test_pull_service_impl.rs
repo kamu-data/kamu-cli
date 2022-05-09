@@ -339,7 +339,7 @@ async fn test_pull_batching_complex_with_remote() {
         .get_remote_aliases(&rl!("e"))
         .unwrap()
         .add(
-            &RemoteDatasetName::try_from("kamu.dev/anonymous/e").unwrap(),
+            &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
             RemoteAliasKind::Pull,
         )
         .unwrap();
@@ -474,7 +474,46 @@ async fn test_sync_from() {
 
     assert_eq!(
         pull_aliases,
-        vec![RemoteDatasetName::try_from("myrepo/foo").unwrap()]
+        vec![DatasetRefRemote::try_from("myrepo/foo").unwrap()]
+    );
+}
+
+#[tokio::test]
+async fn test_sync_from_url() {
+    let tmp_ws_dir = tempfile::tempdir().unwrap();
+    let harness = PullTestHarness::new(tmp_ws_dir.path());
+
+    let res = harness
+        .pull_svc
+        .sync_from(
+            &DatasetRefRemote::try_from("http://foo.bar").unwrap(),
+            &n!("bar"),
+            PullOptions::default(),
+            None,
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Ok(PullResult::Updated {
+            old_head: None,
+            new_head: _,
+            num_blocks: 1,
+        })
+    );
+
+    let aliases = harness
+        .remote_alias_reg
+        .get_remote_aliases(&rl!("bar"))
+        .unwrap();
+    let pull_aliases: Vec<_> = aliases
+        .get_by_kind(RemoteAliasKind::Pull)
+        .map(|i| i.clone())
+        .collect();
+
+    assert_eq!(
+        pull_aliases,
+        vec![DatasetRefRemote::try_from("http://foo.bar").unwrap()]
     );
 }
 

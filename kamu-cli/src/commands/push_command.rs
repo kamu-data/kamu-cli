@@ -22,58 +22,78 @@ use std::sync::Arc;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct PushCommand {
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     push_svc: Arc<dyn PushService>,
     refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
-    as_name: Option<RemoteDatasetName>,
+    add_aliases: bool,
+    as_ref: Option<DatasetRefRemote>,
     output_config: Arc<OutputConfig>,
 }
 
 impl PushCommand {
-    pub fn new<I, R, S>(
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pub fn new<I, R, RR>(
         push_svc: Arc<dyn PushService>,
         refs: I,
         all: bool,
         recursive: bool,
-        as_name: Option<S>,
+        add_aliases: bool,
+        as_ref: Option<RR>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
         I: Iterator<Item = R>,
         R: TryInto<DatasetRefAny>,
         <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
-        S: TryInto<RemoteDatasetName>,
-        <S as TryInto<RemoteDatasetName>>::Error: std::fmt::Debug,
+        RR: TryInto<DatasetRefRemote>,
+        <RR as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
     {
         Self {
-            remote_alias_reg,
             push_svc,
             refs: refs.map(|s| s.try_into().unwrap()).collect(),
             all,
             recursive,
-            as_name: as_name.map(|s| s.try_into().unwrap()),
+            add_aliases,
+            as_ref: as_ref.map(|s| s.try_into().unwrap()),
             output_config,
         }
     }
 
-    async fn push_quiet(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
-        self.push_svc
-            .push_multi(
-                &mut self.refs.iter().cloned(),
-                PushOptions {
-                    all: self.all,
-                    recursive: self.recursive,
-                    sync_options: SyncOptions::default(),
-                },
-                None,
-            )
-            .await
+    async fn do_push(&self, listener: Option<Arc<dyn SyncMultiListener>>) -> Vec<PushResponse> {
+        if let Some(remote_ref) = &self.as_ref {
+            self.push_svc
+                .push_multi_ext(
+                    &mut vec![PushRequest {
+                        local_ref: self.refs[0].as_local_ref(),
+                        remote_ref: Some(remote_ref.clone()),
+                    }]
+                    .into_iter(),
+                    PushOptions {
+                        all: self.all,
+                        recursive: self.recursive,
+                        add_aliases: self.add_aliases,
+                        sync_options: SyncOptions::default(),
+                    },
+                    listener,
+                )
+                .await
+        } else {
+            self.push_svc
+                .push_multi(
+                    &mut self.refs.iter().cloned(),
+                    PushOptions {
+                        all: self.all,
+                        recursive: self.recursive,
+                        add_aliases: self.add_aliases,
+                        sync_options: SyncOptions::default(),
+                    },
+                    listener,
+                )
+                .await
+        }
     }
 
-    async fn push_with_progress(&self) -> Vec<(PushInfo, Result<PushResult, PushError>)> {
+    async fn push_with_progress(&self) -> Vec<PushResponse> {
         let progress = PrettyPushProgress::new();
         let listener = Arc::new(progress.clone());
 
@@ -81,18 +101,7 @@ impl PushCommand {
             progress.draw();
         });
 
-        let results = self
-            .push_svc
-            .push_multi(
-                &mut self.refs.iter().cloned(),
-                PushOptions {
-                    all: self.all,
-                    recursive: self.recursive,
-                    sync_options: SyncOptions::default(),
-                },
-                Some(listener.clone()),
-            )
-            .await;
+        let results = self.do_push(Some(listener.clone())).await;
 
         listener.finish();
         draw_thread.join().unwrap();
@@ -108,29 +117,11 @@ impl Command for PushCommand {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
 
-        if self.refs.len() > 1 && self.as_name.is_some() {
+        if self.refs.len() > 1 && self.as_ref.is_some() {
             return Err(CLIError::usage_error(
                 "Cannot specify multiple datasets with --as alias",
             ));
         }
-
-        // If --as alias is used - add it to push aliases
-        let alias_added = if let Some(remote_name) = &self.as_name {
-            let local_ref = match self.refs[0].as_local_ref() {
-                Some(local_ref) => local_ref,
-                None => {
-                    return Err(CLIError::usage_error(
-                        "When using --as dataset has to refer to a local ID",
-                    ))
-                }
-            };
-
-            self.remote_alias_reg
-                .get_remote_aliases(&local_ref)?
-                .add(remote_name, RemoteAliasKind::Push)?
-        } else {
-            false
-        };
 
         let push_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
@@ -138,28 +129,21 @@ impl Command for PushCommand {
         {
             self.push_with_progress().await
         } else {
-            self.push_quiet().await
+            self.do_push(None).await
         };
 
         let mut updated = 0;
         let mut up_to_date = 0;
         let mut errors = 0;
 
-        for (_, res) in push_results.iter() {
-            match res {
+        for res in push_results.iter() {
+            match &res.result {
                 Ok(r) => match r {
-                    PushResult::UpToDate => up_to_date += 1,
-                    PushResult::Updated { .. } => updated += 1,
+                    SyncResult::UpToDate => up_to_date += 1,
+                    SyncResult::Updated { .. } => updated += 1,
                 },
                 Err(_) => errors += 1,
             }
-        }
-
-        if alias_added && errors != 0 {
-            // This is a bit ugly, but we don't want alias to stay unless the first push is successful
-            self.remote_alias_reg
-                .get_remote_aliases(&self.refs[0].as_local_ref().unwrap())?
-                .delete(self.as_name.as_ref().unwrap(), RemoteAliasKind::Push)?;
         }
 
         if updated != 0 {
@@ -187,13 +171,22 @@ impl Command for PushCommand {
                 console::style("Summary of errors")
             );
 
+            // TODO: Generic multi-error printing
             push_results
                 .into_iter()
-                .filter_map(|(pi, res)| res.err().map(|e| (pi, e)))
-                .for_each(|(pi, err)| {
+                .filter(|res| res.result.is_err())
+                .for_each(|res| {
+                    let err = res.result.err().unwrap();
+
+                    let original_ref = res
+                        .original_request
+                        .local_ref
+                        .map(|r| r.as_any_ref())
+                        .unwrap_or_else(|| res.original_request.remote_ref.unwrap().as_any_ref());
+
                     eprintln!(
                         "\n{}: {}",
-                        console::style(format!("{}", pi.original_ref)).red().bold(),
+                        console::style(format!("{}", original_ref)).red().bold(),
                         err
                     );
                     if let Some(bt) = err.backtrace() {

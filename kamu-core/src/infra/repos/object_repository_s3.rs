@@ -42,7 +42,13 @@ impl<D, const C: u32> ObjectRepositoryS3<D, C> {
         // See: https://github.com/rusoto/rusoto/issues/1482
         let (endpoint, path): (Option<String>, String) =
             match (url.scheme(), url.host_str(), url.port(), url.path()) {
-                ("s3", Some(host), None, "") => (None, host.to_owned()),
+                ("s3", Some(host), None, path) => {
+                    return (
+                        None,
+                        host.to_owned(),
+                        path.trim_start_matches('/').to_owned(),
+                    )
+                }
                 ("s3+http", Some(host), None, path) => {
                     (Some(format!("http://{}", host)), path.to_owned())
                 }

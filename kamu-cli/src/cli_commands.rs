@@ -163,10 +163,10 @@ pub fn get_command(
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
             catalog.get_one()?,
-            catalog.get_one()?,
             push_matches.values_of("dataset").unwrap_or_default(),
             push_matches.is_present("all"),
             push_matches.is_present("recursive"),
+            !push_matches.is_present("no-alias"),
             push_matches.value_of("as"),
             catalog.get_one()?,
         )),
