@@ -41,8 +41,8 @@ macro_rules! page_based_connection {
                     None => (None, nodes.len() != per_page),
                     Some(0) => (Some(0), false),
                     Some(tc) => (
-                        Some(tc.unstable_div_ceil(per_page)),
-                        (tc.unstable_div_ceil(per_page) - 1) > current_page,
+                        Some(tc.div_ceil(per_page)),
+                        (tc.div_ceil(per_page) - 1) > current_page,
                     ),
                 };
 

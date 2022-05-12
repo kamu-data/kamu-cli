@@ -615,9 +615,11 @@ pub fn cli() -> Command<'static> {
 
                         kamu pull kamu/org.example.data
 
-                    Fetch dataset from a URL giving it the specified local name:
+                    Fetch dataset from a URL (optionally renaming it):
 
-                        kamu pull s3://kamu.dev/odf/org.example.data --as my.data
+                        kamu pull ipfs://bafy...a0dx/data
+                        kamu pull s3://my-bucket.example.org/odf/org.example.data
+                        kamu pull s3+https://example.org:5000/data --as org.example.data
 
                     Advance the watermark of a dataset:
 
