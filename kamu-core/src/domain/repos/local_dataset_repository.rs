@@ -25,18 +25,7 @@ pub trait LocalDatasetRepository: Sync + Send {
         dataset_ref: &DatasetRefLocal,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
-    async fn try_resolve_dataset_ref(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
-        match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(hdl) => Ok(Some(hdl)),
-            Err(GetDatasetError::NotFound(_)) => Ok(None),
-            Err(GetDatasetError::Internal(e)) => Err(e),
-        }
-    }
-
-    fn get_all_datasets<'s>(&'s self) -> DatasetListStream<'s>;
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
 
     async fn get_dataset(
         &self,
@@ -47,6 +36,54 @@ pub trait LocalDatasetRepository: Sync + Send {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError>;
+
+    async fn create_dataset_from_snapshot(
+        &self,
+        snapshot: DatasetSnapshot,
+    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>;
+
+    async fn create_datasets_from_snapshots(
+        &self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(
+        DatasetName,
+        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+    )>;
+
+    async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
+        -> Result<(), DeleteDatasetError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type DatasetHandleStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+pub trait DatasetBuilder: Send + Sync {
+    fn as_dataset(&self) -> &dyn Dataset;
+    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError>;
+    async fn discard(&self) -> Result<(), InternalError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Extensions
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
+    async fn try_resolve_dataset_ref(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<Option<DatasetHandle>, InternalError> {
+        match self.resolve_dataset_ref(dataset_ref).await {
+            Ok(hdl) => Ok(Some(hdl)),
+            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::Internal(e)) => Err(e),
+        }
+    }
 
     async fn get_or_create_dataset(
         &self,
@@ -67,35 +104,13 @@ pub trait LocalDatasetRepository: Sync + Send {
             Err(GetDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
         }
     }
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: DatasetSnapshot,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>;
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetName,
-        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
-    )>;
-
-    async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
-        -> Result<(), DeleteDatasetError>;
 }
-/////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetListStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait DatasetBuilder: Send + Sync {
-    fn as_dataset(&self) -> &dyn Dataset;
-    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError>;
-    async fn discard(&self) -> Result<(), InternalError>;
+impl<T> LocalDatasetRepositoryExt for T
+where
+    T: LocalDatasetRepository,
+    T: ?Sized,
+{
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -111,25 +126,53 @@ pub struct DatasetNotFoundError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset {dataset_ref} is referencing non-existing inputs: {missing_inputs:?}")]
 pub struct MissingInputsError {
     pub dataset_ref: DatasetRefLocal,
     pub missing_inputs: Vec<DatasetRefLocal>,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset {dataset_handle} is referenced by: {children:?}")]
-pub struct DanglingReferenceError {
-    pub dataset_handle: DatasetHandle,
-    pub children: Vec<DatasetHandle>,
+impl std::fmt::Display for MissingInputsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Dataset {} is referencing non-existing inputs: ",
+            self.dataset_ref
+        )?;
+        for (i, h) in self.missing_inputs.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", h)?;
+        }
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("New dataset {new_dataset:?} collides with existing dataset {existing_dataset:?}")]
+pub struct DanglingReferenceError {
+    pub dataset_handle: DatasetHandle,
+    pub children: Vec<DatasetHandle>,
+}
+
+impl std::fmt::Display for DanglingReferenceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Dataset {} is referenced by: ", self.dataset_handle)?;
+        for (i, h) in self.children.iter().enumerate() {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", h)?;
+        }
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("New dataset {new_dataset} collides with existing dataset {existing_dataset}")]
 pub struct CollisionError {
     pub new_dataset: DatasetHandle,
     pub existing_dataset: DatasetHandle,

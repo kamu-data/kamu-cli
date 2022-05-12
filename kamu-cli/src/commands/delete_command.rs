@@ -15,7 +15,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct DeleteCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     dataset_refs: Vec<DatasetRefLocal>,
     all: bool,
     recursive: bool,
@@ -24,7 +24,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     pub fn new<I, R>(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_refs: I,
         all: bool,
         recursive: bool,
@@ -36,7 +36,7 @@ impl DeleteCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            dataset_reg,
+            local_repo,
             dataset_refs: dataset_refs
                 .into_iter()
                 .map(|s| s.try_into().unwrap())
@@ -63,6 +63,16 @@ impl Command for DeleteCommand {
             self.dataset_refs.clone()
         };
 
+        // Check references exist
+        // TODO: PERF: Create a batch version of `resolve_dataset_ref`
+        for dataset_ref in &self.dataset_refs {
+            match self.local_repo.resolve_dataset_ref(dataset_ref).await {
+                Ok(_) => Ok(()),
+                Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
+                Err(GetDatasetError::Internal(e)) => Err(e.into()),
+            }?
+        }
+
         let confirmed = if self.no_confirmation {
             true
         } else {
@@ -83,7 +93,11 @@ impl Command for DeleteCommand {
         }
 
         for dataset_ref in &dataset_refs {
-            self.dataset_reg.delete_dataset(dataset_ref)?;
+            match self.local_repo.delete_dataset(dataset_ref).await {
+                Ok(_) => Ok(()),
+                Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
+                Err(e) => Err(CLIError::critical(e)),
+            }?
         }
 
         eprintln!(

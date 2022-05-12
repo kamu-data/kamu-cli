@@ -15,23 +15,17 @@ use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: Replace with Display
 pub fn display_cli_error(err: &CLIError) {
     match err {
-        CLIError::CriticalFailure { .. } => {
-            eprintln!("{}: {}", console::style("Critical Error").red().bold(), err);
-            eprintln!(
-                "Help us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
-            );
-        }
         CLIError::BatchError(b) => print_batch_error(b),
         e => print_error(e),
     }
 
-    if let Some(bt) = err.backtrace() {
-        if bt.status() == BacktraceStatus::Captured {
-            eprintln!();
-            eprintln!("Backtrace:\n{}", console::style(bt).dim().bold());
-        }
+    if let CLIError::CriticalFailure { .. } = err {
+        eprintln!(
+            "\nHelp us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+        );
     }
 }
 
@@ -48,10 +42,18 @@ pub fn print_error(error: &dyn Error) {
     let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
     unchain_error_messages(&mut error_messages);
 
-    eprintln!("{}:", console::style("Error").red().bold(),);
+    if error_messages.len() == 1 {
+        eprintln!(
+            "{}: {}",
+            console::style("Error").red().bold(),
+            error_messages[0]
+        );
+    } else {
+        eprintln!("{}:", console::style("Error").red().bold());
 
-    for (i, e) in error_messages.iter().enumerate() {
-        eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+        for (i, e) in error_messages.iter().enumerate() {
+            eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+        }
     }
 
     // Print the inner most backtrace
@@ -80,14 +82,8 @@ pub fn print_batch_error(batch: &BatchError) {
 
     for (err, ctx) in &batch.errors_with_context {
         eprintln!();
-        eprintln!(
-            "{} {}:",
-            console::style(">").green(),
-            console::style(ctx).bold()
-        );
 
         let mut error_chain = Vec::new();
-
         let mut err_ref: Option<&dyn Error> = Some(err.as_ref());
         while let Some(e) = err_ref {
             error_chain.push(e);
@@ -97,8 +93,23 @@ pub fn print_batch_error(batch: &BatchError) {
         let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
         unchain_error_messages(&mut error_messages);
 
-        for (i, e) in error_messages.iter().enumerate() {
-            eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+        if error_messages.len() == 1 {
+            eprintln!(
+                "{} {}: {}",
+                console::style(">").green(),
+                console::style(ctx).bold(),
+                error_messages[0]
+            );
+        } else {
+            eprintln!(
+                "{} {}:",
+                console::style(">").green(),
+                console::style(ctx).bold()
+            );
+
+            for (i, e) in error_messages.iter().enumerate() {
+                eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
+            }
         }
 
         // Print the inner most backtrace

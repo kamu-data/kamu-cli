@@ -280,7 +280,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn get_all_datasets<'s>(&'s self) -> DatasetListStream<'s> {
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dir =
             std::fs::read_dir(&self.workspace_layout.datasets_dir).into_internal_error()?;
