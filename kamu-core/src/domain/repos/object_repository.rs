@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::InternalError;
+use crate::domain::{BoxedError, InternalError};
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
@@ -24,7 +24,7 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 /// Represents a content-addressable storage
 #[async_trait]
 pub trait ObjectRepository {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError>;
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError>;
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError>;
 
@@ -42,12 +42,7 @@ pub trait ObjectRepository {
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError>;
 
-    // /// Attempts to inserts file via atomic move on local FS.
-    // /// Otherwise will copy the contents and delete the source file.
-    // async fn insert_file(&self, file: &Path, options: InsertOpts)
-    //     -> Result<Multihash, InsertError>;
-
-    async fn delete(&self, hash: &Multihash) -> Result<(), InternalError>;
+    async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +70,123 @@ pub struct InsertOpts<'a> {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// Errors
+// Response Errors
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum ContainsError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetError {
+    #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        ObjectNotFoundError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<ContainsError> for GetError {
+    fn from(v: ContainsError) -> Self {
+        match v {
+            ContainsError::Access(e) => GetError::Access(e),
+            ContainsError::Internal(e) => GetError::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum InsertError {
+    #[error(transparent)]
+    HashMismatch(
+        #[from]
+        #[backtrace]
+        HashMismatchError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<ContainsError> for InsertError {
+    fn from(v: ContainsError) -> Self {
+        match v {
+            ContainsError::Access(e) => InsertError::Access(e),
+            ContainsError::Internal(e) => InsertError::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Individual Errors
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AccessError {
+    #[error("Respository is read-only")]
+    ReadOnly(#[source] Option<BoxedError>),
+    #[error("Unauthorized")]
+    Unauthorized(#[source] BoxedError),
+    #[error("Forbidden")]
+    Forbidden(#[source] BoxedError),
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
@@ -87,36 +198,8 @@ pub struct ObjectNotFoundError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetError {
-    #[error(transparent)]
-    NotFound(#[from] ObjectNotFoundError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
 #[error("Expected hash {expected} but got {actual}")]
 pub struct HashMismatchError {
     pub expected: Multihash,
     pub actual: Multihash,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum InsertError {
-    #[error(transparent)]
-    HashMismatch(#[from] HashMismatchError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }

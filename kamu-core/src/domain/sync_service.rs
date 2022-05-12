@@ -119,12 +119,12 @@ pub enum SyncError {
     Corrupted(#[from] CorruptedSourceError),
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
-    //#[error("{0}")]
-    //Unauthorized(#[source] BoxedError),
-    //#[error("{0}")]
-    //ReadOnly(#[source] BoxedError),
-    //#[error("{0}")]
-    //ProtocolError(#[source] BoxedError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]

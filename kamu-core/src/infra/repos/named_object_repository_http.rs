@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::GetError;
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 use async_trait::async_trait;
@@ -60,11 +60,11 @@ impl NamedObjectRepository for NamedObjectRepositoryHttp {
         Ok(data)
     }
 
-    async fn set(&self, _name: &str, _data: &[u8]) -> Result<(), InternalError> {
-        panic!("Http named object repository is read-only")
+    async fn set(&self, _name: &str, _data: &[u8]) -> Result<(), SetError> {
+        Err(AccessError::ReadOnly(None).into())
     }
 
-    async fn delete(&self, _name: &str) -> Result<(), InternalError> {
-        panic!("Http named object repository is read-only")
+    async fn delete(&self, _name: &str) -> Result<(), DeleteError> {
+        Err(AccessError::ReadOnly(None).into())
     }
 }

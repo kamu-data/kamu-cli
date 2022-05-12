@@ -66,6 +66,12 @@ pub enum GetSummaryError {
     #[error("Dataset is empty")]
     EmptyDataset,
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]

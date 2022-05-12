@@ -48,6 +48,20 @@ fn run_s3_server() -> S3 {
     }
 }
 
+#[ignore = "Rusoto does not handle 403 correctly"]
+#[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_unauthorized() {
+    let s3 = run_s3_server();
+    std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
+
+    assert_matches!(
+        repo.insert_bytes(b"foo", InsertOpts::default()).await,
+        Err(InsertError::Access(AccessError::Unauthorized(_)))
+    );
+}
+
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes() {

@@ -91,12 +91,14 @@ impl SyncServiceImpl {
                 dataset_ref: src_ref.clone(),
             }
             .into()),
+            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
         let dst_head = match dst_chain.get_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
+            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
@@ -123,6 +125,7 @@ impl SyncServiceImpl {
                 dst_head: e.tail,
             }
             .into()),
+            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
             Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
@@ -146,6 +149,7 @@ impl SyncServiceImpl {
                         source: Some(e.into()),
                     }
                     .into()),
+                    Err(GetError::Access(e)) => Err(SyncError::Access(e)),
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
@@ -166,6 +170,7 @@ impl SyncServiceImpl {
                         message: "Data file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
                         source: Some(e.into()),
                     }.into()),
+                    Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
             }
@@ -181,6 +186,7 @@ impl SyncServiceImpl {
                         source: Some(e.into()),
                     }
                     .into()),
+                    Err(GetError::Access(e)) => Err(SyncError::Access(e)),
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
@@ -203,6 +209,7 @@ impl SyncServiceImpl {
                         message: "Checkpoint file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
                         source: Some(e.into()),
                     }.into()),
+                    Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
             }
@@ -235,8 +242,9 @@ impl SyncServiceImpl {
                         source: Some(e.into()),
                     }.into())
                 }
-                Err(AppendError::Internal(e)) => Err(SyncError::Internal(e.into())),
                 Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
+                Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
+                Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
         }
 
@@ -255,8 +263,9 @@ impl SyncServiceImpl {
         {
             Ok(()) => Ok(()),
             Err(SetRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
+            Err(SetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(SetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            Err(SetRefError::BlockNotFound(_)) => unreachable!(),
+            Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
 
         Ok(SyncResult::Updated {
@@ -281,6 +290,7 @@ impl SyncServiceImpl {
                     dataset_ref: dataset_ref.clone(),
                 }
                 .into()),
+                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
                 Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
         }

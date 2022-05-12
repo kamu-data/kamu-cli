@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{BlockRef, InternalError};
+use crate::domain::{AccessError, BlockRef, InternalError};
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
@@ -21,10 +21,10 @@ pub trait ReferenceRepository {
     async fn get(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
     /// Update referece to point at the specified object hash
-    async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), InternalError>;
+    async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError>;
 
     /// Deletes specified reference
-    async fn delete(&self, r: &BlockRef) -> Result<(), InternalError>;
+    async fn delete(&self, r: &BlockRef) -> Result<(), DeleteRefError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,21 +32,63 @@ pub trait ReferenceRepository {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Reference does not exist: {block_ref:?}")]
-pub struct RefNotFoundError {
-    pub block_ref: BlockRef,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
 pub enum GetRefError {
     #[error(transparent)]
     NotFound(RefNotFoundError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum SetRefError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteRefError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Reference does not exist: {block_ref:?}")]
+pub struct RefNotFoundError {
+    pub block_ref: BlockRef,
 }

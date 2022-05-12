@@ -37,19 +37,17 @@ where
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
         if let Some(prev) = &new_block.prev_block_hash {
-            if !self
-                .obj_repo
-                .contains(prev)
-                .await
-                .map_err(|e| AppendError::Internal(e))?
-            {
-                return Err(
+            match self.obj_repo.contains(prev).await {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(
                     AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
                         hash: prev.clone(),
                     })
                     .into(),
-                );
-            }
+                ),
+                Err(ContainsError::Access(e)) => Err(AppendError::Access(e)),
+                Err(ContainsError::Internal(e)) => Err(AppendError::Internal(e)),
+            }?;
         }
         Ok(())
     }
@@ -77,21 +75,22 @@ where
         block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
         let maybe_prev_block = if !block_cache.is_empty() {
-            block_cache.first()
+            Ok(block_cache.first())
         } else if let Some(prev_hash) = &new_block.prev_block_hash {
             match self.get_block(prev_hash).await {
                 Ok(b) => {
                     block_cache.push(b);
-                    block_cache.first()
+                    Ok(block_cache.first())
                 }
-                Err(GetBlockError::NotFound(e)) => {
-                    return Err(AppendValidationError::PrevBlockNotFound(e).into())
-                }
-                Err(GetBlockError::Internal(e)) => return Err(AppendError::Internal(e)),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }
         } else {
-            None
-        };
+            Ok(None)
+        }?;
 
         if let Some(prev_block) = maybe_prev_block {
             if new_block.system_time < prev_block.system_time {
@@ -120,6 +119,7 @@ where
             Err(GetError::NotFound(e)) => {
                 Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
             }
+            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
@@ -158,6 +158,10 @@ where
                         yield Err(IterBlocksError::BlockNotFound(e));
                         break;
                     }
+                    Err(GetBlockError::Access(e)) => {
+                        yield Err(IterBlocksError::Access(e));
+                        break;
+                    }
                     Err(GetBlockError::Internal(e)) => {
                         yield Err(IterBlocksError::Internal(e));
                         break;
@@ -190,16 +194,14 @@ where
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetRefError> {
         if opts.validate_block_present {
-            if !self
-                .obj_repo
-                .contains(hash)
-                .await
-                .map_err(|e| SetRefError::Internal(e))?
-            {
-                return Err(SetRefError::BlockNotFound(BlockNotFoundError {
+            match self.obj_repo.contains(hash).await {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(SetRefError::BlockNotFound(BlockNotFoundError {
                     hash: hash.clone(),
-                }));
-            }
+                })),
+                Err(ContainsError::Access(e)) => Err(SetRefError::Access(e)),
+                Err(ContainsError::Internal(e)) => Err(SetRefError::Internal(e)),
+            }?;
         }
 
         // TODO: CONCURRENCY: Implement true CAS
@@ -207,6 +209,7 @@ where
             let prev_actual = match self.ref_repo.get(r).await {
                 Ok(r) => Ok(Some(r)),
                 Err(GetRefError::NotFound(_)) => Ok(None),
+                Err(GetRefError::Access(e)) => Err(SetRefError::Access(e)),
                 Err(GetRefError::Internal(e)) => Err(SetRefError::Internal(e)),
             }?;
             if prev_expected != prev_actual.as_ref() {
@@ -219,10 +222,7 @@ where
             }
         }
 
-        self.ref_repo
-            .set(r, hash)
-            .await
-            .map_err(|e| SetRefError::Internal(e))?;
+        self.ref_repo.set(r, hash).await?;
 
         Ok(())
     }
@@ -251,10 +251,11 @@ where
             let expected = opts.check_ref_is.unwrap_or(block.prev_block_hash.as_ref());
 
             let actual = match self.ref_repo.get(r).await {
-                Ok(h) => Some(h),
-                Err(GetRefError::NotFound(_)) => None,
-                Err(GetRefError::Internal(e)) => return Err(AppendError::Internal(e)),
-            };
+                Ok(h) => Ok(Some(h)),
+                Err(GetRefError::NotFound(_)) => Ok(None),
+                Err(GetRefError::Access(e)) => Err(AppendError::Access(e)),
+                Err(GetRefError::Internal(e)) => Err(AppendError::Internal(e)),
+            }?;
 
             if expected != actual.as_ref() {
                 return Err(AppendError::RefCASFailed(RefCASError {
@@ -284,14 +285,12 @@ where
                 InsertError::HashMismatch(e) => {
                     AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))
                 }
+                InsertError::Access(e) => AppendError::Access(e),
                 InsertError::Internal(e) => AppendError::Internal(e),
             })?;
 
         if let Some(r) = opts.update_ref {
-            self.ref_repo
-                .set(r, &res.hash)
-                .await
-                .map_err(|e| AppendError::Internal(e))?;
+            self.ref_repo.set(r, &res.hash).await?;
         }
 
         Ok(res.hash)

@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::GetError;
+use crate::domain::repos::named_object_repository::{DeleteError, GetError};
+use crate::domain::repos::reference_repository::SetRefError;
 use crate::domain::*;
 use opendatafabric::Multihash;
 
@@ -40,6 +41,7 @@ where
             Err(GetError::NotFound(_)) => Err(GetRefError::NotFound(RefNotFoundError {
                 block_ref: r.clone(),
             })),
+            Err(GetError::Access(e)) => Err(GetRefError::Access(e)),
             Err(GetError::Internal(e)) => Err(GetRefError::Internal(e)),
         }?;
         let text = std::str::from_utf8(&data[..]).int_err()?;
@@ -47,14 +49,20 @@ where
         Ok(hash)
     }
 
-    async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), InternalError> {
+    async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError> {
         let multibase = hash.to_multibase_string();
-        self.repo.set(&r.as_str(), multibase.as_bytes()).await?;
-        Ok(())
+        match self.repo.set(&r.as_str(), multibase.as_bytes()).await {
+            Ok(()) => Ok(()),
+            Err(SetError::Access(e)) => Err(SetRefError::Access(e)),
+            Err(SetError::Internal(e)) => Err(SetRefError::Internal(e)),
+        }
     }
 
-    async fn delete(&self, r: &BlockRef) -> Result<(), InternalError> {
-        self.repo.delete(r.as_str()).await?;
-        Ok(())
+    async fn delete(&self, r: &BlockRef) -> Result<(), DeleteRefError> {
+        match self.repo.delete(r.as_str()).await {
+            Ok(()) => Ok(()),
+            Err(DeleteError::Access(e)) => Err(DeleteRefError::Access(e)),
+            Err(DeleteError::Internal(e)) => Err(DeleteRefError::Internal(e)),
+        }
     }
 }

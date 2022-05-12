@@ -17,6 +17,7 @@ pub mod reference_repository;
 pub use reference_repository::*;
 
 pub mod metadata_chain;
+pub use metadata_chain::SetRefError;
 pub use metadata_chain::*;
 
 pub mod dataset;

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::GetError;
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 use async_trait::async_trait;
@@ -54,7 +54,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(Bytes::from(data))
     }
 
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), InternalError> {
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
         tokio::fs::write(&self.staging_path, data).await.int_err()?;
 
         // Atomic move/replace
@@ -63,11 +63,11 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(())
     }
 
-    async fn delete(&self, name: &str) -> Result<(), InternalError> {
+    async fn delete(&self, name: &str) -> Result<(), DeleteError> {
         match std::fs::remove_file(self.root.join(name)) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e.int_err()),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 }

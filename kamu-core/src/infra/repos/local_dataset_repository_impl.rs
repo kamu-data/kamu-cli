@@ -180,6 +180,7 @@ impl LocalDatasetRepositoryImpl {
         let summary = match dataset.get_summary(SummaryOptions::default()).await {
             Ok(s) => Ok(s),
             Err(GetSummaryError::EmptyDataset) => unreachable!(),
+            Err(GetSummaryError::Access(e)) => Err(e.int_err().into()),
             Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
         }?;
 
@@ -624,6 +625,7 @@ where
                 self.discard_impl()?;
                 Err(CreateDatasetError::EmptyDataset)
             }
+            Err(GetRefError::Access(e)) => Err(e.int_err().into()),
             Err(GetRefError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
         }?;
 

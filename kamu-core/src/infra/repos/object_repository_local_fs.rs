@@ -95,7 +95,7 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let path = self.get_path(hash);
 
         debug!(?path, "Checking for object");
@@ -226,7 +226,7 @@ where
         })
     }
 
-    async fn delete(&self, hash: &Multihash) -> Result<(), InternalError> {
+    async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let path = self.get_path(hash);
 
         debug!(?path, "Deleting object");

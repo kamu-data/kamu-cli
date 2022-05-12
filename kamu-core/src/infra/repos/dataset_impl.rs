@@ -52,6 +52,7 @@ where
         let data = match self.info_repo.get("summary").await {
             Ok(data) => data,
             Err(GetError::NotFound(_)) => return Ok(None),
+            Err(GetError::Access(e)) => return Err(GetSummaryError::Access(e)),
             Err(GetError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
         };
 
@@ -78,10 +79,11 @@ where
 
         let data = serde_yaml::to_vec(&manifest).int_err()?;
 
-        self.info_repo
-            .set("summary", &data)
-            .await
-            .map_err(|e| GetSummaryError::Internal(e.into()))?;
+        match self.info_repo.set("summary", &data).await {
+            Ok(()) => Ok(()),
+            Err(SetError::Access(e)) => Err(GetSummaryError::Access(e)),
+            Err(SetError::Internal(e)) => Err(GetSummaryError::Internal(e)),
+        }?;
 
         Ok(())
     }
@@ -93,6 +95,7 @@ where
         let current_head = match self.metadata_chain.get_ref(&BlockRef::Head).await {
             Ok(h) => h,
             Err(GetRefError::NotFound(_)) => return Ok(prev),
+            Err(GetRefError::Access(e)) => return Err(GetSummaryError::Access(e)),
             Err(GetRefError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
         };
 

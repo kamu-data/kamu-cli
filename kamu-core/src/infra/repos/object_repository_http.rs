@@ -46,7 +46,7 @@ impl ObjectRepositoryHttp {
 
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryHttp {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
         debug!(%url, "Checking for object");
@@ -56,6 +56,12 @@ impl ObjectRepository for ObjectRepositoryHttp {
         match response.error_for_status() {
             Ok(_) => Ok(true),
             Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => Ok(false),
+            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+                Err(AccessError::Unauthorized(e.into()).into())
+            }
+            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+                Err(AccessError::Forbidden(e.into()).into())
+            }
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -73,6 +79,12 @@ impl ObjectRepository for ObjectRepositoryHttp {
                 Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 }))
+            }
+            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+                Err(AccessError::Unauthorized(e.into()).into())
+            }
+            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+                Err(AccessError::Forbidden(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
         }?;
@@ -96,6 +108,12 @@ impl ObjectRepository for ObjectRepositoryHttp {
                     hash: hash.clone(),
                 }))
             }
+            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+                Err(AccessError::Unauthorized(e.into()).into())
+            }
+            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+                Err(AccessError::Forbidden(e.into()).into())
+            }
             Err(e) => Err(e.int_err().into()),
         }?;
 
@@ -116,7 +134,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         _data: &'a [u8],
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        panic!("Http object repository is read-only")
+        Err(AccessError::ReadOnly(None).into())
     }
 
     async fn insert_stream<'a>(
@@ -124,10 +142,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
         _src: Box<AsyncReadObj>,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        panic!("Http object repository is read-only")
+        Err(AccessError::ReadOnly(None).into())
     }
 
-    async fn delete(&self, _hash: &Multihash) -> Result<(), InternalError> {
-        panic!("Http object repository is read-only")
+    async fn delete(&self, _hash: &Multihash) -> Result<(), DeleteError> {
+        Err(AccessError::ReadOnly(None).into())
     }
 }

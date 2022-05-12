@@ -124,7 +124,7 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let key = self.get_key(hash);
 
         debug!(?key, "Checking for object");
@@ -144,6 +144,7 @@ where
             // TODO: This error type doesn't work
             // See: https://github.com/rusoto/rusoto/issues/716
             Err(RusotoError::Service(HeadObjectError::NoSuchKey(_))) => Ok(false),
+            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
             Err(_) => Ok(false), // return Err(e.into()),
         }
     }
@@ -178,6 +179,7 @@ where
                     hash: hash.clone(),
                 }))
             }
+            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
             Err(e) => Err(e.int_err().into()),
         }?;
 
@@ -210,7 +212,8 @@ where
         debug!(?key, "Inserting object");
 
         // TODO: PERF: Avoid copying data into a buffer
-        self.client
+        match self
+            .client
             .put_object(PutObjectRequest {
                 bucket: self.bucket.clone(),
                 key,
@@ -219,7 +222,13 @@ where
                 ..PutObjectRequest::default()
             })
             .await
-            .int_err()?;
+        {
+            Ok(_) => Ok(()),
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(InsertError::Access(AccessError::Unauthorized(e.into())))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }?;
 
         Ok(InsertResult {
             hash,
@@ -258,7 +267,8 @@ where
         use tokio_util::io::ReaderStream;
         let stream = ReaderStream::new(src);
 
-        self.client
+        match self
+            .client
             .put_object(PutObjectRequest {
                 bucket: self.bucket.clone(),
                 key,
@@ -267,7 +277,13 @@ where
                 ..PutObjectRequest::default()
             })
             .await
-            .int_err()?;
+        {
+            Ok(_) => Ok(()),
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(InsertError::Access(AccessError::Unauthorized(e.into())))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }?;
 
         Ok(InsertResult {
             hash,
@@ -275,19 +291,26 @@ where
         })
     }
 
-    async fn delete(&self, hash: &Multihash) -> Result<(), InternalError> {
+    async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let key = self.get_key(&hash);
 
         debug!(?key, "Deleting object");
 
-        self.client
+        match self
+            .client
             .delete_object(DeleteObjectRequest {
                 bucket: self.bucket.clone(),
                 key,
                 ..DeleteObjectRequest::default()
             })
             .await
-            .int_err()?;
+        {
+            Ok(_) => Ok(()),
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(DeleteError::Access(AccessError::Unauthorized(e.into())))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }?;
 
         Ok(())
     }

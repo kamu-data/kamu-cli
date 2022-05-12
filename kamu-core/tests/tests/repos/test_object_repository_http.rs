@@ -15,6 +15,20 @@ use crate::utils::HttpFileServer;
 use std::assert_matches::assert_matches;
 
 #[tokio::test]
+async fn test_read_only() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let http_server = HttpFileServer::new(tmp_repo_dir.path());
+    let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
+    let _srv_handle = tokio::spawn(http_server.run());
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+
+    assert_matches!(
+        repo.insert_bytes(b"foo", InsertOpts::default()).await,
+        Err(InsertError::Access(AccessError::ReadOnly(_)))
+    );
+}
+
+#[tokio::test]
 async fn test_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let http_server = HttpFileServer::new(tmp_repo_dir.path());

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::GetError;
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 use async_trait::async_trait;
@@ -115,6 +115,9 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                     name: name.to_owned(),
                 }))
             }
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(GetError::Access(AccessError::Unauthorized(e.into())))
+            }
             Err(e) => Err(e.int_err().into()),
         }?;
 
@@ -127,13 +130,14 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         Ok(Bytes::from(data))
     }
 
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), InternalError> {
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
         let key = self.get_key(name);
 
         debug!(?key, "Inserting object");
 
         // TODO: PERF: Avoid copying data into a buffer
-        self.client
+        match self
+            .client
             .put_object(PutObjectRequest {
                 bucket: self.bucket.clone(),
                 key,
@@ -141,24 +145,37 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                 ..PutObjectRequest::default()
             })
             .await
-            .int_err()?;
+        {
+            Ok(_) => Ok(()),
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(SetError::Access(AccessError::Unauthorized(e.into())))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }?;
 
         Ok(())
     }
 
-    async fn delete(&self, name: &str) -> Result<(), InternalError> {
+    async fn delete(&self, name: &str) -> Result<(), DeleteError> {
         let key = self.get_key(name);
 
         debug!(?key, "Deleting object");
 
-        self.client
+        match self
+            .client
             .delete_object(DeleteObjectRequest {
                 bucket: self.bucket.clone(),
                 key,
                 ..DeleteObjectRequest::default()
             })
             .await
-            .int_err()?;
+        {
+            Ok(_) => Ok(()),
+            Err(e @ RusotoError::Credentials(_)) => {
+                Err(DeleteError::Access(AccessError::Unauthorized(e.into())))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }?;
 
         Ok(())
     }

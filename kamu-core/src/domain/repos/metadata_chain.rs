@@ -161,7 +161,115 @@ impl Default for AppendOpts<'_> {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// Errors
+// Response Errors
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetBlockError {
+    #[error(transparent)]
+    NotFound(BlockNotFoundError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum IterBlocksError {
+    #[error(transparent)]
+    BlockNotFound(BlockNotFoundError),
+    #[error(transparent)]
+    InvalidInterval(InvalidIntervalError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum SetRefError {
+    #[error(transparent)]
+    BlockNotFound(BlockNotFoundError),
+    #[error(transparent)]
+    CASFailed(#[from] RefCASError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<super::reference_repository::SetRefError> for SetRefError {
+    fn from(v: super::reference_repository::SetRefError) -> Self {
+        match v {
+            super::reference_repository::SetRefError::Access(e) => Self::Access(e),
+            super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendError {
+    #[error(transparent)]
+    RefNotFound(#[from] RefNotFoundError),
+    #[error(transparent)]
+    RefCASFailed(#[from] RefCASError),
+    #[error(transparent)]
+    InvalidBlock(#[from] AppendValidationError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<super::reference_repository::SetRefError> for AppendError {
+    fn from(v: super::reference_repository::SetRefError) -> Self {
+        match v {
+            super::reference_repository::SetRefError::Access(e) => Self::Access(e),
+            super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Individual Errors
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -182,54 +290,10 @@ pub struct BlockMalformedError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetBlockError {
-    #[error(transparent)]
-    NotFound(BlockNotFoundError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum IterBlocksError {
-    #[error(transparent)]
-    BlockNotFound(BlockNotFoundError),
-    #[error(transparent)]
-    InvalidInterval(InvalidIntervalError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-#[derive(Error, Debug)]
 #[error("Invalid block interval [{head}, {tail})")]
 pub struct InvalidIntervalError {
     pub head: Multihash,
     pub tail: Multihash,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum SetRefError {
-    #[error(transparent)]
-    BlockNotFound(BlockNotFoundError),
-    #[error(transparent)]
-    CASFailed(#[from] RefCASError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -240,24 +304,6 @@ pub struct RefCASError {
     pub reference: BlockRef,
     pub expected: Option<Multihash>,
     pub actual: Option<Multihash>,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum AppendError {
-    #[error(transparent)]
-    RefNotFound(#[from] RefNotFoundError),
-    #[error(transparent)]
-    RefCASFailed(#[from] RefCASError),
-    #[error(transparent)]
-    InvalidBlock(#[from] AppendValidationError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
