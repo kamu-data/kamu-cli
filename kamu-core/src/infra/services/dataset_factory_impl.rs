@@ -79,7 +79,7 @@ impl DatasetFactoryImpl {
         root: P,
     ) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
-        if !root.exists() || root.read_dir().into_internal_error()?.next().is_none() {
+        if !root.exists() || root.read_dir().int_err()?.next().is_none() {
             Self::create_local_fs(root)
         } else {
             Self::get_local_fs(root)
@@ -108,23 +108,23 @@ impl DatasetFactoryImpl {
     pub fn create_local_fs<P: AsRef<Path>>(root: P) -> Result<DatasetImplLocalFS, InternalError> {
         let root = root.as_ref();
         if !root.exists() {
-            std::fs::create_dir(&root).into_internal_error()?;
+            std::fs::create_dir(&root).int_err()?;
         }
 
         let blocks_dir = root.join("blocks");
-        std::fs::create_dir(&blocks_dir).into_internal_error()?;
+        std::fs::create_dir(&blocks_dir).int_err()?;
 
         let refs_dir = root.join("refs");
-        std::fs::create_dir(&refs_dir).into_internal_error()?;
+        std::fs::create_dir(&refs_dir).int_err()?;
 
         let data_dir = root.join("data");
-        std::fs::create_dir(&data_dir).into_internal_error()?;
+        std::fs::create_dir(&data_dir).int_err()?;
 
         let checkpoints_dir = root.join("checkpoints");
-        std::fs::create_dir(&checkpoints_dir).into_internal_error()?;
+        std::fs::create_dir(&checkpoints_dir).int_err()?;
 
         let info_dir = root.join("info");
-        std::fs::create_dir(&info_dir).into_internal_error()?;
+        std::fs::create_dir(&info_dir).int_err()?;
 
         Ok(DatasetImpl::new(
             MetadataChain2Impl::new(
@@ -226,7 +226,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             "ipfs" => {
                 let cid = match url.host() {
                     Some(url::Host::Domain(cid)) => Ok(cid),
-                    _ => Err("Malformed IPFS URL").into_internal_error(),
+                    _ => Err("Malformed IPFS URL").int_err(),
                 }?;
 
                 let gw_url = self

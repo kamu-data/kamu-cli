@@ -55,15 +55,14 @@ where
             Err(GetError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
         };
 
-        let manifest: Manifest<DatasetSummary> =
-            serde_yaml::from_slice(&data[..]).into_internal_error()?;
+        let manifest: Manifest<DatasetSummary> = serde_yaml::from_slice(&data[..]).int_err()?;
 
         if manifest.kind != "DatasetSummary" {
             return Err(InvalidObjectKind {
                 expected: "DatasetSummary".to_owned(),
                 actual: manifest.kind,
             }
-            .into_internal_error()
+            .int_err()
             .into());
         }
 
@@ -77,7 +76,7 @@ where
             content: summary.clone(),
         };
 
-        let data = serde_yaml::to_vec(&manifest).into_internal_error()?;
+        let data = serde_yaml::to_vec(&manifest).int_err()?;
 
         self.info_repo
             .set("summary", &data)
@@ -110,7 +109,7 @@ where
             .iter_blocks_interval(&current_head, last_seen)
             .collect::<Result<_, _>>()
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         let mut summary = prev.unwrap_or(DatasetSummary {
             id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced

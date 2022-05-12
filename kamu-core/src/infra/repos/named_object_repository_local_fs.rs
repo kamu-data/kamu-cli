@@ -48,19 +48,17 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
                     name: name.to_owned(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
         Ok(Bytes::from(data))
     }
 
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), InternalError> {
-        tokio::fs::write(&self.staging_path, data)
-            .await
-            .into_internal_error()?;
+        tokio::fs::write(&self.staging_path, data).await.int_err()?;
 
         // Atomic move/replace
-        std::fs::rename(&self.staging_path, self.root.join(name)).into_internal_error()?;
+        std::fs::rename(&self.staging_path, self.root.join(name)).int_err()?;
 
         Ok(())
     }
@@ -69,7 +67,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         match std::fs::remove_file(self.root.join(name)) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(e) => Err(e.into_internal_error()),
+            Err(e) => Err(e.int_err()),
         }
     }
 }

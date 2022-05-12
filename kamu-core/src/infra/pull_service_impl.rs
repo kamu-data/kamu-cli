@@ -168,10 +168,10 @@ impl PullServiceImpl {
                 .local_repo
                 .get_dataset(&local_handle.as_local_ref())
                 .await
-                .into_internal_error()?
+                .int_err()?
                 .get_summary(SummaryOptions::default())
                 .await
-                .into_internal_error()?;
+                .int_err()?;
 
             if summary.kind != DatasetKind::Root && request.ingest_from.is_some() {
                 return Err(PullError::InvalidOperation(
@@ -235,7 +235,7 @@ impl PullServiceImpl {
                 if self
                     .remote_alias_reg
                     .get_remote_aliases(&local_handle.as_local_ref())
-                    .into_internal_error()?
+                    .int_err()?
                     .contains(&remote_ref, RemoteAliasKind::Pull)
                 {
                     return Ok(Some(local_handle));
@@ -252,7 +252,7 @@ impl PullServiceImpl {
             if self
                 .remote_alias_reg
                 .get_remote_aliases(&dataset_handle.as_local_ref())
-                .into_internal_error()?
+                .int_err()?
                 .contains(&remote_ref, RemoteAliasKind::Pull)
             {
                 return Ok(Some(dataset_handle));
@@ -272,7 +272,7 @@ impl PullServiceImpl {
                     dataset_ref: local_ref.clone(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
         let mut pull_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Pull).collect();
@@ -384,9 +384,9 @@ impl PullServiceImpl {
                     if let Some(remote_ref) = &res.remote_ref {
                         self.remote_alias_reg
                             .get_remote_aliases(res.local_ref.as_ref().unwrap())
-                            .into_internal_error()?
+                            .int_err()?
                             .add(&remote_ref, RemoteAliasKind::Pull)
-                            .into_internal_error()?;
+                            .int_err()?;
                     }
                 }
             }
@@ -537,7 +537,7 @@ impl PullService for PullServiceImpl {
         if !self
             .remote_alias_reg
             .get_remote_aliases(dataset_ref)
-            .into_internal_error()?
+            .int_err()?
             .is_empty(RemoteAliasKind::Pull)
         {
             // TODO: Consider extracting into a watermark-specific error type
@@ -551,7 +551,7 @@ impl PullService for PullServiceImpl {
         let wm_stream = chain
             .iter_blocks()
             .await
-            .into_internal_error()?
+            .int_err()?
             .try_filter_map(|(_, b)| async {
                 Ok(b.into_data_stream_block()
                     .and_then(|b| b.event.output_watermark))
@@ -559,13 +559,13 @@ impl PullService for PullServiceImpl {
 
         futures::pin_mut!(wm_stream);
 
-        if let Some(last_watermark) = wm_stream.try_next().await.into_internal_error()? {
+        if let Some(last_watermark) = wm_stream.try_next().await.int_err()? {
             if last_watermark >= watermark {
                 return Ok(PullResult::UpToDate);
             }
         }
 
-        let old_head = chain.get_ref(&BlockRef::Head).await.into_internal_error()?;
+        let old_head = chain.get_ref(&BlockRef::Head).await.int_err()?;
 
         let new_block = MetadataBlock {
             system_time: Utc::now(),
@@ -578,7 +578,7 @@ impl PullService for PullServiceImpl {
         let new_head = chain
             .append(new_block, AppendOpts::default())
             .await
-            .into_internal_error()?;
+            .int_err()?;
         Ok(PullResult::Updated {
             old_head: Some(old_head),
             new_head,

@@ -153,7 +153,7 @@ where
         let mut stream = self.get_stream(hash).await?;
 
         let mut data: Vec<u8> = Vec::new();
-        stream.read_to_end(&mut data).await.into_internal_error()?;
+        stream.read_to_end(&mut data).await.int_err()?;
 
         Ok(Bytes::from(data))
     }
@@ -178,7 +178,7 @@ where
                     hash: hash.clone(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
         let stream = resp.body.expect("Response with no body").into_async_read();
@@ -219,7 +219,7 @@ where
                 ..PutObjectRequest::default()
             })
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(InsertResult {
             hash,
@@ -267,7 +267,7 @@ where
                 ..PutObjectRequest::default()
             })
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(InsertResult {
             hash,
@@ -287,7 +287,7 @@ where
                 ..DeleteObjectRequest::default()
             })
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(())
     }

@@ -310,7 +310,7 @@ impl SyncServiceImpl {
                 DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
                     repo_name: remote_name.repository().clone(),
                 },
-                e => SyncError::Internal(e.into_internal_error()),
+                e => SyncError::Internal(e.int_err()),
             })?;
 
         repo.url.ensure_trailing_slash();

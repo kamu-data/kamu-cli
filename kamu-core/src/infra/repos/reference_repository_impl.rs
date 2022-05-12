@@ -42,8 +42,8 @@ where
             })),
             Err(GetError::Internal(e)) => Err(GetRefError::Internal(e)),
         }?;
-        let text = std::str::from_utf8(&data[..]).into_internal_error()?;
-        let hash = Multihash::from_multibase_str(&text).into_internal_error()?;
+        let text = std::str::from_utf8(&data[..]).int_err()?;
+        let hash = Multihash::from_multibase_str(&text).int_err()?;
         Ok(hash)
     }
 

@@ -113,7 +113,7 @@ where
                 hash: hash.clone(),
             }));
         }
-        let data = tokio::fs::read(path).await.into_internal_error()?;
+        let data = tokio::fs::read(path).await.int_err()?;
 
         Ok(Bytes::from(data))
     }
@@ -129,7 +129,7 @@ where
             }));
         }
 
-        let file = tokio::fs::File::open(path).await.into_internal_error()?;
+        let file = tokio::fs::File::open(path).await.int_err()?;
 
         Ok(Box::new(file))
     }
@@ -166,12 +166,10 @@ where
         }
 
         // Write to staging file
-        tokio::fs::write(&self.staging_path, data)
-            .await
-            .into_internal_error()?;
+        tokio::fs::write(&self.staging_path, data).await.int_err()?;
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).into_internal_error()?;
+        std::fs::rename(&self.staging_path, path).int_err()?;
 
         Ok(InsertResult {
             hash,
@@ -187,7 +185,7 @@ where
         let actual_hash = self
             .write_stream_with_digest(&self.staging_path, src)
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
@@ -197,9 +195,7 @@ where
 
         if let Some(expected_hash) = options.expected_hash {
             if *expected_hash != hash {
-                tokio::fs::remove_file(&self.staging_path)
-                    .await
-                    .into_internal_error()?;
+                tokio::fs::remove_file(&self.staging_path).await.int_err()?;
 
                 return Err(InsertError::HashMismatch(HashMismatchError {
                     expected: expected_hash.clone(),
@@ -213,9 +209,7 @@ where
         debug!(?path, "Inserting object stream");
 
         if path.exists() {
-            tokio::fs::remove_file(&self.staging_path)
-                .await
-                .into_internal_error()?;
+            tokio::fs::remove_file(&self.staging_path).await.int_err()?;
 
             return Ok(InsertResult {
                 hash,
@@ -224,7 +218,7 @@ where
         }
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).into_internal_error()?;
+        std::fs::rename(&self.staging_path, path).int_err()?;
 
         Ok(InsertResult {
             hash,
@@ -238,7 +232,7 @@ where
         debug!(?path, "Deleting object");
 
         if path.exists() {
-            tokio::fs::remove_file(&path).await.into_internal_error()?;
+            tokio::fs::remove_file(&path).await.int_err()?;
         }
         Ok(())
     }

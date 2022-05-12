@@ -47,7 +47,7 @@ impl LocalDatasetRepositoryImpl {
             dataset_name,
         );
 
-        Ok(DatasetFactoryImpl::get_local_fs_legacy(path, layout).into_internal_error()?)
+        Ok(DatasetFactoryImpl::get_local_fs_legacy(path, layout).int_err()?)
     }
 
     /*async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
@@ -64,14 +64,14 @@ impl LocalDatasetRepositoryImpl {
         };
 
         let manifest: Manifest<DatasetRepositoryInfo> =
-            serde_yaml::from_slice(&data[..]).into_internal_error()?;
+            serde_yaml::from_slice(&data[..]).int_err()?;
 
         if manifest.kind != "DatasetRepositoryInfo" {
             return Err(InvalidObjectKind {
                 expected: "DatasetRepositoryInfo".to_owned(),
                 actual: manifest.kind,
             }
-            .into_internal_error()
+            .int_err()
             .into());
         }
 
@@ -85,7 +85,7 @@ impl LocalDatasetRepositoryImpl {
             content: info,
         };
 
-        let data = serde_yaml::to_vec(&manifest).into_internal_error()?;
+        let data = serde_yaml::to_vec(&manifest).int_err()?;
 
         self.info_repo.set("info", &data).await?;
 
@@ -203,14 +203,13 @@ impl LocalDatasetRepositoryImpl {
             &dataset_name,
         );
 
-        std::fs::rename(&dataset_path, dest_path).into_internal_error()?;
+        std::fs::rename(&dataset_path, dest_path).int_err()?;
 
-        std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).into_internal_error()?;
+        std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).int_err()?;
 
-        std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).into_internal_error()?;
+        std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).int_err()?;
 
-        std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir)
-            .into_internal_error()?;
+        std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir).int_err()?;
 
         // // Add new entry
         // repo_info.datasets.push(DatasetEntry {
@@ -250,23 +249,22 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                 let summary = dataset
                     .get_summary(SummaryOptions::default())
                     .await
-                    .into_internal_error()?;
+                    .int_err()?;
 
                 Ok(DatasetHandle::new(summary.id, name.clone()))
             }
             DatasetRefLocal::ID(id) => {
-                let read_dir =
-                    std::fs::read_dir(&self.workspace_layout.datasets_dir).into_internal_error()?;
+                let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).int_err()?;
 
                 for r in read_dir {
-                    let entry = r.into_internal_error()?;
-                    let name = DatasetName::try_from(&entry.file_name()).into_internal_error()?;
+                    let entry = r.int_err()?;
+                    let name = DatasetName::try_from(&entry.file_name()).int_err()?;
                     let summary = self
                         .get_dataset_impl(&name)
-                        .into_internal_error()?
+                        .int_err()?
                         .get_summary(SummaryOptions::default())
                         .await
-                        .into_internal_error()?;
+                        .int_err()?;
                     if summary.id == *id {
                         return Ok(DatasetHandle::new(summary.id, name));
                     }
@@ -283,12 +281,12 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dir =
-            std::fs::read_dir(&self.workspace_layout.datasets_dir).into_internal_error()?;
+            std::fs::read_dir(&self.workspace_layout.datasets_dir).int_err()?;
 
             for r in read_dir {
-                let entry = r.into_internal_error()?;
-                let name = DatasetName::try_from(&entry.file_name()).into_internal_error()?;
-                let hdl = self.resolve_dataset_ref(&name.into()).await.into_internal_error()?;
+                let entry = r.int_err()?;
+                let name = DatasetName::try_from(&entry.file_name()).int_err()?;
+                let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
                 yield hdl;
             }
         })
@@ -309,18 +307,18 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
         let tmp_path = self.workspace_layout.datasets_dir.join(".pending");
 
-        std::fs::create_dir(&tmp_path).into_internal_error()?;
-        std::fs::create_dir(tmp_path.join("blocks")).into_internal_error()?;
-        std::fs::create_dir(tmp_path.join("refs")).into_internal_error()?;
+        std::fs::create_dir(&tmp_path).int_err()?;
+        std::fs::create_dir(tmp_path.join("blocks")).int_err()?;
+        std::fs::create_dir(tmp_path.join("refs")).int_err()?;
 
         let layout = DatasetLayout::create(
             &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
             &DatasetName::new_unchecked(".pending"),
         )
-        .into_internal_error()?;
+        .int_err()?;
 
-        let dataset = DatasetFactoryImpl::get_local_fs_legacy(tmp_path.clone(), layout)
-            .into_internal_error()?;
+        let dataset =
+            DatasetFactoryImpl::get_local_fs_legacy(tmp_path.clone(), layout).int_err()?;
 
         Ok(Box::new(DatasetBuilderImpl::new(
             Self::new(self.workspace_layout.clone()),
@@ -402,7 +400,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                 AppendOpts::default(),
             )
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         for event in snapshot.metadata {
             head = chain
@@ -415,7 +413,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                     AppendOpts::default(),
                 )
                 .await
-                .into_internal_error()?;
+                .int_err()?;
         }
 
         let hdl = builder.finish().await?;
@@ -467,10 +465,10 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             let summary = self
                 .get_dataset(&hdl.as_local_ref())
                 .await
-                .into_internal_error()?
+                .int_err()?
                 .get_summary(SummaryOptions::default())
                 .await
-                .into_internal_error()?;
+                .int_err()?;
 
             if summary
                 .dependencies
@@ -496,7 +494,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         //     .iter()
         //     .position(|d| d.name == dataset_handle.name)
         //     .ok_or("Inconsistent repository info")
-        //     .into_internal_error()?;
+        //     .int_err()?;
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
@@ -517,7 +515,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         ];
 
         for p in paths.iter().filter(|p| p.exists()) {
-            tokio::fs::remove_dir_all(p).await.into_internal_error()?;
+            tokio::fs::remove_dir_all(p).await.int_err()?;
         }
 
         Ok(())
@@ -558,10 +556,10 @@ impl<D> DatasetBuilderImpl<D> {
                 &VolumeLayout::new(&self.repo.workspace_layout.local_volume_dir),
                 &DatasetName::new_unchecked(".pending"),
             );
-            std::fs::remove_dir_all(&self.dataset_path).into_internal_error()?;
-            std::fs::remove_dir_all(&tmp_layout.cache_dir).into_internal_error()?;
-            std::fs::remove_dir_all(&tmp_layout.data_dir).into_internal_error()?;
-            std::fs::remove_dir_all(&tmp_layout.checkpoints_dir).into_internal_error()?;
+            std::fs::remove_dir_all(&self.dataset_path).int_err()?;
+            std::fs::remove_dir_all(&tmp_layout.cache_dir).int_err()?;
+            std::fs::remove_dir_all(&tmp_layout.data_dir).int_err()?;
+            std::fs::remove_dir_all(&tmp_layout.checkpoints_dir).int_err()?;
         }
 
         Ok(())

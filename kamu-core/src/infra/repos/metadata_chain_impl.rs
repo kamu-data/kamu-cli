@@ -129,7 +129,7 @@ where
                 hash: hash.clone(),
                 source: e.into(),
             })
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(block)
     }
@@ -267,7 +267,7 @@ where
 
         let data = FlatbuffersMetadataBlockSerializer
             .write_manifest(&block)
-            .into_internal_error()?;
+            .int_err()?;
 
         let res = self
             .obj_repo

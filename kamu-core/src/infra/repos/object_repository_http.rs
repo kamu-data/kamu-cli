@@ -47,31 +47,25 @@ impl ObjectRepositoryHttp {
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryHttp {
     async fn contains(&self, hash: &Multihash) -> Result<bool, InternalError> {
-        let url = self
-            .base_url
-            .join(&hash.to_multibase_string())
-            .into_internal_error()?;
+        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
         debug!(%url, "Checking for object");
 
-        let response = self.client.head(url).send().await.into_internal_error()?;
+        let response = self.client.head(url).send().await.int_err()?;
 
         match response.error_for_status() {
             Ok(_) => Ok(true),
             Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => Ok(false),
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }
     }
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        let url = self
-            .base_url
-            .join(&hash.to_multibase_string())
-            .into_internal_error()?;
+        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
         debug!(%url, "Reading object");
 
-        let response = self.client.get(url).send().await.into_internal_error()?;
+        let response = self.client.get(url).send().await.int_err()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -80,23 +74,20 @@ impl ObjectRepository for ObjectRepositoryHttp {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
-        let data = response.bytes().await.into_internal_error()?;
+        let data = response.bytes().await.int_err()?;
 
         Ok(data)
     }
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        let url = self
-            .base_url
-            .join(&hash.to_multibase_string())
-            .into_internal_error()?;
+        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
         debug!(%url, "Reading object stream");
 
-        let response = self.client.get(url).send().await.into_internal_error()?;
+        let response = self.client.get(url).send().await.int_err()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -105,7 +96,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
         let stream = response.bytes_stream();

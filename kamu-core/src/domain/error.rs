@@ -41,30 +41,30 @@ impl InternalError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ErrorIntoInternal {
-    fn into_internal_error(self) -> InternalError;
+    fn int_err(self) -> InternalError;
 }
 
 impl<E> ErrorIntoInternal for E
 where
     E: Into<BoxedError>,
 {
-    fn into_internal_error(self) -> InternalError {
+    fn int_err(self) -> InternalError {
         InternalError::new(self)
     }
 }
 
 pub trait ResultIntoInternal<OK> {
-    fn into_internal_error(self) -> Result<OK, InternalError>;
+    fn int_err(self) -> Result<OK, InternalError>;
 }
 
 impl<OK, E> ResultIntoInternal<OK> for Result<OK, E>
 where
     E: Into<BoxedError>,
 {
-    fn into_internal_error(self) -> Result<OK, InternalError> {
+    fn int_err(self) -> Result<OK, InternalError> {
         match self {
             Ok(ok) => Ok(ok),
-            Err(e) => Err(e.into_internal_error()),
+            Err(e) => Err(e.int_err()),
         }
     }
 }

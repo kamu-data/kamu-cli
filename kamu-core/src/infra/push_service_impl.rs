@@ -149,7 +149,7 @@ impl PushServiceImpl {
                 if self
                     .remote_alias_reg
                     .get_remote_aliases(&local_handle.as_local_ref())
-                    .into_internal_error()?
+                    .int_err()?
                     .contains(&remote_ref, RemoteAliasKind::Push)
                 {
                     return Ok(local_handle);
@@ -166,7 +166,7 @@ impl PushServiceImpl {
             if self
                 .remote_alias_reg
                 .get_remote_aliases(&dataset_handle.as_local_ref())
-                .into_internal_error()?
+                .int_err()?
                 .contains(&remote_ref, RemoteAliasKind::Push)
             {
                 return Ok(dataset_handle);

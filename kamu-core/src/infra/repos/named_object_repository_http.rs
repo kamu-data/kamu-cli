@@ -41,9 +41,9 @@ impl NamedObjectRepositoryHttp {
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryHttp {
     async fn get(&self, name: &str) -> Result<Bytes, GetError> {
-        let url = self.base_url.join(name).into_internal_error()?;
+        let url = self.base_url.join(name).int_err()?;
 
-        let response = self.client.get(url).send().await.into_internal_error()?;
+        let response = self.client.get(url).send().await.int_err()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -52,10 +52,10 @@ impl NamedObjectRepository for NamedObjectRepositoryHttp {
                     name: name.to_owned(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
-        let data = response.bytes().await.into_internal_error()?;
+        let data = response.bytes().await.int_err()?;
 
         Ok(data)
     }

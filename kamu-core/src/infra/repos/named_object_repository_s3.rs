@@ -115,14 +115,14 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                     name: name.to_owned(),
                 }))
             }
-            Err(e) => Err(e.into_internal_error().into()),
+            Err(e) => Err(e.int_err().into()),
         }?;
 
         let mut stream = resp.body.expect("Response with no body").into_async_read();
 
         use tokio::io::AsyncReadExt;
         let mut data: Vec<u8> = Vec::new();
-        stream.read_to_end(&mut data).await.into_internal_error()?;
+        stream.read_to_end(&mut data).await.int_err()?;
 
         Ok(Bytes::from(data))
     }
@@ -141,7 +141,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                 ..PutObjectRequest::default()
             })
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(())
     }
@@ -158,7 +158,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                 ..DeleteObjectRequest::default()
             })
             .await
-            .into_internal_error()?;
+            .int_err()?;
 
         Ok(())
     }
