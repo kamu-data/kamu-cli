@@ -23,12 +23,16 @@ async fn main() {
         pull_svc,
         Arc::new(DatasetRegistryNull),
         Arc::new(RemoteAliasesRegistryNull),
-        Arc::new(OutputConfig::default()),
+        Arc::new(OutputConfig {
+            is_tty: true,
+            ..Default::default()
+        }),
         ["a"],
         false,
         false,
         false,
         None as Option<&str>,
+        true,
         None as Option<&str>,
     );
     cmd.run().await.unwrap();
@@ -44,10 +48,7 @@ fn rand_hash() -> Multihash {
 pub struct TestPullService;
 
 impl TestPullService {
-    fn ingest(
-        hdl: DatasetHandle,
-        listener: Arc<dyn IngestListener>,
-    ) -> (DatasetRefAny, Result<PullResult, PullError>) {
+    fn ingest(hdl: DatasetHandle, listener: Arc<dyn IngestListener>) -> PullResponse {
         let sleep = |t| std::thread::sleep(std::time::Duration::from_millis(t));
         let sleep_rand = |min: u64, max: u64| {
             let d = (max - min) as f32;
@@ -98,20 +99,23 @@ impl TestPullService {
         };
         listener.success(&result);
 
-        (
-            hdl.into(),
-            Ok(PullResult::Updated {
+        PullResponse {
+            original_request: Some(PullRequest {
+                local_ref: Some(hdl.as_local_ref()),
+                remote_ref: None,
+                ingest_from: None,
+            }),
+            local_ref: Some(hdl.as_local_ref()),
+            remote_ref: None,
+            result: Ok(PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks: 1,
             }),
-        )
+        }
     }
 
-    fn transform(
-        hdl: DatasetHandle,
-        listener: Arc<dyn TransformListener>,
-    ) -> (DatasetRefAny, Result<PullResult, PullError>) {
+    fn transform(hdl: DatasetHandle, listener: Arc<dyn TransformListener>) -> PullResponse {
         listener.begin();
 
         std::thread::sleep(std::time::Duration::from_millis(2000));
@@ -124,14 +128,20 @@ impl TestPullService {
             num_blocks: 1,
         });
 
-        (
-            hdl.into(),
-            Ok(PullResult::Updated {
+        PullResponse {
+            original_request: Some(PullRequest {
+                local_ref: Some(hdl.as_local_ref()),
+                remote_ref: None,
+                ingest_from: None,
+            }),
+            local_ref: Some(hdl.as_local_ref()),
+            remote_ref: None,
+            result: Ok(PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks: 1,
             }),
-        )
+        }
     }
 }
 
@@ -139,12 +149,46 @@ impl TestPullService {
 impl PullService for TestPullService {
     async fn pull_multi(
         &self,
-        _dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        options: PullOptions,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        let mut requests = dataset_refs.map(|r| {
+            if let Some(local_ref) = r.as_local_ref() {
+                PullRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: None,
+                    ingest_from: None,
+                }
+            } else {
+                PullRequest {
+                    local_ref: None,
+                    remote_ref: Some(r.as_remote_ref().unwrap()),
+                    ingest_from: None,
+                }
+            }
+        });
+
+        self.pull_multi_ext(
+            &mut requests,
+            options,
+            ingest_listener,
+            transform_listener,
+            sync_listener,
+        )
+        .await
+    }
+
+    async fn pull_multi_ext(
+        &self,
+        _requests: &mut dyn Iterator<Item = PullRequest>,
         _options: PullOptions,
         ingest_listener: Option<Arc<dyn IngestMultiListener>>,
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         _sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(DatasetRefAny, Result<PullResult, PullError>)> {
+    ) -> Result<Vec<PullResponse>, InternalError> {
         let in_l = ingest_listener.unwrap();
         let tr_l = transform_listener.unwrap();
 
@@ -188,34 +232,14 @@ impl PullService for TestPullService {
 
         let mut results = ingest_results;
         results.extend(transform_handles.into_iter().map(|h| h.join().unwrap()));
-        results
-    }
-
-    async fn sync_from(
-        &self,
-        _remote_ref: &DatasetRefRemote,
-        _local_name: &DatasetName,
-        _options: PullOptions,
-        _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<PullResult, PullError> {
-        unimplemented!()
-    }
-
-    async fn ingest_from(
-        &self,
-        _dataset_ref: &DatasetRefLocal,
-        _fetch: FetchStep,
-        _options: PullOptions,
-        _listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<PullResult, PullError> {
-        unimplemented!()
+        Ok(results)
     }
 
     async fn set_watermark(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _watermark: DateTime<Utc>,
-    ) -> Result<PullResult, PullError> {
+    ) -> Result<PullResult, SetWatermarkError> {
         unimplemented!()
     }
 }

@@ -226,7 +226,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             "ipfs" => {
                 let cid = match url.host() {
                     Some(url::Host::Domain(cid)) => Ok(cid),
-                    _ => Err(GenericError::new("Malformed IPFS URL").into_internal_error()),
+                    _ => Err("Malformed IPFS URL").into_internal_error(),
                 }?;
 
                 let gw_url = self

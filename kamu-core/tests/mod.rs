@@ -9,6 +9,7 @@
 
 #![feature(assert_matches)]
 #![feature(backtrace)]
+#![feature(iter_zip)]
 
 mod tests;
 mod utils;

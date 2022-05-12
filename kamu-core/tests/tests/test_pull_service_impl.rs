@@ -32,16 +32,13 @@ macro_rules! rl {
 
 macro_rules! rr {
     ($s:expr) => {
-        DatasetRefRemote::RemoteName(RemoteDatasetName::try_from($s).unwrap())
+        DatasetRefRemote::try_from($s).unwrap()
     };
 }
 
 macro_rules! ar {
     ($s:expr) => {
-        match DatasetName::try_from($s) {
-            Ok(n) => DatasetRefAny::Name(n),
-            _ => DatasetRefAny::RemoteName(RemoteDatasetName::try_from($s).unwrap()),
-        }
+        DatasetRefAny::try_from($s).unwrap()
     };
 }
 
@@ -69,45 +66,67 @@ macro_rules! refs {
     };
 }
 
-fn create_graph(repo: &DatasetRegistryImpl, datasets: Vec<(DatasetName, Vec<DatasetName>)>) {
+async fn create_graph(
+    repo: &LocalDatasetRepositoryImpl,
+    datasets: Vec<(DatasetName, Vec<DatasetName>)>,
+) {
     for (dataset_name, deps) in &datasets {
+        let builder = repo.create_dataset(dataset_name).await.unwrap();
+        let chain = builder.as_dataset().as_metadata_chain();
+
         if deps.is_empty() {
-            repo.add_dataset_from_blocks(
-                dataset_name,
-                &mut [
+            let h = chain
+                .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::seed(DatasetKind::Root)
                             .id_from(dataset_name.as_str())
                             .build(),
                     )
                     .build(),
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
+
+            chain
+                .append(
                     MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
+                        .prev(&h)
                         .build(),
-                ]
-                .into_iter(),
-            )
-            .unwrap();
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
         } else {
-            repo.add_dataset_from_blocks(
-                dataset_name,
-                &mut [
+            let h = chain
+                .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::seed(DatasetKind::Derivative)
                             .id_from(dataset_name.as_str())
                             .build(),
                     )
                     .build(),
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
+
+            chain
+                .append(
                     MetadataFactory::metadata_block(
                         MetadataFactory::set_transform(deps)
                             .input_ids_from_names()
                             .build(),
                     )
+                    .prev(&h)
                     .build(),
-                ]
-                .into_iter(),
-            )
-            .unwrap();
+                    AppendOpts::default(),
+                )
+                .await
+                .unwrap();
         }
+
+        builder.finish().await.unwrap();
     }
 }
 
@@ -213,20 +232,21 @@ async fn create_graph_remote(
     }
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_pull_batching_chain() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
 
     // A - B - C
     create_graph(
-        harness.dataset_reg.as_ref(),
+        harness.local_repo.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
             (n!("c"), names!["b"]),
         ],
-    );
+    )
+    .await;
 
     assert_eq!(
         harness.pull(refs!["c"], PullOptions::default()).await,
@@ -237,7 +257,7 @@ async fn test_pull_batching_chain() {
         harness.pull(refs!["c", "a"], PullOptions::default()).await,
         vec![
             PullBatch::Ingest(refs!["a"]),
-            PullBatch::Transform(refs!["c"])
+            PullBatch::Transform(refs!["c"]),
         ],
     );
 
@@ -254,12 +274,12 @@ async fn test_pull_batching_chain() {
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["b"]),
-            PullBatch::Transform(refs!["c"])
+            PullBatch::Transform(refs!["c"]),
         ]
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_pull_batching_complex() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
@@ -270,7 +290,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.dataset_reg.as_ref(),
+        harness.local_repo.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -278,7 +298,8 @@ async fn test_pull_batching_complex() {
             (n!("d"), names!["a"]),
             (n!("e"), names!["c", "d", "b"]),
         ],
-    );
+    )
+    .await;
 
     assert_eq!(
         harness.pull(refs!["e"], PullOptions::default()).await,
@@ -303,7 +324,7 @@ async fn test_pull_batching_complex() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_pull_batching_complex_with_remote() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_dir.path());
@@ -324,14 +345,15 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.dataset_reg.as_ref(),
+        harness.local_repo.as_ref(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
             (n!("f"), names!["e", "c"]),
             (n!("g"), names!["f", "d"]),
         ],
-    );
+    )
+    .await;
 
     // Add remote pull alias to E
     harness
@@ -451,16 +473,32 @@ async fn test_sync_from() {
 
     let res = harness
         .pull_svc
-        .sync_from(&rr!("myrepo/foo"), &n!("bar"), PullOptions::default(), None)
-        .await;
+        .pull_multi_ext(
+            &mut vec![PullRequest {
+                local_ref: Some(n!("bar").into()),
+                remote_ref: Some(rr!("myrepo/foo")),
+                ingest_from: None,
+            }]
+            .into_iter(),
+            PullOptions::default(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
+    assert_eq!(res.len(), 1);
     assert_matches!(
-        res,
-        Ok(PullResult::Updated {
-            old_head: None,
-            new_head: _,
-            num_blocks: 1,
-        })
+        res[0],
+        PullResponse {
+            result: Ok(PullResult::Updated {
+                old_head: None,
+                new_head: _,
+                num_blocks: 1,
+            }),
+            ..
+        }
     );
 
     let aliases = harness
@@ -479,27 +517,38 @@ async fn test_sync_from() {
 }
 
 #[tokio::test]
-async fn test_sync_from_url() {
+async fn test_sync_from_url_and_local_ref() {
     let tmp_ws_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new(tmp_ws_dir.path());
 
     let res = harness
         .pull_svc
-        .sync_from(
-            &DatasetRefRemote::try_from("http://foo.bar").unwrap(),
-            &n!("bar"),
+        .pull_multi_ext(
+            &mut vec![PullRequest {
+                local_ref: Some(n!("bar").into()),
+                remote_ref: Some(rr!("http://example.com/odf/bar")),
+                ingest_from: None,
+            }]
+            .into_iter(),
             PullOptions::default(),
             None,
+            None,
+            None,
         )
-        .await;
+        .await
+        .unwrap();
 
+    assert_eq!(res.len(), 1);
     assert_matches!(
-        res,
-        Ok(PullResult::Updated {
-            old_head: None,
-            new_head: _,
-            num_blocks: 1,
-        })
+        res[0],
+        PullResponse {
+            result: Ok(PullResult::Updated {
+                old_head: None,
+                new_head: _,
+                num_blocks: 1,
+            }),
+            ..
+        }
     );
 
     let aliases = harness
@@ -513,7 +562,57 @@ async fn test_sync_from_url() {
 
     assert_eq!(
         pull_aliases,
-        vec![DatasetRefRemote::try_from("http://foo.bar").unwrap()]
+        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
+    );
+}
+
+#[tokio::test]
+async fn test_sync_from_url_only() {
+    let tmp_ws_dir = tempfile::tempdir().unwrap();
+    let harness = PullTestHarness::new(tmp_ws_dir.path());
+
+    let res = harness
+        .pull_svc
+        .pull_multi_ext(
+            &mut vec![PullRequest {
+                local_ref: None,
+                remote_ref: Some(rr!("http://example.com/odf/bar")),
+                ingest_from: None,
+            }]
+            .into_iter(),
+            PullOptions::default(),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.len(), 1);
+    assert_matches!(
+        res[0],
+        PullResponse {
+            result: Ok(PullResult::Updated {
+                old_head: None,
+                new_head: _,
+                num_blocks: 1,
+            }),
+            ..
+        }
+    );
+
+    let aliases = harness
+        .remote_alias_reg
+        .get_remote_aliases(&rl!("bar"))
+        .unwrap();
+    let pull_aliases: Vec<_> = aliases
+        .get_by_kind(RemoteAliasKind::Pull)
+        .map(|i| i.clone())
+        .collect();
+
+    assert_eq!(
+        pull_aliases,
+        vec![DatasetRefRemote::try_from("http://example.com/odf/bar").unwrap()]
     );
 }
 
@@ -525,23 +624,31 @@ async fn test_set_watermark() {
     let dataset_name = n!("foo");
 
     harness
-        .dataset_reg
-        .add_dataset(
+        .local_repo
+        .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
                 .build(),
         )
+        .await
         .unwrap();
 
-    let num_blocks = || {
-        harness
-            .dataset_reg
-            .get_metadata_chain(&dataset_name.as_local_ref())
-            .unwrap()
+    let num_blocks = || async {
+        let ds = harness
+            .local_repo
+            .get_dataset(&dataset_name.as_local_ref())
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        ds.as_metadata_chain()
             .iter_blocks()
+            .await
+            .unwrap()
             .count()
+            .await
     };
-    assert_eq!(num_blocks(), 1);
+    assert_eq!(num_blocks().await, 1);
 
     assert!(matches!(
         harness
@@ -553,7 +660,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::Updated { .. })
     ));
-    assert_eq!(num_blocks(), 2);
+    assert_eq!(num_blocks().await, 2);
 
     assert!(matches!(
         harness
@@ -565,7 +672,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::Updated { .. })
     ));
-    assert_eq!(num_blocks(), 3);
+    assert_eq!(num_blocks().await, 3);
 
     assert!(matches!(
         harness
@@ -577,7 +684,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::UpToDate)
     ));
-    assert_eq!(num_blocks(), 3);
+    assert_eq!(num_blocks().await, 3);
 
     assert!(matches!(
         harness
@@ -589,7 +696,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::UpToDate)
     ));
-    assert_eq!(num_blocks(), 3);
+    assert_eq!(num_blocks().await, 3);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -597,7 +704,7 @@ async fn test_set_watermark() {
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     workspace_layout: Arc<WorkspaceLayout>,
-    dataset_reg: Arc<DatasetRegistryImpl>,
+    local_repo: Arc<LocalDatasetRepositoryImpl>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
     pull_svc: PullServiceImpl,
@@ -607,6 +714,7 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
+        let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
         let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
@@ -615,9 +723,9 @@ impl PullTestHarness {
         ));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
-        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), dataset_reg.clone()));
+        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), local_repo.clone()));
         let pull_svc = PullServiceImpl::new(
-            dataset_reg.clone(),
+            local_repo.clone(),
             remote_alias_reg.clone(),
             ingest_svc,
             transform_svc,
@@ -627,7 +735,7 @@ impl PullTestHarness {
         Self {
             calls,
             workspace_layout,
-            dataset_reg,
+            local_repo,
             remote_repo_reg,
             remote_alias_reg,
             pull_svc,
@@ -641,18 +749,74 @@ impl PullTestHarness {
     }
 
     async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
-        self.pull_svc
+        let results = self
+            .pull_svc
             .pull_multi(&mut refs.into_iter(), options, None, None, None)
-            .await;
+            .await
+            .unwrap();
+
+        for res in results {
+            assert_matches!(res, PullResponse { result: Ok(_), .. });
+        }
+
         self.collect_calls()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub enum PullBatch {
     Ingest(Vec<DatasetRefAny>),
     Transform(Vec<DatasetRefAny>),
     Sync(Vec<(DatasetRefAny, DatasetRefAny)>),
+}
+
+impl PullBatch {
+    fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
+        match (lhs, rhs) {
+            (
+                DatasetRefAny::Name(ln) | DatasetRefAny::Handle(DatasetHandle { name: ln, .. }),
+                DatasetRefAny::Name(rn) | DatasetRefAny::Handle(DatasetHandle { name: rn, .. }),
+            ) => ln == rn,
+            (
+                DatasetRefAny::RemoteName(ln)
+                | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name: ln, .. }),
+                DatasetRefAny::RemoteName(rn)
+                | DatasetRefAny::RemoteHandle(RemoteDatasetHandle { name: rn, .. }),
+            ) => ln == rn,
+            _ => false,
+        }
+    }
+}
+
+impl std::cmp::PartialEq for PullBatch {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Ingest(l), Self::Ingest(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
+            }
+            (Self::Transform(l), Self::Transform(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len() && std::iter::zip(&l, &r).all(|(li, ri)| Self::cmp_ref(li, ri))
+            }
+            (Self::Sync(l), Self::Sync(r)) => {
+                let mut l = l.clone();
+                l.sort();
+                let mut r = r.clone();
+                r.sort();
+                l.len() == r.len()
+                    && std::iter::zip(&l, &r)
+                        .all(|((l1, l2), (r1, r2))| Self::cmp_ref(l1, r1) && Self::cmp_ref(l2, r2))
+            }
+            _ => false,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -690,16 +854,25 @@ impl IngestService for TestIngestService {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
+        _dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
         _ingest_options: IngestOptions,
         _maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
-        let dataset_refs: Vec<_> = dataset_refs.collect();
-        let results = dataset_refs
+        unimplemented!()
+    }
+
+    async fn ingest_multi_ext(
+        &self,
+        requests: &mut dyn Iterator<Item = IngestRequest>,
+        _options: IngestOptions,
+        _listener: Option<Arc<dyn IngestMultiListener>>,
+    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
+        let requests: Vec<_> = requests.collect();
+        let results = requests
             .iter()
             .map(|r| {
                 (
-                    r.clone(),
+                    r.dataset_ref.clone(),
                     Ok(IngestResult::UpToDate {
                         uncacheable: false,
                         has_more: false,
@@ -708,7 +881,7 @@ impl IngestService for TestIngestService {
             })
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
-            dataset_refs.into_iter().map(|i| i.into()).collect(),
+            requests.into_iter().map(|i| i.dataset_ref.into()).collect(),
         ));
         results
     }
@@ -776,12 +949,12 @@ impl TransformService for TestTransformService {
 
 struct TestSyncService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
 }
 
 impl TestSyncService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, dataset_reg: Arc<dyn DatasetRegistry>) -> Self {
-        Self { calls, dataset_reg }
+    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, local_repo: Arc<dyn LocalDatasetRepository>) -> Self {
+        Self { calls, local_repo }
     }
 }
 
@@ -790,24 +963,11 @@ impl SyncService for TestSyncService {
     async fn sync(
         &self,
         _src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        _dst: &DatasetRefAny,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
-        let local_name = match dst {
-            DatasetRefAny::Name(name) => name,
-            DatasetRefAny::Handle(DatasetHandle { name, .. }) => name,
-            _ => unreachable!(),
-        };
-        self.dataset_reg
-            .add_dataset(MetadataFactory::dataset_snapshot().name(local_name).build())
-            .unwrap();
-
-        Ok(SyncResult::Updated {
-            old_head: None,
-            new_head: Multihash::from_digest_sha3_256(b"boop"),
-            num_blocks: 1,
-        })
+        unimplemented!()
     }
 
     async fn sync_multi(
@@ -820,10 +980,38 @@ impl SyncService for TestSyncService {
         let mut results = Vec::new();
         for (src, dst) in src_dst {
             call.push((src.clone(), dst.clone()));
+
+            let local_name = match &dst {
+                DatasetRefAny::Name(name) => name,
+                DatasetRefAny::Handle(DatasetHandle { name, .. }) => name,
+                _ => unreachable!(),
+            };
+
+            match self
+                .local_repo
+                .try_resolve_dataset_ref(&local_name.as_local_ref())
+                .await
+                .unwrap()
+            {
+                None => {
+                    self.local_repo
+                        .create_dataset_from_snapshot(
+                            MetadataFactory::dataset_snapshot().name(local_name).build(),
+                        )
+                        .await
+                        .unwrap();
+                }
+                Some(_) => (),
+            }
+
             results.push(SyncResultMulti {
                 src,
                 dst,
-                result: Ok(SyncResult::UpToDate),
+                result: Ok(SyncResult::Updated {
+                    old_head: None,
+                    new_head: Multihash::from_digest_sha3_256(b"boop"),
+                    num_blocks: 1,
+                }),
             });
         }
         self.calls.lock().unwrap().push(PullBatch::Sync(call));

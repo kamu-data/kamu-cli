@@ -9,7 +9,6 @@
 
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
 use async_trait::async_trait;
@@ -17,14 +16,14 @@ use chrono::Utc;
 use dill::*;
 use std::collections::HashSet;
 use std::collections::LinkedList;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LocalDatasetRepositoryImpl {
     workspace_layout: Arc<WorkspaceLayout>,
-    info_repo: NamedObjectRepositoryLocalFS,
+    //info_repo: NamedObjectRepositoryLocalFS,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,10 +31,10 @@ pub struct LocalDatasetRepositoryImpl {
 #[component(pub)]
 impl LocalDatasetRepositoryImpl {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        let info_repo = NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
+        //let info_repo = NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
         Self {
             workspace_layout,
-            info_repo,
+            //info_repo,
         }
     }
 
@@ -51,7 +50,7 @@ impl LocalDatasetRepositoryImpl {
         Ok(DatasetFactoryImpl::get_local_fs_legacy(path, layout).into_internal_error()?)
     }
 
-    async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
+    /*async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
         use crate::domain::repos::named_object_repository::GetError;
 
         let data = match self.info_repo.get("info").await {
@@ -91,7 +90,7 @@ impl LocalDatasetRepositoryImpl {
         self.info_repo.set("info", &data).await?;
 
         Ok(())
-    }
+    }*/
 
     async fn resolve_transform_inputs(
         &self,
@@ -166,13 +165,73 @@ impl LocalDatasetRepositoryImpl {
         }
         ordered
     }
+
+    async fn finish_create_dataset(
+        &self,
+        dataset: &dyn Dataset,
+        dataset_path: &Path,
+        dataset_name: &DatasetName,
+    ) -> Result<DatasetHandle, CreateDatasetError> {
+        let tmp_layout = DatasetLayout::new(
+            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
+            &DatasetName::new_unchecked(".pending"),
+        );
+
+        let summary = match dataset.get_summary(SummaryOptions::default()).await {
+            Ok(s) => Ok(s),
+            Err(GetSummaryError::EmptyDataset) => unreachable!(),
+            Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
+        }?;
+
+        let handle = DatasetHandle::new(summary.id, dataset_name.clone());
+
+        // Check for late name collision
+        if let Some(existing_dataset) = self
+            .try_resolve_dataset_ref(&dataset_name.as_local_ref())
+            .await?
+        {
+            return Err(CreateDatasetError::Collision(CollisionError {
+                new_dataset: handle,
+                existing_dataset,
+            }));
+        }
+
+        // TODO: Atomic move
+        let dest_path = self.workspace_layout.datasets_dir.join(&handle.name);
+        let dest_layout = DatasetLayout::new(
+            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
+            &dataset_name,
+        );
+
+        std::fs::rename(&dataset_path, dest_path).into_internal_error()?;
+
+        std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).into_internal_error()?;
+
+        std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).into_internal_error()?;
+
+        std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir)
+            .into_internal_error()?;
+
+        // // Add new entry
+        // repo_info.datasets.push(DatasetEntry {
+        //     id: handle.id.clone(),
+        //     name: handle.name.clone(),
+        // });
+
+        // self.repo
+        //     .write_repo_info(repo_info)
+        //     .await
+        //     .map_err(|e| CreateDatasetError::Internal(e.into()))?;
+
+        Ok(handle)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
-    // TODO: PERF: Cache data and speed up lookups
+    // TODO: PERF: Cache data and speed up lookups by ID
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -196,23 +255,26 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                 Ok(DatasetHandle::new(summary.id, name.clone()))
             }
             DatasetRefLocal::ID(id) => {
-                let repo_info = self
-                    .read_repo_info()
-                    .await
-                    .map_err(|e| GetDatasetError::Internal(e))?;
+                let read_dir =
+                    std::fs::read_dir(&self.workspace_layout.datasets_dir).into_internal_error()?;
 
-                let entry = repo_info
-                    .datasets
-                    .into_iter()
-                    .filter(|d| d.id == *id)
-                    .next()
-                    .ok_or_else(|| {
-                        GetDatasetError::NotFound(DatasetNotFoundError {
-                            dataset_ref: dataset_ref.clone(),
-                        })
-                    })?;
+                for r in read_dir {
+                    let entry = r.into_internal_error()?;
+                    let name = DatasetName::try_from(&entry.file_name()).into_internal_error()?;
+                    let summary = self
+                        .get_dataset_impl(&name)
+                        .into_internal_error()?
+                        .get_summary(SummaryOptions::default())
+                        .await
+                        .into_internal_error()?;
+                    if summary.id == *id {
+                        return Ok(DatasetHandle::new(summary.id, name));
+                    }
+                }
 
-                Ok(DatasetHandle::new(entry.id, entry.name))
+                Err(GetDatasetError::NotFound(DatasetNotFoundError {
+                    dataset_ref: dataset_ref.clone(),
+                }))
             }
         }
     }
@@ -427,15 +489,16 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             .into());
         }
 
-        // Update repo info
-        let mut repo_info = self.read_repo_info().await?;
-        let index = repo_info
-            .datasets
-            .iter()
-            .position(|d| d.name == dataset_handle.name)
-            .ok_or(GenericError::new("Inconsistent repository info").into_internal_error())?;
-        repo_info.datasets.remove(index);
-        self.write_repo_info(repo_info).await?;
+        // // Update repo info
+        // let mut repo_info = self.read_repo_info().await?;
+        // let index = repo_info
+        //     .datasets
+        //     .iter()
+        //     .position(|d| d.name == dataset_handle.name)
+        //     .ok_or("Inconsistent repository info")
+        //     .into_internal_error()?;
+        // repo_info.datasets.remove(index);
+        // self.write_repo_info(repo_info).await?;
 
         let metadata_dir = self
             .workspace_layout
@@ -525,64 +588,23 @@ where
     }
 
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
-        let tmp_layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.repo.workspace_layout.local_volume_dir),
-            &DatasetName::new_unchecked(".pending"),
-        );
-
-        let summary = match self.dataset.get_summary(SummaryOptions::default()).await {
-            Ok(s) => Ok(s),
-            Err(GetSummaryError::EmptyDataset) => {
+        match self
+            .dataset
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(GetRefError::NotFound(_)) => {
                 self.discard_impl()?;
                 Err(CreateDatasetError::EmptyDataset)
             }
-            Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
+            Err(GetRefError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
         }?;
 
-        let handle = DatasetHandle::new(summary.id, self.dataset_name.clone());
-
-        // Check for name collision
-        let mut repo_info = self
-            .repo
-            .read_repo_info()
-            .await
-            .map_err(|e| CreateDatasetError::Internal(e))?;
-
-        if let Some(existing) = repo_info.datasets.iter().find(|d| d.name == handle.name) {
-            return Err(CreateDatasetError::Collision(CollisionError {
-                new_dataset: handle,
-                existing_dataset: DatasetHandle::new(existing.id.clone(), existing.name.clone()),
-            }));
-        }
-
-        // TODO: Atomic move
-        let dest_path = self.repo.workspace_layout.datasets_dir.join(&handle.name);
-        let dest_layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.repo.workspace_layout.local_volume_dir),
-            &self.dataset_name,
-        );
-
-        std::fs::rename(&self.dataset_path, dest_path).into_internal_error()?;
-
-        std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).into_internal_error()?;
-
-        std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).into_internal_error()?;
-
-        std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir)
-            .into_internal_error()?;
-
-        // Add new entry
-        repo_info.datasets.push(DatasetEntry {
-            id: handle.id.clone(),
-            name: handle.name.clone(),
-        });
-
         self.repo
-            .write_repo_info(repo_info)
+            .finish_create_dataset(&self.dataset, &self.dataset_path, &self.dataset_name)
             .await
-            .map_err(|e| CreateDatasetError::Internal(e.into()))?;
-
-        Ok(handle)
     }
 
     async fn discard(&self) -> Result<(), InternalError> {

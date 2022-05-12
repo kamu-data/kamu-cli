@@ -29,7 +29,7 @@ pub trait PushService: Send + Sync {
 
     async fn push_multi_ext(
         &self,
-        items: &mut dyn Iterator<Item = PushRequest>,
+        requests: &mut dyn Iterator<Item = PushRequest>,
         options: PushOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse>;
@@ -94,13 +94,21 @@ impl std::fmt::Display for PushRequest {
 #[derive(Debug, Error)]
 pub enum PushError {
     #[error(transparent)]
-    SourceNotFound(#[from] DatasetNotFoundError),
+    SourceNotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
     #[error("Cannot choose between multiple push aliases")]
     AmbiguousTarget,
     #[error(transparent)]
-    SyncError(#[from] SyncError),
+    SyncError(
+        #[from]
+        #[backtrace]
+        SyncError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]

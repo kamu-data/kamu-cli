@@ -574,6 +574,9 @@ pub fn cli() -> Command<'static> {
                         .validator(validate_dataset_name)
                         .value_name("NAME")
                         .help("Local name of a dataset to use when syncing from a repository"),
+                    Arg::new("no-alias")
+                        .long("no-alias")
+                        .help("Don't automatically add a remote push alias for this destination"),
                     Arg::new("fetch")
                         .long("fetch")
                         .takes_value(true)
@@ -608,13 +611,13 @@ pub fn cli() -> Command<'static> {
 
                         kamu pull --all
 
-                    Fetch dataset from a repository:
+                    Fetch dataset from a registered repository:
 
-                        kamu pull kamu.dev/foobar/org.example.data
+                        kamu pull kamu/org.example.data
 
-                    Fetch dataset from a repository using a different local name:
+                    Fetch dataset from a URL giving it the specified local name:
 
-                        kamu pull kamu.dev/foobar/org.example.data --as my.data
+                        kamu pull s3://kamu.dev/odf/org.example.data --as my.data
 
                     Advance the watermark of a dataset:
 

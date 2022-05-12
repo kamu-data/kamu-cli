@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use tracing::debug;
 
 use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
@@ -101,6 +102,8 @@ where
             return Ok(prev);
         }
 
+        debug!(?current_head, ?last_seen, "Updating dataset summary");
+
         use tokio_stream::StreamExt;
         let blocks: Vec<_> = self
             .metadata_chain
@@ -110,7 +113,7 @@ where
             .into_internal_error()?;
 
         let mut summary = prev.unwrap_or(DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b""),
+            id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced
             kind: DatasetKind::Root,
             last_block_hash: current_head.clone(),
             dependencies: Vec::new(),

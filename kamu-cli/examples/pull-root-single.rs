@@ -23,12 +23,16 @@ async fn main() {
         pull_svc,
         Arc::new(DatasetRegistryNull),
         Arc::new(RemoteAliasesRegistryNull),
-        Arc::new(OutputConfig::default()),
+        Arc::new(OutputConfig {
+            is_tty: true,
+            ..Default::default()
+        }),
         ["a"],
         false,
         false,
         false,
         None as Option<&str>,
+        true,
         None as Option<&str>,
     );
     cmd.run().await.unwrap();
@@ -47,12 +51,46 @@ pub struct TestPullService;
 impl PullService for TestPullService {
     async fn pull_multi(
         &self,
-        _dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        options: PullOptions,
+        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
+        transform_listener: Option<Arc<dyn TransformMultiListener>>,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        let mut requests = dataset_refs.map(|r| {
+            if let Some(local_ref) = r.as_local_ref() {
+                PullRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: None,
+                    ingest_from: None,
+                }
+            } else {
+                PullRequest {
+                    local_ref: None,
+                    remote_ref: Some(r.as_remote_ref().unwrap()),
+                    ingest_from: None,
+                }
+            }
+        });
+
+        self.pull_multi_ext(
+            &mut requests,
+            options,
+            ingest_listener,
+            transform_listener,
+            sync_listener,
+        )
+        .await
+    }
+
+    async fn pull_multi_ext(
+        &self,
+        _requests: &mut dyn Iterator<Item = PullRequest>,
         _options: PullOptions,
         ingest_listener: Option<Arc<dyn IngestMultiListener>>,
         _transform_listener: Option<Arc<dyn TransformMultiListener>>,
         _sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<(DatasetRefAny, Result<PullResult, PullError>)> {
+    ) -> Result<Vec<PullResponse>, InternalError> {
         let hdl = DatasetHandle::new(
             DatasetID::from_pub_key_ed25519(b"org.geonames.cities"),
             "org.geonames.cities".try_into().unwrap(),
@@ -101,41 +139,27 @@ impl PullService for TestPullService {
             uncacheable: false,
         };
         listener.success(&result);
-        vec![(
-            hdl.into(),
-            Ok(PullResult::Updated {
+        Ok(vec![PullResponse {
+            original_request: Some(PullRequest {
+                local_ref: Some(hdl.as_local_ref()),
+                remote_ref: None,
+                ingest_from: None,
+            }),
+            local_ref: Some(hdl.as_local_ref()),
+            remote_ref: None,
+            result: Ok(PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks: 1,
             }),
-        )]
-    }
-
-    async fn sync_from(
-        &self,
-        _remote_ref: &DatasetRefRemote,
-        _local_name: &DatasetName,
-        _options: PullOptions,
-        _listener: Option<Arc<dyn SyncListener>>,
-    ) -> Result<PullResult, PullError> {
-        unimplemented!()
-    }
-
-    async fn ingest_from(
-        &self,
-        _dataset_ref: &DatasetRefLocal,
-        _fetch: FetchStep,
-        _options: PullOptions,
-        _listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<PullResult, PullError> {
-        unimplemented!()
+        }])
     }
 
     async fn set_watermark(
         &self,
         _dataset_ref: &DatasetRefLocal,
         _watermark: DateTime<Utc>,
-    ) -> Result<PullResult, PullError> {
+    ) -> Result<PullResult, SetWatermarkError> {
         unimplemented!()
     }
 }

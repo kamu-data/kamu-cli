@@ -25,6 +25,17 @@ pub trait LocalDatasetRepository: Sync + Send {
         dataset_ref: &DatasetRefLocal,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
+    async fn try_resolve_dataset_ref(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<Option<DatasetHandle>, InternalError> {
+        match self.resolve_dataset_ref(dataset_ref).await {
+            Ok(hdl) => Ok(Some(hdl)),
+            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::Internal(e)) => Err(e),
+        }
+    }
+
     fn get_all_datasets<'s>(&'s self) -> DatasetListStream<'s>;
 
     async fn get_dataset(

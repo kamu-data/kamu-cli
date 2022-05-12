@@ -124,10 +124,9 @@ async fn test_insert_stream() {
         GetError::NotFound(_),
     );
 
-    let cursor = std::io::Cursor::new(b"foobar");
     assert_eq!(
         repo.insert_stream(
-            Box::new(cursor),
+            Box::new(std::io::Cursor::new(b"foobar")),
             InsertOpts {
                 precomputed_hash: Some(&hash_foobar),
                 size_hint: Some(6),
@@ -148,6 +147,43 @@ async fn test_insert_stream() {
     stream.read_to_end(&mut data).await.unwrap();
 
     assert_eq!(data, b"foobar");
+}
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_insert_stream_long() {
+    let s3 = run_s3_server();
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
+
+    use rand::RngCore;
+
+    let mut data = [0u8; 16000];
+    rand::thread_rng().fill_bytes(&mut data);
+    let hash = Multihash::from_digest_sha3_256(&data);
+
+    assert_eq!(
+        repo.insert_stream(
+            Box::new(std::io::Cursor::new(Vec::from(data))),
+            InsertOpts {
+                precomputed_hash: Some(&hash),
+                size_hint: Some(data.len()),
+                ..Default::default()
+            }
+        )
+        .await
+        .unwrap(),
+        InsertResult {
+            hash: hash.clone(),
+            already_existed: false
+        }
+    );
+
+    use tokio::io::AsyncReadExt;
+    let mut stream = repo.get_stream(&hash).await.unwrap();
+    let mut data_received = Vec::new();
+    stream.read_to_end(&mut data_received).await.unwrap();
+
+    assert_eq!(data, data_received[..]);
 }
 
 #[tokio::test]

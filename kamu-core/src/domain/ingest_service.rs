@@ -42,6 +42,19 @@ pub trait IngestService: Send + Sync {
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)>;
+
+    async fn ingest_multi_ext(
+        &self,
+        requests: &mut dyn Iterator<Item = IngestRequest>,
+        options: IngestOptions,
+        listener: Option<Arc<dyn IngestMultiListener>>,
+    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)>;
+}
+
+#[derive(Clone, Debug)]
+pub struct IngestRequest {
+    pub dataset_ref: DatasetRefLocal,
+    pub fetch_override: Option<FetchStep>,
 }
 
 #[derive(Debug, Clone)]

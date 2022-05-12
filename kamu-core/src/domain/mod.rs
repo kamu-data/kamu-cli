@@ -34,13 +34,14 @@ pub use remote_repository_registry::*;
 pub mod services;
 pub use services::*;
 
-mod engine;
+pub mod engine;
 pub use engine::*;
 
 mod engine_provisioner;
 pub use engine_provisioner::*;
 
-mod ingest_service;
+pub mod ingest_service;
+pub use ingest_service::IngestRequest;
 pub use ingest_service::*;
 
 mod metadata_chain;

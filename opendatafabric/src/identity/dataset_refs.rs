@@ -153,6 +153,20 @@ impl From<&DatasetHandle> for DatasetRefLocal {
     }
 }
 
+impl std::cmp::Ord for DatasetRefLocal {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let l = (self.name(), self.id());
+        let r = (other.name(), other.id());
+        l.cmp(&r)
+    }
+}
+
+impl std::cmp::PartialOrd for DatasetRefLocal {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetRefRemote
 ////////////////////////////////////////////////////////////////////////////////
@@ -257,6 +271,20 @@ impl From<&RemoteDatasetHandle> for DatasetRefRemote {
 impl From<Url> for DatasetRefRemote {
     fn from(v: Url) -> Self {
         Self::Url(Arc::new(v))
+    }
+}
+
+impl std::cmp::Ord for DatasetRefRemote {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let l = (self.name(), self.id());
+        let r = (other.name(), other.id());
+        l.cmp(&r)
+    }
+}
+
+impl std::cmp::PartialOrd for DatasetRefRemote {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -446,6 +474,20 @@ impl From<&DatasetRefRemote> for DatasetRefAny {
 impl From<Url> for DatasetRefAny {
     fn from(v: Url) -> Self {
         Self::Url(Arc::new(v))
+    }
+}
+
+impl std::cmp::Ord for DatasetRefAny {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let l = (self.as_remote_ref(), self.as_local_ref());
+        let r = (other.as_remote_ref(), other.as_local_ref());
+        l.cmp(&r)
+    }
+}
+
+impl std::cmp::PartialOrd for DatasetRefAny {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 

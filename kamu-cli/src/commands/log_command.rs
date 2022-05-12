@@ -169,20 +169,11 @@ impl AsciiRenderer {
                 }
 
                 self.render_section(output, 0, "Data")?;
-                self.render_property(output, 1, "Offset.Start", &output_data.interval.start)?;
-                self.render_property(output, 1, "Offset.End", &output_data.interval.end)?;
-                self.render_property(
-                    output,
-                    1,
-                    "Records",
-                    &(output_data.interval.end - output_data.interval.start + 1),
-                )?;
-                self.render_property(output, 1, "LogicalHash", &output_data.logical_hash)?;
-                self.render_property(output, 1, "PhysicalHash", &output_data.physical_hash)?;
+                self.render_data_slice(output, 1, &output_data)?;
 
                 if let Some(ocp) = output_checkpoint {
                     self.render_section(output, 0, "OutputCheckpoint")?;
-                    self.render_property(output, 1, "PhysicalHash", &ocp.physical_hash)?;
+                    self.render_checkpoint(output, 1, &ocp)?;
                 }
 
                 if let Some(wm) = output_watermark {
@@ -229,21 +220,12 @@ impl AsciiRenderer {
 
                 if let Some(output_data) = output_data {
                     self.render_section(output, 0, "Data")?;
-                    self.render_property(output, 1, "Offset.Start", &output_data.interval.start)?;
-                    self.render_property(output, 1, "Offset.End", &output_data.interval.end)?;
-                    self.render_property(
-                        output,
-                        1,
-                        "NumRecords",
-                        &(output_data.interval.end - output_data.interval.start + 1),
-                    )?;
-                    self.render_property(output, 1, "LogicalHash", &output_data.logical_hash)?;
-                    self.render_property(output, 1, "PhysicalHash", &output_data.physical_hash)?;
+                    self.render_data_slice(output, 1, &output_data)?;
                 }
 
                 if let Some(ocp) = output_checkpoint {
                     self.render_section(output, 0, "OutputCheckpoint")?;
-                    self.render_property(output, 1, "PhysicalHash", &ocp.physical_hash)?;
+                    self.render_checkpoint(output, 1, &ocp)?;
                 }
 
                 if let Some(wm) = output_watermark {
@@ -327,6 +309,37 @@ impl AsciiRenderer {
             }
         }
 
+        Ok(())
+    }
+
+    fn render_data_slice(
+        &self,
+        output: &mut impl Write,
+        indent: i32,
+        slice: &DataSlice,
+    ) -> Result<(), std::io::Error> {
+        self.render_property(output, indent, "Offset.Start", &slice.interval.start)?;
+        self.render_property(output, indent, "Offset.End", &slice.interval.end)?;
+        self.render_property(
+            output,
+            indent,
+            "NumRecords",
+            &(slice.interval.end - slice.interval.start + 1),
+        )?;
+        self.render_property(output, indent, "LogicalHash", &slice.logical_hash)?;
+        self.render_property(output, indent, "PhysicalHash", &slice.physical_hash)?;
+        self.render_property(output, indent, "Size", &slice.size)?;
+        Ok(())
+    }
+
+    fn render_checkpoint(
+        &self,
+        output: &mut impl Write,
+        indent: i32,
+        checkpoint: &Checkpoint,
+    ) -> Result<(), std::io::Error> {
+        self.render_property(output, indent, "PhysicalHash", &checkpoint.physical_hash)?;
+        self.render_property(output, indent, "Size", &checkpoint.size)?;
         Ok(())
     }
 

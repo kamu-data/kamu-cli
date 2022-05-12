@@ -139,6 +139,25 @@ impl PushServiceImpl {
         &self,
         remote_ref: &DatasetRefRemote,
     ) -> Result<DatasetHandle, PushError> {
+        // Do a quick check when remote and local names match
+        if let Some(remote_name) = remote_ref.name() {
+            if let Some(local_handle) = self
+                .local_repo
+                .try_resolve_dataset_ref(&remote_name.dataset().as_local_ref())
+                .await?
+            {
+                if self
+                    .remote_alias_reg
+                    .get_remote_aliases(&local_handle.as_local_ref())
+                    .into_internal_error()?
+                    .contains(&remote_ref, RemoteAliasKind::Push)
+                {
+                    return Ok(local_handle);
+                }
+            }
+        }
+
+        // No luck - now have to search through aliases
         use tokio_stream::StreamExt;
         let mut datasets = self.local_repo.get_all_datasets();
         while let Some(dataset_handle) = datasets.next().await {
@@ -155,10 +174,37 @@ impl PushServiceImpl {
         }
         Err(PushError::NoTarget)
     }
+}
 
-    async fn push_multi_impl(
+#[async_trait::async_trait(?Send)]
+impl PushService for PushServiceImpl {
+    async fn push_multi(
         &self,
-        items: &mut dyn Iterator<Item = PushRequest>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        options: PushOptions,
+        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Vec<PushResponse> {
+        let mut requests = dataset_refs.map(|r| {
+            if let Some(local_ref) = r.as_local_ref() {
+                PushRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: None,
+                }
+            } else {
+                PushRequest {
+                    local_ref: None,
+                    remote_ref: Some(r.as_remote_ref().unwrap()),
+                }
+            }
+        });
+
+        self.push_multi_ext(&mut requests, options, sync_listener)
+            .await
+    }
+
+    async fn push_multi_ext(
+        &self,
+        requests: &mut dyn Iterator<Item = PushRequest>,
         options: PushOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse> {
@@ -169,9 +215,9 @@ impl PushServiceImpl {
             unimplemented!("Pushing all datasets is not yet supported")
         }
 
-        let initial_items: Vec<_> = items.collect();
+        let initial_requests: Vec<_> = requests.collect();
 
-        let (plan, errors) = self.collect_plan(&initial_items).await;
+        let (plan, errors) = self.collect_plan(&initial_requests).await;
         if !errors.is_empty() {
             return errors;
         }
@@ -199,8 +245,8 @@ impl PushServiceImpl {
 
         // If no errors - add alliases to initial items
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
-            for item in &initial_items {
-                match item {
+            for request in &initial_requests {
+                match request {
                     PushRequest {
                         local_ref: Some(local_ref),
                         remote_ref: Some(remote_ref),
@@ -217,42 +263,6 @@ impl PushServiceImpl {
         }
 
         results
-    }
-}
-
-#[async_trait::async_trait(?Send)]
-impl PushService for PushServiceImpl {
-    async fn push_multi(
-        &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
-        options: PushOptions,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PushResponse> {
-        let mut items = dataset_refs.map(|r| {
-            if let Some(local_ref) = r.as_local_ref() {
-                PushRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: None,
-                }
-            } else {
-                PushRequest {
-                    local_ref: None,
-                    remote_ref: Some(r.as_remote_ref().unwrap()),
-                }
-            }
-        });
-
-        self.push_multi_impl(&mut items, options, sync_listener)
-            .await
-    }
-
-    async fn push_multi_ext(
-        &self,
-        items: &mut dyn Iterator<Item = PushRequest>,
-        options: PushOptions,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Vec<PushResponse> {
-        self.push_multi_impl(items, options, sync_listener).await
     }
 }
 

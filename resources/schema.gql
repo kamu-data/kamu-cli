@@ -54,6 +54,7 @@ type BlockRef {
 }
 type Checkpoint {
 	physicalHash: Multihash!
+	size: Int!
 }
 enum CompressionFormat {
 	GZIP
@@ -93,6 +94,7 @@ type DataSlice {
 	logicalHash: Multihash!
 	physicalHash: Multihash!
 	interval: OffsetInterval!
+	size: Int!
 }
 type Dataset {
 	"""

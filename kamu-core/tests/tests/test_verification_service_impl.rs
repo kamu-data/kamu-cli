@@ -86,7 +86,7 @@ async fn test_verify_data_consistency() {
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
     let data_path = tempdir.path().join("data");
 
-    write_record_batch_to_parquet(&data_path, &record_batch).unwrap();
+    let size = write_record_batch_to_parquet(&data_path, &record_batch).unwrap();
     let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
     let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
 
@@ -101,7 +101,7 @@ async fn test_verify_data_consistency() {
                 logical_hash: data_logical_hash.clone(),
                 physical_hash: data_physical_hash.clone(),
                 interval: OffsetInterval { start: 0, end: 0 },
-                size: 10,
+                size: size as i64,
             },
             output_checkpoint: None,
             output_watermark: None,
@@ -154,17 +154,16 @@ async fn test_verify_data_consistency() {
         Err(VerificationError::DataDoesNotMatchMetadata(
             DataDoesNotMatchMetadata {
                 block_hash,
-                logical_hash: Some(logical_hash),
-                physical_hash: None
+                error: DataVerificationError::LogicalHashMismatch { expected, .. },
             }
-        )) if block_hash == head && logical_hash.expected == data_logical_hash,
+        )) if block_hash == head && expected == data_logical_hash,
     );
 }
 
 fn write_record_batch_to_parquet(
     path: &Path,
     record_batch: &RecordBatch,
-) -> Result<(), ParquetError> {
+) -> Result<u64, ParquetError> {
     use datafusion::parquet::arrow::ArrowWriter;
 
     let mut arrow_writer = ArrowWriter::try_new(
@@ -175,5 +174,6 @@ fn write_record_batch_to_parquet(
 
     arrow_writer.write(&record_batch)?;
     arrow_writer.close()?;
-    Ok(())
+
+    Ok(std::fs::metadata(path).unwrap().len())
 }

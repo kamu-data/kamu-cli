@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::*;
+use crate::domain::engine::IngestRequest;
 use crate::domain::*;
 use crate::infra::*;
 use opendatafabric::serde::yaml::*;

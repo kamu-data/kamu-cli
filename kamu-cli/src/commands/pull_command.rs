@@ -22,8 +22,6 @@ use std::sync::Mutex;
 // Command
 ///////////////////////////////////////////////////////////////////////////////
 
-type GenericPullResult = Result<Vec<(DatasetRefAny, Result<PullResult, PullError>)>, CLIError>;
-
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     dataset_reg: Arc<dyn DatasetRegistry>,
@@ -34,6 +32,7 @@ pub struct PullCommand {
     recursive: bool,
     force_uncacheable: bool,
     as_name: Option<DatasetName>,
+    add_aliases: bool,
     fetch: Option<String>,
 }
 
@@ -48,6 +47,7 @@ impl PullCommand {
         recursive: bool,
         force_uncacheable: bool,
         as_name: Option<S>,
+        add_aliases: bool,
         fetch: Option<SS>,
     ) -> Self
     where
@@ -68,42 +68,49 @@ impl PullCommand {
             recursive,
             force_uncacheable,
             as_name: as_name.map(|s| s.try_into().unwrap()),
+            add_aliases,
             fetch: fetch.map(|s| s.into()),
         }
     }
 
-    async fn sync_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn sync_from(
+        &self,
+        listener: Option<Arc<PrettyPullProgress>>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
         let local_name = self.as_name.as_ref().unwrap();
         let remote_ref = self.refs[0].as_remote_ref().ok_or_else(|| {
             CLIError::usage_error("When using --as reference should point to a remote dataset")
         })?;
 
-        let res = self
+        Ok(self
             .pull_svc
-            .sync_from(
-                &remote_ref,
-                &local_name,
+            .pull_multi_ext(
+                &mut vec![PullRequest {
+                    local_ref: Some(local_name.into()),
+                    remote_ref: Some(remote_ref),
+                    ingest_from: None,
+                }]
+                .into_iter(),
                 PullOptions {
-                    create_remote_aliases: true,
+                    add_aliases: self.add_aliases,
                     ..PullOptions::default()
                 },
-                listener
-                    .and_then(|p| p.begin_sync(&remote_ref.as_any_ref(), &local_name.as_any_ref())),
+                None,
+                None,
+                listener.map(|v| v as Arc<dyn SyncMultiListener>),
             )
-            .await;
-
-        Ok(vec![(remote_ref.into(), res)])
+            .await?)
     }
 
-    async fn ingest_from(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
-        let dataset_handle = {
-            let dataset_ref = self.refs[0].as_local_ref().ok_or_else(|| {
-                CLIError::usage_error(
-                    "When using --fetch reference should point to a local dataset",
-                )
-            })?;
-            self.dataset_reg.resolve_dataset_ref(&dataset_ref)?
-        };
+    async fn ingest_from(
+        &self,
+        listener: Option<Arc<PrettyPullProgress>>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
+        let dataset_ref = self.refs[0].as_local_ref().ok_or_else(|| {
+            CLIError::usage_error("When using --fetch reference should point to a local dataset")
+        })?;
+
+        let dataset_handle = { self.dataset_reg.resolve_dataset_ref(&dataset_ref)? };
 
         let summary = self
             .dataset_reg
@@ -149,11 +156,15 @@ impl PullCommand {
             cache: None,
         });
 
-        let res = self
+        Ok(self
             .pull_svc
-            .ingest_from(
-                &dataset_handle.as_local_ref(),
-                fetch_step,
+            .pull_multi_ext(
+                &mut vec![PullRequest {
+                    local_ref: Some(dataset_ref),
+                    remote_ref: None,
+                    ingest_from: Some(fetch_step),
+                }]
+                .into_iter(),
                 PullOptions {
                     ingest_options: IngestOptions {
                         force_uncacheable: self.force_uncacheable,
@@ -161,14 +172,17 @@ impl PullCommand {
                     },
                     ..PullOptions::default()
                 },
-                listener.and_then(|p| p.begin_ingest(&dataset_handle)),
+                listener.map(|v| v as Arc<dyn IngestMultiListener>),
+                None,
+                None,
             )
-            .await;
-
-        Ok(vec![(dataset_handle.into(), res)])
+            .await?)
     }
 
-    async fn pull_multi(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn pull_multi(
+        &self,
+        listener: Option<Arc<PrettyPullProgress>>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
         Ok(self
             .pull_svc
             .pull_multi(
@@ -176,7 +190,7 @@ impl PullCommand {
                 PullOptions {
                     recursive: self.recursive,
                     all: self.all,
-                    create_remote_aliases: true,
+                    add_aliases: self.add_aliases,
                     ingest_options: IngestOptions {
                         force_uncacheable: self.force_uncacheable,
                         exhaust_sources: true,
@@ -189,10 +203,10 @@ impl PullCommand {
                     .map(|v| v as Arc<dyn TransformMultiListener>),
                 listener.map(|v| v as Arc<dyn SyncMultiListener>),
             )
-            .await)
+            .await?)
     }
 
-    async fn pull_with_progress(&self) -> GenericPullResult {
+    async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress = PrettyPullProgress::new();
         let listener = Arc::new(pull_progress.clone());
 
@@ -200,21 +214,52 @@ impl PullCommand {
             pull_progress.draw();
         });
 
-        let results = self.pull(Some(listener.clone())).await;
+        let res = self.pull(Some(listener.clone())).await;
 
         listener.finish();
         draw_thread.join().unwrap();
 
-        results
+        res
     }
 
-    async fn pull(&self, listener: Option<Arc<PrettyPullProgress>>) -> GenericPullResult {
+    async fn pull(
+        &self,
+        listener: Option<Arc<PrettyPullProgress>>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else if self.fetch.is_some() {
             self.ingest_from(listener).await
         } else {
             self.pull_multi(listener).await
+        }
+    }
+
+    fn describe_response(&self, pr: &PullResponse) -> String {
+        let local_ref = pr.local_ref.as_ref().or(pr
+            .original_request
+            .as_ref()
+            .and_then(|r| r.local_ref.as_ref()));
+        let remote_ref = pr.remote_ref.as_ref().or(pr
+            .original_request
+            .as_ref()
+            .and_then(|r| r.remote_ref.as_ref()));
+        match (
+            local_ref,
+            remote_ref,
+            pr.original_request
+                .as_ref()
+                .and_then(|r| r.ingest_from.as_ref()),
+        ) {
+            (Some(local_ref), _, Some(_)) => {
+                format!("ingest data into {} from custom source", local_ref)
+            }
+            (Some(local_ref), Some(remote_ref), _) => {
+                format!("sync {} from {}", local_ref, remote_ref)
+            }
+            (None, Some(remote_ref), _) => format!("sync dataset from {}", remote_ref),
+            (Some(local_ref), None, _) => format!("pull {}", local_ref),
+            _ => format!("???"),
         }
     }
 }
@@ -248,8 +293,8 @@ impl Command for PullCommand {
         let mut up_to_date = 0;
         let mut errors = 0;
 
-        for (_, res) in pull_results.iter() {
-            match res {
+        for res in pull_results.iter() {
+            match &res.result {
                 Ok(r) => match r {
                     PullResult::UpToDate => up_to_date += 1,
                     PullResult::Updated { .. } => updated += 1,
@@ -277,9 +322,13 @@ impl Command for PullCommand {
         if errors != 0 {
             Err(BatchError::new(
                 format!("Failed to update {} dataset(s)", errors),
-                pull_results.into_iter().filter_map(|(dr, res)| {
-                    res.err().map(|e| (e, format!("Failed to pull {}", dr)))
-                }),
+                pull_results
+                    .into_iter()
+                    .filter(|res| res.result.is_err())
+                    .map(|res| {
+                        let ctx = format!("Failed to {}", self.describe_response(&res));
+                        (res.result.err().unwrap(), ctx)
+                    }),
             )
             .into())
         } else {

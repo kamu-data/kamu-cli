@@ -157,6 +157,7 @@ pub fn get_command(
                     submatches.is_present("recursive"),
                     submatches.is_present("force-uncacheable"),
                     submatches.value_of("as"),
+                    !submatches.is_present("no-alias"),
                     submatches.value_of("fetch"),
                 ))
             }

@@ -400,7 +400,7 @@ impl IngestTask {
                                 .map_err(|e| IngestError::internal(e))?,
                             interval: data_interval,
                             size:
-                                std::fs::metadata(&new_checkpoint_path)
+                                std::fs::metadata(&data_path)
                                 .map_err(|e| IngestError::internal(e))?
                                 .len() as i64,
                         };

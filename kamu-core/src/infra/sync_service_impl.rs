@@ -190,7 +190,9 @@ impl SyncServiceImpl {
                         InsertOpts {
                             precomputed_hash: if !trust_source_hashes { None } else { Some(&checkpoint.physical_hash) },
                             expected_hash: Some(&checkpoint.physical_hash),
-                            size_hint: Some(checkpoint.size as usize),
+                            // This hint is necessary only for S3 implementation that does not currently support
+                            // streaming uploads without knowing Content-Length. We should remove it in future.
+                            size_hint: Some(checkpoint.size as usize), 
                             ..Default::default()
                         },
                     )

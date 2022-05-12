@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::{BoxedError, DomainError};
+use kamu::domain::{BoxedError, DomainError, InternalError};
 use std::backtrace::{Backtrace, BacktraceStatus};
 use std::error::Error;
 use std::fmt::Display;
@@ -258,6 +258,12 @@ impl From<dill::InjectionError> for CLIError {
 
 impl From<CommandInterpretationFailed> for CLIError {
     fn from(e: CommandInterpretationFailed) -> Self {
+        Self::critical(e)
+    }
+}
+
+impl From<InternalError> for CLIError {
+    fn from(e: InternalError) -> Self {
         Self::critical(e)
     }
 }

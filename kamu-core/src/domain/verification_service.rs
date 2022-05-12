@@ -163,35 +163,46 @@ pub enum VerificationError {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct HashMismatch {
-    pub expected: Multihash,
-    pub actual: Multihash,
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DataVerificationError {
+    SizeMismatch {
+        expected: u64,
+        actual: u64,
+    },
+    PhysicalHashMismatch {
+        expected: Multihash,
+        actual: Multihash,
+    },
+    LogicalHashMismatch {
+        expected: Multihash,
+        actual: Multihash,
+    },
 }
 
 #[derive(Debug)]
 pub struct DataDoesNotMatchMetadata {
     pub block_hash: Multihash,
-    pub logical_hash: Option<HashMismatch>,
-    pub physical_hash: Option<HashMismatch>,
+    pub error: DataVerificationError,
 }
 
 impl Display for DataDoesNotMatchMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(logical) = &self.logical_hash {
-            write!(
+        match &self.error {
+            DataVerificationError::SizeMismatch { expected, actual } => write!(
                 f,
-                "Data's logical hash for block {} is expected to be {} but actual {}",
-                self.block_hash, logical.expected, logical.actual
-            )
-        } else if let Some(physical) = &self.physical_hash {
-            write!(
+                "Data size for block {} is expected to be {} but actual {}",
+                self.block_hash, expected, actual
+            ),
+            DataVerificationError::PhysicalHashMismatch { expected, actual } => write!(
                 f,
-                "Data's physical hash for block {} is expected to be {} but actual {}",
-                self.block_hash, physical.expected, physical.actual
-            )
-        } else {
-            Ok(())
+                "Data physical hash for block {} is expected to be {} but actual {}",
+                self.block_hash, expected, actual
+            ),
+            DataVerificationError::LogicalHashMismatch { expected, actual } => write!(
+                f,
+                "Data logical hash for block {} is expected to be {} but actual {}",
+                self.block_hash, expected, actual
+            ),
         }
     }
 }
@@ -221,18 +232,37 @@ impl Display for DataNotReproducible {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CheckpointVerificationError {
+    SizeMismatch {
+        expected: u64,
+        actual: u64,
+    },
+    PhysicalHashMismatch {
+        expected: Multihash,
+        actual: Multihash,
+    },
+}
+
 #[derive(Debug)]
 pub struct CheckpointDoesNotMatchMetadata {
     pub block_hash: Multihash,
-    pub physical_hash: HashMismatch,
+    pub error: CheckpointVerificationError,
 }
 
 impl Display for CheckpointDoesNotMatchMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Checkpoint's physical hash for block {} is expected to be {} but actual {}",
-            self.block_hash, self.physical_hash.expected, self.physical_hash.actual
-        )
+        match &self.error {
+            CheckpointVerificationError::SizeMismatch { expected, actual } => write!(
+                f,
+                "Checkpoint size for block {} is expected to be {} but actual {}",
+                self.block_hash, expected, actual
+            ),
+            CheckpointVerificationError::PhysicalHashMismatch { expected, actual } => write!(
+                f,
+                "Checkpoint physical hash for block {} is expected to be {} but actual {}",
+                self.block_hash, expected, actual
+            ),
+        }
     }
 }

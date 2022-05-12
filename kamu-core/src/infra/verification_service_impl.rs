@@ -101,6 +101,23 @@ impl VerificationServiceImpl {
             if let Some(output_slice) = &block.event.output_data {
                 let data_path = dataset_layout.data_slice_path(&output_slice);
 
+                // Check size first
+                let size_actual = std::fs::metadata(&data_path)
+                    .map_err(|e| DomainError::InfraError(e.into()))?
+                    .len();
+
+                if size_actual != (output_slice.size as u64) {
+                    return Err(VerificationError::DataDoesNotMatchMetadata(
+                        DataDoesNotMatchMetadata {
+                            block_hash,
+                            error: DataVerificationError::SizeMismatch {
+                                expected: output_slice.size as u64,
+                                actual: size_actual,
+                            },
+                        },
+                    ));
+                }
+
                 // Do a fast pass using physical hash
                 let physical_hash_actual =
                     crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
@@ -113,11 +130,10 @@ impl VerificationServiceImpl {
                         return Err(VerificationError::DataDoesNotMatchMetadata(
                             DataDoesNotMatchMetadata {
                                 block_hash,
-                                logical_hash: None,
-                                physical_hash: Some(HashMismatch {
+                                error: DataVerificationError::PhysicalHashMismatch {
                                     expected: output_slice.physical_hash.clone(),
                                     actual: physical_hash_actual,
-                                }),
+                                },
                             },
                         ));
                     } else {
@@ -131,11 +147,10 @@ impl VerificationServiceImpl {
                             return Err(VerificationError::DataDoesNotMatchMetadata(
                                 DataDoesNotMatchMetadata {
                                     block_hash,
-                                    logical_hash: Some(HashMismatch {
+                                    error: DataVerificationError::LogicalHashMismatch {
                                         expected: output_slice.logical_hash.clone(),
                                         actual: logical_hash_actual,
-                                    }),
-                                    physical_hash: None,
+                                    },
                                 },
                             ));
                         }
@@ -143,17 +158,35 @@ impl VerificationServiceImpl {
                 }
 
                 if let Some(checkpoint) = block.event.output_checkpoint {
+                    let checkpoint_path = dataset_layout.checkpoint_path(&checkpoint.physical_hash);
+
+                    // Check size
+                    let size_actual = std::fs::metadata(&checkpoint_path)
+                        .map_err(|e| DomainError::InfraError(e.into()))?
+                        .len();
+
+                    if size_actual != (checkpoint.size as u64) {
+                        return Err(VerificationError::CheckpointDoesNotMatchMetadata(
+                            CheckpointDoesNotMatchMetadata {
+                                block_hash,
+                                error: CheckpointVerificationError::SizeMismatch {
+                                    expected: checkpoint.size as u64,
+                                    actual: size_actual,
+                                },
+                            },
+                        ));
+                    }
+
+                    // Check physical hash
                     let physical_hash_actual =
-                        crate::infra::utils::data_utils::get_file_physical_hash(
-                            &dataset_layout.checkpoint_path(&checkpoint.physical_hash),
-                        )
-                        .map_err(|e| DomainError::InfraError(e.into()))?;
+                        crate::infra::utils::data_utils::get_file_physical_hash(&checkpoint_path)
+                            .map_err(|e| DomainError::InfraError(e.into()))?;
 
                     if physical_hash_actual != checkpoint.physical_hash {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
                             CheckpointDoesNotMatchMetadata {
                                 block_hash,
-                                physical_hash: HashMismatch {
+                                error: CheckpointVerificationError::PhysicalHashMismatch {
                                     expected: checkpoint.physical_hash,
                                     actual: physical_hash_actual,
                                 },

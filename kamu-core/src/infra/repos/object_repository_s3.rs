@@ -246,7 +246,7 @@ where
 
         let key = self.get_key(&hash);
 
-        debug!(?key, "Inserting object stream");
+        debug!(?key, size, "Inserting object stream");
 
         if self.contains(&hash).await? {
             return Ok(InsertResult {
