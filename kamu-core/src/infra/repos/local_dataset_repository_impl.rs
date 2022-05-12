@@ -190,10 +190,10 @@ impl LocalDatasetRepositoryImpl {
             .try_resolve_dataset_ref(&dataset_name.as_local_ref())
             .await?
         {
-            return Err(CreateDatasetError::Collision(CollisionError {
-                new_dataset: handle,
-                existing_dataset,
-            }));
+            return Err(NameCollisionError {
+                name: existing_dataset.name,
+            }
+            .into());
         }
 
         // TODO: Atomic move
@@ -204,11 +204,8 @@ impl LocalDatasetRepositoryImpl {
         );
 
         std::fs::rename(&dataset_path, dest_path).int_err()?;
-
         std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).int_err()?;
-
         std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).int_err()?;
-
         std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir).int_err()?;
 
         // // Add new entry
@@ -439,6 +436,36 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             })
             .collect()
             .await
+    }
+
+    // TODO: Atomic move
+    async fn rename_dataset(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+        new_name: &DatasetName,
+    ) -> Result<(), RenameDatasetError> {
+        let old_name = self.resolve_dataset_ref(dataset_ref).await?.name;
+
+        let old_meta_path = self.workspace_layout.datasets_dir.join(&old_name);
+        let new_meta_path = self.workspace_layout.datasets_dir.join(&new_name);
+
+        if new_meta_path.exists() {
+            return Err(NameCollisionError {
+                name: new_name.clone(),
+            }
+            .into());
+        }
+
+        let vol = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
+        let old_layout = DatasetLayout::new(&vol, &old_name);
+        let new_layout = DatasetLayout::new(&vol, &new_name);
+
+        std::fs::rename(old_meta_path, new_meta_path).int_err()?;
+        std::fs::rename(old_layout.cache_dir, new_layout.cache_dir).int_err()?;
+        std::fs::rename(old_layout.data_dir, new_layout.data_dir).int_err()?;
+        std::fs::rename(old_layout.checkpoints_dir, new_layout.checkpoints_dir).int_err()?;
+
+        Ok(())
     }
 
     // TODO: PERF: Need fast inverse dependency lookup

@@ -672,6 +672,31 @@ pub fn cli() -> Command<'static> {
                         kamu push org.example.data
                     "
                 )),
+            Command::new("rename")
+                .about("Rename a dataset")
+                .args(&[
+                    Arg::new("dataset")
+                        .required(true)
+                        .index(1)
+                        .validator(validate_dataset_ref_local)
+                        .help("Dataset reference"),
+                    Arg::new("name")
+                        .required(true)
+                        .index(2)
+                        .help("The new name to give it"),
+                ])
+                .after_help(indoc::indoc!(
+                    r"
+                    Use this command to rename a dataset in your local workspace.
+
+                    ### Examples ###
+
+                    Renaming is often useful when you pull a remote dataset by URL and it gets auto-assigned not the most convenient name:
+
+                        kamu pull ipfs://bafy...a0da
+                        kamu rename bafy...a0da my.dataset
+                    "
+                )),
             /*Command::new("reset")
                 .about("Revert the dataset back to the specified state")
                 .args(&[

@@ -50,6 +50,12 @@ pub trait LocalDatasetRepository: Sync + Send {
         Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
     )>;
 
+    async fn rename_dataset(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+        new_name: &DatasetName,
+    ) -> Result<(), RenameDatasetError>;
+
     async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
         -> Result<(), DeleteDatasetError>;
 }
@@ -172,10 +178,9 @@ impl std::fmt::Display for DanglingReferenceError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("New dataset {new_dataset} collides with existing dataset {existing_dataset}")]
-pub struct CollisionError {
-    pub new_dataset: DatasetHandle,
-    pub existing_dataset: DatasetHandle,
+#[error("Dataset with name {name} already exists")]
+pub struct NameCollisionError {
+    pub name: DatasetName,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +222,7 @@ pub enum CreateDatasetError {
     #[error("Dataset is empty")]
     EmptyDataset,
     #[error(transparent)]
-    Collision(#[from] CollisionError),
+    NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
     Internal(
         #[from]
@@ -233,13 +238,38 @@ pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
     MissingInputs(#[from] MissingInputsError),
     #[error(transparent)]
-    Collision(#[from] CollisionError),
+    NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum RenameDatasetError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    NameCollision(#[from] NameCollisionError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetDatasetError> for RenameDatasetError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::NotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +302,7 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
             CreateDatasetError::EmptyDataset => unreachable!(),
-            CreateDatasetError::Collision(e) => Self::Collision(e),
+            CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::Internal(e) => Self::Internal(e),
         }
     }

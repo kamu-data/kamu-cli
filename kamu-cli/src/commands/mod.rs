@@ -68,6 +68,9 @@ pub use pull_images_command::*;
 mod push_command;
 pub use push_command::*;
 
+mod rename_command;
+pub use rename_command::*;
+
 mod repository_add_command;
 pub use repository_add_command::*;
 

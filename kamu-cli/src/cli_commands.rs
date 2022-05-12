@@ -171,6 +171,11 @@ pub fn get_command(
             push_matches.value_of("to"),
             catalog.get_one()?,
         )),
+        Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
+            catalog.get_one()?,
+            rename_matches.value_of("dataset").unwrap(),
+            rename_matches.value_of("name").unwrap(),
+        )),
         Some(("repo", repo_matches)) => match repo_matches.subcommand() {
             Some(("add", add_matches)) => Box::new(RepositoryAddCommand::new(
                 catalog.get_one()?,
