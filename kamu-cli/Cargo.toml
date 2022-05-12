@@ -11,6 +11,9 @@ repository = "https://github.com/kamu-data/kamu-cli"
 keywords = ["cli", "data", "collaboration", "pipeline", "management", "provenance"]
 categories = ["command-line-utilities"]
 
+[lib]
+doctest = false
+
 [features]
 default = []
 web-ui = []

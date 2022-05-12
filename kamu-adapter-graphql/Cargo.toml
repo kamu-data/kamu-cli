@@ -4,6 +4,9 @@ version = "0.85.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 
+[lib]
+doctest = false
+
 [dependencies]
 # Kamu
 dill = "~0.3"

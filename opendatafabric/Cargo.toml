@@ -5,6 +5,9 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
 
+[lib]
+doctest = false
+
 [dependencies]
 # Domain
 chrono = { version = "*", features = ["serde"] }
