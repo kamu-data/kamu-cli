@@ -136,8 +136,6 @@ fn configure_catalog() -> CatalogBuilder {
     b.add::<QueryServiceImpl>();
     b.bind::<dyn QueryService, QueryServiceImpl>();
 
-    b.add::<RepositoryFactory>();
-
     b.add::<EngineProvisionerLocal>();
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 

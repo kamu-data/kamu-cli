@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::RepositoryError;
+use crate::domain::{AccessError, InternalError, UnsupportedProtocolError};
 use opendatafabric::{RemoteDatasetName, RepositoryName};
 
 use thiserror::Error;
@@ -59,36 +59,22 @@ pub enum SearchError {
         #[source]
         source: BoxedError,
     },
-    #[error("{0}")]
-    IOError(#[source] BoxedError),
-    #[error("{0}")]
-    CredentialsError(#[source] BoxedError),
-    #[error("{0}")]
-    ProtocolError(#[source] BoxedError),
-    #[error("{0}")]
-    InternalError(#[source] BoxedError),
-}
-
-impl From<RepositoryError> for SearchError {
-    fn from(e: RepositoryError) -> Self {
-        match e {
-            RepositoryError::Corrupted {
-                ref message,
-                source: _,
-            } => SearchError::Corrupted {
-                message: message.clone(),
-                source: Box::new(e),
-            },
-            RepositoryError::CredentialsError { .. } => SearchError::CredentialsError(Box::new(e)),
-            RepositoryError::ProtocolError { .. } => SearchError::CredentialsError(Box::new(e)),
-            RepositoryError::IOError { .. } => SearchError::IOError(Box::new(e)),
-            e @ _ => SearchError::InternalError(Box::new(e)),
-        }
-    }
-}
-
-impl From<std::io::Error> for SearchError {
-    fn from(e: std::io::Error) -> Self {
-        Self::InternalError(e.into())
-    }
+    #[error(transparent)]
+    UnsupportedProtocol(
+        #[from]
+        #[backtrace]
+        UnsupportedProtocolError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }

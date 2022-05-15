@@ -7,30 +7,102 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use dill::*;
 use opendatafabric::*;
 use tracing::info;
 
-use super::RepositoryFactory;
 use crate::domain::*;
+
+use std::sync::Arc;
+use url::Url;
 
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    repo_factory: Arc<RepositoryFactory>,
 }
 
 #[component(pub)]
 impl SearchServiceImpl {
-    pub fn new(
-        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        repo_factory: Arc<RepositoryFactory>,
-    ) -> Self {
-        Self {
-            remote_repo_reg,
-            repo_factory,
+    pub fn new(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>) -> Self {
+        Self { remote_repo_reg }
+    }
+
+    // TODO: This is crude temporary implementation until ODF specifies registry interface
+    async fn search_in_resource(
+        &self,
+        url: &Url,
+        query: Option<&str>,
+    ) -> Result<Vec<DatasetNameWithOwner>, SearchError> {
+        let mut datasets = Vec::new();
+
+        match url.scheme() {
+            "file" => {
+                let path = url
+                    .to_file_path()
+                    .map_err(|_| "Invalid path URL")
+                    .int_err()?;
+                let query = query.unwrap_or_default();
+                for entry in std::fs::read_dir(&path).int_err()? {
+                    if let Some(file_name) = entry.int_err()?.file_name().to_str() {
+                        if query.is_empty() || file_name.contains(query) {
+                            datasets.push(DatasetNameWithOwner::new(
+                                None,
+                                DatasetName::try_from(file_name).unwrap(),
+                            ));
+                        }
+                    }
+                }
+            }
+            "s3" | "s3+http" | "s3+https" => {
+                use crate::infra::ObjectRepositoryS3;
+                use rusoto_core::Region;
+                use rusoto_s3::*;
+
+                // TODO: Support prefix?
+                let (endpoint, bucket, _) = ObjectRepositoryS3::<(), 0>::split_url(url);
+
+                let region = match endpoint {
+                    None => Region::default(),
+                    Some(endpoint) => Region::Custom {
+                        name: "custom".to_owned(),
+                        endpoint: endpoint,
+                    },
+                };
+                let client = S3Client::new(region);
+
+                let query = query.unwrap_or_default();
+
+                let list_objects_resp = client
+                    .list_objects_v2(ListObjectsV2Request {
+                        bucket,
+                        delimiter: Some("/".to_owned()),
+                        ..ListObjectsV2Request::default()
+                    })
+                    .await
+                    .int_err()?;
+
+                // TODO: Support iteration
+                assert!(
+                    !list_objects_resp.is_truncated.unwrap_or(false),
+                    "Cannot handle truncated response"
+                );
+
+                for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
+                    let mut prefix = prefix.prefix.unwrap();
+                    while prefix.ends_with('/') {
+                        prefix.pop();
+                    }
+
+                    let name = DatasetName::try_from(prefix).int_err()?;
+
+                    if query.is_empty() || name.contains(query) {
+                        datasets.push(DatasetNameWithOwner::new(None, name));
+                    }
+                }
+            }
+            _ => return Err(UnsupportedProtocolError { url: url.clone() }.into()),
         }
+
+        Ok(datasets)
     }
 
     async fn search_in_repo(
@@ -45,21 +117,15 @@ impl SearchServiceImpl {
                 DomainError::DoesNotExist { .. } => SearchError::RepositoryDoesNotExist {
                     repo_name: repo_name.clone(),
                 },
-                e @ _ => SearchError::InternalError(e.into()),
+                e @ _ => SearchError::Internal(e.int_err()),
             })?;
 
         info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 
-        let repo_client = self
-            .repo_factory
-            .get_repository_client(&repo)
-            .map_err(|e| SearchError::InternalError(e.into()))?;
-
-        let resp = repo_client.search(query).await?;
+        let datasets = self.search_in_resource(&repo.url, query).await?;
 
         Ok(SearchResult {
-            datasets: resp
-                .datasets
+            datasets: datasets
                 .into_iter()
                 .map(|name| name.as_remote_name(repo_name))
                 .collect(),
