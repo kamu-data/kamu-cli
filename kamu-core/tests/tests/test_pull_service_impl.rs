@@ -641,12 +641,7 @@ async fn test_set_watermark() {
             .unwrap();
 
         use futures::StreamExt;
-        ds.as_metadata_chain()
-            .iter_blocks()
-            .await
-            .unwrap()
-            .count()
-            .await
+        ds.as_metadata_chain().iter_blocks().count().await
     };
     assert_eq!(num_blocks().await, 1);
 

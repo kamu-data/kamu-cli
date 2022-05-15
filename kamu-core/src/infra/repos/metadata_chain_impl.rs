@@ -134,57 +134,58 @@ where
         Ok(block)
     }
 
-    fn iter_blocks_interval<'a, 'b>(
+    fn iter_blocks_interval<'a>(
         &'a self,
-        head_ref: &'b Multihash,
-        tail: Option<&'b Multihash>,
-    ) -> BlockStream<'a> {
-        use async_stream::stream;
+        head_hash: &'a Multihash,
+        tail_hash: Option<&'a Multihash>,
+    ) -> DynMetadataStream<'a> {
+        Box::pin(async_stream::try_stream! {
+            let mut current = Some(head_hash.clone());
 
-        let interval_head = head_ref.clone();
-        let tail = tail.cloned();
-
-        let s = stream! {
-            let mut head = Some(interval_head.clone());
-
-            while head.is_some() && head != tail {
-                head = match self.get_block(head.as_ref().unwrap()).await {
-                    Ok(block) => {
-                        let new_head = block.prev_block_hash.clone();
-                        yield Ok((head.clone().unwrap(), block));
-                        new_head
-                    }
-                    Err(GetBlockError::NotFound(e)) => {
-                        yield Err(IterBlocksError::BlockNotFound(e));
-                        break;
-                    }
-                    Err(GetBlockError::Access(e)) => {
-                        yield Err(IterBlocksError::Access(e));
-                        break;
-                    }
-                    Err(GetBlockError::Internal(e)) => {
-                        yield Err(IterBlocksError::Internal(e));
-                        break;
-                    }
-                };
+            while current.is_some() && current.as_ref() != tail_hash {
+                let block = self.get_block(current.as_ref().unwrap()).await?;
+                let next = block.prev_block_hash.clone();
+                yield (current.take().unwrap(), block);
+                current = next;
             }
 
-            if head.is_none() && tail.is_some() {
-                yield Err(IterBlocksError::InvalidInterval(InvalidIntervalError{ head: interval_head, tail: tail.unwrap() }));
+            if current.is_none() && tail_hash.is_some() {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash.clone(),
+                    tail: tail_hash.cloned().unwrap(),
+                }))?;
             }
-        };
-
-        Box::pin(s)
+        })
     }
 
-    async fn iter_blocks<'a>(&'a self) -> Result<BlockStream<'a>, GetRefError> {
-        let head = self.get_ref(&BlockRef::Head).await?;
-        Ok(self.iter_blocks_interval(&head, None))
-    }
+    fn iter_blocks_interval_ref<'a>(
+        &'a self,
+        head: &'a BlockRef,
+        tail: Option<&'a BlockRef>,
+    ) -> DynMetadataStream<'a> {
+        Box::pin(async_stream::try_stream! {
+            let head_hash = self.get_ref(head).await?;
+            let tail_hash = match tail {
+                None => None,
+                Some(r) => Some(self.get_ref(r).await?),
+            };
 
-    async fn iter_blocks_ref<'a>(&'a self, r: &BlockRef) -> Result<BlockStream<'a>, GetRefError> {
-        let head = self.get_ref(r).await?;
-        Ok(self.iter_blocks_interval(&head, None))
+            let mut current = Some(head_hash.clone());
+
+            while current.is_some() && current != tail_hash {
+                let block = self.get_block(current.as_ref().unwrap()).await?;
+                let next = block.prev_block_hash.clone();
+                yield (current.take().unwrap(), block);
+                current = next;
+            }
+
+            if current.is_none() && tail_hash.is_some() {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash,
+                    tail: tail_hash.unwrap()
+                }))?;
+            }
+        })
     }
 
     async fn set_ref<'a>(

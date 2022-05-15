@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
-use std::pin::Pin;
 use thiserror::Error;
-use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,17 +27,18 @@ pub trait MetadataChain2: Send + Sync {
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
-    fn iter_blocks_interval<'a, 'b>(
+    fn iter_blocks_interval<'a>(
         &'a self,
-        head: &'b Multihash,
-        tail: Option<&'b Multihash>,
-    ) -> BlockStream<'a>;
+        head: &'a Multihash,
+        tail: Option<&'a Multihash>,
+    ) -> DynMetadataStream<'a>;
 
-    /// Convenience function to iterate blocks starting with the `head` reference
-    async fn iter_blocks<'a>(&'a self) -> Result<BlockStream<'a>, GetRefError>;
-
-    /// Convenience function to iterate blocks starting with the specified reference
-    async fn iter_blocks_ref<'a>(&'a self, r: &BlockRef) -> Result<BlockStream<'a>, GetRefError>;
+    // TODO: Remove this method by allowing BlockRefs to be either tags or hashes
+    fn iter_blocks_interval_ref<'a>(
+        &'a self,
+        head: &'a BlockRef,
+        tail: Option<&'a BlockRef>,
+    ) -> DynMetadataStream<'a>;
 
     /// Update referece to point at the specified block
     async fn set_ref<'a>(
@@ -58,6 +58,25 @@ pub trait MetadataChain2: Send + Sync {
     fn as_object_repo(&self) -> &dyn ObjectRepository;
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+pub trait MetadataChainExt: MetadataChain2 {
+    /// Convenience function to iterate blocks starting with the `head` reference
+    fn iter_blocks<'a>(&'a self) -> DynMetadataStream<'a> {
+        self.iter_blocks_interval_ref(&BlockRef::Head, None)
+    }
+
+    /// Convenience function to iterate blocks starting with the specified reference
+    fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
+        self.iter_blocks_interval_ref(&head, None)
+    }
+}
+
+impl<T> MetadataChainExt for T where T: MetadataChain2 + ?Sized {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // BlockRef
@@ -88,11 +107,6 @@ impl std::fmt::Display for BlockRef {
         write!(f, "{}", self.as_str())
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub type BlockStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -187,6 +201,8 @@ pub enum GetBlockError {
 #[derive(Error, Debug)]
 pub enum IterBlocksError {
     #[error(transparent)]
+    RefNotFound(RefNotFoundError),
+    #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
     #[error(transparent)]
     InvalidInterval(InvalidIntervalError),
@@ -202,6 +218,26 @@ pub enum IterBlocksError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<GetRefError> for IterBlocksError {
+    fn from(v: GetRefError) -> Self {
+        match v {
+            GetRefError::NotFound(e) => Self::RefNotFound(e),
+            GetRefError::Access(e) => Self::Access(e),
+            GetRefError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetBlockError> for IterBlocksError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            GetBlockError::Access(e) => Self::Access(e),
+            GetBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

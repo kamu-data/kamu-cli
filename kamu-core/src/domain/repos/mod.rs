@@ -20,6 +20,9 @@ pub mod metadata_chain;
 pub use metadata_chain::SetRefError;
 pub use metadata_chain::*;
 
+pub mod metadata_stream;
+pub use metadata_stream::*;
+
 pub mod dataset;
 pub use dataset::*;
 

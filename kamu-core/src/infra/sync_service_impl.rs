@@ -115,6 +115,7 @@ impl SyncServiceImpl {
             .await
         {
             Ok(v) => Ok(v),
+            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
             Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
                 message: "source metadata chain is broken".to_owned(),
                 source: Some(e.into()),

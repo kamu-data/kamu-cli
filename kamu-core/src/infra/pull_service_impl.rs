@@ -547,19 +547,14 @@ impl PullService for PullServiceImpl {
         let dataset = self.local_repo.get_dataset(dataset_ref).await?;
         let chain = dataset.as_metadata_chain();
 
-        use futures::TryStreamExt;
-        let wm_stream = chain
+        if let Some(last_watermark) = chain
             .iter_blocks()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_watermark)
+            .try_first()
             .await
             .int_err()?
-            .try_filter_map(|(_, b)| async {
-                Ok(b.into_data_stream_block()
-                    .and_then(|b| b.event.output_watermark))
-            });
-
-        futures::pin_mut!(wm_stream);
-
-        if let Some(last_watermark) = wm_stream.try_next().await.int_err()? {
+        {
             if last_watermark >= watermark {
                 return Ok(PullResult::UpToDate);
             }

@@ -139,15 +139,7 @@ async fn test_rename_dataset() {
     let baz = repo.get_dataset(&name_baz.as_local_ref()).await.unwrap();
 
     use futures::StreamExt;
-    assert_eq!(
-        baz.as_metadata_chain()
-            .iter_blocks()
-            .await
-            .unwrap()
-            .count()
-            .await,
-        2
-    );
+    assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
 }
 
 #[tokio::test]
