@@ -76,6 +76,7 @@ cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions
 datafusion = "*"  # Reading data + SQL
 dirs = "*"
+futures = "*"
 indoc = "*"
 itertools = "*"
 libc = "*"  # Signal names

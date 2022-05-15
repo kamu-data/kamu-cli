@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct LineageCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRefLocal>,
@@ -33,7 +33,7 @@ pub struct LineageCommand {
 
 impl LineageCommand {
     pub fn new<I, R>(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,
@@ -47,7 +47,7 @@ impl LineageCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            dataset_reg,
+            local_repo,
             provenance_svc,
             workspace_layout,
             dataset_refs: dataset_refs
@@ -92,13 +92,15 @@ impl LineageCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LineageCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
-            self.dataset_reg.get_all_datasets().collect()
+            self.local_repo.get_all_datasets().try_collect().await?
         } else {
-            self.dataset_refs
-                .iter()
-                .map(|r| self.dataset_reg.resolve_dataset_ref(r))
-                .collect::<Result<_, _>>()?
+            futures::stream::iter(&self.dataset_refs)
+                .then(|r| self.local_repo.resolve_dataset_ref(r))
+                .try_collect()
+                .await
+                .map_err(|e| CLIError::failure(e))?
         };
 
         dataset_handles.sort_by(|a, b| a.name.cmp(&b.name));
@@ -112,6 +114,7 @@ impl Command for LineageCommand {
                     visitor.as_mut(),
                     LineageOptions {},
                 )
+                .await
                 .map_err(|e| CLIError::failure(e))?;
         }
         visitor.done();
@@ -474,6 +477,7 @@ impl LineageVisitor for HtmlBrowseVisitor {
         std::mem::swap(&mut visitor, &mut self.html_visitor);
 
         std::fs::write(&self.temp_path, visitor.unwrap()).unwrap();
+        eprintln!("AAAAAAAAAA {:?}", self.temp_path);
         webbrowser::open(
             &url::Url::from_file_path(&self.temp_path)
                 .unwrap()

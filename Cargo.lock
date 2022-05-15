@@ -1908,6 +1908,7 @@ dependencies = [
  "dirs 4.0.0",
  "duration-string",
  "env_logger",
+ "futures",
  "glob",
  "http",
  "humansize",

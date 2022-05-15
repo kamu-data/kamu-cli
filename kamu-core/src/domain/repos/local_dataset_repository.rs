@@ -91,6 +91,17 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         }
     }
 
+    async fn try_get_dataset(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<Option<Arc<dyn Dataset>>, InternalError> {
+        match self.get_dataset(dataset_ref).await {
+            Ok(ds) => Ok(Some(ds)),
+            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::Internal(e)) => Err(e),
+        }
+    }
+
     async fn get_or_create_dataset(
         &self,
         dataset_ref: &DatasetRefLocal,

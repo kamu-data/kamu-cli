@@ -7,37 +7,46 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{collections::HashSet, fmt::Write, marker::PhantomData, sync::Arc};
-
+use crate::domain::*;
 use dill::*;
 use opendatafabric::*;
 
-use crate::domain::{
-    DatasetRegistry, DomainError, LineageOptions, LineageVisitor, NodeInfo, ProvenanceError,
-    ProvenanceService,
-};
+use std::collections::HashSet;
+use std::fmt::Write;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(dataset_reg: Arc<dyn DatasetRegistry>) -> Self {
-        Self { dataset_reg }
+    pub fn new(local_repo: Arc<dyn LocalDatasetRepository>) -> Self {
+        Self { local_repo }
     }
 
-    fn visit_upstream_dependencies_rec(
+    #[async_recursion::async_recursion(?Send)]
+    async fn visit_upstream_dependencies_rec(
         &self,
         dataset_handle: &DatasetHandle,
         visitor: &mut dyn LineageVisitor,
-    ) -> Result<(), ProvenanceError> {
-        let summary = match self.dataset_reg.get_summary(&dataset_handle.as_local_ref()) {
-            Ok(s) => Some(s),
-            Err(DomainError::DoesNotExist { .. }) => None,
-            Err(e) => return Err(e.into()),
+    ) -> Result<(), GetLineageError> {
+        let summary = if let Some(dataset) = self
+            .local_repo
+            .try_get_dataset(&dataset_handle.as_local_ref())
+            .await?
+        {
+            Some(
+                dataset
+                    .get_summary(SummaryOptions::default())
+                    .await
+                    .int_err()?,
+            )
+        } else {
+            None
         };
 
         let dataset_info = summary
@@ -63,7 +72,8 @@ impl ProvenanceServiceImpl {
                     id: input.id.clone().unwrap(),
                     name: input.name.clone(),
                 };
-                self.visit_upstream_dependencies_rec(&input_handle, visitor)?;
+                self.visit_upstream_dependencies_rec(&input_handle, visitor)
+                    .await?;
             }
         }
 
@@ -73,15 +83,16 @@ impl ProvenanceServiceImpl {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ProvenanceService for ProvenanceServiceImpl {
-    fn get_dataset_lineage(
+    async fn get_dataset_lineage(
         &self,
         dataset_ref: &DatasetRefLocal,
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
-    ) -> Result<(), ProvenanceError> {
-        let hdl = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
-        self.visit_upstream_dependencies_rec(&hdl, visitor)
+    ) -> Result<(), GetLineageError> {
+        let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        self.visit_upstream_dependencies_rec(&hdl, visitor).await
     }
 }
 

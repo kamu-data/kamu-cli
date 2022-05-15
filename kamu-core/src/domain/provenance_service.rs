@@ -7,22 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::{DatasetNotFoundError, GetDatasetError, InternalError};
 use opendatafabric::*;
-use thiserror::Error;
 
-use super::DomainError;
+use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait(?Send)]
 pub trait ProvenanceService: Sync + Send {
     /// Passes the visitor through the dependency graph of a dataset
     /// Some predefined visitors are available.
-    fn get_dataset_lineage(
+    async fn get_dataset_lineage(
         &self,
         dataset_ref: &DatasetRefLocal,
         visitor: &mut dyn LineageVisitor,
         options: LineageOptions,
-    ) -> Result<(), ProvenanceError>;
+    ) -> Result<(), GetLineageError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +72,22 @@ pub struct LineageOptions {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ProvenanceError {
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
+pub enum GetLineageError {
+    #[error(transparent)]
+    NotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetDatasetError> for GetLineageError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::NotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
