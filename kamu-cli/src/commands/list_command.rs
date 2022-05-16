@@ -39,7 +39,7 @@ impl ListCommand {
     }
 
     // TODO: support multiple format specifiers
-    fn print_machine_readable(&self) -> Result<(), CLIError> {
+    async fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
         let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
@@ -62,7 +62,7 @@ impl ListCommand {
                 "{},{},{},{},{},{},{}\n",
                 hdl.id,
                 hdl.name,
-                self.get_kind(hdl, &summary)?,
+                self.get_kind(hdl, &summary).await?,
                 head,
                 match summary.last_pulled {
                     None => "".to_owned(),
@@ -75,7 +75,7 @@ impl ListCommand {
         Ok(())
     }
 
-    fn print_pretty(&self) -> Result<(), CLIError> {
+    async fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
         let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
@@ -102,7 +102,7 @@ impl ListCommand {
             if self.detail_level == 0 {
                 table.add_row(Row::new(vec![
                     Cell::new(&hdl.name),
-                    Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
+                    Cell::new(&self.get_kind(hdl, &summary).await?).style_spec("c"),
                     Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                     Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
                     Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
@@ -111,7 +111,7 @@ impl ListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&hdl.id.to_did_string()),
                     Cell::new(&hdl.name),
-                    Cell::new(&self.get_kind(hdl, &summary)?).style_spec("c"),
+                    Cell::new(&self.get_kind(hdl, &summary).await?).style_spec("c"),
                     Cell::new(&head.short().to_string()),
                     Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
                     Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
@@ -170,14 +170,16 @@ impl ListCommand {
         num.to_formatted_string(&Locale::en)
     }
 
-    fn get_kind(
+    async fn get_kind(
         &self,
         handle: &DatasetHandle,
         summary: &DatasetSummary,
-    ) -> Result<String, DomainError> {
+    ) -> Result<String, CLIError> {
         let is_remote = self
             .remote_alias_reg
-            .get_remote_aliases(&handle.as_local_ref())?
+            .get_remote_aliases(&handle.as_local_ref())
+            .await
+            .map_err(CLIError::failure)?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()
             .is_some();
@@ -194,8 +196,8 @@ impl Command for ListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: replace with formatters
         match self.output_config.format {
-            OutputFormat::Table => self.print_pretty()?,
-            OutputFormat::Csv => self.print_machine_readable()?,
+            OutputFormat::Table => self.print_pretty().await?,
+            OutputFormat::Csv => self.print_machine_readable().await?,
             _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
         }
 

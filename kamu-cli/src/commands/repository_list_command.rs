@@ -40,7 +40,10 @@ impl RepositoryListCommand {
         write!(out, "Name,URL\n")?;
 
         for name in repos {
-            let repo = self.remote_repo_reg.get_repository(&name)?;
+            let repo = self
+                .remote_repo_reg
+                .get_repository(&name)
+                .map_err(CLIError::failure)?;
             write!(out, "{},\"{}\"\n", name, repo.url)?;
         }
         Ok(())
@@ -58,7 +61,10 @@ impl RepositoryListCommand {
         table.set_titles(row![bc->"Name", bc->"URL"]);
 
         for name in repos.iter() {
-            let repo = self.remote_repo_reg.get_repository(&name)?;
+            let repo = self
+                .remote_repo_reg
+                .get_repository(&name)
+                .map_err(CLIError::failure)?;
             table.add_row(Row::new(vec![
                 Cell::new(&name),
                 Cell::new(&repo.url.to_string()),

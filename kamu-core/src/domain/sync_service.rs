@@ -109,8 +109,12 @@ pub enum SyncError {
     CreateDatasetFailed(#[from] CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
-    #[error("Repository {repo_name} does not exist")]
-    RepositoryDoesNotExist { repo_name: RepositoryName },
+    #[error(transparent)]
+    RepositoryNotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
     // TODO: Report divergence type (e.g. remote is ahead of local)
     //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
     #[error(transparent)]
@@ -171,6 +175,15 @@ impl From<GetDatasetError> for SyncError {
                 dataset_ref: e.dataset_ref.into(),
             }),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetRepoError> for SyncError {
+    fn from(v: GetRepoError) -> Self {
+        match v {
+            GetRepoError::NotFound(e) => Self::RepositoryNotFound(e),
+            GetRepoError::Internal(e) => Self::Internal(e),
         }
     }
 }

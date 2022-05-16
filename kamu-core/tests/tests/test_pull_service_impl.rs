@@ -359,6 +359,7 @@ async fn test_pull_batching_complex_with_remote() {
     harness
         .remote_alias_reg
         .get_remote_aliases(&rl!("e"))
+        .await
         .unwrap()
         .add(
             &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
@@ -504,6 +505,7 @@ async fn test_sync_from() {
     let aliases = harness
         .remote_alias_reg
         .get_remote_aliases(&rl!("bar"))
+        .await
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
@@ -554,6 +556,7 @@ async fn test_sync_from_url_and_local_ref() {
     let aliases = harness
         .remote_alias_reg
         .get_remote_aliases(&rl!("bar"))
+        .await
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
@@ -604,6 +607,7 @@ async fn test_sync_from_url_only() {
     let aliases = harness
         .remote_alias_reg
         .get_remote_aliases(&rl!("bar"))
+        .await
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
@@ -710,10 +714,9 @@ impl PullTestHarness {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
         let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
-        let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
-            dataset_reg.clone(),
+            local_repo.clone(),
             workspace_layout.clone(),
         ));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));

@@ -235,6 +235,7 @@ impl PullServiceImpl {
                 if self
                     .remote_alias_reg
                     .get_remote_aliases(&local_handle.as_local_ref())
+                    .await
                     .int_err()?
                     .contains(&remote_ref, RemoteAliasKind::Pull)
                 {
@@ -252,6 +253,7 @@ impl PullServiceImpl {
             if self
                 .remote_alias_reg
                 .get_remote_aliases(&dataset_handle.as_local_ref())
+                .await
                 .int_err()?
                 .contains(&remote_ref, RemoteAliasKind::Pull)
             {
@@ -265,13 +267,9 @@ impl PullServiceImpl {
         &self,
         local_ref: &DatasetRefLocal,
     ) -> Result<Option<DatasetRefRemote>, PullError> {
-        let remote_aliases = match self.remote_alias_reg.get_remote_aliases(local_ref) {
+        let remote_aliases = match self.remote_alias_reg.get_remote_aliases(local_ref).await {
             Ok(v) => Ok(v),
-            Err(DomainError::DoesNotExist { .. }) => {
-                Err(PullError::NotFound(DatasetNotFoundError {
-                    dataset_ref: local_ref.clone(),
-                }))
-            }
+            Err(GetAliasesError::DatasetNotFound(e)) => Err(PullError::NotFound(e)),
             Err(e) => Err(e.int_err().into()),
         }?;
 
@@ -384,6 +382,7 @@ impl PullServiceImpl {
                     if let Some(remote_ref) = &res.remote_ref {
                         self.remote_alias_reg
                             .get_remote_aliases(res.local_ref.as_ref().unwrap())
+                            .await
                             .int_err()?
                             .add(&remote_ref, RemoteAliasKind::Pull)
                             .int_err()?;
@@ -534,13 +533,13 @@ impl PullService for PullServiceImpl {
         dataset_ref: &DatasetRefLocal,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError> {
-        if !self
-            .remote_alias_reg
-            .get_remote_aliases(dataset_ref)
-            .int_err()?
-            .is_empty(RemoteAliasKind::Pull)
-        {
-            // TODO: Consider extracting into a watermark-specific error type
+        let aliases = match self.remote_alias_reg.get_remote_aliases(dataset_ref).await {
+            Ok(v) => Ok(v),
+            Err(GetAliasesError::DatasetNotFound(e)) => Err(SetWatermarkError::NotFound(e)),
+            Err(GetAliasesError::Internal(e)) => Err(SetWatermarkError::Internal(e)),
+        }?;
+
+        if !aliases.is_empty(RemoteAliasKind::Pull) {
             return Err(SetWatermarkError::IsRemote);
         }
 

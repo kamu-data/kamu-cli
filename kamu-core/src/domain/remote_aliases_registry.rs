@@ -7,12 +7,41 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
+use crate::domain::*;
 use opendatafabric::*;
 
+use async_trait::async_trait;
+use thiserror::Error;
+
+#[async_trait]
 pub trait RemoteAliasesRegistry: Send + Sync {
-    fn get_remote_aliases(
+    async fn get_remote_aliases(
         &self,
         dataset_ref: &DatasetRefLocal,
-    ) -> Result<Box<dyn RemoteAliases>, DomainError>;
+    ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
+}
+
+#[derive(Error, Debug)]
+pub enum GetAliasesError {
+    #[error(transparent)]
+    DatasetNotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetDatasetError> for GetAliasesError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }

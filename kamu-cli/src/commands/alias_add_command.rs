@@ -58,10 +58,16 @@ impl Command for AliasAddCommand {
         }
 
         if let DatasetRefRemote::RemoteName(name) = &self.alias {
-            self.remote_repo_reg.get_repository(name.repository())?;
+            self.remote_repo_reg
+                .get_repository(name.repository())
+                .map_err(CLIError::failure)?;
         }
 
-        let mut aliases = self.remote_alias_reg.get_remote_aliases(&self.dataset)?;
+        let mut aliases = self
+            .remote_alias_reg
+            .get_remote_aliases(&self.dataset)
+            .await
+            .map_err(CLIError::failure)?;
 
         if self.pull {
             if aliases.add(&self.alias, RemoteAliasKind::Pull)? {

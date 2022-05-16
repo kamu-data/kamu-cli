@@ -51,45 +51,30 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     fn get_repository(
         &self,
         repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, DomainError> {
+    ) -> Result<RepositoryAccessInfo, GetRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if !file_path.exists() {
-            return Err(DomainError::does_not_exist(
-                ResourceKind::Repository,
-                repo_name.to_string(),
-            ));
+            return Err(RepositoryNotFoundError {
+                repo_name: repo_name.clone(),
+            }
+            .into());
         }
 
-        let file = std::fs::File::open(&file_path).unwrap_or_else(|e| {
-            panic!(
-                "Failed to open the Repository file at {}: {}",
-                file_path.display(),
-                e
-            )
-        });
-
-        let manifest: Manifest<RepositoryAccessInfo> = serde_yaml::from_reader(&file)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Failed to deserialize the Repository at {}: {}",
-                    file_path.display(),
-                    e
-                )
-            });
-
+        let file = std::fs::File::open(&file_path).int_err()?;
+        let manifest: Manifest<RepositoryAccessInfo> = serde_yaml::from_reader(&file).int_err()?;
         assert_eq!(manifest.kind, "Repository");
         Ok(manifest.content)
     }
 
-    fn add_repository(&self, repo_name: &RepositoryName, mut url: Url) -> Result<(), DomainError> {
+    fn add_repository(&self, repo_name: &RepositoryName, mut url: Url) -> Result<(), AddRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if file_path.exists() {
-            return Err(DomainError::already_exists(
-                ResourceKind::Repository,
-                repo_name.to_string(),
-            ));
+            return Err(RepositoryAlreadyExistsError {
+                repo_name: repo_name.clone(),
+            }
+            .into());
         }
 
         // Ensure has trailing slash to properly handle relative links
@@ -103,22 +88,22 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
             content: RepositoryAccessInfo { url: url },
         };
 
-        let file = std::fs::File::create(&file_path).map_err(|e| InfraError::from(e).into())?;
-        serde_yaml::to_writer(file, &manifest).map_err(|e| InfraError::from(e).into())?;
+        let file = std::fs::File::create(&file_path).int_err()?;
+        serde_yaml::to_writer(file, &manifest).int_err()?;
         Ok(())
     }
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DomainError> {
+    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if !file_path.exists() {
-            return Err(DomainError::does_not_exist(
-                ResourceKind::Repository,
-                repo_name.to_string(),
-            ));
+            return Err(RepositoryNotFoundError {
+                repo_name: repo_name.clone(),
+            }
+            .into());
         }
 
-        std::fs::remove_file(&file_path).map_err(|e| InfraError::from(e).into())?;
+        std::fs::remove_file(&file_path).int_err()?;
         Ok(())
     }
 }
@@ -137,21 +122,21 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
     fn get_repository(
         &self,
         repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, DomainError> {
-        Err(DomainError::does_not_exist(
-            ResourceKind::Repository,
-            repo_name.to_string(),
-        ))
+    ) -> Result<RepositoryAccessInfo, GetRepoError> {
+        Err(RepositoryNotFoundError {
+            repo_name: repo_name.clone(),
+        }
+        .into())
     }
 
-    fn add_repository(&self, _repo_name: &RepositoryName, _url: Url) -> Result<(), DomainError> {
-        Err(DomainError::ReadOnly)
+    fn add_repository(&self, _repo_name: &RepositoryName, _url: Url) -> Result<(), AddRepoError> {
+        Err("null registry".int_err().into())
     }
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DomainError> {
-        Err(DomainError::does_not_exist(
-            ResourceKind::Repository,
-            repo_name.to_string(),
-        ))
+    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError> {
+        Err(RepositoryNotFoundError {
+            repo_name: repo_name.clone(),
+        }
+        .into())
     }
 }

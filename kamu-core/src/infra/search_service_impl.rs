@@ -110,15 +110,7 @@ impl SearchServiceImpl {
         query: Option<&str>,
         repo_name: &RepositoryName,
     ) -> Result<SearchResult, SearchError> {
-        let repo = self
-            .remote_repo_reg
-            .get_repository(&repo_name)
-            .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SearchError::RepositoryDoesNotExist {
-                    repo_name: repo_name.clone(),
-                },
-                e @ _ => SearchError::Internal(e.int_err()),
-            })?;
+        let repo = self.remote_repo_reg.get_repository(&repo_name)?;
 
         info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 

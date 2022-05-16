@@ -66,7 +66,9 @@ impl Command for RepositoryDeleteCommand {
             self.remote_repo_reg.get_all_repositories().collect()
         } else {
             for name in &self.names {
-                self.remote_repo_reg.get_repository(name)?;
+                self.remote_repo_reg
+                    .get_repository(name)
+                    .map_err(CLIError::failure)?;
             }
             self.names.clone()
         };
@@ -96,7 +98,9 @@ impl Command for RepositoryDeleteCommand {
         }
 
         for name in &repo_names {
-            self.remote_repo_reg.delete_repository(name)?;
+            self.remote_repo_reg
+                .delete_repository(name)
+                .map_err(CLIError::failure)?;
         }
 
         eprintln!(

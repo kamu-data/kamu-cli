@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::InternalError;
 use opendatafabric::DatasetRefRemote;
-
-use super::DomainError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteAliasKind {
@@ -31,13 +30,13 @@ pub trait RemoteAliases {
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
-    ) -> Result<bool, DomainError>;
+    ) -> Result<bool, InternalError>;
 
     fn delete(
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
-    ) -> Result<bool, DomainError>;
+    ) -> Result<bool, InternalError>;
 
-    fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, DomainError>;
+    fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError>;
 }

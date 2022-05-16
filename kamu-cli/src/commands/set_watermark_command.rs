@@ -73,7 +73,11 @@ impl Command for SetWatermarkCommand {
             .as_local_ref()
             .ok_or_else(|| CLIError::usage_error("Expected a local dataset reference"))?;
 
-        let aliases = self.remote_alias_reg.get_remote_aliases(&dataset_ref)?;
+        let aliases = self
+            .remote_alias_reg
+            .get_remote_aliases(&dataset_ref)
+            .await
+            .map_err(CLIError::failure)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.to_string())

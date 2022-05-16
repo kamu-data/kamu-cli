@@ -43,7 +43,9 @@ impl Command for RepositoryAddCommand {
             CLIError::Aborted
         })?;
 
-        self.remote_repo_reg.add_repository(&self.name, url)?;
+        self.remote_repo_reg
+            .add_repository(&self.name, url)
+            .map_err(CLIError::failure)?;
 
         eprintln!("{}: {}", console::style("Added").green(), &self.name);
         Ok(())

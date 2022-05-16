@@ -41,7 +41,7 @@ impl AliasListCommand {
     }
 
     // TODO: support multiple format specifiers
-    fn print_machine_readable(&self) -> Result<(), CLIError> {
+    async fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
         let mut out = std::io::stdout();
@@ -57,7 +57,9 @@ impl AliasListCommand {
         for ds in &datasets {
             let aliases = self
                 .remote_alias_reg
-                .get_remote_aliases(&ds.as_local_ref())?;
+                .get_remote_aliases(&ds.as_local_ref())
+                .await
+                .map_err(CLIError::failure)?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                 write!(out, "{},{},{}\n", &ds.name, "pull", &alias)?;
@@ -70,7 +72,7 @@ impl AliasListCommand {
         Ok(())
     }
 
-    fn print_pretty(&self) -> Result<(), CLIError> {
+    async fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
@@ -89,7 +91,9 @@ impl AliasListCommand {
         for ds in &datasets {
             let aliases = self
                 .remote_alias_reg
-                .get_remote_aliases(&ds.as_local_ref())?;
+                .get_remote_aliases(&ds.as_local_ref())
+                .await
+                .map_err(CLIError::failure)?;
             let mut pull_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Pull)
                 .map(|a| a.to_string())
@@ -135,8 +139,8 @@ impl Command for AliasListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: replace with formatters
         match self.output_config.format {
-            OutputFormat::Table => self.print_pretty()?,
-            OutputFormat::Csv => self.print_machine_readable()?,
+            OutputFormat::Table => self.print_pretty().await?,
+            OutputFormat::Csv => self.print_machine_readable().await?,
             _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
         }
 

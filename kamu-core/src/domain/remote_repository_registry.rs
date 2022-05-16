@@ -10,17 +10,90 @@
 use super::*;
 use opendatafabric::*;
 
+use async_trait::async_trait;
+use thiserror::Error;
 use url::Url;
 
+#[async_trait]
 pub trait RemoteRepositoryRegistry: Send + Sync {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's>;
 
     fn get_repository(
         &self,
         repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, DomainError>;
+    ) -> Result<RepositoryAccessInfo, GetRepoError>;
 
-    fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), DomainError>;
+    fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), AddRepoError>;
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DomainError>;
+    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetRepoError {
+    #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AddRepoError {
+    #[error(transparent)]
+    AlreadyExists(
+        #[from]
+        #[backtrace]
+        RepositoryAlreadyExistsError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DeleteRepoError {
+    #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error("Repository {repo_name} does not exist")]
+pub struct RepositoryNotFoundError {
+    pub repo_name: RepositoryName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error("Repository {repo_name} already exists")]
+pub struct RepositoryAlreadyExistsError {
+    pub repo_name: RepositoryName,
 }

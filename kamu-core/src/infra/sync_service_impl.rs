@@ -316,13 +316,7 @@ impl SyncServiceImpl {
 
         let mut repo = self
             .remote_repo_reg
-            .get_repository(remote_name.repository())
-            .map_err(|e| match e {
-                DomainError::DoesNotExist { .. } => SyncError::RepositoryDoesNotExist {
-                    repo_name: remote_name.repository().clone(),
-                },
-                e => SyncError::Internal(e.int_err()),
-            })?;
+            .get_repository(remote_name.repository())?;
 
         repo.url.ensure_trailing_slash();
         let dataset_url = repo

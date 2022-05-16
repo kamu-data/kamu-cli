@@ -51,7 +51,11 @@ impl AliasDeleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AliasDeleteCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let mut aliases = self.remote_alias_reg.get_remote_aliases(&self.dataset)?;
+        let mut aliases = self
+            .remote_alias_reg
+            .get_remote_aliases(&self.dataset)
+            .await
+            .map_err(CLIError::failure)?;
 
         let mut count = 0;
 

@@ -123,7 +123,9 @@ impl PullCommand {
 
         let aliases = self
             .remote_alias_reg
-            .get_remote_aliases(&dataset_handle.as_local_ref())?;
+            .get_remote_aliases(&dataset_handle.as_local_ref())
+            .await
+            .map_err(CLIError::failure)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
             .map(|r| r.to_string())

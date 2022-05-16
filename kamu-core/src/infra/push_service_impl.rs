@@ -123,7 +123,8 @@ impl PushServiceImpl {
         let remote_aliases = self
             .remote_alias_reg
             .get_remote_aliases(&local_handle.as_local_ref())
-            .unwrap();
+            .await
+            .int_err()?;
 
         let mut push_aliases: Vec<_> = remote_aliases.get_by_kind(RemoteAliasKind::Push).collect();
 
@@ -149,6 +150,7 @@ impl PushServiceImpl {
                 if self
                     .remote_alias_reg
                     .get_remote_aliases(&local_handle.as_local_ref())
+                    .await
                     .int_err()?
                     .contains(&remote_ref, RemoteAliasKind::Push)
                 {
@@ -166,6 +168,7 @@ impl PushServiceImpl {
             if self
                 .remote_alias_reg
                 .get_remote_aliases(&dataset_handle.as_local_ref())
+                .await
                 .int_err()?
                 .contains(&remote_ref, RemoteAliasKind::Push)
             {
@@ -251,8 +254,10 @@ impl PushService for PushServiceImpl {
                         local_ref: Some(local_ref),
                         remote_ref: Some(remote_ref),
                     } => {
+                        // TODO: Improve error handling
                         self.remote_alias_reg
                             .get_remote_aliases(local_ref)
+                            .await
                             .unwrap()
                             .add(remote_ref, RemoteAliasKind::Push)
                             .unwrap();

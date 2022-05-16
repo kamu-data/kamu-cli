@@ -83,12 +83,13 @@ impl CompleteCommand {
         }
     }
 
-    fn complete_alias(&self, prefix: &str) {
+    async fn complete_alias(&self, prefix: &str) {
         if let Some(repo) = self.dataset_reg.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
                 for dataset_handle in repo.get_all_datasets() {
                     let aliases = reg
                         .get_remote_aliases(&dataset_handle.as_local_ref())
+                        .await
                         .unwrap();
                     for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                         if alias.to_string().starts_with(prefix) {
@@ -220,7 +221,7 @@ impl Command for CompleteCommand {
             match pos.get_id() {
                 "dataset" => self.complete_dataset(to_complete),
                 "repository" => self.complete_repository(to_complete),
-                "alias" => self.complete_alias(to_complete),
+                "alias" => self.complete_alias(to_complete).await,
                 "manifest" => self.complete_path(to_complete),
                 "cfgkey" => self.complete_config_key(to_complete),
                 _ => (),

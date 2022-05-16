@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{AccessError, InternalError, UnsupportedProtocolError};
+use crate::domain::*;
 use opendatafabric::{RemoteDatasetName, RepositoryName};
 
 use thiserror::Error;
@@ -47,12 +47,14 @@ impl SearchResult {
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum SearchError {
-    #[error("Repository {repo_name} does not exist")]
-    RepositoryDoesNotExist { repo_name: RepositoryName },
+    #[error(transparent)]
+    RepositoryNotFound(
+        #[from]
+        #[backtrace]
+        RepositoryNotFoundError,
+    ),
     #[error("Repository appears to have corrupted data: {message}")]
     Corrupted {
         message: String,
@@ -77,4 +79,13 @@ pub enum SearchError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<GetRepoError> for SearchError {
+    fn from(v: GetRepoError) -> Self {
+        match v {
+            GetRepoError::NotFound(e) => Self::RepositoryNotFound(e),
+            GetRepoError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
