@@ -76,17 +76,17 @@ fn append_data_block(
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        &volume_layout,
+        volume_layout.clone(),
     );
 
     let foo = new_root(&dataset_reg, "foo");
-    let foo_layout = DatasetLayout::new(&volume_layout, &foo.name);
+    let foo_layout = DatasetLayout::new(volume_layout.as_ref(), &foo.name);
 
     let (bar, bar_source) = new_deriv(&dataset_reg, "bar", &[foo.name.clone()]);
 
@@ -125,19 +125,19 @@ async fn test_get_next_operation() {
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        &volume_layout,
+        volume_layout.clone(),
     );
 
     // Create root dataset
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
     let root_name = DatasetName::new_unchecked("foo");
-    let root_layout = DatasetLayout::create(&volume_layout, &root_name).unwrap();
+    let root_layout = DatasetLayout::create(volume_layout.as_ref(), &root_name).unwrap();
     let (root_hdl, root_head_src) = dataset_reg
         .add_dataset_from_blocks(
             &root_name,

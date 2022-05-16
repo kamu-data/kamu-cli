@@ -46,7 +46,7 @@ async fn test_transform_with_engine_spark() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
 
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
@@ -57,15 +57,15 @@ async fn test_transform_with_engine_spark() {
     ));
 
     let ingest_svc = IngestServiceImpl::new(
-        &volume_layout,
-        dataset_reg.clone(),
+        volume_layout.clone(),
+        local_repo.clone(),
         engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         engine_provisioner.clone(),
-        &volume_layout,
+        volume_layout.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -286,7 +286,7 @@ async fn test_transform_with_engine_flink() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
 
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
@@ -297,15 +297,15 @@ async fn test_transform_with_engine_flink() {
     ));
 
     let ingest_svc = IngestServiceImpl::new(
-        &volume_layout,
-        dataset_reg.clone(),
+        volume_layout.clone(),
+        local_repo.clone(),
         engine_provisioner.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         engine_provisioner.clone(),
-        &volume_layout,
+        volume_layout.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////

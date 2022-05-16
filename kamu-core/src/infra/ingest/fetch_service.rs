@@ -57,11 +57,11 @@ impl FetchService {
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         match fetch_step {
             FetchStep::Url(ref furl) => {
-                let url = Url::parse(&furl.url).map_err(|e| IngestError::internal(e))?;
+                let url = Url::parse(&furl.url).int_err()?;
                 match url.scheme() {
                     "file" => Self::fetch_file(
                         &url.to_file_path()
-                            .map_err(|_| BadUrlError::new(&furl.url))?,
+                            .map_err(|_| format!("Invalid url: {}", url).int_err())?,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
@@ -123,9 +123,9 @@ impl FetchService {
         };
 
         let matched_paths = glob::glob(&fglob.path)
-            .map_err(|e| IngestError::internal(e))?
+            .int_err()?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| IngestError::internal(e))?;
+            .int_err()?;
 
         let mut matched_files: Vec<(String, PathBuf)> = matched_paths
             .into_iter()
@@ -200,7 +200,7 @@ impl FetchService {
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => IngestError::not_found(path, Some(e.into())),
-            _ => IngestError::internal(Box::new(e)),
+            _ => e.int_err().into(),
         })?;
 
         let mod_time: DateTime<Utc> = meta
@@ -241,8 +241,7 @@ impl FetchService {
 
         // TODO: Use symlinks
         // TODO: Support compression
-        fs_extra::file::copy_with_progress(path, target_path, &options, handle)
-            .map_err(|e| IngestError::internal(e))?;
+        fs_extra::file::copy_with_progress(path, target_path, &options, handle).int_err()?;
 
         Ok(ExecutionResult {
             was_up_to_date: false,
@@ -282,8 +281,7 @@ impl FetchService {
         let mut last_modified: Option<DateTime<Utc>> = None;
         let mut etag: Option<String> = None;
         {
-            let mut target_file =
-                std::fs::File::create(&target_path_tmp).map_err(|e| IngestError::internal(e))?;
+            let mut target_file = std::fs::File::create(&target_path_tmp).int_err()?;
 
             let mut transfer = h.transfer();
 
@@ -329,7 +327,7 @@ impl FetchService {
                     curl_sys::CURLE_COULDNT_CONNECT => {
                         IngestError::unreachable(url, Some(e.into()))
                     }
-                    _ => IngestError::internal(e),
+                    _ => e.int_err().into(),
                 }
             })?;
         }
@@ -387,8 +385,7 @@ impl FetchService {
         h.progress(true)?;
 
         {
-            let mut target_file =
-                std::fs::File::create(&target_path_tmp).map_err(|e| IngestError::internal(e))?;
+            let mut target_file = std::fs::File::create(&target_path_tmp).int_err()?;
 
             let mut transfer = h.transfer();
 
@@ -418,7 +415,7 @@ impl FetchService {
                     curl_sys::CURLE_COULDNT_CONNECT => {
                         IngestError::unreachable(url, Some(e.into()))
                     }
-                    _ => IngestError::internal(e),
+                    _ => e.int_err().into(),
                 }
             })?;
         }
@@ -457,7 +454,7 @@ impl FetchService {
         filename: &str,
         src: &EventTimeSourceFromPath,
     ) -> Result<DateTime<Utc>, IngestError> {
-        let time_re = regex::Regex::new(&src.pattern).map_err(|e| IngestError::internal(e))?;
+        let time_re = regex::Regex::new(&src.pattern).int_err()?;
 
         let time_fmt = match src.timestamp_format {
             Some(ref fmt) => fmt,
@@ -545,7 +542,7 @@ impl HttpStatusError {
 
 impl std::convert::From<curl::Error> for IngestError {
     fn from(e: curl::Error) -> Self {
-        Self::internal(e)
+        Self::Internal(e.int_err())
     }
 }
 
@@ -585,29 +582,7 @@ struct EventTimeSourceExtractError {
 
 impl std::convert::From<EventTimeSourceError> for IngestError {
     fn from(e: EventTimeSourceError) -> Self {
-        Self::internal(e)
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("Bad URL {url}")]
-struct BadUrlError {
-    pub url: String,
-}
-
-impl BadUrlError {
-    fn new(url: &str) -> Self {
-        Self {
-            url: url.to_owned(),
-        }
-    }
-}
-
-impl std::convert::From<BadUrlError> for IngestError {
-    fn from(e: BadUrlError) -> Self {
-        Self::internal(e)
+        Self::Internal(e.int_err())
     }
 }
 

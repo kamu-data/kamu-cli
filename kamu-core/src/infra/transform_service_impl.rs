@@ -28,7 +28,7 @@ use tracing::info_span;
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    volume_layout: VolumeLayout,
+    volume_layout: Arc<VolumeLayout>,
 }
 
 #[component(pub)]
@@ -36,12 +36,12 @@ impl TransformServiceImpl {
     pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        volume_layout: &VolumeLayout,
+        volume_layout: Arc<VolumeLayout>,
     ) -> Self {
         Self {
             local_repo,
             engine_provisioner,
-            volume_layout: volume_layout.clone(),
+            volume_layout,
         }
     }
 

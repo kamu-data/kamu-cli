@@ -57,10 +57,10 @@ impl ReadService {
 
         // Clean up previous state leftovers
         if out_data_path.exists() {
-            std::fs::remove_file(&out_data_path).map_err(|e| IngestError::internal(e))?;
+            std::fs::remove_file(&out_data_path).int_err()?;
         }
         if out_checkpoint_path.exists() {
-            std::fs::remove_file(&out_checkpoint_path).map_err(|e| IngestError::internal(e))?;
+            std::fs::remove_file(&out_checkpoint_path).int_err()?;
         }
 
         let request = IngestRequest {

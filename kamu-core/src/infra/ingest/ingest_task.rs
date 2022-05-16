@@ -16,23 +16,21 @@ use opendatafabric::*;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use std::cell::RefCell;
 use std::sync::Arc;
-use tracing::error;
-use tracing::info;
-use tracing::info_span;
+use tracing::{error, info, info_span};
 
 pub struct IngestTask {
-    options: IngestOptions,
     dataset_handle: DatasetHandle,
-    next_offset: i64,
+    dataset: Arc<dyn Dataset>,
+    options: IngestOptions,
     layout: DatasetLayout,
-    meta_chain: RefCell<Box<dyn MetadataChain>>,
-    source: SetPollingSource,
     fetch_override: Option<FetchStep>,
+    listener: Arc<dyn IngestListener>,
+
+    next_offset: i64,
+    source: SetPollingSource,
     prev_checkpoint: Option<Multihash>,
     vocab: DatasetVocabulary,
-    listener: Arc<dyn IngestListener>,
     checkpointing_executor: CheckpointingExecutor,
     fetch_service: FetchService,
     prep_service: PrepService,
@@ -40,68 +38,76 @@ pub struct IngestTask {
 }
 
 impl IngestTask {
-    pub fn new<'a>(
+    pub async fn new<'a>(
         dataset_handle: DatasetHandle,
+        dataset: Arc<dyn Dataset>,
         options: IngestOptions,
         layout: DatasetLayout,
-        meta_chain: Box<dyn MetadataChain>,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-    ) -> Self {
+    ) -> Result<Self, InternalError> {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
         let mut prev_checkpoint = None;
         let mut vocab = None;
         let mut next_offset = 0;
 
-        for (_, block) in meta_chain.iter_blocks() {
-            match block.event {
-                MetadataEvent::AddData(add_data) => {
-                    if next_offset == 0 {
-                        next_offset = add_data.output_data.interval.end + 1;
+        {
+            use futures::stream::TryStreamExt;
+            let mut block_stream = dataset.as_metadata_chain().iter_blocks();
+            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+                match block.event {
+                    MetadataEvent::AddData(add_data) => {
+                        if next_offset == 0 {
+                            next_offset = add_data.output_data.interval.end + 1;
+                        }
+                        // TODO: Keep track of other types of blocks that may produce checkpoints
+                        if prev_checkpoint.is_none() {
+                            prev_checkpoint = add_data.output_checkpoint.map(|cp| cp.physical_hash);
+                        }
                     }
-                    // TODO: Keep track of other types of blocks that may produce checkpoints
-                    if prev_checkpoint.is_none() {
-                        prev_checkpoint = add_data.output_checkpoint.map(|cp| cp.physical_hash);
+                    MetadataEvent::SetPollingSource(src) => {
+                        if source.is_none() {
+                            source = Some(src);
+                        }
                     }
-                }
-                MetadataEvent::SetPollingSource(src) => {
-                    if source.is_none() {
-                        source = Some(src);
+                    MetadataEvent::SetVocab(set_vocab) => {
+                        vocab = Some(set_vocab.into());
                     }
+                    MetadataEvent::ExecuteQuery(_) => unreachable!(),
+                    MetadataEvent::Seed(_)
+                    | MetadataEvent::SetAttachments(_)
+                    | MetadataEvent::SetInfo(_)
+                    | MetadataEvent::SetLicense(_)
+                    | MetadataEvent::SetTransform(_)
+                    | MetadataEvent::SetWatermark(_) => (),
                 }
-                MetadataEvent::SetVocab(set_vocab) => {
-                    vocab = Some(set_vocab.into());
-                }
-                MetadataEvent::ExecuteQuery(_) => unreachable!(),
-                MetadataEvent::Seed(_)
-                | MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetTransform(_)
-                | MetadataEvent::SetWatermark(_) => (),
-            }
 
-            if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
-                break;
+                if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
+                    break;
+                }
             }
         }
 
-        let source = source.expect("Failed to find source definition");
+        let source = source.ok_or_else(|| "Failed to find source definition".int_err())?;
 
         if fetch_override.is_some() {
             if let FetchStep::FilesGlob(_) = source.fetch {
-                panic!("Fetch override use is not supported for glob sources, as globs maintain strict ordering and state")
+                return Err(concat!(
+                    "Fetch override use is not supported for glob sources, ",
+                    "as globs maintain strict ordering and state"
+                )
+                .int_err());
             }
         }
 
-        Self {
+        Ok(Self {
             options,
             dataset_handle,
             next_offset,
             layout,
-            meta_chain: RefCell::new(meta_chain),
+            dataset,
             source,
             fetch_override,
             prev_checkpoint,
@@ -111,7 +117,7 @@ impl IngestTask {
             fetch_service: FetchService::new(),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_provisioner),
-        }
+        })
     }
 
     pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
@@ -139,7 +145,12 @@ impl IngestTask {
         self.listener
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
 
-        let prev_hash = self.meta_chain.borrow().read_ref(&BlockRef::Head).unwrap();
+        let prev_hash = self
+            .dataset
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .int_err()?;
 
         let fetch_result = self.maybe_fetch().await?;
         let has_more = fetch_result.checkpoint.has_more;
@@ -188,7 +199,7 @@ impl IngestTask {
         let commit_checkpoint = self
             .checkpointing_executor
             .read_checkpoint::<CommitCheckpoint>(&commit_checkpoint_path, "CommitCheckpoint")
-            .map_err(|e| IngestError::internal(e))?;
+            .int_err()?;
 
         self.checkpointing_executor
             .execute(
@@ -262,7 +273,7 @@ impl IngestTask {
                 },
             )
             .await
-            .map_err(|e| IngestError::internal(e))?
+            .int_err()?
     }
 
     // TODO: PERF: Skip the copying if there are no prep steps
@@ -302,7 +313,7 @@ impl IngestTask {
                 },
             )
             .await
-            .map_err(|e| IngestError::internal(e))?
+            .int_err()?
     }
 
     async fn maybe_read(
@@ -350,7 +361,7 @@ impl IngestTask {
                 },
             )
             .await
-            .map_err(|e| IngestError::internal(e))?
+            .int_err()?
     }
 
     // TODO: Atomicity
@@ -392,48 +403,48 @@ impl IngestTask {
 
                         // TODO: Move out into common data commit procedure of sorts
                         let output_data = DataSlice {
-                            logical_hash: 
+                            logical_hash:
                                 crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
-                                .map_err(|e| IngestError::internal(e))?,
-                            physical_hash: 
+                                .int_err()?,
+                            physical_hash:
                                 crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
-                                .map_err(|e| IngestError::internal(e))?,
+                                .int_err()?,
                             interval: data_interval,
                             size:
                                 std::fs::metadata(&data_path)
-                                .map_err(|e| IngestError::internal(e))?
+                                .int_err()?
                                 .len() as i64,
                         };
 
                         // Commit checkpoint
                         let output_checkpoint = if new_checkpoint_path.exists() {
-                            let physical_hash = 
+                            let physical_hash =
                                 crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
-                                    .map_err(|e| IngestError::internal(e))?;
+                                    .int_err()?;
 
                             let size = std::fs::metadata(&new_checkpoint_path)
-                                .map_err(|e| IngestError::internal(e))?
+                                .int_err()?
                                 .len() as i64;
-                            
-                            std::fs::create_dir_all(&self.layout.checkpoints_dir).map_err(|e| IngestError::internal(e))?;
+
+                            std::fs::create_dir_all(&self.layout.checkpoints_dir).int_err()?;
                             std::fs::rename(
                                 &new_checkpoint_path,
                                 self.layout.checkpoint_path(&physical_hash),
                             )
-                            .map_err(|e| IngestError::internal(e))?;
-                            
+                            .int_err()?;
+
                             Some(Checkpoint { physical_hash, size })
                         } else {
                             None
                         };
 
                         // Commit data
-                        std::fs::create_dir_all(&self.layout.data_dir).map_err(|e| IngestError::internal(e))?;
+                        std::fs::create_dir_all(&self.layout.data_dir).int_err()?;
                         std::fs::rename(
                             &data_path,
                             self.layout.data_slice_path(&output_data),
                         )
-                        .map_err(|e| IngestError::internal(e))?;
+                        .int_err()?;
 
                         MetadataEvent::AddData(AddData {
                             input_checkpoint: self.prev_checkpoint.clone(),
@@ -442,10 +453,11 @@ impl IngestTask {
                             output_watermark,
                         })
                     } else {
-                        let prev_watermark = self.meta_chain.borrow()
+                        let prev_watermark = self.dataset.as_metadata_chain()
                             .iter_blocks()
-                            .filter_map(|(_, b)| b.into_data_stream_block())
-                            .find_map(|b| b.event.output_watermark);
+                            .filter_data_stream_blocks()
+                            .filter_map_ok(|(_,b)| b.event.output_watermark)
+                            .try_first().await.int_err()?;
 
                         if output_watermark.is_none() || output_watermark == prev_watermark {
                             info!("Skipping commit of new block as it neither has new data or watermark");
@@ -472,7 +484,7 @@ impl IngestTask {
                     };
                     info!(?new_block, "Committing new block");
 
-                    let new_head = self.meta_chain.borrow_mut().append(new_block);
+                    let new_head = self.dataset.as_metadata_chain().append(new_block, AppendOpts::default()).await.int_err()?;
                     info!(%new_head, "Committed new block");
 
                     Ok(ExecutionResult {
@@ -486,7 +498,7 @@ impl IngestTask {
                     })
                 },
             ).await
-            .map_err(|e| IngestError::internal(e))?
+            .int_err()?
     }
 }
 

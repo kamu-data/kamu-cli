@@ -124,7 +124,7 @@ fn test_prep_decompress_zip_bad_file() {
     let prep_svc = PrepService::new();
 
     let res = prep_svc.prepare(&prep_steps, Utc::now(), None, &src_path, &target_path);
-    assert_matches!(res, Err(IngestError::InternalError { .. }));
+    assert_matches!(res, Err(IngestError::Internal(_)));
 }
 
 #[test]

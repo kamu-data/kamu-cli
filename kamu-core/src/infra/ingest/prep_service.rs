@@ -39,8 +39,7 @@ impl PrepService {
         src_path: &Path,
         target_path: &Path,
     ) -> Result<ExecutionResult<PrepCheckpoint>, IngestError> {
-        let mut stream: Box<dyn Stream> =
-            Box::new(File::open(src_path).map_err(|e| IngestError::internal(e))?);
+        let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
 
         for step in prep_steps.iter() {
             stream = match step {
@@ -49,16 +48,13 @@ impl PrepService {
                         .map_err(|e| IngestError::pipe(p.command.clone(), e))?,
                 ),
                 PrepStep::Decompress(ref dc) => match dc.format {
-                    CompressionFormat::Zip => Box::new(
-                        DecompressZipStream::new(stream).map_err(|e| IngestError::internal(e))?,
-                    ),
+                    CompressionFormat::Zip => Box::new(DecompressZipStream::new(stream).int_err()?),
                     CompressionFormat::Gzip => Box::new(DecompressGzipStream::new(stream)),
                 },
             };
         }
 
-        let target_file = File::create(target_path).map_err(|e| IngestError::internal(e))?;
-        let sink = Box::new(FileSink::new(target_file, stream));
+        let sink = Box::new(FileSink::new(File::create(target_path).int_err()?, stream));
 
         sink.join()?;
 
@@ -229,9 +225,8 @@ impl DecompressZipStream {
             .name("decompress_zip_stream".to_owned())
             .spawn(move || {
                 if let Some(seekable) = input.as_seekable_read() {
-                    let mut archive = zip::read::ZipArchive::new(seekable)
-                        .map_err(|e| IngestError::internal(e))?;
-                    let mut file = archive.by_index(0).map_err(|e| IngestError::internal(e))?;
+                    let mut archive = zip::read::ZipArchive::new(seekable).int_err()?;
+                    let mut file = archive.by_index(0).int_err()?;
 
                     loop {
                         let read = producer.read_from(&mut file, None).unwrap();

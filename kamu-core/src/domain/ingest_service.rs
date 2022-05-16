@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{DomainError, EngineError, EngineProvisioningError, EngineProvisioningListener};
-use opendatafabric::{DatasetHandle, DatasetRefLocal, FetchStep, Multihash};
+use crate::domain::*;
+use opendatafabric::*;
 
 use std::backtrace::Backtrace;
 use std::path::Path;
@@ -135,12 +135,14 @@ impl IngestMultiListener for NullIngestMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum IngestError {
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
+    #[error(transparent)]
+    DatasetNotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,
@@ -153,22 +155,39 @@ pub enum IngestError {
         #[source]
         source: Option<BoxedError>,
     },
-    #[error("Engine provisioning error: {0}")]
-    EngineProvisioningError(#[from] EngineProvisioningError),
-    #[error("Engine error: {0}")]
-    EngineError(#[from] EngineError),
+    #[error("Engine provisioning error")]
+    EngineProvisioningError(
+        #[from]
+        #[backtrace]
+        EngineProvisioningError,
+    ),
+    #[error("Engine error")]
+    EngineError(
+        #[from]
+        #[backtrace]
+        EngineError,
+    ),
     #[error("Pipe command error: {command:?} {source}")]
     PipeError {
         command: Vec<String>,
         source: BoxedError,
         backtrace: Backtrace,
     },
-    #[error("Internal error: {source}")]
-    InternalError {
+    #[error(transparent)]
+    Internal(
         #[from]
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetDatasetError> for IngestError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 impl IngestError {
@@ -189,13 +208,6 @@ impl IngestError {
     pub fn pipe(command: Vec<String>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
         IngestError::PipeError {
             command: command,
-            source: e.into(),
-            backtrace: Backtrace::capture(),
-        }
-    }
-
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        IngestError::InternalError {
             source: e.into(),
             backtrace: Backtrace::capture(),
         }

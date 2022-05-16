@@ -17,21 +17,21 @@ use tracing::info;
 use std::sync::Arc;
 
 pub struct IngestServiceImpl {
-    volume_layout: VolumeLayout,
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    volume_layout: Arc<VolumeLayout>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
 #[component(pub)]
 impl IngestServiceImpl {
     pub fn new(
-        volume_layout: &VolumeLayout,
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        volume_layout: Arc<VolumeLayout>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
-            volume_layout: volume_layout.clone(),
-            dataset_reg,
+            volume_layout,
+            local_repo,
             engine_provisioner,
         }
     }
@@ -97,13 +97,14 @@ impl IngestServiceImpl {
         fetch_override: Option<FetchStep>,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref)?;
+        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         let layout = self.get_dataset_layout(&dataset_handle);
 
-        let meta_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
         let engine_provisioner = self.engine_provisioner.clone();
 
@@ -112,13 +113,14 @@ impl IngestServiceImpl {
 
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
+            dataset,
             options.clone(),
             layout,
-            meta_chain,
             fetch_override,
             listener,
             engine_provisioner,
-        );
+        )
+        .await?;
 
         Self::poll_until_exhausted(ingest_task, options).await
     }
