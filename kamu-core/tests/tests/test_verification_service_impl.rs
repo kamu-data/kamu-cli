@@ -33,9 +33,10 @@ async fn test_verify_data_consistency() {
     let dataset_layout = DatasetLayout::create(&volume_layout, &dataset_name).unwrap();
 
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
-        dataset_reg.clone(),
+        local_repo.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
         volume_layout.clone(),
     ));

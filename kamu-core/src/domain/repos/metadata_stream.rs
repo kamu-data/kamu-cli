@@ -65,12 +65,45 @@ pub trait TryStreamExtExt: Stream
 where
     Self: Sized,
 {
+    fn filter_ok<F, T, E>(self, f: F) -> FilterOk<Self, F>
+    where
+        Self: Stream<Item = Result<T, E>>,
+        F: FnMut(&T) -> bool,
+    {
+        FilterOk::new(self, f)
+    }
+
     fn filter_map_ok<F, T1, T2, E>(self, f: F) -> FilterMapOk<Self, F>
     where
         Self: Stream<Item = Result<T1, E>>,
         F: FnMut(T1) -> Option<T2>,
     {
         FilterMapOk::new(self, f)
+    }
+
+    fn take_while_ok<F, T, E>(self, f: F) -> TakeWhileOk<Self, F>
+    where
+        Self: Stream<Item = Result<T, E>>,
+        F: FnMut(&T) -> bool,
+    {
+        TakeWhileOk::new(self, f)
+    }
+
+    fn flatten_ok<T, IT, I, E>(self) -> FlattenOk<Self, IT>
+    where
+        Self: Stream<Item = Result<T, E>>,
+        T: IntoIterator<Item = I, IntoIter = IT>,
+        IT: Iterator<Item = I>,
+    {
+        FlattenOk::new(self)
+    }
+
+    fn any_ok<F, T, E>(self, predicate: F) -> AnyOk<Self, F>
+    where
+        Self: Stream<Item = Result<T, E>>,
+        F: FnMut(&T) -> bool,
+    {
+        AnyOk::new(self, predicate)
     }
 
     fn try_first(self) -> TryFirst<Self> {
@@ -82,6 +115,50 @@ impl<S, T, E> TryStreamExtExt for S where S: Stream<Item = Result<T, E>> {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Combinators
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct FilterOk<S, F> {
+    #[pin]
+    inner: S,
+    f: F,
+}
+
+impl<S, F, T, E> FilterOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    fn new(inner: S, f: F) -> Self {
+        Self { inner, f }
+    }
+}
+
+impl<S, F, T, E> Stream for FilterOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    type Item = Result<T, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => break Poll::Ready(None),
+                Poll::Ready(Some(Ok(v))) => {
+                    if (this.f)(&v) {
+                        break Poll::Ready(Some(Ok(v)));
+                    }
+                }
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Some(Err(e))),
+            }
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[must_use = "streams do nothing unless polled"]
@@ -110,18 +187,176 @@ where
     type Item = Result<T2, E>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => break Poll::Ready(None),
+                Poll::Ready(Some(Ok(v))) => {
+                    if let Some(v2) = (this.f)(v) {
+                        break Poll::Ready(Some(Ok(v2)));
+                    }
+                }
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Some(Err(e))),
+            }
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct TakeWhileOk<S, F> {
+    #[pin]
+    inner: S,
+    f: F,
+    done_taking: bool,
+}
+
+impl<S, F, T, E> TakeWhileOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    fn new(inner: S, f: F) -> Self {
+        Self {
+            inner,
+            f,
+            done_taking: false,
+        }
+    }
+}
+
+impl<S, F, T, E> Stream for TakeWhileOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    type Item = Result<T, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.project();
+        if *this.done_taking {
+            return Poll::Ready(None);
+        }
         match this.inner.poll_next(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Ready(Some(Ok(v))) => {
-                if let Some(v2) = (this.f)(v) {
-                    Poll::Ready(Some(Ok(v2)))
+                if (this.f)(&v) {
+                    Poll::Ready(Some(Ok(v)))
                 } else {
-                    Poll::Pending
+                    *this.done_taking = true;
+                    Poll::Ready(None)
                 }
             }
             Poll::Ready(Some(Err(e))) => Poll::Ready(Some(Err(e))),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct FlattenOk<S, T> {
+    #[pin]
+    inner: S,
+    iter: Option<T>,
+}
+
+impl<S, T, IT, I, E> FlattenOk<S, IT>
+where
+    S: Stream<Item = Result<T, E>>,
+    T: IntoIterator<Item = I, IntoIter = IT>,
+    IT: Iterator<Item = I>,
+{
+    fn new(inner: S) -> Self {
+        Self { inner, iter: None }
+    }
+}
+
+impl<S, T, IT, I, E> Stream for FlattenOk<S, IT>
+where
+    S: Stream<Item = Result<T, E>>,
+    T: IntoIterator<Item = I, IntoIter = IT>,
+    IT: Iterator<Item = I>,
+{
+    type Item = Result<I, E>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+        loop {
+            if let Some(iter) = this.iter.as_mut() {
+                if let Some(next) = iter.next() {
+                    break Poll::Ready(Some(Ok(next)));
+                } else {
+                    *this.iter = None;
+                }
+            }
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => break Poll::Ready(None),
+                Poll::Ready(Some(Ok(v))) => {
+                    *this.iter = Some(v.into_iter());
+                }
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Some(Err(e))),
+            }
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct AnyOk<S, F> {
+    #[pin]
+    inner: S,
+    f: F,
+    accum: Option<bool>,
+}
+
+impl<S, F, T, E> AnyOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    fn new(inner: S, f: F) -> Self {
+        Self {
+            inner,
+            f,
+            accum: Some(false),
+        }
+    }
+}
+
+impl<S, F, T, E> Future for AnyOk<S, F>
+where
+    S: Stream<Item = Result<T, E>>,
+    F: FnMut(&T) -> bool,
+{
+    type Output = Result<bool, E>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        loop {
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => {
+                    if let Some(v) = this.accum.take() {
+                        break Poll::Ready(Ok(v));
+                    } else {
+                        panic!("Any polled after completion")
+                    }
+                }
+                Poll::Ready(Some(Ok(v))) => {
+                    let acc = (this.f)(&v) || this.accum.unwrap();
+                    *this.accum = Some(acc);
+                }
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Err(e)),
+            }
         }
     }
 }

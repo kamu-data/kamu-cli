@@ -72,14 +72,15 @@ fn append_data_block(
     (block_hash, block.into_typed::<AddData>().unwrap())
 }
 
-#[test]
-fn test_get_next_operation() {
+#[test_log::test(tokio::test)]
+async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
-        dataset_reg.clone(),
+        local_repo.clone(),
         Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
@@ -91,7 +92,10 @@ fn test_get_next_operation() {
 
     // No data - no work
     assert_eq!(
-        transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
+        transform_svc
+            .get_next_operation(&bar, Utc::now())
+            .await
+            .unwrap(),
         None
     );
 
@@ -99,7 +103,7 @@ fn test_get_next_operation() {
     let data_path = foo_layout.data_slice_path(&foo_block.event.output_data);
 
     assert!(matches!(
-        transform_svc.get_next_operation(&bar, Utc::now()).unwrap(),
+        transform_svc.get_next_operation(&bar, Utc::now()).await.unwrap(),
         Some(TransformOperation{ request: ExecuteQueryRequest { transform, inputs, .. }, ..})
         if transform == bar_source.transform &&
         inputs == vec![ExecuteQueryInput {
@@ -117,14 +121,15 @@ fn test_get_next_operation() {
     ));
 }
 
-#[test_log::test]
-fn test_get_verification_plan_one_to_one() {
+#[test_log::test(tokio::test)]
+async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
-        dataset_reg.clone(),
+        local_repo.clone(),
         Arc::new(EngineProvisionerNull),
         &volume_layout,
     );
@@ -208,6 +213,7 @@ fn test_get_verification_plan_one_to_one() {
     let t2 = Utc.ymd(2020, 1, 2).and_hms(12, 0, 0);
     let deriv_req_t2 = transform_svc
         .get_next_operation(&deriv_hdl, t2)
+        .await
         .unwrap()
         .unwrap();
     let deriv_head_t2 = dataset_reg
@@ -272,6 +278,7 @@ fn test_get_verification_plan_one_to_one() {
     let t4 = Utc.ymd(2020, 1, 4).and_hms(12, 0, 0);
     let deriv_req_t4 = transform_svc
         .get_next_operation(&deriv_hdl, t4)
+        .await
         .unwrap()
         .unwrap();
     let deriv_head_t4 = dataset_reg
@@ -326,6 +333,7 @@ fn test_get_verification_plan_one_to_one() {
     let t6 = Utc.ymd(2020, 1, 6).and_hms(12, 0, 0);
     let deriv_req_t6 = transform_svc
         .get_next_operation(&deriv_hdl, t6)
+        .await
         .unwrap()
         .unwrap();
     let deriv_head_t6 = dataset_reg
@@ -361,6 +369,7 @@ fn test_get_verification_plan_one_to_one() {
 
     let plan = transform_svc
         .get_verification_plan(&deriv_hdl, (None, None))
+        .await
         .unwrap();
 
     let deriv_chain = dataset_reg

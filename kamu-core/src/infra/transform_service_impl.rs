@@ -14,10 +14,10 @@ use chrono::Utc;
 use opendatafabric::*;
 
 use dill::*;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::debug;
@@ -26,7 +26,7 @@ use tracing::info;
 use tracing::info_span;
 
 pub struct TransformServiceImpl {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     volume_layout: VolumeLayout,
 }
@@ -34,25 +34,29 @@ pub struct TransformServiceImpl {
 #[component(pub)]
 impl TransformServiceImpl {
     pub fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         volume_layout: &VolumeLayout,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             engine_provisioner,
             volume_layout: volume_layout.clone(),
         }
     }
 
     // Note: Can be called from multiple threads
-    async fn do_transform(
+    async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         operation: TransformOperation,
-        commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
+        commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
-    ) -> Result<TransformResult, TransformError> {
-        let span = info_span!("Performing transform", dataset_handle = %operation.dataset_handle);
+    ) -> Result<TransformResult, TransformError>
+    where
+        CommitFn: FnOnce(MetadataBlock, PathBuf, PathBuf) -> Fut,
+        Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
+    {
+        let span = info_span!("Performing transform");
         let _span_guard = span.enter();
         info!(?operation, "Transform request");
 
@@ -75,12 +79,16 @@ impl TransformServiceImpl {
     }
 
     // Note: Can be called from multiple threads
-    async fn do_transform_inner(
+    async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         operation: TransformOperation,
-        commit_fn: impl FnOnce(MetadataBlock, &Path, &Path) -> Result<TransformResult, TransformError>,
+        commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
-    ) -> Result<TransformResult, TransformError> {
+    ) -> Result<TransformResult, TransformError>
+    where
+        CommitFn: FnOnce(MetadataBlock, PathBuf, PathBuf) -> Fut,
+        Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
+    {
         let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_path);
         let system_time = operation.request.system_time.clone();
         let out_data_path = PathBuf::from(&operation.request.out_data_path);
@@ -127,15 +135,13 @@ impl TransformServiceImpl {
             // TODO: Move out into data commit procedure of sorts
             let logical_hash =
                 crate::infra::utils::data_utils::get_parquet_logical_hash(&out_data_path)
-                    .map_err(|e| TransformError::internal(e))?;
+                    .int_err()?;
 
             let physical_hash =
                 crate::infra::utils::data_utils::get_file_physical_hash(&out_data_path)
-                    .map_err(|e| TransformError::internal(e))?;
+                    .int_err()?;
 
-            let size = std::fs::metadata(&new_checkpoint_path)
-                .map_err(|e| TransformError::internal(e))?
-                .len() as i64;
+            let size = std::fs::metadata(&out_data_path).int_err()?.len() as i64;
 
             Some(DataSlice {
                 logical_hash,
@@ -164,11 +170,9 @@ impl TransformServiceImpl {
 
             let physical_hash =
                 crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
-                    .map_err(|e| TransformError::internal(e))?;
+                    .int_err()?;
 
-            let size = std::fs::metadata(&new_checkpoint_path)
-                .map_err(|e| TransformError::internal(e))?
-                .len() as i64;
+            let size = std::fs::metadata(&new_checkpoint_path).int_err()?.len() as i64;
 
             Some(Checkpoint {
                 physical_hash,
@@ -190,7 +194,12 @@ impl TransformServiceImpl {
             }),
         };
 
-        let result = commit_fn(metadata_block, &out_data_path, &new_checkpoint_path)?;
+        let result = commit_fn(
+            metadata_block,
+            out_data_path.clone(),
+            new_checkpoint_path.clone(),
+        )
+        .await?;
 
         // Commit should clean up
         assert!(!out_data_path.exists());
@@ -199,14 +208,14 @@ impl TransformServiceImpl {
         Ok(result)
     }
 
-    fn commit_transform(
-        mut meta_chain: Box<dyn MetadataChain>,
+    async fn commit_transform(
+        meta_chain: &dyn MetadataChain2,
         dataset_handle: DatasetHandle,
         dataset_layout: DatasetLayout,
         prev_block_hash: Multihash,
         new_block: MetadataBlock,
-        new_data_path: &Path,
-        new_checkpoint_path: &Path,
+        new_data_path: PathBuf,
+        new_checkpoint_path: PathBuf,
     ) -> Result<TransformResult, TransformError> {
         let new_block = MetadataBlock {
             prev_block_hash: Some(prev_block_hash.clone()),
@@ -217,7 +226,7 @@ impl TransformServiceImpl {
         // Commit data
         if let Some(data_slice) = &new_block_t.event.output_data {
             std::fs::rename(&new_data_path, dataset_layout.data_slice_path(data_slice))
-                .map_err(|e| TransformError::internal(e))?;
+                .int_err()?;
         }
 
         // Commit checkpoint
@@ -226,10 +235,13 @@ impl TransformServiceImpl {
                 &new_checkpoint_path,
                 dataset_layout.checkpoint_path(&checkpoint.physical_hash),
             )
-            .map_err(|e| TransformError::internal(e))?;
+            .int_err()?;
         }
 
-        let new_block_hash = meta_chain.append(new_block);
+        let new_block_hash = meta_chain
+            .append(new_block, AppendOpts::default())
+            .await
+            .int_err()?;
 
         info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
 
@@ -241,30 +253,38 @@ impl TransformServiceImpl {
     }
 
     // TODO: PERF: Avoid multiple passes over metadata chain
-    pub fn get_next_operation(
+    pub async fn get_next_operation(
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformOperation>, DomainError> {
-        let span = info_span!("Evaluating next transform operation");
+    ) -> Result<Option<TransformOperation>, InternalError> {
+        let span = info_span!("Evaluating transform");
         let _span_guard = span.enter();
 
-        let output_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+        let output_chain = dataset.as_metadata_chain();
 
         // TODO: limit traversal depth
         let mut sources: Vec<_> = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| match b.event {
-                MetadataEvent::SetTransform(st) => Some(st),
-                MetadataEvent::SetPollingSource(_) => panic!(
-                    "Transform called on non-derivative dataset {}",
-                    dataset_handle
-                ),
-                _ => None,
+            .try_filter_map(|(_, b)| async move {
+                match b.event {
+                    MetadataEvent::SetTransform(st) => Ok(Some(st)),
+                    MetadataEvent::SetPollingSource(_) => {
+                        Err("Transform called on non-derivative dataset"
+                            .int_err()
+                            .into())
+                    }
+                    _ => Ok(None),
+                }
             })
-            .collect();
+            .try_collect()
+            .await
+            .int_err()?;
 
         // TODO: source could've changed several times
         if sources.len() > 1 {
@@ -274,25 +294,28 @@ impl TransformServiceImpl {
         let source = sources.pop().unwrap();
         debug!(?source, "Transforming using source");
 
-        if source.inputs.iter().any(|input| {
-            self.is_never_pulled(&input.id.as_ref().unwrap().as_local_ref())
-                .unwrap()
-        }) {
+        if futures::stream::iter(&source.inputs)
+            .map(|input| input.id.as_ref().unwrap().as_local_ref())
+            .then(|input_ref| async move { self.is_never_pulled(&input_ref).await })
+            .any_ok(|never_pulled| *never_pulled)
+            .await?
+        {
             info!("Not processing because one of the inputs was never pulled");
             return Ok(None);
         }
 
         // Prepare inputs
-        let input_slices: Vec<_> = source
-            .inputs
-            .iter()
-            .map(|input| self.get_input_slice(input.id.as_ref().unwrap(), output_chain.as_ref()))
-            .collect::<Result<Vec<_>, _>>()?;
+        let input_slices: Vec<_> = futures::stream::iter(&source.inputs)
+            .then(|input| self.get_input_slice(input.id.as_ref().unwrap(), output_chain))
+            .try_collect()
+            .await
+            .int_err()?;
 
-        let query_inputs: Vec<_> = input_slices
-            .iter()
-            .map(|i| self.to_query_input(i, None))
-            .collect::<Result<Vec<_>, _>>()?;
+        let query_inputs: Vec<_> = futures::stream::iter(&input_slices)
+            .then(|i| self.to_query_input(i, None))
+            .try_collect()
+            .await
+            .int_err()?;
 
         // Nothing to do?
         if query_inputs
@@ -302,19 +325,25 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
+        let vocab = self.get_vocab(&dataset_handle.as_local_ref()).await?;
+
         // TODO: Checkpoint hash should be contained in metadata explicitly, not inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .filter_map(|b| b.output_checkpoint)
-            .next();
+            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .filter_map_ok(|b| b.output_checkpoint)
+            .try_first()
+            .await
+            .int_err()?;
 
         let data_offset_end = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .filter_map(|eq| eq.output_data)
-            .map(|s| s.interval.end)
-            .next();
+            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .filter_map_ok(|eq| eq.output_data)
+            .map_ok(|s| s.interval.end)
+            .try_first()
+            .await
+            .int_err()?;
 
         let output_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
         let out_data_path = output_layout.data_dir.join(".pending");
@@ -325,11 +354,10 @@ impl TransformServiceImpl {
 
         // Clean up previous state leftovers
         if out_data_path.exists() {
-            std::fs::remove_file(&out_data_path).map_err(|e| DomainError::InfraError(e.into()))?;
+            std::fs::remove_file(&out_data_path).int_err()?;
         }
         if new_checkpoint_path.exists() {
-            std::fs::remove_file(&new_checkpoint_path)
-                .map_err(|e| DomainError::InfraError(e.into()))?;
+            std::fs::remove_file(&new_checkpoint_path).int_err()?;
         }
 
         Ok(Some(TransformOperation {
@@ -341,7 +369,7 @@ impl TransformServiceImpl {
                 dataset_name: dataset_handle.name.clone(),
                 system_time,
                 offset: data_offset_end.map(|e| e + 1).unwrap_or(0),
-                vocab: self.get_vocab(&dataset_handle.as_local_ref())?,
+                vocab,
                 transform: source.transform,
                 inputs: query_inputs,
                 prev_checkpoint_path,
@@ -351,44 +379,57 @@ impl TransformServiceImpl {
         }))
     }
 
-    fn is_never_pulled(&self, dataset_ref: &DatasetRefLocal) -> Result<bool, DomainError> {
-        let chain = self.dataset_reg.get_metadata_chain(dataset_ref)?;
-        Ok(chain
+    async fn is_never_pulled(&self, dataset_ref: &DatasetRefLocal) -> Result<bool, InternalError> {
+        let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
+        Ok(dataset
+            .as_metadata_chain()
             .iter_blocks()
-            .filter_map(|(_, b)| b.into_data_stream_block())
-            .find_map(|b| b.event.output_data)
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_data)
+            .try_first()
+            .await
+            .int_err()?
             .is_none())
     }
 
     // TODO: Avoid iterating through output chain multiple times
-    fn get_input_slice(
+    async fn get_input_slice(
         &self,
         dataset_id: &DatasetID,
-        output_chain: &dyn MetadataChain,
-    ) -> Result<InputSlice, DomainError> {
+        output_chain: &dyn MetadataChain2,
+    ) -> Result<InputSlice, InternalError> {
         let input_handle = self
-            .dataset_reg
-            .resolve_dataset_ref(&dataset_id.as_local_ref())?;
-        let input_chain = self
-            .dataset_reg
-            .get_metadata_chain(&input_handle.as_local_ref())?;
+            .local_repo
+            .resolve_dataset_ref(&dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+        let input_dataset = self
+            .local_repo
+            .get_dataset(&input_handle.as_local_ref())
+            .await
+            .int_err()?;
+        let input_chain = input_dataset.as_metadata_chain();
 
         // Determine last processed input block
         let last_processed_block = output_chain
             .iter_blocks()
-            .filter_map(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .map(|eq| eq.input_slices)
-            .flatten()
-            .filter(|slice| slice.dataset_id == *dataset_id)
-            .filter_map(|slice| slice.block_interval)
-            .map(|bi| bi.end)
-            .next();
+            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
+            .map_ok(|eq| eq.input_slices)
+            .flatten_ok()
+            .filter_ok(|slice| slice.dataset_id == *dataset_id)
+            .filter_map_ok(|slice| slice.block_interval)
+            .map_ok(|bi| bi.end)
+            .try_first()
+            .await
+            .int_err()?;
 
         // Collect unprocessed input blocks
         let blocks_unprocessed: Vec<_> = input_chain
             .iter_blocks()
-            .take_while(|(block_hash, _)| Some(block_hash) != last_processed_block.as_ref())
-            .collect();
+            .take_while_ok(|(block_hash, _)| Some(block_hash) != last_processed_block.as_ref())
+            .try_collect()
+            .await
+            .int_err()?;
 
         // Sanity check: First (chronologically) unprocessed block should immediately follow the last processed block
         if let Some((first_unprocessed_hash, first_unprocessed_block)) = blocks_unprocessed.last() {
@@ -440,17 +481,22 @@ impl TransformServiceImpl {
     }
 
     // TODO: Avoid traversing same blocks again
-    fn to_query_input(
+    async fn to_query_input(
         &self,
         slice: &InputSlice,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<ExecuteQueryInput, DomainError> {
+    ) -> Result<ExecuteQueryInput, InternalError> {
         let input_handle = self
-            .dataset_reg
-            .resolve_dataset_ref(&slice.dataset_id.as_local_ref())?;
-        let input_chain = self
-            .dataset_reg
-            .get_metadata_chain(&input_handle.as_local_ref())?;
+            .local_repo
+            .resolve_dataset_ref(&slice.dataset_id.as_local_ref())
+            .await
+            .int_err()?;
+        let input_dataset = self
+            .local_repo
+            .get_dataset(&input_handle.as_local_ref())
+            .await
+            .int_err()?;
+        let input_chain = input_dataset.as_metadata_chain();
         let input_layout = DatasetLayout::new(&self.volume_layout, &input_handle.name);
 
         // List of part files and watermarks that will be used by the engine
@@ -461,15 +507,15 @@ impl TransformServiceImpl {
         if let Some(block_interval) = &slice.block_interval {
             let hash_to_stop_at = input_chain
                 .get_block(&block_interval.start)
+                .await
                 .expect("Starting block of the interval not found")
                 .prev_block_hash;
 
-            for block in input_chain
-                .iter_blocks_starting(&block_interval.end)
-                .unwrap()
-                .take_while(|(block_hash, _)| Some(block_hash) != hash_to_stop_at.as_ref())
-                .filter_map(|(_, b)| b.into_data_stream_block())
-            {
+            let mut block_stream = input_chain
+                .iter_blocks_interval(&block_interval.end, hash_to_stop_at.as_ref())
+                .filter_data_stream_blocks();
+
+            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 if let Some(slice) = &block.event.output_data {
                     data_paths.push(input_layout.data_slice_path(slice));
                 }
@@ -496,7 +542,7 @@ impl TransformServiceImpl {
 
         let vocab = match vocab_hint {
             Some(v) => v,
-            None => self.get_vocab(&input_handle.as_local_ref())?,
+            None => self.get_vocab(&input_handle.as_local_ref()).await?,
         };
 
         let is_empty = data_paths.is_empty() && explicit_watermarks.is_empty();
@@ -523,14 +569,20 @@ impl TransformServiceImpl {
     }
 
     // TODO: Avoid iterating through output chain multiple times
-    fn get_vocab(&self, dataset_ref: &DatasetRefLocal) -> Result<DatasetVocabulary, DomainError> {
-        let chain = self.dataset_reg.get_metadata_chain(dataset_ref)?;
-        let vocab = chain
+    async fn get_vocab(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<DatasetVocabulary, InternalError> {
+        let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
+        Ok(dataset
+            .as_metadata_chain()
             .iter_blocks()
-            .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
+            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
+            .try_first()
+            .await
+            .int_err()?
             .map(|sv| sv.into())
-            .unwrap_or_default();
-        Ok(vocab)
+            .unwrap_or_default())
     }
 
     // TODO: Migrate to providing schema directly
@@ -545,7 +597,7 @@ impl TransformServiceImpl {
 
     // TODO: Improve error handling
     // Need an inconsistent medata error?
-    pub fn get_verification_plan(
+    pub async fn get_verification_plan(
         &self,
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
@@ -553,137 +605,146 @@ impl TransformServiceImpl {
         let span = info_span!("Preparing transformations replay plan");
         let _span_guard = span.enter();
 
-        let metadata_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+        let metadata_chain = dataset.as_metadata_chain();
 
-        let start_block = block_range.0;
-        let end_block = block_range
-            .1
-            .unwrap_or_else(|| metadata_chain.read_ref(&BlockRef::Head).unwrap());
+        let head = match block_range.1 {
+            None => metadata_chain.get_ref(&BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
 
         let mut source = None;
         let mut vocab = None;
         let mut blocks = Vec::new();
         let mut finished_range = false;
 
-        // TODO: This can be simplified
-        for (block_hash, block) in metadata_chain
-            .iter_blocks_starting(&end_block)
-            .ok_or(VerificationError::NoSuchBlock(end_block))?
         {
-            match block.event {
-                MetadataEvent::SetTransform(st) => {
-                    if source.is_none() {
-                        source = Some(st);
-                    } else {
-                        // TODO: Support dataset evolution
-                        unimplemented!(
-                            "Verifying datasets with evolving queries is not yet supported"
-                        );
-                    }
-                }
-                MetadataEvent::SetVocab(sv) => {
-                    if vocab.is_none() {
-                        vocab = Some(sv.into())
-                    }
-                }
-                MetadataEvent::ExecuteQuery(_) => {
-                    if !finished_range {
-                        blocks.push((block_hash.clone(), block));
-                    }
-                }
-                MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => unreachable!(),
-                MetadataEvent::Seed(_)
-                | MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetWatermark(_) => (),
-            }
+            let mut block_stream = metadata_chain.iter_blocks_interval(&head, None);
 
-            if !finished_range && Some(&block_hash) == start_block.as_ref() {
-                finished_range = true;
+            // TODO: This can be simplified
+            while let Some((block_hash, block)) = block_stream.try_next().await? {
+                match block.event {
+                    MetadataEvent::SetTransform(st) => {
+                        if source.is_none() {
+                            source = Some(st);
+                        } else {
+                            // TODO: Support dataset evolution
+                            unimplemented!(
+                                "Verifying datasets with evolving queries is not yet supported"
+                            );
+                        }
+                    }
+                    MetadataEvent::SetVocab(sv) => {
+                        if vocab.is_none() {
+                            vocab = Some(sv.into())
+                        }
+                    }
+                    MetadataEvent::ExecuteQuery(_) => {
+                        if !finished_range {
+                            blocks.push((block_hash.clone(), block));
+                        }
+                    }
+                    MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => {
+                        unreachable!()
+                    }
+                    MetadataEvent::Seed(_)
+                    | MetadataEvent::SetAttachments(_)
+                    | MetadataEvent::SetInfo(_)
+                    | MetadataEvent::SetLicense(_)
+                    | MetadataEvent::SetWatermark(_) => (),
+                }
+
+                if !finished_range && Some(&block_hash) == tail.as_ref() {
+                    finished_range = true;
+                }
             }
         }
 
         // Ensure start_block was found if specified
-        if start_block.is_some() && !finished_range {
-            return Err(VerificationError::NoSuchBlock(start_block.unwrap()));
+        if tail.is_some() && !finished_range {
+            return Err(InvalidIntervalError {
+                head,
+                tail: tail.unwrap(),
+            }
+            .into());
         }
 
-        let source = source.ok_or(VerificationError::NotDerivative)?;
+        let source = source.ok_or(
+            "Expected a derivative dataset but SetTransform block was not found".int_err(),
+        )?;
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
-        let dataset_vocabs = source
-            .inputs
-            .iter()
-            .map(|input| -> Result<_, DomainError> {
-                Ok((
+        let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
+            .map(|input| {
+                (
                     input.id.clone().unwrap(),
-                    self.get_vocab(&input.id.as_ref().unwrap().into())?,
-                ))
+                    input.id.as_ref().unwrap().as_local_ref(),
+                )
             })
-            .collect::<Result<BTreeMap<_, _>, _>>()?;
+            .then(|(input_id, input_ref)| async move {
+                self.get_vocab(&input_ref)
+                    .map_ok(|vocab| (input_id, vocab))
+                    .await
+            })
+            .try_collect()
+            .await?;
 
-        let plan: Vec<_> = blocks
-            .into_iter()
-            .rev()
-            .map(
-                |(block_hash, block)| -> Result<VerificationStep, DomainError> {
-                    let block_t = block.as_typed::<ExecuteQuery>().unwrap();
+        let mut plan = Vec::new();
 
-                    let step = VerificationStep {
-                        operation: TransformOperation {
-                            dataset_handle: dataset_handle.clone(),
-                            input_slices: block_t.event.input_slices.clone(),
-                            input_checkpoint: block_t.event.input_checkpoint.clone(),
-                            request: ExecuteQueryRequest {
-                                dataset_id: dataset_handle.id.clone(),
-                                dataset_name: dataset_handle.name.clone(),
-                                system_time: block.system_time,
-                                offset: block_t
-                                    .event
-                                    .output_data
-                                    .as_ref()
-                                    .map(|s| s.interval.start)
-                                    .unwrap_or(0), // TODO: Assuming offset does not matter if block is not supposed to produce data
-                                transform: source.transform.clone(),
-                                vocab: vocab.clone().unwrap_or_default(),
-                                inputs: block_t
-                                    .event
-                                    .input_slices
-                                    .iter()
-                                    .map(|slice| {
-                                        self.to_query_input(
-                                            slice,
-                                            Some(
-                                                dataset_vocabs
-                                                    .get(&slice.dataset_id)
-                                                    .map(|v| v.clone())
-                                                    .unwrap(),
-                                            ),
-                                        )
-                                    })
-                                    .collect::<Result<_, _>>()?,
-                                prev_checkpoint_path: block_t
-                                    .event
-                                    .input_checkpoint
-                                    .as_ref()
-                                    .map(|cp| dataset_layout.checkpoint_path(cp)),
-                                new_checkpoint_path: dataset_layout
-                                    .checkpoints_dir
-                                    .join(".pending"),
-                                out_data_path: dataset_layout.data_dir.join(".pending"),
-                            },
-                        },
-                        expected_block: block,
-                        expected_hash: block_hash,
-                    };
+        for (block_hash, block) in blocks.into_iter().rev() {
+            let block_t = block.as_typed::<ExecuteQuery>().unwrap();
 
-                    Ok(step)
+            let inputs = futures::stream::iter(&block_t.event.input_slices)
+                .map(|slice| {
+                    (
+                        slice,
+                        dataset_vocabs
+                            .get(&slice.dataset_id)
+                            .map(|v| v.clone())
+                            .unwrap(),
+                    )
+                })
+                .then(|(slice, vocab)| self.to_query_input(slice, Some(vocab)))
+                .try_collect()
+                .await?;
+
+            let step = VerificationStep {
+                operation: TransformOperation {
+                    dataset_handle: dataset_handle.clone(),
+                    input_slices: block_t.event.input_slices.clone(),
+                    input_checkpoint: block_t.event.input_checkpoint.clone(),
+                    request: ExecuteQueryRequest {
+                        dataset_id: dataset_handle.id.clone(),
+                        dataset_name: dataset_handle.name.clone(),
+                        system_time: block.system_time,
+                        offset: block_t
+                            .event
+                            .output_data
+                            .as_ref()
+                            .map(|s| s.interval.start)
+                            .unwrap_or(0), // TODO: Assuming offset does not matter if block is not supposed to produce data
+                        transform: source.transform.clone(),
+                        vocab: vocab.clone().unwrap_or_default(),
+                        inputs,
+                        prev_checkpoint_path: block_t
+                            .event
+                            .input_checkpoint
+                            .as_ref()
+                            .map(|cp| dataset_layout.checkpoint_path(cp)),
+                        new_checkpoint_path: dataset_layout.checkpoints_dir.join(".pending"),
+                        out_data_path: dataset_layout.data_dir.join(".pending"),
+                    },
                 },
-            )
-            .collect::<Result<_, _>>()?;
+                expected_block: block,
+                expected_hash: block_hash,
+            };
+
+            plan.push(step);
+        }
 
         Ok(plan)
     }
@@ -694,22 +755,23 @@ impl TransformServiceImpl {
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
+        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&dataset_ref)?;
+        let span = info_span!("Transforming dataset", %dataset_handle);
+        let _span_guard = span.enter();
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
-        if let Some(operation) = self
-            .get_next_operation(&dataset_handle, Utc::now())
-            .map_err(|e| TransformError::internal(e))?
-        {
+        if let Some(operation) = self.get_next_operation(&dataset_handle, Utc::now()).await? {
             let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
-            let meta_chain = self
-                .dataset_reg
-                .get_metadata_chain(&dataset_handle.as_local_ref())?;
+            let dataset = self
+                .local_repo
+                .get_dataset(&dataset_handle.as_local_ref())
+                .await?;
+            let meta_chain = dataset.as_metadata_chain();
 
-            let head = meta_chain.read_ref(&BlockRef::Head).unwrap();
+            let head = meta_chain.get_ref(&BlockRef::Head).await.int_err()?;
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
@@ -763,18 +825,19 @@ impl TransformService for TransformServiceImpl {
         let dataset_refs: Vec<_> = dataset_refs.collect();
         info!(?dataset_refs, "Transforming multiple datasets");
 
-        let futures: Vec<_> = dataset_refs
-            .iter()
-            .map(|dataset_ref| {
-                match self.dataset_reg.resolve_dataset_ref(dataset_ref) {
-                    Ok(hdl) => {
-                        let maybe_listener = multi_listener.begin_transform(&hdl);
-                        self.transform_impl(hdl.into(), maybe_listener)
-                    }
-                    Err(_) => self.transform_impl(dataset_ref.clone(), None), // Relying on this call to fail to avoid boxing the futures
+        let mut futures = Vec::new();
+
+        for dataset_ref in &dataset_refs {
+            let f = match self.local_repo.resolve_dataset_ref(dataset_ref).await {
+                Ok(hdl) => {
+                    let maybe_listener = multi_listener.begin_transform(&hdl);
+                    self.transform_impl(hdl.into(), maybe_listener)
                 }
-            })
-            .collect();
+                // Relying on this call to fail to avoid boxing the futures
+                Err(_) => self.transform_impl(dataset_ref.clone(), None),
+            };
+            futures.push(f);
+        }
 
         let results = futures::future::join_all(futures).await;
         dataset_refs.into_iter().zip(results).collect()
@@ -789,12 +852,14 @@ impl TransformService for TransformServiceImpl {
     ) -> Result<VerificationResult, VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
 
         let span = info_span!("Replaying dataset transformations", %dataset_handle, ?block_range);
         let _span_guard = span.enter();
 
-        let verification_plan = self.get_verification_plan(&dataset_handle, block_range)?;
+        let verification_plan = self
+            .get_verification_plan(&dataset_handle, block_range)
+            .await?;
         let num_steps = verification_plan.len();
         listener.begin_phase(VerificationPhase::ReplayTransform, num_steps);
 
@@ -827,18 +892,16 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                |mut new_block: MetadataBlock, new_data_path, new_checkpoint_path| {
+                |mut new_block: MetadataBlock, new_data_path, new_checkpoint_path| async {
                     let new_block_t = new_block.as_typed_mut::<ExecuteQuery>().unwrap();
                     let expected_block_t = expected_block.as_typed::<ExecuteQuery>().unwrap();
 
                     // Cleanup not needed outputs
                     if new_block_t.event.output_data.is_some() {
-                        std::fs::remove_file(new_data_path)
-                            .map_err(|e| TransformError::internal(e))?;
+                        std::fs::remove_file(new_data_path).int_err()?;
                     }
                     if new_block_t.event.output_checkpoint.is_some() {
-                        std::fs::remove_file(new_checkpoint_path)
-                            .map_err(|e| TransformError::internal(e))?;
+                        std::fs::remove_file(new_checkpoint_path).int_err()?;
                     }
 
                     // We overwrite the physical hash with the expected one because Parquet format is non-reproducible
@@ -870,7 +933,7 @@ impl TransformService for TransformServiceImpl {
                     actual_block_hash = Some(Multihash::from_digest_sha3_256(
                         &FlatbuffersMetadataBlockSerializer
                             .write_manifest(&new_block)
-                            .map_err(|e| TransformError::internal(e))?,
+                            .int_err()?,
                     ));
 
                     actual_block = Some(new_block);

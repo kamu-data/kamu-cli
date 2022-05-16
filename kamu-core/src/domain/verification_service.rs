@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{DomainError, TransformError, TransformListener};
-use opendatafabric::{DatasetHandle, DatasetRefLocal, MetadataBlock, Multihash};
+use crate::domain::*;
+use opendatafabric::*;
 
 use std::fmt::Display;
 use std::sync::Arc;
@@ -145,20 +145,91 @@ impl VerificationMultiListener for NullVerificationMultiListener {}
 
 #[derive(Debug, Error)]
 pub enum VerificationError {
-    #[error("Dataset is not derivative")]
-    NotDerivative,
-    #[error("Block {0} not found")]
-    NoSuchBlock(Multihash),
-    #[error("Data doesn't match metadata: {0}")]
-    DataDoesNotMatchMetadata(DataDoesNotMatchMetadata),
-    #[error("Data is not reproducible: {0}")]
-    DataNotReproducible(DataNotReproducible),
-    #[error("Checkpoint doesn't match metadata: {0}")]
-    CheckpointDoesNotMatchMetadata(CheckpointDoesNotMatchMetadata),
-    #[error("Tranform error: {0}")]
-    TransformError(#[from] TransformError),
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
+    #[error(transparent)]
+    DatasetNotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+    #[error(transparent)]
+    RefNotFound(
+        #[from]
+        #[backtrace]
+        RefNotFoundError,
+    ),
+    #[error(transparent)]
+    BlockNotFound(
+        #[from]
+        #[backtrace]
+        BlockNotFoundError,
+    ),
+    #[error(transparent)]
+    InvalidInterval(
+        #[from]
+        #[backtrace]
+        InvalidIntervalError,
+    ),
+    #[error("Data doesn't match metadata")]
+    DataDoesNotMatchMetadata(
+        #[from]
+        #[backtrace]
+        DataDoesNotMatchMetadata,
+    ),
+    #[error("Data is not reproducible")]
+    DataNotReproducible(
+        #[from]
+        #[backtrace]
+        DataNotReproducible,
+    ),
+    #[error("Checkpoint doesn't match metadata")]
+    CheckpointDoesNotMatchMetadata(
+        #[from]
+        #[backtrace]
+        CheckpointDoesNotMatchMetadata,
+    ),
+    #[error(transparent)]
+    Transform(
+        #[from]
+        #[backtrace]
+        TransformError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetDatasetError> for VerificationError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
+            GetDatasetError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
+}
+
+impl From<GetRefError> for VerificationError {
+    fn from(v: GetRefError) -> Self {
+        match v {
+            GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
+            GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
+            GetRefError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
+}
+
+impl From<IterBlocksError> for VerificationError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
+            IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
+            IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
+            IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
+            IterBlocksError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -179,7 +250,7 @@ pub enum DataVerificationError {
     },
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub struct DataDoesNotMatchMetadata {
     pub block_hash: Multihash,
     pub error: DataVerificationError,
@@ -209,7 +280,7 @@ impl Display for DataDoesNotMatchMetadata {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub struct DataNotReproducible {
     pub expected_block_hash: Multihash,
     pub expected_block: MetadataBlock,
@@ -244,7 +315,7 @@ pub enum CheckpointVerificationError {
     },
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub struct CheckpointDoesNotMatchMetadata {
     pub block_hash: Multihash,
     pub error: CheckpointVerificationError,

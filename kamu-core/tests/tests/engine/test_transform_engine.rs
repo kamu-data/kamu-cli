@@ -49,6 +49,7 @@ async fn test_transform_with_engine_spark() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
@@ -62,7 +63,7 @@ async fn test_transform_with_engine_spark() {
     );
 
     let transform_svc = TransformServiceImpl::new(
-        dataset_reg.clone(),
+        local_repo.clone(),
         engine_provisioner.clone(),
         &volume_layout,
     );
@@ -288,6 +289,7 @@ async fn test_transform_with_engine_flink() {
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
 
     let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
@@ -301,7 +303,7 @@ async fn test_transform_with_engine_flink() {
     );
 
     let transform_svc = TransformServiceImpl::new(
-        dataset_reg.clone(),
+        local_repo.clone(),
         engine_provisioner.clone(),
         &volume_layout,
     );

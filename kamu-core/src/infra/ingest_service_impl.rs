@@ -182,23 +182,15 @@ impl IngestService for IngestServiceImpl {
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
-        let multi_listener =
-            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
-
-        let dataset_refs: Vec<_> = dataset_refs.collect();
-        info!(datasets = ?dataset_refs, "Ingesting multiple datasets");
-
-        let futures: Vec<_> = dataset_refs
-            .iter()
-            .map(|dataset_ref| {
-                self.do_ingest(dataset_ref, options.clone(), None, |hdl| {
-                    multi_listener.begin_ingest(hdl)
-                })
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-        dataset_refs.into_iter().zip(results).collect()
+        self.ingest_multi_ext(
+            &mut dataset_refs.map(|r| IngestRequest {
+                dataset_ref: r,
+                fetch_override: None,
+            }),
+            options,
+            maybe_multi_listener,
+        )
+        .await
     }
 
     async fn ingest_multi_ext(

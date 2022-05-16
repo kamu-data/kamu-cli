@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tracing::info_span;
 
 pub struct VerificationServiceImpl {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     transform_service: Arc<dyn TransformService>,
     volume_layout: Arc<VolumeLayout>,
 }
@@ -24,58 +24,20 @@ pub struct VerificationServiceImpl {
 #[component(pub)]
 impl VerificationServiceImpl {
     pub fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         transform_service: Arc<dyn TransformService>,
         volume_layout: Arc<VolumeLayout>,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             transform_service,
             volume_layout,
         }
     }
 
-    fn get_integrity_check_plan(
-        &self,
-        dataset_handle: &DatasetHandle,
-        block_range: (Option<Multihash>, Option<Multihash>),
-    ) -> Result<Vec<(Multihash, MetadataBlockDataStream)>, VerificationError> {
-        let metadata_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
-
-        let start_block = block_range.0;
-        let end_block = block_range
-            .1
-            .unwrap_or_else(|| metadata_chain.read_ref(&BlockRef::Head).unwrap());
-
-        let mut plan = Vec::new();
-
-        let mut start_block_found = false;
-
-        for (hash, block) in metadata_chain
-            .iter_blocks_starting(&end_block)
-            .ok_or(VerificationError::NoSuchBlock(end_block))?
-            .filter_map(|(h, b)| b.into_data_stream_block().map(|b| (h, b)))
-        {
-            plan.push((hash.clone(), block));
-
-            if Some(&hash) == start_block.as_ref() {
-                start_block_found = true;
-                break;
-            }
-        }
-
-        if start_block.is_some() && !start_block_found {
-            return Err(VerificationError::NoSuchBlock(start_block.unwrap()));
-        }
-
-        Ok(plan)
-    }
-
-    fn check_data_integrity(
-        &self,
-        dataset_handle: &DatasetHandle,
+    async fn check_data_integrity<'a>(
+        &'a self,
+        dataset_handle: &'a DatasetHandle,
         dataset_kind: DatasetKind,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
@@ -83,9 +45,28 @@ impl VerificationServiceImpl {
         let span = info_span!("Verifying data integrity");
         let _span_guard = span.enter();
 
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
-        let plan = self.get_integrity_check_plan(dataset_handle, block_range)?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
+        let chain = dataset.as_metadata_chain();
+
+        let head = match block_range.1 {
+            None => chain.get_ref(&BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
+
+        // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks` estimate
+        use futures::TryStreamExt;
+        let plan: Vec<_> = chain
+            .iter_blocks_interval(&head, tail.as_ref())
+            .filter_data_stream_blocks()
+            .try_collect()
+            .await?;
+
+        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
         let num_blocks = plan.len();
 
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
@@ -102,9 +83,7 @@ impl VerificationServiceImpl {
                 let data_path = dataset_layout.data_slice_path(&output_slice);
 
                 // Check size first
-                let size_actual = std::fs::metadata(&data_path)
-                    .map_err(|e| DomainError::InfraError(e.into()))?
-                    .len();
+                let size_actual = std::fs::metadata(&data_path).int_err()?.len();
 
                 if size_actual != (output_slice.size as u64) {
                     return Err(VerificationError::DataDoesNotMatchMetadata(
@@ -121,7 +100,7 @@ impl VerificationServiceImpl {
                 // Do a fast pass using physical hash
                 let physical_hash_actual =
                     crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
-                        .map_err(|e| DomainError::InfraError(e.into()))?;
+                        .int_err()?;
 
                 if physical_hash_actual != output_slice.physical_hash {
                     // Root data files are non-reproducible by definition, so
@@ -141,7 +120,7 @@ impl VerificationServiceImpl {
                         // but data must have same logical hash to be valid.
                         let logical_hash_actual =
                             crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
-                                .map_err(|e| DomainError::InfraError(e.into()))?;
+                                .int_err()?;
 
                         if logical_hash_actual != output_slice.logical_hash {
                             return Err(VerificationError::DataDoesNotMatchMetadata(
@@ -161,9 +140,7 @@ impl VerificationServiceImpl {
                     let checkpoint_path = dataset_layout.checkpoint_path(&checkpoint.physical_hash);
 
                     // Check size
-                    let size_actual = std::fs::metadata(&checkpoint_path)
-                        .map_err(|e| DomainError::InfraError(e.into()))?
-                        .len();
+                    let size_actual = std::fs::metadata(&checkpoint_path).int_err()?.len();
 
                     if size_actual != (checkpoint.size as u64) {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
@@ -180,7 +157,7 @@ impl VerificationServiceImpl {
                     // Check physical hash
                     let physical_hash_actual =
                         crate::infra::utils::data_utils::get_file_physical_hash(&checkpoint_path)
-                            .map_err(|e| DomainError::InfraError(e.into()))?;
+                            .int_err()?;
 
                     if physical_hash_actual != checkpoint.physical_hash {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
@@ -219,14 +196,19 @@ impl VerificationService for VerificationServiceImpl {
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
         let span = info_span!("Verifying dataset", %dataset_handle, ?block_range);
         let _span_guard = span.enter();
 
-        let dataset_kind = self
-            .dataset_reg
-            .get_summary(&dataset_handle.as_local_ref())?
+        let dataset_kind = dataset
+            .get_summary(SummaryOptions::default())
+            .await
+            .int_err()?
             .kind;
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
@@ -239,7 +221,8 @@ impl VerificationService for VerificationServiceImpl {
                     dataset_kind,
                     block_range.clone(),
                     listener.clone(),
-                )?;
+                )
+                .await?;
             }
 
             if dataset_kind == DatasetKind::Derivative && options.replay_transformations {

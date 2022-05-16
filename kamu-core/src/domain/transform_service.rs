@@ -7,10 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
-use opendatafabric::{DatasetHandle, DatasetRefLocal, Multihash};
+use crate::domain::*;
+use opendatafabric::*;
 
-use std::backtrace::Backtrace;
 use std::sync::Arc;
 use std::usize;
 use thiserror::Error;
@@ -97,29 +96,39 @@ impl TransformMultiListener for NullTransformMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum TransformError {
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
-    #[error("Engine provisioning error: {0}")]
-    EngineProvisioningError(#[from] EngineProvisioningError),
-    #[error("Engine error: {0}")]
-    EngineError(#[from] EngineError),
-    #[error("Internal error: {source}")]
-    InternalError {
+    #[error(transparent)]
+    DatasetNotFound(
         #[from]
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+    #[error("Engine provisioning error")]
+    EngineProvisioningError(
+        #[from]
+        #[backtrace]
+        EngineProvisioningError,
+    ),
+    #[error("Engine error")]
+    EngineError(
+        #[from]
+        #[backtrace]
+        EngineError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
-impl TransformError {
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        TransformError::InternalError {
-            source: e.into(),
-            backtrace: Backtrace::capture(),
+impl From<GetDatasetError> for TransformError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
