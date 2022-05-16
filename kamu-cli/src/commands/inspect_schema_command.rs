@@ -114,9 +114,9 @@ impl Command for InspectSchemaCommand {
             .get_schema(&self.dataset_ref)
             .await
             .map_err(|e| match e {
-                QueryError::DomainError(e) => CLIError::usage_error_from(e),
+                QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
                 e @ QueryError::DataFusionError(_) => CLIError::failure(e),
-                e @ QueryError::InternalError(_) => CLIError::failure(e),
+                e @ QueryError::Internal(_) => CLIError::critical(e),
             })?;
 
         match self.output_format.as_ref().map(|s| s.as_str()) {

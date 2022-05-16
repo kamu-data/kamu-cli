@@ -34,7 +34,11 @@ pub trait MetadataStream<'a>:
     fn filter_data_stream_blocks(
         self: Pin<Box<Self>>,
     ) -> Pin<
-        Box<dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>> + 'a>,
+        Box<
+            dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>>
+                + Send
+                + 'a,
+        >,
     >;
 }
 
@@ -42,12 +46,16 @@ pub trait MetadataStream<'a>:
 impl<'a, T> MetadataStream<'a> for T
 where
     T: Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>,
-    T: 'a,
+    T: Send + 'a,
 {
     fn filter_data_stream_blocks(
         self: Pin<Box<Self>>,
     ) -> Pin<
-        Box<dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>> + 'a>,
+        Box<
+            dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>>
+                + Send
+                + 'a,
+        >,
     > {
         Box::pin(
             self.try_filter_map(|(h, b)| {

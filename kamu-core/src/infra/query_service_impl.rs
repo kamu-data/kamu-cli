@@ -18,6 +18,7 @@ use datafusion::{
     prelude::*,
 };
 use dill::*;
+use futures::stream::TryStreamExt;
 use opendatafabric::*;
 use std::{
     path::{Path, PathBuf},
@@ -30,15 +31,18 @@ use crate::domain::*;
 use super::{utils::datafusion_hacks::ListingTableOfFiles, DatasetLayout, VolumeLayout};
 
 pub struct QueryServiceImpl {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     volume_layout: Arc<VolumeLayout>,
 }
 
 #[component(pub)]
 impl QueryServiceImpl {
-    pub fn new(dataset_reg: Arc<dyn DatasetRegistry>, volume_layout: Arc<VolumeLayout>) -> Self {
+    pub fn new(
+        local_repo: Arc<dyn LocalDatasetRepository>,
+        volume_layout: Arc<VolumeLayout>,
+    ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             volume_layout,
         }
     }
@@ -51,13 +55,19 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
     ) -> Result<Arc<dyn DataFrame>, QueryError> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
-        let vocab: DatasetVocabulary = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?
+        let vocab: DatasetVocabulary = dataset
+            .as_metadata_chain()
             .iter_blocks()
-            .find_map(|(_, b)| b.event.into_variant::<SetVocab>())
+            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
+            .try_first()
+            .await
+            .int_err()?
             .map(|sv| sv.into())
             .unwrap_or_default();
 
@@ -140,33 +150,40 @@ impl QueryService for QueryServiceImpl {
 
         ctx.register_catalog(
             "kamu",
-            Arc::new(KamuCatalog::new(
-                self.dataset_reg.clone(),
+            Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
+                self.local_repo.clone(),
                 self.volume_layout.clone(),
                 options,
-            )),
+            )))),
         );
 
         Ok(ctx.sql(statement).await?)
     }
 
     async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(dataset_ref)?;
-        let metadata_chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
-        let last_data_file = metadata_chain
+        let last_data_file = dataset
+            .as_metadata_chain()
             .iter_blocks()
-            .filter_map(|(_, b)| b.into_data_stream_block())
-            .filter_map(|b| b.event.output_data)
-            .map(|slice| dataset_layout.data_slice_path(&slice))
-            .next()
-            .expect("Obtaining schema from datasets with no data is not yet supported");
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_data)
+            .map_ok(|slice| dataset_layout.data_slice_path(&slice))
+            .try_first()
+            .await
+            .int_err()?
+            .ok_or_else(|| {
+                "Obtaining schema from datasets with no data is not yet supported".int_err()
+            })?;
 
-        let file = std::fs::File::open(&last_data_file)?;
-        let reader = SerializedFileReader::new(file).map_err(|e| QueryError::internal(e))?;
+        let file = std::fs::File::open(&last_data_file).int_err()?;
+        let reader = SerializedFileReader::new(file).int_err()?;
         Ok(reader.metadata().file_metadata().schema().clone())
     }
 }
@@ -174,22 +191,12 @@ impl QueryService for QueryServiceImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct KamuCatalog {
-    dataset_reg: Arc<dyn DatasetRegistry>,
-    volume_layout: Arc<VolumeLayout>,
-    options: QueryOptions,
+    schema: Arc<KamuSchema>,
 }
 
 impl KamuCatalog {
-    fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
-        volume_layout: Arc<VolumeLayout>,
-        options: QueryOptions,
-    ) -> Self {
-        Self {
-            dataset_reg,
-            volume_layout,
-            options,
-        }
+    fn new(schema: Arc<KamuSchema>) -> Self {
+        Self { schema }
     }
 }
 
@@ -204,11 +211,7 @@ impl CatalogProvider for KamuCatalog {
 
     fn schema(&self, name: &str) -> Option<Arc<dyn datafusion::catalog::schema::SchemaProvider>> {
         if name == "kamu" {
-            Some(Arc::new(KamuSchema::new(
-                self.dataset_reg.clone(),
-                self.volume_layout.clone(),
-                self.options.clone(),
-            )))
+            Some(self.schema.clone())
         } else {
             None
         }
@@ -219,61 +222,68 @@ impl CatalogProvider for KamuCatalog {
 
 // TODO: Performance is poor as it essentially reads all data files in the workspace
 // and in some cases (like 'show tables') even twice
+#[derive(Clone)]
 struct KamuSchema {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     volume_layout: Arc<VolumeLayout>,
     options: QueryOptions,
 }
 
 impl KamuSchema {
     fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         volume_layout: Arc<VolumeLayout>,
         options: QueryOptions,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             volume_layout,
             options,
         }
     }
 
-    fn has_data(&self, dataset_handle: &DatasetHandle) -> bool {
+    async fn has_data(&self, dataset_handle: &DatasetHandle) -> Result<bool, InternalError> {
         let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
-        let files = self.collect_data_files(dataset_handle, limit);
+        let files = self.collect_data_files(dataset_handle, limit).await?;
 
         if files.is_empty() {
-            return false;
+            return Ok(false);
         }
 
-        !Self::is_nested(files.first().unwrap())
+        // TODO: Datafusion does not yet support nested types
+        // See: https://github.com/apache/arrow-datafusion/issues/2326
+        let nested = Self::is_nested(files.first().unwrap())?;
+        Ok(!nested)
     }
 
-    fn is_nested(file: &Path) -> bool {
-        let reader = SerializedFileReader::new(std::fs::File::open(file).unwrap()).unwrap();
+    fn is_nested(file: &Path) -> Result<bool, InternalError> {
+        let reader = SerializedFileReader::new(std::fs::File::open(file).int_err()?).int_err()?;
         let schema = reader.metadata().file_metadata().schema();
-        schema.get_fields().iter().any(|f| f.is_group())
+        Ok(schema.get_fields().iter().any(|f| f.is_group()))
     }
 
-    fn collect_data_files(
+    async fn collect_data_files(
         &self,
         dataset_handle: &DatasetHandle,
         limit: Option<u64>,
-    ) -> Vec<PathBuf> {
+    ) -> Result<Vec<PathBuf>, InternalError> {
         let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
 
-        if let Ok(metadata_chain) = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())
+        if let Ok(dataset) = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await
         {
             let mut files = Vec::new();
             let mut num_records = 0;
 
-            for slice in metadata_chain
+            let mut slices = dataset
+                .as_metadata_chain()
                 .iter_blocks()
-                .filter_map(|(_, b)| b.into_data_stream_block())
-                .filter_map(|b| b.event.output_data)
-            {
+                .filter_data_stream_blocks()
+                .filter_map_ok(|(_, b)| b.event.output_data);
+
+            while let Some(slice) = slices.try_next().await.int_err()? {
                 num_records += slice.interval.end - slice.interval.start + 1;
                 files.push(dataset_layout.data_slice_path(&slice));
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
@@ -281,9 +291,9 @@ impl KamuSchema {
                 }
             }
 
-            files
+            Ok(files)
         } else {
-            Vec::new()
+            Ok(Vec::new())
         }
     }
 
@@ -300,20 +310,19 @@ impl KamuSchema {
         }
         None
     }
-}
 
-impl SchemaProvider for KamuSchema {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    fn table_names(&self) -> Vec<String> {
+    async fn table_names_impl(&self) -> Vec<String> {
         if self.options.datasets.is_empty() {
-            self.dataset_reg
-                .get_all_datasets()
-                .filter(|hdl| self.has_data(hdl))
-                .map(|hdl| hdl.name.to_string())
-                .collect()
+            let mut res = Vec::new();
+            let mut dataset_handles = self.local_repo.get_all_datasets();
+
+            while let Some(hdl) = dataset_handles.try_next().await.unwrap() {
+                if self.has_data(&hdl).await.unwrap() {
+                    res.push(hdl.name.to_string())
+                }
+            }
+
+            res
         } else {
             self.options
                 .datasets
@@ -323,23 +332,31 @@ impl SchemaProvider for KamuSchema {
         }
     }
 
-    fn table_exist(&self, name: &str) -> bool {
-        let dataset_handle: Option<DatasetHandle> = try {
-            let dataset_name = DatasetName::try_from(name).ok()?;
-            self.dataset_reg
-                .resolve_dataset_ref(&dataset_name.into())
-                .ok()?
+    async fn table_exist_impl(&self, name: &str) -> bool {
+        let dataset_name = match DatasetName::try_from(name) {
+            Ok(name) => name,
+            Err(_) => return false,
         };
-        dataset_handle.is_some()
+
+        self.local_repo
+            .try_resolve_dataset_ref(&dataset_name.into())
+            .await
+            .unwrap()
+            .is_some()
     }
 
-    fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
+    async fn table_impl(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         let dataset_handle = self
-            .dataset_reg
+            .local_repo
             .resolve_dataset_ref(&DatasetName::try_from(name).unwrap().into())
+            .await
             .unwrap();
+
         let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
-        let files = self.collect_data_files(&dataset_handle, limit);
+        let files = self
+            .collect_data_files(&dataset_handle, limit)
+            .await
+            .unwrap();
 
         if files.is_empty() {
             None
@@ -347,20 +364,61 @@ impl SchemaProvider for KamuSchema {
             // TODO: Datafusion made it difficult to lazily create table providers,
             // so we have to resort to spawning a thread to call an async function
             // See: https://github.com/apache/arrow-datafusion/issues/1792
-            let table = std::thread::spawn(move || {
-                let runtime = tokio::runtime::Runtime::new().unwrap();
-                runtime.block_on(ListingTableOfFiles::new_with_defaults(
-                    files
-                        .into_iter()
-                        .map(|p| p.to_string_lossy().into())
-                        .collect(),
-                ))
-            })
-            .join()
-            .unwrap()
+            let table = ListingTableOfFiles::new_with_defaults(
+                files
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().into())
+                    .collect(),
+            )
+            .await
             .unwrap();
 
             Some(Arc::new(table))
         }
+    }
+}
+
+impl SchemaProvider for KamuSchema {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    // TODO: Datafusion should make this function async
+    fn table_names(&self) -> Vec<String> {
+        let this = self.clone();
+
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(this.table_names_impl())
+        })
+        .join()
+        .unwrap()
+    }
+
+    fn table_exist(&self, name: &str) -> bool {
+        let this = self.clone();
+        let name = name.to_owned();
+
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(this.table_exist_impl(&name))
+        })
+        .join()
+        .unwrap()
+    }
+
+    fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
+        let this = self.clone();
+        let name = name.to_owned();
+
+        // TODO: Datafusion made it difficult to lazily create table providers,
+        // so we have to resort to spawning a thread to call an async function
+        // See: https://github.com/apache/arrow-datafusion/issues/1792
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(this.table_impl(&name))
+        })
+        .join()
+        .unwrap()
     }
 }

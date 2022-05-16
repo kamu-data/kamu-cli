@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::*;
+
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRefLocal;
 use std::sync::Arc;
 use thiserror::Error;
-
-use super::DomainError;
 
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
@@ -54,26 +54,33 @@ pub struct DatasetQueryOptions {
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum QueryError {
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
-    #[error("{0}")]
-    DataFusionError(#[from] DataFusionError),
-    #[error("{0}")]
-    InternalError(#[source] BoxedError),
+    #[error(transparent)]
+    DatasetNotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+    #[error("DataFusion error")]
+    DataFusionError(
+        #[from]
+        #[backtrace]
+        DataFusionError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
-impl QueryError {
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InternalError(e.into())
-    }
-}
-
-impl From<std::io::Error> for QueryError {
-    fn from(e: std::io::Error) -> Self {
-        Self::internal(e)
+impl From<GetDatasetError> for QueryError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
+        }
     }
 }
