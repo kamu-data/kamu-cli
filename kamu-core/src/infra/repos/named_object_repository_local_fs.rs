@@ -18,7 +18,6 @@ use std::path::PathBuf;
 
 pub struct NamedObjectRepositoryLocalFS {
     root: PathBuf,
-    staging_path: PathBuf,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -29,10 +28,24 @@ impl NamedObjectRepositoryLocalFS {
         P: Into<PathBuf>,
     {
         let root = root.into();
-        Self {
-            staging_path: root.join(".pending"),
-            root,
-        }
+        Self { root }
+    }
+
+    // TODO: Cleanup procedure for orphaned staging files?
+    fn get_staging_path(&self) -> PathBuf {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+
+        let mut filename = String::with_capacity(16);
+        filename.push_str(".pending-");
+        filename.extend(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from),
+        );
+
+        self.root.join(filename)
     }
 }
 
@@ -55,11 +68,11 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
     }
 
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
-        tokio::fs::write(&self.staging_path, data).await.int_err()?;
+        let staging_path = self.get_staging_path();
+        tokio::fs::write(&staging_path, data).await.int_err()?;
 
         // Atomic move/replace
-        std::fs::rename(&self.staging_path, self.root.join(name)).int_err()?;
-
+        std::fs::rename(&staging_path, &self.root.join(name)).int_err()?;
         Ok(())
     }
 

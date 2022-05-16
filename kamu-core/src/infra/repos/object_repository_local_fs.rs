@@ -28,7 +28,6 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 // TODO: Pass a single type that configures digest algo, multicodec, and hash base
 pub struct ObjectRepositoryLocalFS<D, const C: u32> {
     root: PathBuf,
-    staging_path: PathBuf,
     _phantom: PhantomData<D>,
 }
 
@@ -45,7 +44,6 @@ where
     {
         let root = root.into();
         Self {
-            staging_path: root.join(".pending"),
             root,
             _phantom: PhantomData,
         }
@@ -53,6 +51,23 @@ where
 
     fn get_path(&self, hash: &Multihash) -> PathBuf {
         self.root.join(hash.to_multibase_string())
+    }
+
+    // TODO: Cleanup procedure for orphaned staging files?
+    fn get_staging_path(&self) -> PathBuf {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+
+        let mut filename = String::with_capacity(16);
+        filename.push_str(".pending-");
+        filename.extend(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from),
+        );
+
+        self.root.join(filename)
     }
 
     async fn write_stream_with_digest<'a>(
@@ -165,11 +180,13 @@ where
             });
         }
 
+        let staging_path = self.get_staging_path();
+
         // Write to staging file
-        tokio::fs::write(&self.staging_path, data).await.int_err()?;
+        tokio::fs::write(&staging_path, data).await.int_err()?;
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).int_err()?;
+        std::fs::rename(&staging_path, path).int_err()?;
 
         Ok(InsertResult {
             hash,
@@ -182,8 +199,10 @@ where
         src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
+        let staging_path = self.get_staging_path();
+
         let actual_hash = self
-            .write_stream_with_digest(&self.staging_path, src)
+            .write_stream_with_digest(&staging_path, src)
             .await
             .int_err()?;
 
@@ -195,7 +214,7 @@ where
 
         if let Some(expected_hash) = options.expected_hash {
             if *expected_hash != hash {
-                tokio::fs::remove_file(&self.staging_path).await.int_err()?;
+                tokio::fs::remove_file(&staging_path).await.int_err()?;
 
                 return Err(InsertError::HashMismatch(HashMismatchError {
                     expected: expected_hash.clone(),
@@ -209,7 +228,7 @@ where
         debug!(?path, "Inserting object stream");
 
         if path.exists() {
-            tokio::fs::remove_file(&self.staging_path).await.int_err()?;
+            tokio::fs::remove_file(&staging_path).await.int_err()?;
 
             return Ok(InsertResult {
                 hash,
@@ -218,7 +237,7 @@ where
         }
 
         // Atomic move
-        std::fs::rename(&self.staging_path, path).int_err()?;
+        std::fs::rename(&staging_path, path).int_err()?;
 
         Ok(InsertResult {
             hash,

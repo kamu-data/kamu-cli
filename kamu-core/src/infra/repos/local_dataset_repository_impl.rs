@@ -16,7 +16,6 @@ use chrono::Utc;
 use dill::*;
 use std::collections::HashSet;
 use std::collections::LinkedList;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +23,7 @@ use std::sync::Arc;
 pub struct LocalDatasetRepositoryImpl {
     workspace_layout: Arc<WorkspaceLayout>,
     //info_repo: NamedObjectRepositoryLocalFS,
+    thrash_lock: tokio::sync::Mutex<()>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -35,6 +35,7 @@ impl LocalDatasetRepositoryImpl {
         Self {
             workspace_layout,
             //info_repo,
+            thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -169,12 +170,13 @@ impl LocalDatasetRepositoryImpl {
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
-        dataset_path: &Path,
+        staging_name: &String,
         dataset_name: &DatasetName,
     ) -> Result<DatasetHandle, CreateDatasetError> {
+        let dataset_path = self.workspace_layout.datasets_dir.join(staging_name);
         let tmp_layout = DatasetLayout::new(
             &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &DatasetName::new_unchecked(".pending"),
+            &DatasetName::new_unchecked(&staging_name),
         );
 
         let summary = match dataset.get_summary(SummaryOptions::default()).await {
@@ -222,6 +224,23 @@ impl LocalDatasetRepositoryImpl {
 
         Ok(handle)
     }
+
+    // TODO: Cleanup procedure for orphaned staged datasets?
+    fn get_staging_name(&self) -> String {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+
+        let mut name = String::with_capacity(16);
+        name.push_str(".pending-");
+        name.extend(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from),
+        );
+
+        name
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -229,6 +248,12 @@ impl LocalDatasetRepositoryImpl {
 #[async_trait]
 impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     // TODO: PERF: Cache data and speed up lookups by ID
+    //
+    // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing all summaries
+    // multiple threads calling this function or iterating all datasets can result in significant thrashing.
+    // We use a lock here until we have a better solution.
+    //
+    // Note that this lock does not prevent concurrent updates to summaries, only reduces the chances of it.
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -252,6 +277,9 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                 Ok(DatasetHandle::new(summary.id, name.clone()))
             }
             DatasetRefLocal::ID(id) => {
+                // Anti-thrashing lock (see comment above)
+                let _lock_guard = self.thrash_lock.lock().await;
+
                 let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).int_err()?;
 
                 for r in read_dir {
@@ -303,7 +331,8 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let tmp_path = self.workspace_layout.datasets_dir.join(".pending");
+        let staging_name = self.get_staging_name();
+        let tmp_path = self.workspace_layout.datasets_dir.join(&staging_name);
 
         std::fs::create_dir(&tmp_path).int_err()?;
         std::fs::create_dir(tmp_path.join("blocks")).int_err()?;
@@ -311,7 +340,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 
         let layout = DatasetLayout::create(
             &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &DatasetName::new_unchecked(".pending"),
+            &DatasetName::new_unchecked(&staging_name),
         )
         .int_err()?;
 
@@ -321,7 +350,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         Ok(Box::new(DatasetBuilderImpl::new(
             Self::new(self.workspace_layout.clone()),
             dataset,
-            tmp_path,
+            staging_name,
             dataset_name.clone(),
         )))
     }
@@ -557,7 +586,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 struct DatasetBuilderImpl<D> {
     repo: LocalDatasetRepositoryImpl,
     dataset: D,
-    dataset_path: PathBuf,
+    staging_name: String,
     dataset_name: DatasetName,
 }
 
@@ -567,24 +596,30 @@ impl<D> DatasetBuilderImpl<D> {
     fn new(
         repo: LocalDatasetRepositoryImpl,
         dataset: D,
-        dataset_path: PathBuf,
+        staging_name: String,
         dataset_name: DatasetName,
     ) -> Self {
         Self {
             repo,
             dataset,
-            dataset_path,
+            staging_name,
             dataset_name,
         }
     }
 
     fn discard_impl(&self) -> Result<(), InternalError> {
-        if self.dataset_path.exists() {
+        let meta_path = self
+            .repo
+            .workspace_layout
+            .datasets_dir
+            .join(&self.staging_name);
+
+        if meta_path.exists() {
             let tmp_layout = DatasetLayout::new(
                 &VolumeLayout::new(&self.repo.workspace_layout.local_volume_dir),
-                &DatasetName::new_unchecked(".pending"),
+                &DatasetName::new_unchecked(&self.staging_name),
             );
-            std::fs::remove_dir_all(&self.dataset_path).int_err()?;
+            std::fs::remove_dir_all(&meta_path).int_err()?;
             std::fs::remove_dir_all(&tmp_layout.cache_dir).int_err()?;
             std::fs::remove_dir_all(&tmp_layout.data_dir).int_err()?;
             std::fs::remove_dir_all(&tmp_layout.checkpoints_dir).int_err()?;
@@ -630,7 +665,7 @@ where
         }?;
 
         self.repo
-            .finish_create_dataset(&self.dataset, &self.dataset_path, &self.dataset_name)
+            .finish_create_dataset(&self.dataset, &self.staging_name, &self.dataset_name)
             .await
     }
 
