@@ -13,13 +13,14 @@ use super::{CLIError, Command};
 use kamu::domain::*;
 
 use chrono::prelude::*;
+use futures::TryStreamExt;
 use glob;
 use std::fs;
 use std::path;
 use std::sync::Arc;
 
 pub struct CompleteCommand {
-    dataset_reg: Option<Arc<dyn DatasetRegistry>>,
+    local_repo: Option<Arc<dyn LocalDatasetRepository>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
@@ -32,7 +33,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new(
-        dataset_reg: Option<Arc<dyn DatasetRegistry>>,
+        local_repo: Option<Arc<dyn LocalDatasetRepository>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
@@ -41,7 +42,7 @@ impl CompleteCommand {
         current: usize,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             remote_repo_reg,
             remote_alias_reg,
             config_service,
@@ -63,9 +64,10 @@ impl CompleteCommand {
         }
     }
 
-    fn complete_dataset(&self, prefix: &str) {
-        if let Some(repo) = self.dataset_reg.as_ref() {
-            for dataset_handle in repo.get_all_datasets() {
+    async fn complete_dataset(&self, prefix: &str) {
+        if let Some(repo) = self.local_repo.as_ref() {
+            let mut datasets = repo.get_all_datasets();
+            while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                 if dataset_handle.name.starts_with(prefix) {
                     println!("{}", dataset_handle.name);
                 }
@@ -84,9 +86,10 @@ impl CompleteCommand {
     }
 
     async fn complete_alias(&self, prefix: &str) {
-        if let Some(repo) = self.dataset_reg.as_ref() {
+        if let Some(repo) = self.local_repo.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
-                for dataset_handle in repo.get_all_datasets() {
+                let mut datasets = repo.get_all_datasets();
+                while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                     let aliases = reg
                         .get_remote_aliases(&dataset_handle.as_local_ref())
                         .await
@@ -219,7 +222,7 @@ impl Command for CompleteCommand {
         // Complete positionals
         for pos in last_cmd.get_positionals() {
             match pos.get_id() {
-                "dataset" => self.complete_dataset(to_complete),
+                "dataset" => self.complete_dataset(to_complete).await,
                 "repository" => self.complete_repository(to_complete),
                 "alias" => self.complete_alias(to_complete).await,
                 "manifest" => self.complete_path(to_complete),

@@ -188,12 +188,11 @@ impl From<GetRepoError> for SyncError {
     }
 }
 
-impl From<super::services::dataset_factory::GetDatasetError> for SyncError {
-    fn from(v: super::services::dataset_factory::GetDatasetError) -> Self {
-        use super::services::dataset_factory::GetDatasetError;
+impl From<BuildDatasetError> for SyncError {
+    fn from(v: BuildDatasetError) -> Self {
         match v {
-            GetDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
-            GetDatasetError::Internal(e) => Self::Internal(e),
+            BuildDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
+            BuildDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }

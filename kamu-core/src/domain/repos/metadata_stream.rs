@@ -117,6 +117,13 @@ where
     fn try_first(self) -> TryFirst<Self> {
         TryFirst::new(self)
     }
+
+    fn try_last<T, E>(self) -> TryLast<Self, T>
+    where
+        Self: Stream<Item = Result<T, E>>,
+    {
+        TryLast::new(self)
+    }
 }
 
 impl<S, T, E> TryStreamExtExt for S where S: Stream<Item = Result<T, E>> {}
@@ -397,6 +404,47 @@ where
             Poll::Ready(None) => Poll::Ready(Ok(None)),
             Poll::Ready(Some(Ok(v))) => Poll::Ready(Ok(Some(v))),
             Poll::Ready(Some(Err(e))) => Poll::Ready(Err(e)),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct TryLast<S, T> {
+    #[pin]
+    inner: S,
+    last_seen: Option<T>,
+}
+
+impl<S, T, E> TryLast<S, T>
+where
+    S: Stream<Item = Result<T, E>>,
+{
+    fn new(inner: S) -> Self {
+        Self {
+            inner,
+            last_seen: None,
+        }
+    }
+}
+
+impl<S, T, E> Future for TryLast<S, T>
+where
+    S: Stream<Item = Result<T, E>>,
+{
+    type Output = Result<Option<T>, E>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        loop {
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => break Poll::Ready(Ok(this.last_seen.take())),
+                Poll::Ready(Some(Ok(v))) => *this.last_seen = Some(v),
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Err(e)),
+            }
         }
     }
 }

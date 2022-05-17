@@ -30,7 +30,6 @@ async fn test_ingest_with_engine() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
 
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
@@ -81,7 +80,10 @@ async fn test_ingest_with_engine() {
 
     let dataset_name = dataset_snapshot.name.clone();
 
-    dataset_reg.add_dataset(dataset_snapshot).unwrap();
+    local_repo
+        .create_dataset_from_snapshot(dataset_snapshot)
+        .await
+        .unwrap();
 
     let res = ingest_svc
         .ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None)

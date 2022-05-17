@@ -58,6 +58,11 @@ pub trait LocalDatasetRepository: Sync + Send {
 
     async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
         -> Result<(), DeleteDatasetError>;
+
+    fn get_downstream_dependencies<'s>(
+        &'s self,
+        dataset_ref: &'s DatasetRefLocal,
+    ) -> DatasetHandleStream<'s>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -120,6 +125,31 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
             },
             Err(GetDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
         }
+    }
+
+    async fn create_dataset_from_blocks<IT>(
+        &self,
+        dataset_name: &DatasetName,
+        blocks: IT,
+    ) -> Result<(DatasetHandle, Multihash), CreateDatasetError>
+    where
+        IT: IntoIterator<Item = MetadataBlock> + Send,
+        IT::IntoIter: Send,
+    {
+        let ds = self.create_dataset(dataset_name).await?;
+        let mut hash = None;
+        for mut block in blocks {
+            block.prev_block_hash = hash.clone();
+            hash = Some(
+                ds.as_dataset()
+                    .as_metadata_chain()
+                    .append(block, AppendOpts::default())
+                    .await
+                    .int_err()?,
+            );
+        }
+        let hdl = ds.finish().await?;
+        Ok((hdl, hash.unwrap()))
     }
 }
 
@@ -256,6 +286,14 @@ pub enum CreateDatasetFromSnapshotError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<BeginCreateDatasetError> for CreateDatasetError {
+    fn from(v: BeginCreateDatasetError) -> Self {
+        match v {
+            BeginCreateDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

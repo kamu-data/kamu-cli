@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::{BoxedError, DomainError, InternalError};
+use kamu::domain::*;
 use std::backtrace::{Backtrace, BacktraceStatus};
 use std::error::Error;
 use std::fmt::Display;
@@ -255,12 +255,6 @@ impl From<std::io::Error> for CLIError {
     }
 }
 
-impl From<DomainError> for CLIError {
-    fn from(e: DomainError) -> Self {
-        Self::failure(e)
-    }
-}
-
 impl From<dill::InjectionError> for CLIError {
     fn from(e: dill::InjectionError) -> Self {
         Self::critical(e)
@@ -270,6 +264,66 @@ impl From<dill::InjectionError> for CLIError {
 impl From<CommandInterpretationFailed> for CLIError {
     fn from(e: CommandInterpretationFailed) -> Self {
         Self::critical(e)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// TODO: Replace with traits that distinguish critical and non-critical errors
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<GetDatasetError> for CLIError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            e @ GetDatasetError::NotFound(_) => Self::failure(e),
+            e @ GetDatasetError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<GetAliasesError> for CLIError {
+    fn from(v: GetAliasesError) -> Self {
+        match v {
+            e @ GetAliasesError::DatasetNotFound(_) => Self::failure(e),
+            e @ GetAliasesError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<DeleteDatasetError> for CLIError {
+    fn from(v: DeleteDatasetError) -> Self {
+        match v {
+            e @ DeleteDatasetError::NotFound(_) => Self::failure(e),
+            e @ DeleteDatasetError::DanglingReference(_) => Self::failure(e),
+            e @ DeleteDatasetError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<GetSummaryError> for CLIError {
+    fn from(v: GetSummaryError) -> Self {
+        match v {
+            e @ GetSummaryError::EmptyDataset => Self::critical(e),
+            e @ GetSummaryError::Access(_) => Self::critical(e),
+            e @ GetSummaryError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<GetRefError> for CLIError {
+    fn from(v: GetRefError) -> Self {
+        match v {
+            e @ GetRefError::NotFound(_) => Self::critical(e),
+            e @ GetRefError::Access(_) => Self::critical(e),
+            e @ GetRefError::Internal(_) => Self::critical(e),
+        }
+    }
+}
+
+impl From<IterBlocksError> for CLIError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            e => Self::critical(e),
+        }
     }
 }
 

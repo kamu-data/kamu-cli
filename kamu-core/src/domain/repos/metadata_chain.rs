@@ -17,7 +17,7 @@ use thiserror::Error;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait MetadataChain2: Send + Sync {
+pub trait MetadataChain: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
@@ -64,7 +64,28 @@ pub trait MetadataChain2: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait MetadataChainExt: MetadataChain2 {
+pub trait MetadataChainExt: MetadataChain {
+    /// Resolves reference to the block hash it's pointing to if it exists
+    async fn try_get_ref(&self, r: &BlockRef) -> Result<Option<Multihash>, InternalError> {
+        match self.get_ref(r).await {
+            Ok(h) => Ok(Some(h)),
+            Err(GetRefError::NotFound(_)) => Ok(None),
+            Err(e) => Err(e.int_err()),
+        }
+    }
+
+    /// Returns the specified block if it exists
+    async fn try_get_block(
+        &self,
+        hash: &Multihash,
+    ) -> Result<Option<MetadataBlock>, InternalError> {
+        match self.get_block(hash).await {
+            Ok(b) => Ok(Some(b)),
+            Err(GetBlockError::NotFound(_)) => Ok(None),
+            Err(e) => Err(e.int_err()),
+        }
+    }
+
     /// Convenience function to iterate blocks starting with the `head` reference
     fn iter_blocks<'a>(&'a self) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(&BlockRef::Head, None)
@@ -76,7 +97,7 @@ pub trait MetadataChainExt: MetadataChain2 {
     }
 }
 
-impl<T> MetadataChainExt for T where T: MetadataChain2 + ?Sized {}
+impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // BlockRef

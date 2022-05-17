@@ -32,7 +32,6 @@ async fn test_verify_data_consistency() {
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
     let dataset_layout = DatasetLayout::create(&volume_layout, &dataset_name).unwrap();
 
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
@@ -41,24 +40,26 @@ async fn test_verify_data_consistency() {
         volume_layout.clone(),
     ));
 
-    dataset_reg
-        .add_dataset(
+    local_repo
+        .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
+        .await
         .unwrap();
 
-    let (_hdl, head) = dataset_reg
-        .add_dataset(
+    let (_hdl, head) = local_repo
+        .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
                 .kind(DatasetKind::Derivative)
                 .push_event(MetadataFactory::set_transform(["foo"]).build())
                 .build(),
         )
+        .await
         .unwrap();
 
     assert_matches!(
@@ -92,24 +93,31 @@ async fn test_verify_data_consistency() {
     let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
 
     // "Commit" data
-    let mut metadata_chain = dataset_reg
-        .get_metadata_chain(&dataset_name.as_local_ref())
+    let dataset = local_repo
+        .get_dataset(&dataset_name.as_local_ref())
+        .await
         .unwrap();
-    let head = metadata_chain.append(
-        MetadataFactory::metadata_block(AddData {
-            input_checkpoint: None,
-            output_data: DataSlice {
-                logical_hash: data_logical_hash.clone(),
-                physical_hash: data_physical_hash.clone(),
-                interval: OffsetInterval { start: 0, end: 0 },
-                size: size as i64,
-            },
-            output_checkpoint: None,
-            output_watermark: None,
-        })
-        .prev(&head)
-        .build(),
-    );
+
+    let head = dataset
+        .as_metadata_chain()
+        .append(
+            MetadataFactory::metadata_block(AddData {
+                input_checkpoint: None,
+                output_data: DataSlice {
+                    logical_hash: data_logical_hash.clone(),
+                    physical_hash: data_physical_hash.clone(),
+                    interval: OffsetInterval { start: 0, end: 0 },
+                    size: size as i64,
+                },
+                output_checkpoint: None,
+                output_watermark: None,
+            })
+            .prev(&head)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
     std::fs::rename(
         data_path,
         dataset_layout

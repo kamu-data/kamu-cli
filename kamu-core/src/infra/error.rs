@@ -15,6 +15,7 @@ use std::backtrace::Backtrace;
 use std::convert::From;
 use thiserror::Error;
 
+#[deprecated]
 #[derive(Error, Debug)]
 pub enum InfraError {
     #[error("IO error: {source}")]
@@ -27,6 +28,7 @@ pub enum InfraError {
     SerdeError(#[from] SerdeError),
 }
 
+#[deprecated]
 #[derive(Error, Debug)]
 pub enum SerdeError {
     #[error("Yaml serialization error: {source}")]

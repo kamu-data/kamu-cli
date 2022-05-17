@@ -20,9 +20,6 @@ pub use error::*;
 pub mod repos;
 pub use repos::*;
 
-mod dataset_registry;
-pub use dataset_registry::*;
-
 mod remote_aliases_registry;
 pub use remote_aliases_registry::*;
 
@@ -30,9 +27,6 @@ mod remote_repository_registry;
 pub use remote_repository_registry::*;
 
 // Services
-
-pub mod services;
-pub use services::*;
 
 pub mod engine;
 pub use engine::*;
@@ -43,9 +37,6 @@ pub use engine_provisioner::*;
 pub mod ingest_service;
 pub use ingest_service::IngestRequest;
 pub use ingest_service::*;
-
-mod metadata_chain;
-pub use metadata_chain::*;
 
 mod provenance_service;
 pub use provenance_service::*;

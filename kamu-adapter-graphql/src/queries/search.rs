@@ -9,9 +9,12 @@
 
 use crate::queries::*;
 use crate::scalars::*;
+use crate::utils::*;
 
 use async_graphql::*;
+use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::TryStreamExtExt;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Search
@@ -31,25 +34,26 @@ impl Search {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let nodes: Vec<_> = dataset_reg
+        let mut datasets: Vec<_> = local_repo
             .get_all_datasets()
-            .filter(|hdl| hdl.name.contains(&query))
+            .filter_ok(|hdl| hdl.name.contains(&query))
+            .try_collect()
+            .await?;
+
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        let total_count = datasets.len();
+
+        let nodes: Vec<_> = datasets
+            .into_iter()
             .skip(page * per_page)
             .take(per_page)
             .map(|hdl| SearchResult::Dataset(Dataset::new(Account::mock(), hdl)))
             .collect();
-
-        // TODO: Slow but temporary
-        let total_count = dataset_reg
-            .get_all_datasets()
-            .filter(|hdl| hdl.name.contains(&query))
-            .count();
 
         Ok(SearchResultConnection::new(
             nodes,

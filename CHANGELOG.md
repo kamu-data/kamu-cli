@@ -6,10 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.86.0] - 2022-04-23
+## [0.86.0] - 2022-05-16
 ### Changed
-- **Breaking:** Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes.
-- **Breaking:** Data files are now named and stored accodring to their physical hashes, as per ODF spec.
+- **Breaking:** Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes
+- **Breaking:** Data files are now named and stored accodring to their physical hashes, as per ODF spec
+- **Breaking:** Above changes also affect the repository format
+- Upgraded to `rustc-1.62.0` and latest dependencies
+- Improved error handling and reporting
+### Added
+- Support for [ODF: Simple Transfer Protocol](https://github.com/open-data-fabric/open-data-fabric/blob/2e43c39a484309b2726a015dc3c10e4cfb9fd590/rfcs/007-simple-transfer-protocol.md) for syncing datasets to/from remotes
+- Support for URL-based remote references, e.g. `kamu pull http://my.repo.org/some/dataset --as my.dataset`
+  - URLs are also allowed for pull/push aliases
+- Auto-deriving local names from remote reference, e.g. `kamu pull http://my.repo.org/some/dataset` will pull into `dataset`
+- Support for IPFS source (via HTTP Gateway), e.g. `kamu pull ipfs://bafy...aabbcc/some/dataset`
+  - IPFS gateway is configurable
+  - To use your local IPFS daemon as gateway do `kamu config --user set protocol.ipfs.httpGateway "http://localhost:8080"`
 ### Fixed
 - Truncation of `kamu.log` in visual mode
 

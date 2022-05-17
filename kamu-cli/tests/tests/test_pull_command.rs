@@ -66,7 +66,9 @@ async fn test_pull_ingest_from_file() {
 
         kamu.execute(["pull", "population"]).await.unwrap();
 
-        let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));
+        let parquet = kamu
+            .get_last_data_slice(&DatasetName::new_unchecked("population"))
+            .await;
         assert_eq!(
             parquet.column_names(),
             ["offset", "system_time", "event_time", "city", "population"]
@@ -99,7 +101,9 @@ async fn test_pull_ingest_from_file() {
             .await
             .unwrap();
 
-        let parquet = kamu.get_last_data_slice(&DatasetName::new_unchecked("population"));
+        let parquet = kamu
+            .get_last_data_slice(&DatasetName::new_unchecked("population"))
+            .await;
         assert_eq!(
             parquet.column_names(),
             ["offset", "system_time", "event_time", "city", "population"]

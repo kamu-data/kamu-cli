@@ -13,9 +13,11 @@ use crate::utils::*;
 
 use async_graphql::*;
 use chrono::prelude::*;
+use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::{MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
-use opendatafabric::IntoDataStreamBlock;
+use opendatafabric::{AsTypedBlock, VariantOf};
 
 pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
@@ -29,9 +31,27 @@ impl DatasetMetadata {
     }
 
     #[graphql(skip)]
-    fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
+    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset = local_repo
+            .get_dataset(&self.dataset_handle.as_local_ref())
+            .await?;
+        Ok(dataset)
+    }
+
+    #[graphql(skip)]
+    async fn get_last_block_of_type<T: VariantOf<odf::MetadataEvent>>(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Option<odf::MetadataBlockTyped<T>>> {
+        let dataset = self.get_dataset(ctx).await?;
+        let block = dataset
+            .as_metadata_chain()
+            .iter_blocks_ref(&domain::BlockRef::Head)
+            .filter_map_ok(|(_, b)| b.into_typed::<T>())
+            .try_first()
+            .await?;
+        Ok(block)
     }
 
     /// Access to the temporal metadata chain of the dataset
@@ -41,11 +61,14 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let chain = self.get_chain(ctx)?;
-        Ok(chain
+        let ds = self.get_dataset(ctx).await?;
+        Ok(ds
+            .as_metadata_chain()
             .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_data_stream_block())
-            .find_map(|b| b.event.output_watermark))
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_watermark)
+            .try_first()
+            .await?)
     }
 
     /// Latest data schema
@@ -66,8 +89,10 @@ impl DatasetMetadata {
 
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
+        let dataset = self.get_dataset(ctx).await?;
+        let summary = dataset
+            .get_summary(domain::SummaryOptions::default())
+            .await?;
         Ok(summary
             .dependencies
             .into_iter()
@@ -81,64 +106,41 @@ impl DatasetMetadata {
     }
 
     // TODO: Convert to collection
-    // TODO: PERF: This is really slow
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
 
-        let mut downstream = Vec::new();
-
-        for hdl in dataset_reg
-            .get_all_datasets()
-            .filter(|hdl| hdl.id != self.dataset_handle.id)
-        {
-            let summary = dataset_reg.get_summary(&hdl.as_local_ref()).unwrap();
-            if summary
-                .dependencies
-                .iter()
-                .any(|i| i.id.as_ref() == Some(&self.dataset_handle.id))
-            {
-                downstream.push(Dataset::new(Account::mock(), hdl))
-            }
-        }
+        let downstream: Vec<_> = local_repo
+            .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
+            .map_ok(|hdl| Dataset::new(Account::mock(), hdl))
+            .try_collect()
+            .await?;
 
         Ok(downstream)
     }
 
     /// Current source used by the root dataset
     async fn current_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        use opendatafabric::AsTypedBlock;
-
         Ok(self
-            .get_chain(ctx)?
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_typed::<odf::SetPollingSource>())
-            .next()
+            .get_last_block_of_type::<odf::SetPollingSource>(ctx)
+            .await?
             .map(|t| t.event.into()))
     }
 
     /// Current transformation used by the derivative dataset
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        use opendatafabric::AsTypedBlock;
-
         Ok(self
-            .get_chain(ctx)?
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_typed::<odf::SetTransform>())
-            .next()
+            .get_last_block_of_type::<odf::SetTransform>(ctx)
+            .await?
             .map(|t| t.event.into()))
     }
 
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
-        use opendatafabric::AsTypedBlock;
-
         Ok(self
-            .get_chain(ctx)?
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_typed::<odf::SetInfo>())
+            .get_last_block_of_type::<odf::SetInfo>(ctx)
+            .await?
             .map(|b| b.event.into())
-            .next()
             .unwrap_or(SetInfo {
                 description: None,
                 keywords: None,
@@ -147,13 +149,9 @@ impl DatasetMetadata {
 
     /// Current readme file as discovered from attachments associated with the dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
-        use opendatafabric::AsTypedBlock;
-
         if let Some(attachments) = self
-            .get_chain(ctx)?
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_typed::<odf::SetAttachments>())
-            .next()
+            .get_last_block_of_type::<odf::SetAttachments>(ctx)
+            .await?
         {
             match attachments.event.attachments {
                 odf::Attachments::Embedded(embedded) => Ok(embedded
@@ -170,13 +168,9 @@ impl DatasetMetadata {
 
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
-        use opendatafabric::AsTypedBlock;
-
         Ok(self
-            .get_chain(ctx)?
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map(|(_, b)| b.into_typed::<odf::SetLicense>())
-            .map(|b| b.event.into())
-            .next())
+            .get_last_block_of_type::<odf::SetLicense>(ctx)
+            .await?
+            .map(|b| b.event.into()))
     }
 }

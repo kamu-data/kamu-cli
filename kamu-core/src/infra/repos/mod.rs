@@ -36,3 +36,6 @@ pub use dataset_impl::*;
 
 mod local_dataset_repository_impl;
 pub use local_dataset_repository_impl::*;
+
+mod dataset_factory_impl;
+pub use dataset_factory_impl::*;

@@ -7,45 +7,48 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
-use super::{CLIError, Command};
-use chrono::SecondsFormat;
-use console::style;
 use kamu::domain::*;
 use opendatafabric::*;
 
+use chrono::SecondsFormat;
+use console::style;
+use futures::TryStreamExt;
 use std::{io::Write, sync::Arc};
 
 pub struct InspectQueryCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     dataset_ref: DatasetRefLocal,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_ref: DatasetRefLocal,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             dataset_ref,
             output_config,
         }
     }
 
-    fn render(
+    async fn render(
         &self,
         output: &mut impl Write,
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
-        let chain = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?;
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
-        for (block_hash, block) in chain.iter_blocks() {
+        let mut blocks = dataset.as_metadata_chain().iter_blocks();
+        while let Some((block_hash, block)) = blocks.try_next().await? {
             match &block.event {
                 MetadataEvent::SetTransform(SetTransform { inputs, transform }) => {
                     self.render_transform(
@@ -169,7 +172,10 @@ impl InspectQueryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for InspectQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
+        let dataset_handle = self
+            .local_repo
+            .resolve_dataset_ref(&self.dataset_ref)
+            .await?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new();
@@ -178,10 +184,11 @@ impl Command for InspectQueryCommand {
                 .unwrap();
             pager.set_prompt(&dataset_handle.name).unwrap();
 
-            self.render(&mut WritePager(&mut pager), &dataset_handle)?;
+            self.render(&mut WritePager(&mut pager), &dataset_handle)
+                .await?;
             minus::page_all(pager).unwrap();
         } else {
-            self.render(&mut std::io::stdout(), &dataset_handle)?;
+            self.render(&mut std::io::stdout(), &dataset_handle).await?;
         }
         Ok(())
     }

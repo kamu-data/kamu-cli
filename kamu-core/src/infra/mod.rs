@@ -16,9 +16,6 @@ pub use repos::*;
 pub mod ingest;
 pub mod utils;
 
-mod error;
-pub use error::*;
-
 ///////////////////////////////////////////////////////////////////////////////
 // Manifests
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,9 +36,6 @@ pub use workspace_layout::*;
 // Repositories
 ///////////////////////////////////////////////////////////////////////////////
 
-mod dataset_registry_impl;
-pub use dataset_registry_impl::*;
-
 mod remote_aliases_registry_impl;
 pub use remote_aliases_registry_impl::*;
 
@@ -52,14 +46,8 @@ pub use remote_repository_registry_impl::*;
 // Services
 ///////////////////////////////////////////////////////////////////////////////
 
-pub mod services;
-pub use services::*;
-
 mod ingest_service_impl;
 pub use ingest_service_impl::*;
-
-mod metadata_chain_impl;
-pub use metadata_chain_impl::*;
 
 mod provenance_service_impl;
 pub use provenance_service_impl::*;

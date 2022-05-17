@@ -18,19 +18,39 @@ use datafusion::parquet::{
     file::reader::{FileReader, SerializedFileReader},
     record::RowAccessor,
 };
+use futures::TryStreamExt;
 use std::assert_matches::assert_matches;
 use std::fs::File;
 use std::sync::Arc;
 
-fn get_data_of_block(
-    metadata_chain: &dyn MetadataChain,
+async fn block_count(
+    local_repo: &dyn LocalDatasetRepository,
+    dataset_ref: impl Into<DatasetRefLocal>,
+) -> usize {
+    let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+    let blocks: Vec<_> = ds
+        .as_metadata_chain()
+        .iter_blocks()
+        .try_collect()
+        .await
+        .unwrap();
+    blocks.len()
+}
+
+async fn get_data_of_block(
+    local_repo: &dyn LocalDatasetRepository,
+    dataset_ref: impl Into<DatasetRefLocal>,
     dataset_layout: &DatasetLayout,
     block_hash: &Multihash,
 ) -> SerializedFileReader<File> {
+    let dataset = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+    let block = dataset
+        .as_metadata_chain()
+        .get_block(block_hash)
+        .await
+        .unwrap();
     let part_file = dataset_layout.data_slice_path(
-        metadata_chain
-            .get_block(&block_hash)
-            .unwrap()
+        block
             .as_data_stream_block()
             .unwrap()
             .event
@@ -48,7 +68,6 @@ async fn test_transform_with_engine_spark() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
 
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -108,7 +127,10 @@ async fn test_transform_with_engine_spark() {
 
     let root_name = root_snapshot.name.clone();
 
-    dataset_reg.add_dataset(root_snapshot).unwrap();
+    local_repo
+        .create_dataset_from_snapshot(root_snapshot)
+        .await
+        .unwrap();
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
@@ -138,7 +160,10 @@ async fn test_transform_with_engine_spark() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    dataset_reg.add_dataset(deriv_snapshot).unwrap();
+    local_repo
+        .create_dataset_from_snapshot(deriv_snapshot)
+        .await
+        .unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
@@ -151,23 +176,15 @@ async fn test_transform_with_engine_spark() {
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
-    assert_eq!(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .iter_blocks()
-            .count(),
-        3
-    );
+    assert_eq!(block_count(local_repo.as_ref(), &deriv_name).await, 3);
 
     let parquet_reader = get_data_of_block(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .as_ref(),
+        local_repo.as_ref(),
+        &deriv_name,
         &dataset_layout,
         &block_hash,
-    );
+    )
+    .await;
     let columns: Vec<_> = parquet_reader
         .metadata()
         .file_metadata()
@@ -240,13 +257,12 @@ async fn test_transform_with_engine_spark() {
     };
 
     let parquet_reader = get_data_of_block(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .as_ref(),
+        local_repo.as_ref(),
+        &deriv_name,
         &dataset_layout,
         &block_hash,
-    );
+    )
+    .await;
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()
@@ -288,7 +304,6 @@ async fn test_transform_with_engine_flink() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
 
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -348,7 +363,10 @@ async fn test_transform_with_engine_flink() {
 
     let root_name = root_snapshot.name.clone();
 
-    dataset_reg.add_dataset(root_snapshot).unwrap();
+    local_repo
+        .create_dataset_from_snapshot(root_snapshot)
+        .await
+        .unwrap();
 
     ingest_svc
         .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
@@ -378,7 +396,10 @@ async fn test_transform_with_engine_flink() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    dataset_reg.add_dataset(deriv_snapshot).unwrap();
+    local_repo
+        .create_dataset_from_snapshot(deriv_snapshot)
+        .await
+        .unwrap();
 
     let block_hash = match transform_svc
         .transform(&deriv_name.as_local_ref(), None)
@@ -391,23 +412,15 @@ async fn test_transform_with_engine_flink() {
 
     let dataset_layout = DatasetLayout::new(&volume_layout, &deriv_name);
     assert!(dataset_layout.data_dir.exists());
-    assert_eq!(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .iter_blocks()
-            .count(),
-        3
-    );
+    assert_eq!(block_count(local_repo.as_ref(), &deriv_name).await, 3);
 
     let parquet_reader = get_data_of_block(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .as_ref(),
+        local_repo.as_ref(),
+        &deriv_name,
         &dataset_layout,
         &block_hash,
-    );
+    )
+    .await;
     let columns: Vec<_> = parquet_reader
         .metadata()
         .file_metadata()
@@ -480,13 +493,12 @@ async fn test_transform_with_engine_flink() {
     };
 
     let parquet_reader = get_data_of_block(
-        dataset_reg
-            .get_metadata_chain(&deriv_name.as_local_ref())
-            .unwrap()
-            .as_ref(),
+        local_repo.as_ref(),
+        &deriv_name,
         &dataset_layout,
         &block_hash,
-    );
+    )
+    .await;
     let records: Vec<_> = parquet_reader
         .get_row_iter(None)
         .unwrap()

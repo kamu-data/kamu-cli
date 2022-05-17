@@ -16,7 +16,7 @@ use chrono::{TimeZone, Utc};
 use std::assert_matches::assert_matches;
 use std::path::Path;
 
-fn init_chain(root: &Path) -> impl MetadataChain2 {
+fn init_chain(root: &Path) -> impl MetadataChain {
     let blocks_dir = root.join("blocks");
     let refs_dir = root.join("refs");
     std::fs::create_dir(&blocks_dir).unwrap();
@@ -25,7 +25,7 @@ fn init_chain(root: &Path) -> impl MetadataChain2 {
     let obj_repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir);
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
 
-    MetadataChain2Impl::new(obj_repo, ref_repo)
+    MetadataChainImpl::new(obj_repo, ref_repo)
 }
 
 #[tokio::test]

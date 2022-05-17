@@ -10,13 +10,15 @@
 use crate::domain::*;
 
 use async_trait::async_trait;
+use std::sync::Arc;
 use thiserror::Error;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 pub trait DatasetFactory: Send + Sync {
-    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, GetDatasetError>;
+    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, BuildDatasetError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +26,7 @@ pub trait DatasetFactory: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDatasetError {
+pub enum BuildDatasetError {
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
     #[error(transparent)]
@@ -46,7 +48,7 @@ impl std::fmt::Display for UnsupportedProtocolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Usupported protocol {} when accessing dataset at {}",
+            "usupported protocol {} when accessing dataset at {}",
             self.url.scheme(),
             self.url
         )

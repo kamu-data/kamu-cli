@@ -14,10 +14,11 @@ use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
+use futures::TryStreamExt;
 use std::sync::Arc;
 
 pub struct ListCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
@@ -25,13 +26,13 @@ pub struct ListCommand {
 
 impl ListCommand {
     pub fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             remote_alias_reg,
             output_config,
             detail_level,
@@ -42,20 +43,16 @@ impl ListCommand {
     async fn print_machine_readable(&self) -> Result<(), CLIError> {
         use std::io::Write;
 
-        let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
+        let mut datasets: Vec<_> = self.local_repo.get_all_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut out = std::io::stdout();
         write!(out, "ID,Name,Kind,Head,Pulled,Records,Size\n")?;
 
         for hdl in &datasets {
-            let head = self
-                .dataset_reg
-                .get_metadata_chain(&hdl.as_local_ref())?
-                .read_ref(&BlockRef::Head)
-                .unwrap();
-
-            let summary = self.dataset_reg.get_summary(&hdl.as_local_ref())?;
+            let dataset = self.local_repo.get_dataset(&hdl.as_local_ref()).await?;
+            let head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
+            let summary = dataset.get_summary(SummaryOptions::default()).await?;
 
             write!(
                 out,
@@ -78,7 +75,7 @@ impl ListCommand {
     async fn print_pretty(&self) -> Result<(), CLIError> {
         use prettytable::*;
 
-        let mut datasets: Vec<_> = self.dataset_reg.get_all_datasets().collect();
+        let mut datasets: Vec<_> = self.local_repo.get_all_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut table = Table::new();
@@ -91,13 +88,9 @@ impl ListCommand {
         }
 
         for hdl in datasets.iter() {
-            let head = self
-                .dataset_reg
-                .get_metadata_chain(&hdl.as_local_ref())?
-                .read_ref(&BlockRef::Head)
-                .unwrap();
-
-            let summary = self.dataset_reg.get_summary(&hdl.as_local_ref())?;
+            let dataset = self.local_repo.get_dataset(&hdl.as_local_ref()).await?;
+            let head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
+            let summary = dataset.get_summary(SummaryOptions::default()).await?;
 
             if self.detail_level == 0 {
                 table.add_row(Row::new(vec![
@@ -178,8 +171,7 @@ impl ListCommand {
         let is_remote = self
             .remote_alias_reg
             .get_remote_aliases(&handle.as_local_ref())
-            .await
-            .map_err(CLIError::failure)?
+            .await?
             .get_by_kind(RemoteAliasKind::Pull)
             .next()
             .is_some();

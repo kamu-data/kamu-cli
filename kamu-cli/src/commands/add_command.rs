@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -28,7 +28,7 @@ pub struct AddCommand {
 impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -38,7 +38,7 @@ impl AddCommand {
     {
         Self {
             resource_loader,
-            dataset_reg,
+            local_repo,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
@@ -51,7 +51,7 @@ impl AddCommand {
             .map(|r| {
                 self.resource_loader
                     .load_dataset_snapshot_from_ref(r)
-                    .map_err(|e| DatasetAddError::new(r.clone(), DomainError::InfraError(e.into())))
+                    .map_err(|e| DatasetAddError::new(r.clone(), e.int_err()))
             })
             .collect()
     }
@@ -69,12 +69,7 @@ impl AddCommand {
             .map(|p| {
                 self.resource_loader
                     .load_dataset_snapshot_from_path(&p)
-                    .map_err(|e| {
-                        DatasetAddError::new(
-                            p.to_str().unwrap().to_owned(),
-                            DomainError::InfraError(e.into()),
-                        )
-                    })
+                    .map_err(|e| DatasetAddError::new(p.to_str().unwrap().to_owned(), e.int_err()))
             })
             .collect()
     }
@@ -115,14 +110,16 @@ impl Command for AddCommand {
 
         // Delete existing datasets if we are replacing
         if self.replace {
-            let already_exist: Vec<_> = snapshots
-                .iter()
-                .filter_map(|s| {
-                    self.dataset_reg
-                        .resolve_dataset_ref(&s.name.as_local_ref())
-                        .ok()
-                })
-                .collect();
+            let mut already_exist = Vec::new();
+            for s in &snapshots {
+                if let Some(hdl) = self
+                    .local_repo
+                    .try_resolve_dataset_ref(&s.name.as_local_ref())
+                    .await?
+                {
+                    already_exist.push(hdl);
+                }
+            }
 
             if already_exist.len() != 0 {
                 let confirmed = common::prompt_yes_no(&format!(
@@ -141,12 +138,15 @@ impl Command for AddCommand {
                 }
 
                 for hdl in already_exist {
-                    self.dataset_reg.delete_dataset(&hdl.as_local_ref())?;
+                    self.local_repo.delete_dataset(&hdl.as_local_ref()).await?;
                 }
             }
         };
 
-        let mut add_results = self.dataset_reg.add_datasets(&mut snapshots.into_iter());
+        let mut add_results = self
+            .local_repo
+            .create_datasets_from_snapshots(snapshots)
+            .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
 
@@ -158,7 +158,7 @@ impl Command for AddCommand {
                     num_added += 1;
                     eprintln!("{}: {}", console::style("Added").green(), id);
                 }
-                Err(DomainError::AlreadyExists { .. }) => {
+                Err(CreateDatasetFromSnapshotError::NameCollision(_)) => {
                     eprintln!(
                         "{}: {}: Already exists",
                         console::style("Skipped").yellow(),
@@ -194,11 +194,11 @@ impl Command for AddCommand {
 struct DatasetAddError {
     pub dataset_ref: String,
     #[source]
-    pub source: DomainError,
+    pub source: InternalError,
 }
 
 impl DatasetAddError {
-    pub fn new(dataset_ref: String, source: DomainError) -> Self {
+    pub fn new(dataset_ref: String, source: InternalError) -> Self {
         DatasetAddError {
             dataset_ref: dataset_ref,
             source: source,

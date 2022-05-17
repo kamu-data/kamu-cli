@@ -25,11 +25,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_remote_name = RemoteDatasetName::try_from("repo/bar").unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
-        Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone())),
+        local_repo.clone(),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
     );
 
@@ -41,14 +41,15 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    dataset_reg
-        .add_dataset(
+    local_repo
+        .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_local_name)
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
+        .await
         .unwrap();
 
     sync_svc

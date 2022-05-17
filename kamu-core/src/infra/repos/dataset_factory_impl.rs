@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::services::dataset_factory::GetDatasetError;
 use crate::domain::*;
 use crate::infra::*;
 
@@ -40,7 +39,7 @@ impl Default for IpfsGateway {
 
 // TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
-    MetadataChain2Impl<
+    MetadataChainImpl<
         ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
         ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
@@ -65,7 +64,7 @@ impl DatasetFactoryImpl {
         let blocks_dir = meta_dir.join("blocks");
         let refs_dir = meta_dir.join("refs");
         Ok(DatasetImpl::new(
-            MetadataChain2Impl::new(
+            MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
@@ -95,7 +94,7 @@ impl DatasetFactoryImpl {
         let info_dir = root.join("info");
 
         Ok(DatasetImpl::new(
-            MetadataChain2Impl::new(
+            MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
@@ -127,7 +126,7 @@ impl DatasetFactoryImpl {
         std::fs::create_dir(&info_dir).int_err()?;
 
         Ok(DatasetImpl::new(
-            MetadataChain2Impl::new(
+            MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
             ),
@@ -140,7 +139,7 @@ impl DatasetFactoryImpl {
     pub fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
-            MetadataChain2Impl::new(
+            MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(client.clone(), base_url.join("blocks/").unwrap()),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
                     client.clone(),
@@ -175,7 +174,7 @@ impl DatasetFactoryImpl {
         let client = S3Client::new(region);
 
         Ok(DatasetImpl::new(
-            MetadataChain2Impl::new(
+            MetadataChainImpl::new(
                 ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
                     client.clone(),
                     bucket.clone(),
@@ -209,7 +208,7 @@ impl DatasetFactoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetFactory for DatasetFactoryImpl {
-    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, GetDatasetError> {
+    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, BuildDatasetError> {
         match url.scheme() {
             "file" => {
                 let ds = Self::get_or_create_local_fs(url.to_file_path().unwrap())?;

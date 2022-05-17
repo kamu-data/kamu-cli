@@ -97,9 +97,6 @@ fn configure_catalog() -> CatalogBuilder {
     b.add::<DatasetFactoryImpl>();
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
-    b.add::<DatasetRegistryImpl>();
-    b.bind::<dyn DatasetRegistry, DatasetRegistryImpl>();
-
     b.add::<RemoteRepositoryRegistryImpl>();
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 

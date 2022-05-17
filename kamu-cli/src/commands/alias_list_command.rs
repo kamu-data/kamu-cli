@@ -10,12 +10,13 @@
 use super::{CLIError, Command};
 use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
-use opendatafabric::DatasetRefLocal;
+use opendatafabric::*;
 
+use futures::TryStreamExt;
 use std::sync::Arc;
 
 pub struct AliasListCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     dataset_ref: Option<DatasetRefLocal>,
@@ -23,7 +24,7 @@ pub struct AliasListCommand {
 
 impl AliasListCommand {
     pub fn new<R>(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         dataset_ref: Option<R>,
@@ -33,7 +34,7 @@ impl AliasListCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            dataset_reg,
+            local_repo,
             remote_alias_reg,
             output_config,
             dataset_ref: dataset_ref.map(|s| s.try_into().unwrap()),
@@ -41,25 +42,17 @@ impl AliasListCommand {
     }
 
     // TODO: support multiple format specifiers
-    async fn print_machine_readable(&self) -> Result<(), CLIError> {
+    async fn print_machine_readable(&self, datasets: &Vec<DatasetHandle>) -> Result<(), CLIError> {
         use std::io::Write;
 
         let mut out = std::io::stdout();
         write!(out, "Dataset,Kind,Alias\n")?;
 
-        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            vec![self.dataset_reg.resolve_dataset_ref(dataset_ref)?]
-        } else {
-            self.dataset_reg.get_all_datasets().collect()
-        };
-        datasets.sort_by(|a, b| a.name.cmp(&b.name));
-
-        for ds in &datasets {
+        for ds in datasets {
             let aliases = self
                 .remote_alias_reg
                 .get_remote_aliases(&ds.as_local_ref())
-                .await
-                .map_err(CLIError::failure)?;
+                .await?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                 write!(out, "{},{},{}\n", &ds.name, "pull", &alias)?;
@@ -72,15 +65,8 @@ impl AliasListCommand {
         Ok(())
     }
 
-    async fn print_pretty(&self) -> Result<(), CLIError> {
+    async fn print_pretty(&self, datasets: &Vec<DatasetHandle>) -> Result<(), CLIError> {
         use prettytable::*;
-
-        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            vec![self.dataset_reg.resolve_dataset_ref(dataset_ref)?]
-        } else {
-            self.dataset_reg.get_all_datasets().collect()
-        };
-        datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut items = 0;
         let mut table = Table::new();
@@ -88,12 +74,11 @@ impl AliasListCommand {
 
         table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
 
-        for ds in &datasets {
+        for ds in datasets {
             let aliases = self
                 .remote_alias_reg
                 .get_remote_aliases(&ds.as_local_ref())
-                .await
-                .map_err(CLIError::failure)?;
+                .await?;
             let mut pull_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Pull)
                 .map(|a| a.to_string())
@@ -137,10 +122,19 @@ impl AliasListCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AliasListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
+            let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+            vec![hdl]
+        } else {
+            self.local_repo.get_all_datasets().try_collect().await?
+        };
+
+        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+
         // TODO: replace with formatters
         match self.output_config.format {
-            OutputFormat::Table => self.print_pretty().await?,
-            OutputFormat::Csv => self.print_machine_readable().await?,
+            OutputFormat::Table => self.print_pretty(&datasets).await?,
+            OutputFormat::Csv => self.print_machine_readable(&datasets).await?,
             _ => unimplemented!("Unsupported format: {:?}", self.output_config.format),
         }
 

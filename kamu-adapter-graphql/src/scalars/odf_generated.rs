@@ -1146,7 +1146,7 @@ impl TransformInput {
     async fn dataset(&self, ctx: &Context<'_>) -> Result<Dataset> {
         let dref =
             odf::DatasetHandle::new(self.id.clone().unwrap().into(), self.name.clone().into());
-        Dataset::from_ref(ctx, &dref.as_local_ref())
+        Dataset::from_ref(ctx, &dref.as_local_ref()).await
     }
 }
 

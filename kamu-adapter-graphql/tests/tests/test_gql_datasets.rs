@@ -14,11 +14,17 @@ use kamu::infra;
 use kamu::testing::MetadataFactory;
 use opendatafabric::*;
 
+use std::sync::Arc;
+
 #[tokio::test]
 async fn dataset_by_id_does_not_exist() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+
     let cat = dill::CatalogBuilder::new()
-        .add_value(infra::DatasetRegistryNull)
-        .bind::<dyn DatasetRegistry, infra::DatasetRegistryNull>()
+        .add_value(local_repo)
+        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -38,24 +44,24 @@ async fn dataset_by_id_does_not_exist() {
 #[tokio::test]
 async fn dataset_by_id() {
     let tempdir = tempfile::tempdir().unwrap();
-
-    let workspace_layout = infra::WorkspaceLayout::create(tempdir.path()).unwrap();
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(workspace_layout)
-        .add::<infra::DatasetRegistryImpl>()
-        .bind::<dyn DatasetRegistry, infra::DatasetRegistryImpl>()
+        .add_value(local_repo)
+        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
         .build();
 
-    let dataset_reg = cat.get_one::<dyn DatasetRegistry>().unwrap();
-    let (dataset_handle, _) = dataset_reg
-        .add_dataset(
+    let local_repo = cat.get_one::<dyn LocalDatasetRepository>().unwrap();
+    let (dataset_handle, _) = local_repo
+        .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
         )
+        .await
         .unwrap();
 
     let schema = kamu_adapter_graphql::schema(cat);

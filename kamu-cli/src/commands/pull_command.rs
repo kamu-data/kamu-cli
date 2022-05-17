@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
@@ -39,7 +39,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, R, S, SS>(
         pull_svc: Arc<dyn PullService>,
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -60,7 +60,7 @@ impl PullCommand {
     {
         Self {
             pull_svc,
-            dataset_reg,
+            local_repo,
             remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
@@ -110,11 +110,15 @@ impl PullCommand {
             CLIError::usage_error("When using --fetch reference should point to a local dataset")
         })?;
 
-        let dataset_handle = { self.dataset_reg.resolve_dataset_ref(&dataset_ref)? };
+        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         let summary = self
-            .dataset_reg
-            .get_summary(&dataset_handle.as_local_ref())?;
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?
+            .get_summary(SummaryOptions::default())
+            .await?;
+
         if summary.kind != DatasetKind::Root {
             return Err(CLIError::usage_error(
                 "Cannot ingest data into non-root dataset",

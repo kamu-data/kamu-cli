@@ -12,6 +12,7 @@ use crate::utils::*;
 
 use async_graphql::*;
 use kamu::domain;
+use kamu::domain::SummaryOptions;
 use opendatafabric as odf;
 
 pub struct DatasetData {
@@ -29,16 +30,21 @@ impl DatasetData {
 
     /// Total number of records in this dataset
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset = local_repo
+            .get_dataset(&self.dataset_handle.as_local_ref())
+            .await?;
+        let summary = dataset.get_summary(SummaryOptions::default()).await?;
         Ok(summary.num_records)
     }
 
     /// An estimated size of data on disk not accounting for replication or caching
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset = local_repo
+            .get_dataset(&self.dataset_handle.as_local_ref())
+            .await?;
+        let summary = dataset.get_summary(SummaryOptions::default()).await?;
         Ok(summary.data_size)
     }
 

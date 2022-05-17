@@ -29,7 +29,7 @@ pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
     DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain2 + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -183,7 +183,7 @@ where
 impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
     for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
-    MetaChain: MetadataChain2 + Sync + Send,
+    MetaChain: MetadataChain + Sync + Send,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
@@ -200,7 +200,7 @@ where
         summary.ok_or_else(|| GetSummaryError::EmptyDataset)
     }
 
-    fn as_metadata_chain(&self) -> &dyn MetadataChain2 {
+    fn as_metadata_chain(&self) -> &dyn MetadataChain {
         &self.metadata_chain
     }
 

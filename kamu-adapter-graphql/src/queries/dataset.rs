@@ -13,7 +13,9 @@ use crate::utils::*;
 
 use async_graphql::*;
 use chrono::prelude::*;
+use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::{MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 
 #[derive(Debug, Clone)]
@@ -33,19 +35,24 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    pub fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRefLocal) -> Result<Dataset> {
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+    pub async fn from_ref(
+        ctx: &Context<'_>,
+        dataset_ref: &odf::DatasetRefLocal,
+    ) -> Result<Dataset> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail later?
-        let hdl = dataset_reg.resolve_dataset_ref(dataset_ref)?;
+        let hdl = local_repo.resolve_dataset_ref(dataset_ref).await?;
         Ok(Dataset::new(Account::mock(), hdl))
     }
 
     #[graphql(skip)]
-    fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
+    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset = local_repo
+            .get_dataset(&self.dataset_handle.as_local_ref())
+            .await?;
+        Ok(dataset)
     }
 
     /// Unique identifier of the dataset
@@ -66,8 +73,10 @@ impl Dataset {
 
     /// Returns the kind of a dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        let summary = dataset_reg.get_summary(&self.dataset_handle.as_local_ref())?;
+        let dataset = self.get_dataset(ctx).await?;
+        let summary = dataset
+            .get_summary(domain::SummaryOptions::default())
+            .await?;
         Ok(summary.kind.into())
     }
 
@@ -81,26 +90,30 @@ impl Dataset {
         DatasetMetadata::new(self.dataset_handle.clone())
     }
 
-    // TODO: Performance
+    // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let chain = self.get_chain(ctx)?;
-        let first_block = chain
+        let dataset = self.get_dataset(ctx).await?;
+        let seed = dataset
+            .as_metadata_chain()
             .iter_blocks_ref(&domain::BlockRef::Head)
-            .map(|(_, b)| b)
-            .last()
+            .map_ok(|(_, b)| b)
+            .try_last()
+            .await?
             .expect("Dataset without blocks");
-        Ok(first_block.system_time)
+        Ok(seed.system_time)
     }
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let chain = self.get_chain(ctx)?;
-        let last_block = chain
+        let dataset = self.get_dataset(ctx).await?;
+        let head = dataset
+            .as_metadata_chain()
             .iter_blocks_ref(&domain::BlockRef::Head)
-            .map(|(_, b)| b)
-            .next()
+            .map_ok(|(_, b)| b)
+            .try_first()
+            .await?
             .expect("Dataset without blocks");
-        Ok(last_block.system_time)
+        Ok(head.system_time)
     }
 }

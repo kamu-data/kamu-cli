@@ -1878,6 +1878,7 @@ dependencies = [
  "chrono",
  "datafusion",
  "dill",
+ "futures",
  "indoc",
  "kamu",
  "opendatafabric",

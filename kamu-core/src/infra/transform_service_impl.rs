@@ -209,7 +209,7 @@ impl TransformServiceImpl {
     }
 
     async fn commit_transform(
-        meta_chain: &dyn MetadataChain2,
+        meta_chain: &dyn MetadataChain,
         dataset_handle: DatasetHandle,
         dataset_layout: DatasetLayout,
         prev_block_hash: Multihash,
@@ -396,7 +396,7 @@ impl TransformServiceImpl {
     async fn get_input_slice(
         &self,
         dataset_id: &DatasetID,
-        output_chain: &dyn MetadataChain2,
+        output_chain: &dyn MetadataChain,
     ) -> Result<InputSlice, InternalError> {
         let input_handle = self
             .local_repo

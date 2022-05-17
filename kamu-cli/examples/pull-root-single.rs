@@ -18,10 +18,13 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
+    let tempdir = tempfile::tempdir().unwrap();
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
-        Arc::new(DatasetRegistryNull),
+        Arc::new(LocalDatasetRepositoryImpl::new(Arc::new(
+            WorkspaceLayout::create(tempdir.path()).unwrap(),
+        ))),
         Arc::new(RemoteAliasesRegistryNull),
         Arc::new(OutputConfig {
             is_tty: true,

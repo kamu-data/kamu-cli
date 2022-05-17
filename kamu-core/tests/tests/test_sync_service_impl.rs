@@ -19,6 +19,18 @@ use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 
+async fn append_block(
+    local_repo: &dyn LocalDatasetRepository,
+    dataset_ref: impl Into<DatasetRefLocal>,
+    block: MetadataBlock,
+) -> Multihash {
+    let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+    ds.as_metadata_chain()
+        .append(block, AppendOpts::default())
+        .await
+        .unwrap()
+}
+
 fn list_files(dir: &Path) -> Vec<PathBuf> {
     if !dir.exists() {
         return Vec::new();
@@ -120,12 +132,12 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
     let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
     let dataset_layout_2 = DatasetLayout::new(&volume_layout, &dataset_name_2);
-    let dataset_reg = Arc::new(DatasetRegistryImpl::new(workspace_layout.clone()));
-    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(IpfsGateway::default()));
 
-    let sync_svc = SyncServiceImpl::new(remote_repo_reg.clone(), local_repo, dataset_factory);
+    let sync_svc =
+        SyncServiceImpl::new(remote_repo_reg.clone(), local_repo.clone(), dataset_factory);
 
     // Add repositories
     let push_repo_name = RepositoryName::new_unchecked("remote-push");
@@ -173,7 +185,10 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (_, b1) = dataset_reg.add_dataset(snapshot).unwrap();
+    let (_, b1) = local_repo
+        .create_dataset_from_snapshot(snapshot)
+        .await
+        .unwrap();
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -207,23 +222,23 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let b2 = dataset_reg
-        .get_metadata_chain(&dataset_name.as_local_ref())
-        .unwrap()
-        .append(
-            MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-                .prev(&b1)
-                .build(),
-        );
+    let b2 = append_block(
+        local_repo.as_ref(),
+        &dataset_name,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
+            .prev(&b1)
+            .build(),
+    )
+    .await;
 
-    let b3 = dataset_reg
-        .get_metadata_chain(&dataset_name.as_local_ref())
-        .unwrap()
-        .append(
-            MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-                .prev(&b2)
-                .build(),
-        );
+    let b3 = append_block(
+        local_repo.as_ref(),
+        &dataset_name,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
+            .prev(&b2)
+            .build(),
+    )
+    .await;
 
     assert_matches!(
         sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
@@ -281,14 +296,14 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     // Datasets diverged on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let diverged_head = dataset_reg
-        .get_metadata_chain(&dataset_name_2.as_local_ref())
-        .unwrap()
-        .append(
-            MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
-                .prev(&b3)
-                .build(),
-        );
+    let diverged_head = append_block(
+        local_repo.as_ref(),
+        &dataset_name_2,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
+            .prev(&b3)
+            .build(),
+    )
+    .await;
 
     assert_matches!(
         sync_svc.sync(&dataset_name_2.into(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,

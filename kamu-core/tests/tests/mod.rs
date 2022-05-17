@@ -10,8 +10,6 @@
 mod engine;
 mod ingest;
 mod repos;
-mod test_dataset_registry_impl;
-mod test_metadata_chain_impl;
 mod test_pull_service_impl;
 mod test_resource_loader_impl;
 mod test_schema_utils;

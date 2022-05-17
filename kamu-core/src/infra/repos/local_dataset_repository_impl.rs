@@ -14,6 +14,7 @@ use opendatafabric::*;
 use async_trait::async_trait;
 use chrono::Utc;
 use dill::*;
+use futures::{Stream, StreamExt, TryStreamExt};
 use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::sync::Arc;
@@ -241,6 +242,39 @@ impl LocalDatasetRepositoryImpl {
 
         name
     }
+
+    // TODO: PERF: This is super inefficient
+    fn get_downstream_dependencies_impl<'s>(
+        &'s self,
+        dataset_ref: &'s DatasetRefLocal,
+    ) -> impl Stream<Item = Result<DatasetHandle, InternalError>> + 's {
+        async_stream::try_stream! {
+            let dataset_handle = self.resolve_dataset_ref(dataset_ref).await.int_err()?;
+
+            let mut dataset_handles = self.get_all_datasets();
+            while let Some(hdl) = dataset_handles.try_next().await? {
+                if hdl.id == dataset_handle.id {
+                    continue;
+                }
+
+                let summary = self
+                    .get_dataset(&hdl.as_local_ref())
+                    .await
+                    .int_err()?
+                    .get_summary(SummaryOptions::default())
+                    .await
+                    .int_err()?;
+
+                if summary
+                    .dependencies
+                    .iter()
+                    .any(|d| d.id.as_ref() == Some(&dataset_handle.id))
+                {
+                    yield hdl;
+                }
+            }
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -457,7 +491,6 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
 
-        use futures::StreamExt;
         futures::stream::iter(snapshots_ordered)
             .then(|s| async {
                 let name = s.name.clone();
@@ -509,32 +542,10 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        let mut children = Vec::new();
-
-        use futures::StreamExt;
-        let mut dataset_handles = self.get_all_datasets();
-        while let Some(res) = dataset_handles.next().await {
-            let hdl = res?;
-            if hdl.id == dataset_handle.id {
-                continue;
-            }
-
-            let summary = self
-                .get_dataset(&hdl.as_local_ref())
-                .await
-                .int_err()?
-                .get_summary(SummaryOptions::default())
-                .await
-                .int_err()?;
-
-            if summary
-                .dependencies
-                .iter()
-                .any(|d| d.id.as_ref() == Some(&dataset_handle.id))
-            {
-                children.push(hdl)
-            }
-        }
+        let children: Vec<_> = self
+            .get_downstream_dependencies_impl(dataset_ref)
+            .try_collect()
+            .await?;
 
         if !children.is_empty() {
             return Err(DanglingReferenceError {
@@ -576,6 +587,13 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         }
 
         Ok(())
+    }
+
+    fn get_downstream_dependencies<'s>(
+        &'s self,
+        dataset_ref: &'s DatasetRefLocal,
+    ) -> DatasetHandleStream<'s> {
+        Box::pin(self.get_downstream_dependencies_impl(dataset_ref))
     }
 }
 
@@ -686,7 +704,7 @@ where
         self.dataset.get_summary(opts).await
     }
 
-    fn as_metadata_chain(&self) -> &dyn MetadataChain2 {
+    fn as_metadata_chain(&self) -> &dyn MetadataChain {
         self.dataset.as_metadata_chain()
     }
     fn as_data_repo(&self) -> &dyn ObjectRepository {

@@ -15,14 +15,14 @@ use async_trait::async_trait;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChain2Impl<ObjRepo, RefRepo> {
+pub struct MetadataChainImpl<ObjRepo, RefRepo> {
     obj_repo: ObjRepo,
     ref_repo: RefRepo,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo, RefRepo> MetadataChain2Impl<ObjRepo, RefRepo>
+impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
@@ -104,7 +104,7 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo, RefRepo> MetadataChain2 for MetadataChain2Impl<ObjRepo, RefRepo>
+impl<ObjRepo, RefRepo> MetadataChain for MetadataChainImpl<ObjRepo, RefRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,

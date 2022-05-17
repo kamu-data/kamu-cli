@@ -9,9 +9,12 @@
 
 use crate::queries::*;
 use crate::scalars::*;
+use crate::utils::*;
 
 use async_graphql::*;
+use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::LocalDatasetRepositoryExt;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -23,13 +26,11 @@ impl Datasets {
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
-        match dataset_reg.resolve_dataset_ref(&dataset_id.as_local_ref()) {
-            Ok(hdl) => Ok(Some(Dataset::new(Account::mock(), hdl))),
-            Err(domain::DomainError::DoesNotExist { .. }) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let hdl = local_repo
+            .try_resolve_dataset_ref(&dataset_id.as_local_ref())
+            .await?;
+        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
     // TODO: Multitenancy
@@ -42,13 +43,11 @@ impl Datasets {
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
         let account = Account::mock();
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
-        match dataset_reg.resolve_dataset_ref(&dataset_name.as_local_ref()) {
-            Ok(hdl) => Ok(Some(Dataset::new(Account::mock(), hdl))),
-            Err(domain::DomainError::DoesNotExist { .. }) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let hdl = local_repo
+            .try_resolve_dataset_ref(&dataset_name.as_local_ref())
+            .await?;
+        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
     // TODO: Multitenancy
@@ -60,21 +59,21 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let cat = ctx.data::<dill::Catalog>().unwrap();
-        let dataset_reg = cat.get_one::<dyn domain::DatasetRegistry>().unwrap();
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let nodes: Vec<_> = dataset_reg
-            .get_all_datasets()
+        let mut all_datasets: Vec<_> = local_repo.get_all_datasets().try_collect().await?;
+        let total_count = all_datasets.len();
+        all_datasets.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let nodes = all_datasets
+            .into_iter()
             .skip(page * per_page)
             .take(per_page)
             .map(|hdl| Dataset::new(account.clone(), hdl))
             .collect();
-
-        // TODO: Slow but temporary
-        let total_count = dataset_reg.get_all_datasets().count();
 
         Ok(DatasetConnection::new(
             nodes,

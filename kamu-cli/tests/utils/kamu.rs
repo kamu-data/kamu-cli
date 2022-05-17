@@ -7,6 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu::domain::*;
+use kamu::infra::*;
+use kamu_cli::CLIError;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
+
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -14,11 +20,7 @@ use std::sync::Arc;
 
 use datafusion::parquet::file::reader::FileReader;
 use datafusion::parquet::file::serialized_reader::SerializedFileReader;
-use kamu::domain::DatasetRegistry;
-use kamu::infra::*;
-use kamu_cli::CLIError;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use futures::stream::TryStreamExt;
 use thiserror::Error;
 
 // Test wrapper on top of CLI library
@@ -72,17 +74,22 @@ impl Kamu {
         DatasetLayout::new(&self.volume_layout, dataset_name)
     }
 
-    pub fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
-        let dataset_reg = DatasetRegistryImpl::new(Arc::new(self.workspace_layout.clone()));
+    pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
+        let local_repo = LocalDatasetRepositoryImpl::new(Arc::new(self.workspace_layout.clone()));
 
-        let part_file = dataset_reg
-            .get_metadata_chain(&dataset_name.as_local_ref())
-            .unwrap()
+        let dataset = local_repo
+            .get_dataset(&dataset_name.as_local_ref())
+            .await
+            .unwrap();
+        let part_file = dataset
+            .as_metadata_chain()
             .iter_blocks()
-            .filter_map(|(_, b)| b.into_data_stream_block())
-            .filter_map(|b| b.event.output_data)
-            .map(|slice| self.dataset_layout(dataset_name).data_slice_path(&slice))
-            .next()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_data)
+            .map_ok(|slice| self.dataset_layout(dataset_name).data_slice_path(&slice))
+            .try_first()
+            .await
+            .unwrap()
             .expect("Data file not found");
 
         ParquetHelper::open(&part_file)

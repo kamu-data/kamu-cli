@@ -108,7 +108,9 @@ impl Command for SetWatermarkCommand {
                 );
                 Ok(())
             }
-            Err(e) => Err(DomainError::InfraError(e.into()).into()),
+            Err(e @ SetWatermarkError::IsRemote) => Err(CLIError::failure(e)),
+            Err(e @ SetWatermarkError::NotFound(_)) => Err(CLIError::failure(e)),
+            Err(e @ SetWatermarkError::Internal(_)) => Err(CLIError::critical(e)),
         }
     }
 }

@@ -31,7 +31,7 @@ type GenericVerificationResult = Result<
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefLocal>,
@@ -41,7 +41,7 @@ pub struct VerifyCommand {
 
 impl VerifyCommand {
     pub fn new<I, R>(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -54,7 +54,7 @@ impl VerifyCommand {
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
     {
         Self {
-            dataset_reg,
+            local_repo,
             verification_svc,
             output_config,
             refs: refs.map(|s| s.try_into().unwrap()).collect(),
@@ -88,8 +88,9 @@ impl VerifyCommand {
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_handle = self
-            .dataset_reg
-            .resolve_dataset_ref(self.refs.first().unwrap())?;
+            .local_repo
+            .resolve_dataset_ref(self.refs.first().unwrap())
+            .await?;
 
         let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
 

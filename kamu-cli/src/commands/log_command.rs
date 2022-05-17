@@ -15,6 +15,7 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use console::style;
+use futures::TryStreamExt;
 use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::MetadataBlock;
@@ -24,7 +25,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 pub struct LogCommand {
-    dataset_reg: Arc<dyn DatasetRegistry>,
+    local_repo: Arc<dyn LocalDatasetRepository>,
     dataset_ref: DatasetRefLocal,
     outout_format: Option<String>,
     filter: Option<String>,
@@ -33,14 +34,14 @@ pub struct LogCommand {
 
 impl LogCommand {
     pub fn new(
-        dataset_reg: Arc<dyn DatasetRegistry>,
+        local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_ref: DatasetRefLocal,
         outout_format: Option<&str>,
         filter: Option<&str>,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            dataset_reg,
+            local_repo,
             dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
@@ -76,10 +77,11 @@ impl LogCommand {
 impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let id_to_name_lookup: BTreeMap<_, _> = self
-            .dataset_reg
+            .local_repo
             .get_all_datasets()
-            .map(|h| (h.id, h.name))
-            .collect();
+            .map_ok(|h| (h.id, h.name))
+            .try_collect()
+            .await?;
 
         let mut renderer: Box<dyn MetadataRenderer> = match (
             self.outout_format.as_ref().map(|s| s.as_str()),
@@ -92,15 +94,24 @@ impl Command for LogCommand {
             _ => panic!("Unexpected output format combination"),
         };
 
-        let dataset_handle = self.dataset_reg.resolve_dataset_ref(&self.dataset_ref)?;
+        let dataset_handle = self
+            .local_repo
+            .resolve_dataset_ref(&self.dataset_ref)
+            .await?;
 
-        let mut blocks = self
-            .dataset_reg
-            .get_metadata_chain(&dataset_handle.as_local_ref())?
-            .iter_blocks()
-            .filter(|(_, b)| self.filter_block(b));
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
-        renderer.show(&dataset_handle, &mut blocks)?;
+        let blocks = Box::pin(
+            dataset
+                .as_metadata_chain()
+                .iter_blocks()
+                .filter_ok(|(_, b)| self.filter_block(b)),
+        );
+
+        renderer.show(&dataset_handle, blocks).await?;
 
         Ok(())
     }
@@ -108,11 +119,12 @@ impl Command for LogCommand {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
 trait MetadataRenderer {
-    fn show(
-        &mut self,
+    async fn show<'a>(
+        &'a mut self,
         dataset_handle: &DatasetHandle,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
+        blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError>;
 }
 
@@ -127,12 +139,12 @@ impl AsciiRenderer {
         Self { id_to_name_lookup }
     }
 
-    fn render_blocks(
-        &self,
+    async fn render_blocks<'a, 'b>(
+        &'a self,
         output: &mut impl Write,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
-    ) -> Result<(), std::io::Error> {
-        for (hash, block) in blocks {
+        mut blocks: DynMetadataStream<'b>,
+    ) -> Result<(), CLIError> {
+        while let Some((hash, block)) = blocks.try_next().await? {
             self.render_block(output, &hash, &block)?;
             writeln!(output)?;
         }
@@ -392,13 +404,14 @@ impl AsciiRenderer {
     }
 }
 
+#[async_trait::async_trait]
 impl MetadataRenderer for AsciiRenderer {
-    fn show(
-        &mut self,
+    async fn show<'a>(
+        &'a mut self,
         _dataset_handle: &DatasetHandle,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
+        blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
-        self.render_blocks(&mut std::io::stdout(), blocks)?;
+        self.render_blocks(&mut std::io::stdout(), blocks).await?;
         Ok(())
     }
 }
@@ -415,11 +428,12 @@ impl PagedAsciiRenderer {
     }
 }
 
+#[async_trait::async_trait]
 impl MetadataRenderer for PagedAsciiRenderer {
-    fn show(
-        &mut self,
+    async fn show<'a>(
+        &'a mut self,
         dataset_handle: &DatasetHandle,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
+        blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
         pager
@@ -428,7 +442,8 @@ impl MetadataRenderer for PagedAsciiRenderer {
         pager.set_prompt(&dataset_handle.name).unwrap();
 
         let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone());
-        renderer.render_blocks(&mut WritePager(&mut pager), blocks)?;
+        let mut write = WritePager(&mut pager);
+        renderer.render_blocks(&mut write, blocks).await?;
 
         minus::page_all(pager).unwrap();
         Ok(())
@@ -459,11 +474,11 @@ impl YamlRenderer {
         Self
     }
 
-    fn render_blocks(
-        output: &mut impl Write,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
-    ) -> Result<(), std::io::Error> {
-        for (hash, block) in blocks {
+    async fn render_blocks<'a, 'b>(
+        output: &'a mut impl Write,
+        mut blocks: DynMetadataStream<'b>,
+    ) -> Result<(), CLIError> {
+        while let Some((hash, block)) = blocks.try_next().await? {
             Self::render_block(output, &hash, &block)?;
         }
         Ok(())
@@ -480,13 +495,14 @@ impl YamlRenderer {
     }
 }
 
+#[async_trait::async_trait]
 impl MetadataRenderer for YamlRenderer {
-    fn show(
-        &mut self,
+    async fn show<'a>(
+        &'a mut self,
         _dataset_handle: &DatasetHandle,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
+        blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
-        Self::render_blocks(&mut std::io::stdout(), blocks)?;
+        Self::render_blocks(&mut std::io::stdout(), blocks).await?;
         Ok(())
     }
 }
@@ -501,11 +517,12 @@ impl PagedYamlRenderer {
     }
 }
 
+#[async_trait::async_trait]
 impl MetadataRenderer for PagedYamlRenderer {
-    fn show(
-        &mut self,
+    async fn show<'a>(
+        &'a mut self,
         dataset_handle: &DatasetHandle,
-        blocks: &mut dyn Iterator<Item = (Multihash, MetadataBlock)>,
+        blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
         pager
@@ -513,8 +530,12 @@ impl MetadataRenderer for PagedYamlRenderer {
             .unwrap();
         pager.set_prompt(&dataset_handle.name).unwrap();
 
-        YamlRenderer::render_blocks(&mut WritePager(&mut pager), blocks)?;
-        minus::page_all(pager).unwrap();
+        {
+            let mut write = WritePager(&mut pager);
+
+            YamlRenderer::render_blocks(&mut write, blocks).await?;
+            minus::page_all(pager).unwrap();
+        }
         Ok(())
     }
 }

@@ -12,7 +12,9 @@ use crate::scalars::*;
 use crate::utils::*;
 
 use async_graphql::*;
+use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::MetadataChainExt;
 use opendatafabric as odf;
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -43,17 +45,24 @@ impl MetadataChain {
     }
 
     #[graphql(skip)]
-    fn get_chain(&self, ctx: &Context<'_>) -> Result<Box<dyn domain::MetadataChain>> {
-        let dataset_reg = from_catalog::<dyn domain::DatasetRegistry>(ctx).unwrap();
-        Ok(dataset_reg.get_metadata_chain(&self.dataset_handle.as_local_ref())?)
+    async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset = local_repo
+            .get_dataset(&self.dataset_handle.as_local_ref())
+            .await?;
+        Ok(dataset)
     }
 
     /// Returns all named metadata block references
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
-        let chain = self.get_chain(ctx)?;
+        let dataset = self.get_dataset(ctx).await?;
         Ok(vec![BlockRef {
             name: "head".to_owned(),
-            block_hash: chain.read_ref(&domain::BlockRef::Head).unwrap().into(),
+            block_hash: dataset
+                .as_metadata_chain()
+                .get_ref(&domain::BlockRef::Head)
+                .await?
+                .into(),
         }])
     }
 
@@ -63,14 +72,14 @@ impl MetadataChain {
         ctx: &Context<'_>,
         hash: Multihash,
     ) -> Result<Option<MetadataBlockExtended>> {
-        let chain = self.get_chain(ctx)?;
-        Ok(chain
-            .get_block(&hash)
-            .map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
+        let dataset = self.get_dataset(ctx).await?;
+        let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
+        Ok(block.map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
     }
 
     // TODO: Add ref parameter (defaulting to "head")
     // TODO: Support before/after style iteration
+    // TODO: PERF: Avoid traversing entire chain
     /// Iterates all metadata blocks in the reverse chronological order
     async fn blocks(
         &self,
@@ -78,20 +87,25 @@ impl MetadataChain {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<MetadataBlockConnection> {
-        let chain = self.get_chain(ctx)?;
+        let dataset = self.get_dataset(ctx).await?;
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_BLOCKS_PER_PAGE);
 
-        let nodes: Vec<_> = chain
+        let blocks: Vec<_> = dataset
+            .as_metadata_chain()
             .iter_blocks()
+            .try_collect()
+            .await?;
+
+        let total_count = blocks.len();
+
+        let nodes: Vec<_> = blocks
+            .into_iter()
             .skip(page * per_page)
             .take(per_page)
             .map(|(hash, block)| MetadataBlockExtended::new(hash, block, Account::mock()))
             .collect();
-
-        // TODO: PERF: Slow but temporary
-        let total_count = chain.iter_blocks().count();
 
         Ok(MetadataBlockConnection::new(
             nodes,
