@@ -222,7 +222,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let ds = Self::get_s3(url)?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            "ipfs" => {
+            scheme @ ("ipfs" | "ipns") => {
                 let cid = match url.host() {
                     Some(url::Host::Domain(cid)) => Ok(cid),
                     _ => Err("Malformed IPFS URL").int_err(),
@@ -231,7 +231,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let gw_url = self
                     .ipfs_gateway
                     .url
-                    .join(&format!("ipfs/{}{}", cid, url.path()))
+                    .join(&format!("{}/{}{}", scheme, cid, url.path()))
                     .unwrap();
 
                 info!(ipfs_url = %url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
