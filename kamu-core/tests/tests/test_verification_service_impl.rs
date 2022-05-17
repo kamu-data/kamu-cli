@@ -30,7 +30,7 @@ async fn test_verify_data_consistency() {
     let dataset_name = DatasetName::new_unchecked("bar");
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
-    let dataset_layout = DatasetLayout::create(&volume_layout, &dataset_name).unwrap();
+    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
 
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 

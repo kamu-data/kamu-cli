@@ -207,6 +207,26 @@ impl LocalDatasetRepositoryImpl {
             &dataset_name,
         );
 
+        assert!(
+            !dest_path.exists(),
+            "Atomic move target exists: {:?}",
+            dest_path
+        );
+        assert!(
+            !dest_layout.cache_dir.exists(),
+            "Atomic move target exists: {:?}",
+            dest_layout.cache_dir
+        );
+        assert!(
+            !dest_layout.data_dir.exists(),
+            "Atomic move target exists: {:?}",
+            dest_layout.data_dir
+        );
+        assert!(
+            !dest_layout.checkpoints_dir.exists(),
+            "Atomic move target exists: {:?}",
+            dest_layout.data_dir
+        );
         std::fs::rename(&dataset_path, dest_path).int_err()?;
         std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).int_err()?;
         std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).int_err()?;
@@ -523,6 +543,26 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         let old_layout = DatasetLayout::new(&vol, &old_name);
         let new_layout = DatasetLayout::new(&vol, &new_name);
 
+        assert!(
+            !new_meta_path.exists(),
+            "Atomic move target exists: {:?}",
+            new_meta_path
+        );
+        assert!(
+            !new_layout.cache_dir.exists(),
+            "Atomic move target exists: {:?}",
+            new_layout.cache_dir
+        );
+        assert!(
+            !new_layout.data_dir.exists(),
+            "Atomic move target exists: {:?}",
+            new_layout.data_dir
+        );
+        assert!(
+            !new_layout.checkpoints_dir.exists(),
+            "Atomic move target exists: {:?}",
+            new_layout.data_dir
+        );
         std::fs::rename(old_meta_path, new_meta_path).int_err()?;
         std::fs::rename(old_layout.cache_dir, new_layout.cache_dir).int_err()?;
         std::fs::rename(old_layout.data_dir, new_layout.data_dir).int_err()?;

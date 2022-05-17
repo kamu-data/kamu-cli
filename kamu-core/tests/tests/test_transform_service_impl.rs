@@ -152,7 +152,7 @@ async fn test_get_verification_plan_one_to_one() {
     // Create root dataset
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
     let root_name = DatasetName::new_unchecked("foo");
-    let root_layout = DatasetLayout::create(volume_layout.as_ref(), &root_name).unwrap();
+    let root_layout = DatasetLayout::new(volume_layout.as_ref(), &root_name);
     let (root_hdl, root_head_src) = local_repo
         .create_dataset_from_blocks(
             &root_name,
