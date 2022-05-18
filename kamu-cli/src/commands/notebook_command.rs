@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,
-    volume_layout: Arc<VolumeLayout>,
     container_runtime: Arc<ContainerRuntime>,
     output_config: Arc<OutputConfig>,
     env_vars: Vec<(String, Option<String>)>,
@@ -28,7 +27,6 @@ pub struct NotebookCommand {
 impl NotebookCommand {
     pub fn new<Iter, Str>(
         workspace_layout: Arc<WorkspaceLayout>,
-        volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         env_vars: Iter,
@@ -39,7 +37,6 @@ impl NotebookCommand {
     {
         Self {
             workspace_layout,
-            volume_layout,
             container_runtime: container_runtime,
             output_config,
             env_vars: env_vars
@@ -95,7 +92,6 @@ impl Command for NotebookCommand {
 
         notebook_server.run(
             &self.workspace_layout,
-            &self.volume_layout,
             environment_vars,
             self.output_config.verbosity_level > 0,
             move |url| {

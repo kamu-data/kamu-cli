@@ -27,23 +27,23 @@ use std::{
 use tracing::info_span;
 
 use crate::domain::*;
-
-use super::{utils::datafusion_hacks::ListingTableOfFiles, DatasetLayout, VolumeLayout};
+use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
+use crate::infra::*;
 
 pub struct QueryServiceImpl {
     local_repo: Arc<dyn LocalDatasetRepository>,
-    volume_layout: Arc<VolumeLayout>,
+    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 #[component(pub)]
 impl QueryServiceImpl {
     pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
-        volume_layout: Arc<VolumeLayout>,
+        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
             local_repo,
-            volume_layout,
+            workspace_layout,
         }
     }
 }
@@ -152,7 +152,7 @@ impl QueryService for QueryServiceImpl {
             "kamu",
             Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
                 self.local_repo.clone(),
-                self.volume_layout.clone(),
+                self.workspace_layout.clone(),
                 options,
             )))),
         );
@@ -167,7 +167,8 @@ impl QueryService for QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        // TODO: This service shouldn't know the specifics of dataset layouts
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
         let last_data_file = dataset
             .as_metadata_chain()
@@ -225,19 +226,19 @@ impl CatalogProvider for KamuCatalog {
 #[derive(Clone)]
 struct KamuSchema {
     local_repo: Arc<dyn LocalDatasetRepository>,
-    volume_layout: Arc<VolumeLayout>,
+    workspace_layout: Arc<WorkspaceLayout>,
     options: QueryOptions,
 }
 
 impl KamuSchema {
     fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
-        volume_layout: Arc<VolumeLayout>,
+        workspace_layout: Arc<WorkspaceLayout>,
         options: QueryOptions,
     ) -> Self {
         Self {
             local_repo,
-            volume_layout,
+            workspace_layout,
             options,
         }
     }
@@ -267,7 +268,7 @@ impl KamuSchema {
         dataset_handle: &DatasetHandle,
         limit: Option<u64>,
     ) -> Result<Vec<PathBuf>, InternalError> {
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
         if let Ok(dataset) = self
             .local_repo

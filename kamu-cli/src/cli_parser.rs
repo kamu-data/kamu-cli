@@ -325,9 +325,7 @@ pub fn cli() -> Command<'static> {
 
                     It is recommended to create one kamu workspace per data science project, grouping all related datasets together.
 
-                    Initializing a workspace creates two directories:
-                        .kamu - contains dataset metadata as well as all supporting files (configs, known repositories etc.)
-                        .kamu.local - a local data volume where all raw data is stored
+                    Initializing a workspace creates a `.kamu` directory contains dataset metadata, data, and all supporting files (configs, known repositories etc.).
                     "
                 )),
             Command::new("inspect")

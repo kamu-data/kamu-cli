@@ -26,7 +26,6 @@ use thiserror::Error;
 // Test wrapper on top of CLI library
 pub struct Kamu {
     workspace_layout: WorkspaceLayout,
-    volume_layout: VolumeLayout,
     workspace_path: PathBuf,
     _temp_dir: Option<tempfile::TempDir>,
 }
@@ -34,11 +33,9 @@ pub struct Kamu {
 impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
-        let workspace_layout = WorkspaceLayout::new(&workspace_path);
-        let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+        let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
         Self {
             workspace_layout,
-            volume_layout,
             workspace_path,
             _temp_dir: None,
         }
@@ -66,12 +63,8 @@ impl Kamu {
         &self.workspace_path
     }
 
-    //pub fn volume_layout(&self) -> &VolumeLayout {
-    //    &self.volume_layout
-    //}
-
     pub fn dataset_layout(&self, dataset_name: &DatasetName) -> DatasetLayout {
-        DatasetLayout::new(&self.volume_layout, dataset_name)
+        self.workspace_layout.dataset_layout(dataset_name)
     }
 
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
@@ -106,16 +99,12 @@ impl Kamu {
         let app = kamu_cli::cli();
         let matches = app.try_get_matches_from(&full_cmd).unwrap();
 
-        kamu_cli::run(
-            self.workspace_layout.clone(),
-            self.volume_layout.clone(),
-            matches,
-        )
-        .await
-        .map_err(|e| CommandError {
-            cmd: full_cmd,
-            error: e,
-        })
+        kamu_cli::run(self.workspace_layout.clone(), matches)
+            .await
+            .map_err(|e| CommandError {
+                cmd: full_cmd,
+                error: e,
+            })
     }
 
     pub async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) -> Result<(), CommandError> {

@@ -20,7 +20,6 @@ use std::sync::Arc;
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
     workspace_layout: Arc<WorkspaceLayout>,
-    volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     command: Option<String>,
@@ -32,7 +31,6 @@ impl SqlShellCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         workspace_layout: Arc<WorkspaceLayout>,
-        volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         command: Option<&str>,
@@ -42,7 +40,6 @@ impl SqlShellCommand {
         Self {
             query_svc,
             workspace_layout,
-            volume_layout,
             output_config,
             container_runtime,
             command: command.map(|v| v.to_owned()),
@@ -71,7 +68,6 @@ impl SqlShellCommand {
 
         sql_shell.run(
             &self.workspace_layout,
-            &self.volume_layout,
             match self.output_config.format {
                 OutputFormat::Csv => Some("csv"),
                 OutputFormat::Json => Some("json"),

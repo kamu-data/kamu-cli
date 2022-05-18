@@ -17,7 +17,7 @@ use tracing::info;
 use std::sync::Arc;
 
 pub struct IngestServiceImpl {
-    volume_layout: Arc<VolumeLayout>,
+    workspace_layout: Arc<WorkspaceLayout>,
     local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
@@ -25,20 +25,15 @@ pub struct IngestServiceImpl {
 #[component(pub)]
 impl IngestServiceImpl {
     pub fn new(
-        volume_layout: Arc<VolumeLayout>,
+        workspace_layout: Arc<WorkspaceLayout>,
         local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
-            volume_layout,
+            workspace_layout,
             local_repo,
             engine_provisioner,
         }
-    }
-
-    // TODO: error handling
-    fn get_dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
-        DatasetLayout::create(&self.volume_layout, &dataset_handle.name).unwrap()
     }
 
     // TODO: Introduce intermediate structs to avoid full unpacking
@@ -99,7 +94,9 @@ impl IngestServiceImpl {
     ) -> Result<IngestResult, IngestError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
-        let layout = self.get_dataset_layout(&dataset_handle);
+        // TODO: This service should not know the dataset layout specifics
+        // Consider getting layout from LocalDatasetRepository
+        let layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
         let dataset = self
             .local_repo

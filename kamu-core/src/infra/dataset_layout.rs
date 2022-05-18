@@ -7,38 +7,53 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::VolumeLayout;
-use opendatafabric::{DataSlice, DatasetName, Multihash};
+use opendatafabric::{DataSlice, Multihash};
 use std::path::PathBuf;
 
 /// Describes the layout of the dataset on disk
 #[derive(Debug, Clone)]
 pub struct DatasetLayout {
-    /// Path to the directory containing actual data
+    /// Top-level dataset directory
+    pub root_dir: PathBuf,
+    /// Directory containing the metadata chain
+    pub blocks_dir: PathBuf,
+    /// Directory containing the named block references
+    pub refs_dir: PathBuf,
+    /// Directory containing the data part files
     pub data_dir: PathBuf,
-    /// Path to the checkpoints directory
+    /// Directory containing the checkpoint files
     pub checkpoints_dir: PathBuf,
-    /// Stores data that is not essential but can improve performance of operations like data polling
+    /// Directory containing auxiliary information (e.g. summary, lookup tables etc.)
+    pub info_dir: PathBuf,
+    /// Directory containing data that is not essential but can improve performance of operations like data polling
     pub cache_dir: PathBuf,
 }
 
 impl DatasetLayout {
-    pub fn new(volume_layout: &VolumeLayout, dataset_name: &DatasetName) -> Self {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        let root_dir = root.into();
         Self {
-            data_dir: volume_layout.data_dir.join(dataset_name),
-            checkpoints_dir: volume_layout.checkpoints_dir.join(dataset_name),
-            cache_dir: volume_layout.cache_dir.join(dataset_name),
+            blocks_dir: root_dir.join("blocks"),
+            refs_dir: root_dir.join("refs"),
+            data_dir: root_dir.join("data"),
+            checkpoints_dir: root_dir.join("checkpoints"),
+            info_dir: root_dir.join("info"),
+            cache_dir: root_dir.join("cache"),
+            root_dir,
         }
     }
 
-    pub fn create(
-        volume_layout: &VolumeLayout,
-        dataset_name: &DatasetName,
-    ) -> Result<Self, std::io::Error> {
-        let dl = Self::new(volume_layout, dataset_name);
-        std::fs::create_dir_all(&dl.data_dir)?;
-        std::fs::create_dir_all(&dl.checkpoints_dir)?;
-        std::fs::create_dir_all(&dl.cache_dir)?;
+    pub fn create(root: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
+        let dl = Self::new(root);
+        if !dl.root_dir.exists() || dl.root_dir.read_dir()?.next().is_some() {
+            std::fs::create_dir(&dl.root_dir)?;
+        }
+        std::fs::create_dir(&dl.blocks_dir)?;
+        std::fs::create_dir(&dl.refs_dir)?;
+        std::fs::create_dir(&dl.data_dir)?;
+        std::fs::create_dir(&dl.checkpoints_dir)?;
+        std::fs::create_dir(&dl.info_dir)?;
+        std::fs::create_dir(&dl.cache_dir)?;
         Ok(dl)
     }
 

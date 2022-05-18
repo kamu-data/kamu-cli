@@ -7,42 +7,47 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use crate::infra::DatasetLayout;
+use opendatafabric::DatasetName;
+
+use std::path::PathBuf;
 
 /// Describes the layout of the workspace on disk
 #[derive(Debug, Clone)]
 pub struct WorkspaceLayout {
-    /// Root directory of all metadata and configuration
-    pub kamu_root_dir: PathBuf,
-    /// Contains dataset metadata
+    /// Workspace root
+    pub root_dir: PathBuf,
+    /// Contains datasets
     pub datasets_dir: PathBuf,
     /// Contains repository definitions
     pub repos_dir: PathBuf,
     /// Directory for storing per-run diagnostics information and logs
     pub run_info_dir: PathBuf,
-    /// Root directory of a local storage volume
-    pub local_volume_dir: PathBuf,
 }
 
 impl WorkspaceLayout {
-    pub fn new(workspace_root: &Path) -> Self {
-        let kamu_root_dir = workspace_root.join(".kamu");
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        let root_dir = root.into();
         Self {
-            datasets_dir: kamu_root_dir.join("datasets"),
-            repos_dir: kamu_root_dir.join("repos"),
-            run_info_dir: kamu_root_dir.join("run"),
-            kamu_root_dir: kamu_root_dir,
-            local_volume_dir: workspace_root.join(".kamu.local"),
+            datasets_dir: root_dir.join("datasets"),
+            repos_dir: root_dir.join("repos"),
+            run_info_dir: root_dir.join("run"),
+            root_dir,
         }
     }
 
-    pub fn create(workspace_root: &Path) -> Result<Self, std::io::Error> {
-        let ws = Self::new(workspace_root);
-        std::fs::create_dir_all(&ws.kamu_root_dir)?;
-        std::fs::create_dir_all(&ws.datasets_dir)?;
-        std::fs::create_dir_all(&ws.repos_dir)?;
-        std::fs::create_dir_all(&ws.run_info_dir)?;
-        std::fs::create_dir_all(&ws.local_volume_dir)?;
+    pub fn create(root: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
+        let ws = Self::new(root);
+        if !ws.root_dir.exists() || ws.root_dir.read_dir()?.next().is_some() {
+            std::fs::create_dir(&ws.root_dir)?;
+        }
+        std::fs::create_dir(&ws.datasets_dir)?;
+        std::fs::create_dir(&ws.repos_dir)?;
+        std::fs::create_dir(&ws.run_info_dir)?;
         Ok(ws)
+    }
+
+    pub fn dataset_layout(&self, name: &DatasetName) -> DatasetLayout {
+        DatasetLayout::new(self.datasets_dir.join(name))
     }
 }

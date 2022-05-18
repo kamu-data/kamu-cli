@@ -12,7 +12,7 @@ use crate::AlreadyInWorkspace;
 use super::{CLIError, Command};
 use kamu::infra::*;
 
-use std::{fs, sync::Arc};
+use std::sync::Arc;
 
 pub struct InitCommand {
     workspace_layout: Arc<WorkspaceLayout>,
@@ -31,14 +31,11 @@ impl Command for InitCommand {
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
-        if self.workspace_layout.kamu_root_dir.is_dir() {
+        if self.workspace_layout.root_dir.is_dir() {
             return Err(CLIError::usage_error_from(AlreadyInWorkspace));
         }
 
-        fs::create_dir_all(&self.workspace_layout.datasets_dir)?;
-        fs::create_dir_all(&self.workspace_layout.repos_dir)?;
-        fs::create_dir_all(&self.workspace_layout.run_info_dir)?;
-        fs::create_dir_all(&self.workspace_layout.local_volume_dir)?;
+        WorkspaceLayout::create(&self.workspace_layout.root_dir)?;
 
         eprintln!(
             "{}",

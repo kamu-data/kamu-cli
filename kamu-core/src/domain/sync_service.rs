@@ -42,14 +42,14 @@ pub struct SyncOptions {
     pub trust_source: Option<bool>,
 
     /// Whether destination dataset should be created if it does not exist
-    pub create_if_not_exist: bool,
+    pub create_if_not_exists: bool,
 }
 
 impl Default for SyncOptions {
     fn default() -> Self {
         Self {
             trust_source: None,
-            create_if_not_exist: true,
+            create_if_not_exists: true,
         }
     }
 }

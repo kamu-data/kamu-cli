@@ -280,11 +280,11 @@ impl SyncServiceImpl {
         &self,
         dataset_ref: &DatasetRefAny,
         url: Url,
-        ensure_exists: bool,
+        create_if_not_exists: bool,
     ) -> Result<Arc<dyn Dataset>, SyncError> {
-        let dataset = self.dataset_factory.get_dataset(url)?;
+        let dataset = self.dataset_factory.get_dataset(url, create_if_not_exists)?;
 
-        if ensure_exists {
+        if !create_if_not_exists {
             match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
                 Ok(_) => Ok(()),
                 Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
@@ -340,14 +340,14 @@ impl SyncServiceImpl {
         } else {
             let remote_ref = src.as_remote_ref().unwrap();
             let url = self.get_url_for_remote_dataset(&remote_ref)?;
-            let dataset = self.get_remote_dataset(src, url, true).await?;
+            let dataset = self.get_remote_dataset(src, url, false).await?;
             (dataset, false)
         };
 
         // Resolve destination
         let dst_dataset_builder: Box<dyn DatasetBuilder> =
             if let Some(local_ref) = dst.as_local_ref() {
-                if opts.create_if_not_exist {
+                if opts.create_if_not_exists {
                     Box::new(WrapperDatasetBuilder::new(
                         self.local_repo.get_or_create_dataset(&local_ref).await?,
                     ))
@@ -360,7 +360,7 @@ impl SyncServiceImpl {
                 let remote_ref = dst.as_remote_ref().unwrap();
                 let url = self.get_url_for_remote_dataset(&remote_ref)?;
                 let dataset = self
-                    .get_remote_dataset(dst, url, !opts.create_if_not_exist)
+                    .get_remote_dataset(dst, url, opts.create_if_not_exists)
                     .await?;
                 Box::new(NullDatasetBuilder::new(dataset))
             };

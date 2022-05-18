@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 pub struct SqlServerCommand {
     workspace_layout: Arc<WorkspaceLayout>,
-    volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     address: String,
@@ -29,7 +28,6 @@ pub struct SqlServerCommand {
 impl SqlServerCommand {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
-        volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         address: &str,
@@ -37,7 +35,6 @@ impl SqlServerCommand {
     ) -> Self {
         Self {
             workspace_layout,
-            volume_layout,
             output_config,
             container_runtime,
             address: address.to_owned(),
@@ -68,7 +65,6 @@ impl Command for SqlServerCommand {
 
         let mut spark = sql_shell.run_server(
             &self.workspace_layout,
-            &self.volume_layout,
             Vec::new(),
             Some(&self.address),
             Some(self.port),

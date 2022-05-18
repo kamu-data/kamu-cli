@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,
-    volume_layout: Arc<VolumeLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     address: String,
@@ -29,7 +28,6 @@ pub struct SqlServerLivyCommand {
 impl SqlServerLivyCommand {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
-        volume_layout: Arc<VolumeLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         address: &str,
@@ -37,7 +35,6 @@ impl SqlServerLivyCommand {
     ) -> Self {
         Self {
             workspace_layout,
-            volume_layout,
             output_config,
             container_runtime,
             address: address.to_owned(),
@@ -75,7 +72,6 @@ impl Command for SqlServerLivyCommand {
             &self.address,
             self.port,
             &self.workspace_layout,
-            &self.volume_layout,
             self.output_config.verbosity_level > 0,
             move || {
                 if let Some(s) = spinner {

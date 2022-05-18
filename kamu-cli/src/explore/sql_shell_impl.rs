@@ -36,7 +36,6 @@ impl SqlShellImpl {
     pub fn run_server(
         &self,
         workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
         mut extra_volume_map: Vec<(PathBuf, PathBuf)>,
         address: Option<&str>,
         port: Option<u16>,
@@ -53,13 +52,13 @@ impl SqlShellImpl {
         signal_hook::flag::register(libc::SIGINT, exit.clone())?;
         signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
 
-        let mut volume_map = vec![(cwd, PathBuf::from("/opt/bitnami/spark/kamu_shell"))];
-        if volume_layout.data_dir.exists() {
-            volume_map.push((
-                volume_layout.data_dir.clone(),
+        let mut volume_map = vec![
+            (cwd, PathBuf::from("/opt/bitnami/spark/kamu_shell")),
+            (
+                workspace_layout.datasets_dir.clone(),
                 PathBuf::from("/opt/bitnami/spark/kamu_data"),
-            ));
-        }
+            ),
+        ];
         volume_map.append(&mut extra_volume_map);
 
         // Start Spark container in the idle loop
@@ -190,7 +189,6 @@ impl SqlShellImpl {
     pub fn run_two_in_one<S1, S2, StartedClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
         output_format: Option<S1>,
         command: Option<S2>,
         started_clb: StartedClb,
@@ -201,11 +199,13 @@ impl SqlShellImpl {
         StartedClb: FnOnce() + Send + 'static,
     {
         let init_script_path = workspace_layout.run_info_dir.join("shell_init.sql");
-        std::fs::write(&init_script_path, Self::prepare_shell_init(volume_layout)?)?;
+        std::fs::write(
+            &init_script_path,
+            Self::prepare_shell_init(workspace_layout)?,
+        )?;
 
         let mut spark = self.run_server(
             workspace_layout,
-            volume_layout,
             vec![(
                 init_script_path,
                 PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
@@ -254,7 +254,6 @@ impl SqlShellImpl {
     pub fn run<S1, S2, StartedClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
         output_format: Option<S1>,
         url: Option<String>,
         command: Option<S2>,
@@ -269,32 +268,32 @@ impl SqlShellImpl {
             started_clb();
             self.run_shell(output_format, command, url)
         } else {
-            self.run_two_in_one(
-                workspace_layout,
-                volume_layout,
-                output_format,
-                command,
-                started_clb,
-            )
+            self.run_two_in_one(workspace_layout, output_format, command, started_clb)
         }
     }
 
-    fn prepare_shell_init(volume_layout: &VolumeLayout) -> Result<String, std::io::Error> {
+    // TODO: Too many layout assumptions here
+    fn prepare_shell_init(workspace_layout: &WorkspaceLayout) -> Result<String, std::io::Error> {
         use std::fmt::Write;
 
-        if !volume_layout.data_dir.exists() {
-            return Ok(String::default());
-        }
-
         let mut ret = String::with_capacity(2048);
-        for entry in std::fs::read_dir(&volume_layout.data_dir)? {
+        for entry in std::fs::read_dir(&workspace_layout.datasets_dir)? {
             let p = entry?.path();
-            writeln!(
-                ret,
-                "CREATE TEMP VIEW `{0}` AS (SELECT * FROM parquet.`kamu_data/{0}`);",
-                p.file_name().unwrap().to_str().unwrap()
-            )
-            .unwrap();
+            if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
+                if name.starts_with(".") {
+                    continue;
+                }
+
+                let layout = DatasetLayout::new(&p);
+                if layout.data_dir.exists() {
+                    writeln!(
+                        ret,
+                        "CREATE TEMP VIEW `{0}` AS (SELECT * FROM parquet.`kamu_data/{0}/data`);",
+                        name
+                    )
+                    .unwrap();
+                }
+            }
         }
         Ok(ret)
     }

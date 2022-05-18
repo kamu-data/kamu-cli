@@ -17,7 +17,8 @@ use std::assert_matches::assert_matches;
 #[tokio::test]
 async fn test_summary_updates() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let ds = DatasetFactoryImpl::create_local_fs(tmp_dir.path()).unwrap();
+    let layout = DatasetLayout::create(tmp_dir.path()).unwrap();
+    let ds = DatasetFactoryImpl::get_local_fs(layout);
 
     assert_matches!(
         ds.get_summary(SummaryOptions::default()).await,

@@ -11,7 +11,6 @@ use crate::domain::*;
 use crate::infra::*;
 
 use dill::*;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::info;
 use url::Url;
@@ -56,84 +55,16 @@ impl DatasetFactoryImpl {
         Self { ipfs_gateway }
     }
 
-    // TODO: Eliminate
-    pub fn get_local_fs_legacy(
-        meta_dir: PathBuf,
-        layout: DatasetLayout,
-    ) -> Result<DatasetImplLocalFS, InternalError> {
-        let blocks_dir = meta_dir.join("blocks");
-        let refs_dir = meta_dir.join("refs");
-        Ok(DatasetImpl::new(
+    pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
+        DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(blocks_dir),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
+                ObjectRepositoryLocalFS::new(layout.blocks_dir),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
             ObjectRepositoryLocalFS::new(layout.data_dir),
             ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(meta_dir),
-        ))
-    }
-
-    pub fn get_or_create_local_fs<P: AsRef<Path>>(
-        root: P,
-    ) -> Result<DatasetImplLocalFS, InternalError> {
-        let root = root.as_ref();
-        if !root.exists() || root.read_dir().int_err()?.next().is_none() {
-            Self::create_local_fs(root)
-        } else {
-            Self::get_local_fs(root)
-        }
-    }
-
-    pub fn get_local_fs<P: AsRef<Path>>(root: P) -> Result<DatasetImplLocalFS, InternalError> {
-        let root = root.as_ref();
-        let blocks_dir = root.join("blocks");
-        let refs_dir = root.join("refs");
-        let data_dir = root.join("data");
-        let checkpoints_dir = root.join("checkpoints");
-        let info_dir = root.join("info");
-
-        Ok(DatasetImpl::new(
-            MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(blocks_dir),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
-            ),
-            ObjectRepositoryLocalFS::new(data_dir),
-            ObjectRepositoryLocalFS::new(checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(info_dir),
-        ))
-    }
-
-    pub fn create_local_fs<P: AsRef<Path>>(root: P) -> Result<DatasetImplLocalFS, InternalError> {
-        let root = root.as_ref();
-        if !root.exists() {
-            std::fs::create_dir(&root).int_err()?;
-        }
-
-        let blocks_dir = root.join("blocks");
-        std::fs::create_dir(&blocks_dir).int_err()?;
-
-        let refs_dir = root.join("refs");
-        std::fs::create_dir(&refs_dir).int_err()?;
-
-        let data_dir = root.join("data");
-        std::fs::create_dir(&data_dir).int_err()?;
-
-        let checkpoints_dir = root.join("checkpoints");
-        std::fs::create_dir(&checkpoints_dir).int_err()?;
-
-        let info_dir = root.join("info");
-        std::fs::create_dir(&info_dir).int_err()?;
-
-        Ok(DatasetImpl::new(
-            MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(blocks_dir),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir)),
-            ),
-            ObjectRepositoryLocalFS::new(data_dir),
-            ObjectRepositoryLocalFS::new(checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(info_dir),
-        ))
+            NamedObjectRepositoryLocalFS::new(layout.info_dir),
+        )
     }
 
     pub fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
@@ -208,10 +139,23 @@ impl DatasetFactoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetFactory for DatasetFactoryImpl {
-    fn get_dataset(&self, url: Url) -> Result<Arc<dyn Dataset>, BuildDatasetError> {
+    fn get_dataset(
+        &self,
+        url: Url,
+        create_if_not_exists: bool,
+    ) -> Result<Arc<dyn Dataset>, BuildDatasetError> {
         match url.scheme() {
             "file" => {
-                let ds = Self::get_or_create_local_fs(url.to_file_path().unwrap())?;
+                let path = url
+                    .to_file_path()
+                    .map_err(|_| "Invalid file url".int_err())?;
+                let layout = if create_if_not_exists && !path.exists() {
+                    std::fs::create_dir_all(&path).int_err()?;
+                    DatasetLayout::create(path).int_err()?
+                } else {
+                    DatasetLayout::new(path)
+                };
+                let ds = Self::get_local_fs(layout);
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" => {

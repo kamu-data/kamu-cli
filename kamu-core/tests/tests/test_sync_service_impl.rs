@@ -66,32 +66,28 @@ fn assert_in_sync(
     dataset_name_1: &DatasetName,
     dataset_name_2: &DatasetName,
 ) {
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
+    let dataset_1_layout = workspace_layout.dataset_layout(dataset_name_1);
+    let dataset_2_layout = workspace_layout.dataset_layout(dataset_name_2);
 
-    let dataset_1_layout = DatasetLayout::new(&volume_layout, dataset_name_1);
-    let dataset_2_layout = DatasetLayout::new(&volume_layout, dataset_name_2);
-
-    let meta_dir_1 = workspace_layout.datasets_dir.join(dataset_name_1);
-    let meta_dir_2 = workspace_layout.datasets_dir.join(dataset_name_2);
-
-    let blocks_dir_1 = meta_dir_1.join("blocks");
-    let blocks_dir_2 = meta_dir_2.join("blocks");
-
-    let refs_dir_1 = meta_dir_1.join("refs");
-    let refs_dir_2 = meta_dir_2.join("refs");
-
-    assert_eq!(list_files(&blocks_dir_1), list_files(&blocks_dir_2));
+    assert_eq!(
+        list_files(&dataset_1_layout.blocks_dir),
+        list_files(&dataset_2_layout.blocks_dir)
+    );
+    assert_eq!(
+        list_files(&dataset_1_layout.refs_dir),
+        list_files(&dataset_2_layout.refs_dir)
+    );
     assert_eq!(
         list_files(&dataset_1_layout.data_dir),
         list_files(&dataset_2_layout.data_dir)
     );
     assert_eq!(
         list_files(&dataset_1_layout.checkpoints_dir),
-        list_files(&dataset_2_layout.checkpoints_dir),
+        list_files(&dataset_2_layout.checkpoints_dir)
     );
 
-    let head_1 = std::fs::read_to_string(refs_dir_1.join("head")).unwrap();
-    let head_2 = std::fs::read_to_string(refs_dir_2.join("head")).unwrap();
+    let head_1 = std::fs::read_to_string(dataset_1_layout.refs_dir.join("head")).unwrap();
+    let head_2 = std::fs::read_to_string(dataset_2_layout.refs_dir.join("head")).unwrap();
     assert_eq!(head_1, head_2);
 }
 
@@ -129,9 +125,8 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let dataset_name_2 = DatasetName::new_unchecked("bar");
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let volume_layout = VolumeLayout::new(&workspace_layout.local_volume_dir);
-    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
-    let dataset_layout_2 = DatasetLayout::new(&volume_layout, &dataset_name_2);
+    let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
+    let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(IpfsGateway::default()));
@@ -195,7 +190,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
         sync_svc.sync(
             &dataset_name.as_any_ref(),
             &push_remote_dataset_name.as_any_ref(),
-            SyncOptions { create_if_not_exist: false, ..Default::default() },
+            SyncOptions { create_if_not_exists: false, ..Default::default() },
             None
         ).await,
         Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_remote_dataset_name.as_any_ref()

@@ -23,7 +23,7 @@ path = hadoop.fs.Path("{dataset_id}")
 if not fs.exists(path):
     raise Exception("Dataset {dataset_id} does not exist")
 
-{alias} = spark.read.parquet(str(path) + "/*")
+{alias} = spark.read.parquet(str(path) + "/data/*")
 {alias}.createOrReplaceTempView("`{dataset_id}`")
 {alias}.createOrReplaceTempView("{alias}")
 """

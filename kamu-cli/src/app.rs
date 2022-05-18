@@ -35,7 +35,6 @@ const VERBOSE_LOGGING_CONFIG: &str = "debug";
 
 pub async fn run(
     workspace_layout: WorkspaceLayout,
-    local_volume_layout: VolumeLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
     prepare_run_dir(&workspace_layout.run_info_dir);
@@ -44,7 +43,6 @@ pub async fn run(
     let (_log_thread, catalog) = {
         let mut catalog_builder = configure_catalog();
         catalog_builder.add_value(workspace_layout.clone());
-        catalog_builder.add_value(local_volume_layout.clone());
 
         let output_format = configure_output_format(&matches);
         catalog_builder.add_value(output_format.clone());
@@ -53,6 +51,7 @@ pub async fn run(
         info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
+            workspace_root = ?workspace_layout.root_dir,
             "Initializing kamu-cli"
         );
 
@@ -197,14 +196,14 @@ pub fn find_workspace() -> WorkspaceLayout {
     if let Some(ws) = find_workspace_rec(&cwd) {
         ws
     } else {
-        WorkspaceLayout::new(&cwd)
+        WorkspaceLayout::new(cwd.join(".kamu"))
     }
 }
 
 fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
     let root_dir = p.join(".kamu");
     if root_dir.exists() {
-        Some(WorkspaceLayout::new(p))
+        Some(WorkspaceLayout::new(root_dir))
     } else if let Some(parent) = p.parent() {
         find_workspace_rec(parent)
     } else {
@@ -213,7 +212,7 @@ fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
 }
 
 pub(crate) fn in_workspace(workspace_layout: Arc<WorkspaceLayout>) -> bool {
-    workspace_layout.kamu_root_dir.is_dir()
+    workspace_layout.root_dir.is_dir()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

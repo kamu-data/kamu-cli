@@ -29,15 +29,14 @@ async fn test_verify_data_consistency() {
 
     let dataset_name = DatasetName::new_unchecked("bar");
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
-    let dataset_layout = DatasetLayout::new(&volume_layout, &dataset_name);
+    let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
 
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
         local_repo.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
-        volume_layout.clone(),
+        workspace_layout.clone(),
     ));
 
     local_repo

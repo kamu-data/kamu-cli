@@ -1,7 +1,7 @@
 IMAGE_REPO = docker.io/kamudata
-IMAGE_JUPYTER_TAG = 0.2.0
+IMAGE_JUPYTER_TAG = 0.3.0
 
-KAMU_VERSION = 0.86.0
+KAMU_VERSION = 0.87.0
 
 
 .PHONY: jupyter
@@ -39,7 +39,6 @@ kamu-base-push:
 kamu-base-with-data:
 	# Make sure to run first: cargo run --bin create-test-workspace
 	cp -r ../examples/covid kamu-base-with-data/workspace
-	rm -rf kamu-base-with-data/workspace/.kamu.local/cache
 	
 	docker build \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
@@ -65,7 +64,6 @@ kamu-dev:
 
 	# Make sure to run first: cargo run --bin create-test-workspace
 	cp -r ../examples/covid dev/workspace
-	rm -rf dev/workspace/.kamu.local/cache
 
 	docker build \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \

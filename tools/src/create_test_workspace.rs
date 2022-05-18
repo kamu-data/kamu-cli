@@ -76,7 +76,6 @@ fn main() {
 
 fn init_workspace(work_dir: &Path, force: bool) {
     let kamu_root = work_dir.join(".kamu");
-    let kamu_volume = work_dir.join(".kamu.local");
     if kamu_root.exists() {
         if !force {
             panic!(
@@ -86,7 +85,6 @@ fn init_workspace(work_dir: &Path, force: bool) {
         }
 
         std::fs::remove_dir_all(kamu_root).unwrap();
-        std::fs::remove_dir_all(kamu_volume).unwrap();
     }
 
     Command::new("kamu")

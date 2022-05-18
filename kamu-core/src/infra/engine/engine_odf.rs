@@ -62,7 +62,7 @@ impl ODFEngine {
             &self.image,
             &run_info,
             vec![(
-                self.workspace_layout.local_volume_dir.clone(),
+                self.workspace_layout.datasets_dir.clone(),
                 PathBuf::from(Self::CT_VOLUME_DIR),
             )],
         )?;
@@ -108,16 +108,12 @@ impl ODFEngine {
 
     fn to_container_path(&self, host_path: &Path) -> PathBuf {
         let host_path = Self::canonicalize_via_parent(host_path).unwrap();
-        let volume_path = self
-            .workspace_layout
-            .local_volume_dir
-            .canonicalize()
-            .unwrap();
-        let volume_rel_path = host_path.strip_prefix(volume_path).unwrap();
+        let datasets_path = self.workspace_layout.datasets_dir.canonicalize().unwrap();
+        let repo_rel_path = host_path.strip_prefix(datasets_path).unwrap();
 
         let mut container_path = Self::CT_VOLUME_DIR.to_owned();
         container_path.push('/');
-        container_path.push_str(&volume_rel_path.to_string_lossy());
+        container_path.push_str(&repo_rel_path.to_string_lossy());
         PathBuf::from(container_path)
     }
 

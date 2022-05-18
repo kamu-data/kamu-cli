@@ -28,7 +28,7 @@ use tracing::info_span;
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    volume_layout: Arc<VolumeLayout>,
+    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 #[component(pub)]
@@ -36,12 +36,12 @@ impl TransformServiceImpl {
     pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        volume_layout: Arc<VolumeLayout>,
+        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
             local_repo,
             engine_provisioner,
-            volume_layout,
+            workspace_layout,
         }
     }
 
@@ -345,7 +345,9 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
 
-        let output_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        // TODO: This service shouldn't know specifics of dataset layouts
+        // perhaps it should only receive a staging file to write into from Dataset interface
+        let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
         let out_data_path = output_layout.data_dir.join(".pending");
         let prev_checkpoint_path = prev_checkpoint
             .as_ref()
@@ -497,7 +499,7 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
         let input_chain = input_dataset.as_metadata_chain();
-        let input_layout = DatasetLayout::new(&self.volume_layout, &input_handle.name);
+        let input_layout = self.workspace_layout.dataset_layout(&input_handle.name);
 
         // List of part files and watermarks that will be used by the engine
         // Note: Engine will still filter the records by the offset interval
@@ -676,7 +678,7 @@ impl TransformServiceImpl {
         let source = source.ok_or(
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
@@ -763,7 +765,7 @@ impl TransformServiceImpl {
         // TODO: There might be more operations to do
         // TODO: Inject time source
         if let Some(operation) = self.get_next_operation(&dataset_handle, Utc::now()).await? {
-            let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+            let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
             let dataset = self
                 .local_repo

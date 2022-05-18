@@ -4,8 +4,6 @@
 /kamu-core-test/target
 /kamu-cli/target
 /examples/**/.kamu
-/examples/**/.kamu.local
 /examples/**/.ipynb_checkpoints
 /images/demo/**/.kamu
-/images/demo/**/.kamu.local
 /images/demo/**/.ipynb_checkpoints

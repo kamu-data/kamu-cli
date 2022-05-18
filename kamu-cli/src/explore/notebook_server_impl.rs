@@ -39,7 +39,6 @@ impl NotebookServerImpl {
     pub fn run<StartedClb, ShutdownClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
         environment_vars: Vec<(String, String)>,
         inherit_stdio: bool,
         on_started: StartedClb,
@@ -75,14 +74,10 @@ impl NotebookServerImpl {
             network: Some(network_name.to_owned()),
             user: Some("root".to_owned()),
             work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
-            volume_map: if volume_layout.data_dir.exists() {
-                vec![(
-                    volume_layout.data_dir.clone(),
-                    PathBuf::from("/opt/bitnami/spark/work-dir"),
-                )]
-            } else {
-                vec![]
-            },
+            volume_map: vec![(
+                workspace_layout.datasets_dir.clone(),
+                PathBuf::from("/opt/bitnami/spark/work-dir"),
+            )],
             entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
             ..RunArgs::default()
         });

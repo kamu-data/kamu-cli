@@ -200,7 +200,7 @@ pub struct ConfigService {
 impl ConfigService {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         Self {
-            workspace_kamu_dir: workspace_layout.kamu_root_dir.clone(),
+            workspace_kamu_dir: workspace_layout.root_dir.clone(),
         }
     }
 

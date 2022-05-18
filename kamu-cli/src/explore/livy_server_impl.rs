@@ -38,7 +38,6 @@ impl LivyServerImpl {
         addr: &str,
         host_port: u16,
         workspace_layout: &WorkspaceLayout,
-        volume_layout: &VolumeLayout,
         inherit_stdio: bool,
         on_started: StartedClb,
     ) -> Result<(), std::io::Error>
@@ -57,14 +56,10 @@ impl LivyServerImpl {
             user: Some("root".to_owned()),
             expose_port_map_addr: vec![(addr.to_owned(), host_port, LIVY_PORT)],
             work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
-            volume_map: if volume_layout.data_dir.exists() {
-                vec![(
-                    volume_layout.data_dir.clone(),
-                    PathBuf::from("/opt/bitnami/spark/work-dir"),
-                )]
-            } else {
-                vec![]
-            },
+            volume_map: vec![(
+                workspace_layout.datasets_dir.clone(),
+                PathBuf::from("/opt/bitnami/spark/work-dir"),
+            )],
             ..RunArgs::default()
         });
 

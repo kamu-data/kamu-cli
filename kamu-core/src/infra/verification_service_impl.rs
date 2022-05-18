@@ -18,7 +18,7 @@ use tracing::info_span;
 pub struct VerificationServiceImpl {
     local_repo: Arc<dyn LocalDatasetRepository>,
     transform_service: Arc<dyn TransformService>,
-    volume_layout: Arc<VolumeLayout>,
+    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 #[component(pub)]
@@ -26,12 +26,12 @@ impl VerificationServiceImpl {
     pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
         transform_service: Arc<dyn TransformService>,
-        volume_layout: Arc<VolumeLayout>,
+        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
             local_repo,
             transform_service,
-            volume_layout,
+            workspace_layout,
         }
     }
 
@@ -66,7 +66,7 @@ impl VerificationServiceImpl {
             .try_collect()
             .await?;
 
-        let dataset_layout = DatasetLayout::new(&self.volume_layout, &dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
         let num_blocks = plan.len();
 
         listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);

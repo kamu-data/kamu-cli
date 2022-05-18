@@ -17,14 +17,22 @@ use dill::*;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::collections::HashSet;
 use std::collections::LinkedList;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LocalDatasetRepositoryImpl {
-    workspace_layout: Arc<WorkspaceLayout>,
+    root: PathBuf,
     //info_repo: NamedObjectRepositoryLocalFS,
     thrash_lock: tokio::sync::Mutex<()>,
+}
+
+// TODO: Find a better way to share state with dataset builder
+impl Clone for LocalDatasetRepositoryImpl {
+    fn clone(&self) -> Self {
+        Self::from(self.root.clone())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,9 +40,13 @@ pub struct LocalDatasetRepositoryImpl {
 #[component(pub)]
 impl LocalDatasetRepositoryImpl {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
+        Self::from(&workspace_layout.datasets_dir)
+    }
+
+    pub fn from(root: impl Into<PathBuf>) -> Self {
         //let info_repo = NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
         Self {
-            workspace_layout,
+            root: root.into(),
             //info_repo,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
@@ -42,14 +54,8 @@ impl LocalDatasetRepositoryImpl {
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
     fn get_dataset_impl(&self, dataset_name: &DatasetName) -> Result<impl Dataset, InternalError> {
-        let path = self.workspace_layout.datasets_dir.join(&dataset_name);
-
-        let layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            dataset_name,
-        );
-
-        Ok(DatasetFactoryImpl::get_local_fs_legacy(path, layout).int_err()?)
+        let layout = DatasetLayout::new(self.root.join(&dataset_name));
+        Ok(DatasetFactoryImpl::get_local_fs(layout))
     }
 
     /*async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
@@ -171,15 +177,9 @@ impl LocalDatasetRepositoryImpl {
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
-        staging_name: &String,
+        staging_path: &Path,
         dataset_name: &DatasetName,
     ) -> Result<DatasetHandle, CreateDatasetError> {
-        let dataset_path = self.workspace_layout.datasets_dir.join(staging_name);
-        let tmp_layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &DatasetName::new_unchecked(&staging_name),
-        );
-
         let summary = match dataset.get_summary(SummaryOptions::default()).await {
             Ok(s) => Ok(s),
             Err(GetSummaryError::EmptyDataset) => unreachable!(),
@@ -200,37 +200,14 @@ impl LocalDatasetRepositoryImpl {
             .into());
         }
 
-        // TODO: Atomic move
-        let dest_path = self.workspace_layout.datasets_dir.join(&handle.name);
-        let dest_layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &dataset_name,
-        );
-
+        // Atomic move
+        let target_path = self.root.join(dataset_name);
         assert!(
-            !dest_path.exists(),
-            "Atomic move target exists: {:?}",
-            dest_path
+            !target_path.exists(),
+            "Target dir exists: {:?}",
+            target_path
         );
-        assert!(
-            !dest_layout.cache_dir.exists(),
-            "Atomic move target exists: {:?}",
-            dest_layout.cache_dir
-        );
-        assert!(
-            !dest_layout.data_dir.exists(),
-            "Atomic move target exists: {:?}",
-            dest_layout.data_dir
-        );
-        assert!(
-            !dest_layout.checkpoints_dir.exists(),
-            "Atomic move target exists: {:?}",
-            dest_layout.data_dir
-        );
-        std::fs::rename(&dataset_path, dest_path).int_err()?;
-        std::fs::rename(tmp_layout.cache_dir, dest_layout.cache_dir).int_err()?;
-        std::fs::rename(tmp_layout.data_dir, dest_layout.data_dir).int_err()?;
-        std::fs::rename(tmp_layout.checkpoints_dir, dest_layout.checkpoints_dir).int_err()?;
+        std::fs::rename(staging_path, target_path).int_err()?;
 
         // // Add new entry
         // repo_info.datasets.push(DatasetEntry {
@@ -315,7 +292,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         match dataset_ref {
             DatasetRefLocal::Handle(h) => Ok(h.clone()),
             DatasetRefLocal::Name(name) => {
-                let path = self.workspace_layout.datasets_dir.join(&name);
+                let path = self.root.join(&name);
                 if !path.exists() {
                     return Err(GetDatasetError::NotFound(DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
@@ -334,10 +311,16 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                 // Anti-thrashing lock (see comment above)
                 let _lock_guard = self.thrash_lock.lock().await;
 
-                let read_dir = std::fs::read_dir(&self.workspace_layout.datasets_dir).int_err()?;
+                let read_dir = std::fs::read_dir(&self.root).int_err()?;
 
                 for r in read_dir {
                     let entry = r.int_err()?;
+                    if let Some(s) = entry.file_name().to_str() {
+                        if s.starts_with(".") {
+                            continue;
+                        }
+                    }
+
                     let name = DatasetName::try_from(&entry.file_name()).int_err()?;
                     let summary = self
                         .get_dataset_impl(&name)
@@ -361,10 +344,15 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dir =
-            std::fs::read_dir(&self.workspace_layout.datasets_dir).int_err()?;
+            std::fs::read_dir(&self.root).int_err()?;
 
             for r in read_dir {
                 let entry = r.int_err()?;
+                if let Some(s) = entry.file_name().to_str() {
+                    if s.starts_with(".") {
+                        continue;
+                    }
+                }
                 let name = DatasetName::try_from(&entry.file_name()).int_err()?;
                 let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
                 yield hdl;
@@ -385,26 +373,15 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_name = self.get_staging_name();
-        let tmp_path = self.workspace_layout.datasets_dir.join(&staging_name);
+        let staging_path = self.root.join(self.get_staging_name());
 
-        std::fs::create_dir(&tmp_path).int_err()?;
-        std::fs::create_dir(tmp_path.join("blocks")).int_err()?;
-        std::fs::create_dir(tmp_path.join("refs")).int_err()?;
-
-        let layout = DatasetLayout::create(
-            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &DatasetName::new_unchecked(&staging_name),
-        )
-        .int_err()?;
-
-        let dataset =
-            DatasetFactoryImpl::get_local_fs_legacy(tmp_path.clone(), layout).int_err()?;
+        let layout = DatasetLayout::create(&staging_path).int_err()?;
+        let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
         Ok(Box::new(DatasetBuilderImpl::new(
-            Self::new(self.workspace_layout.clone()),
+            self.clone(),
             dataset,
-            staging_name,
+            staging_path,
             dataset_name.clone(),
         )))
     }
@@ -521,7 +498,6 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             .await
     }
 
-    // TODO: Atomic move
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -529,46 +505,19 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     ) -> Result<(), RenameDatasetError> {
         let old_name = self.resolve_dataset_ref(dataset_ref).await?.name;
 
-        let old_meta_path = self.workspace_layout.datasets_dir.join(&old_name);
-        let new_meta_path = self.workspace_layout.datasets_dir.join(&new_name);
+        let old_dataset_path = self.root.join(&old_name);
+        let new_dataset_path = self.root.join(&new_name);
 
-        if new_meta_path.exists() {
-            return Err(NameCollisionError {
+        if new_dataset_path.exists() {
+            Err(NameCollisionError {
                 name: new_name.clone(),
             }
-            .into());
+            .into())
+        } else {
+            // Atomic move
+            std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
+            Ok(())
         }
-
-        let vol = VolumeLayout::new(&self.workspace_layout.local_volume_dir);
-        let old_layout = DatasetLayout::new(&vol, &old_name);
-        let new_layout = DatasetLayout::new(&vol, &new_name);
-
-        assert!(
-            !new_meta_path.exists(),
-            "Atomic move target exists: {:?}",
-            new_meta_path
-        );
-        assert!(
-            !new_layout.cache_dir.exists(),
-            "Atomic move target exists: {:?}",
-            new_layout.cache_dir
-        );
-        assert!(
-            !new_layout.data_dir.exists(),
-            "Atomic move target exists: {:?}",
-            new_layout.data_dir
-        );
-        assert!(
-            !new_layout.checkpoints_dir.exists(),
-            "Atomic move target exists: {:?}",
-            new_layout.data_dir
-        );
-        std::fs::rename(old_meta_path, new_meta_path).int_err()?;
-        std::fs::rename(old_layout.cache_dir, new_layout.cache_dir).int_err()?;
-        std::fs::rename(old_layout.data_dir, new_layout.data_dir).int_err()?;
-        std::fs::rename(old_layout.checkpoints_dir, new_layout.checkpoints_dir).int_err()?;
-
-        Ok(())
     }
 
     // TODO: PERF: Need fast inverse dependency lookup
@@ -606,26 +555,8 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
-        let metadata_dir = self
-            .workspace_layout
-            .datasets_dir
-            .join(&dataset_handle.name);
-        let layout = DatasetLayout::new(
-            &VolumeLayout::new(&self.workspace_layout.local_volume_dir),
-            &dataset_handle.name,
-        );
-
-        let paths = [
-            layout.cache_dir,
-            layout.checkpoints_dir,
-            layout.data_dir,
-            metadata_dir,
-        ];
-
-        for p in paths.iter().filter(|p| p.exists()) {
-            tokio::fs::remove_dir_all(p).await.int_err()?;
-        }
-
+        let dataset_dir = self.root.join(&dataset_handle.name);
+        tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
         Ok(())
     }
 
@@ -644,7 +575,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 struct DatasetBuilderImpl<D> {
     repo: LocalDatasetRepositoryImpl,
     dataset: D,
-    staging_name: String,
+    staging_path: PathBuf,
     dataset_name: DatasetName,
 }
 
@@ -654,35 +585,21 @@ impl<D> DatasetBuilderImpl<D> {
     fn new(
         repo: LocalDatasetRepositoryImpl,
         dataset: D,
-        staging_name: String,
+        staging_path: PathBuf,
         dataset_name: DatasetName,
     ) -> Self {
         Self {
             repo,
             dataset,
-            staging_name,
+            staging_path,
             dataset_name,
         }
     }
 
     fn discard_impl(&self) -> Result<(), InternalError> {
-        let meta_path = self
-            .repo
-            .workspace_layout
-            .datasets_dir
-            .join(&self.staging_name);
-
-        if meta_path.exists() {
-            let tmp_layout = DatasetLayout::new(
-                &VolumeLayout::new(&self.repo.workspace_layout.local_volume_dir),
-                &DatasetName::new_unchecked(&self.staging_name),
-            );
-            std::fs::remove_dir_all(&meta_path).int_err()?;
-            std::fs::remove_dir_all(&tmp_layout.cache_dir).int_err()?;
-            std::fs::remove_dir_all(&tmp_layout.data_dir).int_err()?;
-            std::fs::remove_dir_all(&tmp_layout.checkpoints_dir).int_err()?;
+        if self.staging_path.exists() {
+            std::fs::remove_dir_all(&self.staging_path).int_err()?;
         }
-
         Ok(())
     }
 }
@@ -723,7 +640,7 @@ where
         }?;
 
         self.repo
-            .finish_create_dataset(&self.dataset, &self.staging_name, &self.dataset_name)
+            .finish_create_dataset(&self.dataset, &self.staging_path, &self.dataset_name)
             .await
     }
 

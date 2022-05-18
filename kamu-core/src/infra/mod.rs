@@ -26,9 +26,6 @@ pub use dataset_config::*;
 mod dataset_layout;
 pub use dataset_layout::*;
 
-mod volume_layout;
-pub use volume_layout::*;
-
 mod workspace_layout;
 pub use workspace_layout::*;
 

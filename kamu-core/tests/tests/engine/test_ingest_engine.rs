@@ -28,8 +28,6 @@ async fn test_ingest_with_engine() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let volume_layout = Arc::new(VolumeLayout::new(&workspace_layout.local_volume_dir));
-
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
 
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
@@ -39,7 +37,7 @@ async fn test_ingest_with_engine() {
     ));
 
     let ingest_svc = Arc::new(IngestServiceImpl::new(
-        volume_layout.clone(),
+        workspace_layout.clone(),
         local_repo.clone(),
         engine_provisioner,
     ));
@@ -90,7 +88,7 @@ async fn test_ingest_with_engine() {
         .await;
     assert_matches!(res, Ok(IngestResult::Updated { .. }));
 
-    let dataset_layout = DatasetLayout::new(volume_layout.as_ref(), &dataset_name);
+    let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
     assert!(dataset_layout.data_dir.exists());
 
     let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {

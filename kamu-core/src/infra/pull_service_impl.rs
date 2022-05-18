@@ -126,7 +126,7 @@ impl PullServiceImpl {
             }
         }?;
 
-        if local_handle.is_none() && !options.sync_options.create_if_not_exist {
+        if local_handle.is_none() && !options.sync_options.create_if_not_exists {
             return Err(PullError::InvalidOperation(
                 "Dataset does not exist and auto-create is switched off".to_owned(),
             ));

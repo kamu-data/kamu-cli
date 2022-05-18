@@ -87,9 +87,9 @@ impl SparkEngine {
 
     fn to_container_path(&self, path: &Path) -> PathBuf {
         assert!(path.is_absolute());
-        assert!(self.workspace_layout.local_volume_dir.is_absolute());
+        assert!(self.workspace_layout.datasets_dir.is_absolute());
         let rel = path
-            .strip_prefix(&self.workspace_layout.local_volume_dir)
+            .strip_prefix(&self.workspace_layout.datasets_dir)
             .unwrap();
         let joined = self.volume_dir_in_container().join(rel);
         let unix_path = joined.to_str().unwrap().replace("\\", "/");
@@ -114,7 +114,7 @@ impl SparkEngine {
         let volume_map = vec![
             (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
             (
-                self.workspace_layout.local_volume_dir.clone(),
+                self.workspace_layout.datasets_dir.clone(),
                 self.volume_dir_in_container(),
             ),
         ];
