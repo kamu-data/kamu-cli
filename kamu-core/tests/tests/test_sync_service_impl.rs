@@ -381,6 +381,7 @@ async fn test_sync_from_http() {
 }
 
 #[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_sync_to_from_ipfs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
