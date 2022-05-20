@@ -26,6 +26,9 @@ pub use metadata_stream::*;
 pub mod dataset;
 pub use dataset::*;
 
+pub mod dataset_registry;
+pub use dataset_registry::*;
+
 pub mod dataset_factory;
 pub use dataset_factory::*;
 

@@ -18,3 +18,6 @@ pub use http_file_server::*;
 
 mod minio_server;
 pub use minio_server::*;
+
+mod ipfs_daemon;
+pub use ipfs_daemon::*;

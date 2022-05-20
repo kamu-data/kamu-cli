@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::collections::LinkedList;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -271,6 +272,19 @@ impl LocalDatasetRepositoryImpl {
                 }
             }
         }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+impl DatasetRegistry for LocalDatasetRepositoryImpl {
+    async fn get_dataset_url(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<Url, GetDatasetUrlError> {
+        let handle = self.resolve_dataset_ref(dataset_ref).await?;
+        Ok(Url::from_directory_path(self.root.join(handle.name)).unwrap())
     }
 }
 

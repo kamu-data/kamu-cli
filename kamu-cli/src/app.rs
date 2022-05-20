@@ -185,6 +185,7 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
             .clone()
             .unwrap(),
     });
+    catalog.add_value(kamu::infra::utils::ipfs_wrapper::IpfsClient::default());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

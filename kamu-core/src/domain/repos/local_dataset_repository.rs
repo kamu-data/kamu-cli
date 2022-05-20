@@ -19,7 +19,7 @@ use tokio_stream::Stream;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait LocalDatasetRepository: Sync + Send {
+pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,

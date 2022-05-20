@@ -99,7 +99,13 @@ impl SearchServiceImpl {
                     }
                 }
             }
-            _ => return Err(UnsupportedProtocolError { url: url.clone() }.into()),
+            _ => {
+                return Err(UnsupportedProtocolError {
+                    message: None,
+                    url: url.clone(),
+                }
+                .into())
+            }
         }
 
         Ok(datasets)

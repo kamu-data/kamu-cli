@@ -124,6 +124,10 @@ where
     {
         TryLast::new(self)
     }
+
+    fn try_count(self) -> TryCount<Self> {
+        TryCount::new(self)
+    }
 }
 
 impl<S, T, E> TryStreamExtExt for S where S: Stream<Item = Result<T, E>> {}
@@ -443,6 +447,52 @@ where
                 Poll::Pending => break Poll::Pending,
                 Poll::Ready(None) => break Poll::Ready(Ok(this.last_seen.take())),
                 Poll::Ready(Some(Ok(v))) => *this.last_seen = Some(v),
+                Poll::Ready(Some(Err(e))) => break Poll::Ready(Err(e)),
+            }
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[must_use = "streams do nothing unless polled"]
+#[pin_project]
+pub struct TryCount<S> {
+    #[pin]
+    inner: S,
+    accum: Option<usize>,
+}
+
+impl<S> TryCount<S> {
+    fn new(inner: S) -> Self {
+        Self {
+            inner,
+            accum: Some(0),
+        }
+    }
+}
+
+impl<S, T, E> Future for TryCount<S>
+where
+    S: Stream<Item = Result<T, E>>,
+{
+    type Output = Result<usize, E>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+        loop {
+            match this.inner.as_mut().poll_next(cx) {
+                Poll::Pending => break Poll::Pending,
+                Poll::Ready(None) => {
+                    if let Some(v) = this.accum.take() {
+                        break Poll::Ready(Ok(v));
+                    } else {
+                        panic!("Any polled after completion")
+                    }
+                }
+                Poll::Ready(Some(Ok(_))) => {
+                    *this.accum = Some(this.accum.unwrap() + 1);
+                }
                 Poll::Ready(Some(Err(e))) => break Poll::Ready(Err(e)),
             }
         }

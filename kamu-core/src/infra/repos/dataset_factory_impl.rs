@@ -12,29 +12,13 @@ use crate::infra::*;
 
 use dill::*;
 use std::sync::Arc;
-use tracing::info;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFactoryImpl {
-    ipfs_gateway: IpfsGateway,
-}
+pub struct DatasetFactoryImpl {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug)]
-pub struct IpfsGateway {
-    pub url: Url,
-}
-
-impl Default for IpfsGateway {
-    fn default() -> Self {
-        Self {
-            url: Url::parse("http://localhost:8080").unwrap(),
-        }
-    }
-}
 
 // TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
@@ -51,8 +35,8 @@ type DatasetImplLocalFS = DatasetImpl<
 
 #[component(pub)]
 impl DatasetFactoryImpl {
-    pub fn new(ipfs_gateway: IpfsGateway) -> Self {
-        Self { ipfs_gateway }
+    pub fn new() -> Self {
+        Self {}
     }
 
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
@@ -141,7 +125,7 @@ impl DatasetFactoryImpl {
 impl DatasetFactory for DatasetFactoryImpl {
     fn get_dataset(
         &self,
-        url: Url,
+        url: &Url,
         create_if_not_exists: bool,
     ) -> Result<Arc<dyn Dataset>, BuildDatasetError> {
         match url.scheme() {
@@ -149,7 +133,9 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let path = url
                     .to_file_path()
                     .map_err(|_| "Invalid file url".int_err())?;
-                let layout = if create_if_not_exists && !path.exists() {
+                let layout = if create_if_not_exists
+                    && (!path.exists() || path.read_dir().int_err()?.next().is_none())
+                {
                     std::fs::create_dir_all(&path).int_err()?;
                     DatasetLayout::create(path).int_err()?
                 } else {
@@ -159,31 +145,18 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" => {
-                let ds = Self::get_http(url)?;
+                let ds = Self::get_http(url.clone())?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3(url)?;
+                let ds = Self::get_s3(url.clone())?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            scheme @ ("ipfs" | "ipns") => {
-                let cid = match url.host() {
-                    Some(url::Host::Domain(cid)) => Ok(cid),
-                    _ => Err("Malformed IPFS URL").int_err(),
-                }?;
-
-                let gw_url = self
-                    .ipfs_gateway
-                    .url
-                    .join(&format!("{}/{}{}", scheme, cid, url.path()))
-                    .unwrap();
-
-                info!(ipfs_url = %url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
-
-                let ds = Self::get_http(gw_url)?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+            _ => Err(UnsupportedProtocolError {
+                message: None,
+                url: url.clone(),
             }
-            _ => Err(UnsupportedProtocolError { url }.into()),
+            .into()),
         }
     }
 }

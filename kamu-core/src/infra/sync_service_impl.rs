@@ -9,19 +9,40 @@
 
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
+use crate::infra::utils::ipfs_wrapper::*;
+use crate::infra::utils::simple_transfer_protocol::SimpleTransferProtocol;
 use opendatafabric::*;
 
 use dill::*;
 use std::sync::Arc;
-use tokio_stream::StreamExt;
-use tracing::{debug, info, info_span};
+use tracing::*;
 use url::Url;
 
+/////////////////////////////////////////////////////////////////////////////////////////
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     local_repo: Arc<dyn LocalDatasetRepository>,
     dataset_factory: Arc<dyn DatasetFactory>,
+    ipfs_client: Arc<IpfsClient>,
+    ipfs_gateway: IpfsGateway,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct IpfsGateway {
+    pub url: Url,
+}
+
+impl Default for IpfsGateway {
+    fn default() -> Self {
+        Self {
+            url: Url::parse("http://localhost:8080").unwrap(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl SyncServiceImpl {
@@ -29,77 +50,228 @@ impl SyncServiceImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_factory: Arc<dyn DatasetFactory>,
+        ipfs_client: Arc<IpfsClient>,
+        ipfs_gateway: IpfsGateway,
     ) -> Self {
         Self {
             remote_repo_reg,
             local_repo,
             dataset_factory,
+            ipfs_client,
+            ipfs_gateway,
         }
     }
 
-    /// Implements "Simple Transfer Protocol" as described in ODF spec
-    async fn sync_with_simple_transfer_protocol(
-        &self,
-        src: &dyn Dataset,
-        src_ref: &DatasetRefAny,
-        dst: &dyn Dataset,
-        dst_ref: &DatasetRefAny,
-        validation: AppendValidation,
-        trust_source_hashes: bool,
-    ) -> Result<SyncResult, SyncError> {
-        let span = info_span!("Dataset sync", %src_ref, %dst_ref);
-        let _span_guard = span.enter();
-        info!("Starting sync using Simple Transfer Protocol");
+    fn resolve_remote_dataset_url(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
+        // TODO: REMOTE ID
+        let dataset_url = match remote_ref {
+            DatasetRefRemote::ID(_) => {
+                unimplemented!("Syncing remote dataset by ID is not yet supported")
+            }
+            DatasetRefRemote::RemoteName(name)
+            | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => {
+                let mut repo = self.remote_repo_reg.get_repository(name.repository())?;
 
-        let result = self
-            .sync_with_simple_transfer_protocol_impl(
-                src,
-                src_ref,
-                dst,
-                dst_ref,
-                validation,
-                trust_source_hashes,
-            )
-            .await;
-        info!(?result, "Sync completed");
-        result
+                repo.url.ensure_trailing_slash();
+                repo.url
+                    .join(&format!("{}/", name.as_name_with_owner()))
+                    .unwrap()
+            }
+            DatasetRefRemote::Url(url) => {
+                let mut dataset_url = url.as_ref().clone();
+                dataset_url.ensure_trailing_slash();
+                dataset_url
+            }
+        };
+
+        // Re-map IPFS/IPNS urls to HTTP gateway URLs
+        // Note: This is for read path only, write path is handled separately
+        let dataset_url = match dataset_url.scheme() {
+            "ipfs" | "ipns" => {
+                let cid = match dataset_url.host() {
+                    Some(url::Host::Domain(cid)) => Ok(cid),
+                    _ => Err("Malformed IPFS URL").int_err(),
+                }?;
+
+                let gw_url = self
+                    .ipfs_gateway
+                    .url
+                    .join(&format!(
+                        "{}/{}{}",
+                        dataset_url.scheme(),
+                        cid,
+                        dataset_url.path()
+                    ))
+                    .unwrap();
+
+                info!(ipfs_url = %dataset_url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
+                gw_url
+            }
+            _ => dataset_url,
+        };
+
+        Ok(dataset_url)
     }
 
-    /// Implements "Simple Transfer Protocol" as described in ODF spec
-    /// TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
-    async fn sync_with_simple_transfer_protocol_impl(
+    async fn get_dataset_reader(
         &self,
-        src: &dyn Dataset,
-        src_ref: &DatasetRefAny,
-        dst: &dyn Dataset,
-        _dst_ref: &DatasetRefAny,
-        validation: AppendValidation,
-        trust_source_hashes: bool,
-    ) -> Result<SyncResult, SyncError> {
-        let src_chain = src.as_metadata_chain();
-        let dst_chain = dst.as_metadata_chain();
+        dataset_ref: &DatasetRefAny,
+    ) -> Result<Arc<dyn Dataset>, SyncError> {
+        let dataset = if let Some(local_ref) = dataset_ref.as_local_ref() {
+            self.local_repo.get_dataset(&local_ref).await?
+        } else {
+            let remote_ref = dataset_ref.as_remote_ref().unwrap();
+            let url = self.resolve_remote_dataset_url(&remote_ref)?;
+            self.dataset_factory.get_dataset(&url, false)?
+        };
 
-        let src_data = src.as_data_repo();
-        let dst_data = dst.as_data_repo();
-
-        let src_checkpoints = src.as_checkpoint_repo();
-        let dst_checkpoints = dst.as_checkpoint_repo();
-
-        let src_head = match src_chain.get_ref(&BlockRef::Head).await {
-            Ok(head) => Ok(head),
+        match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            Ok(_) => Ok(dataset),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
-                dataset_ref: src_ref.clone(),
+                dataset_ref: dataset_ref.clone(),
             }
             .into()),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        }
+    }
+
+    async fn get_dataset_writer(
+        &self,
+        dataset_ref: &DatasetRefAny,
+        create_if_not_exists: bool,
+    ) -> Result<Box<dyn DatasetBuilder>, SyncError> {
+        if let Some(local_ref) = dataset_ref.as_local_ref() {
+            if create_if_not_exists {
+                Ok(Box::new(WrapperDatasetBuilder::new(
+                    self.local_repo.get_or_create_dataset(&local_ref).await?,
+                )))
+            } else {
+                Ok(Box::new(NullDatasetBuilder::new(
+                    self.local_repo.get_dataset(&local_ref).await?,
+                )))
+            }
+        } else {
+            let remote_ref = dataset_ref.as_remote_ref().unwrap();
+            let url = self.resolve_remote_dataset_url(&remote_ref)?;
+            let dataset = self
+                .dataset_factory
+                .get_dataset(&url, create_if_not_exists)?;
+
+            if !create_if_not_exists {
+                match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+                    Ok(_) => Ok(()),
+                    Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
+                        dataset_ref: dataset_ref.clone(),
+                    }
+                    .into()),
+                    Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                    Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                }?;
+            }
+
+            Ok(Box::new(NullDatasetBuilder::new(dataset)))
+        }
+    }
+
+    async fn sync_generic(
+        &self,
+        src: &DatasetRefAny,
+        dst: &DatasetRefAny,
+        opts: SyncOptions,
+    ) -> Result<SyncResult, SyncError> {
+        let src_dataset = self.get_dataset_reader(src).await?;
+        let src_is_local = src.as_local_ref().is_some();
+        let dst_dataset_builder = self
+            .get_dataset_writer(dst, opts.create_if_not_exists)
+            .await?;
+
+        let validation = if opts.trust_source.unwrap_or(src_is_local) {
+            AppendValidation::None
+        } else {
+            AppendValidation::Full
+        };
+
+        info!("Starting sync using Simple Transfer Protocol");
+        match SimpleTransferProtocol
+            .sync(
+                src_dataset.as_ref(),
+                src,
+                dst_dataset_builder.as_dataset(),
+                dst,
+                validation,
+                opts.trust_source.unwrap_or(src_is_local),
+            )
+            .await
+        {
+            Ok(result) => {
+                info!(?result, "Sync completed");
+                dst_dataset_builder.finish().await?;
+                Ok(result)
+            }
+            Err(error) => {
+                info!(?error, "Sync failed");
+                dst_dataset_builder.discard().await?;
+                Err(error)
+            }
+        }
+    }
+
+    async fn sync_to_ipfs(
+        &self,
+        src: &DatasetRefLocal,
+        dst_url: &Url,
+        opts: SyncOptions,
+    ) -> Result<SyncResult, SyncError> {
+        // Resolve key
+        let key_id = match (dst_url.host_str(), dst_url.path()) {
+            (Some(h), "" | "/") => Ok(h),
+            _ => Err("Malformed IPFS URL".int_err()),
         }?;
 
-        let dst_head = match dst_chain.get_ref(&BlockRef::Head).await {
-            Ok(h) => Ok(Some(h)),
-            Err(GetRefError::NotFound(_)) => Ok(None),
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        let keys = self.ipfs_client.key_list().await.int_err()?;
+
+        let key = if let Some(key) = keys.into_iter().find(|k| k.id == key_id) {
+            Ok(key)
+        } else {
+            Err(format!("IPFS does not have a key with ID {}", key_id).int_err())
+        }?;
+
+        info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
+
+        // Resolve and compare heads
+        let src_dataset = self.local_repo.get_dataset(src).await?;
+        let src_head = src_dataset
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .int_err()?;
+
+        // If we try to access the IPNS key via HTTP gateway rigt away this may take a very long time
+        // if the key does not exist, as IPFS will be reaching out to remote nodes. To avoid long wait
+        // times on first push we make an assumption that this key is owned by the local IPFS node and
+        // try resolving it with a short timeout. If resolution fails - we assume that the key was not published yet.
+        let dst_head = match self.ipfs_client.name_resolve_local(&key.id).await? {
+            None => {
+                info!("Key does not resolve locally - asumming it's unpublished");
+                Ok(None)
+            }
+            Some(_) => {
+                info!("Attempting to read remote head");
+                let dst_http_url =
+                    self.resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))?;
+                let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
+                match dst_dataset
+                    .as_metadata_chain()
+                    .get_ref(&BlockRef::Head)
+                    .await
+                {
+                    Ok(head) => Ok(Some(head)),
+                    Err(GetRefError::NotFound(_)) => Ok(None),
+                    Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                    Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                }
+            }
         }?;
 
         info!(?src_head, ?dst_head, "Resolved heads");
@@ -108,16 +280,21 @@ impl SyncServiceImpl {
             return Ok(SyncResult::UpToDate);
         }
 
-        // Download missing blocks
-        let blocks = match src_chain
+        if !opts.create_if_not_exists && dst_head.is_none() {
+            return Err(DatasetNotFoundError::new(dst_url).into());
+        }
+
+        // Analyze the block interval
+        let num_blocks = match src_dataset
+            .as_metadata_chain()
             .iter_blocks_interval(&src_head, dst_head.as_ref())
-            .collect::<Result<Vec<_>, _>>()
+            .try_count()
             .await
         {
             Ok(v) => Ok(v),
             Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
             Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
-                message: "source metadata chain is broken".to_owned(),
+                message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
             .into()),
@@ -130,144 +307,33 @@ impl SyncServiceImpl {
             Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
-        let num_blocks = blocks.len();
-        info!("Considering {} new blocks", blocks.len());
+        // Add files to IPFS
+        let source_url = self.local_repo.get_dataset_url(src).await.int_err()?;
+        let source_path = source_url.to_file_path().unwrap();
 
-        // Download data and checkpoints
-        for block in blocks
-            .iter()
-            .rev()
-            .filter_map(|(_, b)| b.as_data_stream_block())
-        {
-            // Data
-            if let Some(data_slice) = block.event.output_data {
-                info!(hash = ?data_slice.physical_hash, "Transfering data file");
-
-                let stream = match src_data.get_stream(&data_slice.physical_hash).await {
-                    Ok(s) => Ok(s),
-                    Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
-                        message: "Source data file is missing".to_owned(),
-                        source: Some(e.into()),
-                    }
-                    .into()),
-                    Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-                    Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
-                }?;
-
-                match dst_data
-                    .insert_stream(
-                        stream,
-                        InsertOpts {
-                            precomputed_hash: if !trust_source_hashes { None } else { Some(&data_slice.physical_hash) },
-                            expected_hash: Some(&data_slice.physical_hash),
-                            size_hint: Some(data_slice.size as usize),
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                        message: "Data file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
-                        source: Some(e.into()),
-                    }.into()),
-                    Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-                    Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-                }?;
-            }
-
-            // Checkpoint
-            if let Some(checkpoint) = block.event.output_checkpoint {
-                info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
-
-                let stream = match src_checkpoints.get_stream(&checkpoint.physical_hash).await {
-                    Ok(s) => Ok(s),
-                    Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
-                        message: "Source checkpoint file is missing".to_owned(),
-                        source: Some(e.into()),
-                    }
-                    .into()),
-                    Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-                    Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
-                }?;
-
-                match dst_checkpoints
-                    .insert_stream(
-                        stream,
-                        InsertOpts {
-                            precomputed_hash: if !trust_source_hashes { None } else { Some(&checkpoint.physical_hash) },
-                            expected_hash: Some(&checkpoint.physical_hash),
-                            // This hint is necessary only for S3 implementation that does not currently support
-                            // streaming uploads without knowing Content-Length. We should remove it in future.
-                            size_hint: Some(checkpoint.size as usize), 
-                            ..Default::default()
-                        },
-                    )
-                    .await
-                {
-                    Ok(_) => Ok(()),
-                    Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                        message: "Checkpoint file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
-                        source: Some(e.into()),
-                    }.into()),
-                    Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-                    Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-                }?;
-            }
-        }
-
-        // Commit blocks
-        for (hash, block) in blocks.into_iter().rev() {
-            debug!(?hash, "Appending block");
-
-            match dst_chain.append(
-                block,
-                AppendOpts {
-                    validation,
-                    update_ref: None, // We will update head once, after sync is complete
-                    precomputed_hash: if !trust_source_hashes { None } else { Some(&hash) },
-                    expected_hash: Some(&hash),
-                    ..Default::default()
-                },
-            ).await {
-                Ok(_) => Ok(()),
-                Err(AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))) => {
-                    Err(CorruptedSourceError {
-                        message: "Block hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
-                        source: Some(e.into()),
-                    }.into())
-                }
-                Err(AppendError::InvalidBlock(e)) => {
-                    Err(CorruptedSourceError {
-                        message: "Source metadata chain is logically inconsistent".to_owned(),
-                        source: Some(e.into()),
-                    }.into())
-                }
-                Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
-                Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
-                Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
-            }?;
-        }
-
-        // Update reference, atomically commiting the sync operation
-        // Any failures before this point may result in dangling files but will keep the destination dataset in its original logical state
-        match dst_chain
-            .set_ref(
-                &BlockRef::Head,
-                &src_head,
-                SetRefOpts {
-                    validate_block_present: false,
-                    check_ref_is: Some(dst_head.as_ref()),
+        info!("Adding files to IPFS");
+        let cid = self
+            .ipfs_client
+            .add_path(
+                source_path,
+                AddOptions {
+                    ignore: Some(&["/cache", "/config", "/info"]),
                 },
             )
-            .await
-        {
-            Ok(()) => Ok(()),
-            Err(SetRefError::CASFailed(e)) => Err(SyncError::UpdatedConcurrently(e.into())),
-            Err(SetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(SetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-        }?;
+            .await?;
+
+        // Publish to IPNS
+        info!(%cid, "Publishing to IPNS");
+        let _id = self
+            .ipfs_client
+            .name_publish(
+                &cid,
+                PublishOptions {
+                    key: Some(&key.name),
+                    ..Default::default()
+                },
+            )
+            .await?;
 
         Ok(SyncResult::Updated {
             old_head: dst_head,
@@ -276,123 +342,68 @@ impl SyncServiceImpl {
         })
     }
 
-    async fn get_remote_dataset(
-        &self,
-        dataset_ref: &DatasetRefAny,
-        url: Url,
-        create_if_not_exists: bool,
-    ) -> Result<Arc<dyn Dataset>, SyncError> {
-        let dataset = self.dataset_factory.get_dataset(url, create_if_not_exists)?;
-
-        if !create_if_not_exists {
-            match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
-                Ok(_) => Ok(()),
-                Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
-                    dataset_ref: dataset_ref.clone(),
-                }
-                .into()),
-                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-            }?;
-        }
-
-        Ok(dataset)
-    }
-
-    fn get_url_for_remote_dataset(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
-        // TODO: REMOTE ID
-        let remote_name = match remote_ref {
-            DatasetRefRemote::ID(_) => {
-                unimplemented!("Syncing remote dataset by ID is not yet supported")
-            }
-            DatasetRefRemote::RemoteName(name) => name,
-            DatasetRefRemote::RemoteHandle(hdl) => &hdl.name,
-            DatasetRefRemote::Url(url) => {
-                let mut dataset_url = url.as_ref().clone();
-                dataset_url.ensure_trailing_slash();
-                return Ok(dataset_url);
-            }
-        };
-
-        let mut repo = self
-            .remote_repo_reg
-            .get_repository(remote_name.repository())?;
-
-        repo.url.ensure_trailing_slash();
-        let dataset_url = repo
-            .url
-            .join(&format!("{}/", remote_name.as_name_with_owner()))
-            .unwrap();
-
-        Ok(dataset_url)
-    }
-
     async fn sync_impl(
         &self,
         src: &DatasetRefAny,
         dst: &DatasetRefAny,
         opts: SyncOptions,
     ) -> Result<SyncResult, SyncError> {
-        // Resolve source
-        let (src_dataset, src_is_local) = if let Some(local_ref) = src.as_local_ref() {
-            let dataset = self.local_repo.get_dataset(&local_ref).await?;
-            (dataset, true)
-        } else {
-            let remote_ref = src.as_remote_ref().unwrap();
-            let url = self.get_url_for_remote_dataset(&remote_ref)?;
-            let dataset = self.get_remote_dataset(src, url, false).await?;
-            (dataset, false)
-        };
+        let span = info_span!("Dataset sync", %src, %dst);
+        let _span_guard = span.enter();
 
-        // Resolve destination
-        let dst_dataset_builder: Box<dyn DatasetBuilder> =
-            if let Some(local_ref) = dst.as_local_ref() {
-                if opts.create_if_not_exists {
-                    Box::new(WrapperDatasetBuilder::new(
-                        self.local_repo.get_or_create_dataset(&local_ref).await?,
-                    ))
-                } else {
-                    Box::new(NullDatasetBuilder::new(
-                        self.local_repo.get_dataset(&local_ref).await?,
-                    ))
+        match (src, dst) {
+            (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipfs" => {
+                Err(UnsupportedProtocolError {
+                    url: dst_url.as_ref().clone(),
+                    message: Some(
+                        concat!(
+                            "Cannot sync to ipfs://{CID} URLs since IPFS ",
+                            "is a content-addressable system ",
+                            "and the CID changes with every update ",
+                            "to the data. Consider using IPNS instead.",
+                        )
+                        .to_owned(),
+                    ),
                 }
-            } else {
-                let remote_ref = dst.as_remote_ref().unwrap();
-                let url = self.get_url_for_remote_dataset(&remote_ref)?;
-                let dataset = self
-                    .get_remote_dataset(dst, url, opts.create_if_not_exists)
-                    .await?;
-                Box::new(NullDatasetBuilder::new(dataset))
-            };
-
-        let validation = if opts.trust_source.unwrap_or(src_is_local) {
-            AppendValidation::None
-        } else {
-            AppendValidation::Full
-        };
-
-        match self
-            .sync_with_simple_transfer_protocol(
-                src_dataset.as_ref(),
-                src,
-                dst_dataset_builder.as_dataset(),
-                dst,
-                validation,
-                opts.trust_source.unwrap_or(src_is_local),
-            )
-            .await
-        {
-            Ok(r) => {
-                dst_dataset_builder.finish().await?;
-                Ok(r)
+                .into())
             }
-            Err(e) => {
-                dst_dataset_builder.discard().await?;
-                Err(e)
+            (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipns" => {
+                if let Some(src) = src.as_local_ref() {
+                    match dst_url.path() {
+                        "" | "/" => self.sync_to_ipfs(&src, dst_url, opts).await,
+                        _ => Err(UnsupportedProtocolError {
+                            url: dst_url.as_ref().clone(),
+                            message: Some(
+                                concat!(
+                                    "Cannot use a sub-path when syncing to ipns:// URL. ",
+                                    "Only a single dataset per IPNS key is currently supported.",
+                                )
+                                .to_owned(),
+                            ),
+                        }
+                        .into()),
+                    }
+                } else {
+                    Err(UnsupportedProtocolError {
+                        url: dst_url.as_ref().clone(),
+                        message: Some(
+                            concat!(
+                                "Syncing from a remote repository directly to IPFS ",
+                                "is not currently supported. Consider pulling the dataset ",
+                                "locally and then pushing to IPFS.",
+                            )
+                            .to_owned(),
+                        ),
+                    }
+                    .into())
+                }
             }
+            (_, _) => self.sync_generic(src, dst, opts).await,
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait(?Send)]
 impl SyncService for SyncServiceImpl {
@@ -439,6 +450,8 @@ impl SyncService for SyncServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Adapter for dataset builder that does not return a handle
+/// and treats local and remote datasets the same way.
 #[async_trait::async_trait]
 trait DatasetBuilder {
     fn as_dataset(&self) -> &dyn Dataset;

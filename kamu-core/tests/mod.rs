@@ -9,6 +9,7 @@
 
 #![feature(assert_matches)]
 #![feature(backtrace)]
+#![feature(exit_status_error)]
 
 mod tests;
 mod utils;

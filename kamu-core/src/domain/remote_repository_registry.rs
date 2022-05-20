@@ -51,6 +51,12 @@ pub enum GetRepoError {
 #[derive(Error, Debug)]
 pub enum AddRepoError {
     #[error(transparent)]
+    UnsupportedProtocol(
+        #[from]
+        #[backtrace]
+        UnsupportedProtocolError,
+    ),
+    #[error(transparent)]
     AlreadyExists(
         #[from]
         #[backtrace]

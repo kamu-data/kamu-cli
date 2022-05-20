@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::{HttpFileServer, MinioServer};
+use crate::utils::{HttpFileServer, IpfsDaemon, MinioServer};
 use kamu::domain::*;
+use kamu::infra::utils::ipfs_wrapper::IpfsClient;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
@@ -119,7 +120,12 @@ async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
         .checkpoint_size(c_size as i64)
 }
 
-async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_url: Url) {
+async fn do_test_sync(
+    tmp_workspace_dir: &Path,
+    push_ref: &DatasetRefRemote,
+    pull_ref: &DatasetRefRemote,
+    ipfs: Option<(IpfsGateway, IpfsClient)>,
+) {
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_name_2 = DatasetName::new_unchecked("bar");
@@ -129,31 +135,23 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
     let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(IpfsGateway::default()));
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new());
+    let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let sync_svc =
-        SyncServiceImpl::new(remote_repo_reg.clone(), local_repo.clone(), dataset_factory);
-
-    // Add repositories
-    let push_repo_name = RepositoryName::new_unchecked("remote-push");
-    let pull_repo_name = RepositoryName::new_unchecked("remote-pull");
-    let push_remote_dataset_name =
-        RemoteDatasetName::new(push_repo_name.clone(), None, dataset_name.clone());
-    let pull_remote_dataset_name =
-        RemoteDatasetName::new(pull_repo_name.clone(), None, dataset_name.clone());
-    remote_repo_reg
-        .add_repository(&push_repo_name, push_repo_url.clone())
-        .unwrap();
-    remote_repo_reg
-        .add_repository(&pull_repo_name, pull_repo_url.clone())
-        .unwrap();
+    let sync_svc = SyncServiceImpl::new(
+        remote_repo_reg.clone(),
+        local_repo.clone(),
+        dataset_factory,
+        Arc::new(ipfs_client),
+        ipfs_gateway,
+    );
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(
         sync_svc
             .sync(
                 &dataset_name.as_any_ref(),
-                &push_remote_dataset_name.as_any_ref(),
+                &push_ref.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
@@ -164,13 +162,13 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     assert_matches!(
         sync_svc
             .sync(
-                &pull_remote_dataset_name.as_any_ref(),
+                &pull_ref.as_any_ref(),
                 &dataset_name_2.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_remote_dataset_name.as_any_ref()
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == pull_ref.as_any_ref()
     );
 
     // Add dataset
@@ -189,15 +187,15 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     assert_matches!(
         sync_svc.sync(
             &dataset_name.as_any_ref(),
-            &push_remote_dataset_name.as_any_ref(),
+            &push_ref.as_any_ref(),
             SyncOptions { create_if_not_exists: false, ..Default::default() },
             None
         ).await,
-        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_remote_dataset_name.as_any_ref()
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == push_ref.as_any_ref()
     );
 
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_remote_dataset_name.as_any_ref(),  SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(),  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -206,7 +204,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     );
 
     assert_matches!(
-        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -236,13 +234,13 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     .await;
 
     assert_matches!(
-        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head }))
         if src_head == b1 && dst_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -251,7 +249,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     );
 
     assert_matches!(
-        sync_svc.sync(&pull_remote_dataset_name.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -266,7 +264,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
         sync_svc
             .sync(
                 &dataset_name.as_any_ref(),
-                &push_remote_dataset_name.as_any_ref(),
+                &push_ref.as_any_ref(),
                 SyncOptions::default(),
                 None
             )
@@ -277,7 +275,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     assert_matches!(
         sync_svc
             .sync(
-                &pull_remote_dataset_name.as_any_ref(),
+                &pull_ref.as_any_ref(),
                 &dataset_name_2.as_any_ref(),
                 SyncOptions::default(),
                 None
@@ -301,7 +299,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
     .await;
 
     assert_matches!(
-        sync_svc.sync(&dataset_name_2.into(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name_2.into(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -311,7 +309,7 @@ async fn do_test_sync(tmp_workspace_dir: &Path, push_repo_url: Url, pull_repo_ur
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync(&dataset_name.into(), &push_remote_dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.into(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
         if src_head == b3 && dst_head == diverged_head
     );
@@ -323,7 +321,13 @@ async fn test_sync_to_from_local_fs() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url.clone(), repo_url).await;
+    do_test_sync(
+        tmp_workspace_dir.path(),
+        &DatasetRefRemote::from(&repo_url),
+        &DatasetRefRemote::from(&repo_url),
+        None,
+    )
+    .await;
 }
 
 #[test_log::test(tokio::test)]
@@ -347,7 +351,13 @@ async fn test_sync_to_from_s3() {
     ))
     .unwrap();
 
-    do_test_sync(tmp_workspace_dir.path(), repo_url.clone(), repo_url).await;
+    do_test_sync(
+        tmp_workspace_dir.path(),
+        &DatasetRefRemote::from(&repo_url),
+        &DatasetRefRemote::from(&repo_url),
+        None,
+    )
+    .await;
 }
 
 #[test_log::test(tokio::test)]
@@ -361,5 +371,34 @@ async fn test_sync_from_http() {
 
     let _server_hdl = tokio::spawn(server.run());
 
-    do_test_sync(tmp_workspace_dir.path(), push_repo_url, pull_repo_url).await;
+    do_test_sync(
+        tmp_workspace_dir.path(),
+        &DatasetRefRemote::from(push_repo_url),
+        &DatasetRefRemote::from(pull_repo_url),
+        None,
+    )
+    .await;
+}
+
+#[test_log::test(tokio::test)]
+async fn test_sync_to_from_ipfs() {
+    let tmp_workspace_dir = tempfile::tempdir().unwrap();
+
+    let ipfs_daemon = IpfsDaemon::new();
+    let ipfs_client = ipfs_daemon.client();
+    let key_id = ipfs_client.key_gen("test").await.unwrap();
+    let ipns_url = Url::from_str(&format!("ipns://{}", key_id)).unwrap();
+
+    do_test_sync(
+        tmp_workspace_dir.path(),
+        &DatasetRefRemote::from(&ipns_url),
+        &DatasetRefRemote::from(&ipns_url),
+        Some((
+            IpfsGateway {
+                url: Url::parse(&format!("http://127.0.0.1:{}", ipfs_daemon.http_port())).unwrap(),
+            },
+            ipfs_client,
+        )),
+    )
+    .await;
 }

@@ -268,6 +268,12 @@ impl From<&RemoteDatasetHandle> for DatasetRefRemote {
     }
 }
 
+impl From<&Url> for DatasetRefRemote {
+    fn from(v: &Url) -> Self {
+        Self::Url(Arc::new(v.clone()))
+    }
+}
+
 impl From<Url> for DatasetRefRemote {
     fn from(v: Url) -> Self {
         Self::Url(Arc::new(v))
@@ -468,6 +474,12 @@ impl From<&DatasetRefRemote> for DatasetRefAny {
             DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v.clone()),
             DatasetRefRemote::Url(v) => DatasetRefAny::Url(v.clone()),
         }
+    }
+}
+
+impl From<&Url> for DatasetRefAny {
+    fn from(v: &Url) -> Self {
+        Self::Url(Arc::new(v.clone()))
     }
 }
 

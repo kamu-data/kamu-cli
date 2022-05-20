@@ -145,6 +145,14 @@ pub struct DatasetNotFoundError {
     pub dataset_ref: DatasetRefAny,
 }
 
+impl DatasetNotFoundError {
+    pub fn new(r: impl Into<DatasetRefAny>) -> Self {
+        Self {
+            dataset_ref: r.into(),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]

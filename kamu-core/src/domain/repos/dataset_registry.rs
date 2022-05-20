@@ -8,21 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use opendatafabric::*;
 
 use async_trait::async_trait;
-use std::sync::Arc;
 use thiserror::Error;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait DatasetFactory: Send + Sync {
-    fn get_dataset(
+pub trait DatasetRegistry: Send + Sync {
+    async fn get_dataset_url(
         &self,
-        url: &Url,
-        create_if_not_exists: bool,
-    ) -> Result<Arc<dyn Dataset>, BuildDatasetError>;
+        dataset_ref: &DatasetRefLocal,
+    ) -> Result<Url, GetDatasetUrlError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -30,9 +29,19 @@ pub trait DatasetFactory: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum BuildDatasetError {
+pub enum GetDatasetUrlError {
     #[error(transparent)]
-    UnsupportedProtocol(#[from] UnsupportedProtocolError),
+    NotFound(
+        #[from]
+        #[backtrace]
+        DatasetNotFoundError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]
@@ -41,25 +50,11 @@ pub enum BuildDatasetError {
     ),
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub struct UnsupportedProtocolError {
-    pub message: Option<String>,
-    pub url: Url,
-}
-
-impl std::fmt::Display for UnsupportedProtocolError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(msg) = &self.message {
-            write!(f, "{}", msg)
-        } else {
-            write!(
-                f,
-                "Usupported protocol {} when accessing dataset at {}",
-                self.url.scheme(),
-                self.url
-            )
+impl From<GetDatasetError> for GetDatasetUrlError {
+    fn from(v: GetDatasetError) -> Self {
+        match v {
+            GetDatasetError::NotFound(e) => Self::NotFound(e),
+            GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
 }
