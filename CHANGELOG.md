@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.89.0] - 2022-05-22
+### Added
+- When pushing to IPNS execute `ipfs name publish` even when data is up-to-date to extend the lifetime of the record.
+
 ## [0.88.0] - 2022-05-19
 ### Added
 - Support pushing datasets to IPFS via IPNS URLs `kamu push <dataset> ipns://<key_id>`
