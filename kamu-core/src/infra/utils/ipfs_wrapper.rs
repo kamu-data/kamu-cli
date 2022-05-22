@@ -140,7 +140,13 @@ impl IpfsClient {
         if !output.status.success() {
             Ok(None)
         } else {
-            Ok(Some(stdout.trim().to_owned()))
+            let (scheme, cid) = stdout
+                .trim()
+                .trim_start_matches('/')
+                .split_once("/")
+                .unwrap();
+            assert_eq!(scheme, "ipfs");
+            Ok(Some(cid.to_owned()))
         }
     }
 

@@ -251,13 +251,13 @@ impl SyncServiceImpl {
         // if the key does not exist, as IPFS will be reaching out to remote nodes. To avoid long wait
         // times on first push we make an assumption that this key is owned by the local IPFS node and
         // try resolving it with a short timeout. If resolution fails - we assume that the key was not published yet.
-        let dst_head = match self.ipfs_client.name_resolve_local(&key.id).await? {
+        let (old_cid, dst_head) = match self.ipfs_client.name_resolve_local(&key.id).await? {
             None => {
                 info!("Key does not resolve locally - asumming it's unpublished");
-                Ok(None)
+                Ok((None, None))
             }
-            Some(_) => {
-                info!("Attempting to read remote head");
+            Some(old_cid) => {
+                info!(%old_cid, "Attempting to read remote head");
                 let dst_http_url =
                     self.resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))?;
                 let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
@@ -266,8 +266,8 @@ impl SyncServiceImpl {
                     .get_ref(&BlockRef::Head)
                     .await
                 {
-                    Ok(head) => Ok(Some(head)),
-                    Err(GetRefError::NotFound(_)) => Ok(None),
+                    Ok(head) => Ok((Some(old_cid), Some(head))),
+                    Err(GetRefError::NotFound(_)) => Ok((None, None)),
                     Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
                     Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
                 }
@@ -277,6 +277,21 @@ impl SyncServiceImpl {
         info!(?src_head, ?dst_head, "Resolved heads");
 
         if Some(&src_head) == dst_head.as_ref() {
+            // IPNS entries have a limited lifetime
+            // so even if data is up-to-date we re-publish to keep the entry alive.
+            let cid = old_cid.unwrap();
+            info!(%cid, "Refreshing IPNS entry");
+            let _id = self
+                .ipfs_client
+                .name_publish(
+                    &cid,
+                    PublishOptions {
+                        key: Some(&key.name),
+                        ..Default::default()
+                    },
+                )
+                .await?;
+
             return Ok(SyncResult::UpToDate);
         }
 
