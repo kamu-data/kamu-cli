@@ -1,0 +1,51 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: account.tokens.investments.usd
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: account.tokens.investments
+        - name: coinpaprika.tickers.eth-usd.24h-historic
+      transform:
+        kind: sql
+        engine: flink
+        temporalTables:
+          - name: coinpaprika.tickers.eth-usd.24h-historic
+            primaryKey:
+              - from_symbol
+        queries:
+          - alias: with_usd_amount
+            # TODO: `account_anchor_symbol` column is a technical necessity
+            # for temporal table join in `accounts.whatif.reth-vs-snp500`
+            # and should be removed
+            query: >
+              select
+                tr.block_time,
+                tr.block_number,
+                tr.transaction_hash,
+                tr.account_symbol,
+                tr.token_symbol,
+                tr.token_amount,
+                tr.eth_amount,
+                tr.token_balance,
+                tr.token_book_value_eth,
+                'usd' as account_anchor_symbol,
+                (
+                  tr.eth_amount * eth2usd.price
+                ) as eth_amount_as_usd
+              from `account.tokens.investments` as tr,
+              lateral table (`coinpaprika.tickers.eth-usd.24h-historic`(tr.block_time)) as eth2usd
+              where
+                tr.account_symbol = eth2usd.from_symbol 
+                and eth2usd.to_symbol = 'usd'
+          - alias: account.tokens.investments.usd
+            query: >
+              select
+                *,
+                sum(-eth_amount_as_usd) over (partition by token_symbol order by block_time) as token_book_value_eth_as_usd
+              from with_usd_amount
+    - kind: setVocab
+      eventTimeColumn: block_time

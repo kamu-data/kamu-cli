@@ -1,0 +1,55 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: account.whatif.reth-vs-snp500.market-value
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: account.whatif.reth-vs-snp500.transactions
+        - name: alphavantage.tickers.daily.spy
+        - name: account.tokens.market-value.reth
+      transform:
+        kind: sql
+        engine: flink
+        temporalTables:
+          - name: account.whatif.reth-vs-snp500.transactions
+            primaryKey:
+              - account_anchor_symbol
+          - name: account.tokens.market-value.reth
+            primaryKey:
+              - account_symbol
+        queries:
+          - alias: spy_market_val
+            query: >
+              select
+                spy2usd.event_time,
+                tr.account_symbol,
+                spy2usd.`close` as alt_spy_price,
+                tr.alt_spy_balance,
+                (
+                  tr.alt_spy_balance * spy2usd.`close`
+                ) as alt_spy_market_value_usd
+              from `alphavantage.tickers.daily.spy` as spy2usd,
+              lateral table (`account.whatif.reth-vs-snp500.transactions`(spy2usd.event_time)) as tr
+              where
+                spy2usd.to_symbol = tr.account_anchor_symbol
+                and spy2usd.from_symbol = 'spy'
+          - alias: account.whatif.reth-vs-snp500.market-value
+            query: >
+              select
+                spy.event_time,
+                mv.account_symbol,
+                mv.token_symbol,
+                mv.token_balance,
+                mv.token_book_value_eth,
+                mv.token_market_value_eth,
+                mv.token_book_value_eth_as_usd,
+                mv.token_market_value_usd,
+                spy.alt_spy_balance,
+                spy.alt_spy_market_value_usd
+              from spy_market_val as spy,
+              lateral table (`account.tokens.market-value.reth`(spy.event_time)) as mv
+              where
+                spy.account_symbol = mv.account_symbol

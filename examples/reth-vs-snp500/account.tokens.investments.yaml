@@ -1,0 +1,69 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: account.tokens.investments
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: account.tokens.transfers
+        - name: account.transactions
+      transform:
+        kind: sql
+        engine: flink
+        queries:
+          - alias: token_transfers
+            query: >
+              select
+                *,
+                case
+                  when `to` = '0xeadb3840596cabf312f2bc88a4bb0b93a4e1ff5f' then value_fp
+                  when `from` = '0xeadb3840596cabf312f2bc88a4bb0b93a4e1ff5f' then -value_fp
+                  else 0
+                end as token_amount
+              from (
+                select
+                  *,
+                  cast(`value` as float) / power(10.0, cast(token_decimal as int)) as value_fp
+                from `account.tokens.transfers`
+              )
+          - alias: transactions
+            query: >
+              select
+                *,
+                case
+                  when `to` = '0xeadb3840596cabf312f2bc88a4bb0b93a4e1ff5f' then value_fp
+                  when `from` = '0xeadb3840596cabf312f2bc88a4bb0b93a4e1ff5f' then -value_fp
+                  else 0
+                end as eth_amount
+              from (
+                select
+                  *,
+                  cast(`value` as float) / power(10.0, 18) as value_fp
+                from `account.transactions`
+              )
+          - alias: token_transactions
+            query: >
+              select
+                tr.block_time,
+                tr.block_number,
+                tr.transaction_hash,
+                tx.symbol as account_symbol,
+                tr.token_symbol,
+                tr.token_amount,
+                tx.eth_amount
+              from token_transfers as tr
+              left join transactions as tx
+              on 
+                tr.transaction_hash = tx.transaction_hash
+                and tr.block_time = tx.block_time
+          - alias: account.tokens.investments
+            query: >
+              select
+                *,
+                sum(token_amount) over (partition by token_symbol order by block_time) as token_balance,
+                sum(-eth_amount) over (partition by token_symbol order by block_time) as token_book_value_eth
+              from token_transactions
+    - kind: setVocab
+      eventTimeColumn: block_time

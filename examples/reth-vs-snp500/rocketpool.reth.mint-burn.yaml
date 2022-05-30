@@ -1,0 +1,45 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: rocketpool.reth.mint-burn
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: url
+        url: file:///data/reth-events.jsonl
+      read:
+        kind: jsonLines
+        schema:
+          - eventName STRING
+          - amount STRING
+          - ethAmount STRING
+          - blockNumber BIGINT
+          - blockHash STRING
+          - blockTime TIMESTAMP
+          - transactionIndex INT
+          - transactionHash STRING
+          - logIndex INT
+      preprocess:
+        kind: sql
+        engine: spark
+        query: >
+          SELECT
+            'rETH' as token_symbol,
+            eventName as event_name,
+            cast(amount as float) / pow(10.0, 18) as amount,
+            cast(ethAmount as float) / pow(10.0, 18) as eth_amount,
+            blockNumber as block_number,
+            blockHash as block_hash,
+            blockTime as block_time,
+            transactionIndex as transaction_index,
+            transactionHash as transaction_hash,
+            logIndex as log_index
+          FROM input
+      merge:
+        kind: ledger
+        primaryKey:
+          - transaction_hash
+    - kind: setVocab
+      eventTimeColumn: block_time

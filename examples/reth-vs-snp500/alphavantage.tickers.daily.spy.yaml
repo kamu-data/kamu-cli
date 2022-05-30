@@ -1,0 +1,43 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: alphavantage.tickers.daily.spy
+  kind: root
+  metadata:
+    - kind: setPollingSource
+      fetch:
+        kind: url
+        url: "https://www.alphavantage.co/query\
+          ?function=TIME_SERIES_DAILY\
+          &symbol=SPY\
+          &outputsize=full\
+          &datatype=csv\
+          &apikey=${{ env.ALPHA_VANTAGE_API_KEY }}"
+      read:
+        kind: csv
+        header: true
+        schema:
+          - timestamp TIMESTAMP
+          - open FLOAT
+          - high FLOAT
+          - low FLOAT
+          - close FLOAT
+          - volume FLOAT
+      preprocess:
+        kind: sql
+        engine: spark
+        query: |
+          select
+            timestamp as event_time,
+            "spy" as from_symbol,
+            "usd" as to_symbol,
+            open,
+            high,
+            low,
+            close
+          from input
+      merge:
+        kind: ledger
+        primaryKey:
+          - event_time
