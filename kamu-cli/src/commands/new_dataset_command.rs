@@ -160,9 +160,10 @@ impl Command for NewDatasetCommand {
     // TODO: link to documentation
     async fn run(&mut self) -> Result<(), CLIError> {
         let path = self.output_path.clone().unwrap_or_else(|| {
-            let mut p = PathBuf::from(self.name.as_str());
-            p.set_extension("yaml");
-            p
+            let mut name = String::with_capacity(100);
+            name.push_str(&self.name);
+            name.push_str(".yaml");
+            PathBuf::from(name)
         });
 
         let contents = if self.is_root {

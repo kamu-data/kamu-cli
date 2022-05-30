@@ -477,7 +477,6 @@ impl LineageVisitor for HtmlBrowseVisitor {
         std::mem::swap(&mut visitor, &mut self.html_visitor);
 
         std::fs::write(&self.temp_path, visitor.unwrap()).unwrap();
-        eprintln!("AAAAAAAAAA {:?}", self.temp_path);
         webbrowser::open(
             &url::Url::from_file_path(&self.temp_path)
                 .unwrap()
