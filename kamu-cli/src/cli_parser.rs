@@ -558,8 +558,8 @@ pub fn cli() -> Command<'static> {
                         .short('r')
                         .long("recursive")
                         .help("Also pull all transitive dependencies of specified datasets"),
-                    Arg::new("force-uncacheable")
-                        .long("force-uncacheable")
+                    Arg::new("fetch-uncacheable")
+                        .long("fetch-uncacheable")
                         .help("Pull latest data from the uncacheable data sources"),
                     Arg::new("dataset")
                         .multiple_occurrences(true)

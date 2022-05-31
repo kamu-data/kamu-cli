@@ -154,7 +154,7 @@ pub fn get_command(
                     submatches.values_of("dataset").unwrap_or_default(),
                     submatches.is_present("all"),
                     submatches.is_present("recursive"),
-                    submatches.is_present("force-uncacheable"),
+                    submatches.is_present("fetch-uncacheable"),
                     submatches.value_of("as"),
                     !submatches.is_present("no-alias"),
                     submatches.value_of("fetch"),

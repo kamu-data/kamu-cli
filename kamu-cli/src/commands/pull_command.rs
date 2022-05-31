@@ -30,7 +30,7 @@ pub struct PullCommand {
     refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
-    force_uncacheable: bool,
+    fetch_uncacheable: bool,
     as_name: Option<DatasetName>,
     add_aliases: bool,
     fetch: Option<String>,
@@ -45,7 +45,7 @@ impl PullCommand {
         refs: I,
         all: bool,
         recursive: bool,
-        force_uncacheable: bool,
+        fetch_uncacheable: bool,
         as_name: Option<S>,
         add_aliases: bool,
         fetch: Option<SS>,
@@ -66,7 +66,7 @@ impl PullCommand {
             refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
             all: all,
             recursive,
-            force_uncacheable,
+            fetch_uncacheable,
             as_name: as_name.map(|s| s.try_into().unwrap()),
             add_aliases,
             fetch: fetch.map(|s| s.into()),
@@ -173,7 +173,7 @@ impl PullCommand {
                 .into_iter(),
                 PullOptions {
                     ingest_options: IngestOptions {
-                        force_uncacheable: self.force_uncacheable,
+                        fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                     },
                     ..PullOptions::default()
@@ -198,7 +198,7 @@ impl PullCommand {
                     all: self.all,
                     add_aliases: self.add_aliases,
                     ingest_options: IngestOptions {
-                        force_uncacheable: self.force_uncacheable,
+                        fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                     },
                     sync_options: SyncOptions::default(),
@@ -558,7 +558,7 @@ impl IngestListener for PrettyIngestProgress {
                         IngestStage::Commit as u32,
                         if *uncacheable {
                             console::style(
-                                "Dataset is uncachable (use --force-uncacheable to update)"
+                                "Dataset is uncachable (use --fetch-uncacheable to update)"
                                     .to_owned(),
                             )
                             .yellow()
