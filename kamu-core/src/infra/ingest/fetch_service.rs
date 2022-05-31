@@ -19,7 +19,7 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
+use tracing::{debug, info};
 use url::Url;
 
 pub struct FetchService {}
@@ -57,7 +57,7 @@ impl FetchService {
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         match fetch_step {
             FetchStep::Url(ref furl) => {
-                let url = Url::parse(&furl.url).int_err()?;
+                let url = Self::template_url(&furl.url)?;
                 match url.scheme() {
                     "file" => Self::fetch_file(
                         &url.to_file_path()
@@ -68,14 +68,14 @@ impl FetchService {
                         listener.as_ref(),
                     ),
                     "http" | "https" => Self::fetch_http(
-                        &furl.url,
+                        &url,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
                         listener.as_ref(),
                     ),
                     "ftp" => Self::fetch_ftp(
-                        &furl.url,
+                        &url,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
@@ -86,6 +86,42 @@ impl FetchService {
             }
             FetchStep::FilesGlob(ref fglob) => {
                 Self::fetch_files_glob(fglob, old_checkpoint, target, listener.as_ref())
+            }
+        }
+    }
+
+    fn template_url(url: impl AsRef<str>) -> Result<Url, IngestError> {
+        let mut url = std::borrow::Cow::Borrowed(url.as_ref());
+        let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
+        let re_env = regex::Regex::new(r"^env\.([a-zA-Z-_]+)$").unwrap();
+
+        loop {
+            if let Some(ctpl) = re_tpl.captures(&url) {
+                let tpl_range = ctpl.get(0).unwrap().range();
+
+                if let Some(cenv) = re_env.captures(ctpl.get(1).unwrap().as_str().trim()) {
+                    let env_name = cenv.get(1).unwrap().as_str();
+                    let env_value = match std::env::var(env_name) {
+                        Ok(v) => Ok(v),
+                        Err(_) => {
+                            Err(format!("Environment variable {} is not set", env_name).int_err())
+                        }
+                    }?;
+                    url.to_mut().replace_range(tpl_range, &env_value);
+                } else {
+                    return Err(format!(
+                        "Invalid pattern '{}' encountered in URL: {}",
+                        ctpl.get(0).unwrap().as_str(),
+                        url
+                    )
+                    .int_err()
+                    .into());
+                }
+            } else {
+                if let std::borrow::Cow::Owned(_) = &url {
+                    debug!(%url, "URL after template substitution");
+                }
+                return Ok(Url::parse(url.as_ref()).int_err()?);
             }
         }
     }
@@ -151,7 +187,7 @@ impl FetchService {
                     checkpoint: cp,
                 })
             } else {
-                Err(IngestError::not_found(fglob.path.clone(), None))
+                Err(IngestError::not_found(&fglob.path, None))
             };
         }
 
@@ -199,7 +235,9 @@ impl FetchService {
         info!(path = ?path, "Ingesting file");
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => IngestError::not_found(path, Some(e.into())),
+            std::io::ErrorKind::NotFound => {
+                IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
+            }
             _ => e.int_err().into(),
         })?;
 
@@ -250,7 +288,7 @@ impl FetchService {
     }
 
     fn fetch_http(
-        url: &str,
+        url: &Url,
         _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
@@ -259,7 +297,7 @@ impl FetchService {
         let target_path_tmp = target_path.with_extension("tmp");
 
         let mut h = curl::easy::Easy::new();
-        h.url(url)?;
+        h.url(url.as_str())?;
         h.get(true)?;
         h.connect_timeout(Duration::from_secs(30))?;
         h.progress(true)?;
@@ -322,10 +360,10 @@ impl FetchService {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 match e.code() {
                     curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
-                        IngestError::unreachable(url, Some(e.into()))
+                        IngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     curl_sys::CURLE_COULDNT_CONNECT => {
-                        IngestError::unreachable(url, Some(e.into()))
+                        IngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     _ => e.int_err().into(),
                 }
@@ -356,12 +394,12 @@ impl FetchService {
             }
             404 => {
                 std::fs::remove_file(&target_path_tmp).unwrap();
-                Err(IngestError::not_found(url, None))
+                Err(IngestError::not_found(url.as_str(), None))
             }
             code => {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 Err(IngestError::unreachable(
-                    url,
+                    url.as_str(),
                     Some(HttpStatusError::new(code).into()),
                 ))
             }
@@ -371,7 +409,7 @@ impl FetchService {
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
     fn fetch_ftp(
-        url: &str,
+        url: &Url,
         _event_time_source: Option<&EventTimeSource>,
         _old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
@@ -381,7 +419,7 @@ impl FetchService {
 
         let mut h = curl::easy::Easy::new();
         h.connect_timeout(Duration::from_secs(30))?;
-        h.url(url)?;
+        h.url(url.as_str())?;
         h.progress(true)?;
 
         {
@@ -410,10 +448,10 @@ impl FetchService {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 match e.code() {
                     curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
-                        IngestError::unreachable(url, Some(e.into()))
+                        IngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     curl_sys::CURLE_COULDNT_CONNECT => {
-                        IngestError::unreachable(url, Some(e.into()))
+                        IngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     _ => e.int_err().into(),
                 }

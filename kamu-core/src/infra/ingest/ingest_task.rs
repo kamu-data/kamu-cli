@@ -233,7 +233,7 @@ impl IngestTask {
                     }
 
                     if let Some(ref cp) = old_checkpoint {
-                        if !cp.is_cacheable() && !self.options.force_uncacheable {
+                        if !cp.is_cacheable() && !self.options.fetch_uncacheable {
                             info!("Skipping fetch of uncacheable source");
                             return Ok(ExecutionResult {
                                 was_up_to_date: true,

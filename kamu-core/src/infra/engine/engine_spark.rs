@@ -15,7 +15,7 @@ use container_runtime::*;
 use opendatafabric::engine::ExecuteQueryError;
 use opendatafabric::serde::yaml::YamlEngineProtocol;
 use opendatafabric::serde::EngineProtocolDeserializer;
-use opendatafabric::{ExecuteQueryResponse, ExecuteQueryResponseSuccess};
+use opendatafabric::*;
 use rand::Rng;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -262,6 +262,17 @@ impl IngestEngine for SparkEngine {
             new_checkpoint_path: self.in_out_dir_in_container().join("new-checkpoint"),
             data_dir: self.to_container_path(&request.data_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
+            // TODO: We are stripping out the "fetch step because URL can contain templating
+            // that will fail to parse in the engine.
+            // In future engine should only receive the query part of the request.
+            source: SetPollingSource {
+                fetch: FetchStep::Url(FetchStepUrl {
+                    url: "http://localhost/".to_owned(),
+                    event_time: None,
+                    cache: None,
+                }),
+                ..request.source
+            },
             ..request
         };
 

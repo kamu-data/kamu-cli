@@ -11,7 +11,6 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use std::backtrace::Backtrace;
-use std::path::Path;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -60,7 +59,7 @@ pub struct IngestRequest {
 #[derive(Debug, Clone)]
 pub struct IngestOptions {
     /// Fetch latest data from uncacheable data sources
-    pub force_uncacheable: bool,
+    pub fetch_uncacheable: bool,
     /// Pull sources that yield multiple data files until they are
     /// fully exhausted
     pub exhaust_sources: bool,
@@ -69,7 +68,7 @@ pub struct IngestOptions {
 impl Default for IngestOptions {
     fn default() -> Self {
         Self {
-            force_uncacheable: false,
+            fetch_uncacheable: false,
             exhaust_sources: false,
         }
     }
@@ -191,16 +190,16 @@ impl From<GetDatasetError> for IngestError {
 }
 
 impl IngestError {
-    pub fn unreachable<S: AsRef<Path>>(path: S, source: Option<BoxedError>) -> Self {
+    pub fn unreachable(path: impl Into<String>, source: Option<BoxedError>) -> Self {
         IngestError::Unreachable {
-            path: path.as_ref().to_str().unwrap().to_owned(),
+            path: path.into(),
             source: source,
         }
     }
 
-    pub fn not_found<S: AsRef<Path>>(path: S, source: Option<BoxedError>) -> Self {
+    pub fn not_found(path: impl Into<String>, source: Option<BoxedError>) -> Self {
         IngestError::NotFound {
-            path: path.as_ref().to_str().unwrap().to_owned(),
+            path: path.into(),
             source: source,
         }
     }

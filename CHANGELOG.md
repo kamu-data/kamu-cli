@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.90.0] - 2022-05-30
+### Added
+- Preliminary support for templating of ingest URLs with environment variables
+```
+fetch:
+  kind: url
+  url: "https://example.org/api/?apikey=${{ env.EXAMPLE_ORG_API_KEY }}"
+```
+### Changed
+- Flag `kamu pull --force-uncacehable` was renamed to `--fetch-uncacheable`
+
 ## [0.89.0] - 2022-05-22
 ### Added
 - When pushing to IPNS execute `ipfs name publish` even when data is up-to-date to extend the lifetime of the record.

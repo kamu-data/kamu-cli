@@ -222,6 +222,66 @@ async fn test_fetch_url_http_ok() {
     assert!(target_path.exists());
 }
 
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_fetch_url_http_env_interpolation() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let server_dir = tempdir.path().join("srv");
+    std::fs::create_dir(&server_dir).unwrap();
+
+    let src_path = server_dir.join("data.csv");
+    let target_path = tempdir.path().join("fetched.bin");
+
+    let content = indoc!(
+        "
+        city,population
+        A,1000
+        B,2000
+        C,3000
+        "
+    );
+    std::fs::write(&src_path, content).unwrap();
+
+    let http_server = HttpServer::new(&server_dir);
+
+    let fetch_step = FetchStep::Url(FetchStepUrl {
+        url: format!(
+            "http://localhost:{}/${{{{ env.KAMU_TEST }}}}",
+            http_server.host_port
+        ),
+        event_time: None,
+        cache: None,
+    });
+
+    let fetch_svc = FetchService::new();
+    let listener = Arc::new(TestListener::new());
+
+    assert_matches!(
+        fetch_svc
+            .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+            .await,
+        Err(_)
+    );
+
+    std::env::set_var("KAMU_TEST", "data.csv");
+
+    let res = fetch_svc
+        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .await
+        .unwrap();
+
+    assert!(!res.was_up_to_date);
+    assert!(target_path.exists());
+    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        listener.get_last_progress(),
+        Some(FetchProgress {
+            total_bytes: 37,
+            fetched_bytes: 37
+        })
+    );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // URL: ftp
 ///////////////////////////////////////////////////////////////////////////////
