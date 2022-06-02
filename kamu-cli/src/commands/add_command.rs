@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use super::common;
-use super::{CLIError, Command};
+use super::{BatchError, CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
-
-use thiserror::Error;
 
 use std::io::Read;
 use std::sync::Arc;
@@ -45,18 +43,19 @@ impl AddCommand {
         }
     }
 
-    fn load_specific(&self) -> Vec<Result<DatasetSnapshot, DatasetAddError>> {
+    fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
         self.snapshot_refs
             .iter()
             .map(|r| {
-                self.resource_loader
-                    .load_dataset_snapshot_from_ref(r)
-                    .map_err(|e| DatasetAddError::new(r.clone(), e.int_err()))
+                (
+                    r.clone(),
+                    self.resource_loader.load_dataset_snapshot_from_ref(r),
+                )
             })
             .collect()
     }
 
-    fn load_recursive(&self) -> Vec<Result<DatasetSnapshot, DatasetAddError>> {
+    fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
         self.snapshot_refs
             .iter()
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
@@ -67,9 +66,10 @@ impl AddCommand {
             .map(|e| e.unwrap())
             .filter(|p| self.is_snapshot_file(p))
             .map(|p| {
-                self.resource_loader
-                    .load_dataset_snapshot_from_path(&p)
-                    .map_err(|e| DatasetAddError::new(p.to_str().unwrap().to_owned(), e.int_err()))
+                (
+                    p.to_str().unwrap().to_owned(),
+                    self.resource_loader.load_dataset_snapshot_from_path(&p),
+                )
             })
             .collect()
     }
@@ -95,17 +95,19 @@ impl Command for AddCommand {
             self.load_recursive()
         };
 
-        let (snapshots, errors): (Vec<_>, Vec<_>) =
-            load_results.into_iter().partition(Result::is_ok);
-        let snapshots: Vec<_> = snapshots.into_iter().map(Result::unwrap).collect();
-        let mut errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
+        let (snapshots, mut errors): (Vec<_>, Vec<_>) =
+            load_results.into_iter().partition(|(_, r)| r.is_ok());
+        let snapshots: Vec<_> = snapshots.into_iter().map(|(_, r)| r.unwrap()).collect();
 
         if errors.len() != 0 {
-            errors.sort_by(|a, b| a.dataset_ref.cmp(&b.dataset_ref));
-            for e in errors {
-                eprintln!("{}: {}", console::style(e.dataset_ref).red(), e.source);
-            }
-            return Err(CLIError::Aborted);
+            errors.sort_by(|(a, _), (b, _)| a.cmp(&b));
+            return Err(BatchError::new(
+                "Failed to load manifests",
+                errors
+                    .into_iter()
+                    .map(|(p, r)| (r.unwrap_err(), format!("Failed to load from {}", p))),
+            )
+            .into());
         }
 
         // Delete existing datasets if we are replacing
@@ -185,23 +187,6 @@ impl Command for AddCommand {
             Err(CLIError::PartialFailure)
         } else {
             Err(CLIError::Aborted)
-        }
-    }
-}
-
-#[derive(Error, Debug)]
-#[error("Failed to add {dataset_ref}")]
-struct DatasetAddError {
-    pub dataset_ref: String,
-    #[source]
-    pub source: InternalError,
-}
-
-impl DatasetAddError {
-    pub fn new(dataset_ref: String, source: InternalError) -> Self {
-        DatasetAddError {
-            dataset_ref: dataset_ref,
-            source: source,
         }
     }
 }

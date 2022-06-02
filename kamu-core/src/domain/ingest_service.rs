@@ -111,6 +111,10 @@ pub trait IngestListener: Send + Sync {
     fn success(&self, _result: &IngestResult) {}
     fn error(&self, _error: &IngestError) {}
 
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        None
+    }
+
     fn get_engine_provisioning_listener(
         self: Arc<Self>,
     ) -> Option<Arc<dyn EngineProvisioningListener>> {
@@ -134,6 +138,18 @@ impl IngestMultiListener for NullIngestMultiListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+#[error("Environment variable {name} not set")]
+pub struct IngestInputNotFound {
+    pub name: String,
+}
+
+impl IngestInputNotFound {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { name: name.into() }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum IngestError {
     #[error(transparent)]
@@ -154,6 +170,24 @@ pub enum IngestError {
         #[source]
         source: Option<BoxedError>,
     },
+    #[error(transparent)]
+    ImageNotFound(
+        #[from]
+        #[backtrace]
+        ImageNotFoundError,
+    ),
+    #[error(transparent)]
+    InputNotFound(
+        #[from]
+        #[backtrace]
+        IngestInputNotFound,
+    ),
+    #[error(transparent)]
+    ProcessError(
+        #[from]
+        #[backtrace]
+        ProcessError,
+    ),
     #[error("Engine provisioning error")]
     EngineProvisioningError(
         #[from]

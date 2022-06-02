@@ -608,6 +608,10 @@ impl IngestListener for PrettyIngestProgress {
             ));
     }
 
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        Some(self)
+    }
+
     fn get_engine_provisioning_listener(
         self: Arc<Self>,
     ) -> Option<Arc<dyn EngineProvisioningListener>> {
@@ -644,7 +648,7 @@ impl PullImageListener for PrettyIngestProgress {
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
             IngestStage::Read as u32,
-            format!("Pulling engine image {}", image),
+            format!("Pulling image {}", image),
         ));
     }
 

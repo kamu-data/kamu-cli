@@ -15,9 +15,11 @@ use crate::utils::{FtpServer, HttpServer};
 
 use chrono::prelude::*;
 use chrono::Utc;
+use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra::ingest::*;
+use kamu::infra::*;
 use opendatafabric::*;
 use url::Url;
 
@@ -28,6 +30,7 @@ use url::Url;
 #[tokio::test]
 async fn test_fetch_url_file() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
 
     let src_path = tempdir.path().join("data.csv");
     let target_path = tempdir.path().join("fetched.bin");
@@ -38,7 +41,7 @@ async fn test_fetch_url_file() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
 
     // No file to fetch
     assert_matches!(
@@ -91,6 +94,7 @@ async fn test_fetch_url_file() {
 #[tokio::test]
 async fn test_fetch_url_http_unreachable() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
@@ -99,7 +103,7 @@ async fn test_fetch_url_http_unreachable() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
@@ -112,6 +116,7 @@ async fn test_fetch_url_http_unreachable() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
     let http_server = HttpServer::new(&tempdir.path().join("srv"));
@@ -122,7 +127,7 @@ async fn test_fetch_url_http_not_found() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
@@ -135,6 +140,7 @@ async fn test_fetch_url_http_not_found() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_ok() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -159,7 +165,7 @@ async fn test_fetch_url_http_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
@@ -226,6 +232,7 @@ async fn test_fetch_url_http_ok() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_env_interpolation() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -253,7 +260,7 @@ async fn test_fetch_url_http_env_interpolation() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
     let listener = Arc::new(TestListener::new());
 
     assert_matches!(
@@ -290,6 +297,7 @@ async fn test_fetch_url_http_env_interpolation() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -314,7 +322,7 @@ async fn test_fetch_url_ftp_ok() {
         cache: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
@@ -341,6 +349,7 @@ async fn test_fetch_url_ftp_ok() {
 #[tokio::test]
 async fn test_fetch_files_glob() {
     let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
 
     let src_path_1 = tempdir.path().join("data-2020-10-01.csv");
     let target_path = tempdir.path().join("fetched.bin");
@@ -360,7 +369,7 @@ async fn test_fetch_files_glob() {
         order: None,
     });
 
-    let fetch_svc = FetchService::new();
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
 
     // No file to fetch
     assert_matches!(
@@ -492,6 +501,50 @@ async fn test_fetch_files_glob() {
         res6.checkpoint.source_event_time,
         Some(Utc.ymd(2020, 10, 10).and_hms(0, 0, 0))
     );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Container
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_fetch_container_ok() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
+
+    let target_path = tempdir.path().join("fetched.bin");
+
+    let content = indoc!(
+        "
+        city,population
+        A,1000
+        B,2000
+        C,3000
+        "
+    );
+
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: kamu::infra::utils::docker_images::HTTPD.to_owned(),
+        command: Some(vec!["/bin/bash".to_owned()]),
+        args: Some(vec![
+            "-c".to_owned(),
+            "printf \"city,population\nA,1000\nB,2000\nC,3000\n\"".to_owned(),
+        ]),
+        env: None,
+    });
+
+    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let listener = Arc::new(TestListener::new());
+
+    let res = fetch_svc
+        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .await
+        .unwrap();
+
+    assert!(!res.was_up_to_date);
+    assert!(target_path.exists());
+    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

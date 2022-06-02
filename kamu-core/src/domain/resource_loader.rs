@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::domain::{BoxedError, InternalError};
 use opendatafabric::DatasetSnapshot;
 
 use std::backtrace::Backtrace;
@@ -30,8 +31,6 @@ pub trait ResourceLoader: Send + Sync {
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Error, Debug)]
 pub enum ResourceError {
     #[error("Source is unreachable at {path}")]
@@ -46,18 +45,18 @@ pub enum ResourceError {
         #[source]
         source: Option<BoxedError>,
     },
-    #[error("Serde error: {source}")]
+    #[error("Could not deserialize data")]
     SerdeError {
         #[source]
         source: BoxedError,
         backtrace: Backtrace,
     },
-    #[error("Internal error: {source}")]
-    InternalError {
+    #[error(transparent)]
+    InternalError(
         #[from]
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 impl ResourceError {
@@ -77,13 +76,6 @@ impl ResourceError {
 
     pub fn serde(e: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::SerdeError {
-            source: e.into(),
-            backtrace: Backtrace::capture(),
-        }
-    }
-
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InternalError {
             source: e.into(),
             backtrace: Backtrace::capture(),
         }

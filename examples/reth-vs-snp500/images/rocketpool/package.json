@@ -1,0 +1,25 @@
+{
+  "name": "rocketpool-fetch",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "start": "tsc && node dist/app.js",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Kamu Data Inc.",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "abi-decoder": "^2.4.0",
+    "web3": "^1.7.3"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^5.26.0",
+    "@typescript-eslint/parser": "^5.26.0",
+    "eslint": "^8.16.0",
+    "typescript": "^4.7.2"
+  }
+}

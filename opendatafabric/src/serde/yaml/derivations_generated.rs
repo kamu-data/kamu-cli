@@ -237,6 +237,23 @@ implement_serde_as!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////
+// EnvVar
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "EnvVar")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EnvVarDef {
+    pub name: String,
+    pub value: Option<String>,
+}
+
+implement_serde_as!(EnvVar, EnvVarDef, "EnvVarDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // EventTimeSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -451,6 +468,8 @@ pub enum FetchStepDef {
     Url(#[serde_as(as = "FetchStepUrlDef")] FetchStepUrl),
     #[serde(rename_all = "camelCase")]
     FilesGlob(#[serde_as(as = "FetchStepFilesGlobDef")] FetchStepFilesGlob),
+    #[serde(rename_all = "camelCase")]
+    Container(#[serde_as(as = "FetchStepContainerDef")] FetchStepContainer),
 }
 
 implement_serde_as!(FetchStep, FetchStepDef, "FetchStepDef");
@@ -459,6 +478,11 @@ implement_serde_as!(
     FetchStepFilesGlob,
     FetchStepFilesGlobDef,
     "FetchStepFilesGlobDef"
+);
+implement_serde_as!(
+    FetchStepContainer,
+    FetchStepContainerDef,
+    "FetchStepContainerDef"
 );
 
 #[serde_as]
@@ -492,6 +516,20 @@ pub struct FetchStepFilesGlobDef {
     #[serde_as(as = "Option<SourceOrderingDef>")]
     #[serde(default)]
     pub order: Option<SourceOrdering>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "FetchStepContainer")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FetchStepContainerDef {
+    pub image: String,
+    pub command: Option<Vec<String>>,
+    pub args: Option<Vec<String>>,
+    #[serde_as(as = "Option<Vec<EnvVarDef>>")]
+    #[serde(default)]
+    pub env: Option<Vec<EnvVar>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

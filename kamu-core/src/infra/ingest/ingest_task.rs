@@ -16,6 +16,7 @@ use opendatafabric::*;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
+use container_runtime::ContainerRuntime;
 use std::sync::Arc;
 use tracing::{error, info, info_span};
 
@@ -46,6 +47,8 @@ impl IngestTask {
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Result<Self, InternalError> {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
@@ -114,7 +117,7 @@ impl IngestTask {
             vocab: vocab.unwrap_or_default(),
             listener,
             checkpointing_executor: CheckpointingExecutor::new(),
-            fetch_service: FetchService::new(),
+            fetch_service: FetchService::new(container_runtime, workspace_layout),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_provisioner),
         })
@@ -513,6 +516,10 @@ impl FetchProgressListener for FetchProgressListenerBridge {
             progress.fetched_bytes,
             progress.total_bytes,
         );
+    }
+
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        self.listener.clone().get_pull_image_listener()
     }
 }
 

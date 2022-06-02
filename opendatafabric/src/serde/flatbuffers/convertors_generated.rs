@@ -338,6 +338,33 @@ impl<'fb> FlatbuffersDeserializable<fb::DatasetVocabulary<'fb>> for odf::Dataset
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// EnvVar
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::EnvVar {
+    type OffsetT = WIPOffset<fb::EnvVar<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let name_offset = { fb.create_string(&self.name) };
+        let value_offset = self.value.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::EnvVarBuilder::new(fb);
+        builder.add_name(name_offset);
+        value_offset.map(|off| builder.add_value(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::EnvVar<'fb>> for odf::EnvVar {
+    fn deserialize(proxy: fb::EnvVar<'fb>) -> Self {
+        odf::EnvVar {
+            name: proxy.name().map(|v| v.to_owned()).unwrap(),
+            value: proxy.value().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EventTimeSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -752,6 +779,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::FetchStep> for odf::FetchStep {
                 fb::FetchStep::FetchStepFilesGlob,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::FetchStep::Container(v) => (
+                fb::FetchStep::FetchStepContainer,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -765,6 +796,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::FetchStep> for odf::FetchStep {
             fb::FetchStep::FetchStepFilesGlob => {
                 odf::FetchStep::FilesGlob(odf::FetchStepFilesGlob::deserialize(
                     fb::FetchStepFilesGlob::init_from_table(table),
+                ))
+            }
+            fb::FetchStep::FetchStepContainer => {
+                odf::FetchStep::Container(odf::FetchStepContainer::deserialize(
+                    fb::FetchStepContainer::init_from_table(table),
                 ))
             }
             _ => panic!("Invalid enum value: {}", t.0),
@@ -840,6 +876,49 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepFilesGlob<'fb>> for odf::FetchS
                 .cache()
                 .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
             order: proxy.order().map(|v| v.into()),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepContainer {
+    type OffsetT = WIPOffset<fb::FetchStepContainer<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let image_offset = { fb.create_string(&self.image) };
+        let command_offset = self.command.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let args_offset = self.args.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let env_offset = self.env.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        });
+        let mut builder = fb::FetchStepContainerBuilder::new(fb);
+        builder.add_image(image_offset);
+        command_offset.map(|off| builder.add_command(off));
+        args_offset.map(|off| builder.add_args(off));
+        env_offset.map(|off| builder.add_env(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::FetchStepContainer<'fb>> for odf::FetchStepContainer {
+    fn deserialize(proxy: fb::FetchStepContainer<'fb>) -> Self {
+        odf::FetchStepContainer {
+            image: proxy.image().map(|v| v.to_owned()).unwrap(),
+            command: proxy
+                .command()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+            args: proxy
+                .args()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+            env: proxy
+                .env()
+                .map(|v| v.iter().map(|i| odf::EnvVar::deserialize(i)).collect()),
         }
     }
 }

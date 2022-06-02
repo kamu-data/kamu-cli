@@ -500,16 +500,17 @@ pub const ENUM_MIN_FETCH_STEP: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_FETCH_STEP: u8 = 2;
+pub const ENUM_MAX_FETCH_STEP: u8 = 3;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 3] = [
+pub const ENUM_VALUES_FETCH_STEP: [FetchStep; 4] = [
     FetchStep::NONE,
     FetchStep::FetchStepUrl,
     FetchStep::FetchStepFilesGlob,
+    FetchStep::FetchStepContainer,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -520,17 +521,23 @@ impl FetchStep {
     pub const NONE: Self = Self(0);
     pub const FetchStepUrl: Self = Self(1);
     pub const FetchStepFilesGlob: Self = Self(2);
+    pub const FetchStepContainer: Self = Self(3);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 2;
-    pub const ENUM_VALUES: &'static [Self] =
-        &[Self::NONE, Self::FetchStepUrl, Self::FetchStepFilesGlob];
+    pub const ENUM_MAX: u8 = 3;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::FetchStepUrl,
+        Self::FetchStepFilesGlob,
+        Self::FetchStepContainer,
+    ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
             Self::FetchStepUrl => Some("FetchStepUrl"),
             Self::FetchStepFilesGlob => Some("FetchStepFilesGlob"),
+            Self::FetchStepContainer => Some("FetchStepContainer"),
             _ => None,
         }
     }
@@ -3307,6 +3314,125 @@ impl std::fmt::Debug for SourceCachingForever<'_> {
         ds.finish()
     }
 }
+pub enum EnvVarOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct EnvVar<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for EnvVar<'a> {
+    type Inner = EnvVar<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> EnvVar<'a> {
+    pub const VT_NAME: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        EnvVar { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args EnvVarArgs<'args>,
+    ) -> flatbuffers::WIPOffset<EnvVar<'bldr>> {
+        let mut builder = EnvVarBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(EnvVar::VT_NAME, None)
+    }
+    #[inline]
+    pub fn value(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(EnvVar::VT_VALUE, None)
+    }
+}
+
+impl flatbuffers::Verifiable for EnvVar<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("value", Self::VT_VALUE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct EnvVarArgs<'a> {
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub value: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for EnvVarArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        EnvVarArgs {
+            name: None,
+            value: None,
+        }
+    }
+}
+pub struct EnvVarBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> EnvVarBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(EnvVar::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(EnvVar::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> EnvVarBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        EnvVarBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<EnvVar<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for EnvVar<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("EnvVar");
+        ds.field("name", &self.name());
+        ds.field("value", &self.value());
+        ds.finish()
+    }
+}
 pub enum FetchStepUrlOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -3866,6 +3992,193 @@ impl std::fmt::Debug for FetchStepFilesGlob<'_> {
             }
         };
         ds.field("order", &self.order());
+        ds.finish()
+    }
+}
+pub enum FetchStepContainerOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct FetchStepContainer<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FetchStepContainer<'a> {
+    type Inner = FetchStepContainer<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> FetchStepContainer<'a> {
+    pub const VT_IMAGE: flatbuffers::VOffsetT = 4;
+    pub const VT_COMMAND: flatbuffers::VOffsetT = 6;
+    pub const VT_ARGS: flatbuffers::VOffsetT = 8;
+    pub const VT_ENV: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FetchStepContainer { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args FetchStepContainerArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FetchStepContainer<'bldr>> {
+        let mut builder = FetchStepContainerBuilder::new(_fbb);
+        if let Some(x) = args.env {
+            builder.add_env(x);
+        }
+        if let Some(x) = args.args {
+            builder.add_args(x);
+        }
+        if let Some(x) = args.command {
+            builder.add_command(x);
+        }
+        if let Some(x) = args.image {
+            builder.add_image(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn image(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(FetchStepContainer::VT_IMAGE, None)
+    }
+    #[inline]
+    pub fn command(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+        >>(FetchStepContainer::VT_COMMAND, None)
+    }
+    #[inline]
+    pub fn args(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+        >>(FetchStepContainer::VT_ARGS, None)
+    }
+    #[inline]
+    pub fn env(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<EnvVar<'a>>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<EnvVar>>,
+        >>(FetchStepContainer::VT_ENV, None)
+    }
+}
+
+impl flatbuffers::Verifiable for FetchStepContainer<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("image", Self::VT_IMAGE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("command", Self::VT_COMMAND, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("args", Self::VT_ARGS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<EnvVar>>,
+            >>("env", Self::VT_ENV, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FetchStepContainerArgs<'a> {
+    pub image: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub command: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub args: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub env: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<EnvVar<'a>>>>,
+    >,
+}
+impl<'a> Default for FetchStepContainerArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FetchStepContainerArgs {
+            image: None,
+            command: None,
+            args: None,
+            env: None,
+        }
+    }
+}
+pub struct FetchStepContainerBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> FetchStepContainerBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_image(&mut self, image: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepContainer::VT_IMAGE, image);
+    }
+    #[inline]
+    pub fn add_command(
+        &mut self,
+        command: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepContainer::VT_COMMAND, command);
+    }
+    #[inline]
+    pub fn add_args(
+        &mut self,
+        args: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepContainer::VT_ARGS, args);
+    }
+    #[inline]
+    pub fn add_env(
+        &mut self,
+        env: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<EnvVar<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepContainer::VT_ENV, env);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> FetchStepContainerBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        FetchStepContainerBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FetchStepContainer<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl std::fmt::Debug for FetchStepContainer<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut ds = f.debug_struct("FetchStepContainer");
+        ds.field("image", &self.image());
+        ds.field("command", &self.command());
+        ds.field("args", &self.args());
+        ds.field("env", &self.env());
         ds.finish()
     }
 }
@@ -6287,6 +6600,16 @@ impl<'a> SetPollingSource<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn fetch_as_fetch_step_container(&self) -> Option<FetchStepContainer<'a>> {
+        if self.fetch_type() == FetchStep::FetchStepContainer {
+            self.fetch().map(FetchStepContainer::init_from_table)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn read_as_read_step_csv(&self) -> Option<ReadStepCsv<'a>> {
         if self.read_type() == ReadStep::ReadStepCsv {
             self.read().map(ReadStepCsv::init_from_table)
@@ -6378,6 +6701,7 @@ impl flatbuffers::Verifiable for SetPollingSource<'_> {
         match key {
           FetchStep::FetchStepUrl => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepUrl>>("FetchStep::FetchStepUrl", pos),
           FetchStep::FetchStepFilesGlob => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepFilesGlob>>("FetchStep::FetchStepFilesGlob", pos),
+          FetchStep::FetchStepContainer => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FetchStepContainer>>("FetchStep::FetchStepContainer", pos),
           _ => Ok(()),
         }
      })?
@@ -6543,6 +6867,16 @@ impl std::fmt::Debug for SetPollingSource<'_> {
             }
             FetchStep::FetchStepFilesGlob => {
                 if let Some(x) = self.fetch_as_fetch_step_files_glob() {
+                    ds.field("fetch", &x)
+                } else {
+                    ds.field(
+                        "fetch",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FetchStep::FetchStepContainer => {
+                if let Some(x) = self.fetch_as_fetch_step_container() {
                     ds.field("fetch", &x)
                 } else {
                     ds.field(

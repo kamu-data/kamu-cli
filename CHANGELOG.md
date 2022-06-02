@@ -6,13 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.90.0] - 2022-05-30
+## [0.90.0] - 2022-06-04
 ### Added
-- Preliminary support for templating of ingest URLs with environment variables
-```
+- Experimental support for templating of ingest URLs with environment variables:
+```yaml
 fetch:
   kind: url
   url: "https://example.org/api/?apikey=${{ env.EXAMPLE_ORG_API_KEY }}"
+```
+- Experimental support for containerized fetch steps:
+```yaml
+fetch:
+  kind: container
+  image: "docker.io/kamudata/example:0.1.0"
+  env:
+    - name: SOME_API_KEY
 ```
 ### Changed
 - Flag `kamu pull --force-uncacehable` was renamed to `--fetch-uncacheable`

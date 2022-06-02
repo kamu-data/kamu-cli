@@ -9,25 +9,36 @@
 
 use super::*;
 use crate::domain::*;
+use crate::infra::WorkspaceLayout;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
+use container_runtime::*;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info};
+use tracing::{debug, error, info, info_span};
 use url::Url;
 
-pub struct FetchService {}
+pub struct FetchService {
+    container_runtime: Arc<ContainerRuntime>,
+    workspace_layout: Arc<WorkspaceLayout>,
+}
 
 // TODO: Reimplement with async libraries
 impl FetchService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: Arc<WorkspaceLayout>,
+    ) -> Self {
+        Self {
+            container_runtime,
+            workspace_layout,
+        }
     }
 
     pub async fn fetch(
@@ -41,9 +52,18 @@ impl FetchService {
 
         let fetch_step = fetch_step.clone();
         let target = target.to_owned();
+        let container_runtime = self.container_runtime.clone();
+        let workspace_layout = self.workspace_layout.clone();
 
         tokio::task::spawn_blocking(move || {
-            Self::fetch_impl(&fetch_step, old_checkpoint, &target, listener)
+            Self::fetch_impl(
+                &fetch_step,
+                old_checkpoint,
+                &target,
+                listener,
+                container_runtime,
+                workspace_layout,
+            )
         })
         .await
         .unwrap()
@@ -54,9 +74,11 @@ impl FetchService {
         old_checkpoint: Option<FetchCheckpoint>,
         target: &Path,
         listener: Arc<dyn FetchProgressListener>,
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
-        match fetch_step {
-            FetchStep::Url(ref furl) => {
+        match &fetch_step {
+            FetchStep::Url(furl) => {
                 let url = Self::template_url(&furl.url)?;
                 match url.scheme() {
                     "file" => Self::fetch_file(
@@ -84,9 +106,17 @@ impl FetchService {
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
-            FetchStep::FilesGlob(ref fglob) => {
+            FetchStep::FilesGlob(fglob) => {
                 Self::fetch_files_glob(fglob, old_checkpoint, target, listener.as_ref())
             }
+            FetchStep::Container(fetch) => Self::fetch_container(
+                container_runtime,
+                workspace_layout,
+                fetch,
+                old_checkpoint,
+                target,
+                listener,
+            ),
         }
     }
 
@@ -123,6 +153,204 @@ impl FetchService {
                 }
                 return Ok(Url::parse(url.as_ref()).int_err()?);
             }
+        }
+    }
+
+    // TODO: Progress reporting
+    // TODO: Env var security
+    // TODO: Allow containers to output watermarks
+    fn fetch_container(
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: Arc<WorkspaceLayout>,
+        fetch: &FetchStepContainer,
+        old_checkpoint: Option<FetchCheckpoint>,
+        target_path: &Path,
+        listener: Arc<dyn FetchProgressListener>,
+    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+        use rand::Rng;
+        use std::process::Stdio;
+
+        if !container_runtime.has_image(&fetch.image) {
+            let span = info_span!("Pulling ingest image", image_name = %fetch.image);
+            let _span_guard = span.enter();
+
+            let image_listener = listener
+                .clone()
+                .get_pull_image_listener()
+                .unwrap_or_else(|| Arc::new(NullPullImageListener));
+            image_listener.begin(&fetch.image);
+
+            // TODO: Better error handling
+            container_runtime
+                .pull_cmd(&fetch.image)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .int_err()?
+                .exit_ok()
+                .map_err(|e| {
+                    error!(error = ?e, "Failed to pull ingest image");
+                    ImageNotFoundError::new(&fetch.image)
+                })?;
+
+            info!("Successfully pulled ingest image");
+            image_listener.success();
+        }
+
+        listener.on_progress(&FetchProgress {
+            total_bytes: 0,
+            fetched_bytes: 0,
+        });
+
+        let run_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(10)
+            .map(char::from)
+            .collect();
+
+        let out_dir = workspace_layout
+            .run_info_dir
+            .join(format!("fetch-{}", &run_id));
+
+        std::fs::create_dir_all(&out_dir).int_err()?;
+
+        let stderr_path = workspace_layout
+            .run_info_dir
+            .join(format!("fetch-{}.err.txt", run_id));
+
+        let stdout_file = std::fs::File::create(target_path).int_err()?;
+        let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
+
+        let new_etag_path = out_dir.join("new-etag");
+        let new_last_modified_path = out_dir.join("new-last-modified");
+
+        let mut environment_vars = vec![
+            (
+                "ODF_LAST_MODIFIED".to_owned(),
+                old_checkpoint
+                    .as_ref()
+                    .and_then(|c| c.last_modified)
+                    .map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
+                    .unwrap_or_default(),
+            ),
+            (
+                "ODF_ETAG".to_owned(),
+                old_checkpoint
+                    .as_ref()
+                    .and_then(|c| c.etag.clone())
+                    .unwrap_or_default(),
+            ),
+            (
+                "ODF_NEW_ETAG_PATH".to_owned(),
+                "/opt/odf/out/new-etag".to_owned(),
+            ),
+            (
+                "ODF_NEW_LAST_MODIFIED_PATH".to_owned(),
+                "/opt/odf/out/new-last-modified".to_owned(),
+            ),
+        ];
+
+        if let Some(env) = &fetch.env {
+            for env_var in env {
+                if let Some(value) = &env_var.value {
+                    environment_vars.push((env_var.name.clone(), value.clone()));
+                } else {
+                    // TODO: This is insecure
+                    let value = match std::env::var(&env_var.name) {
+                        Ok(value) => Ok(value),
+                        Err(_) => Err(IngestInputNotFound::new(&env_var.name)),
+                    }?;
+                    environment_vars.push((env_var.name.clone(), value));
+                }
+            }
+        }
+
+        let status = container_runtime
+            .run_cmd(RunArgs {
+                image: fetch.image.clone(),
+                entry_point: fetch.command.as_ref().map(|cmd| cmd.join(" ")),
+                args: fetch.args.clone().unwrap_or_default(),
+                volume_map: vec![(out_dir.clone(), PathBuf::from("/opt/odf/out"))],
+                environment_vars,
+                ..RunArgs::default()
+            })
+            .stdout(Stdio::from(stdout_file))
+            .stderr(Stdio::from(stderr_file))
+            .status()
+            .int_err()?;
+
+        // Fix permissions
+        if container_runtime.config.runtime == ContainerRuntimeType::Docker {
+            cfg_if::cfg_if! {
+                if #[cfg(unix)] {
+                    container_runtime
+                        .run_shell_cmd(
+                            RunArgs {
+                                image: fetch.image.clone(),
+                                volume_map: vec![(out_dir.clone(), PathBuf::from("/opt/odf/out"))],
+                                user: Some("root".to_owned()),
+                                ..RunArgs::default()
+                            },
+                            &[format!(
+                                "chown -R {}:{} {}",
+                                users::get_current_uid(),
+                                users::get_current_gid(),
+                                "/opt/odf/out"
+                            )],
+                        )
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status().int_err()?;
+                }
+            }
+        }
+
+        if !status.success() {
+            return Err(ProcessError::new(status.code(), vec![stderr_path]).into());
+        }
+
+        let old_checkpoint = old_checkpoint.unwrap_or(FetchCheckpoint {
+            last_fetched: Utc::now(),
+            last_modified: None,
+            etag: None,
+            source_event_time: None,
+            last_filename: None,
+            has_more: false,
+        });
+
+        let etag = if new_etag_path.exists() {
+            Some(std::fs::read_to_string(new_etag_path).int_err()?)
+        } else {
+            old_checkpoint.etag.clone()
+        };
+
+        let last_modified = if new_last_modified_path.exists() {
+            let s = std::fs::read_to_string(new_last_modified_path).int_err()?;
+            Some(chrono::DateTime::parse_from_rfc3339(&s).int_err()?.into())
+        } else {
+            old_checkpoint.last_modified.clone()
+        };
+
+        if target_path.metadata().int_err()?.len() == 0
+            && etag == old_checkpoint.etag
+            && last_modified == old_checkpoint.last_modified
+        {
+            Ok(ExecutionResult {
+                was_up_to_date: true,
+                checkpoint: old_checkpoint,
+            })
+        } else {
+            Ok(ExecutionResult {
+                was_up_to_date: false,
+                checkpoint: FetchCheckpoint {
+                    last_fetched: Utc::now(),
+                    last_modified,
+                    etag,
+                    source_event_time: None,
+                    last_filename: None,
+                    has_more: false,
+                },
+            })
         }
     }
 
@@ -555,6 +783,10 @@ pub struct FetchProgress {
 
 pub trait FetchProgressListener: Send + Sync {
     fn on_progress(&self, _progress: &FetchProgress) {}
+
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        None
+    }
 }
 
 struct NullFetchProgressListener;

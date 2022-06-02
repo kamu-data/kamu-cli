@@ -269,6 +269,11 @@ The input/output is a string in RFC3339 format.
 """
 scalar DateTime
 
+type EnvVar {
+	name: String!
+	value: String
+}
+
 union EventTimeSource = | EventTimeSourceFromMetadata | EventTimeSourceFromPath
 
 type EventTimeSourceFromMetadata {
@@ -288,7 +293,14 @@ type ExecuteQuery {
 	outputWatermark: DateTime
 }
 
-union FetchStep = | FetchStepUrl | FetchStepFilesGlob
+union FetchStep = | FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
+
+type FetchStepContainer {
+	image: String!
+	command: [String!]
+	args: [String!]
+	env: [EnvVar!]
+}
 
 type FetchStepFilesGlob {
 	path: String!

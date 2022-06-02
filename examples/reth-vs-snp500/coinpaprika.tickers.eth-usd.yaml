@@ -2,23 +2,13 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: coinpaprika.tickers.eth-usd.24h-historic
+  name: coinpaprika.tickers.eth-usd
   kind: root
   metadata:
     - kind: setPollingSource
       fetch:
-        kind: url
-        url: "https://api.coinpaprika.com/v1/tickers/eth-ethereum/historical\
-          ?start=2010-01-01
-          &end=2022-05-25
-          &interval=1d
-          &limit=5000"
-      prepare:
-        - kind: pipe
-          command:
-            - "jq"
-            - "-c"
-            - ".[]"
+        kind: container
+        image: "docker.io/kamudata/example-coinpaprika-ingest:0.1.0"
       read:
         kind: jsonLines
         schema:
@@ -44,3 +34,15 @@ content:
           - event_time
           - from_symbol
           - to_symbol
+    - kind: setAttachments
+      attachments:
+        kind: embedded
+        items:
+          - path: README.md
+            content: |
+              # ETH to USD Prices from Coinpaprika
+              This dataset pull best available granularity data that is within Coinpaprika's free tier.
+    - kind: setLicense
+      shortName: Proprietary
+      name: Coinpaprika - Terms of Use
+      websiteUrl: https://api.coinpaprika.com/#section/Terms-of-use

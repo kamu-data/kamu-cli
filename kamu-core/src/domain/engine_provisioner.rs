@@ -83,14 +83,20 @@ pub struct ImageNotFoundError {
     pub backtrace: Backtrace,
 }
 
+impl ImageNotFoundError {
+    pub fn new(image_name: impl Into<String>) -> Self {
+        Self {
+            image_name: image_name.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 impl EngineProvisioningError {
     pub fn image_not_found<S: Into<String>>(image_name: S) -> Self {
-        Self::ImageNotFound(ImageNotFoundError {
-            image_name: image_name.into(),
-            backtrace: Backtrace::capture(),
-        })
+        Self::ImageNotFound(ImageNotFoundError::new(image_name))
     }
 
     pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {

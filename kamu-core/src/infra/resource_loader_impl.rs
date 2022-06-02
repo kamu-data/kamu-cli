@@ -64,7 +64,7 @@ impl ResourceLoader for ResourceLoaderImpl {
         &self,
         path: &Path,
     ) -> Result<DatasetSnapshot, ResourceError> {
-        let buffer = std::fs::read(path).map_err(|e| ResourceError::internal(e))?;
+        let buffer = std::fs::read(path).int_err()?;
         let snapshot = YamlDatasetSnapshotDeserializer
             .read_manifest(&buffer)
             .map_err(|e| ResourceError::serde(e))?;
@@ -93,8 +93,8 @@ impl ResourceLoader for ResourceLoaderImpl {
     }
 }
 
-impl std::convert::From<curl::Error> for ResourceError {
+impl From<curl::Error> for ResourceError {
     fn from(e: curl::Error) -> Self {
-        Self::internal(e)
+        ResourceError::from(e.int_err())
     }
 }

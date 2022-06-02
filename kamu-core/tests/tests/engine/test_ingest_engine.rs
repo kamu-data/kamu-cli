@@ -40,6 +40,7 @@ async fn test_ingest_with_engine() {
         workspace_layout.clone(),
         local_repo.clone(),
         engine_provisioner,
+        Arc::new(ContainerRuntime::default()),
     ));
 
     let src_path = tempdir.path().join("data.csv");

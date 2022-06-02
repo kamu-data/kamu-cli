@@ -10,16 +10,18 @@
 use super::ingest::*;
 use crate::domain::*;
 use crate::infra::*;
-use dill::*;
 use opendatafabric::*;
-use tracing::info;
 
+use container_runtime::ContainerRuntime;
+use dill::*;
 use std::sync::Arc;
+use tracing::info;
 
 pub struct IngestServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
     local_repo: Arc<dyn LocalDatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 #[component(pub)]
@@ -28,11 +30,13 @@ impl IngestServiceImpl {
         workspace_layout: Arc<WorkspaceLayout>,
         local_repo: Arc<dyn LocalDatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
+        container_runtime: Arc<ContainerRuntime>,
     ) -> Self {
         Self {
             workspace_layout,
             local_repo,
             engine_provisioner,
+            container_runtime,
         }
     }
 
@@ -103,11 +107,10 @@ impl IngestServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let engine_provisioner = self.engine_provisioner.clone();
-
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
+        // TODO create via DI to avoid passing through all dependencies
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
             dataset,
@@ -115,7 +118,9 @@ impl IngestServiceImpl {
             layout,
             fetch_override,
             listener,
-            engine_provisioner,
+            self.engine_provisioner.clone(),
+            self.container_runtime.clone(),
+            self.workspace_layout.clone(),
         )
         .await?;
 

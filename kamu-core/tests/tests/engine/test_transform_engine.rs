@@ -78,6 +78,7 @@ async fn test_transform_with_engine_spark() {
         workspace_layout.clone(),
         local_repo.clone(),
         engine_provisioner.clone(),
+        Arc::new(ContainerRuntime::default()),
     );
 
     let transform_svc = TransformServiceImpl::new(
@@ -313,6 +314,7 @@ async fn test_transform_with_engine_flink() {
         workspace_layout.clone(),
         local_repo.clone(),
         engine_provisioner.clone(),
+        Arc::new(ContainerRuntime::default()),
     );
 
     let transform_svc = TransformServiceImpl::new(

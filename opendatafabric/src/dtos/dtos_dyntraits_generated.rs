@@ -302,6 +302,34 @@ impl Into<dtos::DatasetVocabulary> for &dyn DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// EnvVar
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait EnvVar {
+    fn name(&self) -> &str;
+    fn value(&self) -> Option<&str>;
+}
+
+impl EnvVar for dtos::EnvVar {
+    fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    fn value(&self) -> Option<&str> {
+        self.value.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<dtos::EnvVar> for &dyn EnvVar {
+    fn into(self) -> dtos::EnvVar {
+        dtos::EnvVar {
+            name: self.name().to_owned(),
+            value: self.value().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EventTimeSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -644,6 +672,7 @@ impl Into<dtos::ExecuteQueryResponseInternalError> for &dyn ExecuteQueryResponse
 pub enum FetchStep<'a> {
     Url(&'a dyn FetchStepUrl),
     FilesGlob(&'a dyn FetchStepFilesGlob),
+    Container(&'a dyn FetchStepContainer),
 }
 
 impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
@@ -651,6 +680,7 @@ impl<'a> From<&'a dtos::FetchStep> for FetchStep<'a> {
         match other {
             dtos::FetchStep::Url(v) => FetchStep::Url(v),
             dtos::FetchStep::FilesGlob(v) => FetchStep::FilesGlob(v),
+            dtos::FetchStep::Container(v) => FetchStep::Container(v),
         }
     }
 }
@@ -660,6 +690,7 @@ impl Into<dtos::FetchStep> for FetchStep<'_> {
         match self {
             FetchStep::Url(v) => dtos::FetchStep::Url(v.into()),
             FetchStep::FilesGlob(v) => dtos::FetchStep::FilesGlob(v.into()),
+            FetchStep::Container(v) => dtos::FetchStep::Container(v.into()),
         }
     }
 }
@@ -675,6 +706,13 @@ pub trait FetchStepFilesGlob {
     fn event_time(&self) -> Option<EventTimeSource>;
     fn cache(&self) -> Option<SourceCaching>;
     fn order(&self) -> Option<SourceOrdering>;
+}
+
+pub trait FetchStepContainer {
+    fn image(&self) -> &str;
+    fn command(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
+    fn args(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
+    fn env(&self) -> Option<Box<dyn Iterator<Item = &dyn EnvVar> + '_>>;
 }
 
 impl FetchStepUrl for dtos::FetchStepUrl {
@@ -708,6 +746,33 @@ impl FetchStepFilesGlob for dtos::FetchStepFilesGlob {
     }
 }
 
+impl FetchStepContainer for dtos::FetchStepContainer {
+    fn image(&self) -> &str {
+        self.image.as_ref()
+    }
+    fn command(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
+        self.command
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
+                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
+            })
+    }
+    fn args(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
+        self.args
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
+                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
+            })
+    }
+    fn env(&self) -> Option<Box<dyn Iterator<Item = &dyn EnvVar> + '_>> {
+        self.env
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &dyn EnvVar> + '_> {
+                Box::new(v.iter().map(|i| -> &dyn EnvVar { i }))
+            })
+    }
+}
+
 impl Into<dtos::FetchStepUrl> for &dyn FetchStepUrl {
     fn into(self) -> dtos::FetchStepUrl {
         dtos::FetchStepUrl {
@@ -725,6 +790,17 @@ impl Into<dtos::FetchStepFilesGlob> for &dyn FetchStepFilesGlob {
             event_time: self.event_time().map(|v| v.into()),
             cache: self.cache().map(|v| v.into()),
             order: self.order().map(|v| v.into()),
+        }
+    }
+}
+
+impl Into<dtos::FetchStepContainer> for &dyn FetchStepContainer {
+    fn into(self) -> dtos::FetchStepContainer {
+        dtos::FetchStepContainer {
+            image: self.image().to_owned(),
+            command: self.command().map(|v| v.map(|i| i.to_owned()).collect()),
+            args: self.args().map(|v| v.map(|i| i.to_owned()).collect()),
+            env: self.env().map(|v| v.map(|i| i.into()).collect()),
         }
     }
 }

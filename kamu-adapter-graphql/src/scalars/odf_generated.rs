@@ -223,6 +223,26 @@ impl From<odf::DatasetVocabulary> for DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// EnvVar
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct EnvVar {
+    pub name: String,
+    pub value: Option<String>,
+}
+
+impl From<odf::EnvVar> for EnvVar {
+    fn from(v: odf::EnvVar) -> Self {
+        Self {
+            name: v.name.into(),
+            value: v.value.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EventTimeSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#eventtimesource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -439,6 +459,7 @@ impl From<odf::ExecuteQueryResponseInternalError> for ExecuteQueryResponseIntern
 pub enum FetchStep {
     Url(FetchStepUrl),
     FilesGlob(FetchStepFilesGlob),
+    Container(FetchStepContainer),
 }
 
 impl From<odf::FetchStep> for FetchStep {
@@ -446,6 +467,7 @@ impl From<odf::FetchStep> for FetchStep {
         match v {
             odf::FetchStep::Url(v) => Self::Url(v.into()),
             odf::FetchStep::FilesGlob(v) => Self::FilesGlob(v.into()),
+            odf::FetchStep::Container(v) => Self::Container(v.into()),
         }
     }
 }
@@ -482,6 +504,25 @@ impl From<odf::FetchStepFilesGlob> for FetchStepFilesGlob {
             event_time: v.event_time.map(Into::into),
             cache: v.cache.map(Into::into),
             order: v.order.map(Into::into),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct FetchStepContainer {
+    pub image: String,
+    pub command: Option<Vec<String>>,
+    pub args: Option<Vec<String>>,
+    pub env: Option<Vec<EnvVar>>,
+}
+
+impl From<odf::FetchStepContainer> for FetchStepContainer {
+    fn from(v: odf::FetchStepContainer) -> Self {
+        Self {
+            image: v.image.into(),
+            command: v.command.map(|v| v.into_iter().map(Into::into).collect()),
+            args: v.args.map(|v| v.into_iter().map(Into::into).collect()),
+            env: v.env.map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }

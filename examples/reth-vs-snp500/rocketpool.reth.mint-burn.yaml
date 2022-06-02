@@ -7,8 +7,10 @@ content:
   metadata:
     - kind: setPollingSource
       fetch:
-        kind: url
-        url: file:///data/reth-events.jsonl
+        kind: container
+        image: "docker.io/kamudata/example-rocketpool-ingest:0.1.0"
+        env:
+          - name: ETH_NODE_PROVIDER_URL
       read:
         kind: jsonLines
         schema:

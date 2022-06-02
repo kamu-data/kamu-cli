@@ -50,6 +50,22 @@ impl ReadService {
     where
         'a: 'b,
     {
+        // Terminate early for zero-sized files
+        if src_path.metadata().int_err()?.len() == 0 {
+            return Ok(ExecutionResult {
+                was_up_to_date: false,
+                checkpoint: ReadCheckpoint {
+                    last_read: Utc::now(),
+                    for_prepared_at: for_prepared_at,
+                    system_time,
+                    engine_response: ExecuteQueryResponseSuccess {
+                        data_interval: None,
+                        output_watermark: None,
+                    },
+                },
+            });
+        }
+
         let engine = self
             .engine_provisioner
             .provision_ingest_engine(listener.get_engine_provisioning_listener())

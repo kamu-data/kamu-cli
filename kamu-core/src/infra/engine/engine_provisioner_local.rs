@@ -123,13 +123,13 @@ impl EngineProvisionerLocal {
                     .map_err(|e| EngineProvisioningError::internal(e))?
                     .exit_ok()
                     .map_err(|e| {
-                        error!(%image_name, error = ?e, "Failed to pull engine image");
+                        error!(error = ?e, "Failed to pull engine image");
                         EngineProvisioningError::image_not_found(&image_name)
                     }))
             .await
             .unwrap()?;
 
-            info!(image_name = image, "Successfully pulled engine image");
+            info!("Successfully pulled engine image");
             image_listener.success();
 
             {

@@ -114,6 +114,16 @@ pub struct ProcessError {
     pub backtrace: Backtrace,
 }
 
+impl ProcessError {
+    pub fn new(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
+        Self {
+            exit_code,
+            log_files: normalize_logs(log_files),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
 impl std::fmt::Display for ProcessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Process error: ")?;
@@ -190,24 +200,20 @@ impl EngineError {
     pub fn invalid_query(message: impl Into<String>, log_files: Vec<PathBuf>) -> Self {
         EngineError::InvalidQuery(InvalidQueryError {
             message: message.into(),
+            log_files: normalize_logs(log_files),
             backtrace: Backtrace::capture(),
-            log_files: Self::normalize_logs(log_files),
         })
     }
 
     pub fn process_error(exit_code: Option<i32>, log_files: Vec<PathBuf>) -> Self {
-        Self::ProcessError(ProcessError {
-            exit_code,
-            backtrace: Backtrace::capture(),
-            log_files: Self::normalize_logs(log_files),
-        })
+        Self::ProcessError(ProcessError::new(exit_code, log_files))
     }
 
     pub fn contract_error(reason: &str, log_files: Vec<PathBuf>) -> Self {
         Self::ContractError(ContractError {
             reason: reason.to_owned(),
+            log_files: normalize_logs(log_files),
             backtrace: Backtrace::capture(),
-            log_files: Self::normalize_logs(log_files),
         })
     }
 
@@ -217,21 +223,9 @@ impl EngineError {
     {
         EngineError::InternalError(InternalEngineError {
             source: e.into(),
+            log_files: normalize_logs(log_files),
             backtrace: Backtrace::capture(),
-            log_files: Self::normalize_logs(log_files),
         })
-    }
-
-    fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
-        let cwd = std::env::current_dir().unwrap_or_default();
-        log_files
-            .into_iter()
-            .filter(|p| match std::fs::metadata(p) {
-                Ok(m) => m.len() > 0,
-                Err(_) => true,
-            })
-            .map(|p| pathdiff::diff_paths(&p, &cwd).unwrap_or(p))
-            .collect()
     }
 }
 
@@ -239,4 +233,18 @@ impl From<std::io::Error> for EngineError {
     fn from(e: std::io::Error) -> Self {
         Self::internal(e, Vec::new())
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    log_files
+        .into_iter()
+        .filter(|p| match std::fs::metadata(p) {
+            Ok(m) => m.len() > 0,
+            Err(_) => true,
+        })
+        .map(|p| pathdiff::diff_paths(&p, &cwd).unwrap_or(p))
+        .collect()
 }
