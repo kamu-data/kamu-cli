@@ -726,9 +726,6 @@ pub fn cli() -> Command<'static> {
                 .subcommand_required(true)
                 .arg_required_else_help(true)
                 .subcommands([
-                    tabular_output_params(Command::new("list")
-                        .about("Lists known repositories")
-                    ),
                     Command::new("add")
                         .about("Adds a repository")
                         .after_help(indoc::indoc!(r"
