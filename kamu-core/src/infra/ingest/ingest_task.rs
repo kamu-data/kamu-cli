@@ -390,6 +390,10 @@ impl IngestTask {
                         }
                     }
 
+                    let cache_files = vec![
+                        self.layout.cache_dir.join("fetched.bin"),
+                        self.layout.cache_dir.join("prepared.bin"),
+                    ];
                     let data_path = self.layout.cache_dir.join("read.bin");
                     let new_checkpoint_path = self.layout.cache_dir.join("read.checkpoint");
                     let data_interval = read_result.checkpoint.engine_response.data_interval;
@@ -407,27 +411,28 @@ impl IngestTask {
                         // TODO: Move out into common data commit procedure of sorts
                         let output_data = DataSlice {
                             logical_hash:
-                                crate::infra::utils::data_utils::get_parquet_logical_hash(&data_path)
+                                crate::infra::utils::data_utils::get_parquet_logical_hash(
+                                    &data_path,
+                                )
                                 .int_err()?,
-                            physical_hash:
-                                crate::infra::utils::data_utils::get_file_physical_hash(&data_path)
-                                .int_err()?,
+                            physical_hash: crate::infra::utils::data_utils::get_file_physical_hash(
+                                &data_path,
+                            )
+                            .int_err()?,
                             interval: data_interval,
-                            size:
-                                std::fs::metadata(&data_path)
-                                .int_err()?
-                                .len() as i64,
+                            size: std::fs::metadata(&data_path).int_err()?.len() as i64,
                         };
 
                         // Commit checkpoint
                         let output_checkpoint = if new_checkpoint_path.exists() {
                             let physical_hash =
-                                crate::infra::utils::data_utils::get_file_physical_hash(&new_checkpoint_path)
-                                    .int_err()?;
+                                crate::infra::utils::data_utils::get_file_physical_hash(
+                                    &new_checkpoint_path,
+                                )
+                                .int_err()?;
 
-                            let size = std::fs::metadata(&new_checkpoint_path)
-                                .int_err()?
-                                .len() as i64;
+                            let size =
+                                std::fs::metadata(&new_checkpoint_path).int_err()?.len() as i64;
 
                             std::fs::create_dir_all(&self.layout.checkpoints_dir).int_err()?;
                             std::fs::rename(
@@ -436,18 +441,18 @@ impl IngestTask {
                             )
                             .int_err()?;
 
-                            Some(Checkpoint { physical_hash, size })
+                            Some(Checkpoint {
+                                physical_hash,
+                                size,
+                            })
                         } else {
                             None
                         };
 
                         // Commit data
                         std::fs::create_dir_all(&self.layout.data_dir).int_err()?;
-                        std::fs::rename(
-                            &data_path,
-                            self.layout.data_slice_path(&output_data),
-                        )
-                        .int_err()?;
+                        std::fs::rename(&data_path, self.layout.data_slice_path(&output_data))
+                            .int_err()?;
 
                         MetadataEvent::AddData(AddData {
                             input_checkpoint: self.prev_checkpoint.clone(),
@@ -456,26 +461,33 @@ impl IngestTask {
                             output_watermark,
                         })
                     } else {
-                        let prev_watermark = self.dataset.as_metadata_chain()
+                        let prev_watermark = self
+                            .dataset
+                            .as_metadata_chain()
                             .iter_blocks()
                             .filter_data_stream_blocks()
-                            .filter_map_ok(|(_,b)| b.event.output_watermark)
-                            .try_first().await.int_err()?;
+                            .filter_map_ok(|(_, b)| b.event.output_watermark)
+                            .try_first()
+                            .await
+                            .int_err()?;
 
                         if output_watermark.is_none() || output_watermark == prev_watermark {
-                            info!("Skipping commit of new block as it neither has new data or watermark");
+                            info!(concat!(
+                                "Skipping commit of new block as ",
+                                "it neither has new data nor an updated watermark"
+                            ));
                             return Ok(ExecutionResult {
-                                was_up_to_date: false,  // The checkpoint is not up-to-date but dataset is
+                                was_up_to_date: false, // The checkpoint is not up-to-date but dataset is
                                 checkpoint: CommitCheckpoint {
                                     last_committed: Utc::now(),
                                     for_read_at: read_result.checkpoint.last_read,
                                     for_fetched_at: fetch_result.checkpoint.last_fetched,
                                     last_hash: None,
                                 },
-                            })
+                            });
                         }
 
-                        MetadataEvent::SetWatermark(SetWatermark{
+                        MetadataEvent::SetWatermark(SetWatermark {
                             output_watermark: output_watermark.unwrap(),
                         })
                     };
@@ -487,7 +499,18 @@ impl IngestTask {
                     };
                     info!(?new_block, "Committing new block");
 
-                    let new_head = self.dataset.as_metadata_chain().append(new_block, AppendOpts::default()).await.int_err()?;
+                    let new_head = self
+                        .dataset
+                        .as_metadata_chain()
+                        .append(new_block, AppendOpts::default())
+                        .await
+                        .int_err()?;
+
+                    // Clean up intermediate files
+                    for path in cache_files {
+                        std::fs::remove_file(path).int_err()?;
+                    }
+
                     info!(%new_head, "Committed new block");
 
                     Ok(ExecutionResult {
@@ -500,7 +523,8 @@ impl IngestTask {
                         },
                     })
                 },
-            ).await
+            )
+            .await
             .int_err()?
     }
 }
