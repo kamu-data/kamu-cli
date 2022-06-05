@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.91.0] - 2022-06-05
+### Changed
+- Clean up cached data files upon successful commit to save disk space
+- Push `cache` directory of datasets to remote repositories
+  - This is a temporary measure to allow resuming heavy-weight ingest actions from checkpoints
+
 ## [0.90.0] - 2022-06-04
 ### Added
 - Experimental support for templating of ingest URLs with environment variables:
