@@ -44,7 +44,7 @@ RUN chmod +x /usr/bin/tini
 
 
 # Kamu
-RUN wget https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSION/kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
+RUN wget -q https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSION/kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
     tar -xf kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
     chmod +x kamu-cli-x86_64-unknown-linux-gnu/kamu && \
     mv kamu-cli-x86_64-unknown-linux-gnu/kamu /usr/local/bin/ && \
