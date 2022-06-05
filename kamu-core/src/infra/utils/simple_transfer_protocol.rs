@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
 use crate::domain::sync_service::DatasetNotFoundError;
+use crate::domain::*;
 use opendatafabric::*;
 
-use tracing::*;
 use futures::TryStreamExt;
+use tracing::*;
 
 /// Implements "Simple Transfer Protocol" as described in ODF spec
 pub struct SimpleTransferProtocol;
 
 impl SimpleTransferProtocol {
-
     // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
     pub async fn sync(
         &self,
@@ -111,7 +110,11 @@ impl SimpleTransferProtocol {
                     .insert_stream(
                         stream,
                         InsertOpts {
-                            precomputed_hash: if !trust_source_hashes { None } else { Some(&data_slice.physical_hash) },
+                            precomputed_hash: if !trust_source_hashes {
+                                None
+                            } else {
+                                Some(&data_slice.physical_hash)
+                            },
                             expected_hash: Some(&data_slice.physical_hash),
                             size_hint: Some(data_slice.size as usize),
                             ..Default::default()
@@ -121,9 +124,15 @@ impl SimpleTransferProtocol {
                 {
                     Ok(_) => Ok(()),
                     Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                        message: "Data file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
+                        message: concat!(
+                            "Data file hash declared by the source didn't match ",
+                            "the computed - this may be an indication of hashing ",
+                            "algorithm mismatch or an attempted tampering",
+                        )
+                        .to_owned(),
                         source: Some(e.into()),
-                    }.into()),
+                    }
+                    .into()),
                     Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
@@ -148,11 +157,15 @@ impl SimpleTransferProtocol {
                     .insert_stream(
                         stream,
                         InsertOpts {
-                            precomputed_hash: if !trust_source_hashes { None } else { Some(&checkpoint.physical_hash) },
+                            precomputed_hash: if !trust_source_hashes {
+                                None
+                            } else {
+                                Some(&checkpoint.physical_hash)
+                            },
                             expected_hash: Some(&checkpoint.physical_hash),
                             // This hint is necessary only for S3 implementation that does not currently support
                             // streaming uploads without knowing Content-Length. We should remove it in future.
-                            size_hint: Some(checkpoint.size as usize), 
+                            size_hint: Some(checkpoint.size as usize),
                             ..Default::default()
                         },
                     )
@@ -160,9 +173,15 @@ impl SimpleTransferProtocol {
                 {
                     Ok(_) => Ok(()),
                     Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                        message: "Checkpoint file hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
+                        message: concat!(
+                            "Checkpoint file hash declared by the source didn't ",
+                            "match the computed - this may be an indication of hashing ",
+                            "algorithm mismatch or an attempted tampering",
+                        )
+                        .to_owned(),
                         source: Some(e.into()),
-                    }.into()),
+                    }
+                    .into()),
                     Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
@@ -173,29 +192,41 @@ impl SimpleTransferProtocol {
         for (hash, block) in blocks.into_iter().rev() {
             debug!(?hash, "Appending block");
 
-            match dst_chain.append(
-                block,
-                AppendOpts {
-                    validation,
-                    update_ref: None, // We will update head once, after sync is complete
-                    precomputed_hash: if !trust_source_hashes { None } else { Some(&hash) },
-                    expected_hash: Some(&hash),
-                    ..Default::default()
-                },
-            ).await {
+            match dst_chain
+                .append(
+                    block,
+                    AppendOpts {
+                        validation,
+                        update_ref: None, // We will update head once, after sync is complete
+                        precomputed_hash: if !trust_source_hashes {
+                            None
+                        } else {
+                            Some(&hash)
+                        },
+                        expected_hash: Some(&hash),
+                        ..Default::default()
+                    },
+                )
+                .await
+            {
                 Ok(_) => Ok(()),
                 Err(AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))) => {
                     Err(CorruptedSourceError {
-                        message: "Block hash declared by the source didn't match the computed - this may be an indication of hashing algorithm mismatch or an attempted tampering".to_owned(),
+                        message: concat!(
+                            "Block hash declared by the source didn't match ",
+                            "the computed - this may be an indication of hashing ",
+                            "algorithm mismatch or an attempted tampering",
+                        )
+                        .to_owned(),
                         source: Some(e.into()),
-                    }.into())
+                    }
+                    .into())
                 }
-                Err(AppendError::InvalidBlock(e)) => {
-                    Err(CorruptedSourceError {
-                        message: "Source metadata chain is logically inconsistent".to_owned(),
-                        source: Some(e.into()),
-                    }.into())
+                Err(AppendError::InvalidBlock(e)) => Err(CorruptedSourceError {
+                    message: "Source metadata chain is logically inconsistent".to_owned(),
+                    source: Some(e.into()),
                 }
+                .into()),
                 Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
                 Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
                 Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
@@ -221,6 +252,28 @@ impl SimpleTransferProtocol {
             Err(SetRefError::Internal(e)) => Err(SyncError::Internal(e)),
             Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
+
+        // Download kamu-specific cache files (if exist)
+        // TODO: This is not part of the ODF spec and should be revisited.
+        // See also: IPFS sync procedure.
+        // Ticket: https://www.notion.so/Where-to-store-ingest-checkpoints-4d48e8db656042168f94a8ab2793daef
+        let cache_files = ["fetch.yaml", "prep.yaml", "read.yaml", "commit.yaml"];
+        for name in &cache_files {
+            use crate::domain::repos::named_object_repository::GetError;
+
+            match src.as_cache_repo().get(name).await {
+                Ok(data) => {
+                    dst.as_cache_repo()
+                        .set(name, data.as_ref())
+                        .await
+                        .int_err()?;
+                    Ok(())
+                }
+                Err(GetError::NotFound(_)) => Ok(()),
+                Err(GetError::Access(e)) => Err(SyncError::Access(e)),
+                Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
+            }?;
+        }
 
         Ok(SyncResult::Updated {
             old_head: dst_head,

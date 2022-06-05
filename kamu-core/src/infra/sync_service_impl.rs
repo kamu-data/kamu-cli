@@ -332,7 +332,10 @@ impl SyncServiceImpl {
             .add_path(
                 source_path,
                 AddOptions {
-                    ignore: Some(&["/cache", "/config", "/info"]),
+                    // TODO: We are currently including the "/cache" directory when pushing to remotes
+                    // this is to allow ingest tasks to resume gracefully with minimal work.
+                    // But this does not follow the ODF spec and should be revisited.
+                    ignore: Some(&["/config", "/info"]),
                 },
             )
             .await?;

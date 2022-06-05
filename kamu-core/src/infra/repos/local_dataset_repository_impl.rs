@@ -684,4 +684,7 @@ where
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository {
         self.dataset.as_checkpoint_repo()
     }
+    fn as_cache_repo(&self) -> &dyn NamedObjectRepository {
+        self.dataset.as_cache_repo()
+    }
 }

@@ -23,6 +23,7 @@ pub trait Dataset: Send + Sync {
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
+    fn as_cache_repo(&self) -> &dyn NamedObjectRepository;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
