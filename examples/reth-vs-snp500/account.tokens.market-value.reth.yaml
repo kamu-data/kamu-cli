@@ -9,7 +9,7 @@ content:
       inputs:
         - name: account.tokens.investments.usd
         - name: rocketpool.reth.mint-burn
-        - name: coinpaprika.tickers.eth-usd.24h-historic
+        - name: coinpaprika.tickers.eth-usd
       transform:
         kind: sql
         engine: flink
@@ -17,7 +17,7 @@ content:
           - name: account.tokens.investments.usd
             primaryKey:
               - token_symbol
-          - name: coinpaprika.tickers.eth-usd.24h-historic
+          - name: coinpaprika.tickers.eth-usd
             primaryKey:
               - from_symbol
         queries:
@@ -52,7 +52,7 @@ content:
                   rp.token_market_value_eth * eth2usd.price
                 ) as token_market_value_usd
               from market_value_reth2eth as rp,
-              lateral table (`coinpaprika.tickers.eth-usd.24h-historic`(rp.event_time)) as eth2usd
+              lateral table (`coinpaprika.tickers.eth-usd`(rp.event_time)) as eth2usd
               where
                 eth2usd.from_symbol = rp.account_symbol 
                 and eth2usd.to_symbol = 'usd'

@@ -8,12 +8,12 @@ content:
     - kind: setTransform
       inputs:
         - name: account.tokens.investments
-        - name: coinpaprika.tickers.eth-usd.24h-historic
+        - name: coinpaprika.tickers.eth-usd
       transform:
         kind: sql
         engine: flink
         temporalTables:
-          - name: coinpaprika.tickers.eth-usd.24h-historic
+          - name: coinpaprika.tickers.eth-usd
             primaryKey:
               - from_symbol
         queries:
@@ -37,7 +37,7 @@ content:
                   tr.eth_amount * eth2usd.price
                 ) as eth_amount_as_usd
               from `account.tokens.investments` as tr,
-              lateral table (`coinpaprika.tickers.eth-usd.24h-historic`(tr.block_time)) as eth2usd
+              lateral table (`coinpaprika.tickers.eth-usd`(tr.block_time)) as eth2usd
               where
                 tr.account_symbol = eth2usd.from_symbol 
                 and eth2usd.to_symbol = 'usd'
