@@ -33,6 +33,10 @@ pub trait SyncService: Send + Sync {
         opts: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti>;
+
+    /// Adds dataset to IPFS and returns the root CID.
+    /// Unlike `sync` it does not do IPNS resolution and publishing.
+    async fn ipfs_add(&self, src: &DatasetRefLocal) -> Result<String, SyncError>;
 }
 
 #[derive(Debug, Clone)]

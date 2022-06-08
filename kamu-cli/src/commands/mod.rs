@@ -107,6 +107,9 @@ pub use system_api_server_gql_schema_command::*;
 mod system_api_server_run_command;
 pub use system_api_server_run_command::*;
 
+mod system_ipfs_add_command;
+pub use system_ipfs_add_command::*;
+
 mod ui_command;
 pub use ui_command::*;
 

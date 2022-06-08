@@ -164,6 +164,13 @@ impl IpfsClient {
         if options.allow_offline.unwrap_or(self.default_allow_offline) {
             cmd.arg("--allow-offline");
         }
+        if let Some(resolve) = options.resolve {
+            cmd.arg(if resolve {
+                "--resolve=true"
+            } else {
+                "--resolve=false"
+            });
+        }
         cmd.arg(format!("/ipfs/{}", cid));
 
         info!(?cmd, "Running process");
@@ -202,6 +209,7 @@ pub struct AddOptions<'a> {
 pub struct PublishOptions<'a> {
     pub key: Option<&'a str>,
     pub allow_offline: Option<bool>,
+    pub resolve: Option<bool>,
 }
 
 impl Default for PublishOptions<'_> {
@@ -209,6 +217,7 @@ impl Default for PublishOptions<'_> {
         Self {
             key: None,
             allow_offline: None,
+            resolve: None,
         }
     }
 }

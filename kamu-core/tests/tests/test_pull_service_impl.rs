@@ -1018,4 +1018,8 @@ impl SyncService for TestSyncService {
         self.calls.lock().unwrap().push(PullBatch::Sync(call));
         results
     }
+
+    async fn ipfs_add(&self, _src: &DatasetRefLocal) -> Result<String, SyncError> {
+        unimplemented!()
+    }
 }

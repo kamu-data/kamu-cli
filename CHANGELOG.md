@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.92.0] - 2022-06-08
+### Added
+- `kamu system ipfs add` command that adds dataset to IPFS and returns the CID - it can be used to skip slow and unreliable IPNS publishing
+### Fixed
+- Engine runtime error when it was incorrectly using a `.crc` file instead of a parquet data file
+
 ## [0.91.0] - 2022-06-05
 ### Changed
 - Clean up cached data files upon successful commit to save disk space

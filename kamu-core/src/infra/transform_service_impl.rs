@@ -348,6 +348,8 @@ impl TransformServiceImpl {
         // TODO: This service shouldn't know specifics of dataset layouts
         // perhaps it should only receive a staging file to write into from Dataset interface
         let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        // TODO: Avoid giving engines write access directly to data and checkpoint dirs
+        // to prevent accidents and creation of garbage files like .crc
         let out_data_path = output_layout.data_dir.join(".pending");
         let prev_checkpoint_path = prev_checkpoint
             .as_ref()
@@ -537,10 +539,19 @@ impl TransformServiceImpl {
 
         // TODO: Migrate to providing schema directly
         // TODO: Will not work with schema evolution
-        let schema_file = data_paths
-            .last()
-            .map(|p| p.clone())
-            .unwrap_or_else(|| self.get_schema_file_fallback(&input_layout));
+        let schema_file = if let Some(p) = data_paths.last() {
+            p.clone()
+        } else {
+            let last_slice = input_chain
+                .iter_blocks()
+                .filter_data_stream_blocks()
+                .filter_map_ok(|(_, b)| b.event.output_data)
+                .try_first()
+                .await
+                .int_err()?
+                .unwrap();
+            input_layout.data_slice_path(&last_slice)
+        };
 
         let vocab = match vocab_hint {
             Some(v) => v,
@@ -585,16 +596,6 @@ impl TransformServiceImpl {
             .int_err()?
             .map(|sv| sv.into())
             .unwrap_or_default())
-    }
-
-    // TODO: Migrate to providing schema directly
-    fn get_schema_file_fallback(&self, dataset_layout: &DatasetLayout) -> PathBuf {
-        std::fs::read_dir(&dataset_layout.data_dir)
-            .unwrap()
-            .next()
-            .unwrap()
-            .unwrap()
-            .path()
     }
 
     // TODO: Improve error handling

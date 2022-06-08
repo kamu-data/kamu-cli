@@ -273,6 +273,13 @@ pub fn get_command(
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
+            Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
+                Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
+                    catalog.get_one()?,
+                    add_matches.value_of("dataset").unwrap(),
+                )),
+                _ => return Err(CommandInterpretationFailed.into()),
+            },
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(

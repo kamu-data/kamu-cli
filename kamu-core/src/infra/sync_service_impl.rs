@@ -19,6 +19,7 @@ use tracing::*;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     local_repo: Arc<dyn LocalDatasetRepository>,
@@ -323,10 +324,34 @@ impl SyncServiceImpl {
         }?;
 
         // Add files to IPFS
+        info!("Adding files to IPFS");
+        let cid = self.add_to_ipfs(src).await?;
+
+        // Publish to IPNS
+        info!(%cid, "Publishing to IPNS");
+        let _id = self
+            .ipfs_client
+            .name_publish(
+                &cid,
+                PublishOptions {
+                    key: Some(&key.name),
+                    resolve: Some(false),
+                    ..Default::default()
+                },
+            )
+            .await?;
+
+        Ok(SyncResult::Updated {
+            old_head: dst_head,
+            new_head: src_head,
+            num_blocks,
+        })
+    }
+
+    async fn add_to_ipfs(&self, src: &DatasetRefLocal) -> Result<String, SyncError> {
         let source_url = self.local_repo.get_dataset_url(src).await.int_err()?;
         let source_path = source_url.to_file_path().unwrap();
 
-        info!("Adding files to IPFS");
         let cid = self
             .ipfs_client
             .add_path(
@@ -340,24 +365,7 @@ impl SyncServiceImpl {
             )
             .await?;
 
-        // Publish to IPNS
-        info!(%cid, "Publishing to IPNS");
-        let _id = self
-            .ipfs_client
-            .name_publish(
-                &cid,
-                PublishOptions {
-                    key: Some(&key.name),
-                    ..Default::default()
-                },
-            )
-            .await?;
-
-        Ok(SyncResult::Updated {
-            old_head: dst_head,
-            new_head: src_head,
-            num_blocks,
-        })
+        Ok(cid)
     }
 
     async fn sync_impl(
@@ -463,6 +471,10 @@ impl SyncService for SyncServiceImpl {
         }
 
         results
+    }
+
+    async fn ipfs_add(&self, src: &DatasetRefLocal) -> Result<String, SyncError> {
+        self.add_to_ipfs(src).await
     }
 }
 
