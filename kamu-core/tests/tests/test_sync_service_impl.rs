@@ -397,6 +397,7 @@ async fn test_sync_to_from_ipfs() {
         Some((
             IpfsGateway {
                 url: Url::parse(&format!("http://127.0.0.1:{}", ipfs_daemon.http_port())).unwrap(),
+                pre_resolve_dnslink: true,
             },
             ipfs_client,
         )),

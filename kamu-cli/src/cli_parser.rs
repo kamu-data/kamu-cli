@@ -201,7 +201,8 @@ pub fn cli() -> Command<'static> {
                 .arg(
                     Arg::new("shell")
                         .required(true)
-                        .possible_values(clap_complete::Shell::possible_values()),
+                        .takes_value(true)
+                        .value_parser(clap::builder::EnumValueParser::<clap_complete::Shell>::new()),
                 ),
             Command::new("config")
                 .about("Get or set configuration options")

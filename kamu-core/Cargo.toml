@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.92.0"
+version = "0.93.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -51,6 +51,7 @@ async-stream = "*"
 tokio = { version = "*", features=["fs"] }
 tokio-stream = { version = "*" }
 tokio-util = { version = "*", features=["codec", "compat", "io"] }
+trust-dns-resolver = "*"  # TODO: Needed for DNSLink resolution with IPFS
 rusoto_core = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
 rusoto_s3 = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
 

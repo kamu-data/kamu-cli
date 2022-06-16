@@ -15,6 +15,7 @@ use opendatafabric::*;
 
 use dill::*;
 use std::sync::Arc;
+use thiserror::Error;
 use tracing::*;
 use url::Url;
 
@@ -33,12 +34,14 @@ pub struct SyncServiceImpl {
 #[derive(Clone, Debug)]
 pub struct IpfsGateway {
     pub url: Url,
+    pub pre_resolve_dnslink: bool,
 }
 
 impl Default for IpfsGateway {
     fn default() -> Self {
         Self {
             url: Url::parse("http://localhost:8080").unwrap(),
+            pre_resolve_dnslink: true,
         }
     }
 }
@@ -63,7 +66,10 @@ impl SyncServiceImpl {
         }
     }
 
-    fn resolve_remote_dataset_url(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
+    async fn resolve_remote_dataset_url(
+        &self,
+        remote_ref: &DatasetRefRemote,
+    ) -> Result<Url, SyncError> {
         // TODO: REMOTE ID
         let dataset_url = match remote_ref {
             DatasetRefRemote::ID(_) => {
@@ -83,6 +89,29 @@ impl SyncServiceImpl {
                 dataset_url.ensure_trailing_slash();
                 dataset_url
             }
+        };
+
+        // Resolve IPNS DNSLink names if configured
+        let dataset_url = match dataset_url.scheme() {
+            "ipns" if self.ipfs_gateway.pre_resolve_dnslink => {
+                let key = match dataset_url.host() {
+                    Some(url::Host::Domain(k)) => Ok(k),
+                    _ => Err("Malformed IPNS URL").int_err(),
+                }?;
+
+                if !key.contains('.') {
+                    dataset_url
+                } else {
+                    info!(ipns_url = %dataset_url, "Resolving DNSLink name");
+                    let cid = self.resolve_ipns_dnslink(key).await?;
+                    let mut ipfs_url =
+                        Url::parse(&format!("ipfs://{}{}", cid, dataset_url.path())).unwrap();
+                    ipfs_url.ensure_trailing_slash();
+                    info!(ipns_url = %dataset_url, %ipfs_url, "Resolved DNSLink name");
+                    ipfs_url
+                }
+            }
+            _ => dataset_url,
         };
 
         // Re-map IPFS/IPNS urls to HTTP gateway URLs
@@ -105,13 +134,31 @@ impl SyncServiceImpl {
                     ))
                     .unwrap();
 
-                info!(ipfs_url = %dataset_url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
+                info!(url = %dataset_url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
                 gw_url
             }
             _ => dataset_url,
         };
 
         Ok(dataset_url)
+    }
+
+    async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, SyncError> {
+        let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
+        let query = format!("_dnslink.{}", domain);
+        let result = r.txt_lookup(&query).await.int_err()?;
+
+        let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
+
+        for record in result {
+            let data = record.to_string();
+            debug!(%data, "Observed TXT record");
+
+            if let Some(c) = dnslink_re.captures(&data) {
+                return Ok(c.get(1).unwrap().as_str().to_owned());
+            }
+        }
+        Err(DnsLinkResolutionError { record: query }.int_err().into())
     }
 
     async fn get_dataset_reader(
@@ -122,7 +169,7 @@ impl SyncServiceImpl {
             self.local_repo.get_dataset(&local_ref).await?
         } else {
             let remote_ref = dataset_ref.as_remote_ref().unwrap();
-            let url = self.resolve_remote_dataset_url(&remote_ref)?;
+            let url = self.resolve_remote_dataset_url(&remote_ref).await?;
             self.dataset_factory.get_dataset(&url, false)?
         };
 
@@ -154,7 +201,7 @@ impl SyncServiceImpl {
             }
         } else {
             let remote_ref = dataset_ref.as_remote_ref().unwrap();
-            let url = self.resolve_remote_dataset_url(&remote_ref)?;
+            let url = self.resolve_remote_dataset_url(&remote_ref).await?;
             let dataset = self
                 .dataset_factory
                 .get_dataset(&url, create_if_not_exists)?;
@@ -259,8 +306,9 @@ impl SyncServiceImpl {
             }
             Some(old_cid) => {
                 info!(%old_cid, "Attempting to read remote head");
-                let dst_http_url =
-                    self.resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))?;
+                let dst_http_url = self
+                    .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
+                    .await?;
                 let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
                 match dst_dataset
                     .as_metadata_chain()
@@ -552,4 +600,12 @@ impl UrlExt for Url {
             self.set_path(&format!("{}/", self.path()));
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Failed to resolve DNSLink record: {record}")]
+struct DnsLinkResolutionError {
+    pub record: String,
 }

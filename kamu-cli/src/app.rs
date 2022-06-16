@@ -173,17 +173,11 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
             .into(),
     });
 
+    let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
+
     catalog.add_value(IpfsGateway {
-        url: config
-            .protocol
-            .as_ref()
-            .unwrap()
-            .ipfs
-            .as_ref()
-            .unwrap()
-            .http_gateway
-            .clone()
-            .unwrap(),
+        url: ipfs_conf.http_gateway.clone().unwrap(),
+        pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::infra::utils::ipfs_wrapper::IpfsClient::default());
 }

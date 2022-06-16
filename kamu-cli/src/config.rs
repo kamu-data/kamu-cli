@@ -129,6 +129,7 @@ impl Default for EngineConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ProtocolConfig {
     /// IPFS configuration
+    #[merge(strategy = merge_recursive)]
     pub ipfs: Option<IpfsConfig>,
 }
 
@@ -163,11 +164,17 @@ pub struct IpfsConfig {
     /// If you don't have IPFS installed you can set this URL to one of the public gateways like `https://ipfs.io`.
     /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
     pub http_gateway: Option<Url>,
+
+    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it to the Gateway.
+    pub pre_resolve_dnslink: Option<bool>,
 }
 
 impl IpfsConfig {
     pub fn new() -> Self {
-        Self { http_gateway: None }
+        Self {
+            http_gateway: None,
+            pre_resolve_dnslink: None,
+        }
     }
 
     fn sample() -> Self {
@@ -179,6 +186,7 @@ impl Default for IpfsConfig {
     fn default() -> Self {
         Self {
             http_gateway: Some(Url::parse("http://localhost:8080").unwrap()),
+            pre_resolve_dnslink: Some(true),
         }
     }
 }
