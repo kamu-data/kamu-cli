@@ -46,7 +46,7 @@ pub fn get_command(
         )),
         Some(("completions", submatches)) => Box::new(CompletionsCommand::new(
             crate::cli_parser::cli(),
-            submatches.value_of_t_or_exit("shell"),
+            *submatches.get_one("shell").unwrap(),
         )),
         Some(("config", config_matches)) => match config_matches.subcommand() {
             Some(("list", list_matches)) => Box::new(ConfigListCommand::new(

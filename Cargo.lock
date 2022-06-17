@@ -662,7 +662,7 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "container-runtime"
-version = "0.93.0"
+version = "0.93.1"
 dependencies = [
  "dill",
  "regex",
@@ -1036,15 +1036,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dirs"
-version = "4.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1052,17 +1043,6 @@ checksum = "b98cf8ebf19c3d1b223e151f99a4f9f0690dca41414773390fc824184ac833e1"
 dependencies = [
  "cfg-if",
  "dirs-sys-next",
-]
-
-[[package]]
-name = "dirs-sys"
-version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1d1d91c932ef41c0f2663aa8b0ca0342d444d842c06914aa0a7e352d0bada6"
-dependencies = [
- "libc",
- "redox_users 0.4.3",
- "winapi",
 ]
 
 [[package]]
@@ -1833,7 +1813,7 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "kamu"
-version = "0.93.0"
+version = "0.93.1"
 dependencies = [
  "arrow-digest",
  "async-recursion",
@@ -1847,7 +1827,7 @@ dependencies = [
  "curl",
  "curl-sys",
  "datafusion",
- "digest 0.10.3",
+ "digest 0.9.0",
  "dill",
  "env_logger",
  "filetime",
@@ -1895,7 +1875,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.93.0"
+version = "0.93.1"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -1914,7 +1894,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.93.0"
+version = "0.93.1"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -1929,7 +1909,7 @@ dependencies = [
  "container-runtime",
  "datafusion",
  "dill",
- "dirs 4.0.0",
+ "dirs",
  "duration-string",
  "env_logger",
  "futures",
@@ -2585,12 +2565,12 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.93.0"
+version = "0.93.1"
 dependencies = [
  "bs58",
  "byteorder",
  "chrono",
- "digest 0.10.3",
+ "digest 0.9.0",
  "ed25519-dalek",
  "flatbuffers",
  "hex",
@@ -3925,7 +3905,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edd106a334b7657c10b7c540a0106114feadeb4dc314513e97df481d5d966f42"
 dependencies = [
  "byteorder",
- "dirs 1.0.5",
+ "dirs",
  "winapi",
 ]
 

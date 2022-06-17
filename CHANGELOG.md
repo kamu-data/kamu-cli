@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.93.1] - 2022-06-17
+### Fixed
+- Fixed `completions` command that paniced after we upgraded to new `clap` version.
+
 ## [0.93.0] - 2022-06-16
 ### Added
 - By default we will resolve IPNS DNSLink URLs (e.g. `ipns://dataset.example.org`) using DNS query instead of delegating to the gateway. This is helpful when some gateway does not support IPNS (e.g. Infura) and in general should be a little faster and provides more information for possible debugging.
