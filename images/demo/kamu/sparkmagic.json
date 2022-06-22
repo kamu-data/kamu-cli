@@ -51,7 +51,7 @@
   },
   "use_auto_viz": true,
   "coerce_dataframe": true,
-  "max_results_sql": 2500,
+  "default_maxrows": 1000000,
   "pyspark_dataframe_encoding": "utf-8",
   "heartbeat_refresh_seconds": 30,
   "livy_server_heartbeat_timeout_seconds": 0,

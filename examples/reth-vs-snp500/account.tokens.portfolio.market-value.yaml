@@ -2,22 +2,22 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: account.tokens.market-value.reth
+  name: account.tokens.portfolio.market-value
   kind: derivative
   metadata:
     - kind: setTransform
       inputs:
-        - name: account.tokens.investments.usd
+        - name: account.tokens.portfolio.usd
         - name: rocketpool.reth.mint-burn
-        - name: coinpaprika.tickers.eth-usd
+        - name: cryptocompare.ohlcv.eth-usd
       transform:
         kind: sql
         engine: flink
         temporalTables:
-          - name: account.tokens.investments.usd
+          - name: account.tokens.portfolio.usd
             primaryKey:
               - token_symbol
-          - name: coinpaprika.tickers.eth-usd
+          - name: cryptocompare.ohlcv.eth-usd
             primaryKey:
               - from_symbol
         queries:
@@ -35,10 +35,10 @@ content:
                 ) as token_market_value_eth,
                 tr.token_book_value_eth_as_usd
               from `rocketpool.reth.mint-burn` as rp,
-              lateral table (`account.tokens.investments.usd`(rp.block_time)) as tr
+              lateral table (`account.tokens.portfolio.usd`(rp.block_time)) as tr
               where
                 rp.token_symbol = tr.token_symbol
-          - alias: account.tokens.market-value.reth
+          - alias: account.tokens.portfolio.market-value
             query: >
               select
                 rp.event_time,
@@ -49,10 +49,10 @@ content:
                 rp.token_market_value_eth,
                 rp.token_book_value_eth_as_usd,
                 (
-                  rp.token_market_value_eth * eth2usd.price
+                  rp.token_market_value_eth * eth2usd.`close`
                 ) as token_market_value_usd
               from market_value_reth2eth as rp,
-              lateral table (`coinpaprika.tickers.eth-usd`(rp.event_time)) as eth2usd
+              lateral table (`cryptocompare.ohlcv.eth-usd`(rp.event_time)) as eth2usd
               where
                 eth2usd.from_symbol = rp.account_symbol 
                 and eth2usd.to_symbol = 'usd'

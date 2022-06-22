@@ -4,13 +4,15 @@ ARG KAMU_VERSION
 
 # Podman
 # Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
-RUN apt-get update && \
-    apt-get -y install curl wget gnupg unzip && \
+RUN apt update && \
+    apt -y install curl wget gnupg unzip jq && \
     . /etc/os-release && \
-    echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
-    curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | apt-key add - && \
-    apt-get update && \
-    apt-get -y install podman fuse-overlayfs && \
+    echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" \
+        | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
+    curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" \
+        | apt-key add - && \
+    apt update && \
+    apt -y install podman fuse-overlayfs && \
     rm -rf /var/lib/apt/lists/*
 
 COPY podman/containers.conf /etc/containers/containers.conf

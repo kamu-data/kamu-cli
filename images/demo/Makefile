@@ -1,20 +1,24 @@
 IMAGE_REPO = docker.io/kamudata
-KAMU_VERSION = 0.93.1
+KAMU_VERSION = 0.94.0
+DEMO_VERSION = 0.2.0
 
 #########################################################################################
 
+.PHONY: all-examples
+all-examples:
+	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/XX - Other Examples"
+
 .PHONY: jupyter
-jupyter:
-	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/demo/examples"
+jupyter: all-examples
 	docker build \
 		-f Dockerfile.jupyter \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
-		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:latest \
+		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
 		.
 
 .PHONY: jupyter-push
 jupyter-push:
-	docker push $(IMAGE_REPO)/kamu-cli-demo-jupyter:latest
+	docker push $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)
 
 #########################################################################################
 
@@ -22,12 +26,12 @@ jupyter-push:
 minio:
 	docker build \
 		-f Dockerfile.minio \
-		-t $(IMAGE_REPO)/kamu-cli-demo-minio:latest \
+		-t $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION) \
 		.
 
 .PHONY: minio-push
 minio-push:
-	docker push $(IMAGE_REPO)/kamu-cli-demo-minio:latest
+	docker push $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION)
 
 #########################################################################################
 
@@ -35,12 +39,12 @@ minio-push:
 minio-data:
 	rm -rf minio-data && \
 		mkdir -p minio-data/kamu-hub && \
-		mkdir tmp && \
-		cd tmp && \
+		mkdir minio-data/tmp && \
+		cd minio-data/tmp && \
 		kamu init && \
 		kamu repo add kamu-hub file:///$(shell pwd)/minio-data/kamu-hub && \
 		kamu repo list && \
-		kamu add ../user-home/demo/datasets/ontario.case-details.yaml && \
+		kamu add "../../user-home/01 - Kamu Basics (COVID-19 example)/datasets/ontario.case-details.yaml" && \
 		kamu pull --all && \
 		kamu push ontario.case-details --as kamu-hub/covid19.ontario.case-details && \
 		kamu search && \
@@ -58,7 +62,7 @@ strip-notebooks:
 
 podman-images: podman-images/
 podman-images/:
-	docker run --rm --entrypoint bash $(IMAGE_REPO)/kamu-cli-demo-jupyter:latest \
+	docker run --rm --entrypoint bash $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
 		-c "kamu init --pull-images --list-only | grep -e spark -e flink" | \
 		xargs -n 1 -- podman --root podman-images pull
 

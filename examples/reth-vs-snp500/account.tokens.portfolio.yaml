@@ -2,7 +2,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: account.tokens.investments
+  name: account.tokens.portfolio
   kind: derivative
   metadata:
     - kind: setTransform
@@ -58,7 +58,7 @@ content:
               on 
                 tr.transaction_hash = tx.transaction_hash
                 and tr.block_time = tx.block_time
-          - alias: account.tokens.investments
+          - alias: account.tokens.portfolio
             query: >
               select
                 *,

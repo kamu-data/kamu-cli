@@ -12,7 +12,7 @@ use crate::{output::*, records_writers::TableWriter};
 use kamu::domain::*;
 use opendatafabric::*;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use chrono_humanize::HumanTime;
 use futures::TryStreamExt;
 use std::sync::Arc;
@@ -47,26 +47,47 @@ impl ListCommand {
         datasets.sort_by(|a, b| a.name.cmp(&b.name));
 
         let mut out = std::io::stdout();
-        write!(out, "ID,Name,Kind,Head,Pulled,Records,Size\n")?;
+        write!(
+            out,
+            "ID,Name,Kind,Head,Pulled,Records,Blocks,Size,Watermark\n"
+        )?;
 
         for hdl in &datasets {
             let dataset = self.local_repo.get_dataset(&hdl.as_local_ref()).await?;
             let head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
             let summary = dataset.get_summary(SummaryOptions::default()).await?;
 
+            // TODO: Should be precomputed
+            let mut num_blocks = 0;
+            let mut watermark = None;
+            let mut blocks_stream = dataset.as_metadata_chain().iter_blocks();
+            while let Some((_, b)) = blocks_stream.try_next().await? {
+                num_blocks += 1;
+                if watermark.is_none() {
+                    if let Some(b) = b.as_data_stream_block() {
+                        watermark = b.event.output_watermark.cloned();
+                    }
+                }
+            }
+
             write!(
                 out,
-                "{},{},{},{},{},{},{}\n",
+                "{},{},{},{},{},{},{},{},{}\n",
                 hdl.id,
                 hdl.name,
                 self.get_kind(hdl, &summary).await?,
                 head,
                 match summary.last_pulled {
                     None => "".to_owned(),
-                    Some(t) => t.to_rfc3339(),
+                    Some(t) => t.to_rfc3339_opts(SecondsFormat::Millis, true),
                 },
                 summary.num_records,
-                summary.data_size
+                num_blocks,
+                summary.data_size,
+                match watermark {
+                    None => "".to_owned(),
+                    Some(t) => t.to_rfc3339_opts(SecondsFormat::Millis, true),
+                },
             )?;
         }
         Ok(())
@@ -82,9 +103,25 @@ impl ListCommand {
         table.set_format(TableWriter::get_table_format());
 
         if self.detail_level == 0 {
-            table.set_titles(row![bc->"Name", bc->"Kind", bc->"Pulled", bc->"Records", bc->"Size"]);
+            table.set_titles(row![
+                bc->"Name",
+                bc->"Kind",
+                bc->"Pulled",
+                bc->"Records",
+                bc->"Size",
+            ]);
         } else {
-            table.set_titles(row![bc->"ID", bc->"Name", bc->"Kind", bc->"Head", bc->"Pulled", bc->"Records", bc->"Size"]);
+            table.set_titles(row![
+                bc->"ID",
+                bc->"Name",
+                bc->"Kind",
+                bc->"Head",
+                bc->"Pulled",
+                bc->"Records",
+                bc->"Blocks",
+                bc->"Size",
+                bc->"Watermark"
+            ]);
         }
 
         for hdl in datasets.iter() {
@@ -96,19 +133,34 @@ impl ListCommand {
                 table.add_row(Row::new(vec![
                     Cell::new(&hdl.name),
                     Cell::new(&self.get_kind(hdl, &summary).await?).style_spec("c"),
-                    Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
-                    Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
+                    Cell::new(&self.humanize_relative_date(summary.last_pulled)).style_spec("c"),
+                    Cell::new(&self.humanize_quantity(summary.num_records)).style_spec("r"),
                     Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
                 ]));
             } else {
+                // TODO: Should be precomputed
+                let mut num_blocks = 0;
+                let mut watermark = None;
+                let mut blocks_stream = dataset.as_metadata_chain().iter_blocks();
+                while let Some((_, b)) = blocks_stream.try_next().await? {
+                    num_blocks += 1;
+                    if watermark.is_none() {
+                        if let Some(b) = b.as_data_stream_block() {
+                            watermark = b.event.output_watermark.cloned();
+                        }
+                    }
+                }
+
                 table.add_row(Row::new(vec![
                     Cell::new(&hdl.id.to_did_string()),
                     Cell::new(&hdl.name),
                     Cell::new(&self.get_kind(hdl, &summary).await?).style_spec("c"),
                     Cell::new(&head.short().to_string()),
-                    Cell::new(&self.humanize_last_pulled(summary.last_pulled)).style_spec("c"),
-                    Cell::new(&self.humanize_num_records(summary.num_records)).style_spec("r"),
+                    Cell::new(&self.humanize_relative_date(summary.last_pulled)).style_spec("c"),
+                    Cell::new(&self.humanize_quantity(summary.num_records)).style_spec("r"),
+                    Cell::new(&self.humanize_quantity(num_blocks)).style_spec("r"),
                     Cell::new(&self.humanize_data_size(summary.data_size)).style_spec("r"),
+                    Cell::new(&self.humanize_relative_date(watermark)).style_spec("r"),
                 ]));
             }
         }
@@ -140,7 +192,7 @@ impl ListCommand {
         Ok(())
     }
 
-    fn humanize_last_pulled(&self, last_pulled: Option<DateTime<Utc>>) -> String {
+    fn humanize_relative_date(&self, last_pulled: Option<DateTime<Utc>>) -> String {
         match last_pulled {
             None => "-".to_owned(),
             Some(t) => format!("{}", HumanTime::from(t - Utc::now())),
@@ -155,7 +207,7 @@ impl ListCommand {
         size.file_size(file_size_opts::BINARY).unwrap()
     }
 
-    fn humanize_num_records(&self, num: u64) -> String {
+    fn humanize_quantity(&self, num: u64) -> String {
         use num_format::{Locale, ToFormattedString};
         if num == 0 {
             return "-".to_owned();

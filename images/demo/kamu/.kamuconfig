@@ -7,3 +7,6 @@ content:
     networkNs: host
     maxConcurrency: 1
     startTimeout: 60s
+  protocol:
+    ipfs:
+      httpGateway: "https://kamu.infura-ipfs.io/"

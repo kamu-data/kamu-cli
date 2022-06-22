@@ -9,6 +9,28 @@
 
 use std::path::PathBuf;
 
+fn get_all_crates() -> Vec<PathBuf> {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .canonicalize()
+        .unwrap();
+
+    let root_cargo_content = std::fs::read_to_string(repo_root.join("Cargo.toml"))
+        .expect("Could not read root Cargo.toml file");
+
+    let root_cargo: toml::Value = root_cargo_content
+        .parse()
+        .expect("Failed to parse root Cargo.toml");
+
+    root_cargo["workspace"]["members"]
+        .as_array()
+        .unwrap()
+        .into_iter()
+        .map(|v| v.as_str().unwrap())
+        .map(|s| repo_root.join(s))
+        .collect()
+}
+
 #[test]
 fn check_all_files_have_license_header() {
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -18,15 +40,17 @@ fn check_all_files_have_license_header() {
 
     let header = std::fs::read_to_string(repo_root.join("docs/license_header.txt")).unwrap();
 
-    let pattern = repo_root.join("**").join("*.rs");
-
     let mut bad_files = Vec::new();
 
-    for entry in glob::glob(pattern.to_str().unwrap()).unwrap() {
-        let file = entry.unwrap();
-        let file_rel = file.strip_prefix(&repo_root).unwrap().to_owned();
+    for crate_path in get_all_crates() {
+        let pattern = crate_path.join("**").join("*.rs");
 
-        if !file_rel.starts_with("target") {
+        for entry in glob::glob(pattern.to_str().unwrap()).unwrap() {
+            let file = entry.unwrap();
+            let file_rel = file.strip_prefix(&repo_root).unwrap().to_owned();
+
+            eprintln!("Checking file: {}", file_rel.display());
+
             let content = std::fs::read_to_string(&file).unwrap();
             if !content.starts_with(&header) {
                 bad_files.push(file_rel);

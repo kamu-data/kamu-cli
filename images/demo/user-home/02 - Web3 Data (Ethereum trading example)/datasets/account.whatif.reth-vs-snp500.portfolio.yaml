@@ -1,0 +1,51 @@
+---
+kind: DatasetSnapshot
+version: 1
+content:
+  name: account.whatif.reth-vs-snp500.portfolio
+  kind: derivative
+  metadata:
+    - kind: setTransform
+      inputs:
+        - name: account.tokens.portfolio.usd
+        - name: alphavantage.tickers.daily.spy
+      transform:
+        kind: sql
+        engine: flink
+        temporalTables:
+          - name: alphavantage.tickers.daily.spy
+            primaryKey:
+              - to_symbol
+        queries:
+          - alias: spy_transactions
+            query: >
+              select
+                tr.block_time,
+                tr.block_number,
+                tr.transaction_hash,
+                tr.account_symbol,
+                tr.token_symbol,
+                tr.token_amount,
+                tr.eth_amount,
+                tr.token_balance,
+                tr.token_book_value_eth,
+                tr.account_anchor_symbol,
+                tr.eth_amount_as_usd,
+                tr.token_book_value_eth_as_usd,
+                (
+                  -tr.eth_amount_as_usd / spy2usd.`close`
+                ) as alt_spy_amount
+              from `account.tokens.portfolio.usd` as tr,
+              lateral table (`alphavantage.tickers.daily.spy`(tr.block_time)) as spy2usd
+              where 
+                spy2usd.to_symbol = tr.account_anchor_symbol
+                and spy2usd.from_symbol = 'spy'
+                and tr.token_symbol = 'rETH'
+          - alias: account.whatif.reth-vs-snp500.portfolio
+            query: >
+              select 
+                *,
+                sum(alt_spy_amount) over (partition by token_symbol order by block_time) as alt_spy_balance
+              from spy_transactions
+    - kind: setVocab
+      eventTimeColumn: block_time

@@ -2,12 +2,12 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: account.whatif.reth-vs-snp500.transactions
+  name: account.whatif.reth-vs-snp500.portfolio
   kind: derivative
   metadata:
     - kind: setTransform
       inputs:
-        - name: account.tokens.investments.usd
+        - name: account.tokens.portfolio.usd
         - name: alphavantage.tickers.daily.spy
       transform:
         kind: sql
@@ -35,13 +35,13 @@ content:
                 (
                   -tr.eth_amount_as_usd / spy2usd.`close`
                 ) as alt_spy_amount
-              from `account.tokens.investments.usd` as tr,
+              from `account.tokens.portfolio.usd` as tr,
               lateral table (`alphavantage.tickers.daily.spy`(tr.block_time)) as spy2usd
               where 
                 spy2usd.to_symbol = tr.account_anchor_symbol
                 and spy2usd.from_symbol = 'spy'
                 and tr.token_symbol = 'rETH'
-          - alias: account.whatif.reth-vs-snp500.transactions
+          - alias: account.whatif.reth-vs-snp500.portfolio
             query: >
               select 
                 *,

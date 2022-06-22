@@ -4,6 +4,10 @@ FROM docker.io/jupyter/base-notebook:4a112c0f11eb
 
 USER root
 
+RUN apt update \
+    && apt -y install curl wget gnupg unzip jq \
+    && rm -rf /var/lib/apt/lists/*
+
 # This is needed because requests-kerberos fails to install on debian due to missing linux headers
 RUN conda install requests-kerberos -y
 
