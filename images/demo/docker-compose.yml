@@ -16,7 +16,9 @@ services:
       - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
     # volumes:
     #   - ./podman-images:/var/lib/containers/shared:ro
-    #   - ./user-home/demo:/home/jovyan/demo
+    #   - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
+    #   - "./user-home/02 - Web3 Data (Ethereum trading example):/home/jovyan/02 - Web3 Data (Ethereum trading example)"
+    #   - "./user-home/XX - Other Examples:/home/jovyan/XX - Other Examples"
     networks:
       - kamu
     ports:
