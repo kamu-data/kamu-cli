@@ -126,6 +126,9 @@ fn configure_catalog() -> CatalogBuilder {
     b.add::<PushServiceImpl>();
     b.bind::<dyn PushService, PushServiceImpl>();
 
+    b.add::<ResetServiceImpl>();
+    b.bind::<dyn ResetService, ResetServiceImpl>();
+
     b.add::<ProvenanceServiceImpl>();
     b.bind::<dyn ProvenanceService, ProvenanceServiceImpl>();
 

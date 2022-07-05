@@ -725,20 +725,20 @@ pub fn cli() -> Command<'static> {
                         kamu rename bafy...a0da my.dataset
                     "
                 )),
-            /*Command::new("reset")
+            Command::new("reset")
             .about("Revert the dataset back to the specified state")
             .args(&[
                 Arg::new("dataset")
                     .required(true)
                     .index(1)
-                    .validator(validate_dataset_id)
+                    .validator(validate_dataset_ref_local)
                     .help("ID of the dataset"),
                 Arg::new("hash")
                     .required(true)
                     .index(2)
                     .help("Hash of the block to reset to"),
                 Arg::new("yes")
-                    .short("y")
+                    .short('y')
                     .long("yes")
                     .help("Don't ask for confirmation"),
             ])
@@ -752,7 +752,7 @@ pub fn cli() -> Command<'static> {
                 been already observed by other people, so resetting the history will not let \
                 you take that data back.
                 "
-            )),*/
+            )),
             Command::new("repo")
                 .about("Manage set of tracked repositories")
                 .subcommand_required(true)
