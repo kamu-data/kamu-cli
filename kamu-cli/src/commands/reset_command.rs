@@ -7,26 +7,26 @@ use kamu::domain::*;
 pub struct ResetCommand {
     reset_svc: Arc<dyn ResetService>,
     dataset_ref: DatasetRefLocal,
-    block_hash: Multihash,
+    block_hash_as_string: Option<String>,
     no_confirmation: bool,
 }
 
 impl ResetCommand {
-    pub fn new<R>(
+    pub fn new<S, R>(
         reset_svc: Arc<dyn ResetService>,
         dataset_ref: R,
-        block_hash: Multihash,
+        block_hash_as_string: Option<S>,
         no_confirmation: bool,
     ) -> Self 
     where
-        S: Into<String>,
+        S: Into<String>,    
         R: TryInto<DatasetRefLocal>,
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,    
     {
         Self {
             reset_svc,
             dataset_ref: dataset_ref.try_into().unwrap(),
-            block_hash: block_hash.map(|s| s.into()),
+            block_hash_as_string: block_hash_as_string.map(|s| s.into()),
             no_confirmation,
         }
     }
@@ -50,11 +50,14 @@ impl Command for ResetCommand {
             return Err(CLIError::Aborted);
         }
 
-        let _result = self
+        let raw_hash = self.block_hash_as_string.as_deref().unwrap_or_default();
+        let hash = Multihash::from_multibase_str(&raw_hash).unwrap();
+
+        self
         .reset_svc
         .reset_dataset(
             &self.dataset_ref,
-            &self.block_hash,
+            &hash,
         )
         .await
         .map_err(|e| CLIError::failure(e))?;

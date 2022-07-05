@@ -1,8 +1,10 @@
 use crate::domain::*;
 use opendatafabric::*;
 use thiserror::Error;
+use metadata_chain::SetRefError;
 
-#[async_trait::async_trait]
+
+#[async_trait::async_trait(?Send)]
 pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
@@ -22,13 +24,25 @@ pub enum ResetError {
         #[from]
         #[backtrace]
         DatasetNotFoundError,
+    ),    
+    #[error(transparent)]
+    CASFailed(
+        #[from]
+        #[backtrace]
+        RefCASError,
     ),
+    #[error(transparent)]
+    BlockNotFound(
+        #[from]
+        #[backtrace]
+        BlockNotFoundError,
+    ),    
     #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
         AccessError,
-    ),
+    ),    
     #[error(transparent)]
     Internal(
         #[from]
@@ -49,6 +63,8 @@ impl From<GetDatasetError> for ResetError {
 impl From<SetRefError> for ResetError {
     fn from(v: SetRefError) -> Self {
         match v {
+            SetRefError::CASFailed(e) => Self::CASFailed(e),
+            SetRefError::BlockNotFound(e) => Self::BlockNotFound(e),
             SetRefError::Access(e) => Self::Access(e),
             SetRefError::Internal(e) => Self::Internal(e),
         }
