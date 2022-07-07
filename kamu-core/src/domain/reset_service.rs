@@ -17,7 +17,7 @@ use metadata_chain::SetRefError;
 pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_handle: &DatasetHandle,
         block_hash: &Multihash,
     ) -> Result<(), ResetError>;
 }

@@ -33,11 +33,10 @@ impl ResetServiceImpl {
 impl ResetService for ResetServiceImpl {
     async fn reset_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_handle: &DatasetHandle,
         block_hash: &Multihash,
     ) -> Result<(), ResetError> {
 
-        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())

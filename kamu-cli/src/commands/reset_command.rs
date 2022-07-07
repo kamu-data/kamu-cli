@@ -14,28 +14,32 @@ use super::common;
 use kamu::domain::*;
 
 pub struct ResetCommand {
+    local_repo: Arc<dyn LocalDatasetRepository>,
     reset_svc: Arc<dyn ResetService>,
     dataset_ref: DatasetRefLocal,
-    block_hash_as_string: Option<String>,
+    block_hash: Multihash,
     no_confirmation: bool,
 }
 
 impl ResetCommand {
-    pub fn new<S, R>(
+    pub fn new<R, H>(
+        local_repo: Arc<dyn LocalDatasetRepository>,
         reset_svc: Arc<dyn ResetService>,
         dataset_ref: R,
-        block_hash_as_string: Option<S>,
+        block_hash: H,
         no_confirmation: bool,
     ) -> Self 
     where
-        S: Into<String>,    
         R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,    
+        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        H: TryInto<Multihash>,
+        <H as TryInto<Multihash>>::Error: std::fmt::Debug,
     {
         Self {
+            local_repo,
             reset_svc,
             dataset_ref: dataset_ref.try_into().unwrap(),
-            block_hash_as_string: block_hash_as_string.map(|s| s.into()),
+            block_hash: block_hash.try_into().unwrap(),
             no_confirmation,
         }
     }
@@ -44,6 +48,11 @@ impl ResetCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ResetCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        let dataset_handle = self
+            .local_repo
+            .resolve_dataset_ref(&self.dataset_ref)
+            .await?;
+
         let confirmed = if self.no_confirmation {
             true
         } else {
@@ -59,14 +68,11 @@ impl Command for ResetCommand {
             return Err(CLIError::Aborted);
         }
 
-        let raw_hash = self.block_hash_as_string.as_deref().unwrap_or_default();
-        let hash = Multihash::from_multibase_str(&raw_hash).unwrap();
-
         self
         .reset_svc
         .reset_dataset(
-            &self.dataset_ref,
-            &hash,
+            &dataset_handle,
+            &self.block_hash,
         )
         .await
         .map_err(|e| CLIError::failure(e))?;

@@ -13,7 +13,7 @@ use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 
-use crate::{Multicodec, MulticodecError};
+use crate::{Multicodec, MulticodecError, InvalidValue};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -96,13 +96,12 @@ impl<const S: usize> MultihashGeneric<S> {
 
     // TODO: PERF: This is inefficient
     pub fn from_multibase_str(s: &str) -> Result<Self, MultihashError> {
-        assert_eq!(
-            s.as_bytes()[0],
-            b'z',
-            "String does not have multibase prefix"
-        );
-        let buf = bs58::decode(&s.split_at(1).1).into_vec()?;
-        Self::from_bytes(&buf)
+        if s.as_bytes()[0] == b'z' {
+            let buf = bs58::decode(&s.split_at(1).1).into_vec()?;
+            Self::from_bytes(&buf)
+        } else {
+            Err(MultihashError::NoMultibytePrefix)
+        }
     }
 
     // TODO: PERF: This is inefficient
@@ -116,6 +115,21 @@ impl<const S: usize> MultihashGeneric<S> {
         MultihashShortGeneric::new(self)
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl TryFrom<&str> for Multihash {
+    type Error = InvalidValue<Multihash>;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+         match Multihash::from_multibase_str(s) {
+            Ok(v) => Ok(v),
+            Err(_) => Err(InvalidValue::new(s)),
+         }
+    }
+}
+
+crate::formats::impl_invalid_value!(Multihash);
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -170,6 +184,8 @@ pub enum MultihashError {
     TooLong(usize),
     #[error("Malformed data")]
     Malformed,
+    #[error("Should have multibyte 'z' prefix")]
+    NoMultibytePrefix,
 }
 
 impl From<bs58::decode::Error> for MultihashError {

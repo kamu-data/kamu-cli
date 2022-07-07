@@ -220,8 +220,9 @@ pub fn get_command(
         },
         Some(("reset", submatches)) => Box::new(ResetCommand::new(
             catalog.get_one()?,
+            catalog.get_one()?,
             submatches.value_of("dataset").unwrap(),
-            submatches.value_of("hash"),
+            submatches.value_of("hash").unwrap(),
             submatches.is_present("yes"),
         )),
         Some(("search", submatches)) => Box::new(SearchCommand::new(

@@ -736,6 +736,7 @@ pub fn cli() -> Command<'static> {
                 Arg::new("hash")
                     .required(true)
                     .index(2)
+                    .validator(validate_multihash)
                     .help("Hash of the block to reset to"),
                 Arg::new("yes")
                     .short('y')
@@ -1251,6 +1252,15 @@ fn validate_repository_name(s: &str) -> Result<(), String> {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",
+        )),
+    }
+}
+
+fn validate_multihash(s: &str) -> Result<(), String> {
+    match Multihash::try_from(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!(
+            "Block hash should base a valid Base58-encoded string, starting from 'z'",
         )),
     }
 }
