@@ -32,6 +32,9 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_seed_block, new_head);    
+
+    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
+    assert_eq!(new_head, summary.last_block_hash);    
 }
 
 #[test_log::test(tokio::test)]
@@ -49,7 +52,10 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
     ).await;
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
-    assert_eq!(current_head, new_head);   
+    assert_eq!(current_head, new_head);
+
+    let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
+    assert_eq!(current_head, summary.last_block_hash);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -150,6 +156,13 @@ impl ResetTestHarness {
         dataset
             .as_metadata_chain()
             .get_ref(&BlockRef::Head)
+            .await
+            .unwrap()
+    }
+
+    async fn get_dataset_summary(&self, dataset_handle: &DatasetHandle) -> DatasetSummary {
+        let dataset = self.resolve_dataset(dataset_handle).await;
+        dataset.get_summary(SummaryOptions::default())
             .await
             .unwrap()
     }

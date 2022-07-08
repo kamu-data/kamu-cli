@@ -30,12 +30,14 @@ pub trait Dataset: Send + Sync {
 
 #[derive(Clone, Debug)]
 pub struct SummaryOptions {
-    pub update_if_stale: bool,
+    pub force_recomute : bool,
+    pub update_if_stale : bool,
 }
 
 impl Default for SummaryOptions {
     fn default() -> Self {
         Self {
+            force_recomute: false,
             update_if_stale: true,
         }
     }

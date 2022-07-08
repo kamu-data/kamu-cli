@@ -33,7 +33,9 @@ pub enum ResetError {
         #[from]
         #[backtrace]
         DatasetNotFoundError,
-    ),    
+    ),
+    #[error("Dataset is empty")]
+    EmptyDataset,    
     #[error(transparent)]
     CASFailed(
         #[from]
@@ -45,7 +47,7 @@ pub enum ResetError {
         #[from]
         #[backtrace]
         BlockNotFoundError,
-    ),    
+    ),
     #[error(transparent)]
     Access(
         #[from]
@@ -65,6 +67,16 @@ impl From<GetDatasetError> for ResetError {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetSummaryError> for ResetError {
+    fn from(v: GetSummaryError) -> Self {
+        match v {
+            GetSummaryError::EmptyDataset => Self::EmptyDataset,
+            GetSummaryError::Access(e) => Self::Access(e),
+            GetSummaryError::Internal(e) => Self::Internal(e),
         }
     }
 }

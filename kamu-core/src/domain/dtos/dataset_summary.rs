@@ -31,5 +31,21 @@ pub struct DatasetSummary {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
-    pub checkpoints_size: u64,
+    pub checkpoints_size: u64,   
+}
+
+impl DatasetSummary {
+    
+    pub fn default_summary(last_block_hash: &Multihash) -> Self {
+        Self {
+            id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced
+            kind: DatasetKind::Root,
+            last_block_hash: last_block_hash.clone(),
+            dependencies: Vec::new(),
+            last_pulled: None,
+            num_records: 0,
+            data_size: 0,
+            checkpoints_size: 0,
+        }
+    }
 }

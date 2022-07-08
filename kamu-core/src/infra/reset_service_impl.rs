@@ -54,6 +54,11 @@ impl ResetService for ResetServiceImpl {
             )
             .await?;
 
+        dataset.get_summary(SummaryOptions{
+            force_recomute: true,
+            update_if_stale: false
+        }).await?;
+
         Ok(())
     }    
 }
