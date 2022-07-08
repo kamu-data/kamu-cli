@@ -217,6 +217,9 @@ impl PushService for PushServiceImpl {
         if options.all {
             unimplemented!("Pushing all datasets is not yet supported")
         }
+        if options.force {
+            unimplemented!("Force pushing is not yet supported")
+        }
 
         let initial_requests: Vec<_> = requests.collect();
 

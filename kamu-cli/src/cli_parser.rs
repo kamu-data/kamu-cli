@@ -681,6 +681,10 @@ pub fn cli() -> Command<'static> {
                         .validator(validate_dataset_ref_remote)
                         .value_name("REM")
                         .help("Remote alias or a URL to push to"),
+                    Arg::new("force")
+                        .short('f')
+                        .long("force")
+                        .help("Overwrite remote version with local, even if revisions have diverged")
                 ])
                 .after_help(indoc::indoc!(
                     "

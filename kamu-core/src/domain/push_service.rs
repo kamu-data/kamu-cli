@@ -61,6 +61,8 @@ pub struct PushOptions {
     pub all: bool,
     /// Add remote aliases to datasets if they don't already exist
     pub add_aliases: bool,
+    /// Force pushing, even if revisions have diverged
+    pub force: bool,
     /// Sync options
     pub sync_options: SyncOptions,
 }
@@ -71,6 +73,7 @@ impl Default for PushOptions {
             recursive: false,
             all: false,
             add_aliases: true,
+            force: false,
             sync_options: SyncOptions::default(),
         }
     }
