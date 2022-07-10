@@ -34,8 +34,6 @@ pub enum ResetError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error("Dataset is empty")]
-    EmptyDataset,    
     #[error(transparent)]
     CASFailed(
         #[from]
@@ -74,7 +72,7 @@ impl From<GetDatasetError> for ResetError {
 impl From<GetSummaryError> for ResetError {
     fn from(v: GetSummaryError) -> Self {
         match v {
-            GetSummaryError::EmptyDataset => Self::EmptyDataset,
+            GetSummaryError::EmptyDataset => unreachable!(),
             GetSummaryError::Access(e) => Self::Access(e),
             GetSummaryError::Internal(e) => Self::Internal(e),
         }
