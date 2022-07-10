@@ -8,27 +8,29 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use std::path::Path;
 
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
+use tempfile::TempDir;
 
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = ResetTestHarness::new(tmp_dir.path());
+    let harness = ResetTestHarness::new();
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_polling_source_block, current_head);        
 
-    harness.reset_dataset(
-        &test_case.dataset_handle, 
-        &test_case.hash_seed_block
-    ).await;
+    let result = harness.reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle, 
+            &test_case.hash_seed_block
+        )
+        .await;
+    assert!(result.is_ok());   
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_seed_block, new_head);    
@@ -39,23 +41,43 @@ async fn test_reset_dataset_with_2revisions_drop_last() {
 
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_without_changes() {
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = ResetTestHarness::new(tmp_dir.path());
+    let harness = ResetTestHarness::new();
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(test_case.hash_polling_source_block, current_head);        
 
-    harness.reset_dataset(
-        &test_case.dataset_handle, 
-        &test_case.hash_polling_source_block
-    ).await;
+    let result = harness.reset_svc
+        .reset_dataset(
+            &test_case.dataset_handle, 
+            &test_case.hash_polling_source_block
+        )
+        .await;
+    assert!(result.is_ok());    
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(current_head, new_head);
 
     let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
     assert_eq!(current_head, summary.last_block_hash);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_reset_dataset_to_non_existing_block_fails() {
+    let harness = ResetTestHarness::new();
+    let test_case = harness.a_chain_with_2_blocks().await;
+
+    let a_hash_not_present_in_chain = Multihash::from_multibase_str(
+        "zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8"
+    ).unwrap();
+    
+    let result = harness.reset_svc
+    .reset_dataset(
+        &test_case.dataset_handle, 
+        &a_hash_not_present_in_chain
+    )
+    .await;
+    assert!(result.is_err());    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -83,13 +105,15 @@ impl ChainWith2BlocksTestCase {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct ResetTestHarness {
+    _temp_dir: TempDir,
     local_repo: Arc<LocalDatasetRepositoryImpl>,
     reset_svc: ResetServiceImpl,
 }
 
 impl ResetTestHarness {
-    fn new(tmp_path: &Path) -> Self {
-        let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
+    fn new() -> Self {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path()).unwrap());
         let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout));
 
         let reset_svc = ResetServiceImpl::new(
@@ -97,6 +121,7 @@ impl ResetTestHarness {
         );
 
         Self {
+            _temp_dir: temp_dir,
             local_repo,
             reset_svc,
         }
@@ -172,13 +197,6 @@ impl ResetTestHarness {
             .get_dataset(&dataset_handle.as_local_ref())
             .await
             .unwrap()
-    }
-
-    async fn reset_dataset(&self, dataset_handle: &DatasetHandle, new_head: &Multihash) {
-        let result = self.reset_svc
-            .reset_dataset(&dataset_handle, &new_head)
-            .await;
-        assert!(result.is_ok());
     }
 
 }

@@ -749,7 +749,7 @@ pub fn cli() -> Command<'static> {
                 that followed it and deletes all data added since that point. This can \
                 sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
-                Keep in mind that blocks that were already pushed to a repository could've \
+                Keep in mind that blocks that were pushed to a repository could've \
                 been already observed by other people, so resetting the history will not let \
                 you take that data back.
                 "
@@ -1260,7 +1260,7 @@ fn validate_multihash(s: &str) -> Result<(), String> {
     match Multihash::try_from(s) {
         Ok(_) => Ok(()),
         Err(_) => Err(format!(
-            "Block hash should base a valid Base58-encoded string, starting from 'z'",
+            "Block hash must be a valid multihash string",
         )),
     }
 }

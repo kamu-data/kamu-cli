@@ -119,7 +119,7 @@ where
             .int_err()?;
 
         let mut summary = prev.unwrap_or(
-            DatasetSummary::default_summary(&current_head)
+            Self::prepare_blank_summary_for_update(&current_head)
         );
 
         self.compute_blocks_summary_increment(blocks, &mut summary);
@@ -136,7 +136,7 @@ where
             Err(GetRefError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
         };
 
-        let mut summary = DatasetSummary::default_summary(&current_head);
+        let mut summary = Self::prepare_blank_summary_for_update(&current_head);
 
         use tokio_stream::StreamExt;
         let blocks: Vec<(Multihash, MetadataBlock)> = self
@@ -150,6 +150,19 @@ where
         self.write_summary(&summary).await?;
         
         Ok(Some(summary))
+    }
+
+    fn prepare_blank_summary_for_update(last_block_hash: &Multihash) -> DatasetSummary {
+        DatasetSummary {
+            id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced
+            kind: DatasetKind::Root,
+            last_block_hash: last_block_hash.clone(),
+            dependencies: Vec::new(),
+            last_pulled: None,
+            num_records: 0,
+            data_size: 0,
+            checkpoints_size: 0,
+        }
     }
 
     fn compute_blocks_summary_increment(&self, blocks: Vec<(Multihash, MetadataBlock)>, summary: &mut DatasetSummary) {
@@ -217,7 +230,7 @@ where
     async fn get_summary(&self, opts: SummaryOptions) -> Result<DatasetSummary, GetSummaryError> {
         let summary = self.read_summary().await?;
 
-        let summary = if opts.force_recomute {
+        let summary = if opts.force_recompute {
             self.recompute_summary().await?
         } else if opts.update_if_stale {
             self.update_summary(summary).await?
