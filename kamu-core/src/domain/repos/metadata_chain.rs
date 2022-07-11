@@ -32,7 +32,7 @@ pub trait MetadataChain: Send + Sync {
         head: &'a Multihash,
         tail: Option<&'a Multihash>,
     ) -> DynMetadataStream<'a>;
-
+    
     // TODO: Remove this method by allowing BlockRefs to be either tags or hashes
     fn iter_blocks_interval_ref<'a>(
         &'a self,
@@ -95,9 +95,80 @@ pub trait MetadataChainExt: MetadataChain {
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(&head, None)
     }
+
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// collect_interval_blocks
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct CollectIntervalBlocksOptions {
+    pub recover_from_divergence: bool,
+}
+
+impl Default for CollectIntervalBlocksOptions {
+    fn default() -> Self {
+        Self {
+            recover_from_divergence: false,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn collect_interval_blocks(
+    chain: &dyn MetadataChain,
+    head: &Multihash,
+    tail: Option<&Multihash>,
+    options: CollectIntervalBlocksOptions
+) -> Result<CollectedInterval, IterBlocksError>{
+
+    // Try normal iteration first
+    use tokio_stream::StreamExt;
+    let iter_result = chain
+        .iter_blocks_interval(head, tail)
+        .collect::<Result<_, _>>()
+        .await;
+
+    // If a divergence is detected, and we have a recovery option, just reiterate all blocks instead
+    if options.recover_from_divergence {
+        if let Err(IterBlocksError::InvalidInterval(_)) = iter_result {
+            let full_chain_iter_result = chain
+                    .iter_blocks_interval(&head, Option::None)
+                    .collect::<Result<_, _>>()
+                    .await;
+            return match full_chain_iter_result {
+                Ok(collection) => Ok((collection, IntervalKind::DivergedInterval)),
+                Err(e) => Err(e)
+            };
+        }    
+    }
+
+    // Otherwise, propagate standard result
+    match iter_result {
+        Ok(collection) => Ok((collection, IntervalKind::ValidInterval)),
+        Err(e) => Err(e)
+    }
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// IntervalKind
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntervalKind {
+    ValidInterval,
+    DivergedInterval
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// CollectedInterval
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type CollectedInterval = (Vec<(Multihash, MetadataBlock)>, IntervalKind);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // BlockRef

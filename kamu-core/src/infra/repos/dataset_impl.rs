@@ -110,45 +110,29 @@ where
 
         debug!(?current_head, ?last_seen, "Updating dataset summary");
 
-        use tokio_stream::StreamExt;
-        let blocks: Vec<(Multihash, MetadataBlock)> = self
-            .metadata_chain
-            .iter_blocks_interval(&current_head, last_seen)
-            .collect::<Result<_, _>>()
-            .await
-            .int_err()?;
+        let blocks_interval: CollectedInterval =
+            collect_interval_blocks(
+                self.as_metadata_chain(), 
+                &current_head, 
+                last_seen, 
+                CollectIntervalBlocksOptions {
+                    recover_from_divergence: true,
+                }
+            )
+                .await
+                .int_err()?;
 
-        let mut summary = prev.unwrap_or(
-            Self::prepare_blank_summary_for_update(&current_head)
-        );
+        let (blocks, interval_kind) = blocks_interval;
 
-        self.compute_blocks_summary_increment(blocks, &mut summary);
-        self.write_summary(&summary).await?;
-
-        Ok(Some(summary))
-    }
-
-    async fn recompute_summary(&self) -> Result<Option<DatasetSummary>, GetSummaryError> {
-        let current_head = match self.metadata_chain.get_ref(&BlockRef::Head).await {
-            Ok(h) => h,
-            Err(GetRefError::NotFound(_)) => return Err(GetSummaryError::EmptyDataset),
-            Err(GetRefError::Access(e)) => return Err(GetSummaryError::Access(e)),
-            Err(GetRefError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
-        };
-
-        let mut summary = Self::prepare_blank_summary_for_update(&current_head);
-
-        use tokio_stream::StreamExt;
-        let blocks: Vec<(Multihash, MetadataBlock)> = self
-            .metadata_chain
-            .iter_blocks_interval(&current_head, Option::None)
-            .collect::<Result<_, _>>()
-            .await
-            .int_err()?;
+        let blank_summary = Self::prepare_blank_summary_for_update(&current_head);
+        let mut summary = match interval_kind {
+            IntervalKind::ValidInterval => prev.unwrap_or(blank_summary),
+            IntervalKind::DivergedInterval => blank_summary,
+        };  
 
         self.compute_blocks_summary_increment(blocks, &mut summary);
         self.write_summary(&summary).await?;
-        
+
         Ok(Some(summary))
     }
 
@@ -230,9 +214,7 @@ where
     async fn get_summary(&self, opts: SummaryOptions) -> Result<DatasetSummary, GetSummaryError> {
         let summary = self.read_summary().await?;
 
-        let summary = if opts.force_recompute {
-            self.recompute_summary().await?
-        } else if opts.update_if_stale {
+        let summary = if opts.update_if_stale {
             self.update_summary(summary).await?
         } else {
             summary

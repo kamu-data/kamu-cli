@@ -69,16 +69,6 @@ impl From<GetDatasetError> for ResetError {
     }
 }
 
-impl From<GetSummaryError> for ResetError {
-    fn from(v: GetSummaryError) -> Self {
-        match v {
-            GetSummaryError::EmptyDataset => unreachable!(),
-            GetSummaryError::Access(e) => Self::Access(e),
-            GetSummaryError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 impl From<SetRefError> for ResetError {
     fn from(v: SetRefError) -> Self {
         match v {
