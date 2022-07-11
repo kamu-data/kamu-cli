@@ -249,6 +249,7 @@ impl SyncServiceImpl {
                 dst,
                 validation,
                 opts.trust_source.unwrap_or(src_is_local),
+                opts.force,
             )
             .await
         {

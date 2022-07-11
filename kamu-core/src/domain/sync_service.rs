@@ -47,6 +47,9 @@ pub struct SyncOptions {
 
     /// Whether destination dataset should be created if it does not exist
     pub create_if_not_exists: bool,
+
+    /// Force synchronization, even if revisions have diverged
+    pub force: bool,    
 }
 
 impl Default for SyncOptions {
@@ -54,6 +57,7 @@ impl Default for SyncOptions {
         Self {
             trust_source: None,
             create_if_not_exists: true,
+            force: false,
         }
     }
 }
