@@ -30,7 +30,7 @@ pub trait Dataset: Send + Sync {
 
 #[derive(Clone, Debug)]
 pub struct SummaryOptions {
-    pub update_if_stale : bool,
+    pub update_if_stale: bool,
 }
 
 impl Default for SummaryOptions {

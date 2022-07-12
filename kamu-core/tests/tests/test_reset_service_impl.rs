@@ -15,28 +15,25 @@ use kamu::testing::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
     let harness = ResetTestHarness::new();
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
-    assert_eq!(test_case.hash_polling_source_block, current_head);        
+    assert_eq!(test_case.hash_polling_source_block, current_head);
 
-    let result = harness.reset_svc
-        .reset_dataset(
-            &test_case.dataset_handle, 
-            &test_case.hash_seed_block
-        )
+    let result = harness
+        .reset_svc
+        .reset_dataset(&test_case.dataset_handle, &test_case.hash_seed_block)
         .await;
-    assert!(result.is_ok());   
+    assert!(result.is_ok());
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
-    assert_eq!(test_case.hash_seed_block, new_head);    
+    assert_eq!(test_case.hash_seed_block, new_head);
 
     let summary = harness.get_dataset_summary(&test_case.dataset_handle).await;
-    assert_eq!(new_head, summary.last_block_hash);    
+    assert_eq!(new_head, summary.last_block_hash);
 }
 
 #[test_log::test(tokio::test)]
@@ -45,15 +42,16 @@ async fn test_reset_dataset_with_2revisions_without_changes() {
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let current_head = harness.get_dataset_head(&test_case.dataset_handle).await;
-    assert_eq!(test_case.hash_polling_source_block, current_head);        
+    assert_eq!(test_case.hash_polling_source_block, current_head);
 
-    let result = harness.reset_svc
+    let result = harness
+        .reset_svc
         .reset_dataset(
-            &test_case.dataset_handle, 
-            &test_case.hash_polling_source_block
+            &test_case.dataset_handle,
+            &test_case.hash_polling_source_block,
         )
         .await;
-    assert!(result.is_ok());    
+    assert!(result.is_ok());
 
     let new_head = harness.get_dataset_head(&test_case.dataset_handle).await;
     assert_eq!(current_head, new_head);
@@ -67,17 +65,14 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
     let harness = ResetTestHarness::new();
     let test_case = harness.a_chain_with_2_blocks().await;
 
-    let a_hash_not_present_in_chain = Multihash::from_multibase_str(
-        "zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8"
-    ).unwrap();
-    
-    let result = harness.reset_svc
-    .reset_dataset(
-        &test_case.dataset_handle, 
-        &a_hash_not_present_in_chain
-    )
-    .await;
-    assert!(result.is_err());    
+    let a_hash_not_present_in_chain =
+        Multihash::from_multibase_str("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
+
+    let result = harness
+        .reset_svc
+        .reset_dataset(&test_case.dataset_handle, &a_hash_not_present_in_chain)
+        .await;
+    assert!(result.is_err());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -92,12 +87,12 @@ impl ChainWith2BlocksTestCase {
     fn new(
         dataset_handle: DatasetHandle,
         hash_seed_block: Multihash,
-        hash_polling_source_block: Multihash
+        hash_polling_source_block: Multihash,
     ) -> Self {
         Self {
             dataset_handle,
             hash_seed_block,
-            hash_polling_source_block
+            hash_polling_source_block,
         }
     }
 }
@@ -116,9 +111,7 @@ impl ResetTestHarness {
         let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path()).unwrap());
         let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout));
 
-        let reset_svc = ResetServiceImpl::new(
-            local_repo.clone(),
-        );
+        let reset_svc = ResetServiceImpl::new(local_repo.clone());
 
         Self {
             _temp_dir: temp_dir,
@@ -141,30 +134,33 @@ impl ResetTestHarness {
     }
 
     async fn a_dataset_builder(&self, dataset_name: &DatasetName) -> Box<dyn DatasetBuilder> {
-        self.local_repo
-            .create_dataset(
-                &dataset_name
+        self.local_repo.create_dataset(&dataset_name).await.unwrap()
+    }
+
+    async fn a_seed_block(
+        &self,
+        chain: &dyn MetadataChain,
+        dataset_name: &DatasetName,
+    ) -> Multihash {
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(DatasetKind::Root)
+                        .id_from(dataset_name.as_str())
+                        .build(),
+                )
+                .build(),
+                AppendOpts::default(),
             )
             .await
             .unwrap()
     }
 
-    async fn a_seed_block(&self, chain: &dyn MetadataChain, dataset_name: &DatasetName) -> Multihash {
-        chain
-            .append(
-            MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root)
-                    .id_from(dataset_name.as_str())
-                    .build(),
-            )
-            .build(),
-            AppendOpts::default(),
-        )
-        .await
-        .unwrap()
-    }
-
-    async fn a_polling_source_block(&self, chain: &dyn MetadataChain, prev_block_hash: &Multihash) -> Multihash {
+    async fn a_polling_source_block(
+        &self,
+        chain: &dyn MetadataChain,
+        prev_block_hash: &Multihash,
+    ) -> Multihash {
         chain
             .append(
                 MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
@@ -187,7 +183,8 @@ impl ResetTestHarness {
 
     async fn get_dataset_summary(&self, dataset_handle: &DatasetHandle) -> DatasetSummary {
         let dataset = self.resolve_dataset(dataset_handle).await;
-        dataset.get_summary(SummaryOptions::default())
+        dataset
+            .get_summary(SummaryOptions::default())
             .await
             .unwrap()
     }
@@ -198,5 +195,4 @@ impl ResetTestHarness {
             .await
             .unwrap()
     }
-
 }

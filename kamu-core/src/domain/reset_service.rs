@@ -8,10 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use metadata_chain::SetRefError;
 use opendatafabric::*;
 use thiserror::Error;
-use metadata_chain::SetRefError;
-
 
 #[async_trait::async_trait(?Send)]
 pub trait ResetService: Send + Sync {
@@ -51,7 +50,7 @@ pub enum ResetError {
         #[from]
         #[backtrace]
         AccessError,
-    ),    
+    ),
     #[error(transparent)]
     Internal(
         #[from]

@@ -110,17 +110,16 @@ where
 
         debug!(?current_head, ?last_seen, "Updating dataset summary");
 
-        let blocks_interval: CollectedInterval =
-            collect_interval_blocks(
-                self.as_metadata_chain(), 
-                &current_head, 
-                last_seen, 
-                CollectIntervalBlocksOptions {
-                    recover_from_divergence: true,
-                }
-            )
-                .await
-                .int_err()?;
+        let blocks_interval: CollectedInterval = collect_interval_blocks(
+            self.as_metadata_chain(),
+            &current_head,
+            last_seen,
+            CollectIntervalBlocksOptions {
+                recover_from_divergence: true,
+            },
+        )
+        .await
+        .int_err()?;
 
         let (blocks, interval_kind) = blocks_interval;
 
@@ -128,7 +127,7 @@ where
         let mut summary = match interval_kind {
             IntervalKind::ValidInterval => prev.unwrap_or(blank_summary),
             IntervalKind::DivergedInterval => blank_summary,
-        };  
+        };
 
         self.compute_blocks_summary_increment(blocks, &mut summary);
         self.write_summary(&summary).await?;
@@ -149,7 +148,11 @@ where
         }
     }
 
-    fn compute_blocks_summary_increment(&self, blocks: Vec<(Multihash, MetadataBlock)>, summary: &mut DatasetSummary) {
+    fn compute_blocks_summary_increment(
+        &self,
+        blocks: Vec<(Multihash, MetadataBlock)>,
+        summary: &mut DatasetSummary,
+    ) {
         for (hash, block) in blocks.into_iter().rev() {
             summary.last_block_hash = hash;
 
@@ -196,7 +199,6 @@ where
             }
         }
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -1259,9 +1259,7 @@ fn validate_repository_name(s: &str) -> Result<(), String> {
 fn validate_multihash(s: &str) -> Result<(), String> {
     match Multihash::try_from(s) {
         Ok(_) => Ok(()),
-        Err(_) => Err(format!(
-            "Block hash must be a valid multihash string",
-        )),
+        Err(_) => Err(format!("Block hash must be a valid multihash string",)),
     }
 }
 

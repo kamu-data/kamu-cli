@@ -31,6 +31,5 @@ pub struct DatasetSummary {
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
     pub data_size: u64,
-    pub checkpoints_size: u64,   
+    pub checkpoints_size: u64,
 }
-

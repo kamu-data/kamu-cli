@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-use opendatafabric::*;
-use super::{CLIError, Command};
 use super::common;
+use super::{CLIError, Command};
 use kamu::domain::*;
+use opendatafabric::*;
+use std::sync::Arc;
 
 pub struct ResetCommand {
     local_repo: Arc<dyn LocalDatasetRepository>,
@@ -28,7 +28,7 @@ impl ResetCommand {
         dataset_ref: R,
         block_hash: H,
         no_confirmation: bool,
-    ) -> Self 
+    ) -> Self
     where
         R: TryInto<DatasetRefLocal>,
         <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
@@ -68,14 +68,10 @@ impl Command for ResetCommand {
             return Err(CLIError::Aborted);
         }
 
-        self
-        .reset_svc
-        .reset_dataset(
-            &dataset_handle,
-            &self.block_hash,
-        )
-        .await
-        .map_err(|e| CLIError::failure(e))?;
+        self.reset_svc
+            .reset_dataset(&dataset_handle, &self.block_hash)
+            .await
+            .map_err(|e| CLIError::failure(e))?;
 
         Ok(())
     }
