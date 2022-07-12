@@ -138,6 +138,7 @@ where
         &'a self,
         head_hash: &'a Multihash,
         tail_hash: Option<&'a Multihash>,
+        ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a> {
         Box::pin(async_stream::try_stream! {
             let mut current = Some(head_hash.clone());
@@ -149,7 +150,7 @@ where
                 current = next;
             }
 
-            if current.is_none() && tail_hash.is_some() {
+            if !ignore_missing_tail && current.is_none() && tail_hash.is_some() {
                 Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
                     head: head_hash.clone(),
                     tail: tail_hash.cloned().unwrap(),

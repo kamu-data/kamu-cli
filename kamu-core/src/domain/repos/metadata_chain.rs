@@ -27,10 +27,12 @@ pub trait MetadataChain: Send + Sync {
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
+    /// If `ignore_missing_tail` argument is provided, the exception is not generated if tail is not detected while traversing from head
     fn iter_blocks_interval<'a>(
         &'a self,
         head: &'a Multihash,
         tail: Option<&'a Multihash>,
+        ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a>;
 
     // TODO: Remove this method by allowing BlockRefs to be either tags or hashes
@@ -98,74 +100,6 @@ pub trait MetadataChainExt: MetadataChain {
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// collect_interval_blocks
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct CollectIntervalBlocksOptions {
-    pub recover_from_divergence: bool,
-}
-
-impl Default for CollectIntervalBlocksOptions {
-    fn default() -> Self {
-        Self {
-            recover_from_divergence: false,
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn collect_interval_blocks(
-    chain: &dyn MetadataChain,
-    head: &Multihash,
-    tail: Option<&Multihash>,
-    options: CollectIntervalBlocksOptions,
-) -> Result<CollectedInterval, IterBlocksError> {
-    // Try normal iteration first
-    use tokio_stream::StreamExt;
-    let iter_result = chain
-        .iter_blocks_interval(head, tail)
-        .collect::<Result<_, _>>()
-        .await;
-
-    // If a divergence is detected, and we have a recovery option, just reiterate all blocks instead
-    if options.recover_from_divergence {
-        if let Err(IterBlocksError::InvalidInterval(_)) = iter_result {
-            let full_chain_iter_result = chain
-                .iter_blocks_interval(&head, Option::None)
-                .collect::<Result<_, _>>()
-                .await;
-            return match full_chain_iter_result {
-                Ok(collection) => Ok((collection, IntervalKind::DivergedInterval)),
-                Err(e) => Err(e),
-            };
-        }
-    }
-
-    // Otherwise, propagate standard result
-    match iter_result {
-        Ok(collection) => Ok((collection, IntervalKind::ValidInterval)),
-        Err(e) => Err(e),
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// IntervalKind
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IntervalKind {
-    ValidInterval,
-    DivergedInterval,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// CollectedInterval
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub type CollectedInterval = (Vec<(Multihash, MetadataBlock)>, IntervalKind);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // BlockRef

@@ -351,7 +351,7 @@ impl SyncServiceImpl {
         // Analyze the block interval
         let num_blocks = match src_dataset
             .as_metadata_chain()
-            .iter_blocks_interval(&src_head, dst_head.as_ref())
+            .iter_blocks_interval(&src_head, dst_head.as_ref(), false)
             .try_count()
             .await
         {

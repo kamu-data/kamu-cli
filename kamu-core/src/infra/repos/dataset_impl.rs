@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use tracing::debug;
 
 use crate::domain::repos::named_object_repository::GetError;
@@ -110,26 +111,85 @@ where
 
         debug!(?current_head, ?last_seen, "Updating dataset summary");
 
-        let blocks_interval: CollectedInterval = collect_interval_blocks(
-            self.as_metadata_chain(),
-            &current_head,
-            last_seen,
-            CollectIntervalBlocksOptions {
-                recover_from_divergence: true,
-            },
-        )
-        .await
-        .int_err()?;
+        let mut block_stream =
+            self.metadata_chain
+                .iter_blocks_interval(&current_head, last_seen, true);
 
-        let (blocks, interval_kind) = blocks_interval;
+        let mut seen_id: Option<DatasetID> = None;
+        let mut seen_kind: Option<DatasetKind> = None;
+        let mut seen_dependencies: Option<Vec<TransformInput>> = None;
+        let mut seen_last_pulled: Option<DateTime<Utc>> = None;
+        let mut seen_num_records: u64 = 0;
+        let mut seen_data_size: u64 = 0;
+        let mut seen_checkpoints_size: u64 = 0;
+        let mut seen_empty_prev_block_hash: bool = false;
 
-        let blank_summary = Self::prepare_blank_summary_for_update(&current_head);
-        let mut summary = match interval_kind {
-            IntervalKind::ValidInterval => prev.unwrap_or(blank_summary),
-            IntervalKind::DivergedInterval => blank_summary,
+        use tokio_stream::StreamExt;
+        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+            seen_empty_prev_block_hash = block.prev_block_hash.is_none();
+
+            match block.event {
+                MetadataEvent::Seed(seed) => {
+                    seen_id = seen_id.or_else(|| Some(seed.dataset_id));
+                    seen_kind = seen_kind.or_else(|| Some(seed.dataset_kind));
+                }
+                MetadataEvent::SetTransform(set_transform) => {
+                    seen_dependencies = seen_dependencies.or_else(|| Some(set_transform.inputs));
+                }
+                MetadataEvent::AddData(add_data) => {
+                    seen_last_pulled = seen_last_pulled.or_else(|| Some(block.system_time));
+
+                    let iv = add_data.output_data.interval;
+                    seen_num_records += (iv.end - iv.start + 1) as u64;
+
+                    seen_data_size += add_data.output_data.size as u64;
+
+                    if let Some(checkpoint) = add_data.output_checkpoint {
+                        seen_checkpoints_size += checkpoint.size as u64;
+                    }
+                }
+                MetadataEvent::ExecuteQuery(execute_query) => {
+                    seen_last_pulled = seen_last_pulled.or_else(|| Some(block.system_time));
+
+                    if let Some(output_data) = execute_query.output_data {
+                        let iv = output_data.interval;
+                        seen_num_records += (iv.end - iv.start + 1) as u64;
+
+                        seen_data_size += output_data.size as u64;
+                    }
+
+                    if let Some(checkpoint) = execute_query.output_checkpoint {
+                        seen_checkpoints_size += checkpoint.size as u64;
+                    }
+                }
+                MetadataEvent::SetAttachments(_)
+                | MetadataEvent::SetInfo(_)
+                | MetadataEvent::SetLicense(_)
+                | MetadataEvent::SetWatermark(_)
+                | MetadataEvent::SetVocab(_)
+                | MetadataEvent::SetPollingSource(_) => (),
+            }
+        }
+
+        let blank_summary: DatasetSummary = Self::prepare_blank_summary_for_update(&current_head);
+
+        let base_summary = if seen_empty_prev_block_hash {
+            &blank_summary
+        } else {
+            prev.as_ref().unwrap_or(&blank_summary)
         };
 
-        self.compute_blocks_summary_increment(blocks, &mut summary);
+        let summary = DatasetSummary {
+            id: seen_id.unwrap_or_else(|| base_summary.id.clone()),
+            kind: seen_kind.unwrap_or(base_summary.kind),
+            last_block_hash: current_head.clone(),
+            dependencies: seen_dependencies.unwrap_or_else(|| base_summary.dependencies.clone()),
+            last_pulled: seen_last_pulled.or(base_summary.last_pulled),
+            num_records: base_summary.num_records + seen_num_records,
+            data_size: base_summary.data_size + seen_data_size,
+            checkpoints_size: base_summary.checkpoints_size + seen_checkpoints_size,
+        };
+
         self.write_summary(&summary).await?;
 
         Ok(Some(summary))
@@ -145,58 +205,6 @@ where
             num_records: 0,
             data_size: 0,
             checkpoints_size: 0,
-        }
-    }
-
-    fn compute_blocks_summary_increment(
-        &self,
-        blocks: Vec<(Multihash, MetadataBlock)>,
-        summary: &mut DatasetSummary,
-    ) {
-        for (hash, block) in blocks.into_iter().rev() {
-            summary.last_block_hash = hash;
-
-            match block.event {
-                MetadataEvent::Seed(seed) => {
-                    summary.id = seed.dataset_id;
-                    summary.kind = seed.dataset_kind;
-                }
-                MetadataEvent::SetTransform(set_transform) => {
-                    summary.dependencies = set_transform.inputs;
-                }
-                MetadataEvent::AddData(add_data) => {
-                    summary.last_pulled = Some(block.system_time);
-
-                    let iv = add_data.output_data.interval;
-                    summary.num_records += (iv.end - iv.start + 1) as u64;
-
-                    summary.data_size += add_data.output_data.size as u64;
-
-                    if let Some(checkpoint) = add_data.output_checkpoint {
-                        summary.checkpoints_size += checkpoint.size as u64;
-                    }
-                }
-                MetadataEvent::ExecuteQuery(execute_query) => {
-                    summary.last_pulled = Some(block.system_time);
-
-                    if let Some(output_data) = execute_query.output_data {
-                        let iv = output_data.interval;
-                        summary.num_records += (iv.end - iv.start + 1) as u64;
-
-                        summary.data_size += output_data.size as u64;
-                    }
-
-                    if let Some(checkpoint) = execute_query.output_checkpoint {
-                        summary.checkpoints_size += checkpoint.size as u64;
-                    }
-                }
-                MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetWatermark(_)
-                | MetadataEvent::SetVocab(_)
-                | MetadataEvent::SetPollingSource(_) => (),
-            }
         }
     }
 }
