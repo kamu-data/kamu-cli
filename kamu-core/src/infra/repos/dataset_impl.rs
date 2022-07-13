@@ -117,10 +117,10 @@ where
 
         let summary = if increment.seen_chain_beginning() {
             // Increment includes the entire chain (most likely due to a history reset)
-            increment.into_summary(&current_head)
+            increment.into_summary()
         } else {
             // Increment applies to interval [head, prev.last_block_hash)
-            increment.apply_to_summary(prev.unwrap(), &current_head)
+            increment.apply_to_summary(prev.unwrap())
         };
 
         self.write_summary(&summary).await?;
@@ -139,6 +139,7 @@ where
 
         use tokio_stream::StreamExt;
         let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::default();
+        increment.seen_head = Some(current_head.clone());
 
         while let Some((_, block)) = block_stream.try_next().await.int_err()? {
             match block.event {
@@ -196,6 +197,7 @@ where
 struct UpdateSummaryIncrement {
     seen_id: Option<DatasetID>,
     seen_kind: Option<DatasetKind>,
+    seen_head: Option<Multihash>,
     seen_dependencies: Option<Vec<TransformInput>>,
     seen_last_pulled: Option<DateTime<Utc>>,
     seen_num_records: u64,
@@ -209,11 +211,11 @@ impl UpdateSummaryIncrement {
         return self.seen_id.is_some();
     }
 
-    fn into_summary(self, head: &Multihash) -> DatasetSummary {
+    fn into_summary(self) -> DatasetSummary {
         DatasetSummary {
             id: self.seen_id.unwrap(),
             kind: self.seen_kind.unwrap(),
-            last_block_hash: head.clone(),
+            last_block_hash: self.seen_head.unwrap(),
             dependencies: self.seen_dependencies.unwrap_or_default(),
             last_pulled: self.seen_last_pulled,
             num_records: self.seen_num_records,
@@ -222,11 +224,11 @@ impl UpdateSummaryIncrement {
         }
     }
 
-    fn apply_to_summary(self, summary: DatasetSummary, head: &Multihash) -> DatasetSummary {
+    fn apply_to_summary(self, summary: DatasetSummary) -> DatasetSummary {
         DatasetSummary {
             id: self.seen_id.unwrap_or(summary.id),
             kind: self.seen_kind.unwrap_or(summary.kind),
-            last_block_hash: head.clone(),
+            last_block_hash: self.seen_head.unwrap(),
             dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
             last_pulled: self.seen_last_pulled.or(summary.last_pulled),
             num_records: summary.num_records + self.seen_num_records,
