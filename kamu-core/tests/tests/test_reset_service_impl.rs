@@ -13,6 +13,7 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
+use std::assert_matches::assert_matches;
 use tempfile::TempDir;
 
 #[test_log::test(tokio::test)]
@@ -72,7 +73,7 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
         .reset_svc
         .reset_dataset(&test_case.dataset_handle, &a_hash_not_present_in_chain)
         .await;
-    assert!(result.is_err());
+    assert_matches!(result, Err(ResetError::BlockNotFound(_)));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

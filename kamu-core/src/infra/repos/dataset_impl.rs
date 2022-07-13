@@ -115,15 +115,13 @@ where
             .compute_summary_increment(&current_head, last_seen)
             .await?;
 
-        let blank_summary: DatasetSummary = Self::prepare_blank_summary_for_update(&current_head);
-        let base_summary = if increment.seen_empty_prev_block_hash {
-            &blank_summary
+        let summary = if increment.seen_chain_beginning() {
+            // Increment includes the entire chain (most likely due to a history reset)
+            increment.into_summary(&current_head)
         } else {
-            prev.as_ref().unwrap_or(&blank_summary)
+            // Increment applies to interval [head, prev.last_block_hash)
+            increment.apply_to_summary(prev.unwrap(), &current_head)
         };
-
-        let summary =
-            UpdateSummaryIncrement::apply_increment_to(increment, &base_summary, &current_head);
 
         self.write_summary(&summary).await?;
 
@@ -140,25 +138,21 @@ where
                 .iter_blocks_interval(&current_head, last_seen, true);
 
         use tokio_stream::StreamExt;
-        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::new();
+        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::default();
 
         while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-            increment.seen_empty_prev_block_hash = block.prev_block_hash.is_none();
-
             match block.event {
                 MetadataEvent::Seed(seed) => {
-                    increment.seen_id = increment.seen_id.or_else(|| Some(seed.dataset_id));
-                    increment.seen_kind = increment.seen_kind.or_else(|| Some(seed.dataset_kind));
+                    increment.seen_id.get_or_insert(seed.dataset_id);
+                    increment.seen_kind.get_or_insert(seed.dataset_kind);
                 }
                 MetadataEvent::SetTransform(set_transform) => {
-                    increment.seen_dependencies = increment
+                    increment
                         .seen_dependencies
-                        .or_else(|| Some(set_transform.inputs));
+                        .get_or_insert(set_transform.inputs);
                 }
                 MetadataEvent::AddData(add_data) => {
-                    increment.seen_last_pulled = increment
-                        .seen_last_pulled
-                        .or_else(|| Some(block.system_time));
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
                     let iv = add_data.output_data.interval;
                     increment.seen_num_records += (iv.end - iv.start + 1) as u64;
@@ -170,9 +164,7 @@ where
                     }
                 }
                 MetadataEvent::ExecuteQuery(execute_query) => {
-                    increment.seen_last_pulled = increment
-                        .seen_last_pulled
-                        .or_else(|| Some(block.system_time));
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
                     if let Some(output_data) = execute_query.output_data {
                         let iv = output_data.interval;
@@ -196,23 +188,11 @@ where
 
         Ok(increment)
     }
-
-    fn prepare_blank_summary_for_update(last_block_hash: &Multihash) -> DatasetSummary {
-        DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced
-            kind: DatasetKind::Root,
-            last_block_hash: last_block_hash.clone(),
-            dependencies: Vec::new(),
-            last_pulled: None,
-            num_records: 0,
-            data_size: 0,
-            checkpoints_size: 0,
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 struct UpdateSummaryIncrement {
     seen_id: Option<DatasetID>,
     seen_kind: Option<DatasetKind>,
@@ -221,39 +201,37 @@ struct UpdateSummaryIncrement {
     seen_num_records: u64,
     seen_data_size: u64,
     seen_checkpoints_size: u64,
-    seen_empty_prev_block_hash: bool,
 }
 
 impl UpdateSummaryIncrement {
-    fn new() -> Self {
-        Self {
-            seen_id: None,
-            seen_kind: None,
-            seen_dependencies: None,
-            seen_last_pulled: None,
-            seen_num_records: 0,
-            seen_data_size: 0,
-            seen_checkpoints_size: 0,
-            seen_empty_prev_block_hash: false,
+    fn seen_chain_beginning(&self) -> bool {
+        // Seed blocks are guaranteed to appear only once in a chain, and only at the very beginning
+        return self.seen_id.is_some();
+    }
+
+    fn into_summary(self, head: &Multihash) -> DatasetSummary {
+        DatasetSummary {
+            id: self.seen_id.unwrap(),
+            kind: self.seen_kind.unwrap(),
+            last_block_hash: head.clone(),
+            dependencies: self.seen_dependencies.unwrap_or_default(),
+            last_pulled: self.seen_last_pulled,
+            num_records: self.seen_num_records,
+            data_size: self.seen_data_size,
+            checkpoints_size: self.seen_checkpoints_size,
         }
     }
 
-    fn apply_increment_to(
-        increment: UpdateSummaryIncrement,
-        base_summary: &DatasetSummary,
-        head: &Multihash,
-    ) -> DatasetSummary {
+    fn apply_to_summary(self, summary: DatasetSummary, head: &Multihash) -> DatasetSummary {
         DatasetSummary {
-            id: increment.seen_id.unwrap_or_else(|| base_summary.id.clone()),
-            kind: increment.seen_kind.unwrap_or(base_summary.kind),
+            id: self.seen_id.unwrap_or(summary.id),
+            kind: self.seen_kind.unwrap_or(summary.kind),
             last_block_hash: head.clone(),
-            dependencies: increment
-                .seen_dependencies
-                .unwrap_or_else(|| base_summary.dependencies.clone()),
-            last_pulled: increment.seen_last_pulled.or(base_summary.last_pulled),
-            num_records: base_summary.num_records + increment.seen_num_records,
-            data_size: base_summary.data_size + increment.seen_data_size,
-            checkpoints_size: base_summary.checkpoints_size + increment.seen_checkpoints_size,
+            dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
+            last_pulled: self.seen_last_pulled.or(summary.last_pulled),
+            num_records: summary.num_records + self.seen_num_records,
+            data_size: summary.data_size + self.seen_data_size,
+            checkpoints_size: summary.checkpoints_size + self.seen_checkpoints_size,
         }
     }
 }
