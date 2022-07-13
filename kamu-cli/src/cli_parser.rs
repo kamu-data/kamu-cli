@@ -725,20 +725,21 @@ pub fn cli() -> Command<'static> {
                         kamu rename bafy...a0da my.dataset
                     "
                 )),
-            /*Command::new("reset")
+            Command::new("reset")
             .about("Revert the dataset back to the specified state")
             .args(&[
                 Arg::new("dataset")
                     .required(true)
                     .index(1)
-                    .validator(validate_dataset_id)
+                    .validator(validate_dataset_ref_local)
                     .help("ID of the dataset"),
                 Arg::new("hash")
                     .required(true)
                     .index(2)
+                    .validator(validate_multihash)
                     .help("Hash of the block to reset to"),
                 Arg::new("yes")
-                    .short("y")
+                    .short('y')
                     .long("yes")
                     .help("Don't ask for confirmation"),
             ])
@@ -748,11 +749,11 @@ pub fn cli() -> Command<'static> {
                 that followed it and deletes all data added since that point. This can \
                 sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
-                Keep in mind that blocks that were already pushed to a repository could've \
+                Keep in mind that blocks that were pushed to a repository could've \
                 been already observed by other people, so resetting the history will not let \
                 you take that data back.
                 "
-            )),*/
+            )),
             Command::new("repo")
                 .about("Manage set of tracked repositories")
                 .subcommand_required(true)
@@ -1252,6 +1253,13 @@ fn validate_repository_name(s: &str) -> Result<(), String> {
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",
         )),
+    }
+}
+
+fn validate_multihash(s: &str) -> Result<(), String> {
+    match Multihash::try_from(s) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(format!("Block hash must be a valid multihash string",)),
     }
 }
 

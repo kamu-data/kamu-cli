@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use tracing::debug;
 
 use crate::domain::repos::named_object_repository::GetError;
@@ -110,60 +111,71 @@ where
 
         debug!(?current_head, ?last_seen, "Updating dataset summary");
 
+        let increment = self
+            .compute_summary_increment(&current_head, last_seen)
+            .await?;
+
+        let summary = if increment.seen_chain_beginning() {
+            // Increment includes the entire chain (most likely due to a history reset)
+            increment.into_summary()
+        } else {
+            // Increment applies to interval [head, prev.last_block_hash)
+            increment.apply_to_summary(prev.unwrap())
+        };
+
+        self.write_summary(&summary).await?;
+
+        Ok(Some(summary))
+    }
+
+    async fn compute_summary_increment(
+        &self,
+        current_head: &Multihash,
+        last_seen: Option<&Multihash>,
+    ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
+        let mut block_stream =
+            self.metadata_chain
+                .iter_blocks_interval(&current_head, last_seen, true);
+
         use tokio_stream::StreamExt;
-        let blocks: Vec<_> = self
-            .metadata_chain
-            .iter_blocks_interval(&current_head, last_seen)
-            .collect::<Result<_, _>>()
-            .await
-            .int_err()?;
+        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::default();
+        increment.seen_head = Some(current_head.clone());
 
-        let mut summary = prev.unwrap_or(DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b""), // Will be replaced
-            kind: DatasetKind::Root,
-            last_block_hash: current_head.clone(),
-            dependencies: Vec::new(),
-            last_pulled: None,
-            num_records: 0,
-            data_size: 0,
-            checkpoints_size: 0,
-        });
-
-        for (hash, block) in blocks.into_iter().rev() {
-            summary.last_block_hash = hash;
-
+        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
             match block.event {
                 MetadataEvent::Seed(seed) => {
-                    summary.id = seed.dataset_id;
-                    summary.kind = seed.dataset_kind;
+                    increment.seen_id.get_or_insert(seed.dataset_id);
+                    increment.seen_kind.get_or_insert(seed.dataset_kind);
                 }
                 MetadataEvent::SetTransform(set_transform) => {
-                    summary.dependencies = set_transform.inputs;
+                    increment
+                        .seen_dependencies
+                        .get_or_insert(set_transform.inputs);
                 }
                 MetadataEvent::AddData(add_data) => {
-                    summary.last_pulled = Some(block.system_time);
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
                     let iv = add_data.output_data.interval;
-                    summary.num_records += (iv.end - iv.start + 1) as u64;
+                    increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
-                    summary.data_size += add_data.output_data.size as u64;
+                    increment.seen_data_size += add_data.output_data.size as u64;
 
                     if let Some(checkpoint) = add_data.output_checkpoint {
-                        summary.checkpoints_size += checkpoint.size as u64;
+                        increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
                 MetadataEvent::ExecuteQuery(execute_query) => {
-                    summary.last_pulled = Some(block.system_time);
+                    increment.seen_last_pulled.get_or_insert(block.system_time);
 
                     if let Some(output_data) = execute_query.output_data {
                         let iv = output_data.interval;
-                        summary.num_records += (iv.end - iv.start + 1) as u64;
+                        increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
-                        summary.data_size += output_data.size as u64;
+                        increment.seen_data_size += output_data.size as u64;
                     }
 
                     if let Some(checkpoint) = execute_query.output_checkpoint {
-                        summary.checkpoints_size += checkpoint.size as u64;
+                        increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
                 MetadataEvent::SetAttachments(_)
@@ -175,9 +187,54 @@ where
             }
         }
 
-        self.write_summary(&summary).await?;
+        Ok(increment)
+    }
+}
 
-        Ok(Some(summary))
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default)]
+struct UpdateSummaryIncrement {
+    seen_id: Option<DatasetID>,
+    seen_kind: Option<DatasetKind>,
+    seen_head: Option<Multihash>,
+    seen_dependencies: Option<Vec<TransformInput>>,
+    seen_last_pulled: Option<DateTime<Utc>>,
+    seen_num_records: u64,
+    seen_data_size: u64,
+    seen_checkpoints_size: u64,
+}
+
+impl UpdateSummaryIncrement {
+    fn seen_chain_beginning(&self) -> bool {
+        // Seed blocks are guaranteed to appear only once in a chain, and only at the very beginning
+        return self.seen_id.is_some();
+    }
+
+    fn into_summary(self) -> DatasetSummary {
+        DatasetSummary {
+            id: self.seen_id.unwrap(),
+            kind: self.seen_kind.unwrap(),
+            last_block_hash: self.seen_head.unwrap(),
+            dependencies: self.seen_dependencies.unwrap_or_default(),
+            last_pulled: self.seen_last_pulled,
+            num_records: self.seen_num_records,
+            data_size: self.seen_data_size,
+            checkpoints_size: self.seen_checkpoints_size,
+        }
+    }
+
+    fn apply_to_summary(self, summary: DatasetSummary) -> DatasetSummary {
+        DatasetSummary {
+            id: self.seen_id.unwrap_or(summary.id),
+            kind: self.seen_kind.unwrap_or(summary.kind),
+            last_block_hash: self.seen_head.unwrap(),
+            dependencies: self.seen_dependencies.unwrap_or(summary.dependencies),
+            last_pulled: self.seen_last_pulled.or(summary.last_pulled),
+            num_records: summary.num_records + self.seen_num_records,
+            data_size: summary.data_size + self.seen_data_size,
+            checkpoints_size: summary.checkpoints_size + self.seen_checkpoints_size,
+        }
     }
 }
 

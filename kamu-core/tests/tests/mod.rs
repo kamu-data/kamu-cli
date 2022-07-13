@@ -11,6 +11,7 @@ mod engine;
 mod ingest;
 mod repos;
 mod test_pull_service_impl;
+mod test_reset_service_impl;
 mod test_resource_loader_impl;
 mod test_schema_utils;
 mod test_search_service_impl;

@@ -80,6 +80,9 @@ pub use repository_delete_command::*;
 mod repository_list_command;
 pub use repository_list_command::*;
 
+mod reset_command;
+pub use reset_command::*;
+
 mod search_command;
 pub use search_command::*;
 

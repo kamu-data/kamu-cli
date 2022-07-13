@@ -27,10 +27,12 @@ pub trait MetadataChain: Send + Sync {
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
+    /// If `ignore_missing_tail` argument is provided, the exception is not generated if tail is not detected while traversing from head
     fn iter_blocks_interval<'a>(
         &'a self,
         head: &'a Multihash,
         tail: Option<&'a Multihash>,
+        ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a>;
 
     // TODO: Remove this method by allowing BlockRefs to be either tags or hashes

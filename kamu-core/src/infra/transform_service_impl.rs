@@ -516,7 +516,7 @@ impl TransformServiceImpl {
                 .prev_block_hash;
 
             let mut block_stream = input_chain
-                .iter_blocks_interval(&block_interval.end, hash_to_stop_at.as_ref())
+                .iter_blocks_interval(&block_interval.end, hash_to_stop_at.as_ref(), false)
                 .filter_data_stream_blocks();
 
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
@@ -626,7 +626,7 @@ impl TransformServiceImpl {
         let mut finished_range = false;
 
         {
-            let mut block_stream = metadata_chain.iter_blocks_interval(&head, None);
+            let mut block_stream = metadata_chain.iter_blocks_interval(&head, None, false);
 
             // TODO: This can be simplified
             while let Some((block_hash, block)) = block_stream.try_next().await? {

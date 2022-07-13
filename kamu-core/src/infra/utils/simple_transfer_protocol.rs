@@ -62,7 +62,7 @@ impl SimpleTransferProtocol {
 
         // Download missing blocks
         let blocks: Vec<_> = match src_chain
-            .iter_blocks_interval(&src_head, dst_head.as_ref())
+            .iter_blocks_interval(&src_head, dst_head.as_ref(), false)
             .try_collect()
             .await
         {

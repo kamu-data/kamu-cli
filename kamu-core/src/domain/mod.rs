@@ -56,6 +56,9 @@ pub use repository::*;
 mod remote_aliases;
 pub use remote_aliases::*;
 
+mod reset_service;
+pub use reset_service::*;
+
 mod resource_loader;
 pub use resource_loader::*;
 

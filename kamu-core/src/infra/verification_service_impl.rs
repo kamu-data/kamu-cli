@@ -61,7 +61,7 @@ impl VerificationServiceImpl {
         // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks` estimate
         use futures::TryStreamExt;
         let plan: Vec<_> = chain
-            .iter_blocks_interval(&head, tail.as_ref())
+            .iter_blocks_interval(&head, tail.as_ref(), false)
             .filter_data_stream_blocks()
             .try_collect()
             .await?;
