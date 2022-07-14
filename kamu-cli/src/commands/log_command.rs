@@ -15,7 +15,7 @@ use opendatafabric::*;
 
 use chrono::prelude::*;
 use console::style;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::MetadataBlock;
@@ -29,6 +29,7 @@ pub struct LogCommand {
     dataset_ref: DatasetRefLocal,
     outout_format: Option<String>,
     filter: Option<String>,
+    limit: usize,
     output_config: Arc<OutputConfig>,
 }
 
@@ -38,6 +39,7 @@ impl LogCommand {
         dataset_ref: DatasetRefLocal,
         outout_format: Option<&str>,
         filter: Option<&str>,
+        limit: usize,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
@@ -45,6 +47,7 @@ impl LogCommand {
             dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
+            limit,
             output_config,
         }
     }
@@ -87,10 +90,10 @@ impl Command for LogCommand {
             self.outout_format.as_ref().map(|s| s.as_str()),
             self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
-            (None, true) => Box::new(PagedAsciiRenderer::new(id_to_name_lookup)),
-            (None, false) => Box::new(AsciiRenderer::new(id_to_name_lookup)),
-            (Some("yaml"), true) => Box::new(PagedYamlRenderer::new()),
-            (Some("yaml"), false) => Box::new(YamlRenderer::new()),
+            (None, true) => Box::new(PagedAsciiRenderer::new(id_to_name_lookup, self.limit)),
+            (None, false) => Box::new(AsciiRenderer::new(id_to_name_lookup, self.limit)),
+            (Some("yaml"), true) => Box::new(PagedYamlRenderer::new(self.limit)),
+            (Some("yaml"), false) => Box::new(YamlRenderer::new(self.limit)),
             _ => panic!("Unexpected output format combination"),
         };
 
@@ -132,21 +135,34 @@ trait MetadataRenderer {
 
 struct AsciiRenderer {
     id_to_name_lookup: BTreeMap<DatasetID, DatasetName>,
+    limit: usize,
 }
 
 impl AsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>) -> Self {
-        Self { id_to_name_lookup }
+    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>, limit: usize) -> Self {
+        Self {
+            id_to_name_lookup,
+            limit,
+        }
     }
 
     async fn render_blocks<'a, 'b>(
         &'a self,
         output: &mut impl Write,
-        mut blocks: DynMetadataStream<'b>,
+        blocks: DynMetadataStream<'b>,
     ) -> Result<(), CLIError> {
+        let mut blocks = blocks.take(self.limit);
+
+        // TODO: We buffer output per block as writing directly to minus::Pager seems to
+        // have a lot of overhead. In future we should improve its async paging support.
+        let mut buf = Vec::new();
+
         while let Some((hash, block)) = blocks.try_next().await? {
-            self.render_block(output, &hash, &block)?;
-            writeln!(output)?;
+            buf.clear();
+            self.render_block(&mut buf, &hash, &block)?;
+            writeln!(buf)?;
+
+            output.write_all(&buf)?;
         }
         Ok(())
     }
@@ -420,11 +436,15 @@ impl MetadataRenderer for AsciiRenderer {
 
 struct PagedAsciiRenderer {
     id_to_name_lookup: BTreeMap<DatasetID, DatasetName>,
+    limit: usize,
 }
 
 impl PagedAsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>) -> Self {
-        Self { id_to_name_lookup }
+    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>, limit: usize) -> Self {
+        Self {
+            id_to_name_lookup,
+            limit,
+        }
     }
 }
 
@@ -441,7 +461,7 @@ impl MetadataRenderer for PagedAsciiRenderer {
             .unwrap();
         pager.set_prompt(&dataset_handle.name).unwrap();
 
-        let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone());
+        let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone(), self.limit);
         let mut write = WritePager(&mut pager);
         renderer.render_blocks(&mut write, blocks).await?;
 
@@ -467,19 +487,32 @@ impl<'a> Write for WritePager<'a> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct YamlRenderer;
+struct YamlRenderer {
+    limit: usize,
+}
 
 impl YamlRenderer {
-    fn new() -> Self {
-        Self
+    fn new(limit: usize) -> Self {
+        Self { limit }
     }
 
     async fn render_blocks<'a, 'b>(
+        &self,
         output: &'a mut impl Write,
-        mut blocks: DynMetadataStream<'b>,
+        blocks: DynMetadataStream<'b>,
     ) -> Result<(), CLIError> {
+        let mut blocks = blocks.take(self.limit);
+
+        // TODO: We buffer output per block as writing directly to minus::Pager seems to
+        // have a lot of overhead. In future we should improve its async paging support.
+        let mut buf = Vec::new();
+
         while let Some((hash, block)) = blocks.try_next().await? {
-            Self::render_block(output, &hash, &block)?;
+            buf.clear();
+            Self::render_block(&mut buf, &hash, &block)?;
+            writeln!(buf)?;
+
+            output.write_all(&buf)?;
         }
         Ok(())
     }
@@ -502,18 +535,20 @@ impl MetadataRenderer for YamlRenderer {
         _dataset_handle: &DatasetHandle,
         blocks: DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
-        Self::render_blocks(&mut std::io::stdout(), blocks).await?;
+        self.render_blocks(&mut std::io::stdout(), blocks).await?;
         Ok(())
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct PagedYamlRenderer;
+struct PagedYamlRenderer {
+    limit: usize,
+}
 
 impl PagedYamlRenderer {
-    fn new() -> Self {
-        Self
+    fn new(limit: usize) -> Self {
+        Self { limit }
     }
 }
 
@@ -533,7 +568,8 @@ impl MetadataRenderer for PagedYamlRenderer {
         {
             let mut write = WritePager(&mut pager);
 
-            YamlRenderer::render_blocks(&mut write, blocks).await?;
+            let renderer = YamlRenderer::new(self.limit);
+            renderer.render_blocks(&mut write, blocks).await?;
             minus::page_all(pager).unwrap();
         }
         Ok(())

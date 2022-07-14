@@ -119,6 +119,7 @@ pub fn get_command(
             submatches.value_of_t_or_exit("dataset"),
             submatches.value_of("output-format"),
             submatches.value_of("filter"),
+            submatches.value_of_t_or_exit("limit"),
             catalog.get_one()?,
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(

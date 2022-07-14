@@ -484,6 +484,11 @@ pub fn cli() -> Command<'static> {
                         .takes_value(true)
                         .value_name("FLT")
                         .validator(validate_log_filter),
+                    Arg::new("limit")
+                        .long("limit")
+                        .takes_value(true)
+                        .default_value("500")
+                        .help("Maximum number of blocks to display"),
                 ])
                 .after_help(indoc::indoc!(
                     "
