@@ -159,6 +159,7 @@ pub fn get_command(
                     submatches.value_of("as"),
                     !submatches.is_present("no-alias"),
                     submatches.value_of("fetch"),
+                    submatches.is_present("force"),
                 ))
             }
         }

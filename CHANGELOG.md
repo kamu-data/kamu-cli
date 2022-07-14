@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - New `kamu reset` command that reverts the dataset back to the specified state
+- Added `kamu push --force` switch that allows overwriting diverged remote dataset with a local version
+- Added `kamu pull --force` switch that allows overwriting diverged local dataset with a remote version
 ### Fixed
 - Improved the `kamu log` command's performance on datasets with high block counts and introruced a `--limit` parameter
 
