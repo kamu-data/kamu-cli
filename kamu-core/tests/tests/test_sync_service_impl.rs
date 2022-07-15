@@ -299,7 +299,7 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc.sync(&dataset_name_2.into(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -309,9 +309,56 @@ async fn do_test_sync(
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync(&dataset_name.into(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
         if src_head == b3 && dst_head == diverged_head
+    );
+
+    // Try push from dataset_1 with --force: it should abandon the diverged_head block
+    assert_matches!(
+        sync_svc
+            .sync(
+                &dataset_name.as_any_ref(),
+                &push_ref.as_any_ref(),
+                SyncOptions {
+                    force: true,
+                    ..SyncOptions::default()
+                },
+                None
+            )
+            .await,
+        Ok(SyncResult::Updated {
+            old_head,
+            new_head,
+            num_blocks: 4, // full resynchronization: seed, b1, b2, b3
+        }) if old_head == Some(diverged_head.clone()) && new_head == b3
+    );
+
+    // Try pulling dataset_2: should fail, diverged
+    assert_matches!(
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
+        if src_head == b3 && dst_head == diverged_head
+    );
+
+    // Try pulling dataset_2 with --force: should abandon diverged_head
+    assert_matches!(
+        sync_svc
+            .sync(
+                &pull_ref.as_any_ref(),
+                &dataset_name_2.as_any_ref(),
+                SyncOptions {
+                    force: true,
+                    .. SyncOptions::default()
+                },
+                None
+            )
+            .await,
+        Ok(SyncResult::Updated {
+            old_head,
+            new_head,
+            num_blocks: 4, // full resynchronization: seed, b1, b2, b3
+        }) if old_head == Some(diverged_head.clone()) && new_head == b3
     );
 }
 

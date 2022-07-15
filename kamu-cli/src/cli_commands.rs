@@ -159,6 +159,7 @@ pub fn get_command(
                     submatches.value_of("as"),
                     !submatches.is_present("no-alias"),
                     submatches.value_of("fetch"),
+                    submatches.is_present("force"),
                 ))
             }
         }
@@ -168,6 +169,7 @@ pub fn get_command(
             push_matches.is_present("all"),
             push_matches.is_present("recursive"),
             !push_matches.is_present("no-alias"),
+            push_matches.is_present("force"),
             push_matches.value_of("to"),
             catalog.get_one()?,
         )),

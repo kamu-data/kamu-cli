@@ -37,6 +37,7 @@ async fn main() {
         None as Option<&str>,
         true,
         None as Option<&str>,
+        false,
     );
     cmd.run().await.unwrap();
 }

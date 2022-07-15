@@ -610,6 +610,10 @@ pub fn cli() -> Command<'static> {
                             "Injects a manual watermark into the dataset to signify that",
                             "no data is expected to arrive with event time that precedes it"
                         )),
+                    Arg::new("force")
+                        .short('f')
+                        .long("force")
+                        .help("Overwrite local version with remote, even if revisions have diverged"),
                 ])
                 .after_help(indoc::indoc!(
                     "
@@ -681,6 +685,10 @@ pub fn cli() -> Command<'static> {
                         .validator(validate_dataset_ref_remote)
                         .value_name("REM")
                         .help("Remote alias or a URL to push to"),
+                    Arg::new("force")
+                        .short('f')
+                        .long("force")
+                        .help("Overwrite remote version with local, even if revisions have diverged")
                 ])
                 .after_help(indoc::indoc!(
                     "

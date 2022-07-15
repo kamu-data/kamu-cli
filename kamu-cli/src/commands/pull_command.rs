@@ -34,6 +34,7 @@ pub struct PullCommand {
     as_name: Option<DatasetName>,
     add_aliases: bool,
     fetch: Option<String>,
+    force: bool,
 }
 
 impl PullCommand {
@@ -49,6 +50,7 @@ impl PullCommand {
         as_name: Option<S>,
         add_aliases: bool,
         fetch: Option<SS>,
+        force: bool,
     ) -> Self
     where
         I: IntoIterator<Item = R>,
@@ -70,6 +72,7 @@ impl PullCommand {
             as_name: as_name.map(|s| s.try_into().unwrap()),
             add_aliases,
             fetch: fetch.map(|s| s.into()),
+            force,
         }
     }
 
@@ -201,7 +204,10 @@ impl PullCommand {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                     },
-                    sync_options: SyncOptions::default(),
+                    sync_options: SyncOptions {
+                        force: self.force,
+                        ..SyncOptions::default()
+                    },
                 },
                 listener.clone().map(|v| v as Arc<dyn IngestMultiListener>),
                 listener

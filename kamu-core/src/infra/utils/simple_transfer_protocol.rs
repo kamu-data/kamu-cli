@@ -27,6 +27,7 @@ impl SimpleTransferProtocol {
         _dst_ref: &DatasetRefAny,
         validation: AppendValidation,
         trust_source_hashes: bool,
+        force: bool,
     ) -> Result<SyncResult, SyncError> {
         let src_chain = src.as_metadata_chain();
         let dst_chain = dst.as_metadata_chain();
@@ -62,7 +63,7 @@ impl SimpleTransferProtocol {
 
         // Download missing blocks
         let blocks: Vec<_> = match src_chain
-            .iter_blocks_interval(&src_head, dst_head.as_ref(), false)
+            .iter_blocks_interval(&src_head, dst_head.as_ref(), force)
             .try_collect()
             .await
         {

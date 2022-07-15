@@ -25,6 +25,7 @@ pub struct PushCommand {
     all: bool,
     recursive: bool,
     add_aliases: bool,
+    force: bool,
     to: Option<DatasetRefRemote>,
     output_config: Arc<OutputConfig>,
 }
@@ -36,6 +37,7 @@ impl PushCommand {
         all: bool,
         recursive: bool,
         add_aliases: bool,
+        force: bool,
         to: Option<RR>,
         output_config: Arc<OutputConfig>,
     ) -> Self
@@ -52,6 +54,7 @@ impl PushCommand {
             all,
             recursive,
             add_aliases,
+            force,
             to: to.map(|s| s.try_into().unwrap()),
             output_config,
         }
@@ -70,7 +73,7 @@ impl PushCommand {
                         all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
-                        sync_options: SyncOptions::default(),
+                        sync_options: self.sync_options(),
                     },
                     listener,
                 )
@@ -83,11 +86,18 @@ impl PushCommand {
                         all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
-                        sync_options: SyncOptions::default(),
+                        sync_options: self.sync_options(),
                     },
                     listener,
                 )
                 .await
+        }
+    }
+
+    fn sync_options(&self) -> SyncOptions {
+        SyncOptions {
+            force: self.force,
+            ..SyncOptions::default()
         }
     }
 
