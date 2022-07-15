@@ -44,7 +44,7 @@ type AttachmentEmbedded {
 	content: String!
 }
 
-union Attachments = | AttachmentsEmbedded
+union Attachments = AttachmentsEmbedded
 
 type AttachmentsEmbedded {
 	items: [AttachmentEmbedded!]!
@@ -274,7 +274,7 @@ type EnvVar {
 	value: String
 }
 
-union EventTimeSource = | EventTimeSourceFromMetadata | EventTimeSourceFromPath
+union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath
 
 type EventTimeSourceFromMetadata {
 	dummy: String
@@ -293,7 +293,7 @@ type ExecuteQuery {
 	outputWatermark: DateTime
 }
 
-union FetchStep = | FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
+union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
 
 type FetchStepContainer {
 	image: String!
@@ -329,7 +329,7 @@ type LoginResponse {
 	accountInfo: AccountInfo!
 }
 
-union MergeStrategy = | MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
+union MergeStrategy = MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
 
 type MergeStrategyAppend {
 	dummy: String
@@ -391,7 +391,7 @@ type MetadataChain {
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
 
-union MetadataEvent = | AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
+union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
 
 scalar Multihash
 
@@ -434,7 +434,7 @@ type PageBasedInfo {
 	totalPages: Int
 }
 
-union PrepStep = | PrepStepDecompress | PrepStepPipe
+union PrepStep = PrepStepDecompress | PrepStepPipe
 
 type PrepStepDecompress {
 	format: CompressionFormat!
@@ -472,7 +472,7 @@ enum QueryDialect {
 	DATA_FUSION
 }
 
-union ReadStep = | ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile
+union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile
 
 type ReadStepCsv {
 	schema: [String!]
@@ -521,7 +521,7 @@ type Search {
 	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
 }
 
-union SearchResult = | Dataset
+union SearchResult = Dataset
 
 type SearchResultConnection {
 	"""
@@ -587,7 +587,7 @@ type SetWatermark {
 	outputWatermark: DateTime!
 }
 
-union SourceCaching = | SourceCachingForever
+union SourceCaching = SourceCachingForever
 
 type SourceCachingForever {
 	dummy: String
@@ -609,7 +609,7 @@ type TemporalTable {
 	primaryKey: [String!]!
 }
 
-union Transform = | TransformSql
+union Transform = TransformSql
 
 type TransformInput {
 	id: DatasetID
