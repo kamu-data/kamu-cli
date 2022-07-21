@@ -781,6 +781,7 @@ pub enum ReadStep {
     JsonLines(ReadStepJsonLines),
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
+    Parquet(ReadStepParquet),
 }
 
 impl From<odf::ReadStep> for ReadStep {
@@ -790,6 +791,7 @@ impl From<odf::ReadStep> for ReadStep {
             odf::ReadStep::JsonLines(v) => Self::JsonLines(v.into()),
             odf::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
             odf::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
+            odf::ReadStep::Parquet(v) => Self::Parquet(v.into()),
         }
     }
 }
@@ -890,6 +892,19 @@ impl From<odf::ReadStepEsriShapefile> for ReadStepEsriShapefile {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
             sub_path: v.sub_path.map(Into::into),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ReadStepParquet {
+    pub schema: Option<Vec<String>>,
+}
+
+impl From<odf::ReadStepParquet> for ReadStepParquet {
+    fn from(v: odf::ReadStepParquet) -> Self {
+        Self {
+            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }

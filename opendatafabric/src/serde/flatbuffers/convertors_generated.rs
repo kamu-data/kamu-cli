@@ -1386,6 +1386,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ReadStep> for odf::ReadStep {
                 fb::ReadStep::ReadStepEsriShapefile,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::ReadStep::Parquet(v) => (
+                fb::ReadStep::ReadStepParquet,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -1407,6 +1411,9 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ReadStep> for odf::ReadStep {
                     fb::ReadStepEsriShapefile::init_from_table(table),
                 ))
             }
+            fb::ReadStep::ReadStepParquet => odf::ReadStep::Parquet(
+                odf::ReadStepParquet::deserialize(fb::ReadStepParquet::init_from_table(table)),
+            ),
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -1571,6 +1578,30 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepEsriShapefile<'fb>> for odf::Rea
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
             sub_path: proxy.sub_path().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepParquet {
+    type OffsetT = WIPOffset<fb::ReadStepParquet<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let schema_offset = self.schema.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let mut builder = fb::ReadStepParquetBuilder::new(fb);
+        schema_offset.map(|off| builder.add_schema(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ReadStepParquet<'fb>> for odf::ReadStepParquet {
+    fn deserialize(proxy: fb::ReadStepParquet<'fb>) -> Self {
+        odf::ReadStepParquet {
+            schema: proxy
+                .schema()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
         }
     }
 }

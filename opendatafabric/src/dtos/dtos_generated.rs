@@ -541,6 +541,7 @@ pub enum ReadStep {
     JsonLines(ReadStepJsonLines),
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
+    Parquet(ReadStepParquet),
 }
 
 /// Reader for comma-separated files.
@@ -617,6 +618,13 @@ pub struct ReadStepEsriShapefile {
     pub schema: Option<Vec<String>>,
     /// Path to a data file within a multi-file archive. Can contain glob patterns.
     pub sub_path: Option<String>,
+}
+
+/// Reader for Apache Parquet format.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ReadStepParquet {
+    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    pub schema: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
