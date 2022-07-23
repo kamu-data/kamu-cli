@@ -276,11 +276,16 @@ table ReadStepEsriShapefile {
   sub_path: string;
 }
 
+table ReadStepParquet {
+  schema: [string];
+}
+
 union ReadStep {
   ReadStepCsv,
   ReadStepJsonLines,
   ReadStepGeoJson,
   ReadStepEsriShapefile,
+  ReadStepParquet,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

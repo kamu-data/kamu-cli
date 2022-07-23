@@ -1134,6 +1134,7 @@ pub enum ReadStep<'a> {
     JsonLines(&'a dyn ReadStepJsonLines),
     GeoJson(&'a dyn ReadStepGeoJson),
     EsriShapefile(&'a dyn ReadStepEsriShapefile),
+    Parquet(&'a dyn ReadStepParquet),
 }
 
 impl<'a> From<&'a dtos::ReadStep> for ReadStep<'a> {
@@ -1143,6 +1144,7 @@ impl<'a> From<&'a dtos::ReadStep> for ReadStep<'a> {
             dtos::ReadStep::JsonLines(v) => ReadStep::JsonLines(v),
             dtos::ReadStep::GeoJson(v) => ReadStep::GeoJson(v),
             dtos::ReadStep::EsriShapefile(v) => ReadStep::EsriShapefile(v),
+            dtos::ReadStep::Parquet(v) => ReadStep::Parquet(v),
         }
     }
 }
@@ -1154,6 +1156,7 @@ impl Into<dtos::ReadStep> for ReadStep<'_> {
             ReadStep::JsonLines(v) => dtos::ReadStep::JsonLines(v.into()),
             ReadStep::GeoJson(v) => dtos::ReadStep::GeoJson(v.into()),
             ReadStep::EsriShapefile(v) => dtos::ReadStep::EsriShapefile(v.into()),
+            ReadStep::Parquet(v) => dtos::ReadStep::Parquet(v.into()),
         }
     }
 }
@@ -1196,6 +1199,10 @@ pub trait ReadStepGeoJson {
 pub trait ReadStepEsriShapefile {
     fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
     fn sub_path(&self) -> Option<&str>;
+}
+
+pub trait ReadStepParquet {
+    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
 }
 
 impl ReadStepCsv for dtos::ReadStepCsv {
@@ -1318,6 +1325,16 @@ impl ReadStepEsriShapefile for dtos::ReadStepEsriShapefile {
     }
 }
 
+impl ReadStepParquet for dtos::ReadStepParquet {
+    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
+        self.schema
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
+                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
+            })
+    }
+}
+
 impl Into<dtos::ReadStepCsv> for &dyn ReadStepCsv {
     fn into(self) -> dtos::ReadStepCsv {
         dtos::ReadStepCsv {
@@ -1370,6 +1387,14 @@ impl Into<dtos::ReadStepEsriShapefile> for &dyn ReadStepEsriShapefile {
         dtos::ReadStepEsriShapefile {
             schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
             sub_path: self.sub_path().map(|v| v.to_owned()),
+        }
+    }
+}
+
+impl Into<dtos::ReadStepParquet> for &dyn ReadStepParquet {
+    fn into(self) -> dtos::ReadStepParquet {
+        dtos::ReadStepParquet {
+            schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
         }
     }
 }

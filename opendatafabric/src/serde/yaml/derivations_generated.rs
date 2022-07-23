@@ -765,6 +765,8 @@ pub enum ReadStepDef {
     GeoJson(#[serde_as(as = "ReadStepGeoJsonDef")] ReadStepGeoJson),
     #[serde(rename_all = "camelCase")]
     EsriShapefile(#[serde_as(as = "ReadStepEsriShapefileDef")] ReadStepEsriShapefile),
+    #[serde(rename_all = "camelCase")]
+    Parquet(#[serde_as(as = "ReadStepParquetDef")] ReadStepParquet),
 }
 
 implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
@@ -780,6 +782,7 @@ implement_serde_as!(
     ReadStepEsriShapefileDef,
     "ReadStepEsriShapefileDef"
 );
+implement_serde_as!(ReadStepParquet, ReadStepParquetDef, "ReadStepParquetDef");
 
 #[serde_as]
 #[skip_serializing_none]
@@ -839,6 +842,15 @@ pub struct ReadStepGeoJsonDef {
 pub struct ReadStepEsriShapefileDef {
     pub schema: Option<Vec<String>>,
     pub sub_path: Option<String>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ReadStepParquet")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ReadStepParquetDef {
+    pub schema: Option<Vec<String>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
