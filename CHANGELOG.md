@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.96.0] - 2022-07-23
+### Added
+- Support for ingesting Parquet format, a new kind of ReadStep in ODF protocol
+
+## [0.95.0] - 2022-07-15
 ### Added
 - New `kamu reset` command that reverts the dataset back to the specified state
 - New `kamu push --force` switch to overwrite diverged remote dataset with a local version

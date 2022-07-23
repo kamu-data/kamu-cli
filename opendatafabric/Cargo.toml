@@ -1,6 +1,6 @@
 [package]
 name = "opendatafabric"
-version = "0.95.0"
+version = "0.96.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
