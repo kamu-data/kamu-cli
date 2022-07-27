@@ -50,7 +50,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    let (_hdl, head) = local_repo
+    let (dataset_handle, head) = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
@@ -60,6 +60,13 @@ async fn test_verify_data_consistency() {
         )
         .await
         .unwrap();
+
+    let dataset = local_repo
+        .get_dataset(&(dataset_handle.as_local_ref()))
+        .await
+        .unwrap();
+    let snapshot_head_block = dataset.as_metadata_chain().get_block(&head).await.unwrap();
+    let snapshot_sequence_number = snapshot_head_block.sequence_number.unwrap();
 
     assert_matches!(
         verification_svc
@@ -111,7 +118,7 @@ async fn test_verify_data_consistency() {
                 output_checkpoint: None,
                 output_watermark: None,
             })
-            .prev(&head)
+            .prev(&head, snapshot_sequence_number)
             .build(),
             AppendOpts::default(),
         )

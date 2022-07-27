@@ -459,6 +459,8 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         // proof of control over dataset and metadata signing.
         let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
 
+        let mut sequence_number = 0;
+
         let mut head = chain
             .append(
                 MetadataBlock {
@@ -468,6 +470,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                         dataset_id,
                         dataset_kind: snapshot.kind,
                     }),
+                    sequence_number: Some(sequence_number),
                 },
                 AppendOpts::default(),
             )
@@ -475,12 +478,14 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             .int_err()?;
 
         for event in snapshot.metadata {
+            sequence_number += 1;
             head = chain
                 .append(
                     MetadataBlock {
                         system_time,
                         prev_block_hash: Some(head),
                         event,
+                        sequence_number: Some(sequence_number),
                     },
                     AppendOpts::default(),
                 )

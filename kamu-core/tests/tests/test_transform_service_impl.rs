@@ -73,13 +73,16 @@ async fn append_data_block(
         .unwrap()
         .unwrap_or(0);
 
+    let prev_head = chain.get_ref(&BlockRef::Head).await.unwrap();
+    let prev_block = chain.get_block(&prev_head).await.unwrap();
+
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .interval(offset, offset + records - 1)
             .watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
             .build(),
     )
-    .prev(&chain.get_ref(&BlockRef::Head).await.unwrap())
+    .prev(&prev_head, prev_block.sequence_number.unwrap())
     .build();
 
     let block_hash = chain
@@ -151,7 +154,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
     let root_name = DatasetName::new_unchecked("foo");
     let root_layout = workspace_layout.dataset_layout(&root_name);
-    let (root_hdl, root_head_src) = local_repo
+    let (root_hdl, root_head_src, root_sequence_number) = local_repo
         .create_dataset_from_blocks(
             &root_name,
             [
@@ -172,7 +175,7 @@ async fn test_get_verification_plan_one_to_one() {
 
     // Create derivative
     let deriv_name = DatasetName::new_unchecked("bar");
-    let (deriv_hdl, deriv_head_src) = local_repo
+    let (deriv_hdl, deriv_head_src, mut derived_sequence_number) = local_repo
         .create_dataset_from_blocks(
             &deriv_name,
             [
@@ -212,7 +215,7 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: Some(t0),
         })
         .system_time(t1)
-        .prev(&root_head_src)
+        .prev(&root_head_src, root_sequence_number)
         .build(),
     )
     .await;
@@ -252,13 +255,14 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: Some(t0),
         })
         .system_time(t2)
-        .prev(&deriv_head_src)
+        .prev(&deriv_head_src, derived_sequence_number)
         .build(),
     )
     .await;
 
     // T3: More root data
     let t3 = Utc.ymd(2020, 1, 3).and_hms(12, 0, 0);
+    derived_sequence_number += 1;
     let root_head_t3 = append_block(
         local_repo.as_ref(),
         &root_hdl,
@@ -277,7 +281,7 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: Some(t2),
         })
         .system_time(t3)
-        .prev(&root_head_t1)
+        .prev(&root_head_t1, derived_sequence_number)
         .build(),
     )
     .await;
@@ -289,6 +293,7 @@ async fn test_get_verification_plan_one_to_one() {
 
     // T4: Transform [T3; T3]
     let t4 = Utc.ymd(2020, 1, 4).and_hms(12, 0, 0);
+    derived_sequence_number += 1;
     let deriv_req_t4 = transform_svc
         .get_next_operation(&deriv_hdl, t4)
         .await
@@ -323,13 +328,14 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: Some(t2),
         })
         .system_time(t4)
-        .prev(&deriv_head_t2)
+        .prev(&deriv_head_t2, derived_sequence_number)
         .build(),
     )
     .await;
 
     // T5: Root watermark update only
     let t5 = Utc.ymd(2020, 1, 5).and_hms(12, 0, 0);
+    derived_sequence_number += 1;
     let root_head_t5 = append_block(
         local_repo.as_ref(),
         &root_hdl,
@@ -337,13 +343,14 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: t4,
         })
         .system_time(t5)
-        .prev(&root_head_t3)
+        .prev(&root_head_t3, derived_sequence_number)
         .build(),
     )
     .await;
 
     // T6: Transform [T5; T5]
     let t6 = Utc.ymd(2020, 1, 6).and_hms(12, 0, 0);
+    derived_sequence_number += 1;
     let deriv_req_t6 = transform_svc
         .get_next_operation(&deriv_hdl, t6)
         .await
@@ -375,7 +382,7 @@ async fn test_get_verification_plan_one_to_one() {
             output_watermark: Some(t4),
         })
         .system_time(t6)
-        .prev(&deriv_head_t4)
+        .prev(&deriv_head_t4, derived_sequence_number)
         .build(),
     )
     .await;

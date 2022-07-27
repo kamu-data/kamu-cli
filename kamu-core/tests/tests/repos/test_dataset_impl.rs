@@ -59,7 +59,7 @@ async fn test_summary_updates() {
             .checkpoint_size(10)
             .build(),
     )
-    .prev(&hash_1)
+    .prev(&hash_1, block_1.sequence_number.unwrap())
     .build();
 
     let hash_2 = ds

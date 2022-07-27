@@ -293,6 +293,7 @@ pub struct MetadataBlockBuilder {
     prev_block_hash: Option<Multihash>,
     system_time: DateTime<Utc>,
     event: MetadataEvent,
+    sequence_number: i32,
 }
 
 impl MetadataBlockBuilder {
@@ -301,11 +302,13 @@ impl MetadataBlockBuilder {
             prev_block_hash: None,
             system_time: Utc::now(),
             event: event.into(),
+            sequence_number: 0,
         }
     }
 
-    pub fn prev(mut self, prev_block_hash: &Multihash) -> Self {
+    pub fn prev(mut self, prev_block_hash: &Multihash, prev_sequence_number: i32) -> Self {
         self.prev_block_hash = Some(prev_block_hash.clone());
+        self.sequence_number = prev_sequence_number + 1;
         self
     }
 
@@ -319,6 +322,7 @@ impl MetadataBlockBuilder {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash,
             event: self.event,
+            sequence_number: Some(self.sequence_number),
         }
     }
 }

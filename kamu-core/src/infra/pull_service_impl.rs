@@ -568,12 +568,15 @@ impl PullService for PullServiceImpl {
 
         let old_head = chain.get_ref(&BlockRef::Head).await.int_err()?;
 
+        let old_head_block = chain.get_block(&old_head).await.int_err()?;
+
         let new_block = MetadataBlock {
             system_time: Utc::now(),
             prev_block_hash: Some(old_head.clone()),
             event: MetadataEvent::SetWatermark(SetWatermark {
                 output_watermark: watermark,
             }),
+            sequence_number: Some(old_head_block.sequence_number.unwrap() + 1),
         };
 
         let new_head = chain

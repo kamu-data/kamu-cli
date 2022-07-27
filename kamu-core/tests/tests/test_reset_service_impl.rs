@@ -126,8 +126,11 @@ impl ResetTestHarness {
         let dataset_builder = self.a_dataset_builder(&dataset_name).await;
 
         let chain = dataset_builder.as_dataset().as_metadata_chain();
-        let hash_seed_block = self.a_seed_block(chain, &dataset_name).await;
-        let hash_polling_source_block = self.a_polling_source_block(chain, &hash_seed_block).await;
+        let (hash_seed_block, seed_block_sequence_number) =
+            self.a_seed_block(chain, &dataset_name).await;
+        let hash_polling_source_block = self
+            .a_polling_source_block(chain, &hash_seed_block, seed_block_sequence_number)
+            .await;
 
         let dataset_handle = dataset_builder.finish().await.unwrap();
 
@@ -142,30 +145,34 @@ impl ResetTestHarness {
         &self,
         chain: &dyn MetadataChain,
         dataset_name: &DatasetName,
-    ) -> Multihash {
-        chain
-            .append(
-                MetadataFactory::metadata_block(
-                    MetadataFactory::seed(DatasetKind::Root)
-                        .id_from(dataset_name.as_str())
-                        .build(),
-                )
+    ) -> (Multihash, i32) {
+        let seed_block = MetadataFactory::metadata_block(
+            MetadataFactory::seed(DatasetKind::Root)
+                .id_from(dataset_name.as_str())
                 .build(),
-                AppendOpts::default(),
-            )
-            .await
-            .unwrap()
+        )
+        .build();
+        let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+
+        (
+            chain
+                .append(seed_block, AppendOpts::default())
+                .await
+                .unwrap(),
+            seed_block_sequence_number,
+        )
     }
 
     async fn a_polling_source_block(
         &self,
         chain: &dyn MetadataChain,
         prev_block_hash: &Multihash,
+        prev_sequence_number: i32,
     ) -> Multihash {
         chain
             .append(
                 MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                    .prev(prev_block_hash)
+                    .prev(prev_block_hash, prev_sequence_number)
                     .build(),
                 AppendOpts::default(),
             )

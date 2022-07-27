@@ -54,7 +54,7 @@ async fn test_append_and_get() {
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1.sequence_number.unwrap())
         .build();
 
     let hash_2 = chain
@@ -156,13 +156,17 @@ async fn test_append_prev_block_not_found() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number.unwrap();
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&Multihash::from_digest_sha3_256(b"does-not-exist"))
+        .prev(
+            &Multihash::from_digest_sha3_256(b"does-not-exist"),
+            block_1_sequence_number,
+        )
         .build();
 
     assert_matches!(
@@ -182,13 +186,14 @@ async fn test_append_unexpected_ref() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number.unwrap();
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1_sequence_number)
         .build();
 
     let invalid_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
@@ -230,11 +235,12 @@ async fn test_append_seed_block_not_first() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number.unwrap();
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1_sequence_number)
         .build();
 
     assert_matches!(
@@ -252,11 +258,12 @@ async fn test_append_system_time_non_monotonic() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number.unwrap();
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1_sequence_number)
         .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
         .build();
 
@@ -283,7 +290,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1.sequence_number.unwrap())
         .build();
     let hash_2 = chain
         .append(block_2.clone(), AppendOpts::default())
@@ -291,7 +298,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_3 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2)
+        .prev(&hash_2, block_2.sequence_number.unwrap())
         .build();
     let hash_3 = chain
         .append(block_3.clone(), AppendOpts::default())

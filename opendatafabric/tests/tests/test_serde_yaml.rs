@@ -237,6 +237,7 @@ fn serde_metadata_block() {
             output_checkpoint: None,
             output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         }),
+        sequence_number: None,
     };
 
     let actual = YamlMetadataBlockDeserializer

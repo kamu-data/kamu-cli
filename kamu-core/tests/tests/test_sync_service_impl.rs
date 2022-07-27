@@ -178,7 +178,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (_, b1) = local_repo
+    let (dataset_handle, b1) = local_repo
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap();
@@ -214,12 +214,19 @@ async fn do_test_sync(
 
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
+    let dataset = local_repo
+        .get_dataset(&(dataset_handle.as_local_ref()))
+        .await
+        .unwrap();
+    let b1_head_block = dataset.as_metadata_chain().get_block(&b1).await.unwrap();
+    let b1_sequence_number = b1_head_block.sequence_number.unwrap();
+
     // Subsequent sync ////////////////////////////////////////////////////////
     let b2 = append_block(
         local_repo.as_ref(),
         &dataset_name,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b1)
+            .prev(&b1, b1_sequence_number)
             .build(),
     )
     .await;
@@ -228,7 +235,7 @@ async fn do_test_sync(
         local_repo.as_ref(),
         &dataset_name,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b2)
+            .prev(&b2, b1_sequence_number + 1)
             .build(),
     )
     .await;
@@ -293,7 +300,7 @@ async fn do_test_sync(
         local_repo.as_ref(),
         &dataset_name_2,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
-            .prev(&b3)
+            .prev(&b3, b1_sequence_number + 2)
             .build(),
     )
     .await;

@@ -462,6 +462,8 @@ pub struct MetadataBlock {
     pub prev_block_hash: Option<Multihash>,
     /// Event data.
     pub event: MetadataEvent,
+    /// Block sequence number starting from tail to head.
+    pub sequence_number: Option<i32>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

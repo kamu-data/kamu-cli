@@ -131,15 +131,17 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         &self,
         dataset_name: &DatasetName,
         blocks: IT,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetError>
+    ) -> Result<(DatasetHandle, Multihash, i32), CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
     {
         let ds = self.create_dataset(dataset_name).await?;
         let mut hash = None;
+        let mut sequence_number = 0;
         for mut block in blocks {
             block.prev_block_hash = hash.clone();
+            sequence_number = block.sequence_number.unwrap();
             hash = Some(
                 ds.as_dataset()
                     .as_metadata_chain()
@@ -149,7 +151,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
             );
         }
         let hdl = ds.finish().await?;
-        Ok((hdl, hash.unwrap()))
+        Ok((hdl, hash.unwrap(), sequence_number))
     }
 }
 
