@@ -322,7 +322,7 @@ impl MetadataBlockBuilder {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash,
             event: self.event,
-            sequence_number: Some(self.sequence_number),
+            sequence_number: self.sequence_number,
         }
     }
 }

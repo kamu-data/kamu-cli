@@ -634,7 +634,7 @@ pub struct MetadataBlockDef {
     pub prev_block_hash: Option<Multihash>,
     #[serde_as(as = "MetadataEventDef")]
     pub event: MetadataEvent,
-    pub sequence_number: Option<i32>,
+    pub sequence_number: i32,
 }
 
 implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");

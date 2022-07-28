@@ -141,7 +141,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         let mut sequence_number = 0;
         for mut block in blocks {
             block.prev_block_hash = hash.clone();
-            sequence_number = block.sequence_number.unwrap();
+            sequence_number = block.sequence_number;
             hash = Some(
                 ds.as_dataset()
                     .as_metadata_chain()

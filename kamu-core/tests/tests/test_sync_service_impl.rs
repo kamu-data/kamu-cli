@@ -219,7 +219,7 @@ async fn do_test_sync(
         .await
         .unwrap();
     let b1_head_block = dataset.as_metadata_chain().get_block(&b1).await.unwrap();
-    let b1_sequence_number = b1_head_block.sequence_number.unwrap();
+    let b1_sequence_number = b1_head_block.sequence_number;
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let b2 = append_block(

@@ -54,7 +54,7 @@ async fn test_append_and_get() {
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, block_1.sequence_number.unwrap())
+        .prev(&hash_1, block_1.sequence_number)
         .build();
 
     let hash_2 = chain
@@ -156,7 +156,7 @@ async fn test_append_prev_block_not_found() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
-    let block_1_sequence_number = block_1.sequence_number.unwrap();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
@@ -186,7 +186,7 @@ async fn test_append_unexpected_ref() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
-    let block_1_sequence_number = block_1.sequence_number.unwrap();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
@@ -235,7 +235,7 @@ async fn test_append_seed_block_not_first() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
-    let block_1_sequence_number = block_1.sequence_number.unwrap();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
@@ -258,7 +258,7 @@ async fn test_append_system_time_non_monotonic() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
-    let block_1_sequence_number = block_1.sequence_number.unwrap();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
@@ -290,7 +290,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, block_1.sequence_number.unwrap())
+        .prev(&hash_1, block_1.sequence_number)
         .build();
     let hash_2 = chain
         .append(block_2.clone(), AppendOpts::default())
@@ -298,7 +298,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_3 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2, block_2.sequence_number.unwrap())
+        .prev(&hash_2, block_2.sequence_number)
         .build();
     let hash_3 = chain
         .append(block_3.clone(), AppendOpts::default())

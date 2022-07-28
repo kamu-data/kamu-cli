@@ -10037,9 +10037,7 @@ impl<'a> MetadataBlock<'a> {
         args: &'args MetadataBlockArgs<'args>,
     ) -> flatbuffers::WIPOffset<MetadataBlock<'bldr>> {
         let mut builder = MetadataBlockBuilder::new(_fbb);
-        if let Some(x) = args.sequence_number {
-            builder.add_sequence_number(x);
-        }
+        builder.add_sequence_number(args.sequence_number);
         if let Some(x) = args.event {
             builder.add_event(x);
         }
@@ -10082,9 +10080,10 @@ impl<'a> MetadataBlock<'a> {
             )
     }
     #[inline]
-    pub fn sequence_number(&self) -> Option<i32> {
+    pub fn sequence_number(&self) -> i32 {
         self._tab
-            .get::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, None)
+            .get::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, Some(0))
+            .unwrap()
     }
     #[inline]
     #[allow(non_snake_case)]
@@ -10271,7 +10270,7 @@ pub struct MetadataBlockArgs<'a> {
     pub prev_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub event_type: MetadataEvent,
     pub event: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
-    pub sequence_number: Option<i32>,
+    pub sequence_number: i32,
 }
 impl<'a> Default for MetadataBlockArgs<'a> {
     #[inline]
@@ -10281,7 +10280,7 @@ impl<'a> Default for MetadataBlockArgs<'a> {
             prev_block_hash: None,
             event_type: MetadataEvent::NONE,
             event: None,
-            sequence_number: None,
+            sequence_number: 0,
         }
     }
 }
@@ -10322,7 +10321,7 @@ impl<'a: 'b, 'b> MetadataBlockBuilder<'a, 'b> {
     #[inline]
     pub fn add_sequence_number(&mut self, sequence_number: i32) {
         self.fbb_
-            .push_slot_always::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, sequence_number);
+            .push_slot::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, sequence_number, 0);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> MetadataBlockBuilder<'a, 'b> {

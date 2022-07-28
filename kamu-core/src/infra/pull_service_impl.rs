@@ -576,7 +576,7 @@ impl PullService for PullServiceImpl {
             event: MetadataEvent::SetWatermark(SetWatermark {
                 output_watermark: watermark,
             }),
-            sequence_number: Some(old_head_block.sequence_number.unwrap() + 1),
+            sequence_number: old_head_block.sequence_number + 1,
         };
 
         let new_head = chain

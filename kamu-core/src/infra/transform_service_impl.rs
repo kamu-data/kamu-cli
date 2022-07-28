@@ -192,7 +192,7 @@ impl TransformServiceImpl {
                 output_checkpoint,
                 output_watermark: response.output_watermark,
             }),
-            sequence_number: Some(0), // Filled out at commit
+            sequence_number: 0, // Filled out at commit
         };
 
         let result = commit_fn(
@@ -221,7 +221,7 @@ impl TransformServiceImpl {
     ) -> Result<TransformResult, TransformError> {
         let new_block = MetadataBlock {
             prev_block_hash: Some(prev_block_hash.clone()),
-            sequence_number: Some(prev_sequence_number + 1),
+            sequence_number: prev_sequence_number + 1,
             ..new_block
         };
         let new_block_t = new_block.as_typed::<ExecuteQuery>().unwrap();
@@ -790,7 +790,7 @@ impl TransformServiceImpl {
                         dataset_handle,
                         dataset_layout,
                         head,
-                        head_block.sequence_number.unwrap(),
+                        head_block.sequence_number,
                         new_block,
                         new_data_path,
                         new_checkpoint_path,
@@ -937,7 +937,7 @@ impl TransformService for TransformServiceImpl {
 
                     // Link new block
                     new_block.prev_block_hash = expected_block.prev_block_hash.clone();
-                    new_block.sequence_number = Some(expected_block.sequence_number.unwrap());
+                    new_block.sequence_number = expected_block.sequence_number;
 
                     // All we care about is the new block and its hash
                     actual_block_hash = Some(Multihash::from_digest_sha3_256(

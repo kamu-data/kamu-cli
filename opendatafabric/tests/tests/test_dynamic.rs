@@ -36,7 +36,7 @@ fn load() -> MetadataBlock {
                 temporal_tables: None,
             }),
         }),
-        sequence_number: Some(TEST_SEQUENCE_NUMBER),
+        sequence_number: TEST_SEQUENCE_NUMBER,
     }
 }
 
@@ -51,7 +51,7 @@ fn test_accessors() {
         *block.prev_block_hash().unwrap(),
         Multihash::from_digest_sha3_256(b"prev")
     );
-    assert_eq!(block.sequence_number(), Some(TEST_SEQUENCE_NUMBER));
+    assert_eq!(block.sequence_number(), TEST_SEQUENCE_NUMBER);
     let transform = match block.event() {
         dynamic::MetadataEvent::SetTransform(t) => t,
         _ => panic!(),

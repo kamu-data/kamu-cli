@@ -82,7 +82,7 @@ async fn append_data_block(
             .watermark(Utc.ymd(2020, 1, 1).and_hms(10, 0, 0))
             .build(),
     )
-    .prev(&prev_head, prev_block.sequence_number.unwrap())
+    .prev(&prev_head, prev_block.sequence_number)
     .build();
 
     let block_hash = chain

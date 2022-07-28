@@ -81,7 +81,7 @@ async fn create_graph(
                     .build(),
             )
             .build();
-            let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+            let seed_block_sequence_number = seed_block.sequence_number;
 
             let h = chain
                 .append(seed_block, AppendOpts::default())
@@ -104,7 +104,7 @@ async fn create_graph(
                     .build(),
             )
             .build();
-            let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+            let seed_block_sequence_number = seed_block.sequence_number;
 
             let h = chain
                 .append(seed_block, AppendOpts::default())
@@ -147,7 +147,7 @@ async fn create_graph_in_repository(
                     .build(),
             )
             .build();
-            let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+            let seed_block_sequence_number = seed_block.sequence_number;
 
             let head = chain
                 .append(seed_block, AppendOpts::default())
@@ -169,7 +169,7 @@ async fn create_graph_in_repository(
                     .build(),
             )
             .build();
-            let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+            let seed_block_sequence_number = seed_block.sequence_number;
 
             let head = chain
                 .append(seed_block, AppendOpts::default())

@@ -951,7 +951,7 @@ pub trait MetadataBlock {
     fn system_time(&self) -> DateTime<Utc>;
     fn prev_block_hash(&self) -> Option<&Multihash>;
     fn event(&self) -> MetadataEvent;
-    fn sequence_number(&self) -> Option<i32>;
+    fn sequence_number(&self) -> i32;
 }
 
 impl MetadataBlock for dtos::MetadataBlock {
@@ -964,8 +964,8 @@ impl MetadataBlock for dtos::MetadataBlock {
     fn event(&self) -> MetadataEvent {
         (&self.event).into()
     }
-    fn sequence_number(&self) -> Option<i32> {
-        self.sequence_number.as_ref().map(|v| -> i32 { *v })
+    fn sequence_number(&self) -> i32 {
+        self.sequence_number
     }
 }
 
@@ -975,7 +975,7 @@ impl Into<dtos::MetadataBlock> for &dyn MetadataBlock {
             system_time: self.system_time(),
             prev_block_hash: self.prev_block_hash().map(|v| v.clone()),
             event: self.event().into(),
-            sequence_number: self.sequence_number().map(|v| v),
+            sequence_number: self.sequence_number(),
         }
     }
 }

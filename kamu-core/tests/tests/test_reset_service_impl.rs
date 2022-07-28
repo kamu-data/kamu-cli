@@ -152,7 +152,7 @@ impl ResetTestHarness {
                 .build(),
         )
         .build();
-        let seed_block_sequence_number = seed_block.sequence_number.unwrap();
+        let seed_block_sequence_number = seed_block.sequence_number;
 
         (
             chain

@@ -470,7 +470,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                         dataset_id,
                         dataset_kind: snapshot.kind,
                     }),
-                    sequence_number: Some(sequence_number),
+                    sequence_number: sequence_number,
                 },
                 AppendOpts::default(),
             )
@@ -485,7 +485,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                         system_time,
                         prev_block_hash: Some(head),
                         event,
-                        sequence_number: Some(sequence_number),
+                        sequence_number: sequence_number,
                     },
                     AppendOpts::default(),
                 )

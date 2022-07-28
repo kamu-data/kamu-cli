@@ -45,7 +45,7 @@ fn get_block_root() -> MetadataBlock {
                 primary_key: vec!["a".to_owned()],
             }),
         }),
-        sequence_number: None,
+        sequence_number: 0,
     }
 }
 
@@ -73,7 +73,7 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                     temporal_tables: None,
                 }),
             }),
-            sequence_number: None,
+            sequence_number: 0,
         },
         MetadataBlock {
             prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
@@ -107,7 +107,7 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                 output_checkpoint: None,
                 output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             }),
-            sequence_number: None,
+            sequence_number: 0,
         },
     ]
 }

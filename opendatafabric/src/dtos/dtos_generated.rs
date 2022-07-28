@@ -463,7 +463,7 @@ pub struct MetadataBlock {
     /// Event data.
     pub event: MetadataEvent,
     /// Block sequence number starting from tail to head.
-    pub sequence_number: Option<i32>,
+    pub sequence_number: i32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

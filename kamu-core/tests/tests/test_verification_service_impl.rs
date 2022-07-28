@@ -66,7 +66,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
     let snapshot_head_block = dataset.as_metadata_chain().get_block(&head).await.unwrap();
-    let snapshot_sequence_number = snapshot_head_block.sequence_number.unwrap();
+    let snapshot_sequence_number = snapshot_head_block.sequence_number;
 
     assert_matches!(
         verification_svc

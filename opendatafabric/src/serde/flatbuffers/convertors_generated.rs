@@ -1125,7 +1125,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
         prev_block_hash_offset.map(|off| builder.add_prev_block_hash(off));
         builder.add_event_type(event_offset.0);
         builder.add_event(event_offset.1);
-        self.sequence_number.map(|v| builder.add_sequence_number(v));
+        builder.add_sequence_number(self.sequence_number);
         builder.finish()
     }
 }
@@ -1141,7 +1141,7 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
                 .event()
                 .map(|v| odf::MetadataEvent::deserialize(v, proxy.event_type()))
                 .unwrap(),
-            sequence_number: proxy.sequence_number().map(|v| v),
+            sequence_number: proxy.sequence_number(),
         }
     }
 }

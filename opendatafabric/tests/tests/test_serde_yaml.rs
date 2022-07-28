@@ -202,7 +202,8 @@ fn serde_metadata_block() {
                 start: 10
                 end: 20
               size: 10
-            outputWatermark: \"2020-01-01T12:00:00Z\"\n"
+            outputWatermark: \"2020-01-01T12:00:00Z\"
+          sequenceNumber: 127\n"
     );
 
     let expected = MetadataBlock {
@@ -237,7 +238,7 @@ fn serde_metadata_block() {
             output_checkpoint: None,
             output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
         }),
-        sequence_number: None,
+        sequence_number: 127,
     };
 
     let actual = YamlMetadataBlockDeserializer

@@ -185,7 +185,7 @@ impl IngestTask {
                 fetch_result,
                 read_result,
                 prev_hash.clone(),
-                prev_block.sequence_number.unwrap(),
+                prev_block.sequence_number,
             )
             .await?;
 
@@ -509,7 +509,7 @@ impl IngestTask {
                         system_time: read_result.checkpoint.system_time,
                         prev_block_hash: Some(prev_hash),
                         event: metadata_event,
-                        sequence_number: Some(prev_sequence_number + 1),
+                        sequence_number: prev_sequence_number + 1,
                     };
                     info!(?new_block, "Committing new block");
 

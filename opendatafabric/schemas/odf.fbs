@@ -563,6 +563,6 @@ table MetadataBlock {
   system_time: Timestamp;
   prev_block_hash: [ubyte];
   event: MetadataEvent;
-  sequence_number: int32 = null;
+  sequence_number: int32;
 }
 
