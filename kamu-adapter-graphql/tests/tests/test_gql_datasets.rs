@@ -53,7 +53,7 @@ async fn dataset_by_id() {
         .build();
 
     let local_repo = cat.get_one::<dyn LocalDatasetRepository>().unwrap();
-    let (dataset_handle, _) = local_repo
+    let (dataset_handle, _, _) = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")

@@ -18,6 +18,10 @@ use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type CreatedDatasetData = (DatasetHandle, Multihash, i32);
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait]
 pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn resolve_dataset_ref(
@@ -40,14 +44,14 @@ pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>;
+    ) -> Result<CreatedDatasetData, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+        Result<CreatedDatasetData, CreateDatasetFromSnapshotError>,
     )>;
 
     async fn rename_dataset(
@@ -131,7 +135,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         &self,
         dataset_name: &DatasetName,
         blocks: IT,
-    ) -> Result<(DatasetHandle, Multihash, i32), CreateDatasetError>
+    ) -> Result<CreatedDatasetData, CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,

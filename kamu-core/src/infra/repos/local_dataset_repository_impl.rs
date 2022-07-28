@@ -403,7 +403,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     async fn create_dataset_from_snapshot(
         &self,
         mut snapshot: DatasetSnapshot,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError> {
+    ) -> Result<CreatedDatasetData, CreateDatasetFromSnapshotError> {
         // Validate / resolve events
         for event in snapshot.metadata.iter_mut() {
             match event {
@@ -494,7 +494,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         }
 
         let hdl = builder.finish().await?;
-        Ok((hdl, head))
+        Ok((hdl, head, sequence_number))
     }
 
     async fn create_datasets_from_snapshots(
@@ -502,7 +502,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+        Result<CreatedDatasetData, CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());

@@ -80,7 +80,7 @@ async fn test_create_dataset_from_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (hdl, head) = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let (hdl, head, _) = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
 
     let dataset = repo.get_dataset(&hdl.into()).await.unwrap();
 
