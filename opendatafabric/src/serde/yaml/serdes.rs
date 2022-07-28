@@ -44,7 +44,7 @@ impl YamlMetadataBlockSerializer {}
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         let manifest = Manifest {
-            version: 1,
+            version: METADATA_BLOCK_CURRENT_VERSION as i32,
             kind: "MetadataBlock".to_owned(),
             content: MetadataBlockWrapper(block.clone()),
         };
@@ -73,7 +73,11 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
 
         // TODO: Handle conversions?
         assert_eq!(manifest.kind, "MetadataBlock");
-        assert_eq!(manifest.version, 1);
+        assert_eq!(manifest.version, METADATA_BLOCK_CURRENT_VERSION as i32);
+
+        // TODO: Handle conversions for compatible versions
+        let version = MetadataBlockVersion::try_from(manifest.version)?;
+        Self::check_version_compatibility(version)?;
 
         Ok(manifest.content.0)
     }

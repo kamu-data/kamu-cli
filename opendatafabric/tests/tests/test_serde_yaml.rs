@@ -177,7 +177,7 @@ fn serde_metadata_block() {
         "
         ---
         kind: MetadataBlock
-        version: 1
+        version: 2
         content:
           systemTime: \"2020-01-01T12:00:00Z\"
           prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
@@ -250,6 +250,55 @@ fn serde_metadata_block() {
     let data2 = YamlMetadataBlockSerializer.write_manifest(&actual).unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
+}
+
+#[test]
+fn serde_metadata_block_obsolete_version() {
+    let data = indoc!(
+        "
+    ---
+    kind: MetadataBlock
+    version: 1
+    content:
+      systemTime: \"2020-01-01T12:00:00Z\"
+      prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+      event:
+        kind: executeQuery
+        inputSlices:
+          - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
+            blockInterval:
+              start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+              end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+            dataInterval:
+              start: 10
+              end: 20
+          - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
+            blockInterval:
+              start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+              end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+        outputData:
+          logicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
+          physicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
+          interval:
+            start: 10
+            end: 20
+          size: 10
+        outputWatermark: \"2020-01-01T12:00:00Z\"\n"
+    );
+
+    // TODO: find out how to get this expectation instead of Yaml deserialization error
+    // let expected_error = Error::ObsoleteVersion {
+    //    manifest_version: 1,
+    //    minimum_supported_version: METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION as i32,
+    // };
+    let expected_errror_str =
+        "Serde error: content: missing field `sequenceNumber` at line 5 column 13";
+
+    let actual_error = YamlMetadataBlockDeserializer
+        .read_manifest(data.as_bytes())
+        .unwrap_err();
+
+    assert_eq!(expected_errror_str, actual_error.to_string());
 }
 
 #[test]

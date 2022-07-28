@@ -85,6 +85,9 @@ where
                 Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
                     AppendValidationError::PrevBlockNotFound(e),
                 )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockVersionError(e),
+                )),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
                 Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }
@@ -123,15 +126,26 @@ where
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
-        let block = FlatbuffersMetadataBlockDeserializer
-            .read_manifest(&data)
-            .map_err(|e| BlockMalformedError {
-                hash: hash.clone(),
-                source: e.into(),
-            })
-            .int_err()?;
-
-        Ok(block)
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
+            Ok(block) => return Ok(block),
+            Err(e) => match e {
+                Error::ObsoleteVersion { .. } | Error::UnsupportedVersion { .. } => {
+                    return Err(GetBlockError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }));
+                }
+                _ => {
+                    return Err(GetBlockError::Internal(
+                        BlockMalformedError {
+                            hash: hash.clone(),
+                            source: e.into(),
+                        }
+                        .int_err(),
+                    ));
+                }
+            },
+        }
     }
 
     fn iter_blocks_interval<'a>(

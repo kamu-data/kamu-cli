@@ -74,6 +74,11 @@ impl SimpleTransferProtocol {
                 source: Some(e.into()),
             }
             .into()),
+            Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
             Err(IterBlocksError::InvalidInterval(e)) => Err(DatasetsDivergedError {
                 src_head: e.head,
                 dst_head: e.tail,

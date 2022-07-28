@@ -52,7 +52,7 @@ impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
 
         let mut builder = fbgen::ManifestBuilder::new(&mut fb);
         builder.add_kind(Multicodec::ODFMetadataBlock as i64);
-        builder.add_version(1);
+        builder.add_version(METADATA_BLOCK_CURRENT_VERSION as i32);
         builder.add_content(content_offset);
         let offset = builder.finish();
 
@@ -80,13 +80,9 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
         let kind = Multicodec::try_from(manifest_proxy.kind() as u32).unwrap();
         assert_eq!(kind, Multicodec::ODFMetadataBlock);
 
-        // TODO: Handle conversions
-        if manifest_proxy.version() > 1 {
-            return Err(Error::UnsupportedVersion {
-                manifest_version: manifest_proxy.version(),
-                supported_version: 1,
-            });
-        }
+        // TODO: Handle conversions for compatible versions
+        let version = MetadataBlockVersion::try_from(manifest_proxy.version())?;
+        Self::check_version_compatibility(version)?;
 
         let block_proxy =
             flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap())
@@ -148,3 +144,5 @@ impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
         ))
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

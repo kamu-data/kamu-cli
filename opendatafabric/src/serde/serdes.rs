@@ -14,6 +14,39 @@ use thiserror::Error;
 use super::Buffer;
 
 ///////////////////////////////////////////////////////////////////////////////
+// MetadataBlockVersion
+///////////////////////////////////////////////////////////////////////////////
+
+pub enum MetadataBlockVersion {
+    Initial = 1,
+    SequenceNumbers = 2,
+}
+
+#[derive(Error, Debug)]
+pub enum MetadataBlockVersionError {
+    #[error("Unsupported version: {0}")]
+    UnsupportedVersion(i32),
+}
+
+impl TryFrom<i32> for MetadataBlockVersion {
+    type Error = MetadataBlockVersionError;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            1 => Ok(MetadataBlockVersion::Initial),
+            2 => Ok(MetadataBlockVersion::SequenceNumbers),
+            _ => Err(MetadataBlockVersionError::UnsupportedVersion(value)),
+        }
+    }
+}
+
+pub const METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION: MetadataBlockVersion =
+    MetadataBlockVersion::SequenceNumbers;
+
+pub const METADATA_BLOCK_CURRENT_VERSION: MetadataBlockVersion =
+    MetadataBlockVersion::SequenceNumbers;
+
+///////////////////////////////////////////////////////////////////////////////
 // MetadataBlock
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +56,16 @@ pub trait MetadataBlockSerializer {
 
 pub trait MetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error>;
+
+    fn check_version_compatibility(version: MetadataBlockVersion) -> Result<(), Error> {
+        match version {
+            MetadataBlockVersion::Initial => Err(Error::ObsoleteVersion {
+                manifest_version: version as i32,
+                minimum_supported_version: METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION as i32,
+            }),
+            MetadataBlockVersion::SequenceNumbers => Ok(()),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -77,6 +120,11 @@ pub enum Error {
         manifest_version: i32,
         supported_version: i32,
     },
+    #[error("Obsolete version: manifest has version {manifest_version} while minimum supported version is {minimum_supported_version}")]
+    ObsoleteVersion {
+        manifest_version: i32,
+        minimum_supported_version: i32,
+    },
 }
 
 impl Error {
@@ -91,6 +139,17 @@ impl Error {
         Self::SerdeError {
             source: e.into(),
             backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl From<MetadataBlockVersionError> for Error {
+    fn from(e: MetadataBlockVersionError) -> Self {
+        match e {
+            MetadataBlockVersionError::UnsupportedVersion(e) => Error::UnsupportedVersion {
+                manifest_version: e,
+                supported_version: (METADATA_BLOCK_CURRENT_VERSION as i32),
+            },
         }
     }
 }
