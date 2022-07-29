@@ -79,6 +79,7 @@ impl Default for VerificationOptions {
 pub enum VerificationPhase {
     DataIntegrity,
     ReplayTransform,
+    SequenceIntegrity,
 }
 
 // The call pattern is:
@@ -174,6 +175,12 @@ pub enum VerificationError {
         #[from]
         #[backtrace]
         InvalidIntervalError,
+    ),
+    #[error(transparent)]
+    SequenceIntegrityViolated(
+        #[from]
+        #[backtrace]
+        SequenceIntegrityError,
     ),
     #[error("Data doesn't match metadata")]
     DataDoesNotMatchMetadata(
@@ -344,3 +351,16 @@ impl Display for CheckpointDoesNotMatchMetadata {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+#[error("Block '{block_hash}' with sequence number {block_sequence_number} is followed by block '{next_block_hash}' with sequence number {next_block_sequence_number}")]
+pub struct SequenceIntegrityError {
+    pub block_hash: Multihash,
+    pub block_sequence_number: i32,
+    pub next_block_hash: Multihash,
+    pub next_block_sequence_number: i32,
+}
+
+///////////////////////////////////////////////////////////////////////////////

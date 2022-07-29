@@ -12,6 +12,7 @@ use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
+use opendatafabric::dynamic::MetadataBlock;
 use std::sync::Arc;
 use tracing::info_span;
 
@@ -185,6 +186,81 @@ impl VerificationServiceImpl {
 
         Ok(VerificationResult::Valid)
     }
+
+    async fn check_sequence_integrity<'a>(
+        &'a self,
+        dataset_handle: &'a DatasetHandle,
+        block_range: (Option<Multihash>, Option<Multihash>),
+        listener: Arc<dyn VerificationListener>,
+    ) -> Result<VerificationResult, VerificationError> {
+        let span = info_span!("Verifying sequence integrity");
+        let _span_guard = span.enter();
+
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let chain = dataset.as_metadata_chain();
+
+        let head = match block_range.1 {
+            None => chain.get_ref(&BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
+
+        // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks` estimate
+        use futures::TryStreamExt;
+        let plan: Vec<_> = chain
+            .iter_blocks_interval(&head, tail.as_ref(), false)
+            .try_collect()
+            .await?;
+
+        let num_blocks = plan.len();
+
+        listener.begin_phase(VerificationPhase::SequenceIntegrity, num_blocks);
+
+        let mut next_block_sequence_number = plan
+            .get(0)
+            .map(|(_, block)| block.sequence_number())
+            .unwrap_or(0);
+        let mut next_block_hash = head;
+
+        // Skip head during iteration
+        for (block_index, (block_hash, block)) in plan.into_iter().skip(1).enumerate() {
+            listener.begin_block(
+                &block_hash,
+                block_index,
+                num_blocks,
+                VerificationPhase::SequenceIntegrity,
+            );
+
+            if block.sequence_number() != (next_block_sequence_number - 1) {
+                return Err(VerificationError::SequenceIntegrityViolated(
+                    SequenceIntegrityError {
+                        block_hash,
+                        block_sequence_number: block.sequence_number(),
+                        next_block_hash: next_block_hash.clone(),
+                        next_block_sequence_number,
+                    },
+                ));
+            }
+
+            listener.end_block(
+                &block_hash,
+                block_index,
+                num_blocks,
+                VerificationPhase::SequenceIntegrity,
+            );
+
+            next_block_sequence_number -= 1;
+            next_block_hash = block_hash;
+        }
+
+        listener.end_phase(VerificationPhase::SequenceIntegrity, num_blocks);
+
+        Ok(VerificationResult::Valid)
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -216,6 +292,13 @@ impl VerificationService for VerificationServiceImpl {
 
         let res = try {
             if options.check_integrity {
+                self.check_sequence_integrity(
+                    &dataset_handle,
+                    block_range.clone(),
+                    listener.clone(),
+                )
+                .await?;
+
                 self.check_data_integrity(
                     &dataset_handle,
                     dataset_kind,
