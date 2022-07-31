@@ -49,7 +49,7 @@ pub struct SyncOptions {
     pub create_if_not_exists: bool,
 
     /// Force synchronization, even if revisions have diverged
-    pub force: bool,    
+    pub force: bool,
 }
 
 impl Default for SyncOptions {
@@ -209,6 +209,23 @@ impl From<BuildDatasetError> for SyncError {
         match v {
             BuildDatasetError::UnsupportedProtocol(e) => Self::UnsupportedProtocol(e),
             BuildDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetBlockError> for SyncError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }),
+            GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }),
+            GetBlockError::Access(e) => Self::Access(e),
+            GetBlockError::Internal(e) => Self::Internal(e),
         }
     }
 }

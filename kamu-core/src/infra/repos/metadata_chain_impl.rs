@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use futures::StreamExt;
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
@@ -146,6 +147,20 @@ where
                 }
             },
         }
+    }
+
+    async fn take_n_blocks<'a>(
+        &'a self,
+        head: &'a Multihash,
+        count: usize,
+    ) -> Result<Vec<(Multihash, MetadataBlock)>, IterBlocksError> {
+        use futures::TryStreamExt;
+        let results = self
+            .iter_blocks_interval(&head, None, false)
+            .take(count)
+            .try_collect()
+            .await?;
+        Ok(results)
     }
 
     fn iter_blocks_interval<'a>(
