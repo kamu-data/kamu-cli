@@ -227,19 +227,12 @@ impl From<BuildDatasetError> for SyncError {
     }
 }
 
-impl From<GetBlockError> for SyncError {
-    fn from(v: GetBlockError) -> Self {
+impl From<CompareChainsError> for SyncError {
+    fn from(v: CompareChainsError) -> Self {
         match v {
-            GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
-            }),
-            GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
-            }),
-            GetBlockError::Access(e) => Self::Access(e),
-            GetBlockError::Internal(e) => Self::Internal(e),
+            CompareChainsError::Corrupted(e) => SyncError::Corrupted(e),
+            CompareChainsError::Access(e) => SyncError::Access(e),
+            CompareChainsError::Internal(e) => SyncError::Internal(e),
         }
     }
 }

@@ -19,8 +19,6 @@ use thiserror::Error;
 use tracing::*;
 use url::Url;
 
-use super::utils::simple_transfer_protocol::ChainsComparison;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
@@ -320,14 +318,13 @@ impl SyncServiceImpl {
                         .await
                     {
                         Ok(dst_head) => {
-                            let chains_comparison = SimpleTransferProtocol
-                                .compare_chains(
-                                    src_dataset.as_metadata_chain(),
-                                    &src_head,
-                                    dst_dataset.as_metadata_chain(),
-                                    Some(&dst_head),
-                                )
-                                .await?;
+                            let chains_comparison = MetadataChainComparator::compare_chains(
+                                src_dataset.as_metadata_chain(),
+                                &src_head,
+                                dst_dataset.as_metadata_chain(),
+                                Some(&dst_head),
+                            )
+                            .await?;
 
                             Ok((Some(old_cid), Some(dst_head), Some(chains_comparison)))
                         }
