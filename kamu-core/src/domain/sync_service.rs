@@ -128,6 +128,8 @@ pub enum SyncError {
     #[error(transparent)]
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
+    DestinationAhead(#[from] DestinationAheadError),
+    #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
@@ -164,12 +166,24 @@ impl DatasetNotFoundError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("Source and destination datasets have diverged, source head is {src_head}, destination head is {dst_head}")]
+#[error("Source and destination datasets have diverged, source head is '{src_head}', ahead by {uncommon_blocks_in_src} blocks, destination head is {dst_head}, ahead by {uncommon_blocks_in_dst}")]
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,
-    //uncommon_blocks_in_local: usize,
-    //uncommon_blocks_in_remote: usize,
+    pub uncommon_blocks_in_src: usize,
+    pub uncommon_blocks_in_dst: usize,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, Eq, PartialEq, Debug)]
+#[error(
+    "Destination head '{dst_head}' is ahead of source head '{src_head}' by {dst_ahead_size} blocks"
+)]
+pub struct DestinationAheadError {
+    pub src_head: Multihash,
+    pub dst_head: Multihash,
+    pub dst_ahead_size: usize,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

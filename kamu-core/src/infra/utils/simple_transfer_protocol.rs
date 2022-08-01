@@ -12,7 +12,7 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use futures::TryStreamExt;
-use opendatafabric::dynamic::MetadataBlock;
+use opendatafabric::MetadataBlock;
 use tracing::*;
 
 /// Implements "Simple Transfer Protocol" as described in ODF spec
@@ -33,13 +33,78 @@ impl SimpleTransferProtocol {
         let src_chain = src.as_metadata_chain();
         let dst_chain = dst.as_metadata_chain();
 
-        let src_data = src.as_data_repo();
-        let dst_data = dst.as_data_repo();
+        let src_head = self.get_src_head(src_ref, src_chain).await?;
+        let dst_head = self.get_dest_head(dst_chain).await?;
 
-        let src_checkpoints = src.as_checkpoint_repo();
-        let dst_checkpoints = dst.as_checkpoint_repo();
+        info!(?src_head, ?dst_head, "Resolved heads");
 
-        let src_head = match src_chain.get_ref(&BlockRef::Head).await {
+        let chains_comparison = self
+            .compare_chains(src_chain, &src_head, dst_chain, dst_head.as_ref())
+            .await?;
+
+        match chains_comparison {
+            ChainsComparison::Equal => return Ok(SyncResult::UpToDate),
+            ChainsComparison::SourceAhead { .. } => { /* Skip */ }
+            ChainsComparison::DestinationAhead { dst_ahead_size } => {
+                if !force {
+                    return Err(SyncError::DestinationAhead(DestinationAheadError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        dst_ahead_size: dst_ahead_size,
+                    }));
+                }
+            }
+            ChainsComparison::Divergence {
+                uncommon_blocks_in_dst,
+                uncommon_blocks_in_src,
+            } => {
+                if !force {
+                    return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        uncommon_blocks_in_dst,
+                        uncommon_blocks_in_src,
+                    }));
+                }
+            }
+        };
+
+        let blocks = match chains_comparison {
+            ChainsComparison::Equal => unreachable!(),
+            ChainsComparison::SourceAhead { src_ahead_blocks } => src_ahead_blocks,
+            ChainsComparison::DestinationAhead { .. } | ChainsComparison::Divergence { .. } => {
+                // Load all source blocks from head to tail
+                assert!(force);
+                self.map_block_iteration_errors(src_chain.iter_blocks().try_collect().await)?
+            }
+        };
+
+        let num_blocks = blocks.len();
+
+        self.synchronize_blocks(
+            blocks,
+            src,
+            dst,
+            &src_head,
+            dst_head.as_ref(),
+            validation,
+            trust_source_hashes,
+        )
+        .await?;
+
+        Ok(SyncResult::Updated {
+            old_head: dst_head,
+            new_head: src_head,
+            num_blocks,
+        })
+    }
+
+    async fn get_src_head(
+        &self,
+        src_ref: &DatasetRefAny,
+        src_chain: &dyn MetadataChain,
+    ) -> Result<Multihash, SyncError> {
+        match src_chain.get_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                 dataset_ref: src_ref.clone(),
@@ -47,106 +112,54 @@ impl SimpleTransferProtocol {
             .into()),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+        }
+    }
 
-        let dst_head = match dst_chain.get_ref(&BlockRef::Head).await {
+    async fn get_dest_head(
+        &self,
+        dst_chain: &dyn MetadataChain,
+    ) -> Result<Option<Multihash>, SyncError> {
+        match dst_chain.get_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
-
-        info!(?src_head, ?dst_head, "Resolved heads");
-
-        if Some(&src_head) == dst_head.as_ref() {
-            return Ok(SyncResult::UpToDate);
         }
+    }
 
-        // By this point we know the heads are different.
-
-        // Get sequence numbers of heads in both chains
-        let src_block_sequence_number = src_chain.get_block(&src_head).await?.sequence_number();
-        let dst_block_sequence_number = if dst_head.is_some() {
-            dst_chain
-                .get_block(dst_head.as_ref().unwrap())
-                .await?
-                .sequence_number()
-        } else {
-            -1
-        };
-
-        // Compute how many blocks ahead is the source over destination.
-        // Note: the number could be 0 or negative, this means dataset have diverged for sure.
-        // If the difference is positive, we don't know if they've diverged without iterating
-        let src_ahead_size: usize = (src_block_sequence_number - dst_block_sequence_number)
-            .try_into()
-            .unwrap_or(0);
-
-        // Extract source blocks that are ahead of destination, if any
-        let (src_ahead_blocks, diverged) = if src_ahead_size > 0 {
-            // Read N blocks, N = difference between head sequence numbers
-            let ahead_blocks = self.map_block_iteration_errors(
-                src_chain.take_n_blocks(&src_head, src_ahead_size).await,
-            )?;
-
-            // If last read block points to the previous hash that is identical to destination head, there is no divergence
-            let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
-            let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash();
-            let diverged = dst_head.is_some() && { dst_head.as_ref() != boundary_block_prev_hash };
-            (ahead_blocks, diverged)
-        } else {
-            // Source is not ahead of dest, destination has diverged
-            (vec![], true)
-        };
-
-        // Divergence is an error unless --force mode is requested
-        if diverged && !force {
-            return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
-                src_head: src_head,
-                dst_head: dst_head.unwrap(),
-            }));
-        }
-
-        // Collect blocks to synchronize:
-        //  - diverged && force: collect full chain
-        //  - non-diverged: take only the source ahead part
-        let blocks = if diverged {
-            // Divergence with some source blocks ahead
-            if src_ahead_size > 0 {
-                // Anything preceeding already loaded blocks in the source chain?
-                let boundary_ahead_block_data = src_ahead_blocks.last().unwrap();
-                let boundary_block_prev_hash = boundary_ahead_block_data.1.prev_block_hash();
-                if boundary_block_prev_hash.is_some() {
-                    // Append what's remaining until the tail to what is already loaded.
-                    let remaining_blocks = self.map_block_iteration_errors(
-                        src_chain
-                            .iter_blocks_interval(&boundary_ahead_block_data.0, None, false)
-                            .try_collect()
-                            .await,
-                    )?;
-                    src_ahead_blocks
-                        .into_iter()
-                        .chain(remaining_blocks.into_iter())
-                        .collect()
-                } else {
-                    // Nothing there, only source ahead
-                    src_ahead_blocks
-                }
-            } else {
-                // Load all source blocks from head to tail
-                self.map_block_iteration_errors(
-                    src_chain
-                        .iter_blocks_interval(&src_head, None, false)
-                        .try_collect()
-                        .await,
-                )?
+    fn map_block_iteration_errors<T>(
+        &self,
+        iteration_result: Result<Vec<T>, IterBlocksError>,
+    ) -> Result<Vec<T>, SyncError> {
+        match iteration_result {
+            Ok(v) => Ok(v),
+            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
+            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
             }
-        } else {
-            // No divergence, simply synchronize source ahead blocks
-            src_ahead_blocks
-        };
+            .into()),
+            Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
+            Err(IterBlocksError::InvalidInterval(_)) => unreachable!(),
+            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
+            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
+        }
+    }
 
-        let num_blocks = blocks.len();
+    async fn synchronize_blocks(
+        &self,
+        blocks: Vec<(Multihash, MetadataBlock)>,
+        src: &dyn Dataset,
+        dst: &dyn Dataset,
+        src_head: &Multihash,
+        dst_head: Option<&Multihash>,
+        validation: AppendValidation,
+        trust_source_hashes: bool,
+    ) -> Result<(), SyncError> {
         info!("Considering {} new blocks", blocks.len());
 
         // Download data and checkpoints
@@ -159,7 +172,11 @@ impl SimpleTransferProtocol {
             if let Some(data_slice) = block.event.output_data {
                 info!(hash = ?data_slice.physical_hash, "Transfering data file");
 
-                let stream = match src_data.get_stream(&data_slice.physical_hash).await {
+                let stream = match src
+                    .as_data_repo()
+                    .get_stream(&data_slice.physical_hash)
+                    .await
+                {
                     Ok(s) => Ok(s),
                     Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source data file is missing".to_owned(),
@@ -170,7 +187,8 @@ impl SimpleTransferProtocol {
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
-                match dst_data
+                match dst
+                    .as_data_repo()
                     .insert_stream(
                         stream,
                         InsertOpts {
@@ -206,7 +224,11 @@ impl SimpleTransferProtocol {
             if let Some(checkpoint) = block.event.output_checkpoint {
                 info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
 
-                let stream = match src_checkpoints.get_stream(&checkpoint.physical_hash).await {
+                let stream = match src
+                    .as_checkpoint_repo()
+                    .get_stream(&checkpoint.physical_hash)
+                    .await
+                {
                     Ok(s) => Ok(s),
                     Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source checkpoint file is missing".to_owned(),
@@ -217,7 +239,8 @@ impl SimpleTransferProtocol {
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
-                match dst_checkpoints
+                match dst
+                    .as_checkpoint_repo()
                     .insert_stream(
                         stream,
                         InsertOpts {
@@ -256,7 +279,8 @@ impl SimpleTransferProtocol {
         for (hash, block) in blocks.into_iter().rev() {
             debug!(?hash, "Appending block");
 
-            match dst_chain
+            match dst
+                .as_metadata_chain()
                 .append(
                     block,
                     AppendOpts {
@@ -299,13 +323,14 @@ impl SimpleTransferProtocol {
 
         // Update reference, atomically commiting the sync operation
         // Any failures before this point may result in dangling files but will keep the destination dataset in its original logical state
-        match dst_chain
+        match dst
+            .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,
                 &src_head,
                 SetRefOpts {
                     validate_block_present: false,
-                    check_ref_is: Some(dst_head.as_ref()),
+                    check_ref_is: Some(dst_head),
                 },
             )
             .await
@@ -338,38 +363,228 @@ impl SimpleTransferProtocol {
                 Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
         }
-
-        Ok(SyncResult::Updated {
-            old_head: dst_head,
-            new_head: src_head,
-            num_blocks,
-        })
+        Ok(())
     }
 
-    fn map_block_iteration_errors<T>(
+    pub async fn compare_chains(
         &self,
-        iteration_result: Result<Vec<T>, IterBlocksError>,
-    ) -> Result<Vec<T>, SyncError> {
-        match iteration_result {
-            Ok(v) => Ok(v),
-            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
+        src_chain: &dyn MetadataChain,
+        src_head: &Multihash,
+        dst_chain: &dyn MetadataChain,
+        dst_head: Option<&Multihash>,
+    ) -> Result<ChainsComparison, SyncError> {
+        // When source and destination point to the same block, chains are equal, no synchronization required
+        if Some(&src_head) == dst_head.as_ref() {
+            return Ok(ChainsComparison::Equal);
+        }
+
+        // Extract sequence number of head blocks
+        let src_sequence_number = src_chain.get_block(&src_head).await?.sequence_number;
+        let dst_sequence_number = if dst_head.is_some() {
+            dst_chain
+                .get_block(dst_head.as_ref().unwrap())
+                .await?
+                .sequence_number
+        } else {
+            -1
+        };
+
+        // If numbers are equal, it's a guaranteed divergence, as we've checked blocks for equality above
+        if src_sequence_number == dst_sequence_number {
+            let last_common_sequence_number = self
+                .locate_last_common_block(
+                    src_chain,
+                    src_head,
+                    src_sequence_number,
+                    dst_chain,
+                    dst_head,
+                    dst_sequence_number,
+                )
+                .await?;
+            return Ok(self.describe_divergence(
+                dst_sequence_number,
+                src_sequence_number,
+                last_common_sequence_number,
+            ));
+        }
+        // Source ahead
+        else if src_sequence_number > dst_sequence_number {
+            let convergence_check = self
+                .detect_convergence(
+                    src_sequence_number,
+                    src_chain,
+                    &src_head,
+                    dst_sequence_number,
+                    dst_chain,
+                    dst_head,
+                )
+                .await?;
+            match convergence_check {
+                ConvergenceCheck::Converged { ahead_blocks } => {
+                    return Ok(ChainsComparison::SourceAhead {
+                        src_ahead_blocks: ahead_blocks,
+                    })
+                }
+                ConvergenceCheck::Diverged {
+                    last_common_sequence_number,
+                } => {
+                    return Ok(self.describe_divergence(
+                        dst_sequence_number,
+                        src_sequence_number,
+                        last_common_sequence_number,
+                    ));
+                }
             }
-            .into()),
-            Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
+        }
+        // Destination ahead
+        else {
+            let convergence_check = self
+                .detect_convergence(
+                    dst_sequence_number,
+                    dst_chain,
+                    dst_head.as_ref().unwrap(),
+                    src_sequence_number,
+                    src_chain,
+                    Some(&src_head),
+                )
+                .await?;
+            match convergence_check {
+                ConvergenceCheck::Converged { ahead_blocks } => {
+                    return Ok(ChainsComparison::DestinationAhead {
+                        dst_ahead_size: ahead_blocks.len(),
+                    })
+                }
+                ConvergenceCheck::Diverged {
+                    last_common_sequence_number,
+                } => {
+                    return Ok(self.describe_divergence(
+                        dst_sequence_number,
+                        src_sequence_number,
+                        last_common_sequence_number,
+                    ));
+                }
             }
-            .into()),
-            Err(IterBlocksError::InvalidInterval(e)) => Err(DatasetsDivergedError {
-                src_head: e.head,
-                dst_head: e.tail,
-            }
-            .into()),
-            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
-            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
         }
     }
+
+    async fn detect_convergence(
+        &self,
+        ahead_sequence_number: i32,
+        ahead_chain: &dyn MetadataChain,
+        ahead_head: &Multihash,
+        baseline_sequence_number: i32,
+        baseline_chain: &dyn MetadataChain,
+        baseline_head: Option<&Multihash>,
+    ) -> Result<ConvergenceCheck, SyncError> {
+        let ahead_size: usize = (ahead_sequence_number - baseline_sequence_number)
+            .try_into()
+            .unwrap();
+        let ahead_blocks = self
+            .map_block_iteration_errors(ahead_chain.take_n_blocks(ahead_head, ahead_size).await)?;
+        // If last read block points to the previous hash that is identical to earlier head, there is no divergence
+        let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
+        let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
+        if baseline_head.is_some() && baseline_head != boundary_block_prev_hash {
+            let last_common_sequence_number = self
+                .locate_last_common_block(
+                    ahead_chain,
+                    ahead_head,
+                    ahead_sequence_number - ahead_size as i32,
+                    baseline_chain,
+                    baseline_head,
+                    baseline_sequence_number,
+                )
+                .await?;
+            Ok(ConvergenceCheck::Diverged {
+                last_common_sequence_number,
+            })
+        } else {
+            Ok(ConvergenceCheck::Converged { ahead_blocks })
+        }
+    }
+
+    fn describe_divergence(
+        &self,
+        dst_sequence_number: i32,
+        src_sequence_number: i32,
+        last_common_sequence_number: i32,
+    ) -> ChainsComparison {
+        ChainsComparison::Divergence {
+            uncommon_blocks_in_dst: (dst_sequence_number - last_common_sequence_number)
+                .try_into()
+                .unwrap(),
+            uncommon_blocks_in_src: (src_sequence_number - last_common_sequence_number)
+                .try_into()
+                .unwrap(),
+        }
+    }
+
+    async fn locate_last_common_block(
+        &self,
+        src_chain: &dyn MetadataChain,
+        src_head: &Multihash,
+        src_start_block_sequence_number: i32,
+        dst_chain: &dyn MetadataChain,
+        dst_head: Option<&Multihash>,
+        dst_start_block_sequence_number: i32,
+    ) -> Result<i32, SyncError> {
+        if dst_head.is_none() {
+            return Ok(-1);
+        }
+
+        let mut src_stream = src_chain.iter_blocks_interval(src_head, None, false);
+        let mut dst_stream = dst_chain.iter_blocks_interval(dst_head.unwrap(), None, false);
+
+        let mut curr_src_block_sequence_number = src_start_block_sequence_number;
+        while curr_src_block_sequence_number > dst_start_block_sequence_number {
+            src_stream.try_next().await.int_err()?;
+            curr_src_block_sequence_number -= 1;
+        }
+
+        let mut curr_dst_block_sequence_number = dst_start_block_sequence_number;
+        while curr_dst_block_sequence_number > src_start_block_sequence_number {
+            dst_stream.try_next().await.int_err()?;
+            curr_dst_block_sequence_number -= 1;
+        }
+
+        assert_eq!(
+            curr_src_block_sequence_number,
+            curr_dst_block_sequence_number
+        );
+
+        let mut curr_block_sequence_number = curr_src_block_sequence_number;
+        while curr_block_sequence_number >= 0 {
+            let (src_block_hash, _) = src_stream.try_next().await.int_err()?.unwrap();
+            let (dst_block_hash, _) = dst_stream.try_next().await.int_err()?.unwrap();
+            if src_block_hash == dst_block_hash {
+                return Ok(curr_block_sequence_number);
+            }
+            curr_block_sequence_number -= 1;
+        }
+
+        Ok(-1)
+    }
+}
+
+pub enum ChainsComparison {
+    Equal,
+    SourceAhead {
+        src_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
+    },
+    DestinationAhead {
+        dst_ahead_size: usize,
+    },
+    Divergence {
+        uncommon_blocks_in_dst: usize,
+        uncommon_blocks_in_src: usize,
+    },
+}
+
+enum ConvergenceCheck {
+    Converged {
+        ahead_blocks: Vec<(Multihash, MetadataBlock)>,
+    },
+    Diverged {
+        last_common_sequence_number: i32,
+    },
 }

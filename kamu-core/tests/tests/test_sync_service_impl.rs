@@ -235,7 +235,7 @@ async fn do_test_sync(
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head }))
+        Err(SyncError::DestinationAhead(DestinationAheadError {src_head, dst_head, dst_ahead_size: 2 }))
         if src_head == b1 && dst_head == b3
     );
 
@@ -310,7 +310,7 @@ async fn do_test_sync(
     // Try push from dataset_1
     assert_matches!(
         sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
+        Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1 }))
         if src_head == b3 && dst_head == diverged_head
     );
 
@@ -334,10 +334,10 @@ async fn do_test_sync(
         }) if old_head == Some(diverged_head.clone()) && new_head == b3
     );
 
-    // Try pulling dataset_2: should fail, diverged
+    // Try pulling dataset_2: should fail, destination is ahead
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
+        Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1}))
         if src_head == b3 && dst_head == diverged_head
     );
 

@@ -19,6 +19,8 @@ use thiserror::Error;
 use tracing::*;
 use url::Url;
 
+use super::utils::simple_transfer_protocol::ChainsComparison;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
@@ -300,82 +302,120 @@ impl SyncServiceImpl {
         // if the key does not exist, as IPFS will be reaching out to remote nodes. To avoid long wait
         // times on first push we make an assumption that this key is owned by the local IPFS node and
         // try resolving it with a short timeout. If resolution fails - we assume that the key was not published yet.
-        let (old_cid, dst_head) = match self.ipfs_client.name_resolve_local(&key.id).await? {
-            None => {
-                info!("Key does not resolve locally - asumming it's unpublished");
-                Ok((None, None))
-            }
-            Some(old_cid) => {
-                info!(%old_cid, "Attempting to read remote head");
-                let dst_http_url = self
-                    .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
-                    .await?;
-                let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
-                match dst_dataset
-                    .as_metadata_chain()
-                    .get_ref(&BlockRef::Head)
-                    .await
-                {
-                    Ok(head) => Ok((Some(old_cid), Some(head))),
-                    Err(GetRefError::NotFound(_)) => Ok((None, None)),
-                    Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-                    Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        let (old_cid, dst_head, chains_comparison) =
+            match self.ipfs_client.name_resolve_local(&key.id).await? {
+                None => {
+                    info!("Key does not resolve locally - asumming it's unpublished");
+                    Ok((None, None, None))
                 }
-            }
-        }?;
+                Some(old_cid) => {
+                    info!(%old_cid, "Attempting to read remote head");
+                    let dst_http_url = self
+                        .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
+                        .await?;
+                    let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
+                    match dst_dataset
+                        .as_metadata_chain()
+                        .get_ref(&BlockRef::Head)
+                        .await
+                    {
+                        Ok(dst_head) => {
+                            let chains_comparison = SimpleTransferProtocol
+                                .compare_chains(
+                                    src_dataset.as_metadata_chain(),
+                                    &src_head,
+                                    dst_dataset.as_metadata_chain(),
+                                    Some(&dst_head),
+                                )
+                                .await?;
+
+                            Ok((Some(old_cid), Some(dst_head), Some(chains_comparison)))
+                        }
+                        Err(GetRefError::NotFound(_)) => Ok((None, None, None)),
+                        Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                        Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+                    }
+                }
+            }?;
 
         info!(?src_head, ?dst_head, "Resolved heads");
-
-        if Some(&src_head) == dst_head.as_ref() {
-            // IPNS entries have a limited lifetime
-            // so even if data is up-to-date we re-publish to keep the entry alive.
-            let cid = old_cid.unwrap();
-            info!(%cid, "Refreshing IPNS entry");
-            let _id = self
-                .ipfs_client
-                .name_publish(
-                    &cid,
-                    PublishOptions {
-                        key: Some(&key.name),
-                        ..Default::default()
-                    },
-                )
-                .await?;
-
-            return Ok(SyncResult::UpToDate);
-        }
 
         if !opts.create_if_not_exists && dst_head.is_none() {
             return Err(DatasetNotFoundError::new(dst_url).into());
         }
 
-        // Analyze the block interval
-        let num_blocks = match src_dataset
-            .as_metadata_chain()
-            .iter_blocks_interval(&src_head, dst_head.as_ref(), opts.force)
-            .try_count()
-            .await
-        {
-            Ok(v) => Ok(v),
-            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
+        match chains_comparison {
+            Some(ChainsComparison::Equal) => {
+                // IPNS entries have a limited lifetime
+                // so even if data is up-to-date we re-publish to keep the entry alive.
+                let cid = old_cid.unwrap();
+                info!(%cid, "Refreshing IPNS entry");
+                let _id = self
+                    .ipfs_client
+                    .name_publish(
+                        &cid,
+                        PublishOptions {
+                            key: Some(&key.name),
+                            ..Default::default()
+                        },
+                    )
+                    .await?;
+
+                return Ok(SyncResult::UpToDate);
             }
-            .into()),
-            Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
-                source: Some(e.into()),
+            Some(ChainsComparison::SourceAhead { .. }) | None => { /* Skip */ }
+            Some(ChainsComparison::DestinationAhead { dst_ahead_size }) => {
+                if !opts.force {
+                    return Err(SyncError::DestinationAhead(DestinationAheadError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        dst_ahead_size: dst_ahead_size,
+                    }));
+                }
             }
-            .into()),
-            Err(IterBlocksError::InvalidInterval(e)) => Err(DatasetsDivergedError {
-                src_head: e.head,
-                dst_head: e.tail,
+            Some(ChainsComparison::Divergence {
+                uncommon_blocks_in_dst,
+                uncommon_blocks_in_src,
+            }) => {
+                if !opts.force {
+                    return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        uncommon_blocks_in_dst,
+                        uncommon_blocks_in_src,
+                    }));
+                }
             }
-            .into()),
-            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
-            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+        }
+
+        let num_blocks = match chains_comparison {
+            Some(ChainsComparison::Equal) => unreachable!(),
+            Some(ChainsComparison::SourceAhead { src_ahead_blocks }) => src_ahead_blocks.len(),
+            None
+            | Some(ChainsComparison::DestinationAhead { .. })
+            | Some(ChainsComparison::Divergence { .. }) => match src_dataset
+                .as_metadata_chain()
+                .iter_blocks_interval(&src_head, None, false)
+                .try_count()
+                .await
+            {
+                Ok(v) => Ok(v),
+                Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
+                Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
+                    message: "Source metadata chain is broken".to_owned(),
+                    source: Some(e.into()),
+                }
+                .into()),
+                Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
+                    message: "Source metadata chain is broken".to_owned(),
+                    source: Some(e.into()),
+                }
+                .into()),
+                Err(IterBlocksError::InvalidInterval(_)) => unreachable!(),
+                Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
+                Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
+            }?,
+        };
 
         // Add files to IPFS
         info!("Adding files to IPFS");
