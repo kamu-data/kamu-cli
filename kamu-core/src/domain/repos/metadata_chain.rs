@@ -332,6 +332,19 @@ impl From<super::reference_repository::SetRefError> for AppendError {
     }
 }
 
+impl From<GetBlockError> for AppendError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => {
+                AppendError::InvalidBlock(AppendValidationError::PrevBlockNotFound(e))
+            }
+            GetBlockError::BlockVersion(e) => AppendError::Internal(e.int_err()),
+            GetBlockError::Access(e) => AppendError::Access(e),
+            GetBlockError::Internal(e) => AppendError::Internal(e),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // Individual Errors
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -391,6 +404,8 @@ pub enum AppendValidationError {
     AppendingSeedBlockToNonEmptyChain,
     #[error("Invalid previous block")]
     PrevBlockNotFound(BlockNotFoundError),
+    #[error("Invalid sequence number of previous block")]
+    SequenceIntegrity(SequenceIntegrityError),
     #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
 }

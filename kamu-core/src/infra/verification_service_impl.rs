@@ -216,10 +216,10 @@ impl VerificationServiceImpl {
         let mut block_stream = chain.iter_blocks_interval(&head, tail.as_ref(), false);
 
         // Handle head separately to obtain starting hash and sequence number
-        let (mut next_block_hash, mut next_block_sequence_number) = block_stream
+        let mut next_block_sequence_number = block_stream
             .try_next()
             .await?
-            .map(|(block_hash, block)| (block_hash, block.sequence_number()))
+            .map(|(_, block)| block.sequence_number())
             .unwrap();
 
         // Continue iterating and checking integrity of sequence numbers
@@ -229,13 +229,11 @@ impl VerificationServiceImpl {
                     SequenceIntegrityError {
                         block_hash,
                         block_sequence_number: block.sequence_number(),
-                        next_block_hash: next_block_hash.clone(),
                         next_block_sequence_number,
                     },
                 ));
             }
             next_block_sequence_number -= 1;
-            next_block_hash = block_hash;
         }
 
         listener.end_phase(VerificationPhase::MetadataIntegrity);

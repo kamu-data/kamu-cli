@@ -368,11 +368,10 @@ impl Display for CheckpointDoesNotMatchMetadata {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Block '{block_hash}' with sequence number {block_sequence_number} is followed by block '{next_block_hash}' with sequence number {next_block_sequence_number}")]
+#[error("Block '{block_hash}' with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
 pub struct SequenceIntegrityError {
     pub block_hash: Multihash,
     pub block_sequence_number: i32,
-    pub next_block_hash: Multihash,
     pub next_block_sequence_number: i32,
 }
 

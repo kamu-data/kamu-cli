@@ -52,6 +52,28 @@ where
         Ok(())
     }
 
+    async fn validate_append_sequence_numbers_integrity(
+        &self,
+        new_block: &MetadataBlock,
+        _block_cache: &mut Vec<MetadataBlock>,
+    ) -> Result<(), AppendError> {
+        if new_block.prev_block_hash.is_some() {
+            let block_hash = new_block.prev_block_hash.as_ref().unwrap();
+            let block = self.get_block(block_hash).await?;
+            if block.sequence_number != (new_block.sequence_number - 1) {
+                return Err(
+                    AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                        block_hash: block_hash.clone(),
+                        block_sequence_number: block.sequence_number,
+                        next_block_sequence_number: new_block.sequence_number,
+                    })
+                    .into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
     async fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
@@ -82,12 +104,7 @@ where
                     block_cache.push(b);
                     Ok(block_cache.first())
                 }
-                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
-                    AppendValidationError::PrevBlockNotFound(e),
-                )),
-                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
-                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
-                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
+                Err(e) => Err(e),
             }
         } else {
             Ok(None)
@@ -251,6 +268,8 @@ where
 
         if opts.validation == AppendValidation::Full {
             self.validate_append_prev_block_exists(&block, &mut block_cache)
+                .await?;
+            self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
             self.validate_append_seed_block_order(&block, &mut block_cache)
                 .await?;
