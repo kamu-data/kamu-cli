@@ -24,8 +24,8 @@ async fn new_root(local_repo: &dyn LocalDatasetRepository, name: &str) -> Datase
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (handle, _, _) = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
-    handle
+    let create_result = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
+    create_result.dataset_handle
 }
 
 async fn new_deriv(
@@ -41,8 +41,8 @@ async fn new_deriv(
         .push_event(transform.clone())
         .build();
 
-    let (handle, _, _) = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
-    (handle, transform)
+    let create_result = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
+    (create_result.dataset_handle, transform)
 }
 
 async fn append_block(
@@ -154,7 +154,7 @@ async fn test_get_verification_plan_one_to_one() {
     let t0 = Utc.ymd(2020, 1, 1).and_hms(11, 0, 0);
     let root_name = DatasetName::new_unchecked("foo");
     let root_layout = workspace_layout.dataset_layout(&root_name);
-    let (root_hdl, root_head_src, root_initial_sequence_number) = local_repo
+    let root_create_result = local_repo
         .create_dataset_from_blocks(
             &root_name,
             [
@@ -173,9 +173,13 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
+    let root_hdl = root_create_result.dataset_handle;
+    let root_head_src = root_create_result.head;
+    let root_initial_sequence_number = root_create_result.head_sequence_number;
+
     // Create derivative
     let deriv_name = DatasetName::new_unchecked("bar");
-    let (deriv_hdl, deriv_head_src, deriv_initial_sequence_number) = local_repo
+    let deriv_create_result = local_repo
         .create_dataset_from_blocks(
             &deriv_name,
             [
@@ -197,6 +201,10 @@ async fn test_get_verification_plan_one_to_one() {
         )
         .await
         .unwrap();
+
+    let deriv_hdl = deriv_create_result.dataset_handle;
+    let deriv_head_src = deriv_create_result.head;
+    let deriv_initial_sequence_number = deriv_create_result.head_sequence_number;
 
     // T1: Root data added
     let t1 = Utc.ymd(2020, 1, 1).and_hms(12, 0, 0);
@@ -239,7 +247,7 @@ async fn test_get_verification_plan_one_to_one() {
             input_slices: vec![InputSlice {
                 dataset_id: root_hdl.id.clone(),
                 block_interval: Some(BlockInterval {
-                    start: root_head_src,
+                    start: root_head_src.clone(),
                     end: root_head_t1.clone(),
                 }),
                 data_interval: Some(OffsetInterval { start: 0, end: 99 }),

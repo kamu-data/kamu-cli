@@ -53,7 +53,7 @@ async fn dataset_by_id() {
         .build();
 
     let local_repo = cat.get_one::<dyn LocalDatasetRepository>().unwrap();
-    let (dataset_handle, _, _) = local_repo
+    let create_result = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -68,7 +68,7 @@ async fn dataset_by_id() {
     let res = schema
         .execute(format!(
             "{{ datasets {{ byId (datasetId: \"{}\") {{ name }} }} }}",
-            dataset_handle.id
+            create_result.dataset_handle.id
         ))
         .await;
     assert!(res.is_ok());

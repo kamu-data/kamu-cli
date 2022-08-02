@@ -79,7 +79,7 @@ impl Default for VerificationOptions {
 pub enum VerificationPhase {
     DataIntegrity,
     ReplayTransform,
-    SequenceIntegrity,
+    MetadataIntegrity,
 }
 
 // The call pattern is:
@@ -177,7 +177,7 @@ pub enum VerificationError {
         InvalidIntervalError,
     ),
     #[error(transparent)]
-    SequenceIntegrityViolated(
+    SequenceIntegrity(
         #[from]
         #[backtrace]
         SequenceIntegrityError,

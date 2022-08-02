@@ -50,7 +50,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    let (_, head, snapshot_sequence_number) = local_repo
+    let create_result = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)
@@ -111,7 +111,7 @@ async fn test_verify_data_consistency() {
                 output_checkpoint: None,
                 output_watermark: None,
             })
-            .prev(&head, snapshot_sequence_number)
+            .prev(&create_result.head, create_result.head_sequence_number)
             .build(),
             AppendOpts::default(),
         )

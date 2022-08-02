@@ -52,19 +52,21 @@ impl SimpleTransferProtocol {
 
         match chains_comparison {
             ChainsComparison::Equal => return Ok(SyncResult::UpToDate),
-            ChainsComparison::SourceAhead { .. } => { /* Skip */ }
-            ChainsComparison::DestinationAhead { dst_ahead_size } => {
+            ChainsComparison::LhsAhead { .. } => { /* Skip */ }
+            ChainsComparison::RhsAhead {
+                ref rhs_ahead_blocks,
+            } => {
                 if !force {
                     return Err(SyncError::DestinationAhead(DestinationAheadError {
                         src_head: src_head,
                         dst_head: dst_head.unwrap(),
-                        dst_ahead_size: dst_ahead_size,
+                        dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
                 }
             }
             ChainsComparison::Divergence {
-                uncommon_blocks_in_dst,
-                uncommon_blocks_in_src,
+                uncommon_blocks_in_lhs: uncommon_blocks_in_src,
+                uncommon_blocks_in_rhs: uncommon_blocks_in_dst,
             } => {
                 if !force {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
@@ -79,8 +81,10 @@ impl SimpleTransferProtocol {
 
         let blocks = match chains_comparison {
             ChainsComparison::Equal => unreachable!(),
-            ChainsComparison::SourceAhead { src_ahead_blocks } => src_ahead_blocks,
-            ChainsComparison::DestinationAhead { .. } | ChainsComparison::Divergence { .. } => {
+            ChainsComparison::LhsAhead {
+                lhs_ahead_blocks: src_ahead_blocks,
+            } => src_ahead_blocks,
+            ChainsComparison::RhsAhead { .. } | ChainsComparison::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
                 self.map_block_iteration_errors(src_chain.iter_blocks().try_collect().await)?

@@ -18,7 +18,22 @@ use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type CreatedDatasetData = (DatasetHandle, Multihash, i32);
+#[derive(Debug)]
+pub struct CreatedDatasetResult {
+    pub dataset_handle: DatasetHandle,
+    pub head: Multihash,
+    pub head_sequence_number: i32,
+}
+
+impl CreatedDatasetResult {
+    pub fn new(dataset_handle: DatasetHandle, head: Multihash, head_sequence_number: i32) -> Self {
+        Self {
+            dataset_handle,
+            head,
+            head_sequence_number,
+        }
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,14 +59,14 @@ pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
-    ) -> Result<CreatedDatasetData, CreateDatasetFromSnapshotError>;
+    ) -> Result<CreatedDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<CreatedDatasetData, CreateDatasetFromSnapshotError>,
+        Result<CreatedDatasetResult, CreateDatasetFromSnapshotError>,
     )>;
 
     async fn rename_dataset(
@@ -135,7 +150,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         &self,
         dataset_name: &DatasetName,
         blocks: IT,
-    ) -> Result<CreatedDatasetData, CreateDatasetError>
+    ) -> Result<CreatedDatasetResult, CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
@@ -155,7 +170,11 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
             );
         }
         let hdl = ds.finish().await?;
-        Ok((hdl, hash.unwrap(), sequence_number))
+        Ok(CreatedDatasetResult::new(
+            hdl,
+            hash.unwrap(),
+            sequence_number,
+        ))
     }
 }
 

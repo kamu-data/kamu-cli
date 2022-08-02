@@ -19,21 +19,21 @@ pub struct MetadataChainComparator {}
 
 impl MetadataChainComparator {
     pub async fn compare_chains(
-        src_chain: &dyn MetadataChain,
-        src_head: &Multihash,
-        dst_chain: &dyn MetadataChain,
-        dst_head: Option<&Multihash>,
+        lhs_chain: &dyn MetadataChain,
+        lhs_head: &Multihash,
+        rhs_chain: &dyn MetadataChain,
+        rhs_head: Option<&Multihash>,
     ) -> Result<ChainsComparison, CompareChainsError> {
         // When source and destination point to the same block, chains are equal, no synchronization required
-        if Some(&src_head) == dst_head.as_ref() {
+        if Some(&lhs_head) == rhs_head.as_ref() {
             return Ok(ChainsComparison::Equal);
         }
 
         // Extract sequence number of head blocks
-        let src_sequence_number = src_chain.get_block(&src_head).await?.sequence_number;
-        let dst_sequence_number = if dst_head.is_some() {
-            dst_chain
-                .get_block(dst_head.as_ref().unwrap())
+        let lhs_sequence_number = lhs_chain.get_block(&lhs_head).await?.sequence_number;
+        let rhs_sequence_number = if rhs_head.is_some() {
+            rhs_chain
+                .get_block(rhs_head.as_ref().unwrap())
                 .await?
                 .sequence_number
         } else {
@@ -41,45 +41,45 @@ impl MetadataChainComparator {
         };
 
         // If numbers are equal, it's a guaranteed divergence, as we've checked blocks for equality above
-        if src_sequence_number == dst_sequence_number {
+        if lhs_sequence_number == rhs_sequence_number {
             let last_common_sequence_number = Self::locate_last_common_block(
-                src_chain,
-                src_head,
-                src_sequence_number,
-                dst_chain,
-                dst_head,
-                dst_sequence_number,
+                lhs_chain,
+                lhs_head,
+                lhs_sequence_number,
+                rhs_chain,
+                rhs_head,
+                rhs_sequence_number,
             )
             .await?;
             return Ok(Self::describe_divergence(
-                dst_sequence_number,
-                src_sequence_number,
+                lhs_sequence_number,
+                rhs_sequence_number,
                 last_common_sequence_number,
             ));
         }
         // Source ahead
-        else if src_sequence_number > dst_sequence_number {
+        else if lhs_sequence_number > rhs_sequence_number {
             let convergence_check = Self::detect_convergence(
-                src_sequence_number,
-                src_chain,
-                &src_head,
-                dst_sequence_number,
-                dst_chain,
-                dst_head,
+                lhs_sequence_number,
+                lhs_chain,
+                &lhs_head,
+                rhs_sequence_number,
+                rhs_chain,
+                rhs_head,
             )
             .await?;
             match convergence_check {
                 ConvergenceCheck::Converged { ahead_blocks } => {
-                    return Ok(ChainsComparison::SourceAhead {
-                        src_ahead_blocks: ahead_blocks,
+                    return Ok(ChainsComparison::LhsAhead {
+                        lhs_ahead_blocks: ahead_blocks,
                     })
                 }
                 ConvergenceCheck::Diverged {
                     last_common_sequence_number,
                 } => {
                     return Ok(Self::describe_divergence(
-                        dst_sequence_number,
-                        src_sequence_number,
+                        lhs_sequence_number,
+                        rhs_sequence_number,
                         last_common_sequence_number,
                     ));
                 }
@@ -88,26 +88,26 @@ impl MetadataChainComparator {
         // Destination ahead
         else {
             let convergence_check = Self::detect_convergence(
-                    dst_sequence_number,
-                    dst_chain,
-                    dst_head.as_ref().unwrap(),
-                    src_sequence_number,
-                    src_chain,
-                    Some(&src_head),
-                )
-                .await?;
+                rhs_sequence_number,
+                rhs_chain,
+                rhs_head.as_ref().unwrap(),
+                lhs_sequence_number,
+                lhs_chain,
+                Some(&lhs_head),
+            )
+            .await?;
             match convergence_check {
                 ConvergenceCheck::Converged { ahead_blocks } => {
-                    return Ok(ChainsComparison::DestinationAhead {
-                        dst_ahead_size: ahead_blocks.len(),
+                    return Ok(ChainsComparison::RhsAhead {
+                        rhs_ahead_blocks: ahead_blocks,
                     })
                 }
                 ConvergenceCheck::Diverged {
                     last_common_sequence_number,
                 } => {
                     return Ok(Self::describe_divergence(
-                        dst_sequence_number,
-                        src_sequence_number,
+                        lhs_sequence_number,
+                        rhs_sequence_number,
                         last_common_sequence_number,
                     ));
                 }
@@ -123,23 +123,29 @@ impl MetadataChainComparator {
         baseline_chain: &dyn MetadataChain,
         baseline_head: Option<&Multihash>,
     ) -> Result<ConvergenceCheck, CompareChainsError> {
+        use futures::TryStreamExt;
         let ahead_size: usize = (ahead_sequence_number - baseline_sequence_number)
             .try_into()
             .unwrap();
-        let ahead_blocks = ahead_chain.take_n_blocks(ahead_head, ahead_size).await?;
+        let ahead_blocks: Vec<(Multihash, MetadataBlock)> = ahead_chain
+            .iter_blocks_interval(ahead_head, None, false)
+            .take(ahead_size)
+            .try_collect()
+            .await?;
+
         // If last read block points to the previous hash that is identical to earlier head, there is no divergence
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
         if baseline_head.is_some() && baseline_head != boundary_block_prev_hash {
             let last_common_sequence_number = Self::locate_last_common_block(
-                    ahead_chain,
-                    ahead_head,
-                    ahead_sequence_number - ahead_size as i32,
-                    baseline_chain,
-                    baseline_head,
-                    baseline_sequence_number,
-                )
-                .await?;
+                ahead_chain,
+                ahead_head,
+                ahead_sequence_number - ahead_size as i32,
+                baseline_chain,
+                baseline_head,
+                baseline_sequence_number,
+            )
+            .await?;
             Ok(ConvergenceCheck::Diverged {
                 last_common_sequence_number,
             })
@@ -149,57 +155,57 @@ impl MetadataChainComparator {
     }
 
     fn describe_divergence(
-        dst_sequence_number: i32,
-        src_sequence_number: i32,
+        lhs_sequence_number: i32,
+        rhs_sequence_number: i32,
         last_common_sequence_number: i32,
     ) -> ChainsComparison {
         ChainsComparison::Divergence {
-            uncommon_blocks_in_dst: (dst_sequence_number - last_common_sequence_number)
+            uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number)
                 .try_into()
                 .unwrap(),
-            uncommon_blocks_in_src: (src_sequence_number - last_common_sequence_number)
+            uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number)
                 .try_into()
                 .unwrap(),
         }
     }
 
     async fn locate_last_common_block(
-        src_chain: &dyn MetadataChain,
-        src_head: &Multihash,
-        src_start_block_sequence_number: i32,
-        dst_chain: &dyn MetadataChain,
-        dst_head: Option<&Multihash>,
-        dst_start_block_sequence_number: i32,
+        lhs_chain: &dyn MetadataChain,
+        lhs_head: &Multihash,
+        lhs_start_block_sequence_number: i32,
+        rhs_chain: &dyn MetadataChain,
+        rhs_head: Option<&Multihash>,
+        rhs_start_block_sequence_number: i32,
     ) -> Result<i32, CompareChainsError> {
-        if dst_head.is_none() {
+        if rhs_head.is_none() {
             return Ok(-1);
         }
 
-        let mut src_stream = src_chain.iter_blocks_interval(src_head, None, false);
-        let mut dst_stream = dst_chain.iter_blocks_interval(dst_head.unwrap(), None, false);
+        let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
+        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head.unwrap(), None, false);
 
-        let mut curr_src_block_sequence_number = src_start_block_sequence_number;
-        while curr_src_block_sequence_number > dst_start_block_sequence_number {
-            src_stream.try_next().await.int_err()?;
-            curr_src_block_sequence_number -= 1;
+        let mut curr_lhs_block_sequence_number = lhs_start_block_sequence_number;
+        while curr_lhs_block_sequence_number > rhs_start_block_sequence_number {
+            lhs_stream.try_next().await.int_err()?;
+            curr_lhs_block_sequence_number -= 1;
         }
 
-        let mut curr_dst_block_sequence_number = dst_start_block_sequence_number;
-        while curr_dst_block_sequence_number > src_start_block_sequence_number {
-            dst_stream.try_next().await.int_err()?;
-            curr_dst_block_sequence_number -= 1;
+        let mut curr_rhs_block_sequence_number = rhs_start_block_sequence_number;
+        while curr_rhs_block_sequence_number > lhs_start_block_sequence_number {
+            rhs_stream.try_next().await.int_err()?;
+            curr_rhs_block_sequence_number -= 1;
         }
 
         assert_eq!(
-            curr_src_block_sequence_number,
-            curr_dst_block_sequence_number
+            curr_lhs_block_sequence_number,
+            curr_rhs_block_sequence_number
         );
 
-        let mut curr_block_sequence_number = curr_src_block_sequence_number;
+        let mut curr_block_sequence_number = curr_lhs_block_sequence_number;
         while curr_block_sequence_number >= 0 {
-            let (src_block_hash, _) = src_stream.try_next().await.int_err()?.unwrap();
-            let (dst_block_hash, _) = dst_stream.try_next().await.int_err()?.unwrap();
-            if src_block_hash == dst_block_hash {
+            let (lhs_block_hash, _) = lhs_stream.try_next().await.int_err()?.unwrap();
+            let (rhs_block_hash, _) = rhs_stream.try_next().await.int_err()?.unwrap();
+            if lhs_block_hash == rhs_block_hash {
                 return Ok(curr_block_sequence_number);
             }
             curr_block_sequence_number -= 1;
@@ -213,15 +219,15 @@ impl MetadataChainComparator {
 
 pub enum ChainsComparison {
     Equal,
-    SourceAhead {
-        src_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
+    LhsAhead {
+        lhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
-    DestinationAhead {
-        dst_ahead_size: usize,
+    RhsAhead {
+        rhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
     Divergence {
-        uncommon_blocks_in_dst: usize,
-        uncommon_blocks_in_src: usize,
+        uncommon_blocks_in_lhs: usize,
+        uncommon_blocks_in_rhs: usize,
     },
 }
 
@@ -260,11 +266,11 @@ impl From<GetBlockError> for CompareChainsError {
     fn from(v: GetBlockError) -> Self {
         match v {
             GetBlockError::NotFound(e) => Self::Corrupted(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
+                message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
             GetBlockError::BlockVersion(e) => Self::Corrupted(CorruptedSourceError {
-                message: "Source metadata chain is broken".to_owned(),
+                message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
             GetBlockError::Access(e) => Self::Access(e),
@@ -279,14 +285,14 @@ impl From<IterBlocksError> for CompareChainsError {
             IterBlocksError::RefNotFound(e) => CompareChainsError::Internal(e.int_err()),
             IterBlocksError::BlockNotFound(e) => CompareChainsError::Corrupted(
                 CorruptedSourceError {
-                    message: "Source metadata chain is broken".to_owned(),
+                    message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 }
                 .into(),
             ),
             IterBlocksError::BlockVersion(e) => CompareChainsError::Corrupted(
                 CorruptedSourceError {
-                    message: "Source metadata chain is broken".to_owned(),
+                    message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 }
                 .into(),

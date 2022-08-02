@@ -218,7 +218,7 @@ impl VerificationServiceImpl {
 
         let num_blocks = plan.len();
 
-        listener.begin_phase(VerificationPhase::SequenceIntegrity, num_blocks);
+        listener.begin_phase(VerificationPhase::MetadataIntegrity, num_blocks);
 
         let mut next_block_sequence_number = plan
             .get(0)
@@ -232,11 +232,11 @@ impl VerificationServiceImpl {
                 &block_hash,
                 block_index,
                 num_blocks,
-                VerificationPhase::SequenceIntegrity,
+                VerificationPhase::MetadataIntegrity,
             );
 
             if block.sequence_number() != (next_block_sequence_number - 1) {
-                return Err(VerificationError::SequenceIntegrityViolated(
+                return Err(VerificationError::SequenceIntegrity(
                     SequenceIntegrityError {
                         block_hash,
                         block_sequence_number: block.sequence_number(),
@@ -250,14 +250,14 @@ impl VerificationServiceImpl {
                 &block_hash,
                 block_index,
                 num_blocks,
-                VerificationPhase::SequenceIntegrity,
+                VerificationPhase::MetadataIntegrity,
             );
 
             next_block_sequence_number -= 1;
             next_block_hash = block_hash;
         }
 
-        listener.end_phase(VerificationPhase::SequenceIntegrity, num_blocks);
+        listener.end_phase(VerificationPhase::MetadataIntegrity, num_blocks);
 
         Ok(VerificationResult::Valid)
     }

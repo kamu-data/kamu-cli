@@ -24,13 +24,6 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    /// Extracts {count} blocks, starting from head block
-    async fn take_n_blocks<'a>(
-        &'a self,
-        head: &'a Multihash,
-        count: usize,
-    ) -> Result<Vec<(Multihash, MetadataBlock)>, IterBlocksError>;
-
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.

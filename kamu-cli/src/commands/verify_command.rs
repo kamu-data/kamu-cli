@@ -353,11 +353,11 @@ impl VerificationListener for VerificationProgress {
     ) {
         self.save_state(block_hash, block_index, num_blocks, phase);
         match phase {
-            VerificationPhase::SequenceIntegrity => {
+            VerificationPhase::MetadataIntegrity => {
                 self.curr_progress.set_message(self.spinner_message(
                     block_index + 1,
                     num_blocks,
-                    "Verifying sequence integrity",
+                    "Verifying metadata integrity",
                     Some(block_hash),
                 ))
             }

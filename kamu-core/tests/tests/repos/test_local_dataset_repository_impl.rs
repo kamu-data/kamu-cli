@@ -80,18 +80,20 @@ async fn test_create_dataset_from_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (hdl, head, _) = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
 
-    let dataset = repo.get_dataset(&hdl.into()).await.unwrap();
+    let dataset = repo
+        .get_dataset(&create_result.dataset_handle.into())
+        .await
+        .unwrap();
 
-    assert_eq!(
-        dataset
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-            .unwrap(),
-        head
-    );
+    let actual_head = dataset
+        .as_metadata_chain()
+        .get_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_eq!(actual_head, create_result.head);
 }
 
 #[tokio::test]
@@ -169,7 +171,7 @@ async fn test_delete_dataset() {
         .create_datasets_from_snapshots(snapshots)
         .await
         .into_iter()
-        .map(|(_, r)| r.unwrap().0)
+        .map(|(_, r)| r.unwrap().dataset_handle)
         .collect();
 
     assert_matches!(

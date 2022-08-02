@@ -360,26 +360,28 @@ impl SyncServiceImpl {
 
                 return Ok(SyncResult::UpToDate);
             }
-            Some(ChainsComparison::SourceAhead { .. }) | None => { /* Skip */ }
-            Some(ChainsComparison::DestinationAhead { dst_ahead_size }) => {
+            Some(ChainsComparison::LhsAhead { .. }) | None => { /* Skip */ }
+            Some(ChainsComparison::RhsAhead {
+                ref rhs_ahead_blocks,
+            }) => {
                 if !opts.force {
                     return Err(SyncError::DestinationAhead(DestinationAheadError {
                         src_head: src_head,
                         dst_head: dst_head.unwrap(),
-                        dst_ahead_size: dst_ahead_size,
+                        dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
                 }
             }
             Some(ChainsComparison::Divergence {
-                uncommon_blocks_in_dst,
-                uncommon_blocks_in_src,
+                uncommon_blocks_in_lhs,
+                uncommon_blocks_in_rhs,
             }) => {
                 if !opts.force {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
                         src_head: src_head,
                         dst_head: dst_head.unwrap(),
-                        uncommon_blocks_in_dst,
-                        uncommon_blocks_in_src,
+                        uncommon_blocks_in_dst: uncommon_blocks_in_rhs,
+                        uncommon_blocks_in_src: uncommon_blocks_in_lhs,
                     }));
                 }
             }
@@ -387,9 +389,9 @@ impl SyncServiceImpl {
 
         let num_blocks = match chains_comparison {
             Some(ChainsComparison::Equal) => unreachable!(),
-            Some(ChainsComparison::SourceAhead { src_ahead_blocks }) => src_ahead_blocks.len(),
+            Some(ChainsComparison::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
             None
-            | Some(ChainsComparison::DestinationAhead { .. })
+            | Some(ChainsComparison::RhsAhead { .. })
             | Some(ChainsComparison::Divergence { .. }) => match src_dataset
                 .as_metadata_chain()
                 .iter_blocks_interval(&src_head, None, false)

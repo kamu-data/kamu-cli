@@ -178,10 +178,12 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (_, b1, b1_sequence_number) = local_repo
+    let create_result = local_repo
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap();
+    let b1 = create_result.head;
+    let b1_sequence_number = create_result.head_sequence_number;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -245,7 +247,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1.clone()) && new_head == b3
+        }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_matches!(
@@ -254,7 +256,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1.clone()) && new_head == b3
+        }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
