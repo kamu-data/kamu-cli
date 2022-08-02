@@ -24,6 +24,7 @@ pub struct MetadataBlockExtended {
     pub system_time: DateTime<Utc>,
     pub author: Account,
     pub event: MetadataEvent,
+    pub sequence_number: i32,
 }
 
 impl MetadataBlockExtended {
@@ -39,6 +40,7 @@ impl MetadataBlockExtended {
             system_time: b.system_time,
             author,
             event: b.event,
+            sequence_number: b.sequence_number,
         }
     }
 }

@@ -374,6 +374,7 @@ type MetadataBlockExtended {
 	systemTime: DateTime!
 	author: Account!
 	event: MetadataEvent!
+	sequenceNumber: Int!
 }
 
 type MetadataChain {
