@@ -85,9 +85,7 @@ where
                 Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
                     AppendValidationError::PrevBlockNotFound(e),
                 )),
-                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::InvalidBlock(
-                    AppendValidationError::PrevBlockVersionError(e),
-                )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
                 Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }

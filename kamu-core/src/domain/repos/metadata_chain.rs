@@ -391,8 +391,6 @@ pub enum AppendValidationError {
     AppendingSeedBlockToNonEmptyChain,
     #[error("Invalid previous block")]
     PrevBlockNotFound(BlockNotFoundError),
-    #[error("Invalid previous block version")]
-    PrevBlockVersionError(BlockVersionError),
     #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
 }
