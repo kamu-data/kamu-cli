@@ -178,12 +178,6 @@ pub enum VerificationError {
         #[backtrace]
         InvalidIntervalError,
     ),
-    #[error(transparent)]
-    SequenceIntegrity(
-        #[from]
-        #[backtrace]
-        SequenceIntegrityError,
-    ),
     #[error("Data doesn't match metadata")]
     DataDoesNotMatchMetadata(
         #[from]
@@ -242,6 +236,15 @@ impl From<GetBlockError> for VerificationError {
             GetBlockError::BlockVersion(e) => VerificationError::BlockVersion(e),
             GetBlockError::Access(e) => VerificationError::Internal(e.int_err()),
             GetBlockError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
+}
+
+impl From<AppendError> for VerificationError {
+    fn from(v: AppendError) -> Self {
+        match v {
+            AppendError::RefNotFound(e) => VerificationError::RefNotFound(e),
+            _ => VerificationError::Internal(v.int_err()),
         }
     }
 }
@@ -363,16 +366,6 @@ impl Display for CheckpointDoesNotMatchMetadata {
             ),
         }
     }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("Block '{block_hash}' with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
-pub struct SequenceIntegrityError {
-    pub block_hash: Multihash,
-    pub block_sequence_number: i32,
-    pub next_block_sequence_number: i32,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

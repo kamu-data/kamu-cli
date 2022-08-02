@@ -404,8 +404,14 @@ pub enum AppendValidationError {
     AppendingSeedBlockToNonEmptyChain,
     #[error("Invalid previous block")]
     PrevBlockNotFound(BlockNotFoundError),
-    #[error("Invalid sequence number of previous block")]
-    SequenceIntegrity(SequenceIntegrityError),
+    #[error("Block '{block_hash}' with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
+    SequenceIntegrity {
+        block_hash: Multihash,
+        block_sequence_number: i32,
+        next_block_sequence_number: i32,
+    },
     #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
 }
+
+///////////////////////////////////////////////////////////////////////////////

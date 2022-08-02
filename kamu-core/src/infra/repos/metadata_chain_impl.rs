@@ -61,14 +61,12 @@ where
             let block_hash = new_block.prev_block_hash.as_ref().unwrap();
             let block = self.get_block(block_hash).await?;
             if block.sequence_number != (new_block.sequence_number - 1) {
-                return Err(
-                    AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-                        block_hash: block_hash.clone(),
-                        block_sequence_number: block.sequence_number,
-                        next_block_sequence_number: new_block.sequence_number,
-                    })
-                    .into(),
-                );
+                return Err(AppendValidationError::SequenceIntegrity {
+                    block_hash: block_hash.clone(),
+                    block_sequence_number: block.sequence_number,
+                    next_block_sequence_number: new_block.sequence_number,
+                }
+                .into());
             }
         }
         Ok(())

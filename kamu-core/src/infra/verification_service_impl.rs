@@ -13,7 +13,6 @@ use opendatafabric::*;
 
 use dill::*;
 use futures::TryStreamExt;
-use opendatafabric::dynamic::MetadataBlock;
 use std::sync::Arc;
 use tracing::info_span;
 
@@ -212,28 +211,29 @@ impl VerificationServiceImpl {
 
         listener.begin_phase(VerificationPhase::MetadataIntegrity);
 
-        // Begin iteration
-        let mut block_stream = chain.iter_blocks_interval(&head, tail.as_ref(), false);
+        let blocks: Vec<_> = dataset
+            .as_metadata_chain()
+            .iter_blocks_interval(&head, tail.as_ref(), false)
+            .try_collect()
+            .await?;
 
-        // Handle head separately to obtain starting hash and sequence number
-        let mut next_block_sequence_number = block_stream
-            .try_next()
-            .await?
-            .map(|(_, block)| block.sequence_number())
-            .unwrap();
+        // To verify sequence integrity, let's build a temporary chain from the same blocks in memory.
+        // Here we reuse validations implemented in append rules when adding blocks to new chain.
+        let in_memory_chain = MetadataChainImpl::new(
+            ObjectRepositoryInMemory::new(),
+            ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+        );
 
-        // Continue iterating and checking integrity of sequence numbers
-        while let Some((block_hash, block)) = block_stream.try_next().await? {
-            if block.sequence_number() != (next_block_sequence_number - 1) {
-                return Err(VerificationError::SequenceIntegrity(
-                    SequenceIntegrityError {
-                        block_hash,
-                        block_sequence_number: block.sequence_number(),
-                        next_block_sequence_number,
+        for (block_hash, block) in blocks.into_iter().rev() {
+            in_memory_chain
+                .append(
+                    block,
+                    AppendOpts {
+                        precomputed_hash: Some(&block_hash),
+                        ..AppendOpts::default()
                     },
-                ));
-            }
-            next_block_sequence_number -= 1;
+                )
+                .await?;
         }
 
         listener.end_phase(VerificationPhase::MetadataIntegrity);
