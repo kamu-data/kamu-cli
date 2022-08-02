@@ -870,7 +870,7 @@ impl TransformService for TransformServiceImpl {
             .get_verification_plan(&dataset_handle, block_range)
             .await?;
         let num_steps = verification_plan.len();
-        listener.begin_phase(VerificationPhase::ReplayTransform, num_steps);
+        listener.begin_phase(VerificationPhase::ReplayTransform);
 
         for (step_index, step) in verification_plan.into_iter().enumerate() {
             let operation = step.operation;
@@ -984,7 +984,7 @@ impl TransformService for TransformServiceImpl {
             );
         }
 
-        listener.end_phase(VerificationPhase::ReplayTransform, num_steps);
+        listener.end_phase(VerificationPhase::ReplayTransform);
         Ok(VerificationResult::Valid)
     }
 

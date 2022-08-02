@@ -12,6 +12,7 @@ use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
+use futures::TryStreamExt;
 use opendatafabric::dynamic::MetadataBlock;
 use std::sync::Arc;
 use tracing::info_span;
@@ -70,7 +71,7 @@ impl VerificationServiceImpl {
         let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
         let num_blocks = plan.len();
 
-        listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
+        listener.begin_phase(VerificationPhase::DataIntegrity);
 
         for (block_index, (block_hash, block)) in plan.into_iter().enumerate() {
             listener.begin_block(
@@ -182,7 +183,7 @@ impl VerificationServiceImpl {
             );
         }
 
-        listener.end_phase(VerificationPhase::DataIntegrity, num_blocks);
+        listener.end_phase(VerificationPhase::DataIntegrity);
 
         Ok(VerificationResult::Valid)
     }
@@ -193,7 +194,7 @@ impl VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying sequence integrity");
+        let span = info_span!("Verifying metadata integrity");
         let _span_guard = span.enter();
 
         let dataset = self
@@ -209,32 +210,20 @@ impl VerificationServiceImpl {
         };
         let tail = block_range.0;
 
-        // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks` estimate
-        use futures::TryStreamExt;
-        let plan: Vec<_> = chain
-            .iter_blocks_interval(&head, tail.as_ref(), false)
-            .try_collect()
-            .await?;
+        listener.begin_phase(VerificationPhase::MetadataIntegrity);
 
-        let num_blocks = plan.len();
+        // Begin iteration
+        let mut block_stream = chain.iter_blocks_interval(&head, tail.as_ref(), false);
 
-        listener.begin_phase(VerificationPhase::MetadataIntegrity, num_blocks);
+        // Handle head separately to obtain starting hash and sequence number
+        let (mut next_block_hash, mut next_block_sequence_number) = block_stream
+            .try_next()
+            .await?
+            .map(|(block_hash, block)| (block_hash, block.sequence_number()))
+            .unwrap();
 
-        let mut next_block_sequence_number = plan
-            .get(0)
-            .map(|(_, block)| block.sequence_number())
-            .unwrap_or(0);
-        let mut next_block_hash = head;
-
-        // Skip head during iteration
-        for (block_index, (block_hash, block)) in plan.into_iter().skip(1).enumerate() {
-            listener.begin_block(
-                &block_hash,
-                block_index,
-                num_blocks,
-                VerificationPhase::MetadataIntegrity,
-            );
-
+        // Continue iterating and checking integrity of sequence numbers
+        while let Some((block_hash, block)) = block_stream.try_next().await? {
             if block.sequence_number() != (next_block_sequence_number - 1) {
                 return Err(VerificationError::SequenceIntegrity(
                     SequenceIntegrityError {
@@ -245,19 +234,11 @@ impl VerificationServiceImpl {
                     },
                 ));
             }
-
-            listener.end_block(
-                &block_hash,
-                block_index,
-                num_blocks,
-                VerificationPhase::MetadataIntegrity,
-            );
-
             next_block_sequence_number -= 1;
             next_block_hash = block_hash;
         }
 
-        listener.end_phase(VerificationPhase::MetadataIntegrity, num_blocks);
+        listener.end_phase(VerificationPhase::MetadataIntegrity);
 
         Ok(VerificationResult::Valid)
     }

@@ -84,6 +84,8 @@ pub enum VerificationPhase {
 
 // The call pattern is:
 //   begin()
+//     begin_phase(MetadataIntegrity)
+//     end_phase(MetadataIntegrity)
 //     begin_phase(DataIntegrity)
 //       begin_block()
 //       end_block()
@@ -101,8 +103,8 @@ pub trait VerificationListener {
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
 
-    fn begin_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
-    fn end_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
+    fn begin_phase(&self, _phase: VerificationPhase) {}
+    fn end_phase(&self, _phase: VerificationPhase) {}
 
     fn begin_block(
         &self,
@@ -229,6 +231,17 @@ impl From<GetRefError> for VerificationError {
             GetRefError::NotFound(e) => VerificationError::RefNotFound(e),
             GetRefError::Access(e) => VerificationError::Internal(e.int_err()),
             GetRefError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
+}
+
+impl From<GetBlockError> for VerificationError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => VerificationError::BlockNotFound(e),
+            GetBlockError::BlockVersion(e) => VerificationError::BlockVersion(e),
+            GetBlockError::Access(e) => VerificationError::Internal(e.int_err()),
+            GetBlockError::Internal(e) => VerificationError::Internal(e),
         }
     }
 }

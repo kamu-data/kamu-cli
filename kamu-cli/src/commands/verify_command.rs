@@ -341,8 +341,16 @@ impl VerificationListener for VerificationProgress {
         ));
     }
 
-    fn begin_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
-    fn end_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
+    fn begin_phase(&self, phase: VerificationPhase) {
+        let message = match phase {
+            VerificationPhase::DataIntegrity => "Verifying data integrity",
+            VerificationPhase::ReplayTransform => "Replaying transformations",
+            VerificationPhase::MetadataIntegrity => "Verifying metadata integrity",
+        };
+        self.curr_progress.set_message(message);
+    }
+
+    fn end_phase(&self, _phase: VerificationPhase) {}
 
     fn begin_block(
         &self,
@@ -353,14 +361,7 @@ impl VerificationListener for VerificationProgress {
     ) {
         self.save_state(block_hash, block_index, num_blocks, phase);
         match phase {
-            VerificationPhase::MetadataIntegrity => {
-                self.curr_progress.set_message(self.spinner_message(
-                    block_index + 1,
-                    num_blocks,
-                    "Verifying metadata integrity",
-                    Some(block_hash),
-                ))
-            }
+            VerificationPhase::MetadataIntegrity => unreachable!(),
             VerificationPhase::DataIntegrity => {
                 self.curr_progress.set_message(self.spinner_message(
                     block_index + 1,
