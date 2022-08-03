@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::derivations_generated::*;
-use super::Manifest;
+use super::{ContentFreeManifest, Manifest};
 use crate::dtos::*;
 pub use crate::serde::*;
 use ::serde::{Deserialize, Serialize};
@@ -68,16 +68,20 @@ impl YamlMetadataBlockDeserializer {}
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        let manifest: Manifest<MetadataBlockWrapper> =
+        // Read short manifest first, with kind and version only
+        let manifest_no_content: ContentFreeManifest =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
-        // TODO: Handle conversions?
-        assert_eq!(manifest.kind, "MetadataBlock");
-        assert_eq!(manifest.version, METADATA_BLOCK_CURRENT_VERSION as i32);
+        assert_eq!(manifest_no_content.kind, "MetadataBlock");
+
+        let version = MetadataBlockVersion::try_from(manifest_no_content.version)?;
+        Self::check_version_compatibility(version)?;
 
         // TODO: Handle conversions for compatible versions
-        let version = MetadataBlockVersion::try_from(manifest.version)?;
-        Self::check_version_compatibility(version)?;
+
+        // Re-read full manifest with content definition
+        let manifest: Manifest<MetadataBlockWrapper> =
+            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         Ok(manifest.content.0)
     }

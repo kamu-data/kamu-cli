@@ -286,19 +286,16 @@ fn serde_metadata_block_obsolete_version() {
         outputWatermark: \"2020-01-01T12:00:00Z\"\n"
     );
 
-    // TODO: find out how to get this expectation instead of Yaml deserialization error
-    // let expected_error = Error::ObsoleteVersion {
-    //    manifest_version: 1,
-    //    minimum_supported_version: METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION as i32,
-    // };
-    let expected_errror_str =
-        "Serde error: content: missing field `sequenceNumber` at line 5 column 13";
+    let expected_error = Error::ObsoleteVersion {
+        manifest_version: 1,
+        minimum_supported_version: METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION as i32,
+    };
 
     let actual_error = YamlMetadataBlockDeserializer
         .read_manifest(data.as_bytes())
         .unwrap_err();
 
-    assert_eq!(expected_errror_str, actual_error.to_string());
+    assert_eq!(expected_error.to_string(), actual_error.to_string());
 }
 
 #[test]
