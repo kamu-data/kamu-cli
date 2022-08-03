@@ -229,17 +229,6 @@ impl From<GetRefError> for VerificationError {
     }
 }
 
-impl From<GetBlockError> for VerificationError {
-    fn from(v: GetBlockError) -> Self {
-        match v {
-            GetBlockError::NotFound(e) => VerificationError::BlockNotFound(e),
-            GetBlockError::BlockVersion(e) => VerificationError::BlockVersion(e),
-            GetBlockError::Access(e) => VerificationError::Internal(e.int_err()),
-            GetBlockError::Internal(e) => VerificationError::Internal(e),
-        }
-    }
-}
-
 impl From<AppendError> for VerificationError {
     fn from(v: AppendError) -> Self {
         match v {

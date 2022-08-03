@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use core::panic;
 use std::{collections::HashMap, sync::Mutex};
 
 use crate::domain::*;
@@ -85,11 +84,8 @@ impl ObjectRepository for ObjectRepositoryInMemory {
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let mut blocks_by_hash = self.blocks_by_hash.lock().unwrap();
-        let res = blocks_by_hash.remove(hash);
-        match res {
-            Some(_) => Ok(()),
-            None => panic!(),
-        }
+        blocks_by_hash.remove(hash);
+        Ok(())
     }
 }
 
