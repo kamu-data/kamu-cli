@@ -703,13 +703,21 @@ pub fn cli() -> Command<'static> {
 
                     ### Examples ###
 
-                    Push dataset to a repository and create an association between the two:
+                    Sync dataset to a destination URL:
 
-                        kamu push org.example.data --to kamu.dev/me/org.example.data
+                        kamu push org.example.data --to s3://my-bucket.example.org/odf/org.example.data
 
-                    Push dataset previously associated with a repository:
+                    Sync dataset to a named repository (see `kamu repo` command group):
+
+                        kamu push org.example.data --to kamu-hub/org.example.data
+
+                    Sync dataset that already has a push alias:
 
                         kamu push org.example.data
+
+                    Add dataset to local IPFS node and update IPNS entry to the new CID:
+
+                        kamu push org.example.data --to ipns://k5..zy
                     "
                 )),
             Command::new("rename")
