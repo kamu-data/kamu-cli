@@ -52,6 +52,7 @@ async fn test_append_and_get() {
         .unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(0, block_1.sequence_number);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
         .prev(&hash_1, block_1.sequence_number)
@@ -63,6 +64,7 @@ async fn test_append_and_get() {
         .unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_2);
+    assert_eq!(1, block_2.sequence_number);
 
     assert_eq!(chain.get_block(&hash_1).await.unwrap(), block_1);
     assert_eq!(chain.get_block(&hash_2).await.unwrap(), block_2);
@@ -177,6 +179,71 @@ async fn test_append_prev_block_not_found() {
     );
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+}
+
+#[tokio::test]
+async fn test_append_prev_block_sequence_integrity_broken() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block_1 =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+
+    let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
+
+    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+
+    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_1, 0)
+        .build();
+
+    let hash_2 = chain.append(block_2, AppendOpts::default()).await.unwrap();
+
+    let block_too_low = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 0 /* should be 1 */)
+        .build();
+
+    assert_matches!(
+        chain.append(block_too_low, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                block_hash,
+                block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 1
+    );
+
+    let block_too_high = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 2 /* should be 1 */)
+        .build();
+
+    assert_matches!(
+        chain.append(block_too_high, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                block_hash,
+                block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 3
+    );
+
+    let block_just_right = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 1)
+        .build();
+
+    let hash_just_right = chain
+        .append(block_just_right, AppendOpts::default())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        chain.get_ref(&BlockRef::Head).await.unwrap(),
+        hash_just_right
+    );
 }
 
 #[tokio::test]
