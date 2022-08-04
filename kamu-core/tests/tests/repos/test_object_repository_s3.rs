@@ -16,6 +16,10 @@ use url::Url;
 
 use crate::utils::MinioServer;
 
+use super::test_object_repository_shared;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[allow(dead_code)]
 struct S3 {
     tmp_dir: tempfile::TempDir,
@@ -48,6 +52,8 @@ fn run_s3_server() -> S3 {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[ignore = "Rusoto does not handle 403 correctly"]
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
@@ -67,36 +73,7 @@ async fn test_unauthorized() {
 async fn test_insert_bytes() {
     let s3 = run_s3_server();
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
-
-    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
-    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
-
-    assert!(!repo.contains(&hash_foo).await.unwrap());
-    assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)),);
-
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-            already_existed: false
-        }
-    );
-    assert_eq!(
-        repo.insert_bytes(b"bar", InsertOpts::default())
-            .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_bar.clone(),
-            already_existed: false
-        }
-    );
-
-    assert!(repo.contains(&hash_foo).await.unwrap());
-    assert!(repo.contains(&hash_bar).await.unwrap());
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"bar");
+    test_object_repository_shared::test_insert_bytes(&repo).await;
 }
 
 #[tokio::test]
@@ -205,39 +182,7 @@ async fn test_insert_stream_long() {
 async fn test_delete() {
     let s3 = run_s3_server();
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
-
-    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
-
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-            already_existed: false
-        }
-    );
-
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-
-    assert_eq!(
-        repo.insert_bytes(b"foo", InsertOpts::default())
-            .await
-            .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-            already_existed: false // Note: S3's insert_bytes does not check for existence to save a roundtrip
-        }
-    );
-
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-
-    repo.delete(&hash_foo).await.unwrap();
-
-    assert_matches!(
-        repo.get_bytes(&hash_foo).await,
-        Err(GetError::NotFound(e)) if e.hash == hash_foo
-    );
+    test_object_repository_shared::test_delete(&repo, false).await;
 }
 
 #[tokio::test]
@@ -245,27 +190,7 @@ async fn test_delete() {
 async fn test_insert_precomputed() {
     let s3 = run_s3_server();
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
-
-    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
-    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
-
-    assert_eq!(
-        repo.insert_bytes(
-            b"foo",
-            InsertOpts {
-                precomputed_hash: Some(&hash_bar),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_bar.clone(),
-            already_existed: false
-        }
-    );
-    assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"foo");
-    assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)));
+    test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
 
 #[tokio::test]
@@ -273,40 +198,7 @@ async fn test_insert_precomputed() {
 async fn test_insert_expect() {
     let s3 = run_s3_server();
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::from_url(&s3.url);
-
-    let hash_foo = Multihash::from_digest_sha3_256(b"foo");
-    let hash_bar = Multihash::from_digest_sha3_256(b"bar");
-
-    assert_eq!(
-        repo.insert_bytes(
-            b"foo",
-            InsertOpts {
-                expected_hash: Some(&hash_foo),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap(),
-        InsertResult {
-            hash: hash_foo.clone(),
-            already_existed: false
-        }
-    );
-    assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");
-
-    assert_matches!(
-        repo.insert_bytes(
-            b"bar",
-            InsertOpts {
-                expected_hash: Some(&hash_foo),
-                ..Default::default()
-            },
-        )
-        .await,
-        Err(InsertError::HashMismatch(HashMismatchError {
-            expected,
-            actual,
-        })) if expected == hash_foo && actual == hash_bar
-    );
-    assert_matches!(repo.get_bytes(&hash_bar).await, Err(GetError::NotFound(_)));
+    test_object_repository_shared::test_insert_expect(&repo).await;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
