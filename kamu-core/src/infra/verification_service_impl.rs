@@ -225,7 +225,7 @@ impl VerificationServiceImpl {
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {
-            in_memory_chain
+            match in_memory_chain
                 .append(
                     block,
                     AppendOpts {
@@ -233,7 +233,12 @@ impl VerificationServiceImpl {
                         ..AppendOpts::default()
                     },
                 )
-                .await?;
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(AppendError::RefNotFound(e)) => Err(VerificationError::RefNotFound(e)),
+                Err(e) => Err(VerificationError::Internal(e.int_err())),
+            }?;
         }
 
         listener.end_phase(VerificationPhase::MetadataIntegrity);

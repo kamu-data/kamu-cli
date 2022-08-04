@@ -24,7 +24,7 @@ impl MetadataChainComparator {
         rhs_chain: &dyn MetadataChain,
         rhs_head: Option<&Multihash>,
     ) -> Result<ChainsComparison, CompareChainsError> {
-        // When source and destination point to the same block, chains are equal, no synchronization required
+        // When source and destination point to the same block, chains are equal, no further scanning required
         if Some(&lhs_head) == rhs_head.as_ref() {
             return Ok(ChainsComparison::Equal);
         }
@@ -42,7 +42,7 @@ impl MetadataChainComparator {
 
         // If numbers are equal, it's a guaranteed divergence, as we've checked blocks for equality above
         if lhs_sequence_number == rhs_sequence_number {
-            let last_common_sequence_number = Self::locate_last_common_block(
+            let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
                 lhs_chain,
                 lhs_head,
                 lhs_sequence_number,
@@ -59,23 +59,23 @@ impl MetadataChainComparator {
         }
         // Source ahead
         else if lhs_sequence_number > rhs_sequence_number {
-            let convergence_check = Self::detect_convergence(
-                lhs_sequence_number,
+            let convergence_check = Self::check_expected_common_ancestor(
                 lhs_chain,
+                lhs_sequence_number,
                 &lhs_head,
-                rhs_sequence_number,
                 rhs_chain,
+                rhs_sequence_number,
                 rhs_head,
             )
             .await?;
             match convergence_check {
-                ConvergenceCheck::Converged { ahead_blocks } => {
+                CommonAncestorCheck::Success { ahead_blocks } => {
                     return Ok(ChainsComparison::LhsAhead {
                         lhs_ahead_blocks: ahead_blocks,
                     })
                 }
-                ConvergenceCheck::Diverged {
-                    last_common_sequence_number,
+                CommonAncestorCheck::Failure {
+                    common_ancestor_sequence_number: last_common_sequence_number,
                 } => {
                     return Ok(Self::describe_divergence(
                         lhs_sequence_number,
@@ -87,23 +87,23 @@ impl MetadataChainComparator {
         }
         // Destination ahead
         else {
-            let convergence_check = Self::detect_convergence(
-                rhs_sequence_number,
+            let convergence_check = Self::check_expected_common_ancestor(
                 rhs_chain,
+                rhs_sequence_number,
                 rhs_head.as_ref().unwrap(),
-                lhs_sequence_number,
                 lhs_chain,
+                lhs_sequence_number,
                 Some(&lhs_head),
             )
             .await?;
             match convergence_check {
-                ConvergenceCheck::Converged { ahead_blocks } => {
-                    return Ok(ChainsComparison::RhsAhead {
+                CommonAncestorCheck::Success { ahead_blocks } => {
+                    return Ok(ChainsComparison::LhsBehind {
                         rhs_ahead_blocks: ahead_blocks,
                     })
                 }
-                ConvergenceCheck::Diverged {
-                    last_common_sequence_number,
+                CommonAncestorCheck::Failure {
+                    common_ancestor_sequence_number: last_common_sequence_number,
                 } => {
                     return Ok(Self::describe_divergence(
                         lhs_sequence_number,
@@ -115,18 +115,16 @@ impl MetadataChainComparator {
         }
     }
 
-    async fn detect_convergence(
-        ahead_sequence_number: i32,
+    async fn check_expected_common_ancestor(
         ahead_chain: &dyn MetadataChain,
+        ahead_sequence_number: i32,
         ahead_head: &Multihash,
-        baseline_sequence_number: i32,
-        baseline_chain: &dyn MetadataChain,
-        baseline_head: Option<&Multihash>,
-    ) -> Result<ConvergenceCheck, CompareChainsError> {
+        reference_chain: &dyn MetadataChain,
+        expected_common_sequence_number: i32,
+        expected_common_ancestor_hash: Option<&Multihash>,
+    ) -> Result<CommonAncestorCheck, CompareChainsError> {
         use futures::TryStreamExt;
-        let ahead_size: usize = (ahead_sequence_number - baseline_sequence_number)
-            .try_into()
-            .unwrap();
+        let ahead_size: usize = (ahead_sequence_number - expected_common_sequence_number) as usize;
         let ahead_blocks: Vec<(Multihash, MetadataBlock)> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
             .take(ahead_size)
@@ -136,21 +134,23 @@ impl MetadataChainComparator {
         // If last read block points to the previous hash that is identical to earlier head, there is no divergence
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
-        if baseline_head.is_some() && baseline_head != boundary_block_prev_hash {
-            let last_common_sequence_number = Self::locate_last_common_block(
+        if expected_common_ancestor_hash.is_some()
+            && expected_common_ancestor_hash != boundary_block_prev_hash
+        {
+            let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
                 ahead_chain,
                 ahead_head,
                 ahead_sequence_number - ahead_size as i32,
-                baseline_chain,
-                baseline_head,
-                baseline_sequence_number,
+                reference_chain,
+                expected_common_ancestor_hash,
+                expected_common_sequence_number,
             )
             .await?;
-            Ok(ConvergenceCheck::Diverged {
-                last_common_sequence_number,
+            Ok(CommonAncestorCheck::Failure {
+                common_ancestor_sequence_number,
             })
         } else {
-            Ok(ConvergenceCheck::Converged { ahead_blocks })
+            Ok(CommonAncestorCheck::Success { ahead_blocks })
         }
     }
 
@@ -160,16 +160,12 @@ impl MetadataChainComparator {
         last_common_sequence_number: i32,
     ) -> ChainsComparison {
         ChainsComparison::Divergence {
-            uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number)
-                .try_into()
-                .unwrap(),
-            uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number)
-                .try_into()
-                .unwrap(),
+            uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number) as usize,
+            uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number) as usize,
         }
     }
 
-    async fn locate_last_common_block(
+    async fn find_common_ancestor_sequence_number(
         lhs_chain: &dyn MetadataChain,
         lhs_head: &Multihash,
         lhs_start_block_sequence_number: i32,
@@ -222,7 +218,7 @@ pub enum ChainsComparison {
     LhsAhead {
         lhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
-    RhsAhead {
+    LhsBehind {
         rhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
     Divergence {
@@ -233,17 +229,17 @@ pub enum ChainsComparison {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-enum ConvergenceCheck {
-    Converged {
+enum CommonAncestorCheck {
+    Success {
         ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
-    Diverged {
-        last_common_sequence_number: i32,
+    Failure {
+        common_ancestor_sequence_number: i32,
     },
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-///
+
 #[derive(Debug, Error)]
 pub enum CompareChainsError {
     #[error(transparent)]

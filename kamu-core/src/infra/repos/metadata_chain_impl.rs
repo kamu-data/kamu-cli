@@ -59,7 +59,15 @@ where
     ) -> Result<(), AppendError> {
         if new_block.prev_block_hash.is_some() {
             let block_hash = new_block.prev_block_hash.as_ref().unwrap();
-            let block = self.get_block(block_hash).await?;
+            let block = match self.get_block(block_hash).await {
+                Ok(block) => Ok(block),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
+                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
+            }?;
             if block.sequence_number != (new_block.sequence_number - 1) {
                 return Err(
                     AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
@@ -104,7 +112,12 @@ where
                     block_cache.push(b);
                     Ok(block_cache.first())
                 }
-                Err(e) => Err(e),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
+                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }
         } else {
             Ok(None)

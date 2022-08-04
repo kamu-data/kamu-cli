@@ -229,15 +229,6 @@ impl From<GetRefError> for VerificationError {
     }
 }
 
-impl From<AppendError> for VerificationError {
-    fn from(v: AppendError) -> Self {
-        match v {
-            AppendError::RefNotFound(e) => VerificationError::RefNotFound(e),
-            _ => VerificationError::Internal(v.int_err()),
-        }
-    }
-}
-
 impl From<IterBlocksError> for VerificationError {
     fn from(v: IterBlocksError) -> Self {
         match v {

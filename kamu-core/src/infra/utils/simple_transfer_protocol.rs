@@ -53,7 +53,7 @@ impl SimpleTransferProtocol {
         match chains_comparison {
             ChainsComparison::Equal => return Ok(SyncResult::UpToDate),
             ChainsComparison::LhsAhead { .. } => { /* Skip */ }
-            ChainsComparison::RhsAhead {
+            ChainsComparison::LhsBehind {
                 ref rhs_ahead_blocks,
             } => {
                 if !force {
@@ -84,7 +84,7 @@ impl SimpleTransferProtocol {
             ChainsComparison::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
             } => src_ahead_blocks,
-            ChainsComparison::RhsAhead { .. } | ChainsComparison::Divergence { .. } => {
+            ChainsComparison::LhsBehind { .. } | ChainsComparison::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
                 self.map_block_iteration_errors(src_chain.iter_blocks().try_collect().await)?

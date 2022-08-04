@@ -19,13 +19,13 @@ use tokio_stream::Stream;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct CreatedDatasetResult {
+pub struct CreateDatasetResult {
     pub dataset_handle: DatasetHandle,
     pub head: Multihash,
     pub head_sequence_number: i32,
 }
 
-impl CreatedDatasetResult {
+impl CreateDatasetResult {
     pub fn new(dataset_handle: DatasetHandle, head: Multihash, head_sequence_number: i32) -> Self {
         Self {
             dataset_handle,
@@ -59,14 +59,14 @@ pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
-    ) -> Result<CreatedDatasetResult, CreateDatasetFromSnapshotError>;
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<CreatedDatasetResult, CreateDatasetFromSnapshotError>,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )>;
 
     async fn rename_dataset(
@@ -150,7 +150,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         &self,
         dataset_name: &DatasetName,
         blocks: IT,
-    ) -> Result<CreatedDatasetResult, CreateDatasetError>
+    ) -> Result<CreateDatasetResult, CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
@@ -171,7 +171,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
             );
         }
         let hdl = ds.finish().await?;
-        Ok(CreatedDatasetResult::new(
+        Ok(CreateDatasetResult::new(
             hdl,
             hash.unwrap(),
             sequence_number,

@@ -361,7 +361,7 @@ impl SyncServiceImpl {
                 return Ok(SyncResult::UpToDate);
             }
             Some(ChainsComparison::LhsAhead { .. }) | None => { /* Skip */ }
-            Some(ChainsComparison::RhsAhead {
+            Some(ChainsComparison::LhsBehind {
                 ref rhs_ahead_blocks,
             }) => {
                 if !opts.force {
@@ -391,7 +391,7 @@ impl SyncServiceImpl {
             Some(ChainsComparison::Equal) => unreachable!(),
             Some(ChainsComparison::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
             None
-            | Some(ChainsComparison::RhsAhead { .. })
+            | Some(ChainsComparison::LhsBehind { .. })
             | Some(ChainsComparison::Divergence { .. }) => match src_dataset
                 .as_metadata_chain()
                 .iter_blocks_interval(&src_head, None, false)
