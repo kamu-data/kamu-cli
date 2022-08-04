@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## Added
+- Metadata blocks now contain sequence number (breaking format change!)
+- Optimized sync operations for diverged datasets using sequence number in blocks
 ### Fixed
 - Panic when pulling a non-existing dataset
 
