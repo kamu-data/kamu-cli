@@ -342,7 +342,7 @@ impl SyncServiceImpl {
         }
 
         match chains_comparison {
-            Some(ChainsComparison::Equal) => {
+            Some(CompareChainsResult::Equal) => {
                 // IPNS entries have a limited lifetime
                 // so even if data is up-to-date we re-publish to keep the entry alive.
                 let cid = old_cid.unwrap();
@@ -360,8 +360,8 @@ impl SyncServiceImpl {
 
                 return Ok(SyncResult::UpToDate);
             }
-            Some(ChainsComparison::LhsAhead { .. }) | None => { /* Skip */ }
-            Some(ChainsComparison::LhsBehind {
+            Some(CompareChainsResult::LhsAhead { .. }) | None => { /* Skip */ }
+            Some(CompareChainsResult::LhsBehind {
                 ref rhs_ahead_blocks,
             }) => {
                 if !opts.force {
@@ -372,7 +372,7 @@ impl SyncServiceImpl {
                     }));
                 }
             }
-            Some(ChainsComparison::Divergence {
+            Some(CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs,
                 uncommon_blocks_in_rhs,
             }) => {
@@ -388,11 +388,11 @@ impl SyncServiceImpl {
         }
 
         let num_blocks = match chains_comparison {
-            Some(ChainsComparison::Equal) => unreachable!(),
-            Some(ChainsComparison::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
+            Some(CompareChainsResult::Equal) => unreachable!(),
+            Some(CompareChainsResult::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
             None
-            | Some(ChainsComparison::LhsBehind { .. })
-            | Some(ChainsComparison::Divergence { .. }) => match src_dataset
+            | Some(CompareChainsResult::LhsBehind { .. })
+            | Some(CompareChainsResult::Divergence { .. }) => match src_dataset
                 .as_metadata_chain()
                 .iter_blocks_interval(&src_head, None, false)
                 .try_count()

@@ -23,10 +23,10 @@ impl MetadataChainComparator {
         lhs_head: &Multihash,
         rhs_chain: &dyn MetadataChain,
         rhs_head: Option<&Multihash>,
-    ) -> Result<ChainsComparison, CompareChainsError> {
+    ) -> Result<CompareChainsResult, CompareChainsError> {
         // When source and destination point to the same block, chains are equal, no further scanning required
         if Some(&lhs_head) == rhs_head.as_ref() {
-            return Ok(ChainsComparison::Equal);
+            return Ok(CompareChainsResult::Equal);
         }
 
         // Extract sequence number of head blocks
@@ -70,7 +70,7 @@ impl MetadataChainComparator {
             .await?;
             match convergence_check {
                 CommonAncestorCheck::Success { ahead_blocks } => {
-                    return Ok(ChainsComparison::LhsAhead {
+                    return Ok(CompareChainsResult::LhsAhead {
                         lhs_ahead_blocks: ahead_blocks,
                     })
                 }
@@ -98,7 +98,7 @@ impl MetadataChainComparator {
             .await?;
             match convergence_check {
                 CommonAncestorCheck::Success { ahead_blocks } => {
-                    return Ok(ChainsComparison::LhsBehind {
+                    return Ok(CompareChainsResult::LhsBehind {
                         rhs_ahead_blocks: ahead_blocks,
                     })
                 }
@@ -159,8 +159,8 @@ impl MetadataChainComparator {
         lhs_sequence_number: i32,
         rhs_sequence_number: i32,
         last_common_sequence_number: i32,
-    ) -> ChainsComparison {
-        ChainsComparison::Divergence {
+    ) -> CompareChainsResult {
+        CompareChainsResult::Divergence {
             uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number) as usize,
             uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number) as usize,
         }
@@ -214,7 +214,8 @@ impl MetadataChainComparator {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub enum ChainsComparison {
+#[derive(Debug, Eq, PartialEq)]
+pub enum CompareChainsResult {
     Equal,
     LhsAhead {
         lhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,

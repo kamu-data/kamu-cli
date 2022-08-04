@@ -51,9 +51,9 @@ impl SimpleTransferProtocol {
         .await?;
 
         match chains_comparison {
-            ChainsComparison::Equal => return Ok(SyncResult::UpToDate),
-            ChainsComparison::LhsAhead { .. } => { /* Skip */ }
-            ChainsComparison::LhsBehind {
+            CompareChainsResult::Equal => return Ok(SyncResult::UpToDate),
+            CompareChainsResult::LhsAhead { .. } => { /* Skip */ }
+            CompareChainsResult::LhsBehind {
                 ref rhs_ahead_blocks,
             } => {
                 if !force {
@@ -64,7 +64,7 @@ impl SimpleTransferProtocol {
                     }));
                 }
             }
-            ChainsComparison::Divergence {
+            CompareChainsResult::Divergence {
                 uncommon_blocks_in_lhs: uncommon_blocks_in_src,
                 uncommon_blocks_in_rhs: uncommon_blocks_in_dst,
             } => {
@@ -80,11 +80,11 @@ impl SimpleTransferProtocol {
         };
 
         let blocks = match chains_comparison {
-            ChainsComparison::Equal => unreachable!(),
-            ChainsComparison::LhsAhead {
+            CompareChainsResult::Equal => unreachable!(),
+            CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
             } => src_ahead_blocks,
-            ChainsComparison::LhsBehind { .. } | ChainsComparison::Divergence { .. } => {
+            CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
                 self.map_block_iteration_errors(src_chain.iter_blocks().try_collect().await)?

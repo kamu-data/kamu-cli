@@ -9,6 +9,7 @@
 
 mod test_dataset_impl;
 mod test_local_dataset_repository_impl;
+mod test_metadata_chain_comparator;
 mod test_metadata_chain_impl;
 mod test_object_repository_http;
 mod test_object_repository_in_memory;
