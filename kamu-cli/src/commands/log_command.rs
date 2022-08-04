@@ -174,6 +174,7 @@ impl AsciiRenderer {
         block: &MetadataBlock,
     ) -> Result<(), std::io::Error> {
         self.render_header(output, hash, block)?;
+        self.render_property(output, 0, "SequenceNumber", block.sequence_number)?;
         self.render_property(
             output,
             0,
