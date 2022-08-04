@@ -135,11 +135,12 @@ impl MetadataChainComparator {
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
         if expected_common_ancestor_hash.is_some()
+            && boundary_block_prev_hash.is_some()
             && expected_common_ancestor_hash != boundary_block_prev_hash
         {
             let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
                 ahead_chain,
-                ahead_head,
+                boundary_block_prev_hash.unwrap(),
                 ahead_sequence_number - ahead_size as i32,
                 reference_chain,
                 expected_common_ancestor_hash,
