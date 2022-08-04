@@ -174,7 +174,6 @@ impl AsciiRenderer {
         block: &MetadataBlock,
     ) -> Result<(), std::io::Error> {
         self.render_header(output, hash, block)?;
-        self.render_property(output, 0, "SequenceNumber", block.sequence_number)?;
         self.render_property(
             output,
             0,
@@ -376,14 +375,13 @@ impl AsciiRenderer {
         &self,
         output: &mut impl Write,
         hash: &Multihash,
-        _block: &MetadataBlock,
+        block: &MetadataBlock,
     ) -> Result<(), std::io::Error> {
-        writeln!(
-            output,
-            "{} {}",
-            style("Block:").green(),
-            style(&hash).yellow()
-        )
+        use std::fmt::Write;
+        let mut buf = String::new();
+        write!(&mut buf, "Block #{}:", block.sequence_number).unwrap();
+
+        writeln!(output, "{} {}", style(buf).green(), style(&hash).yellow())
     }
 
     fn render_section(
