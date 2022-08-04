@@ -164,15 +164,15 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         format!("{:x}", sha3::Sha3_256::digest(&buffer)),
-        "8afb3148121ced75b2762f238a21d399b1d453cfebad21afca1c37afff6eb8f4"
+        "b7b9d53f84abee88393a92bde7f615c3a3cd2d33a7d9df1409c8a8ffee8aaf2c"
     );
 }
 
 #[test]
 fn serializer_hashes_are_stable_deriv() {
     let expected_hashes = vec![
-        "1c09c5b547a77217d50039d395e2db096128ff362ba2ca36625ba894414504c6",
-        "66de102280d9aa4485a6013354d4dddcbe4229c6696002f44b8de081f1b7d564",
+        "36e2d65bf87dc36bcf391d8301bd5004244c0bc389c3aeb6e2e38fa1c73ed0e3",
+        "74817d74427ddb0abf3735f069e24c4c4a52249d7dc8cf6d188a3141328fb40a",
     ];
 
     for (block, expected_hash) in get_block_deriv().iter().zip(expected_hashes) {

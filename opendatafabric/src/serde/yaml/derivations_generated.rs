@@ -632,9 +632,9 @@ pub struct MetadataBlockDef {
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<Multihash>,
+    pub sequence_number: i32,
     #[serde_as(as = "MetadataEventDef")]
     pub event: MetadataEvent,
-    pub sequence_number: i32,
 }
 
 implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");

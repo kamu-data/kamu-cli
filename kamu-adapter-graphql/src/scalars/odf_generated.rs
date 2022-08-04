@@ -638,8 +638,8 @@ impl From<odf::MergeStrategySnapshot> for MergeStrategySnapshot {
 pub struct MetadataBlock {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<Multihash>,
-    pub event: MetadataEvent,
     pub sequence_number: i32,
+    pub event: MetadataEvent,
 }
 
 impl From<odf::MetadataBlock> for MetadataBlock {
@@ -647,8 +647,8 @@ impl From<odf::MetadataBlock> for MetadataBlock {
         Self {
             system_time: v.system_time.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
-            event: v.event.into(),
             sequence_number: v.sequence_number.into(),
+            event: v.event.into(),
         }
     }
 }

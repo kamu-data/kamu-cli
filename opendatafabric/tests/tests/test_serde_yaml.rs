@@ -181,6 +181,7 @@ fn serde_metadata_block() {
         content:
           systemTime: \"2020-01-01T12:00:00Z\"
           prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+          sequenceNumber: 127
           event:
             kind: executeQuery
             inputSlices:
@@ -202,8 +203,7 @@ fn serde_metadata_block() {
                 start: 10
                 end: 20
               size: 10
-            outputWatermark: \"2020-01-01T12:00:00Z\"
-          sequenceNumber: 127\n"
+            outputWatermark: \"2020-01-01T12:00:00Z\"\n"
     );
 
     let expected = MetadataBlock {

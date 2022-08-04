@@ -562,7 +562,7 @@ table Manifest {
 table MetadataBlock {
   system_time: Timestamp;
   prev_block_hash: [ubyte];
-  event: MetadataEvent;
   sequence_number: int32;
+  event: MetadataEvent;
 }
 
