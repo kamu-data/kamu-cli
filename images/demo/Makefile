@@ -1,5 +1,5 @@
 IMAGE_REPO = docker.io/kamudata
-KAMU_VERSION = 0.96.0
+KAMU_VERSION = 0.97.0
 DEMO_VERSION = 0.2.0
 
 #########################################################################################
