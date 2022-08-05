@@ -400,7 +400,7 @@ pub enum AppendValidationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("Block '{block_hash}' with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
+#[error("Block {block_hash} with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
 pub struct SequenceIntegrityError {
     pub block_hash: Multihash,
     pub block_sequence_number: i32,

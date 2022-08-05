@@ -87,7 +87,11 @@ impl SimpleTransferProtocol {
             CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
-                self.map_block_iteration_errors(src_chain.iter_blocks().try_collect().await)?
+                src_chain
+                    .iter_blocks()
+                    .try_collect()
+                    .await
+                    .map_err(Self::map_block_iteration_error)?
             }
         };
 
@@ -139,26 +143,22 @@ impl SimpleTransferProtocol {
         }
     }
 
-    fn map_block_iteration_errors<T>(
-        &self,
-        iteration_result: Result<Vec<T>, IterBlocksError>,
-    ) -> Result<Vec<T>, SyncError> {
-        match iteration_result {
-            Ok(v) => Ok(v),
-            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
+    fn map_block_iteration_error(e: IterBlocksError) -> SyncError {
+        match e {
+            IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+            IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
-            .into()),
-            Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
+            .into(),
+            IterBlocksError::BlockVersion(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
-            .into()),
-            Err(IterBlocksError::InvalidInterval(_)) => unreachable!(),
-            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
-            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
+            .into(),
+            IterBlocksError::InvalidInterval(_) => unreachable!(),
+            IterBlocksError::Access(e) => SyncError::Access(e),
+            IterBlocksError::Internal(e) => SyncError::Internal(e),
         }
     }
 

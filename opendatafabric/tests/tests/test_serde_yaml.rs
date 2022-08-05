@@ -286,10 +286,10 @@ fn serde_metadata_block_obsolete_version() {
         outputWatermark: \"2020-01-01T12:00:00Z\"\n"
     );
 
-    let expected_error = Error::ObsoleteVersion {
+    let expected_error = Error::UnsupportedVersion(UnsupportedVersionError {
         manifest_version: 1,
-        minimum_supported_version: METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION as i32,
-    };
+        supported_version_range: METADATA_BLOCK_SUPPORTED_VERSION_RANGE,
+    });
 
     let actual_error = YamlMetadataBlockDeserializer
         .read_manifest(data.as_bytes())

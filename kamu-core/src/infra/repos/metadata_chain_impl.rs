@@ -157,7 +157,7 @@ where
         match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
             Ok(block) => return Ok(block),
             Err(e) => match e {
-                Error::ObsoleteVersion { .. } | Error::UnsupportedVersion { .. } => {
+                Error::UnsupportedVersion { .. } => {
                     return Err(GetBlockError::BlockVersion(BlockVersionError {
                         hash: hash.clone(),
                         source: e.into(),

@@ -166,7 +166,7 @@ impl DatasetNotFoundError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("Source and destination datasets have diverged, source head is '{src_head}', ahead by {uncommon_blocks_in_src} blocks, destination head is {dst_head}, ahead by {uncommon_blocks_in_dst}")]
+#[error("Source and destination datasets have diverged and have {uncommon_blocks_in_src} and {uncommon_blocks_in_dst} different blocks respectively, source head is {src_head}, destination head is {dst_head}")]
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,
@@ -178,7 +178,7 @@ pub struct DatasetsDivergedError {
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error(
-    "Destination head '{dst_head}' is ahead of source head '{src_head}' by {dst_ahead_size} blocks"
+    "Destination head {dst_head} is ahead of source head {src_head} by {dst_ahead_size} blocks"
 )]
 pub struct DestinationAheadError {
     pub src_head: Multihash,
