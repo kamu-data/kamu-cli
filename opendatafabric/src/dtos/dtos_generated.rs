@@ -460,6 +460,8 @@ pub struct MetadataBlock {
     pub system_time: DateTime<Utc>,
     /// Hash sum of the preceding block.
     pub prev_block_hash: Option<Multihash>,
+    /// Block sequence number starting from tail to head.
+    pub sequence_number: i32,
     /// Event data.
     pub event: MetadataEvent,
 }

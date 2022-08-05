@@ -16,6 +16,9 @@ pub use object_repository_http::*;
 mod object_repository_s3;
 pub use object_repository_s3::*;
 
+mod object_repository_in_memory;
+pub use object_repository_in_memory::*;
+
 mod named_object_repository_local_fs;
 pub use named_object_repository_local_fs::*;
 
@@ -24,6 +27,9 @@ pub use named_object_repository_http::*;
 
 mod named_object_repository_s3;
 pub use named_object_repository_s3::*;
+
+mod named_object_repository_in_memory;
+pub use named_object_repository_in_memory::*;
 
 mod reference_repository_impl;
 pub use reference_repository_impl::*;

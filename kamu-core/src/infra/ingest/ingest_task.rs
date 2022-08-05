@@ -155,6 +155,13 @@ impl IngestTask {
             .await
             .int_err()?;
 
+        let prev_block = self
+            .dataset
+            .as_metadata_chain()
+            .get_block(&prev_hash)
+            .await
+            .int_err()?;
+
         let fetch_result = self.maybe_fetch().await?;
         let has_more = fetch_result.checkpoint.has_more;
         let cacheable = fetch_result.checkpoint.is_cacheable();
@@ -174,7 +181,12 @@ impl IngestTask {
         self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
         let commit_result = self
-            .maybe_commit(fetch_result, read_result, prev_hash.clone())
+            .maybe_commit(
+                fetch_result,
+                read_result,
+                prev_hash.clone(),
+                prev_block.sequence_number,
+            )
             .await?;
 
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
@@ -373,6 +385,7 @@ impl IngestTask {
         fetch_result: ExecutionResult<FetchCheckpoint>,
         read_result: ExecutionResult<ReadCheckpoint>,
         prev_hash: Multihash,
+        prev_sequence_number: i32,
     ) -> Result<ExecutionResult<CommitCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("commit.yaml");
 
@@ -496,6 +509,7 @@ impl IngestTask {
                         system_time: read_result.checkpoint.system_time,
                         prev_block_hash: Some(prev_hash),
                         event: metadata_event,
+                        sequence_number: prev_sequence_number + 1,
                     };
                     info!(?new_block, "Committing new block");
 

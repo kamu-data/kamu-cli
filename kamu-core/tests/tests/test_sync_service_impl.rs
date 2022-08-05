@@ -178,10 +178,12 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let (_, b1) = local_repo
+    let create_result = local_repo
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap();
+    let b1 = create_result.head;
+    let b1_sequence_number = create_result.head_sequence_number;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -219,7 +221,7 @@ async fn do_test_sync(
         local_repo.as_ref(),
         &dataset_name,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b1)
+            .prev(&b1, b1_sequence_number)
             .build(),
     )
     .await;
@@ -228,14 +230,14 @@ async fn do_test_sync(
         local_repo.as_ref(),
         &dataset_name,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b2)
+            .prev(&b2, b1_sequence_number + 1)
             .build(),
     )
     .await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head }))
+        Err(SyncError::DestinationAhead(DestinationAheadError {src_head, dst_head, dst_ahead_size: 2 }))
         if src_head == b1 && dst_head == b3
     );
 
@@ -245,7 +247,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1.clone()) && new_head == b3
+        }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_matches!(
@@ -254,7 +256,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
-        }) if old_head == Some(b1.clone()) && new_head == b3
+        }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
@@ -286,14 +288,14 @@ async fn do_test_sync(
 
     assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
 
-    // Datasets diverged on push //////////////////////////////////////////////
+    // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let diverged_head = append_block(
+    let exta_head = append_block(
         local_repo.as_ref(),
         &dataset_name_2,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
-            .prev(&b3)
+            .prev(&b3, b1_sequence_number + 2)
             .build(),
     )
     .await;
@@ -304,14 +306,14 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 1,
-        }) if old_head == Some(b3.clone()) && new_head == diverged_head
+        }) if old_head == Some(b3.clone()) && new_head == exta_head
     );
 
     // Try push from dataset_1
     assert_matches!(
         sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
-        if src_head == b3 && dst_head == diverged_head
+        Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1 }))
+        if src_head == b3 && dst_head == exta_head
     );
 
     // Try push from dataset_1 with --force: it should abandon the diverged_head block
@@ -331,14 +333,14 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
-        }) if old_head == Some(diverged_head.clone()) && new_head == b3
+        }) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
-    // Try pulling dataset_2: should fail, diverged
+    // Try pulling dataset_2: should fail, destination is ahead
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
-        Err(SyncError::DatasetsDiverged (DatasetsDivergedError { src_head, dst_head }))
-        if src_head == b3 && dst_head == diverged_head
+        Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1}))
+        if src_head == b3 && dst_head == exta_head
     );
 
     // Try pulling dataset_2 with --force: should abandon diverged_head
@@ -358,7 +360,51 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
-        }) if old_head == Some(diverged_head.clone()) && new_head == b3
+        }) if old_head == Some(exta_head.clone()) && new_head == b3
+    );
+
+    // Datasets complex divergence //////////////////////////////////////////////
+
+    let b4 = append_block(
+        local_repo.as_ref(),
+        &dataset_name,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
+            .prev(&b3, b1_sequence_number + 2)
+            .build(),
+    )
+    .await;
+
+    let b5 = append_block(
+        local_repo.as_ref(),
+        &dataset_name,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
+            .prev(&b4, b1_sequence_number + 3)
+            .build(),
+    )
+    .await;
+
+    let b4_alt = append_block(
+        local_repo.as_ref(),
+        &dataset_name_2,
+        MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
+            .prev(&b3, b1_sequence_number + 2)
+            .build(),
+    )
+    .await;
+
+    assert_matches!(
+        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        Ok(SyncResult::Updated {
+            old_head,
+            new_head,
+            num_blocks: 2,
+        }) if old_head.as_ref() == Some(&b3) && new_head == b5
+    );
+
+    assert_matches!(
+        sync_svc.sync(&dataset_name_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head, uncommon_blocks_in_src, uncommon_blocks_in_dst }))
+        if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src == 1 && uncommon_blocks_in_dst == 2
     );
 }
 

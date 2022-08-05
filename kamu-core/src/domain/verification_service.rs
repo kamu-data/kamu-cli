@@ -79,10 +79,13 @@ impl Default for VerificationOptions {
 pub enum VerificationPhase {
     DataIntegrity,
     ReplayTransform,
+    MetadataIntegrity,
 }
 
 // The call pattern is:
 //   begin()
+//     begin_phase(MetadataIntegrity)
+//     end_phase(MetadataIntegrity)
 //     begin_phase(DataIntegrity)
 //       begin_block()
 //       end_block()
@@ -100,8 +103,8 @@ pub trait VerificationListener {
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
 
-    fn begin_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
-    fn end_phase(&self, _phase: VerificationPhase, _num_blocks: usize) {}
+    fn begin_phase(&self, _phase: VerificationPhase) {}
+    fn end_phase(&self, _phase: VerificationPhase) {}
 
     fn begin_block(
         &self,
@@ -162,6 +165,12 @@ pub enum VerificationError {
         #[from]
         #[backtrace]
         BlockNotFoundError,
+    ),
+    #[error(transparent)]
+    BlockVersion(
+        #[from]
+        #[backtrace]
+        BlockVersionError,
     ),
     #[error(transparent)]
     InvalidInterval(
@@ -225,6 +234,7 @@ impl From<IterBlocksError> for VerificationError {
         match v {
             IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
             IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
+            IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
             IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
             IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
             IterBlocksError::Internal(e) => VerificationError::Internal(e),
@@ -337,3 +347,5 @@ impl Display for CheckpointDoesNotMatchMetadata {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

@@ -1123,6 +1123,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
         let mut builder = fb::MetadataBlockBuilder::new(fb);
         builder.add_system_time(&datetime_to_fb(&self.system_time));
         prev_block_hash_offset.map(|off| builder.add_prev_block_hash(off));
+        builder.add_sequence_number(self.sequence_number);
         builder.add_event_type(event_offset.0);
         builder.add_event(event_offset.1);
         builder.finish()
@@ -1136,6 +1137,7 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
             prev_block_hash: proxy
                 .prev_block_hash()
                 .map(|v| odf::Multihash::from_bytes(v).unwrap()),
+            sequence_number: proxy.sequence_number(),
             event: proxy
                 .event()
                 .map(|v| odf::MetadataEvent::deserialize(v, proxy.event_type()))

@@ -12,6 +12,7 @@ use crate::infra::*;
 use opendatafabric::*;
 
 use dill::*;
+use futures::TryStreamExt;
 use std::sync::Arc;
 use tracing::info_span;
 
@@ -69,7 +70,7 @@ impl VerificationServiceImpl {
         let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
         let num_blocks = plan.len();
 
-        listener.begin_phase(VerificationPhase::DataIntegrity, num_blocks);
+        listener.begin_phase(VerificationPhase::DataIntegrity);
 
         for (block_index, (block_hash, block)) in plan.into_iter().enumerate() {
             listener.begin_block(
@@ -181,7 +182,66 @@ impl VerificationServiceImpl {
             );
         }
 
-        listener.end_phase(VerificationPhase::DataIntegrity, num_blocks);
+        listener.end_phase(VerificationPhase::DataIntegrity);
+
+        Ok(VerificationResult::Valid)
+    }
+
+    async fn check_sequence_integrity<'a>(
+        &'a self,
+        dataset_handle: &'a DatasetHandle,
+        block_range: (Option<Multihash>, Option<Multihash>),
+        listener: Arc<dyn VerificationListener>,
+    ) -> Result<VerificationResult, VerificationError> {
+        let span = info_span!("Verifying metadata integrity");
+        let _span_guard = span.enter();
+
+        let dataset = self
+            .local_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let chain = dataset.as_metadata_chain();
+
+        let head = match block_range.1 {
+            None => chain.get_ref(&BlockRef::Head).await?,
+            Some(hash) => hash,
+        };
+        let tail = block_range.0;
+
+        listener.begin_phase(VerificationPhase::MetadataIntegrity);
+
+        let blocks: Vec<_> = dataset
+            .as_metadata_chain()
+            .iter_blocks_interval(&head, tail.as_ref(), false)
+            .try_collect()
+            .await?;
+
+        // To verify sequence integrity, let's build a temporary chain from the same blocks in memory.
+        // Here we reuse validations implemented in append rules when adding blocks to new chain.
+        let in_memory_chain = MetadataChainImpl::new(
+            ObjectRepositoryInMemory::new(),
+            ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+        );
+
+        for (block_hash, block) in blocks.into_iter().rev() {
+            match in_memory_chain
+                .append(
+                    block,
+                    AppendOpts {
+                        precomputed_hash: Some(&block_hash),
+                        ..AppendOpts::default()
+                    },
+                )
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(AppendError::RefNotFound(e)) => Err(VerificationError::RefNotFound(e)),
+                Err(e) => Err(VerificationError::Internal(e.int_err())),
+            }?;
+        }
+
+        listener.end_phase(VerificationPhase::MetadataIntegrity);
 
         Ok(VerificationResult::Valid)
     }
@@ -216,6 +276,13 @@ impl VerificationService for VerificationServiceImpl {
 
         let res = try {
             if options.check_integrity {
+                self.check_sequence_integrity(
+                    &dataset_handle,
+                    block_range.clone(),
+                    listener.clone(),
+                )
+                .await?;
+
                 self.check_data_integrity(
                     &dataset_handle,
                     dataset_kind,

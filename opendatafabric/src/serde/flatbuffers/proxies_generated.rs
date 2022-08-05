@@ -10023,8 +10023,9 @@ impl<'a> flatbuffers::Follow<'a> for MetadataBlock<'a> {
 impl<'a> MetadataBlock<'a> {
     pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 4;
     pub const VT_PREV_BLOCK_HASH: flatbuffers::VOffsetT = 6;
-    pub const VT_EVENT_TYPE: flatbuffers::VOffsetT = 8;
-    pub const VT_EVENT: flatbuffers::VOffsetT = 10;
+    pub const VT_SEQUENCE_NUMBER: flatbuffers::VOffsetT = 8;
+    pub const VT_EVENT_TYPE: flatbuffers::VOffsetT = 10;
+    pub const VT_EVENT: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -10039,6 +10040,7 @@ impl<'a> MetadataBlock<'a> {
         if let Some(x) = args.event {
             builder.add_event(x);
         }
+        builder.add_sequence_number(args.sequence_number);
         if let Some(x) = args.prev_block_hash {
             builder.add_prev_block_hash(x);
         }
@@ -10062,6 +10064,12 @@ impl<'a> MetadataBlock<'a> {
                 None,
             )
             .map(|v| v.safe_slice())
+    }
+    #[inline]
+    pub fn sequence_number(&self) -> i32 {
+        self._tab
+            .get::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, Some(0))
+            .unwrap()
     }
     #[inline]
     pub fn event_type(&self) -> MetadataEvent {
@@ -10192,6 +10200,7 @@ impl flatbuffers::Verifiable for MetadataBlock<'_> {
                 Self::VT_PREV_BLOCK_HASH,
                 false,
             )?
+            .visit_field::<i32>("sequence_number", Self::VT_SEQUENCE_NUMBER, false)?
             .visit_union::<MetadataEvent, _>(
                 "event_type",
                 Self::VT_EVENT_TYPE,
@@ -10259,6 +10268,7 @@ impl flatbuffers::Verifiable for MetadataBlock<'_> {
 pub struct MetadataBlockArgs<'a> {
     pub system_time: Option<&'a Timestamp>,
     pub prev_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub sequence_number: i32,
     pub event_type: MetadataEvent,
     pub event: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
 }
@@ -10268,6 +10278,7 @@ impl<'a> Default for MetadataBlockArgs<'a> {
         MetadataBlockArgs {
             system_time: None,
             prev_block_hash: None,
+            sequence_number: 0,
             event_type: MetadataEvent::NONE,
             event: None,
         }
@@ -10293,6 +10304,11 @@ impl<'a: 'b, 'b> MetadataBlockBuilder<'a, 'b> {
             MetadataBlock::VT_PREV_BLOCK_HASH,
             prev_block_hash,
         );
+    }
+    #[inline]
+    pub fn add_sequence_number(&mut self, sequence_number: i32) {
+        self.fbb_
+            .push_slot::<i32>(MetadataBlock::VT_SEQUENCE_NUMBER, sequence_number, 0);
     }
     #[inline]
     pub fn add_event_type(&mut self, event_type: MetadataEvent) {
@@ -10327,6 +10343,7 @@ impl core::fmt::Debug for MetadataBlock<'_> {
         let mut ds = f.debug_struct("MetadataBlock");
         ds.field("system_time", &self.system_time());
         ds.field("prev_block_hash", &self.prev_block_hash());
+        ds.field("sequence_number", &self.sequence_number());
         ds.field("event_type", &self.event_type());
         match self.event_type() {
             MetadataEvent::AddData => {

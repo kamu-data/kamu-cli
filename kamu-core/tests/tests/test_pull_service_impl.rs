@@ -75,39 +75,39 @@ async fn create_graph(
         let chain = builder.as_dataset().as_metadata_chain();
 
         if deps.is_empty() {
-            let h = chain
-                .append(
-                    MetadataFactory::metadata_block(
-                        MetadataFactory::seed(DatasetKind::Root)
-                            .id_from(dataset_name.as_str())
-                            .build(),
-                    )
+            let seed_block = MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Root)
+                    .id_from(dataset_name.as_str())
                     .build(),
-                    AppendOpts::default(),
-                )
+            )
+            .build();
+            let seed_block_sequence_number = seed_block.sequence_number;
+
+            let h = chain
+                .append(seed_block, AppendOpts::default())
                 .await
                 .unwrap();
 
             chain
                 .append(
                     MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                        .prev(&h)
+                        .prev(&h, seed_block_sequence_number)
                         .build(),
                     AppendOpts::default(),
                 )
                 .await
                 .unwrap();
         } else {
-            let h = chain
-                .append(
-                    MetadataFactory::metadata_block(
-                        MetadataFactory::seed(DatasetKind::Derivative)
-                            .id_from(dataset_name.as_str())
-                            .build(),
-                    )
+            let seed_block = MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Derivative)
+                    .id_from(dataset_name.as_str())
                     .build(),
-                    AppendOpts::default(),
-                )
+            )
+            .build();
+            let seed_block_sequence_number = seed_block.sequence_number;
+
+            let h = chain
+                .append(seed_block, AppendOpts::default())
                 .await
                 .unwrap();
 
@@ -118,7 +118,7 @@ async fn create_graph(
                             .input_ids_from_names()
                             .build(),
                     )
-                    .prev(&h)
+                    .prev(&h, seed_block_sequence_number)
                     .build(),
                     AppendOpts::default(),
                 )
@@ -141,38 +141,38 @@ async fn create_graph_in_repository(
         let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {
-            let head = chain
-                .append(
-                    MetadataFactory::metadata_block(
-                        MetadataFactory::seed(DatasetKind::Root)
-                            .id_from(dataset_name.as_str())
-                            .build(),
-                    )
+            let seed_block = MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Root)
+                    .id_from(dataset_name.as_str())
                     .build(),
-                    AppendOpts::default(),
-                )
+            )
+            .build();
+            let seed_block_sequence_number = seed_block.sequence_number;
+
+            let head = chain
+                .append(seed_block, AppendOpts::default())
                 .await
                 .unwrap();
             chain
                 .append(
                     MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                        .prev(&head)
+                        .prev(&head, seed_block_sequence_number)
                         .build(),
                     AppendOpts::default(),
                 )
                 .await
                 .unwrap();
         } else {
-            let head = chain
-                .append(
-                    MetadataFactory::metadata_block(
-                        MetadataFactory::seed(DatasetKind::Derivative)
-                            .id_from(dataset_name.as_str())
-                            .build(),
-                    )
+            let seed_block = MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Derivative)
+                    .id_from(dataset_name.as_str())
                     .build(),
-                    AppendOpts::default(),
-                )
+            )
+            .build();
+            let seed_block_sequence_number = seed_block.sequence_number;
+
+            let head = chain
+                .append(seed_block, AppendOpts::default())
                 .await
                 .unwrap();
 
@@ -183,7 +183,7 @@ async fn create_graph_in_repository(
                             .input_ids_from_names()
                             .build(),
                     )
-                    .prev(&head)
+                    .prev(&head, seed_block_sequence_number)
                     .build(),
                     AppendOpts::default(),
                 )

@@ -11,6 +11,8 @@ use chrono::prelude::*;
 use opendatafabric::*;
 use std::convert::TryFrom;
 
+const TEST_SEQUENCE_NUMBER: i32 = 132;
+
 fn load() -> MetadataBlock {
     MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
@@ -34,6 +36,7 @@ fn load() -> MetadataBlock {
                 temporal_tables: None,
             }),
         }),
+        sequence_number: TEST_SEQUENCE_NUMBER,
     }
 }
 
@@ -48,6 +51,7 @@ fn test_accessors() {
         *block.prev_block_hash().unwrap(),
         Multihash::from_digest_sha3_256(b"prev")
     );
+    assert_eq!(block.sequence_number(), TEST_SEQUENCE_NUMBER);
     let transform = match block.event() {
         dynamic::MetadataEvent::SetTransform(t) => t,
         _ => panic!(),

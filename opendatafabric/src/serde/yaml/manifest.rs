@@ -18,3 +18,11 @@ pub struct Manifest<T> {
     pub version: i32,
     pub content: T,
 }
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentFreeManifest {
+    pub kind: String,
+    pub version: i32,
+}

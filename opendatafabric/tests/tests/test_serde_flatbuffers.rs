@@ -16,6 +16,8 @@ use std::convert::TryFrom;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const TEST_SEQUENCE_NUMBER: i32 = 117;
+
 fn get_block_root() -> MetadataBlock {
     MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
@@ -45,6 +47,7 @@ fn get_block_root() -> MetadataBlock {
                 primary_key: vec!["a".to_owned()],
             }),
         }),
+        sequence_number: TEST_SEQUENCE_NUMBER,
     }
 }
 
@@ -72,6 +75,7 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                     temporal_tables: None,
                 }),
             }),
+            sequence_number: TEST_SEQUENCE_NUMBER,
         },
         MetadataBlock {
             prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
@@ -105,6 +109,7 @@ fn get_block_deriv() -> Vec<MetadataBlock> {
                 output_checkpoint: None,
                 output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
             }),
+            sequence_number: TEST_SEQUENCE_NUMBER,
         },
     ]
 }
@@ -159,15 +164,15 @@ fn serializer_hashes_are_stable_root() {
 
     assert_eq!(
         format!("{:x}", sha3::Sha3_256::digest(&buffer)),
-        "baa52564c6f90b0190f2dd6dfce8f5cf235c2259c3af6369d1564d2835c7b667"
+        "b7b9d53f84abee88393a92bde7f615c3a3cd2d33a7d9df1409c8a8ffee8aaf2c"
     );
 }
 
 #[test]
 fn serializer_hashes_are_stable_deriv() {
     let expected_hashes = vec![
-        "a99f2128da758d9bb08395438ab8b4aec6acc53bee0dd8b1965443d5aa1e1fc7",
-        "ed0ea782486888d336d69973c8a6209aae7ddcb88e3782f8e76acd2d1d4afc9d",
+        "36e2d65bf87dc36bcf391d8301bd5004244c0bc389c3aeb6e2e38fa1c73ed0e3",
+        "74817d74427ddb0abf3735f069e24c4c4a52249d7dc8cf6d188a3141328fb40a",
     ];
 
     for (block, expected_hash) in get_block_deriv().iter().zip(expected_hashes) {

@@ -12,10 +12,15 @@ use crate::domain::*;
 use opendatafabric::*;
 
 use futures::TryStreamExt;
+use opendatafabric::MetadataBlock;
 use tracing::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Implements "Simple Transfer Protocol" as described in ODF spec
 pub struct SimpleTransferProtocol;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 impl SimpleTransferProtocol {
     // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
@@ -32,13 +37,90 @@ impl SimpleTransferProtocol {
         let src_chain = src.as_metadata_chain();
         let dst_chain = dst.as_metadata_chain();
 
-        let src_data = src.as_data_repo();
-        let dst_data = dst.as_data_repo();
+        let src_head = self.get_src_head(src_ref, src_chain).await?;
+        let dst_head = self.get_dest_head(dst_chain).await?;
 
-        let src_checkpoints = src.as_checkpoint_repo();
-        let dst_checkpoints = dst.as_checkpoint_repo();
+        info!(?src_head, ?dst_head, "Resolved heads");
 
-        let src_head = match src_chain.get_ref(&BlockRef::Head).await {
+        let chains_comparison = MetadataChainComparator::compare_chains(
+            src_chain,
+            &src_head,
+            dst_chain,
+            dst_head.as_ref(),
+        )
+        .await?;
+
+        match chains_comparison {
+            CompareChainsResult::Equal => return Ok(SyncResult::UpToDate),
+            CompareChainsResult::LhsAhead { .. } => { /* Skip */ }
+            CompareChainsResult::LhsBehind {
+                ref rhs_ahead_blocks,
+            } => {
+                if !force {
+                    return Err(SyncError::DestinationAhead(DestinationAheadError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        dst_ahead_size: rhs_ahead_blocks.len(),
+                    }));
+                }
+            }
+            CompareChainsResult::Divergence {
+                uncommon_blocks_in_lhs: uncommon_blocks_in_src,
+                uncommon_blocks_in_rhs: uncommon_blocks_in_dst,
+            } => {
+                if !force {
+                    return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
+                        src_head: src_head,
+                        dst_head: dst_head.unwrap(),
+                        uncommon_blocks_in_dst,
+                        uncommon_blocks_in_src,
+                    }));
+                }
+            }
+        };
+
+        let blocks = match chains_comparison {
+            CompareChainsResult::Equal => unreachable!(),
+            CompareChainsResult::LhsAhead {
+                lhs_ahead_blocks: src_ahead_blocks,
+            } => src_ahead_blocks,
+            CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
+                // Load all source blocks from head to tail
+                assert!(force);
+                src_chain
+                    .iter_blocks()
+                    .try_collect()
+                    .await
+                    .map_err(Self::map_block_iteration_error)?
+            }
+        };
+
+        let num_blocks = blocks.len();
+
+        self.synchronize_blocks(
+            blocks,
+            src,
+            dst,
+            &src_head,
+            dst_head.as_ref(),
+            validation,
+            trust_source_hashes,
+        )
+        .await?;
+
+        Ok(SyncResult::Updated {
+            old_head: dst_head,
+            new_head: src_head,
+            num_blocks,
+        })
+    }
+
+    async fn get_src_head(
+        &self,
+        src_ref: &DatasetRefAny,
+        src_chain: &dyn MetadataChain,
+    ) -> Result<Multihash, SyncError> {
+        match src_chain.get_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                 dataset_ref: src_ref.clone(),
@@ -46,44 +128,50 @@ impl SimpleTransferProtocol {
             .into()),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+        }
+    }
 
-        let dst_head = match dst_chain.get_ref(&BlockRef::Head).await {
+    async fn get_dest_head(
+        &self,
+        dst_chain: &dyn MetadataChain,
+    ) -> Result<Option<Multihash>, SyncError> {
+        match dst_chain.get_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
-
-        info!(?src_head, ?dst_head, "Resolved heads");
-
-        if Some(&src_head) == dst_head.as_ref() {
-            return Ok(SyncResult::UpToDate);
         }
+    }
 
-        // Download missing blocks
-        let blocks: Vec<_> = match src_chain
-            .iter_blocks_interval(&src_head, dst_head.as_ref(), force)
-            .try_collect()
-            .await
-        {
-            Ok(v) => Ok(v),
-            Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-            Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
+    fn map_block_iteration_error(e: IterBlocksError) -> SyncError {
+        match e {
+            IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+            IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }
-            .into()),
-            Err(IterBlocksError::InvalidInterval(e)) => Err(DatasetsDivergedError {
-                src_head: e.head,
-                dst_head: e.tail,
+            .into(),
+            IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
             }
-            .into()),
-            Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
-            Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+            .into(),
+            IterBlocksError::InvalidInterval(_) => unreachable!(),
+            IterBlocksError::Access(e) => SyncError::Access(e),
+            IterBlocksError::Internal(e) => SyncError::Internal(e),
+        }
+    }
 
-        let num_blocks = blocks.len();
+    async fn synchronize_blocks(
+        &self,
+        blocks: Vec<(Multihash, MetadataBlock)>,
+        src: &dyn Dataset,
+        dst: &dyn Dataset,
+        src_head: &Multihash,
+        dst_head: Option<&Multihash>,
+        validation: AppendValidation,
+        trust_source_hashes: bool,
+    ) -> Result<(), SyncError> {
         info!("Considering {} new blocks", blocks.len());
 
         // Download data and checkpoints
@@ -96,7 +184,11 @@ impl SimpleTransferProtocol {
             if let Some(data_slice) = block.event.output_data {
                 info!(hash = ?data_slice.physical_hash, "Transfering data file");
 
-                let stream = match src_data.get_stream(&data_slice.physical_hash).await {
+                let stream = match src
+                    .as_data_repo()
+                    .get_stream(&data_slice.physical_hash)
+                    .await
+                {
                     Ok(s) => Ok(s),
                     Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source data file is missing".to_owned(),
@@ -107,7 +199,8 @@ impl SimpleTransferProtocol {
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
-                match dst_data
+                match dst
+                    .as_data_repo()
                     .insert_stream(
                         stream,
                         InsertOpts {
@@ -143,7 +236,11 @@ impl SimpleTransferProtocol {
             if let Some(checkpoint) = block.event.output_checkpoint {
                 info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
 
-                let stream = match src_checkpoints.get_stream(&checkpoint.physical_hash).await {
+                let stream = match src
+                    .as_checkpoint_repo()
+                    .get_stream(&checkpoint.physical_hash)
+                    .await
+                {
                     Ok(s) => Ok(s),
                     Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
                         message: "Source checkpoint file is missing".to_owned(),
@@ -154,7 +251,8 @@ impl SimpleTransferProtocol {
                     Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
 
-                match dst_checkpoints
+                match dst
+                    .as_checkpoint_repo()
                     .insert_stream(
                         stream,
                         InsertOpts {
@@ -193,7 +291,8 @@ impl SimpleTransferProtocol {
         for (hash, block) in blocks.into_iter().rev() {
             debug!(?hash, "Appending block");
 
-            match dst_chain
+            match dst
+                .as_metadata_chain()
                 .append(
                     block,
                     AppendOpts {
@@ -236,13 +335,14 @@ impl SimpleTransferProtocol {
 
         // Update reference, atomically commiting the sync operation
         // Any failures before this point may result in dangling files but will keep the destination dataset in its original logical state
-        match dst_chain
+        match dst
+            .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,
                 &src_head,
                 SetRefOpts {
                     validate_block_present: false,
-                    check_ref_is: Some(dst_head.as_ref()),
+                    check_ref_is: Some(dst_head),
                 },
             )
             .await
@@ -275,11 +375,8 @@ impl SimpleTransferProtocol {
                 Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
         }
-
-        Ok(SyncResult::Updated {
-            old_head: dst_head,
-            new_head: src_head,
-            num_blocks,
-        })
+        Ok(())
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

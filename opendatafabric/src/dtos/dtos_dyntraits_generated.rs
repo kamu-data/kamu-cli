@@ -950,6 +950,7 @@ impl Into<dtos::MergeStrategySnapshot> for &dyn MergeStrategySnapshot {
 pub trait MetadataBlock {
     fn system_time(&self) -> DateTime<Utc>;
     fn prev_block_hash(&self) -> Option<&Multihash>;
+    fn sequence_number(&self) -> i32;
     fn event(&self) -> MetadataEvent;
 }
 
@@ -959,6 +960,9 @@ impl MetadataBlock for dtos::MetadataBlock {
     }
     fn prev_block_hash(&self) -> Option<&Multihash> {
         self.prev_block_hash.as_ref().map(|v| -> &Multihash { v })
+    }
+    fn sequence_number(&self) -> i32 {
+        self.sequence_number
     }
     fn event(&self) -> MetadataEvent {
         (&self.event).into()
@@ -970,6 +974,7 @@ impl Into<dtos::MetadataBlock> for &dyn MetadataBlock {
         dtos::MetadataBlock {
             system_time: self.system_time(),
             prev_block_hash: self.prev_block_hash().map(|v| v.clone()),
+            sequence_number: self.sequence_number(),
             event: self.event().into(),
         }
     }

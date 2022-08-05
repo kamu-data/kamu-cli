@@ -18,6 +18,25 @@ use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct CreateDatasetResult {
+    pub dataset_handle: DatasetHandle,
+    pub head: Multihash,
+    pub head_sequence_number: i32,
+}
+
+impl CreateDatasetResult {
+    pub fn new(dataset_handle: DatasetHandle, head: Multihash, head_sequence_number: i32) -> Self {
+        Self {
+            dataset_handle,
+            head,
+            head_sequence_number,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait]
 pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn resolve_dataset_ref(
@@ -40,14 +59,14 @@ pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset_from_snapshot(
         &self,
         snapshot: DatasetSnapshot,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>;
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )>;
 
     async fn rename_dataset(
@@ -131,15 +150,18 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
         &self,
         dataset_name: &DatasetName,
         blocks: IT,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetError>
+    ) -> Result<CreateDatasetResult, CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
     {
         let ds = self.create_dataset(dataset_name).await?;
         let mut hash = None;
+        let mut sequence_number = -1;
         for mut block in blocks {
+            sequence_number += 1;
             block.prev_block_hash = hash.clone();
+            block.sequence_number = sequence_number;
             hash = Some(
                 ds.as_dataset()
                     .as_metadata_chain()
@@ -149,7 +171,11 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
             );
         }
         let hdl = ds.finish().await?;
-        Ok((hdl, hash.unwrap()))
+        Ok(CreateDatasetResult::new(
+            hdl,
+            hash.unwrap(),
+            sequence_number,
+        ))
     }
 }
 

@@ -52,9 +52,10 @@ async fn test_append_and_get() {
         .unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(0, block_1.sequence_number);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1.sequence_number)
         .build();
 
     let hash_2 = chain
@@ -63,6 +64,7 @@ async fn test_append_and_get() {
         .unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_2);
+    assert_eq!(1, block_2.sequence_number);
 
     assert_eq!(chain.get_block(&hash_1).await.unwrap(), block_1);
     assert_eq!(chain.get_block(&hash_2).await.unwrap(), block_2);
@@ -156,13 +158,17 @@ async fn test_append_prev_block_not_found() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&Multihash::from_digest_sha3_256(b"does-not-exist"))
+        .prev(
+            &Multihash::from_digest_sha3_256(b"does-not-exist"),
+            block_1_sequence_number,
+        )
         .build();
 
     assert_matches!(
@@ -176,7 +182,7 @@ async fn test_append_prev_block_not_found() {
 }
 
 #[tokio::test]
-async fn test_append_unexpected_ref() {
+async fn test_append_prev_block_sequence_integrity_broken() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
@@ -188,7 +194,73 @@ async fn test_append_unexpected_ref() {
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, 0)
+        .build();
+
+    let hash_2 = chain.append(block_2, AppendOpts::default()).await.unwrap();
+
+    let block_too_low = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 0 /* should be 1 */)
+        .build();
+
+    assert_matches!(
+        chain.append(block_too_low, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                block_hash,
+                block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 1
+    );
+
+    let block_too_high = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 2 /* should be 1 */)
+        .build();
+
+    assert_matches!(
+        chain.append(block_too_high, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                block_hash,
+                block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 3
+    );
+
+    let block_just_right = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_2, 1)
+        .build();
+
+    let hash_just_right = chain
+        .append(block_just_right, AppendOpts::default())
+        .await
+        .unwrap();
+
+    assert_eq!(
+        chain.get_ref(&BlockRef::Head).await.unwrap(),
+        hash_just_right
+    );
+}
+
+#[tokio::test]
+async fn test_append_unexpected_ref() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block_1 =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number;
+
+    let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
+
+    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+
+    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+        .prev(&hash_1, block_1_sequence_number)
         .build();
 
     let invalid_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
@@ -230,11 +302,12 @@ async fn test_append_seed_block_not_first() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1_sequence_number)
         .build();
 
     assert_matches!(
@@ -252,11 +325,12 @@ async fn test_append_system_time_non_monotonic() {
 
     let block_1 =
         MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let block_1_sequence_number = block_1.sequence_number;
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1_sequence_number)
         .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
         .build();
 
@@ -283,7 +357,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1)
+        .prev(&hash_1, block_1.sequence_number)
         .build();
     let hash_2 = chain
         .append(block_2.clone(), AppendOpts::default())
@@ -291,7 +365,7 @@ async fn test_iter_blocks() {
         .unwrap();
 
     let block_3 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2)
+        .prev(&hash_2, block_2.sequence_number)
         .build();
     let hash_3 = chain
         .append(block_3.clone(), AppendOpts::default())

@@ -52,6 +52,36 @@ where
         Ok(())
     }
 
+    async fn validate_append_sequence_numbers_integrity(
+        &self,
+        new_block: &MetadataBlock,
+        _block_cache: &mut Vec<MetadataBlock>,
+    ) -> Result<(), AppendError> {
+        if new_block.prev_block_hash.is_some() {
+            let block_hash = new_block.prev_block_hash.as_ref().unwrap();
+            let block = match self.get_block(block_hash).await {
+                Ok(block) => Ok(block),
+                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
+                    AppendValidationError::PrevBlockNotFound(e),
+                )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
+                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
+            }?;
+            if block.sequence_number != (new_block.sequence_number - 1) {
+                return Err(
+                    AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                        block_hash: block_hash.clone(),
+                        block_sequence_number: block.sequence_number,
+                        next_block_sequence_number: new_block.sequence_number,
+                    })
+                    .into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
     async fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
@@ -85,6 +115,7 @@ where
                 Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
                     AppendValidationError::PrevBlockNotFound(e),
                 )),
+                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
                 Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }
@@ -123,15 +154,26 @@ where
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
-        let block = FlatbuffersMetadataBlockDeserializer
-            .read_manifest(&data)
-            .map_err(|e| BlockMalformedError {
-                hash: hash.clone(),
-                source: e.into(),
-            })
-            .int_err()?;
-
-        Ok(block)
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
+            Ok(block) => return Ok(block),
+            Err(e) => match e {
+                Error::UnsupportedVersion { .. } => {
+                    return Err(GetBlockError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }));
+                }
+                _ => {
+                    return Err(GetBlockError::Internal(
+                        BlockMalformedError {
+                            hash: hash.clone(),
+                            source: e.into(),
+                        }
+                        .int_err(),
+                    ));
+                }
+            },
+        }
     }
 
     fn iter_blocks_interval<'a>(
@@ -239,6 +281,8 @@ where
 
         if opts.validation == AppendValidation::Full {
             self.validate_append_prev_block_exists(&block, &mut block_cache)
+                .await?;
+            self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
             self.validate_append_seed_block_order(&block, &mut block_cache)
                 .await?;

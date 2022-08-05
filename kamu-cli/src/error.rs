@@ -322,7 +322,8 @@ impl From<GetRefError> for CLIError {
 impl From<IterBlocksError> for CLIError {
     fn from(v: IterBlocksError) -> Self {
         match v {
-            e => Self::critical(e),
+            e @ IterBlocksError::BlockVersion(_) => Self::failure(e),
+            _ => Self::critical(v),
         }
     }
 }

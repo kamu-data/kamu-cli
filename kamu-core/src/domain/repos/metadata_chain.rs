@@ -206,6 +206,8 @@ pub enum GetBlockError {
     #[error(transparent)]
     NotFound(BlockNotFoundError),
     #[error(transparent)]
+    BlockVersion(BlockVersionError),
+    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -227,6 +229,8 @@ pub enum IterBlocksError {
     RefNotFound(RefNotFoundError),
     #[error(transparent)]
     BlockNotFound(BlockNotFoundError),
+    #[error(transparent)]
+    BlockVersion(BlockVersionError),
     #[error(transparent)]
     InvalidInterval(InvalidIntervalError),
     #[error(transparent)]
@@ -257,6 +261,7 @@ impl From<GetBlockError> for IterBlocksError {
     fn from(v: GetBlockError) -> Self {
         match v {
             GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
         }
@@ -332,6 +337,15 @@ impl From<super::reference_repository::SetRefError> for AppendError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+#[error("Block has incompatible version: {hash}")]
+pub struct BlockVersionError {
+    pub hash: Multihash,
+    pub source: BoxedError,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 #[error("Block does not exist: {hash}")]
 pub struct BlockNotFoundError {
     pub hash: Multihash,
@@ -377,6 +391,20 @@ pub enum AppendValidationError {
     AppendingSeedBlockToNonEmptyChain,
     #[error("Invalid previous block")]
     PrevBlockNotFound(BlockNotFoundError),
+    #[error(transparent)]
+    SequenceIntegrity(SequenceIntegrityError),
     #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, PartialEq, Eq, Debug)]
+#[error("Block {block_hash} with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
+pub struct SequenceIntegrityError {
+    pub block_hash: Multihash,
+    pub block_sequence_number: i32,
+    pub next_block_sequence_number: i32,
+}
+
+///////////////////////////////////////////////////////////////////////////////

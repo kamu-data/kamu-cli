@@ -403,7 +403,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
     async fn create_dataset_from_snapshot(
         &self,
         mut snapshot: DatasetSnapshot,
-    ) -> Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError> {
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // Validate / resolve events
         for event in snapshot.metadata.iter_mut() {
             match event {
@@ -459,6 +459,8 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         // proof of control over dataset and metadata signing.
         let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
 
+        let mut sequence_number = 0;
+
         let mut head = chain
             .append(
                 MetadataBlock {
@@ -468,6 +470,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                         dataset_id,
                         dataset_kind: snapshot.kind,
                     }),
+                    sequence_number: sequence_number,
                 },
                 AppendOpts::default(),
             )
@@ -475,12 +478,14 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             .int_err()?;
 
         for event in snapshot.metadata {
+            sequence_number += 1;
             head = chain
                 .append(
                     MetadataBlock {
                         system_time,
                         prev_block_hash: Some(head),
                         event,
+                        sequence_number: sequence_number,
                     },
                     AppendOpts::default(),
                 )
@@ -489,7 +494,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         }
 
         let hdl = builder.finish().await?;
-        Ok((hdl, head))
+        Ok(CreateDatasetResult::new(hdl, head, sequence_number))
     }
 
     async fn create_datasets_from_snapshots(
@@ -497,7 +502,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
-        Result<(DatasetHandle, Multihash), CreateDatasetFromSnapshotError>,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered =
             self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
