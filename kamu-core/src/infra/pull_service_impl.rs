@@ -88,7 +88,14 @@ impl PullServiceImpl {
 
         // Resolve local dataset if it exists
         let local_handle = if let Some(local_ref) = &request.local_ref {
-            self.local_repo.try_resolve_dataset_ref(local_ref).await?
+            let local_handle = self.local_repo.try_resolve_dataset_ref(local_ref).await?;
+            if local_handle.is_none() && request.remote_ref.is_none() {
+                // Dataset does not exist locally nor remote ref was provided
+                return Err(PullError::NotFound(DatasetNotFoundError {
+                    dataset_ref: local_ref.clone(),
+                }));
+            }
+            local_handle
         } else if let Some(remote_ref) = &request.remote_ref {
             self.try_inverse_lookup_dataset_by_pull_alias(remote_ref)
                 .await?
