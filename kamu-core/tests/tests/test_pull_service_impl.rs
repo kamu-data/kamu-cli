@@ -309,6 +309,24 @@ async fn test_pull_batching_complex() {
         vec![PullBatch::Transform(refs!["e"])]
     );
 
+    assert_matches!(
+        harness
+            .pull_svc
+            .pull_multi(
+                &mut vec![ar!("z")].into_iter(),
+                PullOptions::default(),
+                None,
+                None,
+                None
+            )
+            .await
+            .unwrap()[0],
+        PullResponse {
+            result: Err(PullError::NotFound(_)),
+            ..
+        },
+    );
+
     assert_eq!(
         harness
             .pull(
