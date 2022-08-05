@@ -5,7 +5,7 @@ networks:
 
 services:
   jupyter:
-    image: kamudata/kamu-cli-demo-jupyter:0.2.0
+    image: kamudata/kamu-cli-demo-jupyter:0.3.0
     command:
       - "start-notebook.sh"
       - "--port=8765"
@@ -28,7 +28,7 @@ services:
       - minio
 
   minio:
-    image: kamudata/kamu-cli-demo-minio:0.2.0
+    image: kamudata/kamu-cli-demo-minio:0.3.0
     command:
       - "server"
       - "--address"
