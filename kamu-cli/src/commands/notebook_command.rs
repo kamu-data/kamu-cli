@@ -16,6 +16,7 @@ use kamu::infra::*;
 
 use console::style as s;
 use std::sync::Arc;
+use std::time::Duration;
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,
@@ -80,11 +81,12 @@ impl Command for NotebookCommand {
             notebook_server.ensure_images(&pull_progress);
 
             let s = indicatif::ProgressBar::new_spinner();
-            s.set_style(
-                indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"),
-            );
+            let style = indicatif::ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap();
+            s.set_style(style);
             s.set_message("Starting Jupyter server");
-            s.enable_steady_tick(100);
+            s.enable_steady_tick(Duration::from_millis(100));
             Some(s)
         } else {
             None

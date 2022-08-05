@@ -17,6 +17,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -369,7 +370,6 @@ impl PrettyPullProgress {
 
     fn draw(&self) {
         loop {
-            self.multi_progress.join().unwrap();
             if self.finished.load(Ordering::SeqCst) {
                 break;
             }
@@ -454,31 +454,27 @@ impl PrettyIngestProgress {
         }
     }
 
-    fn new_progress_bar(
-        prefix: &str,
-        pos: u64,
-        len: u64,
-        draw_delta: Option<u64>,
-    ) -> indicatif::ProgressBar {
+    fn new_progress_bar(prefix: &str, pos: u64, len: u64) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
-        pb.set_style(
-            indicatif::ProgressStyle::default_bar()
-            .template("{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-            .progress_chars("#>-"));
+        let style = indicatif::ProgressStyle::default_bar()
+        .template("{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+        .unwrap()
+        .progress_chars("#>-");
+        pb.set_style(style);
         pb.set_prefix(prefix.to_owned());
         pb.set_length(len);
         pb.set_position(pos);
-        if let Some(d) = draw_delta {
-            pb.set_draw_delta(d);
-        }
         pb
     }
 
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
-        pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        let style = indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap();
+        pb.set_style(style);
         pb.set_message(msg.to_owned());
-        pb.enable_steady_tick(100);
+        pb.enable_steady_tick(Duration::from_millis(100));
         pb
     }
 
@@ -536,7 +532,6 @@ impl IngestListener for PrettyIngestProgress {
                     &self.dataset_handle.name,
                     n,
                     out_of,
-                    Some(1024),
                 )),
             }
         } else {
@@ -690,9 +685,12 @@ impl PrettyTransformProgress {
 
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
-        pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        let style = indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap();
+        pb.set_style(style);
         pb.set_message(msg.to_owned());
-        pb.enable_steady_tick(100);
+        pb.enable_steady_tick(Duration::from_millis(100));
         pb
     }
 
@@ -827,9 +825,12 @@ impl PrettySyncProgress {
 
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
-        pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        let style = indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap();
+        pb.set_style(style);
         pb.set_message(msg.to_owned());
-        pb.enable_steady_tick(100);
+        pb.enable_steady_tick(Duration::from_millis(100));
         pb
     }
 

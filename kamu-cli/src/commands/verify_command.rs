@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc, Mutex,
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::Duration,
 };
 
 use kamu::domain::*;
@@ -196,7 +199,6 @@ impl VerificationMultiProgress {
 
     fn draw(&self) {
         loop {
-            self.multi_progress.join().unwrap();
             if self.finished.load(Ordering::SeqCst) {
                 break;
             }
@@ -254,9 +256,12 @@ impl VerificationProgress {
 
     fn new_spinner(msg: &str) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
-        pb.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        let style = indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap();
+        pb.set_style(style);
         pb.set_message(msg.to_owned());
-        pb.enable_steady_tick(100);
+        pb.enable_steady_tick(Duration::from_millis(100));
         pb
     }
 

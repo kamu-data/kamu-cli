@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Mutex;
+use std::{sync::Mutex, time::Duration};
 
 use kamu::domain::PullImageListener;
 use read_input::prelude::*;
@@ -47,9 +47,12 @@ impl PullImageProgress {
 impl PullImageListener for PullImageProgress {
     fn begin(&self, image: &str) {
         let s = indicatif::ProgressBar::new_spinner();
-        s.set_style(indicatif::ProgressStyle::default_spinner().template("{spinner:.cyan} {msg}"));
+        let style = indicatif::ProgressStyle::default_spinner()
+            .template("{spinner:.cyan} {msg}")
+            .unwrap();
+        s.set_style(style);
         s.set_message(format!("Pulling {} image {}", self.image_purpose, image));
-        s.enable_steady_tick(100);
+        s.enable_steady_tick(Duration::from_millis(100));
         self.progress_bar.lock().unwrap().replace(s);
     }
 
