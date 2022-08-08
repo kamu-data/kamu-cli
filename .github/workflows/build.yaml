@@ -19,18 +19,8 @@ jobs:
         with:
           components: rustfmt
       - uses: ibnesayeed/setup-ipfs@master
-      - name: Build protobuf library
-        run: |
-          git clone https://github.com/protocolbuffers/protobuf.git
-          cd protobuf
-          git submodule update --init --recursive
-          ./autogen.sh
-          ./autogen.sh  # run autogen twice, see below
-          ./configure
-          make
-          make check
-          sudo make install
-          sudo ldconfig          
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
@@ -54,6 +44,8 @@ jobs:
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
@@ -72,6 +64,8 @@ jobs:
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
