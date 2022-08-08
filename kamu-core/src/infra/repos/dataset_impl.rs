@@ -82,7 +82,7 @@ where
             content: summary.clone(),
         };
 
-        let data = serde_yaml::to_vec(&manifest).int_err()?;
+        let data = serde_yaml::to_string(&manifest).int_err()?.into_bytes();
 
         match self.info_repo.set("summary", &data).await {
             Ok(()) => Ok(()),

@@ -18,34 +18,33 @@ use std::convert::TryFrom;
 fn serde_dataset_snapshot_root() {
     let data = indoc!(
         "
-        ---
         kind: DatasetSnapshot
         version: 1
         content:
           name: kamu.test
           kind: root
           metadata:
-            - kind: setPollingSource
-              fetch:
-                kind: url
-                url: \"ftp://kamu.dev/test.zip\"
-                cache:
-                  kind: forever
-              prepare:
-                - kind: decompress
-                  format: zip
-                  subPath: data_*.csv
-              read:
-                kind: csv
-                header: true
-              preprocess:
-                kind: sql
-                engine: spark
-                query: SELECT * FROM input
-              merge:
-                kind: snapshot
-                primaryKey:
-                  - id\n"
+          - kind: setPollingSource
+            fetch:
+              kind: url
+              url: ftp://kamu.dev/test.zip
+              cache:
+                kind: forever
+            prepare:
+            - kind: decompress
+              format: zip
+              subPath: data_*.csv
+            read:
+              kind: csv
+              header: true
+            preprocess:
+              kind: sql
+              engine: spark
+              query: SELECT * FROM input
+            merge:
+              kind: snapshot
+              primaryKey:
+              - id\n"
     );
 
     let expected = DatasetSnapshot {
@@ -117,21 +116,20 @@ fn serde_dataset_snapshot_root() {
 fn serde_dataset_snapshot_derivative() {
     let data = indoc!(
         "
-        ---
         kind: DatasetSnapshot
         version: 1
         content:
           name: com.naturalearthdata.admin0
           kind: derivative
           metadata:
-            - kind: setTransform
-              inputs:
-                - name: com.naturalearthdata.10m.admin0
-                - name: com.naturalearthdata.50m.admin0
-              transform:
-                kind: sql
-                engine: spark
-                query: SOME_SQL\n"
+          - kind: setTransform
+            inputs:
+            - name: com.naturalearthdata.10m.admin0
+            - name: com.naturalearthdata.50m.admin0
+            transform:
+              kind: sql
+              engine: spark
+              query: SOME_SQL\n"
     );
 
     let expected = DatasetSnapshot {
@@ -175,27 +173,26 @@ fn serde_dataset_snapshot_derivative() {
 fn serde_metadata_block() {
     let data = indoc!(
         "
-        ---
         kind: MetadataBlock
         version: 2
         content:
-          systemTime: \"2020-01-01T12:00:00Z\"
+          systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
           sequenceNumber: 127
           event:
             kind: executeQuery
             inputSlices:
-              - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
-                blockInterval:
-                  start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                  end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
-                dataInterval:
-                  start: 10
-                  end: 20
-              - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
-                blockInterval:
-                  start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                  end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+            - datasetID: did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ
+              blockInterval:
+                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+              dataInterval:
+                start: 10
+                end: 20
+            - datasetID: did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc
+              blockInterval:
+                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
             outputData:
               logicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
               physicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
@@ -203,7 +200,7 @@ fn serde_metadata_block() {
                 start: 10
                 end: 20
               size: 10
-            outputWatermark: \"2020-01-01T12:00:00Z\"\n"
+            outputWatermark: 2020-01-01T12:00:00Z\n"
     );
 
     let expected = MetadataBlock {
@@ -256,26 +253,25 @@ fn serde_metadata_block() {
 fn serde_metadata_block_obsolete_version() {
     let data = indoc!(
         "
-    ---
     kind: MetadataBlock
     version: 1
     content:
-      systemTime: \"2020-01-01T12:00:00Z\"
+      systemTime: 2020-01-01T12:00:00Z
       prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
       event:
         kind: executeQuery
         inputSlices:
-          - datasetID: \"did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ\"
-            blockInterval:
-              start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-              end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
-            dataInterval:
-              start: 10
-              end: 20
-          - datasetID: \"did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc\"
-            blockInterval:
-              start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-              end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+        - datasetID: did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ
+          blockInterval:
+            start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+            end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+          dataInterval:
+            start: 10
+            end: 20
+        - datasetID: did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc
+          blockInterval:
+            start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
+            end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
         outputData:
           logicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
           physicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
@@ -283,7 +279,7 @@ fn serde_metadata_block_obsolete_version() {
             start: 10
             end: 20
           size: 10
-        outputWatermark: \"2020-01-01T12:00:00Z\"\n"
+        outputWatermark: 2020-01-01T12:00:00Z\n"
     );
 
     let expected_error = Error::UnsupportedVersion(UnsupportedVersionError {
@@ -302,7 +298,6 @@ fn serde_metadata_block_obsolete_version() {
 fn serde_fetch_step_files_glob() {
     let data = indoc!(
         "
-        ---
         kind: filesGlob
         path: /opt/x/*.txt
         cache:
@@ -328,7 +323,6 @@ fn serde_fetch_step_files_glob() {
         serde_yaml::to_string(&Helper(actual)).unwrap(),
         indoc!(
             "
-            ---
             kind: filesGlob
             path: /opt/x/*.txt
             cache:
@@ -342,7 +336,6 @@ fn serde_fetch_step_files_glob() {
 fn serde_transform() {
     let data = indoc!(
         "
-        ---
         kind: sql
         engine: flink
         temporalTables:
@@ -380,16 +373,15 @@ fn serde_transform() {
         serde_yaml::to_string(&Helper(actual)).unwrap(),
         indoc!(
             "
-            ---
             kind: sql
             engine: flink
             queries:
-              - alias: bar
-                query: SELECT * FROM foo
+            - alias: bar
+              query: SELECT * FROM foo
             temporalTables:
-              - name: foo
-                primaryKey:
-                  - id\n"
+            - name: foo
+              primaryKey:
+              - id\n"
         )
     );
 }

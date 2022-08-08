@@ -508,6 +508,7 @@ impl YamlRenderer {
 
         while let Some((hash, block)) = blocks.try_next().await? {
             buf.clear();
+            writeln!(buf, "---")?;
             Self::render_block(&mut buf, &hash, &block)?;
             writeln!(buf)?;
 

@@ -19,17 +19,16 @@ use std::convert::TryFrom;
 fn serde_dataset_summary() {
     let data = indoc!(
         "
-    ---
     kind: DatasetSummary
     version: 1
     content:
-      id: \"did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh\"
+      id: did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh
       kind: root
       lastBlockHash: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
       dependencies:
-        - name: foo
-        - name: bar
-      lastPulled: \"2020-01-01T12:00:00Z\"
+      - name: foo
+      - name: bar
+      lastPulled: 2020-01-01T12:00:00Z
       numRecords: 100
       dataSize: 1024
       checkpointsSize: 64\n"

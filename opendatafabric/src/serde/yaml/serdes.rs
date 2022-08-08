@@ -49,7 +49,9 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
             content: MetadataBlockWrapper(block.clone()),
         };
 
-        let buf = serde_yaml::to_vec(&manifest).map_err(|e| Error::serde(e))?;
+        let buf = serde_yaml::to_string(&manifest)
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
         Ok(Buffer::new(0, buf.len(), buf))
     }
 }
@@ -101,7 +103,9 @@ impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
             content: DatasetSnapshotWrapper(snapshot.clone()),
         };
 
-        let buf = serde_yaml::to_vec(&manifest).map_err(|e| Error::serde(e))?;
+        let buf = serde_yaml::to_string(&manifest)
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
         Ok(Buffer::new(0, buf.len(), buf))
     }
 }
@@ -133,8 +137,9 @@ pub struct YamlEngineProtocol;
 
 impl EngineProtocolSerializer for YamlEngineProtocol {
     fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error> {
-        let buf = serde_yaml::to_vec(&ExecuteQueryRequestWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?;
+        let buf = serde_yaml::to_string(&ExecuteQueryRequestWrapper(inst.clone()))
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
     }
@@ -143,8 +148,9 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
         &self,
         inst: &ExecuteQueryResponse,
     ) -> Result<Buffer<u8>, Error> {
-        let buf = serde_yaml::to_vec(&ExecuteQueryResponseWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?;
+        let buf = serde_yaml::to_string(&ExecuteQueryResponseWrapper(inst.clone()))
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
     }
