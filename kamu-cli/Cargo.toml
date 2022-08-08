@@ -35,7 +35,7 @@ clap_complete = "*"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
-minus = { version = "*", features = ["static_output", "search"] }  # Terminal paginator
+minus = { version = "= 5.0.3", features = ["static_output", "search"] }  # Terminal paginator # TODO: https://github.com/arijit79/minus/issues/78
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser
