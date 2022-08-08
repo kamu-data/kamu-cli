@@ -21,6 +21,8 @@ jobs:
       - uses: ibnesayeed/setup-ipfs@master
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
@@ -46,6 +48,8 @@ jobs:
           components: rustfmt
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
@@ -66,6 +70,8 @@ jobs:
           components: rustfmt
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
