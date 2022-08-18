@@ -298,10 +298,7 @@ impl ConfigService {
             }
         }
 
-        let yaml_str = serde_yaml::to_string(current).unwrap();
-        let result = self.strip_yaml(&yaml_str).to_owned();
-
-        return Some(result);
+        Some(serde_yaml::to_string(current).unwrap())
     }
 
     pub fn set(&self, key: &str, value: &str, scope: ConfigScope) -> Result<(), CLIError> {
@@ -398,8 +395,7 @@ impl ConfigService {
         if with_defaults {
             config.merge(CLIConfig::default())
         }
-        let yaml = serde_yaml::to_string(&config).unwrap();
-        self.strip_yaml(&yaml).to_owned()
+        serde_yaml::to_string(&config).unwrap()
     }
 
     pub fn all_keys(&self) -> Vec<String> {
@@ -431,10 +427,6 @@ impl ConfigService {
                 }
             }
         }
-    }
-
-    fn strip_yaml<'a>(&self, yaml_str: &'a str) -> &'a str {
-        yaml_str.split_once('\n').unwrap().1.trim_end()
     }
 
     fn path_for_scope(&self, scope: ConfigScope) -> PathBuf {
