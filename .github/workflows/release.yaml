@@ -23,6 +23,10 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
           override: true
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Fetch web UI artifacts # TODO: Add target without UI
         run: |
           wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
@@ -53,6 +57,10 @@ jobs:
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Fetch web UI artifacts # TODO: Add target without UI
         run: |
           wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
@@ -79,6 +87,10 @@ jobs:
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo build --release --target=${{ matrix.target }}
       - name: Rename binary
         shell: bash
