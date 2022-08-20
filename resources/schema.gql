@@ -9,7 +9,7 @@ interface Account {
 	name: String!
 }
 
-scalar AccountID
+scalar AccountID 
 
 type AccountInfo {
 	login: String!
@@ -19,7 +19,7 @@ type AccountInfo {
 	gravatarId: String
 }
 
-scalar AccountName
+scalar AccountName 
 
 type Accounts {
 	"""
@@ -191,7 +191,7 @@ type DatasetEdge {
 	node: Dataset!
 }
 
-scalar DatasetID
+scalar DatasetID 
 
 enum DatasetKind {
 	ROOT
@@ -241,7 +241,7 @@ type DatasetMetadata {
 	currentLicense: SetLicense
 }
 
-scalar DatasetName
+scalar DatasetName 
 
 type Datasets {
 	"""
@@ -267,7 +267,7 @@ Implement the DateTime<Utc> scalar
 
 The input/output is a string in RFC3339 format.
 """
-scalar DateTime
+scalar DateTime 
 
 type EnvVar {
 	name: String!
@@ -394,7 +394,7 @@ type MetadataChain {
 
 union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
 
-scalar Multihash
+scalar Multihash 
 
 type Mutation {
 	auth: Auth!

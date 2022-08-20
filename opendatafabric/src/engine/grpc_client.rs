@@ -14,8 +14,8 @@ use crate::{
     ExecuteQueryResponseInvalidQuery, ExecuteQueryResponseSuccess,
 };
 
-use super::engine_grpc_generated::engine_client::EngineClient as EngineClientGRPC;
-use super::engine_grpc_generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
+use super::grpc_generated::engine_client::EngineClient as EngineClientGRPC;
+use super::grpc_generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
 
 use thiserror::Error;
 

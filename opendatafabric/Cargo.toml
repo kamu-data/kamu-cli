@@ -39,7 +39,3 @@ prost = "*"
 # Utils
 indoc = "*"  # Compile-time unindent
 thiserror = "*"  # Structured error derivations
-
-
-[build-dependencies]
-tonic-build = "*"
