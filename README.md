@@ -187,8 +187,10 @@ We also scrape a lot of websites to make smarter purchasing decisions. `kamu` le
 - Launch a **Jupyter notebook** with one command
 - Join, filter, and shape your data using SQL
 - Visualize the result using your favorite library
+- Explore complex pipelines in Web UI
   ![SQL Shell](docs/readme_files/sql.gif)
   ![Jupyter](docs/readme_files/notebook-005.png)
+  ![Web UI](docs/readme_files/web-ui.png)
 
 </details>
 
