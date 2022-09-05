@@ -10,6 +10,7 @@
 use crate::domain::*;
 use opendatafabric::{MetadataBlock, Multihash};
 
+use async_trait::async_trait;
 use thiserror::Error;
 use tokio_stream::StreamExt;
 
@@ -23,11 +24,34 @@ impl MetadataChainComparator {
         lhs_head: &Multihash,
         rhs_chain: &dyn MetadataChain,
         rhs_head: Option<&Multihash>,
+        listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
         // When source and destination point to the same block, chains are equal, no further scanning required
         if Some(&lhs_head) == rhs_head.as_ref() {
             return Ok(CompareChainsResult::Equal);
         }
+
+        let lhs_chain = MetadataChainWithStats::new(
+            lhs_chain,
+            |n| {
+                listener.on_lhs_expected_reads(n);
+            },
+            |n| {
+                listener.on_lhs_read(n);
+            },
+        );
+        let rhs_chain = MetadataChainWithStats::new(
+            rhs_chain,
+            |n| {
+                listener.on_rhs_expected_reads(n);
+            },
+            |n| {
+                listener.on_rhs_read(n);
+            },
+        );
+
+        lhs_chain.expecting_to_read_blocks(1);
+        rhs_chain.expecting_to_read_blocks(1);
 
         // Extract sequence number of head blocks
         let lhs_sequence_number = lhs_chain.get_block(&lhs_head).await?.sequence_number;
@@ -43,10 +67,10 @@ impl MetadataChainComparator {
         // If numbers are equal, it's a guaranteed divergence, as we've checked blocks for equality above
         if lhs_sequence_number == rhs_sequence_number {
             let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
-                lhs_chain,
+                &lhs_chain,
                 lhs_head,
                 lhs_sequence_number,
-                rhs_chain,
+                &rhs_chain,
                 rhs_head,
                 rhs_sequence_number,
             )
@@ -60,10 +84,10 @@ impl MetadataChainComparator {
         // Source ahead
         else if lhs_sequence_number > rhs_sequence_number {
             let convergence_check = Self::check_expected_common_ancestor(
-                lhs_chain,
+                &lhs_chain,
                 lhs_sequence_number,
                 &lhs_head,
-                rhs_chain,
+                &rhs_chain,
                 rhs_sequence_number,
                 rhs_head,
             )
@@ -88,10 +112,10 @@ impl MetadataChainComparator {
         // Destination ahead
         else {
             let convergence_check = Self::check_expected_common_ancestor(
-                rhs_chain,
+                &rhs_chain,
                 rhs_sequence_number,
                 rhs_head.as_ref().unwrap(),
-                lhs_chain,
+                &lhs_chain,
                 lhs_sequence_number,
                 Some(&lhs_head),
             )
@@ -116,15 +140,18 @@ impl MetadataChainComparator {
     }
 
     async fn check_expected_common_ancestor(
-        ahead_chain: &dyn MetadataChain,
+        ahead_chain: &MetadataChainWithStats<'_>,
         ahead_sequence_number: i32,
         ahead_head: &Multihash,
-        reference_chain: &dyn MetadataChain,
+        reference_chain: &MetadataChainWithStats<'_>,
         expected_common_sequence_number: i32,
         expected_common_ancestor_hash: Option<&Multihash>,
     ) -> Result<CommonAncestorCheck, CompareChainsError> {
         use futures::TryStreamExt;
+
         let ahead_size: usize = (ahead_sequence_number - expected_common_sequence_number) as usize;
+        ahead_chain.expecting_to_read_blocks(ahead_size);
+
         let ahead_blocks: Vec<(Multihash, MetadataBlock)> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
             .take(ahead_size)
@@ -167,15 +194,25 @@ impl MetadataChainComparator {
     }
 
     async fn find_common_ancestor_sequence_number(
-        lhs_chain: &dyn MetadataChain,
+        lhs_chain: &MetadataChainWithStats<'_>,
         lhs_head: &Multihash,
         lhs_start_block_sequence_number: i32,
-        rhs_chain: &dyn MetadataChain,
+        rhs_chain: &MetadataChainWithStats<'_>,
         rhs_head: Option<&Multihash>,
         rhs_start_block_sequence_number: i32,
     ) -> Result<i32, CompareChainsError> {
         if rhs_head.is_none() {
             return Ok(-1);
+        }
+
+        if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
+            lhs_chain.expecting_to_read_blocks(
+                (lhs_start_block_sequence_number - rhs_start_block_sequence_number) as usize,
+            );
+        } else {
+            rhs_chain.expecting_to_read_blocks(
+                (rhs_start_block_sequence_number - lhs_start_block_sequence_number) as usize,
+            );
         }
 
         let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
@@ -200,8 +237,12 @@ impl MetadataChainComparator {
 
         let mut curr_block_sequence_number = curr_lhs_block_sequence_number;
         while curr_block_sequence_number >= 0 {
+            lhs_chain.expecting_to_read_blocks(1);
+            rhs_chain.expecting_to_read_blocks(1);
+
             let (lhs_block_hash, _) = lhs_stream.try_next().await.int_err()?.unwrap();
             let (rhs_block_hash, _) = rhs_stream.try_next().await.int_err()?.unwrap();
+
             if lhs_block_hash == rhs_block_hash {
                 return Ok(curr_block_sequence_number);
             }
@@ -303,3 +344,102 @@ impl From<IterBlocksError> for CompareChainsError {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+struct MetadataChainWithStats<'a> {
+    chain: &'a dyn MetadataChain,
+    on_expected: Box<dyn Fn(usize) -> () + Send + Sync + 'a>,
+    on_read: Box<dyn Fn(usize) -> () + Send + Sync + 'a>,
+}
+
+impl<'a> MetadataChainWithStats<'a> {
+    fn new(
+        chain: &'a dyn MetadataChain,
+        on_expected: impl Fn(usize) -> () + Send + Sync + 'a,
+        on_read: impl Fn(usize) -> () + Send + Sync + 'a,
+    ) -> Self {
+        Self {
+            chain,
+            on_expected: Box::new(on_expected),
+            on_read: Box::new(on_read),
+        }
+    }
+
+    fn expecting_to_read_blocks(&self, num_blocks: usize) {
+        (self.on_expected)(num_blocks);
+    }
+}
+
+#[async_trait]
+impl<'a> MetadataChain for MetadataChainWithStats<'a> {
+    async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
+        self.chain.get_ref(r).await
+    }
+
+    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+        (self.on_read)(1);
+        self.chain.get_block(hash).await
+    }
+
+    fn iter_blocks_interval<'b>(
+        &'b self,
+        head: &'b Multihash,
+        tail: Option<&'b Multihash>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'b> {
+        Box::pin(
+            self.chain
+                .iter_blocks_interval(head, tail, ignore_missing_tail)
+                .map(|v| {
+                    (self.on_read)(1);
+                    v
+                }),
+        )
+    }
+
+    fn iter_blocks_interval_ref<'b>(
+        &'b self,
+        head: &'b BlockRef,
+        tail: Option<&'b BlockRef>,
+    ) -> DynMetadataStream<'b> {
+        Box::pin(self.chain.iter_blocks_interval_ref(head, tail).map(|v| {
+            (self.on_read)(1);
+            v
+        }))
+    }
+
+    async fn set_ref<'b>(
+        &'b self,
+        r: &BlockRef,
+        hash: &Multihash,
+        opts: SetRefOpts<'b>,
+    ) -> Result<(), SetRefError> {
+        self.set_ref(r, hash, opts).await
+    }
+
+    async fn append<'b>(
+        &'b self,
+        block: MetadataBlock,
+        opts: AppendOpts<'b>,
+    ) -> Result<Multihash, AppendError> {
+        self.append(block, opts).await
+    }
+
+    fn as_object_repo(&self) -> &dyn ObjectRepository {
+        self.chain.as_object_repo()
+    }
+
+    fn as_reference_repo(&self) -> &dyn ReferenceRepository {
+        self.chain.as_reference_repo()
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait CompareChainsListener: Send + Sync {
+    fn on_lhs_expected_reads(&self, _num_blocks: usize) {}
+    fn on_lhs_read(&self, _num_blocks: usize) {}
+    fn on_rhs_expected_reads(&self, _num_blocks: usize) {}
+    fn on_rhs_read(&self, _num_blocks: usize) {}
+}
+pub struct NullCompareChainsListener;
+impl CompareChainsListener for NullCompareChainsListener {}

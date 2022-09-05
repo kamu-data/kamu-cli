@@ -37,9 +37,15 @@ async fn compare_chains(
         Err(_) => None,
     };
 
-    MetadataChainComparator::compare_chains(lhs_chain, &lhs_head, rhs_chain, rhs_head.as_ref())
-        .await
-        .unwrap()
+    MetadataChainComparator::compare_chains(
+        lhs_chain,
+        &lhs_head,
+        rhs_chain,
+        rhs_head.as_ref(),
+        &NullCompareChainsListener,
+    )
+    .await
+    .unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

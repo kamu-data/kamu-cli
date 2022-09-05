@@ -802,8 +802,13 @@ impl PullImageListener for PrettyTransformProgress {
 struct PrettySyncProgress {
     local_ref: DatasetRefLocal,
     remote_ref: DatasetRefRemote,
-    _multi_progress: Arc<indicatif::MultiProgress>,
-    curr_progress: indicatif::ProgressBar,
+    multi_progress: Arc<indicatif::MultiProgress>,
+    state: Mutex<PrettySyncProgressState>,
+}
+
+struct PrettySyncProgressState {
+    stage: SyncStage,
+    progress: indicatif::ProgressBar,
 }
 
 impl PrettySyncProgress {
@@ -812,41 +817,108 @@ impl PrettySyncProgress {
         remote_ref: DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
-        let inst = Self {
+        Self {
+            state: Mutex::new(PrettySyncProgressState {
+                stage: SyncStage::CommitBlocks,
+                progress: multi_progress.add(Self::new_spinner(&local_ref, &remote_ref)),
+            }),
             local_ref,
             remote_ref,
-            curr_progress: multi_progress.add(Self::new_spinner("")),
-            _multi_progress: multi_progress,
-        };
-        inst.curr_progress
-            .set_message(inst.spinner_message(0, "Syncing remote dataset"));
-        inst
+            multi_progress,
+        }
     }
 
-    fn new_spinner(msg: &str) -> indicatif::ProgressBar {
-        let pb = indicatif::ProgressBar::hidden();
+    fn new_spinner(
+        local_ref: &DatasetRefLocal,
+        remote_ref: &DatasetRefRemote,
+    ) -> indicatif::ProgressBar {
+        let spinner = indicatif::ProgressBar::hidden();
         let style = indicatif::ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
+            .template("{spinner:.cyan} {msg} {prefix:.dim}")
             .unwrap();
-        pb.set_style(style);
-        pb.set_message(msg.to_owned());
-        pb.enable_steady_tick(Duration::from_millis(100));
-        pb
-    }
-
-    fn spinner_message<T: std::fmt::Display>(&self, step: u32, msg: T) -> String {
-        let step_str = format!("[{}/1]", step + 1);
-        let dataset = format!("({} > {})", self.remote_ref, self.local_ref);
-        format!(
-            "{} {} {}",
-            console::style(step_str).bold().dim(),
-            msg,
-            console::style(dataset).dim(),
-        )
+        spinner.set_style(style);
+        spinner.set_prefix(format!("({} > {})", remote_ref, local_ref));
+        spinner.set_message("Syncing remote dataset".to_owned());
+        spinner.enable_steady_tick(Duration::from_millis(100));
+        spinner
     }
 }
 
 impl SyncListener for PrettySyncProgress {
+    fn on_status(&self, stage: SyncStage, stats: &SyncStats) {
+        let mut state = self.state.lock().unwrap();
+
+        if state.stage != stage {
+            state.stage = stage;
+
+            let pb = match stage {
+                SyncStage::ReadMetadata => {
+                    let pb = indicatif::ProgressBar::hidden();
+                    let style = indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.cyan} Syncing metadata {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("#>-");
+                    pb.set_style(style);
+                    pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
+                    pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
+                    pb.set_position(stats.src.metadata_blocks_read as u64);
+                    pb
+                }
+                SyncStage::TransferData => {
+                    let pb = indicatif::ProgressBar::hidden();
+                    let style = indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.cyan} Syncing data & checkpoints {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+                .unwrap()
+                .progress_chars("#>-");
+                    pb.set_style(style);
+                    pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
+                    pb.set_length(stats.src_estimated.bytes_read as u64);
+                    pb.set_position(stats.src.bytes_read as u64);
+                    pb
+                }
+                SyncStage::CommitBlocks => {
+                    let pb = indicatif::ProgressBar::hidden();
+                    let style = indicatif::ProgressStyle::default_bar()
+                .template("{spinner:.cyan} Committing blocks {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
+                .unwrap()
+                .progress_chars("#>-");
+                    pb.set_style(style);
+                    pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
+                    pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);
+                    pb.set_position(stats.dst.metadata_blocks_writen as u64);
+                    pb
+                }
+            };
+
+            state.progress = self.multi_progress.add(pb);
+        }
+
+        match stage {
+            SyncStage::ReadMetadata => {
+                state
+                    .progress
+                    .set_length(stats.src_estimated.metadata_blocks_read as u64);
+                state
+                    .progress
+                    .set_position(stats.src.metadata_blocks_read as u64);
+            }
+            SyncStage::TransferData => {
+                state
+                    .progress
+                    .set_length(stats.src_estimated.bytes_read as u64);
+                state.progress.set_position(stats.src.bytes_read as u64);
+            }
+            SyncStage::CommitBlocks => {
+                state
+                    .progress
+                    .set_length(stats.dst_estimated.metadata_blocks_writen as u64);
+                state
+                    .progress
+                    .set_position(stats.dst.metadata_blocks_writen as u64);
+            }
+        }
+    }
+
     fn success(&self, result: &SyncResult) {
         let msg = match result {
             SyncResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
@@ -861,13 +933,27 @@ impl SyncListener for PrettySyncProgress {
             ))
             .green(),
         };
-        self.curr_progress
-            .finish_with_message(self.spinner_message(0, msg));
+
+        let mut state = self.state.lock().unwrap();
+
+        state.progress = self
+            .multi_progress
+            .add(Self::new_spinner(&self.local_ref, &self.remote_ref));
+
+        state.progress.finish_with_message(msg.to_string());
     }
 
     fn error(&self, _error: &SyncError) {
-        self.curr_progress.finish_with_message(
-            self.spinner_message(0, console::style("Failed to sync remote dataset").red()),
+        let mut state = self.state.lock().unwrap();
+
+        state.progress = self
+            .multi_progress
+            .add(Self::new_spinner(&self.local_ref, &self.remote_ref));
+
+        state.progress.finish_with_message(
+            console::style("Failed to sync remote dataset")
+                .red()
+                .to_string(),
         );
     }
 }

@@ -28,7 +28,7 @@ pub struct InternalError {
 impl InternalError {
     pub fn new<E: Into<BoxedError>>(e: E) -> Self {
         let source = e.into();
-        let backtrace = if source.backtrace().is_some() {
+        let backtrace = if source.request_ref::<Backtrace>().is_some() {
             None
         } else {
             Some(Backtrace::capture())

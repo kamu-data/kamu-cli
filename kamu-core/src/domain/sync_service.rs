@@ -83,10 +83,50 @@ pub struct SyncResultMulti {
 // Listener
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait SyncListener: Send {
+pub trait SyncListener: Sync + Send {
     fn begin(&self) {}
+    fn on_status(&self, _stage: SyncStage, _stats: &SyncStats) {}
     fn success(&self, _result: &SyncResult) {}
     fn error(&self, _error: &SyncError) {}
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SyncStage {
+    ReadMetadata,
+    TransferData,
+    CommitBlocks,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SyncStats {
+    /// Statitsics for the source party of the exchange
+    pub src: SyncPartyStats,
+    /// Estimated totals for the source party of the exchange
+    pub src_estimated: SyncPartyStats,
+    /// Statistics for the destination party of the exchange
+    pub dst: SyncPartyStats,
+    /// Estimated totals for the destination party of the exchange
+    pub dst_estimated: SyncPartyStats,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SyncPartyStats {
+    /// Number of metadata blocks read from the party
+    pub metadata_blocks_read: usize,
+    /// Number of metadata blocks written to the party
+    pub metadata_blocks_writen: usize,
+    /// Number of checkpoint files read from the party
+    pub checkpoints_read: usize,
+    /// Number of checkpoint files written to the party
+    pub checkpoints_written: usize,
+    /// Number of data files read from the party
+    pub data_slices_read: usize,
+    /// Number of data files written to the party
+    pub data_slices_written: usize,
+    /// Number of bytes read from the party
+    pub bytes_read: usize,
+    /// Number of bytes written to the party
+    pub bytes_written: usize,
 }
 
 pub struct NullSyncListener;

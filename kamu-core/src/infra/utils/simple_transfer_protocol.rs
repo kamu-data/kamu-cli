@@ -13,6 +13,7 @@ use opendatafabric::*;
 
 use futures::TryStreamExt;
 use opendatafabric::MetadataBlock;
+use std::sync::{Arc, Mutex};
 use tracing::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,16 +25,19 @@ pub struct SimpleTransferProtocol;
 
 impl SimpleTransferProtocol {
     // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
-    pub async fn sync(
-        &self,
-        src: &dyn Dataset,
-        src_ref: &DatasetRefAny,
-        dst: &dyn Dataset,
-        _dst_ref: &DatasetRefAny,
+    pub async fn sync<'a>(
+        &'a self,
+        src: &'a dyn Dataset,
+        src_ref: &'a DatasetRefAny,
+        dst: &'a dyn Dataset,
+        _dst_ref: &'a DatasetRefAny,
         validation: AppendValidation,
         trust_source_hashes: bool,
         force: bool,
+        listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
+        listener.begin();
+
         let src_chain = src.as_metadata_chain();
         let dst_chain = dst.as_metadata_chain();
 
@@ -42,11 +46,14 @@ impl SimpleTransferProtocol {
 
         info!(?src_head, ?dst_head, "Resolved heads");
 
+        let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
+
         let chains_comparison = MetadataChainComparator::compare_chains(
             src_chain,
             &src_head,
             dst_chain,
             dst_head.as_ref(),
+            &listener_adapter,
         )
         .await?;
 
@@ -105,6 +112,8 @@ impl SimpleTransferProtocol {
             dst_head.as_ref(),
             validation,
             trust_source_hashes,
+            listener,
+            listener_adapter.into_status(),
         )
         .await?;
 
@@ -162,17 +171,37 @@ impl SimpleTransferProtocol {
         }
     }
 
-    async fn synchronize_blocks(
-        &self,
+    async fn synchronize_blocks<'a>(
+        &'a self,
         blocks: Vec<(Multihash, MetadataBlock)>,
-        src: &dyn Dataset,
-        dst: &dyn Dataset,
-        src_head: &Multihash,
-        dst_head: Option<&Multihash>,
+        src: &'a dyn Dataset,
+        dst: &'a dyn Dataset,
+        src_head: &'a Multihash,
+        dst_head: Option<&'a Multihash>,
         validation: AppendValidation,
         trust_source_hashes: bool,
+        listener: Arc<dyn SyncListener>,
+        mut stats: SyncStats,
     ) -> Result<(), SyncError> {
-        info!("Considering {} new blocks", blocks.len());
+        // Update stats estimates based on metadata
+        stats.dst_estimated.metadata_blocks_writen += blocks.len();
+        for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
+            if let Some(data_slice) = block.event.output_data {
+                stats.src_estimated.data_slices_read += 1;
+                stats.src_estimated.bytes_read += data_slice.size as usize;
+                stats.dst_estimated.data_slices_written += 1;
+                stats.dst_estimated.bytes_written += data_slice.size as usize;
+            }
+            if let Some(checkpoint) = block.event.output_checkpoint {
+                stats.src_estimated.checkpoints_read += 1;
+                stats.src_estimated.bytes_read += checkpoint.size as usize;
+                stats.dst_estimated.checkpoints_written += 1;
+                stats.dst_estimated.bytes_written += checkpoint.size as usize;
+            }
+        }
+
+        info!(?stats, "Considering {} new blocks", blocks.len());
+        listener.on_status(SyncStage::TransferData, &stats);
 
         // Download data and checkpoints
         for block in blocks
@@ -230,6 +259,12 @@ impl SimpleTransferProtocol {
                     Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
+
+                stats.src.data_slices_read += 1;
+                stats.dst.data_slices_written += 1;
+                stats.src.bytes_read += data_slice.size as usize;
+                stats.dst.bytes_written += data_slice.size as usize;
+                listener.on_status(SyncStage::TransferData, &stats);
             }
 
             // Checkpoint
@@ -284,6 +319,12 @@ impl SimpleTransferProtocol {
                     Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
                     Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
                 }?;
+
+                stats.src.checkpoints_read += 1;
+                stats.dst.checkpoints_written += 1;
+                stats.src.bytes_read += checkpoint.size as usize;
+                stats.dst.bytes_written += checkpoint.size as usize;
+                listener.on_status(SyncStage::TransferData, &stats);
             }
         }
 
@@ -331,6 +372,9 @@ impl SimpleTransferProtocol {
                 Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
                 Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
+
+            stats.dst.metadata_blocks_writen += 1;
+            listener.on_status(SyncStage::CommitBlocks, &stats);
         }
 
         // Update reference, atomically commiting the sync operation
@@ -380,3 +424,47 @@ impl SimpleTransferProtocol {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+struct CompareChainsListenerAdapter {
+    l: Arc<dyn SyncListener>,
+    stats: Mutex<SyncStats>,
+}
+
+impl CompareChainsListenerAdapter {
+    fn new(l: Arc<dyn SyncListener>) -> Self {
+        Self {
+            l,
+            stats: Mutex::new(SyncStats::default()),
+        }
+    }
+
+    fn into_status(self) -> SyncStats {
+        self.stats.into_inner().unwrap()
+    }
+}
+
+impl CompareChainsListener for CompareChainsListenerAdapter {
+    fn on_lhs_expected_reads(&self, num_blocks: usize) {
+        let mut s = self.stats.lock().unwrap();
+        s.src_estimated.metadata_blocks_read += num_blocks;
+        self.l.on_status(SyncStage::ReadMetadata, &s);
+    }
+
+    fn on_lhs_read(&self, num_blocks: usize) {
+        let mut s = self.stats.lock().unwrap();
+        s.src.metadata_blocks_read += num_blocks;
+        self.l.on_status(SyncStage::ReadMetadata, &s);
+    }
+
+    fn on_rhs_expected_reads(&self, num_blocks: usize) {
+        let mut s = self.stats.lock().unwrap();
+        s.dst_estimated.metadata_blocks_read += num_blocks;
+        self.l.on_status(SyncStage::ReadMetadata, &s);
+    }
+
+    fn on_rhs_read(&self, num_blocks: usize) {
+        let mut s = self.stats.lock().unwrap();
+        s.dst.metadata_blocks_read += num_blocks;
+        self.l.on_status(SyncStage::ReadMetadata, &s);
+    }
+}

@@ -227,6 +227,7 @@ impl SyncServiceImpl {
         src: &DatasetRefAny,
         dst: &DatasetRefAny,
         opts: SyncOptions,
+        listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let src_dataset = self.get_dataset_reader(src).await?;
         let src_is_local = src.as_local_ref().is_some();
@@ -250,6 +251,7 @@ impl SyncServiceImpl {
                 validation,
                 opts.trust_source.unwrap_or(src_is_local),
                 opts.force,
+                listener,
             )
             .await
         {
@@ -323,6 +325,7 @@ impl SyncServiceImpl {
                                 &src_head,
                                 dst_dataset.as_metadata_chain(),
                                 Some(&dst_head),
+                                &NullCompareChainsListener,
                             )
                             .await?;
 
@@ -466,6 +469,7 @@ impl SyncServiceImpl {
         src: &DatasetRefAny,
         dst: &DatasetRefAny,
         opts: SyncOptions,
+        listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let span = info_span!("Dataset sync", %src, %dst);
         let _span_guard = span.enter();
@@ -517,7 +521,7 @@ impl SyncServiceImpl {
                     .into())
                 }
             }
-            (_, _) => self.sync_generic(src, dst, opts).await,
+            (_, _) => self.sync_generic(src, dst, opts, listener).await,
         }
     }
 }
@@ -536,7 +540,7 @@ impl SyncService for SyncServiceImpl {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.sync_impl(src, dst, opts).await {
+        match self.sync_impl(src, dst, opts, listener.clone()).await {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
