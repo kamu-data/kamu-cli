@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.98.0] - 2022-09-05
+### Added
+- Progress indication when syncing datasets to and from remote repositories
+### Changed
+- Upgraded to new `rust` toolchain and latest dependencies
+
 ## [0.97.1] - 2022-08-19
 ### Fixed
 - Output truncation in `kamu config *` commands

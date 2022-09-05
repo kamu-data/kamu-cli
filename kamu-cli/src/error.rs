@@ -58,7 +58,7 @@ pub fn print_error(error: &dyn Error) {
 
     // Print the inner most backtrace
     for e in error_chain.iter().rev() {
-        if let Some(bt) = e.backtrace() {
+        if let Some(bt) = e.request_ref::<Backtrace>() {
             if bt.status() == BacktraceStatus::Captured {
                 eprintln!();
                 eprintln!("Backtrace:");
@@ -114,7 +114,7 @@ pub fn print_batch_error(batch: &BatchError) {
 
         // Print the inner most backtrace
         for e in error_chain.iter().rev() {
-            if let Some(bt) = e.backtrace() {
+            if let Some(bt) = e.request_ref::<Backtrace>() {
                 if bt.status() == BacktraceStatus::Captured {
                     eprintln!();
                     eprintln!("Backtrace:");
@@ -180,10 +180,6 @@ impl std::fmt::Display for BatchError {
 
 impl std::error::Error for BatchError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
-    }
-
-    fn backtrace(&self) -> Option<&Backtrace> {
         None
     }
 }

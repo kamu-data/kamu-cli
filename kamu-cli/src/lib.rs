@@ -10,6 +10,8 @@
 #![feature(backtrace)]
 #![feature(box_patterns)]
 #![feature(exit_status_error)]
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 
 pub mod app;
 pub use app::*;

@@ -9,6 +9,8 @@
 
 #![feature(backtrace)]
 #![feature(exit_status_error)]
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 
 mod container_runtime;
 pub use crate::container_runtime::*;

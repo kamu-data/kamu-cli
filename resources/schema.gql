@@ -9,7 +9,7 @@ interface Account {
 	name: String!
 }
 
-scalar AccountID 
+scalar AccountID
 
 type AccountInfo {
 	login: String!
@@ -19,7 +19,7 @@ type AccountInfo {
 	gravatarId: String
 }
 
-scalar AccountName 
+scalar AccountName
 
 type Accounts {
 	"""
@@ -71,7 +71,7 @@ type Checkpoint {
 	size: Int!
 }
 
-enum CompressionFormat {
+enum CompressionFormat{
 	GZIP
 	ZIP
 }
@@ -82,7 +82,7 @@ type DataBatch {
 	numRecords: Int!
 }
 
-enum DataBatchFormat {
+enum DataBatchFormat{
 	JSON
 	JSON_LD
 	JSON_SOA
@@ -107,7 +107,7 @@ type DataSchema {
 	content: String!
 }
 
-enum DataSchemaFormat {
+enum DataSchemaFormat{
 	PARQUET
 	PARQUET_JSON
 }
@@ -191,9 +191,9 @@ type DatasetEdge {
 	node: Dataset!
 }
 
-scalar DatasetID 
+scalar DatasetID
 
-enum DatasetKind {
+enum DatasetKind{
 	ROOT
 	DERIVATIVE
 }
@@ -241,7 +241,7 @@ type DatasetMetadata {
 	currentLicense: SetLicense
 }
 
-scalar DatasetName 
+scalar DatasetName
 
 type Datasets {
 	"""
@@ -267,7 +267,7 @@ Implement the DateTime<Utc> scalar
 
 The input/output is a string in RFC3339 format.
 """
-scalar DateTime 
+scalar DateTime @specifiedBy(url: "https://datatracker.ietf.org/doc/html/rfc3339")
 
 type EnvVar {
 	name: String!
@@ -394,7 +394,7 @@ type MetadataChain {
 
 union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
 
-scalar Multihash 
+scalar Multihash
 
 type Mutation {
 	auth: Auth!
@@ -469,7 +469,7 @@ type Query {
 	data: DataQueries!
 }
 
-enum QueryDialect {
+enum QueryDialect{
 	DATA_FUSION
 }
 
@@ -598,7 +598,7 @@ type SourceCachingForever {
 	dummy: String
 }
 
-enum SourceOrdering {
+enum SourceOrdering{
 	BY_EVENT_TIME
 	BY_NAME
 }

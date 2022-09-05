@@ -12,6 +12,8 @@
 #![feature(box_patterns)]
 #![feature(map_first_last)]
 #![feature(exit_status_error)]
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 
 pub mod domain;
 pub mod infra;
