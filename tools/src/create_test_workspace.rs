@@ -23,7 +23,7 @@ fn main() {
 
     let work_dir = PathBuf::from_str("examples/covid").unwrap();
 
-    init_workspace(&work_dir, matches.is_present("force"));
+    init_workspace(&work_dir, matches.contains_id("force"));
 
     // BC dataset does not contain unique IDs so it's a pain to slice and we pull it whole
     Command::new("kamu")

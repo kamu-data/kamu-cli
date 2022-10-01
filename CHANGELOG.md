@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.99.0] - 2022-10-01
+### Added
+- Support custom headers when fetching data from a URL (e.g. HTTP `Authorization` header)
+
 ## [0.98.0] - 2022-09-05
 ### Added
 - Progress indication when syncing datasets to and from remote repositories

@@ -55,6 +55,7 @@ fn serde_dataset_snapshot_root() {
                 url: "ftp://kamu.dev/test.zip".to_owned(),
                 event_time: None,
                 cache: Some(SourceCaching::Forever),
+                headers: None,
             }),
             prepare: Some(vec![PrepStep::Decompress(PrepStepDecompress {
                 format: CompressionFormat::Zip,

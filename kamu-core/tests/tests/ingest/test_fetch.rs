@@ -39,6 +39,7 @@ async fn test_fetch_url_file() {
         url: Url::from_file_path(&src_path).unwrap().as_str().to_owned(),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
@@ -101,6 +102,7 @@ async fn test_fetch_url_http_unreachable() {
         url: format!("http://localhost:{}/data.csv", 123),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
@@ -125,6 +127,7 @@ async fn test_fetch_url_http_not_found() {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
@@ -163,6 +166,7 @@ async fn test_fetch_url_http_ok() {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
@@ -258,6 +262,7 @@ async fn test_fetch_url_http_env_interpolation() {
         ),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
@@ -320,6 +325,7 @@ async fn test_fetch_url_ftp_ok() {
         url: format!("ftp://foo:bar@localhost:{}/data.csv", ftp_server.host_port),
         event_time: None,
         cache: None,
+        headers: None,
     });
 
     let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);

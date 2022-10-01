@@ -313,6 +313,7 @@ type FetchStepUrl {
 	url: String!
 	eventTime: EventTimeSource
 	cache: SourceCaching
+	headers: [RequestHeader!]
 }
 
 
@@ -517,6 +518,11 @@ type ReadStepJsonLines {
 
 type ReadStepParquet {
 	schema: [String!]
+}
+
+type RequestHeader {
+	name: String!
+	value: String!
 }
 
 type Search {

@@ -136,6 +136,7 @@ impl SetPollingSourceBuilder {
                     url: "http://nowhere.org".to_owned(),
                     event_time: None,
                     cache: None,
+                    headers: None,
                 }),
                 prepare: None,
                 read: ReadStep::GeoJson(ReadStepGeoJson { schema: None }),
@@ -158,6 +159,7 @@ impl SetPollingSourceBuilder {
             url: url::Url::from_file_path(path).unwrap().as_str().to_owned(),
             event_time: None, // TODO: Some(EventTimeSource::FromMetadata),
             cache: None,
+            headers: None,
         }))
     }
 

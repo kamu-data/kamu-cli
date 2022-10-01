@@ -815,6 +815,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepUrl {
         let url_offset = { fb.create_string(&self.url) };
         let event_time_offset = self.event_time.as_ref().map(|v| v.serialize(fb));
         let cache_offset = self.cache.as_ref().map(|v| v.serialize(fb));
+        let headers_offset = self.headers.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| i.serialize(fb)).collect();
+            fb.create_vector(&offsets)
+        });
         let mut builder = fb::FetchStepUrlBuilder::new(fb);
         builder.add_url(url_offset);
         event_time_offset.map(|(e, off)| {
@@ -825,6 +829,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::FetchStepUrl {
             builder.add_cache_type(e);
             builder.add_cache(off)
         });
+        headers_offset.map(|off| builder.add_headers(off));
         builder.finish()
     }
 }
@@ -839,6 +844,11 @@ impl<'fb> FlatbuffersDeserializable<fb::FetchStepUrl<'fb>> for odf::FetchStepUrl
             cache: proxy
                 .cache()
                 .map(|v| odf::SourceCaching::deserialize(v, proxy.cache_type())),
+            headers: proxy.headers().map(|v| {
+                v.iter()
+                    .map(|i| odf::RequestHeader::deserialize(i))
+                    .collect()
+            }),
         }
     }
 }
@@ -1604,6 +1614,33 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepParquet<'fb>> for odf::ReadStepP
             schema: proxy
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RequestHeader
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::RequestHeader {
+    type OffsetT = WIPOffset<fb::RequestHeader<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let name_offset = { fb.create_string(&self.name) };
+        let value_offset = { fb.create_string(&self.value) };
+        let mut builder = fb::RequestHeaderBuilder::new(fb);
+        builder.add_name(name_offset);
+        builder.add_value(value_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::RequestHeader<'fb>> for odf::RequestHeader {
+    fn deserialize(proxy: fb::RequestHeader<'fb>) -> Self {
+        odf::RequestHeader {
+            name: proxy.name().map(|v| v.to_owned()).unwrap(),
+            value: proxy.value().map(|v| v.to_owned()).unwrap(),
         }
     }
 }

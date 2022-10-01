@@ -477,6 +477,7 @@ pub struct FetchStepUrl {
     pub url: String,
     pub event_time: Option<EventTimeSource>,
     pub cache: Option<SourceCaching>,
+    pub headers: Option<Vec<RequestHeader>>,
 }
 
 impl From<odf::FetchStepUrl> for FetchStepUrl {
@@ -485,6 +486,7 @@ impl From<odf::FetchStepUrl> for FetchStepUrl {
             url: v.url.into(),
             event_time: v.event_time.map(Into::into),
             cache: v.cache.map(Into::into),
+            headers: v.headers.map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -907,6 +909,26 @@ impl From<odf::ReadStepParquet> for ReadStepParquet {
     fn from(v: odf::ReadStepParquet) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RequestHeader
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RequestHeader {
+    pub name: String,
+    pub value: String,
+}
+
+impl From<odf::RequestHeader> for RequestHeader {
+    fn from(v: odf::RequestHeader) -> Self {
+        Self {
+            name: v.name.into(),
+            value: v.value.into(),
         }
     }
 }

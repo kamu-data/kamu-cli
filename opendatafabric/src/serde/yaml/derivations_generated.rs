@@ -498,6 +498,9 @@ pub struct FetchStepUrlDef {
     #[serde_as(as = "Option<SourceCachingDef>")]
     #[serde(default)]
     pub cache: Option<SourceCaching>,
+    #[serde_as(as = "Option<Vec<RequestHeaderDef>>")]
+    #[serde(default)]
+    pub headers: Option<Vec<RequestHeader>>,
 }
 
 #[serde_as]
@@ -853,6 +856,23 @@ pub struct ReadStepEsriShapefileDef {
 pub struct ReadStepParquetDef {
     pub schema: Option<Vec<String>>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// RequestHeader
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RequestHeader")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RequestHeaderDef {
+    pub name: String,
+    pub value: String,
+}
+
+implement_serde_as!(RequestHeader, RequestHeaderDef, "RequestHeaderDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // Seed

@@ -315,6 +315,8 @@ pub struct FetchStepUrl {
     pub event_time: Option<EventTimeSource>,
     /// Describes the caching settings used for this source.
     pub cache: Option<SourceCaching>,
+    /// Headers to pass during the request (e.g. HTTP Authorization)
+    pub headers: Option<Vec<RequestHeader>>,
 }
 
 /// Uses glob operator to match files on the local file system.
@@ -627,6 +629,20 @@ pub struct ReadStepEsriShapefile {
 pub struct ReadStepParquet {
     /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
     pub schema: Option<Vec<String>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RequestHeader
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a header (e.g. HTTP) to be passed into some request.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RequestHeader {
+    /// Name of the header.
+    pub name: String,
+    /// Value of the header.
+    pub value: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

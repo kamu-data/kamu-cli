@@ -3334,6 +3334,126 @@ impl core::fmt::Debug for SourceCachingForever<'_> {
         ds.finish()
     }
 }
+pub enum RequestHeaderOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct RequestHeader<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RequestHeader<'a> {
+    type Inner = RequestHeader<'a>;
+    #[inline]
+    fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table { buf, loc },
+        }
+    }
+}
+
+impl<'a> RequestHeader<'a> {
+    pub const VT_NAME: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RequestHeader { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RequestHeaderArgs<'args>,
+    ) -> flatbuffers::WIPOffset<RequestHeader<'bldr>> {
+        let mut builder = RequestHeaderBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(RequestHeader::VT_NAME, None)
+    }
+    #[inline]
+    pub fn value(&self) -> Option<&'a str> {
+        self._tab
+            .get::<flatbuffers::ForwardsUOffset<&str>>(RequestHeader::VT_VALUE, None)
+    }
+}
+
+impl flatbuffers::Verifiable for RequestHeader<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("value", Self::VT_VALUE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RequestHeaderArgs<'a> {
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub value: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for RequestHeaderArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        RequestHeaderArgs {
+            name: None,
+            value: None,
+        }
+    }
+}
+
+pub struct RequestHeaderBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RequestHeaderBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(RequestHeader::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(RequestHeader::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RequestHeaderBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RequestHeaderBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RequestHeader<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RequestHeader<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RequestHeader");
+        ds.field("name", &self.name());
+        ds.field("value", &self.value());
+        ds.finish()
+    }
+}
 pub enum EnvVarOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -3479,6 +3599,7 @@ impl<'a> FetchStepUrl<'a> {
     pub const VT_EVENT_TIME: flatbuffers::VOffsetT = 8;
     pub const VT_CACHE_TYPE: flatbuffers::VOffsetT = 10;
     pub const VT_CACHE: flatbuffers::VOffsetT = 12;
+    pub const VT_HEADERS: flatbuffers::VOffsetT = 14;
 
     #[inline]
     pub fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -3490,6 +3611,9 @@ impl<'a> FetchStepUrl<'a> {
         args: &'args FetchStepUrlArgs<'args>,
     ) -> flatbuffers::WIPOffset<FetchStepUrl<'bldr>> {
         let mut builder = FetchStepUrlBuilder::new(_fbb);
+        if let Some(x) = args.headers {
+            builder.add_headers(x);
+        }
         if let Some(x) = args.cache {
             builder.add_cache(x);
         }
@@ -3539,6 +3663,14 @@ impl<'a> FetchStepUrl<'a> {
                 FetchStepUrl::VT_CACHE,
                 None,
             )
+    }
+    #[inline]
+    pub fn headers(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RequestHeader<'a>>>> {
+        self._tab.get::<flatbuffers::ForwardsUOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RequestHeader>>,
+        >>(FetchStepUrl::VT_HEADERS, None)
     }
     #[inline]
     #[allow(non_snake_case)]
@@ -3597,6 +3729,7 @@ impl flatbuffers::Verifiable for FetchStepUrl<'_> {
           _ => Ok(()),
         }
      })?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<RequestHeader>>>>("headers", Self::VT_HEADERS, false)?
      .finish();
         Ok(())
     }
@@ -3607,6 +3740,11 @@ pub struct FetchStepUrlArgs<'a> {
     pub event_time: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
     pub cache_type: SourceCaching,
     pub cache: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub headers: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RequestHeader<'a>>>,
+        >,
+    >,
 }
 impl<'a> Default for FetchStepUrlArgs<'a> {
     #[inline]
@@ -3617,6 +3755,7 @@ impl<'a> Default for FetchStepUrlArgs<'a> {
             event_time: None,
             cache_type: SourceCaching::NONE,
             cache: None,
+            headers: None,
         }
     }
 }
@@ -3659,6 +3798,16 @@ impl<'a: 'b, 'b> FetchStepUrlBuilder<'a, 'b> {
     pub fn add_cache(&mut self, cache: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepUrl::VT_CACHE, cache);
+    }
+    #[inline]
+    pub fn add_headers(
+        &mut self,
+        headers: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<RequestHeader<'b>>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FetchStepUrl::VT_HEADERS, headers);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> FetchStepUrlBuilder<'a, 'b> {
@@ -3723,6 +3872,7 @@ impl core::fmt::Debug for FetchStepUrl<'_> {
                 ds.field("cache", &x)
             }
         };
+        ds.field("headers", &self.headers());
         ds.finish()
     }
 }

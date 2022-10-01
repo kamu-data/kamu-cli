@@ -1,6 +1,6 @@
 [package]
 name = "container-runtime"
-version = "0.98.0"
+version = "0.99.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../../LICENSE.txt"

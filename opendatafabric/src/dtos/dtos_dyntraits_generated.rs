@@ -699,6 +699,7 @@ pub trait FetchStepUrl {
     fn url(&self) -> &str;
     fn event_time(&self) -> Option<EventTimeSource>;
     fn cache(&self) -> Option<SourceCaching>;
+    fn headers(&self) -> Option<Box<dyn Iterator<Item = &dyn RequestHeader> + '_>>;
 }
 
 pub trait FetchStepFilesGlob {
@@ -726,6 +727,13 @@ impl FetchStepUrl for dtos::FetchStepUrl {
     }
     fn cache(&self) -> Option<SourceCaching> {
         self.cache.as_ref().map(|v| -> SourceCaching { v.into() })
+    }
+    fn headers(&self) -> Option<Box<dyn Iterator<Item = &dyn RequestHeader> + '_>> {
+        self.headers
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &dyn RequestHeader> + '_> {
+                Box::new(v.iter().map(|i| -> &dyn RequestHeader { i }))
+            })
     }
 }
 
@@ -779,6 +787,7 @@ impl Into<dtos::FetchStepUrl> for &dyn FetchStepUrl {
             url: self.url().to_owned(),
             event_time: self.event_time().map(|v| v.into()),
             cache: self.cache().map(|v| v.into()),
+            headers: self.headers().map(|v| v.map(|i| i.into()).collect()),
         }
     }
 }
@@ -1400,6 +1409,34 @@ impl Into<dtos::ReadStepParquet> for &dyn ReadStepParquet {
     fn into(self) -> dtos::ReadStepParquet {
         dtos::ReadStepParquet {
             schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RequestHeader
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#requestheader-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait RequestHeader {
+    fn name(&self) -> &str;
+    fn value(&self) -> &str;
+}
+
+impl RequestHeader for dtos::RequestHeader {
+    fn name(&self) -> &str {
+        self.name.as_ref()
+    }
+    fn value(&self) -> &str {
+        self.value.as_ref()
+    }
+}
+
+impl Into<dtos::RequestHeader> for &dyn RequestHeader {
+    fn into(self) -> dtos::RequestHeader {
+        dtos::RequestHeader {
+            name: self.name().to_owned(),
+            value: self.value().to_owned(),
         }
     }
 }

@@ -164,6 +164,7 @@ impl PullCommand {
             url: url.to_string(),
             event_time: None,
             cache: None,
+            headers: None,
         });
 
         Ok(self

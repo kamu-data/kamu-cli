@@ -31,6 +31,7 @@ async fn test_pull_ingest_from_file() {
                     .to_string(),
                 event_time: None,
                 cache: None,
+                headers: None,
             }),
             prepare: None,
             read: ReadStep::Csv(ReadStepCsv {

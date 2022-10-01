@@ -17,6 +17,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
+use std::borrow::Cow;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -80,6 +81,8 @@ impl FetchService {
         match &fetch_step {
             FetchStep::Url(furl) => {
                 let url = Self::template_url(&furl.url)?;
+                let headers = Self::template_headers(&furl.headers)?;
+
                 match url.scheme() {
                     "file" => Self::fetch_file(
                         &url.to_file_path()
@@ -91,6 +94,7 @@ impl FetchService {
                     ),
                     "http" | "https" => Self::fetch_http(
                         &url,
+                        &headers,
                         furl.event_time.as_ref(),
                         old_checkpoint,
                         target,
@@ -120,13 +124,33 @@ impl FetchService {
         }
     }
 
-    fn template_url(url: impl AsRef<str>) -> Result<Url, IngestError> {
-        let mut url = std::borrow::Cow::Borrowed(url.as_ref());
+    fn template_url(url_tpl: &str) -> Result<Url, IngestError> {
+        let url = Self::template_string(url_tpl)?;
+        Ok(Url::parse(&url).int_err()?)
+    }
+
+    fn template_headers(
+        headers_tpl: &Option<Vec<RequestHeader>>,
+    ) -> Result<Vec<RequestHeader>, IngestError> {
+        let mut res = Vec::new();
+        let empty = Vec::new();
+        for htpl in headers_tpl.as_ref().unwrap_or(&empty) {
+            let hdr = RequestHeader {
+                name: htpl.name.clone(),
+                value: Self::template_string(&htpl.value)?.into_owned(),
+            };
+            res.push(hdr);
+        }
+        Ok(res)
+    }
+
+    fn template_string<'a>(s: &'a str) -> Result<Cow<'a, str>, IngestError> {
+        let mut s = Cow::from(s);
         let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
         let re_env = regex::Regex::new(r"^env\.([a-zA-Z-_]+)$").unwrap();
 
         loop {
-            if let Some(ctpl) = re_tpl.captures(&url) {
+            if let Some(ctpl) = re_tpl.captures(&s) {
                 let tpl_range = ctpl.get(0).unwrap().range();
 
                 if let Some(cenv) = re_env.captures(ctpl.get(1).unwrap().as_str().trim()) {
@@ -137,21 +161,21 @@ impl FetchService {
                             Err(format!("Environment variable {} is not set", env_name).int_err())
                         }
                     }?;
-                    url.to_mut().replace_range(tpl_range, &env_value);
+                    s.to_mut().replace_range(tpl_range, &env_value);
                 } else {
                     return Err(format!(
-                        "Invalid pattern '{}' encountered in URL: {}",
+                        "Invalid pattern '{}' encountered in string: {}",
                         ctpl.get(0).unwrap().as_str(),
-                        url
+                        s
                     )
                     .int_err()
                     .into());
                 }
             } else {
-                if let std::borrow::Cow::Owned(_) = &url {
-                    debug!(%url, "URL after template substitution");
+                if let std::borrow::Cow::Owned(_) = &s {
+                    debug!(%s, "String after template substitution");
                 }
-                return Ok(Url::parse(url.as_ref()).int_err()?);
+                return Ok(s);
             }
         }
     }
@@ -517,6 +541,7 @@ impl FetchService {
 
     fn fetch_http(
         url: &Url,
+        headers: &Vec<RequestHeader>,
         _event_time_source: Option<&EventTimeSource>,
         old_checkpoint: Option<FetchCheckpoint>,
         target_path: &Path,
@@ -531,18 +556,21 @@ impl FetchService {
         h.progress(true)?;
         h.follow_location(true)?;
 
+        let mut header_list = curl::easy::List::new();
+        for hdr in headers {
+            header_list.append(&format!("{}: {}", hdr.name, hdr.value))?;
+        }
         if let Some(ref cp) = old_checkpoint {
-            let mut list = curl::easy::List::new();
             if let Some(ref etag) = cp.etag {
-                list.append(&format!("If-None-Match: {}", etag))?;
+                header_list.append(&format!("If-None-Match: {}", etag))?;
             } else if let Some(ref last_modified) = cp.last_modified {
-                list.append(&format!(
+                header_list.append(&format!(
                     "If-Modified-Since: {}",
                     last_modified.to_rfc2822()
                 ))?;
             }
-            h.http_headers(list)?;
         }
+        h.http_headers(header_list)?;
 
         let mut last_modified: Option<DateTime<Utc>> = None;
         let mut etag: Option<String> = None;

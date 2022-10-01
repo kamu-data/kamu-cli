@@ -270,6 +270,7 @@ impl IngestEngine for SparkEngine {
                     url: "http://localhost/".to_owned(),
                     event_time: None,
                     cache: None,
+                    headers: None,
                 }),
                 ..request.source
             },
