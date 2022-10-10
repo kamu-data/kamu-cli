@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::IpAddr;
+use std::str::FromStr;
+
+use opendatafabric::DatasetRefLocal;
+
 use crate::app::in_workspace;
 use crate::commands::*;
 use crate::CommandInterpretationFailed;
@@ -19,9 +24,9 @@ pub fn get_command(
         Some(("add", submatches)) => Box::new(AddCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.values_of("manifest").unwrap(),
-            submatches.is_present("recursive"),
-            submatches.is_present("replace"),
+            submatches.get_many("manifest").unwrap().map(String::as_str),
+            submatches.get_flag("recursive"),
+            submatches.get_flag("replace"),
         )),
         Some(("complete", submatches)) => Box::new(CompleteCommand::new(
             if in_workspace(catalog.get_one()?) {
@@ -41,8 +46,11 @@ pub fn get_command(
             },
             catalog.get_one()?,
             crate::cli_parser::cli(),
-            submatches.value_of("input").unwrap().into(),
-            submatches.value_of("current").unwrap().parse().unwrap(),
+            submatches
+                .get_one::<String>("input")
+                .map(|s| s.to_string())
+                .unwrap(),
+            *(submatches.get_one("current").unwrap()),
         )),
         Some(("completions", submatches)) => Box::new(CompletionsCommand::new(
             crate::cli_parser::cli(),
@@ -51,36 +59,36 @@ pub fn get_command(
         Some(("config", config_matches)) => match config_matches.subcommand() {
             Some(("list", list_matches)) => Box::new(ConfigListCommand::new(
                 catalog.get_one()?,
-                list_matches.is_present("user"),
-                list_matches.is_present("with-defaults"),
+                list_matches.get_flag("user"),
+                list_matches.get_flag("with-defaults"),
             )),
             Some(("get", get_matches)) => Box::new(ConfigGetCommand::new(
                 catalog.get_one()?,
-                get_matches.is_present("user"),
-                get_matches.is_present("with-defaults"),
-                get_matches.value_of("cfgkey").unwrap().to_owned(),
+                get_matches.get_flag("user"),
+                get_matches.get_flag("with-defaults"),
+                get_matches.get_one::<String>("cfgkey").unwrap().to_string(),
             )),
             Some(("set", set_matches)) => Box::new(ConfigSetCommand::new(
                 catalog.get_one()?,
-                set_matches.is_present("user"),
-                set_matches.value_of("cfgkey").unwrap().to_owned(),
-                set_matches.value_of("value").map(|s| s.to_owned()),
+                set_matches.get_flag("user"),
+                set_matches.get_one::<String>("cfgkey").unwrap().to_string(),
+                set_matches.get_one("value").map(|s: &String| s.to_owned()),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
-            submatches.values_of("dataset").unwrap_or_default(),
-            submatches.is_present("all"),
-            submatches.is_present("recursive"),
-            submatches.is_present("yes"),
+            submatches.get_many("dataset").unwrap().map(String::as_str),
+            submatches.get_flag("all"),
+            submatches.get_flag("recursive"),
+            submatches.get_flag("yes"),
         )),
         Some(("init", submatches)) => {
-            if submatches.is_present("pull-images") || submatches.is_present("pull-test-images") {
+            if submatches.get_flag("pull-images") || submatches.get_flag("pull-test-images") {
                 Box::new(PullImagesCommand::new(
                     catalog.get_one()?,
-                    submatches.is_present("pull-test-images"),
-                    submatches.is_present("list-only"),
+                    submatches.get_flag("pull-test-images"),
+                    submatches.get_flag("list-only"),
                 ))
             } else {
                 Box::new(InitCommand::new(catalog.get_one()?))
@@ -91,20 +99,29 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
-                lin_matches.values_of("dataset").unwrap_or_default(),
-                lin_matches.is_present("browse"),
-                lin_matches.value_of("output-format"),
+                lin_matches.get_many("dataset").unwrap().map(String::as_str),
+                lin_matches.get_flag("browse"),
+                lin_matches.get_one("output-format").map(String::as_str),
                 catalog.get_one()?,
             )),
             Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
-                query_matches.value_of_t_or_exit("dataset"),
+                DatasetRefLocal::from_str(
+                    query_matches.get_one::<String>("dataset").unwrap().as_str(),
+                )
+                .unwrap(),
                 catalog.get_one()?,
             )),
             Some(("schema", schema_matches)) => Box::new(InspectSchemaCommand::new(
                 catalog.get_one()?,
-                schema_matches.value_of_t_or_exit("dataset"),
-                schema_matches.value_of("output-format"),
+                DatasetRefLocal::from_str(
+                    schema_matches
+                        .get_one::<String>("dataset")
+                        .unwrap()
+                        .as_str(),
+                )
+                .unwrap(),
+                schema_matches.get_one("output-format").map(String::as_str),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
@@ -112,39 +129,49 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.occurrences_of("wide") as u8,
+            submatches.get_count("wide"),
         )),
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
-            submatches.value_of_t_or_exit("dataset"),
-            submatches.value_of("output-format"),
-            submatches.value_of("filter"),
-            submatches.value_of_t_or_exit("limit"),
+            DatasetRefLocal::from_str(submatches.get_one::<String>("dataset").unwrap().as_str())
+                .unwrap(),
+            submatches.get_one("output-format").map(String::as_str),
+            submatches.get_one("filter").map(String::as_str),
+            *(submatches.get_one("limit").unwrap()),
             catalog.get_one()?,
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
-            submatches.value_of("name").unwrap(),
-            submatches.is_present("root"),
-            submatches.is_present("derivative"),
+            submatches.get_one("name").map(String::as_str).unwrap(),
+            submatches.get_flag("root"),
+            submatches.get_flag("derivative"),
             None::<&str>,
         )),
         Some(("notebook", submatches)) => Box::new(NotebookCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.values_of("env").unwrap_or_default(),
+            submatches.get_many("env").unwrap().map(String::as_str),
         )),
         Some(("pull", submatches)) => {
-            if submatches.is_present("set-watermark") {
-                let datasets = submatches.values_of("dataset").unwrap_or_default();
+            if submatches.contains_id("set-watermark") {
+                let datasets = submatches
+                    .get_many("dataset")
+                    .unwrap_or_default()
+                    .map(String::as_str);
                 if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    submatches.values_of("dataset").unwrap_or_default(),
-                    submatches.is_present("all"),
-                    submatches.is_present("recursive"),
-                    submatches.value_of("set-watermark").unwrap(),
+                    submatches
+                        .get_many("dataset")
+                        .unwrap_or_default()
+                        .map(String::as_str),
+                    submatches.get_flag("all"),
+                    submatches.get_flag("recursive"),
+                    submatches
+                        .get_one("set-watermark")
+                        .map(String::as_str)
+                        .unwrap(),
                 ))
             } else {
                 Box::new(PullCommand::new(
@@ -152,43 +179,55 @@ pub fn get_command(
                     catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    submatches.values_of("dataset").unwrap_or_default(),
-                    submatches.is_present("all"),
-                    submatches.is_present("recursive"),
-                    submatches.is_present("fetch-uncacheable"),
-                    submatches.value_of("as"),
-                    !submatches.is_present("no-alias"),
-                    submatches.value_of("fetch"),
-                    submatches.is_present("force"),
+                    submatches
+                        .get_many::<String>("dataset")
+                        .unwrap_or_default()
+                        .map(String::as_str),
+                    submatches.get_flag("all"),
+                    submatches.get_flag("recursive"),
+                    submatches.get_flag("fetch-uncacheable"),
+                    submatches.get_one("as").map(String::as_str),
+                    !submatches.get_flag("no-alias"),
+                    submatches.get_one("fetch").map(String::as_str),
+                    submatches.get_flag("force"),
                 ))
             }
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
             catalog.get_one()?,
-            push_matches.values_of("dataset").unwrap_or_default(),
-            push_matches.is_present("all"),
-            push_matches.is_present("recursive"),
-            !push_matches.is_present("no-alias"),
-            push_matches.is_present("force"),
-            push_matches.value_of("to"),
+            push_matches
+                .get_many("dataset")
+                .unwrap_or_default()
+                .map(String::as_str),
+            push_matches.get_flag("all"),
+            push_matches.get_flag("recursive"),
+            !push_matches.get_flag("no-alias"),
+            push_matches.get_flag("force"),
+            push_matches.get_one("to").map(String::as_str),
             catalog.get_one()?,
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
             catalog.get_one()?,
-            rename_matches.value_of("dataset").unwrap(),
-            rename_matches.value_of("name").unwrap(),
+            rename_matches
+                .get_one("dataset")
+                .map(String::as_str)
+                .unwrap(),
+            rename_matches.get_one("name").map(String::as_str).unwrap(),
         )),
         Some(("repo", repo_matches)) => match repo_matches.subcommand() {
             Some(("add", add_matches)) => Box::new(RepositoryAddCommand::new(
                 catalog.get_one()?,
-                add_matches.value_of("name").unwrap(),
-                add_matches.value_of("url").unwrap(),
+                add_matches.get_one("name").map(String::as_str).unwrap(),
+                add_matches.get_one("url").map(String::as_str).unwrap(),
             )),
             Some(("delete", delete_matches)) => Box::new(RepositoryDeleteCommand::new(
                 catalog.get_one()?,
-                delete_matches.values_of("repository").unwrap_or_default(),
-                delete_matches.is_present("all"),
-                delete_matches.is_present("yes"),
+                delete_matches
+                    .get_many("repository")
+                    .unwrap_or_default()
+                    .map(String::as_str),
+                delete_matches.get_flag("all"),
+                delete_matches.get_flag("yes"),
             )),
             Some(("list", _)) => Box::new(RepositoryListCommand::new(
                 catalog.get_one()?,
@@ -198,24 +237,27 @@ pub fn get_command(
                 Some(("add", add_matches)) => Box::new(AliasAddCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    add_matches.value_of("dataset").unwrap(),
-                    add_matches.value_of("alias").unwrap(),
-                    add_matches.is_present("pull"),
-                    add_matches.is_present("push"),
+                    add_matches.get_one("dataset").map(String::as_str).unwrap(),
+                    add_matches.get_one("alias").map(String::as_str).unwrap(),
+                    add_matches.get_flag("pull"),
+                    add_matches.get_flag("push"),
                 )),
                 Some(("delete", delete_matches)) => Box::new(AliasDeleteCommand::new(
                     catalog.get_one()?,
-                    delete_matches.value_of("dataset").unwrap(),
-                    delete_matches.value_of("alias"),
-                    delete_matches.is_present("all"),
-                    delete_matches.is_present("pull"),
-                    delete_matches.is_present("push"),
+                    delete_matches
+                        .get_one("dataset")
+                        .map(String::as_str)
+                        .unwrap(),
+                    delete_matches.get_one("alias").map(String::as_str),
+                    delete_matches.get_flag("all"),
+                    delete_matches.get_flag("pull"),
+                    delete_matches.get_flag("push"),
                 )),
                 Some(("list", list_matches)) => Box::new(AliasListCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    list_matches.value_of("dataset"),
+                    list_matches.get_one("dataset").map(String::as_str),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -224,15 +266,18 @@ pub fn get_command(
         Some(("reset", submatches)) => Box::new(ResetCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.value_of("dataset").unwrap(),
-            submatches.value_of("hash").unwrap(),
-            submatches.is_present("yes"),
+            submatches.get_one("dataset").map(String::as_str).unwrap(),
+            submatches.get_one("hash").map(String::as_str).unwrap(),
+            submatches.get_flag("yes"),
         )),
         Some(("search", submatches)) => Box::new(SearchCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.value_of("query"),
-            submatches.values_of("repo").unwrap_or_default(),
+            submatches.get_one("query").map(String::as_str),
+            submatches
+                .get_many("repo")
+                .unwrap_or_default()
+                .map(String::as_str),
         )),
         Some(("sql", submatches)) => match submatches.subcommand() {
             None => Box::new(SqlShellCommand::new(
@@ -240,26 +285,32 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
-                submatches.value_of("command"),
-                submatches.value_of("url"),
-                submatches.value_of("engine"),
+                submatches.get_one("command").map(String::as_str),
+                submatches.get_one("url").map(String::as_str),
+                submatches.get_one("engine").map(String::as_str),
             )),
             Some(("server", server_matches)) => {
-                if !server_matches.is_present("livy") {
+                if !server_matches.get_flag("livy") {
                     Box::new(SqlServerCommand::new(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        server_matches.value_of("address").unwrap(),
-                        server_matches.value_of_t_or_exit("port"),
+                        server_matches
+                            .get_one("address")
+                            .map(String::as_str)
+                            .unwrap(),
+                        *(server_matches.get_one("port").unwrap()),
                     ))
                 } else {
                     Box::new(SqlServerLivyCommand::new(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        server_matches.value_of("address").unwrap(),
-                        server_matches.value_of_t_or_exit("port"),
+                        server_matches
+                            .get_one("address")
+                            .map(String::as_str)
+                            .unwrap(),
+                        *(server_matches.get_one("port").unwrap()),
                     ))
                 }
             }
@@ -270,13 +321,13 @@ pub fn get_command(
                 None => Box::new(APIServerRunCommand::new(
                     catalog.clone(), // TODO: Currently very expensive!
                     catalog.get_one()?,
-                    server_matches.value_of_t("address").ok(),
-                    server_matches.value_of_t("http-port").ok(),
+                    server_matches.get_one::<IpAddr>("address").map(|a| *a),
+                    server_matches.get_one::<u16>("http-port").map(|p| *p),
                 )),
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
                     catalog.clone(), // TODO: Currently very expensive!
-                    query_matches.value_of("query").unwrap(),
-                    query_matches.is_present("full"),
+                    query_matches.get_one("query").map(String::as_str).unwrap(),
+                    query_matches.get_flag("full"),
                 )),
                 Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand::new(
                     catalog.clone(), // TODO: Currently very expensive
@@ -286,7 +337,7 @@ pub fn get_command(
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     catalog.get_one()?,
-                    add_matches.value_of("dataset").unwrap(),
+                    add_matches.get_one("dataset").map(String::as_str).unwrap(),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -294,23 +345,26 @@ pub fn get_command(
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(
             catalog.get_one()?,
-            submatches.value_of("dataset").unwrap(),
-            submatches.value_of_t_or_exit("num-records"),
+            submatches.get_one("dataset").map(String::as_str).unwrap(),
+            *(submatches.get_one("num-records").unwrap()),
             catalog.get_one()?,
         )),
         Some(("ui", submatches)) => Box::new(UICommand::new(
             catalog.clone(), // TODO: Currently very expensive!
             catalog.get_one()?,
-            submatches.value_of_t("address").ok(),
-            submatches.value_of_t("http-port").ok(),
+            submatches.get_one::<IpAddr>("address").map(|a| *a),
+            submatches.get_one::<u16>("http-port").map(|p| *p),
         )),
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.values_of("dataset").unwrap_or_default(),
-            submatches.is_present("recursive"),
-            submatches.is_present("integrity"),
+            submatches
+                .get_many("dataset")
+                .unwrap_or_default()
+                .map(String::as_str),
+            submatches.get_flag("recursive"),
+            submatches.get_flag("integrity"),
         )),
         _ => return Err(CommandInterpretationFailed.into()),
     };

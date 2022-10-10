@@ -309,12 +309,12 @@ fn configure_logging(
 fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
-    let verbosity_level = matches.occurrences_of("verbose") as u8;
+    let verbosity_level = matches.get_count("verbose");
     if verbosity_level > 0 {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
-    let quiet = matches.is_present("quiet");
+    let quiet = matches.get_flag("quiet");
 
     let format_str = get_output_format_recursive(matches, &super::cli());
 
@@ -343,7 +343,7 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
 
 fn get_output_format_recursive<'a>(
     matches: &'a clap::ArgMatches,
-    cmd: &clap::Command<'_>,
+    cmd: &clap::Command,
 ) -> Option<&'a str> {
     if let Some((subcommand_name, submatches)) = matches.subcommand() {
         let subcommand = cmd
@@ -356,7 +356,7 @@ fn get_output_format_recursive<'a>(
             .is_some();
 
         if has_output_format {
-            if let Some(fmt) = submatches.value_of("output-format") {
+            if let Some(fmt) = submatches.get_one("output-format").map(String::as_str) {
                 return Some(fmt);
             }
         }

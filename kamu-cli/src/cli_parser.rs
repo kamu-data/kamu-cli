@@ -7,17 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use opendatafabric::*;
 
-fn tabular_output_params<'a>(app: Command<'a>) -> Command<'a> {
+fn tabular_output_params<'a>(app: Command) -> Command {
     app.args(&[
         Arg::new("output-format")
             .long("output-format")
             .short('o')
-            .takes_value(true)
             .value_name("FMT")
-            .possible_values(&[
+            .value_parser([
                 "table", "csv", "json", "json-ld",
                 "json-soa",
                 // "vertical",
@@ -28,57 +27,52 @@ fn tabular_output_params<'a>(app: Command<'a>) -> Command<'a> {
             .help("Format to display the results in"),
         /*Arg::new("no-color")
             .long("no-color")
+            .action(ArgAction::SetTrue)
             .help("Control whether color is used for display"),
         Arg::new("incremental")
             .long("incremental")
+            .action(ArgAction::SetTrue)
             .help("Display result rows immediately as they are fetched"),
         Arg::new("no-header")
             .long("no-header")
+            .action(ArgAction::SetTrue)
             .help("Whether to show column names in query results"),
         Arg::new("header-interval")
             .long("header-interval")
-            .takes_value(true)
             .value_name("INT")
             .help("The number of rows between which headers are displayed"),
         Arg::new("csv-delimiter")
             .long("csv-delimiter")
-            .takes_value(true)
             .value_name("DELIM")
             .help("Delimiter in the csv output format"),
         Arg::new("csv-quote-character")
             .long("csv-quote-character")
-            .takes_value(true)
             .value_name("CHAR")
             .help("Quote character in the csv output format"),
         Arg::new("null-value")
             .long("null-value")
-            .takes_value(true)
             .value_name("VAL")
             .help("Use specified string in place of NULL values"),
         Arg::new("number-format")
             .long("number-format")
-            .takes_value(true)
             .value_name("FMT")
             .help("Format numbers using DecimalFormat pattern"),
         Arg::new("date-format")
             .long("date-format")
-            .takes_value(true)
             .value_name("FMT")
             .help("Format dates using SimpleDateFormat pattern"),
         Arg::new("time-format")
             .long("time-format")
-            .takes_value(true)
             .value_name("FMT")
             .help("Format times using SimpleDateFormat pattern"),
         Arg::new("timestamp-format")
             .long("timestamp-format")
-            .takes_value(true)
             .value_name("FMT")
             .help("Format timestamps using SimpleDateFormat pattern"),*/
     ])
 }
 
-pub fn cli() -> Command<'static> {
+pub fn cli() -> Command {
     Command::new(crate::BINARY_NAME)
         .subcommand_required(true)
         .arg_required_else_help(true)
@@ -86,11 +80,12 @@ pub fn cli() -> Command<'static> {
         .args(&[
             Arg::new("verbose")
                 .short('v')
-                .multiple_occurrences(true)
+                .action(ArgAction::Count)
                 .help("Sets the level of verbosity (repeat for more)"),
             Arg::new("quiet")
                 .long("quiet")
                 .short('q')
+                .action(ArgAction::SetTrue)
                 .help("Suppress all non-essential output"),
         ])
         .after_help(indoc::indoc!(
@@ -107,12 +102,14 @@ pub fn cli() -> Command<'static> {
                     Arg::new("recursive")
                         .short('r')
                         .long("recursive")
+                        .action(ArgAction::SetTrue)
                         .help("Recursively search for all manifest in the specified directory"),
                     Arg::new("replace")
                         .long("replace")
+                        .action(ArgAction::SetTrue)
                         .help("Delete and re-add datasets that already exist"),
                     Arg::new("manifest")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .required(true)
                         .index(1)
                         .help("Dataset manifest reference(s) (path, or URL)"),
@@ -201,7 +198,6 @@ pub fn cli() -> Command<'static> {
                 .arg(
                     Arg::new("shell")
                         .required(true)
-                        .takes_value(true)
                         .value_parser(clap::builder::EnumValueParser::<clap_complete::Shell>::new()),
                 ),
             Command::new("config")
@@ -214,9 +210,11 @@ pub fn cli() -> Command<'static> {
                         .args(&[
                             Arg::new("user")
                                 .long("user")
+                                .action(ArgAction::SetTrue)
                                 .help("Show only user scope configuration"),
                             Arg::new("with-defaults")
                                 .long("with-defaults")
+                                .action(ArgAction::SetTrue)
                                 .help("Show configuration with all default values applied"),
                         ]),
                     Command::new("get")
@@ -224,9 +222,11 @@ pub fn cli() -> Command<'static> {
                         .args(&[
                             Arg::new("user")
                                 .long("user")
+                                .action(ArgAction::SetTrue)
                                 .help("Operate on the user scope configuration file"),
                             Arg::new("with-defaults")
                                 .long("with-defaults")
+                                .action(ArgAction::SetTrue)
                                 .help("Get default value if config option is not explicitly set"),
                             Arg::new("cfgkey")
                                 .required(true)
@@ -238,6 +238,7 @@ pub fn cli() -> Command<'static> {
                         .args(&[
                             Arg::new("user")
                                 .long("user")
+                                .action(ArgAction::SetTrue)
                                 .help("Operate on the user scope configuration file"),
                             Arg::new("cfgkey")
                                 .required(true)
@@ -285,19 +286,22 @@ pub fn cli() -> Command<'static> {
                     Arg::new("all")
                         .short('a')
                         .long("all")
+                        .action(ArgAction::SetTrue)
                         .help("Delete all datasets in the workspace"),
                     Arg::new("recursive")
                         .short('r')
                         .long("recursive")
+                        .action(ArgAction::SetTrue)
                         .help("Also delete all transitive dependencies of specified datasets"),
                     Arg::new("dataset")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .index(1)
-                        .validator(validate_dataset_ref_local)
+                        .value_parser(validate_dataset_ref_local)
                         .help("Local dataset reference(s)"),
                     Arg::new("yes")
                         .short('y')
                         .long("yes")
+                        .action(ArgAction::SetTrue)
                         .help("Don't ask for confirmation"),
                 ])
                 .after_help(indoc::indoc!(
@@ -323,13 +327,16 @@ pub fn cli() -> Command<'static> {
                 .args(&[
                     Arg::new("pull-images")
                         .long("pull-images")
+                        .action(ArgAction::SetTrue)
                         .help("Only pull container images and exit"),
                     Arg::new("pull-test-images")
                         .long("pull-test-images")
+                        .action(ArgAction::SetTrue)
                         .hide(true)
                         .help("Only pull test-related container images and exit"),
                     Arg::new("list-only")
                         .long("list-only")
+                        .action(ArgAction::SetTrue)
                         .hide(true)
                         .help("List image names instead of pulling"),
                 ])
@@ -356,18 +363,18 @@ pub fn cli() -> Command<'static> {
                             Arg::new("output-format")
                                 .long("output-format")
                                 .short('o')
-                                .takes_value(true)
                                 .value_name("FMT")
-                                .possible_values(&["shell", "dot", "csv", "html"])
+                                .value_parser(["shell", "dot", "csv", "html"])
                                 .help("Format of an output"),
                             Arg::new("browse")
                                 .long("browse")
                                 .short('b')
+                                .action(ArgAction::SetTrue)
                                 .help("Produce HTML and open it in a browser"),
                             Arg::new("dataset")
-                                .multiple_occurrences(true)
+                                .action(ArgAction::Append)
                                 .index(1)
-                                .validator(validate_dataset_ref_local)
+                                .value_parser(validate_dataset_ref_local)
                                 .help("Local dataset reference(s)"),
                         ])
                         .after_help(indoc::indoc!(
@@ -395,7 +402,7 @@ pub fn cli() -> Command<'static> {
                         .args(&[Arg::new("dataset")
                             .required(true)
                             .index(1)
-                            .validator(validate_dataset_ref_local)
+                            .value_parser(validate_dataset_ref_local)
                             .help("Local dataset reference")])
                         .after_help(indoc::indoc!(
                             "
@@ -411,14 +418,13 @@ pub fn cli() -> Command<'static> {
                             Arg::new("dataset")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_dataset_ref_local)
+                                .value_parser(validate_dataset_ref_local)
                                 .help("Local dataset reference"),
                             Arg::new("output-format")
                                 .long("output-format")
                                 .short('o')
-                                .takes_value(true)
                                 .value_name("FMT")
-                                .possible_values(&["ddl", "parquet", "json"])
+                                .value_parser(["ddl", "parquet", "json"])
                                 .help("Format of an output"),
                         ])
                         .after_help(indoc::indoc!(
@@ -444,7 +450,7 @@ pub fn cli() -> Command<'static> {
                     .args(&[Arg::new("wide")
                         .long("wide")
                         .short('w')
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Count)
                         .help("Show more details (repeat for more)")])
                     .after_help(indoc::indoc!(
                         "
@@ -470,23 +476,20 @@ pub fn cli() -> Command<'static> {
                     Arg::new("dataset")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_ref_local)
+                        .value_parser(validate_dataset_ref_local)
                         .help("Local dataset reference"),
                     Arg::new("output-format")
                         .long("output-format")
                         .short('o')
-                        .takes_value(true)
                         .value_name("FMT")
-                        .possible_values(&["yaml"]),
+                        .value_parser(["yaml"]),
                     Arg::new("filter")
                         .long("filter")
                         .short('f')
-                        .takes_value(true)
                         .value_name("FLT")
-                        .validator(validate_log_filter),
+                        .value_parser(validate_log_filter),
                     Arg::new("limit")
                         .long("limit")
-                        .takes_value(true)
                         .default_value("500")
                         .help("Maximum number of blocks to display"),
                 ])
@@ -522,14 +525,18 @@ pub fn cli() -> Command<'static> {
             Command::new("new")
                 .about("Creates a new dataset manifest from a template")
                 .args(&[
-                    Arg::new("root").long("root").help("Create a root dataset"),
+                    Arg::new("root")
+                        .long("root")
+                        .action(ArgAction::SetTrue)
+                        .help("Create a root dataset"),
                     Arg::new("derivative")
                         .long("derivative")
+                        .action(ArgAction::SetTrue)
                         .help("Create a derivative dataset"),
                     Arg::new("name")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_name)
+                        .value_parser(validate_dataset_name)
                         .help("Name of the new dataset"),
                 ])
                 .after_help(indoc::indoc!(
@@ -561,9 +568,8 @@ pub fn cli() -> Command<'static> {
                     Arg::new("env")
                         .short('e')
                         .long("env")
-                        .takes_value(true)
                         .value_name("VAR")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .help(concat!(
                             "Pass specified environment variable into the notebook ",
                             "(e.g. `-e VAR` or `-e VAR=foo`)"
@@ -575,23 +581,25 @@ pub fn cli() -> Command<'static> {
                     Arg::new("all")
                         .short('a')
                         .long("all")
+                        .action(ArgAction::SetTrue)                        
                         .help("Pull all datasets in the workspace"),
                     Arg::new("recursive")
                         .short('r')
                         .long("recursive")
+                        .action(ArgAction::SetTrue)                        
                         .help("Also pull all transitive dependencies of specified datasets"),
                     Arg::new("fetch-uncacheable")
                         .long("fetch-uncacheable")
+                        .action(ArgAction::SetTrue)                        
                         .help("Pull latest data from the uncacheable data sources"),
                     Arg::new("dataset")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .index(1)
-                        .validator(validate_dataset_ref_any)
+                        .value_parser(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
                     Arg::new("as")
                         .long("as")
-                        .takes_value(true)
-                        .validator(validate_dataset_name)
+                        .value_parser(validate_dataset_name)
                         .value_name("NAME")
                         .help("Local name of a dataset to use when syncing from a repository"),
                     Arg::new("no-alias")
@@ -599,12 +607,10 @@ pub fn cli() -> Command<'static> {
                         .help("Don't automatically add a remote push alias for this destination"),
                     Arg::new("fetch")
                         .long("fetch")
-                        .takes_value(true)
                         .value_name("SRC")
                         .help("Data location (path or URL)"),
                     Arg::new("set-watermark")
                         .long("set-watermark")
-                        .takes_value(true)
                         .value_name("TIME")
                         .help(concat!(
                             "Injects a manual watermark into the dataset to signify that",
@@ -613,6 +619,7 @@ pub fn cli() -> Command<'static> {
                     Arg::new("force")
                         .short('f')
                         .long("force")
+                        .action(ArgAction::SetTrue)                        
                         .help("Overwrite local version with remote, even if revisions have diverged"),
                 ])
                 .after_help(indoc::indoc!(
@@ -666,28 +673,31 @@ pub fn cli() -> Command<'static> {
                     Arg::new("all")
                         .short('a')
                         .long("all")
+                        .action(ArgAction::SetTrue)                        
                         .help("Push all datasets in the workspace"),
                     Arg::new("recursive")
                         .short('r')
                         .long("recursive")
+                        .action(ArgAction::SetTrue)                        
                         .help("Also push all transitive dependencies of specified datasets"),
                     Arg::new("no-alias")
                         .long("no-alias")
+                        .action(ArgAction::SetTrue)                        
                         .help("Don't automatically add a remote push alias for this destination"),
                     Arg::new("dataset")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .index(1)
-                        .validator(validate_dataset_ref_any)
+                        .value_parser(validate_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
                     Arg::new("to")
                         .long("to")
-                        .takes_value(true)
-                        .validator(validate_dataset_ref_remote)
+                        .value_parser(validate_dataset_ref_remote)
                         .value_name("REM")
                         .help("Remote alias or a URL to push to"),
                     Arg::new("force")
                         .short('f')
                         .long("force")
+                        .action(ArgAction::SetTrue)                        
                         .help("Overwrite remote version with local, even if revisions have diverged")
                 ])
                 .after_help(indoc::indoc!(
@@ -726,7 +736,7 @@ pub fn cli() -> Command<'static> {
                     Arg::new("dataset")
                         .required(true)
                         .index(1)
-                        .validator(validate_dataset_ref_local)
+                        .value_parser(validate_dataset_ref_local)
                         .help("Dataset reference"),
                     Arg::new("name")
                         .required(true)
@@ -752,16 +762,17 @@ pub fn cli() -> Command<'static> {
                 Arg::new("dataset")
                     .required(true)
                     .index(1)
-                    .validator(validate_dataset_ref_local)
+                    .value_parser(validate_dataset_ref_local)
                     .help("ID of the dataset"),
                 Arg::new("hash")
                     .required(true)
                     .index(2)
-                    .validator(validate_multihash)
+                    .value_parser(validate_multihash)
                     .help("Hash of the block to reset to"),
                 Arg::new("yes")
                     .short('y')
                     .long("yes")
+                    .action(ArgAction::SetTrue)                    
                     .help("Don't ask for confirmation"),
             ])
             .after_help(indoc::indoc!(
@@ -798,7 +809,7 @@ pub fn cli() -> Command<'static> {
                             Arg::new("name")
                                 .required(true)
                                 .index(1)
-                                .validator(validate_repository_name)
+                                .value_parser(validate_repository_name)
                                 .help("Local alias of the repository"),
                             Arg::new("url")
                                 .required(true)
@@ -811,15 +822,17 @@ pub fn cli() -> Command<'static> {
                             Arg::new("all")
                                 .short('a')
                                 .long("all")
+                                .action(ArgAction::SetTrue)                                
                                 .help("Delete all known repositories"),
                             Arg::new("repository")
-                                .multiple_occurrences(true)
+                                .action(ArgAction::Append)
                                 .index(1)
-                                .validator(validate_repository_name)
+                                .value_parser(validate_repository_name)
                                 .help("Repository name(s)"),
                             Arg::new("yes")
                                 .short('y')
                                 .long("yes")
+                                .action(ArgAction::SetTrue)                                
                                 .help("Don't ask for confirmation"),
                         ]),
                     tabular_output_params(Command::new("list").about("Lists known repositories")),
@@ -832,7 +845,7 @@ pub fn cli() -> Command<'static> {
                                 Command::new("list").about("Lists remote aliases").args(&[
                                     Arg::new("dataset")
                                         .index(1)
-                                        .validator(validate_dataset_ref_local)
+                                        .value_parser(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
                                 ]),
                             ),
@@ -842,12 +855,12 @@ pub fn cli() -> Command<'static> {
                                     Arg::new("dataset")
                                         .required(true)
                                         .index(1)
-                                        .validator(validate_dataset_ref_local)
+                                        .value_parser(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
                                     Arg::new("alias")
                                         .required(true)
                                         .index(2)
-                                        .validator(validate_dataset_ref_remote)
+                                        .value_parser(validate_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push").long("push").help("Add a push alias"),
                                     Arg::new("pull").long("pull").help("Add a pull alias"),
@@ -858,15 +871,16 @@ pub fn cli() -> Command<'static> {
                                     Arg::new("all")
                                         .short('a')
                                         .long("all")
+                                        .action(ArgAction::SetTrue)                                        
                                         .help("Delete all aliases"),
                                     Arg::new("dataset")
                                         .required(true)
                                         .index(1)
-                                        .validator(validate_dataset_ref_local)
+                                        .value_parser(validate_dataset_ref_local)
                                         .help("Local dataset reference"),
                                     Arg::new("alias")
                                         .index(2)
-                                        .validator(validate_dataset_ref_remote)
+                                        .value_parser(validate_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push").long("push").help("Add a push alias"),
                                     Arg::new("pull").long("pull").help("Add a pull alias"),
@@ -926,9 +940,9 @@ pub fn cli() -> Command<'static> {
                             .help("Search terms"),
                         Arg::new("repo")
                             .long("repo")
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .value_name("REPO")
-                            .validator(validate_repository_name)
+                            .value_parser(validate_repository_name)
                             .help("Repository name(s) to search in"),
                     ])
                     .after_help(indoc::indoc!(
@@ -957,16 +971,17 @@ pub fn cli() -> Command<'static> {
                         Command::new("server").about("Run JDBC server only").args(&[
                             Arg::new("address")
                                 .long("address")
-                                .validator(validate_ip_addr)
+                                .value_parser(validate_ip_addr)
                                 .default_value("127.0.0.1")
                                 .help("Expose JDBC server on specific network interface"),
                             Arg::new("port")
                                 .long("port")
                                 .default_value("10000")
-                                .validator(validate_port)
+                                .value_parser(validate_port)
                                 .help("Expose JDBC server on specific port"),
                             Arg::new("livy")
                                 .long("livy")
+                                .action(ArgAction::SetTrue)                                
                                 .help("Run Livy server instead of JDBC")
                                 .hide(true),
                         ]),
@@ -974,7 +989,6 @@ pub fn cli() -> Command<'static> {
                     .args(&[
                         Arg::new("url")
                             .long("url")
-                            .takes_value(true)
                             .value_name("URL")
                             .help(
                                 "URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)",
@@ -982,18 +996,15 @@ pub fn cli() -> Command<'static> {
                         Arg::new("command")
                             .short('c')
                             .long("command")
-                            .takes_value(true)
                             .value_name("CMD")
                             .help("SQL command to run"),
                         Arg::new("script")
                             .long("script")
-                            .takes_value(true)
                             .value_name("FILE")
                             .help("SQL script file to execute"),
                         Arg::new("engine")
                             .long("engine")
-                            .takes_value(true)
-                            .possible_values(&["spark", "datafusion"])
+                            .value_parser(["spark", "datafusion"])
                             .value_name("ENG")
                             .help("Engine type to use for this SQL session"),
                     ])
@@ -1044,6 +1055,7 @@ pub fn cli() -> Command<'static> {
                                 .args([
                                     Arg::new("full")
                                         .long("full")
+                                        .action(ArgAction::SetTrue)                                        
                                         .help("Display the full result including extensions"),
                                     Arg::new("query").index(1).required(true),
                                 ]),
@@ -1052,13 +1064,11 @@ pub fn cli() -> Command<'static> {
                         .args([
                             Arg::new("address")
                                 .long("address")
-                                .takes_value(true)
-                                .validator(validate_ip_addr)
+                                .value_parser(validate_ip_addr)
                                 .help("Expose HTTP server on specific network interface"),
                             Arg::new("http-port")
                                 .long("http-port")
-                                .takes_value(true)
-                                .validator(validate_port)
+                                .value_parser(validate_port)
                                 .help("Expose HTTP server on specific port"),
                         ])
                         .after_help(indoc::indoc!(
@@ -1085,7 +1095,7 @@ pub fn cli() -> Command<'static> {
                             .about("Adds the specified dataset to IPFS and returns the CID")
                             .args([Arg::new("dataset")
                                 .index(1)
-                                .validator(validate_dataset_ref_local)
+                                .value_parser(validate_dataset_ref_local)
                                 .help("Dataset reference")])]),
                 ]),
             tabular_output_params(
@@ -1095,12 +1105,11 @@ pub fn cli() -> Command<'static> {
                         Arg::new("dataset")
                             .required(true)
                             .index(1)
-                            .validator(validate_dataset_ref_local)
+                            .value_parser(validate_dataset_ref_local)
                             .help("Local dataset reference"),
                         Arg::new("num-records")
                             .long("num-records")
                             .short('n')
-                            .takes_value(true)
                             .default_value("10")
                             .value_name("NUM")
                             .help("Number of records to display"),
@@ -1119,13 +1128,11 @@ pub fn cli() -> Command<'static> {
                 .args([
                     Arg::new("address")
                         .long("address")
-                        .takes_value(true)
-                        .validator(validate_ip_addr)
+                        .value_parser(validate_ip_addr)
                         .help("Expose HTTP server on specific network interface"),
                     Arg::new("http-port")
                         .long("http-port")
-                        .takes_value(true)
-                        .validator(validate_port)
+                        .value_parser(validate_port)
                         .help("Which port to run HTTP server on"),
                 ])
                 .after_help(indoc::indoc!(
@@ -1150,15 +1157,16 @@ pub fn cli() -> Command<'static> {
                     Arg::new("recursive")
                         .short('r')
                         .long("recursive")
+                        .action(ArgAction::SetTrue)                        
                         .help("Verify the entire transformation chain starting with root datasets"),
                     Arg::new("integrity").long("integrity").help(concat!(
                         "Check only the hashes of metadata ",
                         "and data without replaying transformations"
                     )),
                     Arg::new("dataset")
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .index(1)
-                        .validator(validate_dataset_ref_local)
+                        .value_parser(validate_dataset_ref_local)
                         .help("Local dataset reference(s)"),
                 ])
                 .after_help(indoc::indoc!(
