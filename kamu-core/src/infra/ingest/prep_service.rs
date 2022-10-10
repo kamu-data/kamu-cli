@@ -20,6 +20,7 @@ use std::io::prelude::*;
 use std::io::Error as IOError;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use thiserror::Error;
 
 const BUFFER_SIZE: usize = 8096;
@@ -208,13 +209,13 @@ impl<'a> Read for ReaderHelper<'a> {
 
 struct DecompressZipStream {
     ingress: std::thread::JoinHandle<Result<(), IngestError>>,
-    consumer: ringbuf::Consumer<u8>,
+    consumer: ringbuf::Consumer<u8, Arc<ringbuf::HeapRb<u8>>>,
     done_recvr: std::sync::mpsc::Receiver<usize>,
 }
 
 impl DecompressZipStream {
     fn new(mut input: Box<dyn Stream>) -> Result<Self, IOError> {
-        let (mut producer, consumer) = ringbuf::RingBuffer::<u8>::new(BUFFER_SIZE).split();
+        let (mut producer, consumer) = ringbuf::HeapRb::<u8>::new(BUFFER_SIZE).split();
 
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
