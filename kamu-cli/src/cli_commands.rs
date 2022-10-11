@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::net::IpAddr;
 use std::str::FromStr;
 
 use opendatafabric::DatasetRefLocal;
@@ -153,19 +152,16 @@ pub fn get_command(
             submatches.get_many("env").unwrap().map(String::as_str),
         )),
         Some(("pull", submatches)) => {
+            let datasets = submatches
+                .get_many("dataset")
+                .unwrap_or_default()
+                .map(String::as_str);
             if submatches.contains_id("set-watermark") {
-                let datasets = submatches
-                    .get_many("dataset")
-                    .unwrap_or_default()
-                    .map(String::as_str);
                 if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    submatches
-                        .get_many("dataset")
-                        .unwrap_or_default()
-                        .map(String::as_str),
+                    datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches
@@ -179,10 +175,7 @@ pub fn get_command(
                     catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    submatches
-                        .get_many::<String>("dataset")
-                        .unwrap_or_default()
-                        .map(String::as_str),
+                    datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches.get_flag("fetch-uncacheable"),
@@ -295,10 +288,7 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        server_matches
-                            .get_one("address")
-                            .map(String::as_str)
-                            .unwrap(),
+                        *(server_matches.get_one("address").unwrap()),
                         *(server_matches.get_one("port").unwrap()),
                     ))
                 } else {
@@ -321,8 +311,8 @@ pub fn get_command(
                 None => Box::new(APIServerRunCommand::new(
                     catalog.clone(), // TODO: Currently very expensive!
                     catalog.get_one()?,
-                    server_matches.get_one::<IpAddr>("address").map(|a| *a),
-                    server_matches.get_one::<u16>("http-port").map(|p| *p),
+                    server_matches.get_one("address").map(|a| *a),
+                    server_matches.get_one("http-port").map(|p| *p),
                 )),
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
                     catalog.clone(), // TODO: Currently very expensive!
@@ -352,8 +342,8 @@ pub fn get_command(
         Some(("ui", submatches)) => Box::new(UICommand::new(
             catalog.clone(), // TODO: Currently very expensive!
             catalog.get_one()?,
-            submatches.get_one::<IpAddr>("address").map(|a| *a),
-            submatches.get_one::<u16>("http-port").map(|p| *p),
+            submatches.get_one("address").map(|a| *a),
+            submatches.get_one("http-port").map(|p| *p),
         )),
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(
             catalog.get_one()?,

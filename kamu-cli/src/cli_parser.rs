@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use clap::{Arg, ArgAction, Command};
+use std::net::IpAddr;
+
+use clap::{Arg, ArgAction, Command, value_parser};
 use opendatafabric::*;
 
 fn tabular_output_params<'a>(app: Command) -> Command {
@@ -148,7 +150,7 @@ pub fn cli() -> Command {
                 .about("Completes a command in the shell")
                 .hide(true)
                 .arg(Arg::new("input").required(true).index(1))
-                .arg(Arg::new("current").required(true).index(2))
+                .arg(Arg::new("current").value_parser(value_parser!(usize)).required(true).index(2))
                 .after_help(indoc::indoc!(
                     "
                     This hidden command is called by shell completions to use domain knowledge \
@@ -490,6 +492,7 @@ pub fn cli() -> Command {
                         .value_parser(validate_log_filter),
                     Arg::new("limit")
                         .long("limit")
+                        .value_parser(value_parser!(usize))
                         .default_value("500")
                         .help("Maximum number of blocks to display"),
                 ])
@@ -604,6 +607,7 @@ pub fn cli() -> Command {
                         .help("Local name of a dataset to use when syncing from a repository"),
                     Arg::new("no-alias")
                         .long("no-alias")
+                        .action(ArgAction::SetTrue)
                         .help("Don't automatically add a remote push alias for this destination"),
                     Arg::new("fetch")
                         .long("fetch")
@@ -971,13 +975,13 @@ pub fn cli() -> Command {
                         Command::new("server").about("Run JDBC server only").args(&[
                             Arg::new("address")
                                 .long("address")
-                                .value_parser(validate_ip_addr)
+                                .value_parser(value_parser!(IpAddr))
                                 .default_value("127.0.0.1")
                                 .help("Expose JDBC server on specific network interface"),
                             Arg::new("port")
                                 .long("port")
                                 .default_value("10000")
-                                .value_parser(validate_port)
+                                .value_parser(value_parser!(u16))
                                 .help("Expose JDBC server on specific port"),
                             Arg::new("livy")
                                 .long("livy")
@@ -1064,11 +1068,11 @@ pub fn cli() -> Command {
                         .args([
                             Arg::new("address")
                                 .long("address")
-                                .value_parser(validate_ip_addr)
+                                .value_parser(value_parser!(std::net::IpAddr))
                                 .help("Expose HTTP server on specific network interface"),
                             Arg::new("http-port")
                                 .long("http-port")
-                                .value_parser(validate_port)
+                                .value_parser(value_parser!(u16))
                                 .help("Expose HTTP server on specific port"),
                         ])
                         .after_help(indoc::indoc!(
@@ -1110,6 +1114,7 @@ pub fn cli() -> Command {
                         Arg::new("num-records")
                             .long("num-records")
                             .short('n')
+                            .value_parser(value_parser!(u64))
                             .default_value("10")
                             .value_name("NUM")
                             .help("Number of records to display"),
@@ -1128,11 +1133,11 @@ pub fn cli() -> Command {
                 .args([
                     Arg::new("address")
                         .long("address")
-                        .value_parser(validate_ip_addr)
+                        .value_parser(value_parser!(std::net::IpAddr))
                         .help("Expose HTTP server on specific network interface"),
                     Arg::new("http-port")
                         .long("http-port")
-                        .value_parser(validate_port)
+                        .value_parser(value_parser!(u16))
                         .help("Which port to run HTTP server on"),
                 ])
                 .after_help(indoc::indoc!(
@@ -1216,23 +1221,9 @@ pub fn cli() -> Command {
         ])
 }
 
-fn validate_port(s: &str) -> Result<(), String> {
-    match str::parse::<u16>(s) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(format!("Value {} is not a valid port number", s)),
-    }
-}
-
-fn validate_ip_addr(s: &str) -> Result<(), String> {
-    match str::parse::<std::net::IpAddr>(s) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(format!("Value {} is not a valid IPv4 or IPv6", s)),
-    }
-}
-
-fn validate_dataset_name(s: &str) -> Result<(), String> {
+fn validate_dataset_name(s: &str) -> Result<String, String> {
     match DatasetName::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`",
         )),
@@ -1240,59 +1231,59 @@ fn validate_dataset_name(s: &str) -> Result<(), String> {
 }
 
 #[allow(dead_code)]
-fn validate_dataset_remote_name(s: &str) -> Result<(), String> {
+fn validate_dataset_remote_name(s: &str) -> Result<String, String> {
     match RemoteDatasetName::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "Remote dataset name should be in form: `repository/dataset-id` or `repository/account/dataset-id`",
         )),
     }
 }
 
-fn validate_dataset_ref_local(s: &str) -> Result<(), String> {
+fn validate_dataset_ref_local(s: &str) -> Result<String, String> {
     match DatasetRefLocal::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
         )),
     }
 }
 
-fn validate_dataset_ref_remote(s: &str) -> Result<(), String> {
+fn validate_dataset_ref_remote(s: &str) -> Result<String, String> {
     match DatasetRefRemote::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
         )),
     }
 }
 
-fn validate_dataset_ref_any(s: &str) -> Result<(), String> {
+fn validate_dataset_ref_any(s: &str) -> Result<String, String> {
     match DatasetRefAny::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "Dataset reference should be in form: `my.dataset.id` or `repository/account/dataset-id` or `did:odf:...`",
         )),
     }
 }
 
-fn validate_repository_name(s: &str) -> Result<(), String> {
+fn validate_repository_name(s: &str) -> Result<String, String> {
     match RepositoryName::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",
         )),
     }
 }
 
-fn validate_multihash(s: &str) -> Result<(), String> {
+fn validate_multihash(s: &str) -> Result<String, String> {
     match Multihash::try_from(s) {
-        Ok(_) => Ok(()),
+        Ok(_) => Ok(s.to_string()),
         Err(_) => Err(format!("Block hash must be a valid multihash string",)),
     }
 }
 
-fn validate_log_filter(s: &str) -> Result<(), String> {
+fn validate_log_filter(s: &str) -> Result<String, String> {
     let items: Vec<_> = s.split(',').collect();
     for item in items {
         match item {
@@ -1304,5 +1295,5 @@ fn validate_log_filter(s: &str) -> Result<(), String> {
             )),
         }?;
     }
-    Ok(())
+    Ok(s.to_string())
 }
