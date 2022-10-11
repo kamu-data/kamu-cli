@@ -71,7 +71,7 @@ type Checkpoint {
 	size: Int!
 }
 
-enum CompressionFormat{
+enum CompressionFormat {
 	GZIP
 	ZIP
 }
@@ -82,7 +82,7 @@ type DataBatch {
 	numRecords: Int!
 }
 
-enum DataBatchFormat{
+enum DataBatchFormat {
 	JSON
 	JSON_LD
 	JSON_SOA
@@ -107,7 +107,7 @@ type DataSchema {
 	content: String!
 }
 
-enum DataSchemaFormat{
+enum DataSchemaFormat {
 	PARQUET
 	PARQUET_JSON
 }
@@ -193,7 +193,7 @@ type DatasetEdge {
 
 scalar DatasetID
 
-enum DatasetKind{
+enum DatasetKind {
 	ROOT
 	DERIVATIVE
 }
@@ -267,7 +267,7 @@ Implement the DateTime<Utc> scalar
 
 The input/output is a string in RFC3339 format.
 """
-scalar DateTime @specifiedBy(url: "https://datatracker.ietf.org/doc/html/rfc3339")
+scalar DateTime
 
 type EnvVar {
 	name: String!
@@ -470,7 +470,7 @@ type Query {
 	data: DataQueries!
 }
 
-enum QueryDialect{
+enum QueryDialect {
 	DATA_FUSION
 }
 
@@ -604,7 +604,7 @@ type SourceCachingForever {
 	dummy: String
 }
 
-enum SourceOrdering{
+enum SourceOrdering {
 	BY_EVENT_TIME
 	BY_NAME
 }
