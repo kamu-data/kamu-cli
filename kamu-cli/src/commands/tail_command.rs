@@ -23,19 +23,15 @@ pub struct TailCommand {
 }
 
 impl TailCommand {
-    pub fn new<R>(
+    pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: R,
+        dataset_ref: DatasetRefLocal,
         num_records: u64,
         output_cfg: Arc<OutputConfig>,
-    ) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-    {
+    ) -> Self {
         Self {
             query_svc,
-            dataset_ref: dataset_ref.try_into().unwrap(),
+            dataset_ref,
             num_records,
             output_cfg,
         }

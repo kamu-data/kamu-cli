@@ -22,7 +22,7 @@ pub struct SearchCommand {
 }
 
 impl SearchCommand {
-    pub fn new<S, R, I>(
+    pub fn new<S, I>(
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         query: Option<S>,
@@ -30,18 +30,13 @@ impl SearchCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: IntoIterator<Item = R>,
-        R: TryInto<RepositoryName>,
-        <R as TryInto<RepositoryName>>::Error: std::fmt::Debug,
+        I: IntoIterator<Item = RepositoryName>,
     {
         Self {
             search_svc,
             output_config,
             query: query.map(|s| s.into()),
-            repository_names: repository_names
-                .into_iter()
-                .map(|r| r.try_into().unwrap())
-                .collect(),
+            repository_names: repository_names.into_iter().collect(),
         }
     }
 

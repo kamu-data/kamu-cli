@@ -23,25 +23,19 @@ pub struct AliasAddCommand {
 }
 
 impl AliasAddCommand {
-    pub fn new<R, N>(
+    pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: R,
-        alias: N,
+        dataset: DatasetRefLocal,
+        alias: DatasetRefRemote,
         pull: bool,
         push: bool,
-    ) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-        N: TryInto<DatasetRefRemote>,
-        <N as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
-    {
+    ) -> Self {
         Self {
             remote_repo_reg,
             remote_alias_reg,
-            dataset: dataset.try_into().unwrap(),
-            alias: alias.try_into().unwrap(),
+            dataset,
+            alias,
             pull,
             push,
         }

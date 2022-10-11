@@ -22,14 +22,17 @@ pub struct NewDatasetCommand {
 }
 
 impl NewDatasetCommand {
-    pub fn new<N, P>(name: N, is_root: bool, is_derivative: bool, output_path: Option<P>) -> Self
+    pub fn new<P>(
+        name: DatasetName,
+        is_root: bool,
+        is_derivative: bool,
+        output_path: Option<P>,
+    ) -> Self
     where
-        N: TryInto<DatasetName>,
-        <N as TryInto<opendatafabric::DatasetName>>::Error: std::fmt::Debug,
         P: AsRef<Path>,
     {
         Self {
-            name: name.try_into().unwrap(),
+            name,
             is_root: is_root,
             is_derivative: is_derivative,
             output_path: output_path.map(|p| p.as_ref().to_owned()),

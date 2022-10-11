@@ -23,24 +23,18 @@ pub struct AliasDeleteCommand {
 }
 
 impl AliasDeleteCommand {
-    pub fn new<R, N>(
+    pub fn new(
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: R,
-        alias: Option<N>,
+        dataset: DatasetRefLocal,
+        alias: Option<DatasetRefRemote>,
         all: bool,
         pull: bool,
         push: bool,
-    ) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-        N: TryInto<DatasetRefRemote>,
-        <N as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
-    {
+    ) -> Self {
         Self {
             remote_alias_reg,
-            dataset: dataset.try_into().unwrap(),
-            alias: alias.map(|s| s.try_into().unwrap()),
+            dataset,
+            alias,
             all,
             pull,
             push,

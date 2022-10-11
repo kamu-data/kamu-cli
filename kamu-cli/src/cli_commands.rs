@@ -7,9 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
+use opendatafabric::DatasetName;
+use opendatafabric::DatasetRefAny;
 use opendatafabric::DatasetRefLocal;
+use opendatafabric::DatasetRefRemote;
+use opendatafabric::Multihash;
+use opendatafabric::RepositoryName;
 
 use crate::app::in_workspace;
 use crate::commands::*;
@@ -77,7 +80,10 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
-            submatches.get_many("dataset").unwrap().map(String::as_str),
+            submatches
+                .get_many("dataset")
+                .unwrap()
+                .map(|r: &DatasetRefLocal| r.clone()),
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
@@ -98,28 +104,28 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
-                lin_matches.get_many("dataset").unwrap().map(String::as_str),
+                lin_matches
+                    .get_many("dataset")
+                    .unwrap()
+                    .map(|r: &DatasetRefLocal| r.clone()),
                 lin_matches.get_flag("browse"),
                 lin_matches.get_one("output-format").map(String::as_str),
                 catalog.get_one()?,
             )),
             Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
-                DatasetRefLocal::from_str(
-                    query_matches.get_one::<String>("dataset").unwrap().as_str(),
-                )
-                .unwrap(),
+                query_matches
+                    .get_one::<DatasetRefLocal>("dataset")
+                    .unwrap()
+                    .clone(),
                 catalog.get_one()?,
             )),
             Some(("schema", schema_matches)) => Box::new(InspectSchemaCommand::new(
                 catalog.get_one()?,
-                DatasetRefLocal::from_str(
-                    schema_matches
-                        .get_one::<String>("dataset")
-                        .unwrap()
-                        .as_str(),
-                )
-                .unwrap(),
+                schema_matches
+                    .get_one::<DatasetRefLocal>("dataset")
+                    .unwrap()
+                    .clone(),
                 schema_matches.get_one("output-format").map(String::as_str),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
@@ -132,15 +138,17 @@ pub fn get_command(
         )),
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
-            DatasetRefLocal::from_str(submatches.get_one::<String>("dataset").unwrap().as_str())
-                .unwrap(),
+            submatches
+                .get_one::<DatasetRefLocal>("dataset")
+                .unwrap()
+                .clone(),
             submatches.get_one("output-format").map(String::as_str),
             submatches.get_one("filter").map(String::as_str),
             *(submatches.get_one("limit").unwrap()),
             catalog.get_one()?,
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
-            submatches.get_one("name").map(String::as_str).unwrap(),
+            submatches.get_one::<DatasetName>("name").unwrap().clone(),
             submatches.get_flag("root"),
             submatches.get_flag("derivative"),
             None::<&str>,
@@ -155,7 +163,7 @@ pub fn get_command(
             let datasets = submatches
                 .get_many("dataset")
                 .unwrap_or_default()
-                .map(String::as_str);
+                .map(|r: &DatasetRefAny| r.clone());
             if submatches.contains_id("set-watermark") {
                 if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
@@ -179,7 +187,7 @@ pub fn get_command(
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches.get_flag("fetch-uncacheable"),
-                    submatches.get_one("as").map(String::as_str),
+                    submatches.get_one("as").map(|s: &DatasetName| s.clone()),
                     !submatches.get_flag("no-alias"),
                     submatches.get_one("fetch").map(String::as_str),
                     submatches.get_flag("force"),
@@ -191,26 +199,31 @@ pub fn get_command(
             push_matches
                 .get_many("dataset")
                 .unwrap_or_default()
-                .map(String::as_str),
+                .map(|r: &DatasetRefAny| r.clone()),
             push_matches.get_flag("all"),
             push_matches.get_flag("recursive"),
             !push_matches.get_flag("no-alias"),
             push_matches.get_flag("force"),
-            push_matches.get_one("to").map(String::as_str),
+            push_matches
+                .get_one("to")
+                .map(|t: &DatasetRefRemote| t.clone()),
             catalog.get_one()?,
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
             catalog.get_one()?,
             rename_matches
-                .get_one("dataset")
-                .map(String::as_str)
-                .unwrap(),
+                .get_one::<DatasetRefLocal>("dataset")
+                .unwrap()
+                .clone(),
             rename_matches.get_one("name").map(String::as_str).unwrap(),
         )),
         Some(("repo", repo_matches)) => match repo_matches.subcommand() {
             Some(("add", add_matches)) => Box::new(RepositoryAddCommand::new(
                 catalog.get_one()?,
-                add_matches.get_one("name").map(String::as_str).unwrap(),
+                add_matches
+                    .get_one::<RepositoryName>("name")
+                    .unwrap()
+                    .clone(),
                 add_matches.get_one("url").map(String::as_str).unwrap(),
             )),
             Some(("delete", delete_matches)) => Box::new(RepositoryDeleteCommand::new(
@@ -218,7 +231,7 @@ pub fn get_command(
                 delete_matches
                     .get_many("repository")
                     .unwrap_or_default()
-                    .map(String::as_str),
+                    .map(|rn: &RepositoryName| rn.clone()),
                 delete_matches.get_flag("all"),
                 delete_matches.get_flag("yes"),
             )),
@@ -230,18 +243,26 @@ pub fn get_command(
                 Some(("add", add_matches)) => Box::new(AliasAddCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    add_matches.get_one("dataset").map(String::as_str).unwrap(),
-                    add_matches.get_one("alias").map(String::as_str).unwrap(),
+                    add_matches
+                        .get_one::<DatasetRefLocal>("dataset")
+                        .unwrap()
+                        .clone(),
+                    add_matches
+                        .get_one::<DatasetRefRemote>("alias")
+                        .unwrap()
+                        .clone(),
                     add_matches.get_flag("pull"),
                     add_matches.get_flag("push"),
                 )),
                 Some(("delete", delete_matches)) => Box::new(AliasDeleteCommand::new(
                     catalog.get_one()?,
                     delete_matches
-                        .get_one("dataset")
-                        .map(String::as_str)
-                        .unwrap(),
-                    delete_matches.get_one("alias").map(String::as_str),
+                        .get_one::<DatasetRefLocal>("dataset")
+                        .unwrap()
+                        .clone(),
+                    delete_matches
+                        .get_one("alias")
+                        .map(|a: &DatasetRefRemote| a.clone()),
                     delete_matches.get_flag("all"),
                     delete_matches.get_flag("pull"),
                     delete_matches.get_flag("push"),
@@ -250,7 +271,9 @@ pub fn get_command(
                     catalog.get_one()?,
                     catalog.get_one()?,
                     catalog.get_one()?,
-                    list_matches.get_one("dataset").map(String::as_str),
+                    list_matches
+                        .get_one("dataset")
+                        .map(|s: &DatasetRefLocal| s.clone()),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -259,8 +282,11 @@ pub fn get_command(
         Some(("reset", submatches)) => Box::new(ResetCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.get_one("dataset").map(String::as_str).unwrap(),
-            submatches.get_one("hash").map(String::as_str).unwrap(),
+            submatches
+                .get_one::<DatasetRefLocal>("dataset")
+                .unwrap()
+                .clone(),
+            submatches.get_one::<Multihash>("hash").unwrap().clone(),
             submatches.get_flag("yes"),
         )),
         Some(("search", submatches)) => Box::new(SearchCommand::new(
@@ -270,7 +296,7 @@ pub fn get_command(
             submatches
                 .get_many("repo")
                 .unwrap_or_default()
-                .map(String::as_str),
+                .map(|rn: &RepositoryName| rn.clone()),
         )),
         Some(("sql", submatches)) => match submatches.subcommand() {
             None => Box::new(SqlShellCommand::new(
@@ -327,7 +353,10 @@ pub fn get_command(
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     catalog.get_one()?,
-                    add_matches.get_one("dataset").map(String::as_str).unwrap(),
+                    add_matches
+                        .get_one::<DatasetRefLocal>("dataset")
+                        .unwrap()
+                        .clone(),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -335,7 +364,10 @@ pub fn get_command(
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(
             catalog.get_one()?,
-            submatches.get_one("dataset").map(String::as_str).unwrap(),
+            submatches
+                .get_one::<DatasetRefLocal>("dataset")
+                .unwrap()
+                .clone(),
             *(submatches.get_one("num-records").unwrap()),
             catalog.get_one()?,
         )),
@@ -351,8 +383,8 @@ pub fn get_command(
             catalog.get_one()?,
             submatches
                 .get_many("dataset")
-                .unwrap_or_default()
-                .map(String::as_str),
+                .unwrap()
+                .map(|r: &DatasetRefLocal| r.clone()),
             submatches.get_flag("recursive"),
             submatches.get_flag("integrity"),
         )),

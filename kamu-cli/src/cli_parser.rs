@@ -298,7 +298,7 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .action(ArgAction::Append)
                         .index(1)
-                        .value_parser(validate_dataset_ref_local)
+                        .value_parser(value_parse_dataset_ref_local)
                         .help("Local dataset reference(s)"),
                     Arg::new("yes")
                         .short('y')
@@ -376,7 +376,7 @@ pub fn cli() -> Command {
                             Arg::new("dataset")
                                 .action(ArgAction::Append)
                                 .index(1)
-                                .value_parser(validate_dataset_ref_local)
+                                .value_parser(value_parse_dataset_ref_local)
                                 .help("Local dataset reference(s)"),
                         ])
                         .after_help(indoc::indoc!(
@@ -404,7 +404,7 @@ pub fn cli() -> Command {
                         .args(&[Arg::new("dataset")
                             .required(true)
                             .index(1)
-                            .value_parser(validate_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_local)
                             .help("Local dataset reference")])
                         .after_help(indoc::indoc!(
                             "
@@ -420,7 +420,7 @@ pub fn cli() -> Command {
                             Arg::new("dataset")
                                 .required(true)
                                 .index(1)
-                                .value_parser(validate_dataset_ref_local)
+                                .value_parser(value_parse_dataset_ref_local)
                                 .help("Local dataset reference"),
                             Arg::new("output-format")
                                 .long("output-format")
@@ -478,7 +478,7 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .required(true)
                         .index(1)
-                        .value_parser(validate_dataset_ref_local)
+                        .value_parser(value_parse_dataset_ref_local)
                         .help("Local dataset reference"),
                     Arg::new("output-format")
                         .long("output-format")
@@ -539,7 +539,7 @@ pub fn cli() -> Command {
                     Arg::new("name")
                         .required(true)
                         .index(1)
-                        .value_parser(validate_dataset_name)
+                        .value_parser(value_parse_dataset_name)
                         .help("Name of the new dataset"),
                 ])
                 .after_help(indoc::indoc!(
@@ -598,11 +598,11 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .action(ArgAction::Append)
                         .index(1)
-                        .value_parser(validate_dataset_ref_any)
+                        .value_parser(value_parse_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
                     Arg::new("as")
                         .long("as")
-                        .value_parser(validate_dataset_name)
+                        .value_parser(value_parse_dataset_name)
                         .value_name("NAME")
                         .help("Local name of a dataset to use when syncing from a repository"),
                     Arg::new("no-alias")
@@ -691,11 +691,11 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .action(ArgAction::Append)
                         .index(1)
-                        .value_parser(validate_dataset_ref_any)
+                        .value_parser(value_parse_dataset_ref_any)
                         .help("Local or remote dataset reference(s)"),
                     Arg::new("to")
                         .long("to")
-                        .value_parser(validate_dataset_ref_remote)
+                        .value_parser(value_parse_dataset_ref_remote)
                         .value_name("REM")
                         .help("Remote alias or a URL to push to"),
                     Arg::new("force")
@@ -740,7 +740,7 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .required(true)
                         .index(1)
-                        .value_parser(validate_dataset_ref_local)
+                        .value_parser(value_parse_dataset_ref_local)
                         .help("Dataset reference"),
                     Arg::new("name")
                         .required(true)
@@ -766,12 +766,12 @@ pub fn cli() -> Command {
                 Arg::new("dataset")
                     .required(true)
                     .index(1)
-                    .value_parser(validate_dataset_ref_local)
+                    .value_parser(value_parse_dataset_ref_local)
                     .help("ID of the dataset"),
                 Arg::new("hash")
                     .required(true)
                     .index(2)
-                    .value_parser(validate_multihash)
+                    .value_parser(value_parse_multihash)
                     .help("Hash of the block to reset to"),
                 Arg::new("yes")
                     .short('y')
@@ -813,7 +813,7 @@ pub fn cli() -> Command {
                             Arg::new("name")
                                 .required(true)
                                 .index(1)
-                                .value_parser(validate_repository_name)
+                                .value_parser(value_parse_repository_name)
                                 .help("Local alias of the repository"),
                             Arg::new("url")
                                 .required(true)
@@ -831,7 +831,7 @@ pub fn cli() -> Command {
                             Arg::new("repository")
                                 .action(ArgAction::Append)
                                 .index(1)
-                                .value_parser(validate_repository_name)
+                                .value_parser(value_parse_repository_name)
                                 .help("Repository name(s)"),
                             Arg::new("yes")
                                 .short('y')
@@ -849,7 +849,7 @@ pub fn cli() -> Command {
                                 Command::new("list").about("Lists remote aliases").args(&[
                                     Arg::new("dataset")
                                         .index(1)
-                                        .value_parser(validate_dataset_ref_local)
+                                        .value_parser(value_parse_dataset_ref_local)
                                         .help("Local dataset reference"),
                                 ]),
                             ),
@@ -859,12 +859,12 @@ pub fn cli() -> Command {
                                     Arg::new("dataset")
                                         .required(true)
                                         .index(1)
-                                        .value_parser(validate_dataset_ref_local)
+                                        .value_parser(value_parse_dataset_ref_local)
                                         .help("Local dataset reference"),
                                     Arg::new("alias")
                                         .required(true)
                                         .index(2)
-                                        .value_parser(validate_dataset_ref_remote)
+                                        .value_parser(value_parse_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push").long("push").help("Add a push alias"),
                                     Arg::new("pull").long("pull").help("Add a pull alias"),
@@ -880,11 +880,11 @@ pub fn cli() -> Command {
                                     Arg::new("dataset")
                                         .required(true)
                                         .index(1)
-                                        .value_parser(validate_dataset_ref_local)
+                                        .value_parser(value_parse_dataset_ref_local)
                                         .help("Local dataset reference"),
                                     Arg::new("alias")
                                         .index(2)
-                                        .value_parser(validate_dataset_ref_remote)
+                                        .value_parser(value_parse_dataset_ref_remote)
                                         .help("Remote dataset name"),
                                     Arg::new("push").long("push").help("Add a push alias"),
                                     Arg::new("pull").long("pull").help("Add a pull alias"),
@@ -946,7 +946,7 @@ pub fn cli() -> Command {
                             .long("repo")
                             .action(ArgAction::Append)
                             .value_name("REPO")
-                            .value_parser(validate_repository_name)
+                            .value_parser(value_parse_repository_name)
                             .help("Repository name(s) to search in"),
                     ])
                     .after_help(indoc::indoc!(
@@ -1099,7 +1099,7 @@ pub fn cli() -> Command {
                             .about("Adds the specified dataset to IPFS and returns the CID")
                             .args([Arg::new("dataset")
                                 .index(1)
-                                .value_parser(validate_dataset_ref_local)
+                                .value_parser(value_parse_dataset_ref_local)
                                 .help("Dataset reference")])]),
                 ]),
             tabular_output_params(
@@ -1109,7 +1109,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .required(true)
                             .index(1)
-                            .value_parser(validate_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_local)
                             .help("Local dataset reference"),
                         Arg::new("num-records")
                             .long("num-records")
@@ -1164,14 +1164,19 @@ pub fn cli() -> Command {
                         .long("recursive")
                         .action(ArgAction::SetTrue)                        
                         .help("Verify the entire transformation chain starting with root datasets"),
-                    Arg::new("integrity").long("integrity").help(concat!(
+                    Arg::new("integrity")
+                        .long("integrity")
+                        .action(ArgAction::SetTrue)
+                        .help(concat!(
                         "Check only the hashes of metadata ",
                         "and data without replaying transformations"
                     )),
                     Arg::new("dataset")
                         .action(ArgAction::Append)
                         .index(1)
-                        .value_parser(validate_dataset_ref_local)
+                        .num_args(1..)
+                        .required(true)
+                        .value_parser(value_parse_dataset_ref_local)
                         .help("Local dataset reference(s)"),
                 ])
                 .after_help(indoc::indoc!(
@@ -1221,9 +1226,9 @@ pub fn cli() -> Command {
         ])
 }
 
-fn validate_dataset_name(s: &str) -> Result<String, String> {
+fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     match DatasetName::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`",
         )),
@@ -1231,54 +1236,56 @@ fn validate_dataset_name(s: &str) -> Result<String, String> {
 }
 
 #[allow(dead_code)]
-fn validate_dataset_remote_name(s: &str) -> Result<String, String> {
+fn value_parse_dataset_remote_name(s: &str) -> Result<RemoteDatasetName, String> {
     match RemoteDatasetName::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Remote dataset name should be in form: `repository/dataset-id` or `repository/account/dataset-id`",
         )),
     }
 }
 
-fn validate_dataset_ref_local(s: &str) -> Result<String, String> {
+
+fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRefLocal, String> {
     match DatasetRefLocal::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
         )),
     }
 }
 
-fn validate_dataset_ref_remote(s: &str) -> Result<String, String> {
+
+fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
     match DatasetRefRemote::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id`",
         )),
     }
 }
 
-fn validate_dataset_ref_any(s: &str) -> Result<String, String> {
+fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     match DatasetRefAny::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Dataset reference should be in form: `my.dataset.id` or `repository/account/dataset-id` or `did:odf:...`",
         )),
     }
 }
 
-fn validate_repository_name(s: &str) -> Result<String, String> {
+fn value_parse_repository_name(s: &str) -> Result<RepositoryName, String> {
     match RepositoryName::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",
         )),
     }
 }
 
-fn validate_multihash(s: &str) -> Result<String, String> {
+fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
     match Multihash::try_from(s) {
-        Ok(_) => Ok(s.to_string()),
+        Ok(v) => Ok(v),
         Err(_) => Err(format!("Block hash must be a valid multihash string",)),
     }
 }
