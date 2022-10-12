@@ -43,7 +43,7 @@ pub struct VerifyCommand {
 }
 
 impl VerifyCommand {
-    pub fn new<I, R>(
+    pub fn new<I>(
         local_repo: Arc<dyn LocalDatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
@@ -52,15 +52,13 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = R>,
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        I: Iterator<Item = DatasetRefLocal>,
     {
         Self {
             local_repo,
             verification_svc,
             output_config,
-            refs: refs.map(|s| s.try_into().unwrap()).collect(),
+            refs: refs.collect(),
             recursive,
             integrity,
         }

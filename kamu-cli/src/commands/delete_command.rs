@@ -23,7 +23,7 @@ pub struct DeleteCommand {
 }
 
 impl DeleteCommand {
-    pub fn new<I, R>(
+    pub fn new<I>(
         local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_refs: I,
         all: bool,
@@ -31,16 +31,11 @@ impl DeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = R>,
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        I: IntoIterator<Item = DatasetRefLocal>,
     {
         Self {
             local_repo,
-            dataset_refs: dataset_refs
-                .into_iter()
-                .map(|s| s.try_into().unwrap())
-                .collect(),
+            dataset_refs: dataset_refs.into_iter().collect(),
             all,
             recursive,
             no_confirmation,

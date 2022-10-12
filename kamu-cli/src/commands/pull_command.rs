@@ -39,7 +39,7 @@ pub struct PullCommand {
 }
 
 impl PullCommand {
-    pub fn new<I, R, S, SS>(
+    pub fn new<I, SS>(
         pull_svc: Arc<dyn PullService>,
         local_repo: Arc<dyn LocalDatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -48,17 +48,13 @@ impl PullCommand {
         all: bool,
         recursive: bool,
         fetch_uncacheable: bool,
-        as_name: Option<S>,
+        as_name: Option<DatasetName>,
         add_aliases: bool,
         fetch: Option<SS>,
         force: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = R>,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
-        S: TryInto<DatasetName>,
-        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        I: IntoIterator<Item = DatasetRefAny>,
         SS: Into<String>,
     {
         Self {
@@ -66,11 +62,11 @@ impl PullCommand {
             local_repo,
             remote_alias_reg,
             output_config,
-            refs: refs.into_iter().map(|s| s.try_into().unwrap()).collect(),
+            refs: refs.into_iter().map(|s| s.clone()).collect(),
             all: all,
             recursive,
             fetch_uncacheable,
-            as_name: as_name.map(|s| s.try_into().unwrap()),
+            as_name,
             add_aliases,
             fetch: fetch.map(|s| s.into()),
             force,

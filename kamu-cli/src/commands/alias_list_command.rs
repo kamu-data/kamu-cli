@@ -23,21 +23,17 @@ pub struct AliasListCommand {
 }
 
 impl AliasListCommand {
-    pub fn new<R>(
+    pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
-        dataset_ref: Option<R>,
-    ) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-    {
+        dataset_ref: Option<DatasetRefLocal>,
+    ) -> Self {
         Self {
             local_repo,
             remote_alias_reg,
             output_config,
-            dataset_ref: dataset_ref.map(|s| s.try_into().unwrap()),
+            dataset_ref,
         }
     }
 

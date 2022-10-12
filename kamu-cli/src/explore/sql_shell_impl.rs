@@ -12,6 +12,7 @@ use kamu::infra::*;
 
 use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
 use std::fs::File;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
@@ -37,7 +38,7 @@ impl SqlShellImpl {
         &self,
         workspace_layout: &WorkspaceLayout,
         mut extra_volume_map: Vec<(PathBuf, PathBuf)>,
-        address: Option<&str>,
+        address: Option<&IpAddr>,
         port: Option<u16>,
     ) -> Result<std::process::Child, std::io::Error> {
         let cwd = Path::new(".").canonicalize().unwrap();
@@ -75,7 +76,9 @@ impl SqlShellImpl {
                 RunArgs {
                     network: Some("host".to_owned()),
                     expose_port_map_addr: vec![(
-                        address.unwrap_or("127.0.0.1").to_owned(),
+                        address
+                            .map(|a| a.to_string())
+                            .unwrap_or(String::from("127.0.0.1")),
                         p,
                         10000,
                     )],

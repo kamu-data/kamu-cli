@@ -33,31 +33,27 @@ pub struct PushCommand {
 }
 
 impl PushCommand {
-    pub fn new<I, R, RR>(
+    pub fn new<I>(
         push_svc: Arc<dyn PushService>,
         refs: I,
         all: bool,
         recursive: bool,
         add_aliases: bool,
         force: bool,
-        to: Option<RR>,
+        to: Option<DatasetRefRemote>,
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = R>,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
-        RR: TryInto<DatasetRefRemote>,
-        <RR as TryInto<DatasetRefRemote>>::Error: std::fmt::Debug,
+        I: Iterator<Item = DatasetRefAny>,
     {
         Self {
             push_svc,
-            refs: refs.map(|s| s.try_into().unwrap()).collect(),
+            refs: refs.collect(),
             all,
             recursive,
             add_aliases,
             force,
-            to: to.map(|s| s.try_into().unwrap()),
+            to,
             output_config,
         }
     }

@@ -24,7 +24,7 @@ pub struct CompleteCommand {
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
-    cli: clap::Command<'static>,
+    cli: clap::Command,
     input: String,
     current: usize,
 }
@@ -37,7 +37,7 @@ impl CompleteCommand {
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
-        cli: clap::Command<'static>,
+        cli: clap::Command,
         input: String,
         current: usize,
     ) -> Self {
@@ -188,10 +188,10 @@ impl Command for CompleteCommand {
         if prev.starts_with("--") {
             for opt in last_cmd.get_opts() {
                 let full_name = format!("--{}", opt.get_long().unwrap_or_default());
-                if full_name == *prev && opt.is_takes_value_set() {
+                if full_name == *prev && opt.get_action().takes_values() {
                     if let Some(val_names) = opt.get_value_names() {
                         for name in val_names {
-                            match *name {
+                            match name.as_str() {
                                 "REPO" => self.complete_repository(to_complete),
                                 "TIME" => self.complete_timestamp(),
                                 "VAR" => self.complete_env_var(to_complete),
@@ -200,11 +200,9 @@ impl Command for CompleteCommand {
                             }
                         }
                     }
-                    if let Some(possible_vals) = opt.get_possible_values() {
-                        for pval in possible_vals {
-                            if pval.get_name().starts_with(to_complete) {
-                                println!("{}", pval.get_name());
-                            }
+                    for pval in opt.get_possible_values() {
+                        if pval.get_name().starts_with(to_complete) {
+                            println!("{}", pval.get_name());
                         }
                     }
                     return Ok(());
@@ -221,7 +219,7 @@ impl Command for CompleteCommand {
 
         // Complete positionals
         for pos in last_cmd.get_positionals() {
-            match pos.get_id() {
+            match pos.get_id().as_str() {
                 "dataset" => self.complete_dataset(to_complete).await,
                 "repository" => self.complete_repository(to_complete),
                 "alias" => self.complete_alias(to_complete).await,

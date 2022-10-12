@@ -23,14 +23,10 @@ pub struct SystemIpfsAddCommand {
 }
 
 impl SystemIpfsAddCommand {
-    pub fn new<R>(sync_svc: Arc<dyn SyncService>, dataset_ref: R) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-    {
+    pub fn new(sync_svc: Arc<dyn SyncService>, dataset_ref: DatasetRefLocal) -> Self {
         Self {
             sync_svc,
-            dataset_ref: dataset_ref.try_into().unwrap(),
+            dataset_ref,
         }
     }
 }

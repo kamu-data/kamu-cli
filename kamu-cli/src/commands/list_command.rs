@@ -203,8 +203,8 @@ impl ListCommand {
         if size == 0 {
             return "-".to_owned();
         }
-        use humansize::{file_size_opts, FileSize};
-        size.file_size(file_size_opts::BINARY).unwrap()
+        use humansize::{format_size, BINARY};
+        format_size(size, BINARY)
     }
 
     fn humanize_quantity(&self, num: u64) -> String {

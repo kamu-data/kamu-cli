@@ -32,7 +32,7 @@ pub struct LineageCommand {
 }
 
 impl LineageCommand {
-    pub fn new<I, R>(
+    pub fn new<I>(
         local_repo: Arc<dyn LocalDatasetRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
@@ -42,18 +42,13 @@ impl LineageCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: IntoIterator<Item = R>,
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
+        I: IntoIterator<Item = DatasetRefLocal>,
     {
         Self {
             local_repo,
             provenance_svc,
             workspace_layout,
-            dataset_refs: dataset_refs
-                .into_iter()
-                .map(|s| s.try_into().unwrap())
-                .collect(),
+            dataset_refs: dataset_refs.into_iter().collect(),
             browse,
             output_format: output_format.map(|s| s.to_owned()),
             output_config,

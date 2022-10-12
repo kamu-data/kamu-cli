@@ -23,12 +23,12 @@ complete -F _kamu_ kamu
 ";
 
 pub struct CompletionsCommand {
-    cli: clap::Command<'static>,
+    cli: clap::Command,
     shell: clap_complete::Shell,
 }
 
 impl CompletionsCommand {
-    pub fn new(cli: clap::Command<'static>, shell: clap_complete::Shell) -> Self {
+    pub fn new(cli: clap::Command, shell: clap_complete::Shell) -> Self {
         Self { cli, shell }
     }
 }

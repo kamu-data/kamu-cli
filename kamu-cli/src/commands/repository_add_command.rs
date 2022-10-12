@@ -21,15 +21,17 @@ pub struct RepositoryAddCommand {
 }
 
 impl RepositoryAddCommand {
-    pub fn new<N, S>(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>, name: N, url: S) -> Self
+    pub fn new<S>(
+        remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
+        name: RepositoryName,
+        url: S,
+    ) -> Self
     where
-        N: TryInto<RepositoryName>,
-        <N as TryInto<RepositoryName>>::Error: std::fmt::Debug,
         S: Into<String>,
     {
         Self {
             remote_repo_reg,
-            name: name.try_into().unwrap(),
+            name,
             url: url.into(),
         }
     }

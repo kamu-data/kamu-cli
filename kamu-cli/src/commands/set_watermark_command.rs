@@ -24,7 +24,7 @@ pub struct SetWatermarkCommand {
 }
 
 impl SetWatermarkCommand {
-    pub fn new<I, R, S>(
+    pub fn new<I, S>(
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         pull_svc: Arc<dyn PullService>,
         refs: I,
@@ -34,14 +34,12 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = R>,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+        I: Iterator<Item = DatasetRefAny>,
     {
         Self {
             remote_alias_reg,
             pull_svc,
-            refs: refs.map(|s| s.try_into().unwrap()).collect(),
+            refs: refs.collect(),
             all,
             recursive,
             watermark: watermark.into(),

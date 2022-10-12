@@ -15,6 +15,7 @@ use container_runtime::{ContainerHandle, ContainerRuntime};
 use kamu::infra::*;
 
 use console::style as s;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,7 +23,7 @@ pub struct SqlServerCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    address: String,
+    address: IpAddr,
     port: u16,
 }
 
@@ -31,7 +32,7 @@ impl SqlServerCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        address: &str,
+        address: IpAddr,
         port: u16,
     ) -> Self {
         Self {

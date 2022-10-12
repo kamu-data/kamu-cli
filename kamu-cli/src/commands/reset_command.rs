@@ -22,24 +22,18 @@ pub struct ResetCommand {
 }
 
 impl ResetCommand {
-    pub fn new<R, H>(
+    pub fn new(
         local_repo: Arc<dyn LocalDatasetRepository>,
         reset_svc: Arc<dyn ResetService>,
-        dataset_ref: R,
-        block_hash: H,
+        dataset_ref: DatasetRefLocal,
+        block_hash: Multihash,
         no_confirmation: bool,
-    ) -> Self
-    where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
-        H: TryInto<Multihash>,
-        <H as TryInto<Multihash>>::Error: std::fmt::Debug,
-    {
+    ) -> Self {
         Self {
             local_repo,
             reset_svc,
-            dataset_ref: dataset_ref.try_into().unwrap(),
-            block_hash: block_hash.try_into().unwrap(),
+            dataset_ref,
+            block_hash,
             no_confirmation,
         }
     }

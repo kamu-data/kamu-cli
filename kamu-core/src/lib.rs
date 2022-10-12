@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(backtrace)]
 #![feature(try_blocks)]
 #![feature(box_patterns)]
 #![feature(map_first_last)]

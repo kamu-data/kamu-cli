@@ -14,6 +14,7 @@ use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
 
 use chrono::{DateTime, Utc};
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -30,11 +31,11 @@ async fn main() {
             is_tty: true,
             ..Default::default()
         }),
-        ["a"],
+        [DatasetRefAny::from_str("a").unwrap()],
         false,
         false,
         false,
-        None as Option<&str>,
+        None as Option<DatasetName>,
         true,
         None as Option<&str>,
         false,

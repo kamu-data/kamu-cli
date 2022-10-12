@@ -13,6 +13,7 @@ extern crate toml_edit;
 use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, NaiveDate};
+use clap::ArgAction;
 use regex::Captures;
 use semver::Version;
 
@@ -24,9 +25,13 @@ fn main() {
             clap::Arg::new("version")
                 .long("version")
                 .short('v')
-                .takes_value(true),
-            clap::Arg::new("next-minor").long("minor"),
-            clap::Arg::new("next-patch").long("patch"),
+                .action(ArgAction::Set),
+            clap::Arg::new("next-minor")
+                .long("minor")
+                .action(ArgAction::SetTrue),
+            clap::Arg::new("next-patch")
+                .long("patch")
+                .action(ArgAction::SetTrue),
         ])
         .get_matches();
 
@@ -34,15 +39,15 @@ fn main() {
     let current_version = get_version(&crates.first().unwrap().cargo_toml_path);
     eprintln!("Current version: {}", current_version);
 
-    let new_version: Version = if let Some(v) = matches.value_of("version") {
+    let new_version: Version = if let Some(v) = matches.get_one::<String>("version") {
         v.strip_prefix('v').unwrap_or(v).parse().unwrap()
-    } else if matches.is_present("next-minor") {
+    } else if matches.get_flag("next-minor") {
         Version {
             minor: current_version.minor + 1,
             patch: 0,
             ..current_version.clone()
         }
-    } else if matches.is_present("next-patch") {
+    } else if matches.get_flag("next-patch") {
         Version {
             patch: current_version.patch + 1,
             ..current_version.clone()

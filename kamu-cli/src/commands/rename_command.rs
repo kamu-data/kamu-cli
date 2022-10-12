@@ -20,20 +20,18 @@ pub struct RenameCommand {
 }
 
 impl RenameCommand {
-    pub fn new<R, N>(
+    pub fn new<N>(
         local_repo: Arc<dyn LocalDatasetRepository>,
-        dataset_ref: R,
+        dataset_ref: DatasetRefLocal,
         new_name: N,
     ) -> Self
     where
-        R: TryInto<DatasetRefLocal>,
-        <R as TryInto<DatasetRefLocal>>::Error: std::fmt::Debug,
         N: TryInto<DatasetName>,
         <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
     {
         Self {
             local_repo,
-            dataset_ref: dataset_ref.try_into().unwrap(),
+            dataset_ref,
             new_name: new_name.try_into().unwrap(),
         }
     }

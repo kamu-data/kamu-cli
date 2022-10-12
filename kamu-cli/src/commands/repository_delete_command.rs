@@ -21,20 +21,18 @@ pub struct RepositoryDeleteCommand {
 }
 
 impl RepositoryDeleteCommand {
-    pub fn new<I, N>(
+    pub fn new<I>(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         names: I,
         all: bool,
         no_confirmation: bool,
     ) -> Self
     where
-        I: Iterator<Item = N>,
-        N: TryInto<RepositoryName>,
-        <N as TryInto<RepositoryName>>::Error: std::fmt::Debug,
+        I: Iterator<Item = RepositoryName>,
     {
         Self {
             remote_repo_reg,
-            names: names.map(|s| s.try_into().unwrap()).collect(),
+            names: names.collect(),
             all: all,
             no_confirmation: no_confirmation,
         }
