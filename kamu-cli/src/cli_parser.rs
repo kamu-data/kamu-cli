@@ -298,6 +298,7 @@ pub fn cli() -> Command {
                     Arg::new("dataset")
                         .action(ArgAction::Append)
                         .index(1)
+                        .required(true)
                         .value_parser(value_parse_dataset_ref_local)
                         .help("Local dataset reference(s)"),
                     Arg::new("yes")
@@ -376,6 +377,7 @@ pub fn cli() -> Command {
                             Arg::new("dataset")
                                 .action(ArgAction::Append)
                                 .index(1)
+                                .required(true)
                                 .value_parser(value_parse_dataset_ref_local)
                                 .help("Local dataset reference(s)"),
                         ])
@@ -1099,6 +1101,7 @@ pub fn cli() -> Command {
                             .about("Adds the specified dataset to IPFS and returns the CID")
                             .args([Arg::new("dataset")
                                 .index(1)
+                                .required(true)
                                 .value_parser(value_parse_dataset_ref_local)
                                 .help("Dataset reference")])]),
                 ]),

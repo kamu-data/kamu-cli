@@ -26,7 +26,7 @@ pub fn get_command(
         Some(("add", submatches)) => Box::new(AddCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.get_many("manifest").unwrap().map(String::as_str),
+            submatches.get_many("manifest").unwrap().map(String::as_str), // required
             submatches.get_flag("recursive"),
             submatches.get_flag("replace"),
         )),
@@ -82,7 +82,7 @@ pub fn get_command(
             catalog.get_one()?,
             submatches
                 .get_many("dataset")
-                .unwrap()
+                .unwrap() // required
                 .map(|r: &DatasetRefLocal| r.clone()),
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
@@ -106,7 +106,7 @@ pub fn get_command(
                 catalog.get_one()?,
                 lin_matches
                     .get_many("dataset")
-                    .unwrap()
+                    .unwrap() // required
                     .map(|r: &DatasetRefLocal| r.clone()),
                 lin_matches.get_flag("browse"),
                 lin_matches.get_one("output-format").map(String::as_str),
@@ -157,12 +157,15 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.get_many("env").unwrap().map(String::as_str),
+            submatches
+                .get_many("env")
+                .unwrap_or_default() // optional
+                .map(String::as_str),
         )),
         Some(("pull", submatches)) => {
             let datasets = submatches
                 .get_many("dataset")
-                .unwrap_or_default()
+                .unwrap_or_default() // optional
                 .map(|r: &DatasetRefAny| r.clone());
             if submatches.contains_id("set-watermark") {
                 if datasets.len() != 1 {}
@@ -230,7 +233,7 @@ pub fn get_command(
                 catalog.get_one()?,
                 delete_matches
                     .get_many("repository")
-                    .unwrap_or_default()
+                    .unwrap_or_default() // optional
                     .map(|rn: &RepositoryName| rn.clone()),
                 delete_matches.get_flag("all"),
                 delete_matches.get_flag("yes"),
@@ -295,7 +298,7 @@ pub fn get_command(
             submatches.get_one("query").map(String::as_str),
             submatches
                 .get_many("repo")
-                .unwrap_or_default()
+                .unwrap_or_default() // optional
                 .map(|rn: &RepositoryName| rn.clone()),
         )),
         Some(("sql", submatches)) => match submatches.subcommand() {
@@ -383,7 +386,7 @@ pub fn get_command(
             catalog.get_one()?,
             submatches
                 .get_many("dataset")
-                .unwrap()
+                .unwrap() // required
                 .map(|r: &DatasetRefLocal| r.clone()),
             submatches.get_flag("recursive"),
             submatches.get_flag("integrity"),
