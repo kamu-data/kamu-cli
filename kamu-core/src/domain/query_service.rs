@@ -62,7 +62,7 @@ pub enum QueryError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error("DataFusion error")]
+    #[error(transparent)]
     DataFusionError(
         #[from]
         #[backtrace]
