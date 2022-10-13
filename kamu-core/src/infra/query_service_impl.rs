@@ -347,34 +347,38 @@ impl KamuSchema {
     }
 
     async fn table_impl(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_handle = self
+        let dataset_resolution = self
             .local_repo
             .resolve_dataset_ref(&DatasetName::try_from(name).unwrap().into())
-            .await
-            .unwrap();
+            .await;
 
-        let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
-        let files = self
-            .collect_data_files(&dataset_handle, limit)
-            .await
-            .unwrap();
+        match dataset_resolution {
+            Err(_) => None,
+            Ok(dataset_handle) => {
+                let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
+                let files = self
+                    .collect_data_files(&dataset_handle, limit)
+                    .await
+                    .unwrap();
 
-        if files.is_empty() {
-            None
-        } else {
-            // TODO: Datafusion made it difficult to lazily create table providers,
-            // so we have to resort to spawning a thread to call an async function
-            // See: https://github.com/apache/arrow-datafusion/issues/1792
-            let table = ListingTableOfFiles::new_with_defaults(
-                files
-                    .into_iter()
-                    .map(|p| p.to_string_lossy().into())
-                    .collect(),
-            )
-            .await
-            .unwrap();
+                if files.is_empty() {
+                    None
+                } else {
+                    // TODO: Datafusion made it difficult to lazily create table providers,
+                    // so we have to resort to spawning a thread to call an async function
+                    // See: https://github.com/apache/arrow-datafusion/issues/1792
+                    let table = ListingTableOfFiles::new_with_defaults(
+                        files
+                            .into_iter()
+                            .map(|p| p.to_string_lossy().into())
+                            .collect(),
+                    )
+                    .await
+                    .unwrap();
 
-            Some(Arc::new(table))
+                    Some(Arc::new(table))
+                }
+            }
         }
     }
 }
