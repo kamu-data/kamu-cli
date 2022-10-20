@@ -163,7 +163,7 @@ type DatasetConnection {
 	"""
 	Approximate number of total nodes
 	"""
-	totalCount: Int
+	totalCount: Int!
 	"""
 	Page information
 	"""
@@ -357,7 +357,7 @@ type MetadataBlockConnection {
 	"""
 	Approximate number of total nodes
 	"""
-	totalCount: Int
+	totalCount: Int!
 	"""
 	Page information
 	"""
@@ -542,7 +542,7 @@ type SearchResultConnection {
 	"""
 	Approximate number of total nodes
 	"""
-	totalCount: Int
+	totalCount: Int!
 	"""
 	Page information
 	"""

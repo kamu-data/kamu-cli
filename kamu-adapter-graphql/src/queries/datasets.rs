@@ -75,12 +75,7 @@ impl Datasets {
             .map(|hdl| Dataset::new(account.clone(), hdl))
             .collect();
 
-        Ok(DatasetConnection::new(
-            nodes,
-            page,
-            per_page,
-            Some(total_count),
-        ))
+        Ok(DatasetConnection::new(nodes, page, per_page, total_count))
     }
 
     /// Returns datasets belonging to the specified account
