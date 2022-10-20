@@ -22,7 +22,7 @@ macro_rules! page_based_connection {
             pub nodes: Vec<$node_type>,
 
             /// Approximate number of total nodes
-            pub total_count: Option<usize>,
+            pub total_count: usize,
 
             /// Page information
             pub page_info: crate::scalars::PageBasedInfo,
@@ -35,12 +35,11 @@ macro_rules! page_based_connection {
                 nodes: Vec<$node_type>,
                 current_page: usize,
                 per_page: usize,
-                total_count: Option<usize>,
+                total_count: usize,
             ) -> Self {
                 let (total_pages, has_next_page) = match total_count {
-                    None => (None, nodes.len() != per_page),
-                    Some(0) => (Some(0), false),
-                    Some(tc) => (
+                    0 => (Some(0), false),
+                    tc => (
                         Some(tc.div_ceil(per_page)),
                         (tc.div_ceil(per_page) - 1) > current_page,
                     ),

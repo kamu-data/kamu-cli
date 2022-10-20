@@ -111,7 +111,7 @@ impl MetadataChain {
             nodes,
             page,
             per_page,
-            Some(total_count),
+            total_count,
         ))
     }
 }
