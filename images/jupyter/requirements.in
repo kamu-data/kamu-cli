@@ -15,10 +15,8 @@ altair
 mapboxgl
 shapely
 
-
-# TODO: Pinned to avoid a compatibility issue - need to upgrade to newer Jupyter
-hdijupyterutils==0.19.0
-ipywidgets==7.6.3
-jupyter-console==6.4.0
-jupyterlab-widgets==1.0.0
-widgetsnbextension==3.5.1
+hdijupyterutils
+ipywidgets
+jupyter-console
+jupyterlab-widgets
+widgetsnbextension

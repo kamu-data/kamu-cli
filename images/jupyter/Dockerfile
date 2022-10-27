@@ -1,6 +1,6 @@
 # Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
 # TODO: Using old version due https://github.com/jupyter-incubator/sparkmagic/issues/492
-FROM docker.io/jupyter/base-notebook:4a112c0f11eb
+FROM docker.io/jupyter/base-notebook:latest
 
 USER root
 
