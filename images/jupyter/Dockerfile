@@ -11,7 +11,7 @@ RUN apt update \
 # This is needed because requests-kerberos fails to install on debian due to missing linux headers
 RUN conda install requests-kerberos -y
 
-COPY kamu.py /opt/conda/lib/python3.8/site-packages/kamu.py
+COPY kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
 
 #########################################################################################
