@@ -96,7 +96,13 @@ type DataQueries {
 	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
 }
 
-type DataQueryResult {
+type DataQueryFailureResult {
+	errors: [String!]!
+}
+
+union DataQueryResult = DataQuerySuccessResult | DataQueryFailureResult
+
+type DataQuerySuccessResult {
 	schema: DataSchema!
 	data: DataBatch!
 	limit: Int!

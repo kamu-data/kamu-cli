@@ -40,21 +40,24 @@ impl DataQueries {
 
         let df = match query_dialect {
             QueryDialect::DataFusion => {
-                query_svc
+                let sql_result = query_svc
                     .sql_statement(&query, domain::QueryOptions::default())
-                    .await?
+                    .await;
+                match sql_result {
+                    Ok(r) => r,
+                    Err(e) => return DataQueryResult::failure(vec![e.to_string()]),
+                }
             }
         }
         .limit(limit as usize)?;
 
-        let record_batches = df.collect().await?;
+        let record_batches = match df.collect().await {
+            Ok(rb) => rb,
+            Err(e) => return DataQueryResult::failure(vec![e.to_string()]),
+        };
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult {
-            schema,
-            data,
-            limit,
-        })
+        DataQueryResult::success(schema, data, limit)
     }
 }

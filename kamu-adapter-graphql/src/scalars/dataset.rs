@@ -214,10 +214,35 @@ impl DataBatch {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct DataQueryResult {
+pub struct DataQuerySuccessResult {
     pub schema: DataSchema,
     pub data: DataBatch,
     pub limit: u64,
+}
+
+#[derive(SimpleObject)]
+pub struct DataQueryFailureResult {
+    pub errors: Vec<String>,
+}
+
+#[derive(Union)]
+pub enum DataQueryResult {
+    Success(DataQuerySuccessResult),
+    Failure(DataQueryFailureResult),
+}
+
+impl DataQueryResult {
+    pub fn success(schema: DataSchema, data: DataBatch, limit: u64) -> Result<DataQueryResult> {
+        Ok(DataQueryResult::Success(DataQuerySuccessResult {
+            schema,
+            data,
+            limit,
+        }))
+    }
+
+    pub fn failure(errors: Vec<String>) -> Result<DataQueryResult> {
+        return Ok(DataQueryResult::Failure(DataQueryFailureResult { errors }));
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
