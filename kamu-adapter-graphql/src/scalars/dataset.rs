@@ -278,6 +278,7 @@ impl From<DataFusionError> for DataQueryResult {
     fn from(e: DataFusionError) -> Self {
         match e {
             DataFusionError::SQL(e) => DataQueryResult::invalid_sql(e.to_string()),
+            DataFusionError::Plan(e) => DataQueryResult::invalid_sql(e),
             _ => DataQueryResult::internal(e.to_string()),
         }
     }
