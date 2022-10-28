@@ -10,6 +10,8 @@
 use std::{convert::TryFrom, ops::Deref};
 
 use async_graphql::*;
+use datafusion::error::DataFusionError;
+use kamu::domain::QueryError;
 use opendatafabric as odf;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -221,27 +223,63 @@ pub struct DataQuerySuccessResult {
 }
 
 #[derive(SimpleObject)]
-pub struct DataQueryFailureResult {
-    pub errors: Vec<String>,
+pub struct DataQueryInvalidSqlResult {
+    pub error: String,
+}
+
+#[derive(SimpleObject)]
+pub struct DataQueryInternalErrorResult {
+    pub error: String,
+}
+
+#[derive(Interface)]
+#[graphql(field(name = "error", type = "String"))]
+pub enum DataQueryErrorResult {
+    InvalidSql(DataQueryInvalidSqlResult),
+    InternalError(DataQueryInternalErrorResult),
 }
 
 #[derive(Union)]
 pub enum DataQueryResult {
     Success(DataQuerySuccessResult),
-    Failure(DataQueryFailureResult),
+    InvalidSql(DataQueryInvalidSqlResult),
+    InternalError(DataQueryInternalErrorResult),
 }
 
 impl DataQueryResult {
-    pub fn success(schema: DataSchema, data: DataBatch, limit: u64) -> Result<DataQueryResult> {
-        Ok(DataQueryResult::Success(DataQuerySuccessResult {
+    pub fn success(schema: DataSchema, data: DataBatch, limit: u64) -> DataQueryResult {
+        DataQueryResult::Success(DataQuerySuccessResult {
             schema,
             data,
             limit,
-        }))
+        })
     }
 
-    pub fn failure(errors: Vec<String>) -> Result<DataQueryResult> {
-        return Ok(DataQueryResult::Failure(DataQueryFailureResult { errors }));
+    pub fn invalid_sql(error: String) -> DataQueryResult {
+        DataQueryResult::InvalidSql(DataQueryInvalidSqlResult { error })
+    }
+
+    pub fn internal(error: String) -> DataQueryResult {
+        DataQueryResult::InternalError(DataQueryInternalErrorResult { error })
+    }
+}
+
+impl From<QueryError> for DataQueryResult {
+    fn from(e: QueryError) -> Self {
+        match e {
+            QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
+            QueryError::DataFusionError(e) => Into::<DataQueryResult>::into(e),
+            QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
+        }
+    }
+}
+
+impl From<DataFusionError> for DataQueryResult {
+    fn from(e: DataFusionError) -> Self {
+        match e {
+            DataFusionError::SQL(e) => DataQueryResult::invalid_sql(e.to_string()),
+            _ => DataQueryResult::internal(e.to_string()),
+        }
     }
 }
 
