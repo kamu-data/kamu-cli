@@ -216,39 +216,39 @@ impl DataBatch {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct DataQuerySuccessResult {
+pub struct DataQueryResultSuccess {
     pub schema: DataSchema,
     pub data: DataBatch,
     pub limit: u64,
 }
 
 #[derive(SimpleObject)]
-pub struct DataQueryInvalidSqlResult {
+pub struct DataQueryResultInvalidSql {
     pub error: String,
 }
 
 #[derive(SimpleObject)]
-pub struct DataQueryInternalErrorResult {
+pub struct DataQueryResultInternalError {
     pub error: String,
 }
 
 #[derive(Interface)]
 #[graphql(field(name = "error", type = "String"))]
-pub enum DataQueryErrorResult {
-    InvalidSql(DataQueryInvalidSqlResult),
-    InternalError(DataQueryInternalErrorResult),
+pub enum DataQueryResultError {
+    InvalidSql(DataQueryResultInvalidSql),
+    InternalError(DataQueryResultInternalError),
 }
 
 #[derive(Union)]
 pub enum DataQueryResult {
-    Success(DataQuerySuccessResult),
-    InvalidSql(DataQueryInvalidSqlResult),
-    InternalError(DataQueryInternalErrorResult),
+    Success(DataQueryResultSuccess),
+    InvalidSql(DataQueryResultInvalidSql),
+    InternalError(DataQueryResultInternalError),
 }
 
 impl DataQueryResult {
     pub fn success(schema: DataSchema, data: DataBatch, limit: u64) -> DataQueryResult {
-        DataQueryResult::Success(DataQuerySuccessResult {
+        DataQueryResult::Success(DataQueryResultSuccess {
             schema,
             data,
             limit,
@@ -256,11 +256,11 @@ impl DataQueryResult {
     }
 
     pub fn invalid_sql(error: String) -> DataQueryResult {
-        DataQueryResult::InvalidSql(DataQueryInvalidSqlResult { error })
+        DataQueryResult::InvalidSql(DataQueryResultInvalidSql { error })
     }
 
     pub fn internal(error: String) -> DataQueryResult {
-        DataQueryResult::InternalError(DataQueryInternalErrorResult { error })
+        DataQueryResult::InternalError(DataQueryResultInternalError { error })
     }
 }
 
@@ -268,7 +268,7 @@ impl From<QueryError> for DataQueryResult {
     fn from(e: QueryError) -> Self {
         match e {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
-            QueryError::DataFusionError(e) => Into::<DataQueryResult>::into(e),
+            QueryError::DataFusionError(e) => e.into(),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
         }
     }

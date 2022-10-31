@@ -68,12 +68,12 @@ impl DatasetData {
             .await
         {
             Ok(r) => r,
-            Err(e) => return Ok(Into::<DataQueryResult>::into(e)),
+            Err(e) => return Ok(e.into()),
         };
 
         let record_batches = match df.collect().await {
             Ok(rb) => rb,
-            Err(e) => return Ok(Into::<DataQueryResult>::into(e)),
+            Err(e) => return Ok(e.into()),
         };
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let data = DataBatch::from_records(&record_batches, data_format)?;

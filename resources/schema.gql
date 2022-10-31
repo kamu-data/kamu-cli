@@ -96,21 +96,21 @@ type DataQueries {
 	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
 }
 
-interface DataQueryErrorResult {
+union DataQueryResult = DataQueryResultSuccess | DataQueryResultInvalidSql | DataQueryResultInternalError
+
+interface DataQueryResultError {
 	error: String!
 }
 
-type DataQueryInternalErrorResult implements DataQueryErrorResult {
+type DataQueryResultInternalError implements DataQueryResultError {
 	error: String!
 }
 
-type DataQueryInvalidSqlResult implements DataQueryErrorResult {
+type DataQueryResultInvalidSql implements DataQueryResultError {
 	error: String!
 }
 
-union DataQueryResult = DataQuerySuccessResult | DataQueryInvalidSqlResult | DataQueryInternalErrorResult
-
-type DataQuerySuccessResult {
+type DataQueryResultSuccess {
 	schema: DataSchema!
 	data: DataBatch!
 	limit: Int!
