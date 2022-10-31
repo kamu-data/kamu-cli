@@ -347,12 +347,13 @@ impl KamuSchema {
     }
 
     async fn table_impl(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_resolution = self
-            .local_repo
-            .resolve_dataset_ref(&DatasetName::try_from(name).unwrap().into())
-            .await;
+        let dataset_name = DatasetName::try_from(name);
+        if let Err(_) = dataset_name {
+            return None;
+        }
+        let dataset_ref_local = &dataset_name.unwrap().into();
 
-        match dataset_resolution {
+        match self.local_repo.resolve_dataset_ref(dataset_ref_local).await {
             Err(_) => None,
             Ok(dataset_handle) => {
                 let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
