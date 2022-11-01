@@ -223,27 +223,21 @@ pub struct DataQueryResultSuccess {
 }
 
 #[derive(SimpleObject)]
-pub struct DataQueryResultInvalidSql {
-    pub error: String,
+pub struct DataQueryResultError {
+    pub error_message: String,
+    pub error_kind: DataQueryResultErrorKind,
 }
 
-#[derive(SimpleObject)]
-pub struct DataQueryResultInternalError {
-    pub error: String,
-}
-
-#[derive(Interface)]
-#[graphql(field(name = "error", type = "String"))]
-pub enum DataQueryResultError {
-    InvalidSql(DataQueryResultInvalidSql),
-    InternalError(DataQueryResultInternalError),
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DataQueryResultErrorKind {
+    InvalidSql,
+    InternalError,
 }
 
 #[derive(Union)]
 pub enum DataQueryResult {
     Success(DataQueryResultSuccess),
-    InvalidSql(DataQueryResultInvalidSql),
-    InternalError(DataQueryResultInternalError),
+    Error(DataQueryResultError),
 }
 
 impl DataQueryResult {
@@ -255,12 +249,18 @@ impl DataQueryResult {
         })
     }
 
-    pub fn invalid_sql(error: String) -> DataQueryResult {
-        DataQueryResult::InvalidSql(DataQueryResultInvalidSql { error })
+    pub fn invalid_sql(error_message: String) -> DataQueryResult {
+        DataQueryResult::Error(DataQueryResultError {
+            error_message,
+            error_kind: DataQueryResultErrorKind::InvalidSql,
+        })
     }
 
-    pub fn internal(error: String) -> DataQueryResult {
-        DataQueryResult::InternalError(DataQueryResultInternalError { error })
+    pub fn internal(error_message: String) -> DataQueryResult {
+        DataQueryResult::Error(DataQueryResultError {
+            error_message,
+            error_kind: DataQueryResultErrorKind::InternalError,
+        })
     }
 }
 

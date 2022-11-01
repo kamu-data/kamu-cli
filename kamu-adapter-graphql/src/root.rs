@@ -9,7 +9,6 @@
 
 use crate::mutations::*;
 use crate::queries::*;
-use crate::scalars::DataQueryResultError;
 
 use async_graphql::*;
 
@@ -65,7 +64,6 @@ pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub fn schema(catalog: dill::Catalog) -> Schema {
     Schema::build(Query, Mutation, EmptySubscription)
         .extension(extensions::ApolloTracing)
-        .register_output_type::<DataQueryResultError>()
         .data(catalog)
         .finish()
 }
