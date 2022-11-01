@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- More elaborate SQL error messages propagated from DataFusion via GraphQL API
+### Changed
+- Upgraded rusttoolchain to fix `thiserror` issues. Backtrace feature is now considered stable
+- Fixed issues with `ringbuf` library updates
+- Updates related to breaking changes in `clap`
+- Utilized value parsing capabilities from `clap` to simplify argument conversions
+### Fixed
+- Field 'total_count' in pagination views of GraphQL API should be mandatory
+
+
 ## [0.99.0] - 2022-10-01
 ### Added
 - Support custom headers when fetching data from a URL (e.g. HTTP `Authorization` header)
