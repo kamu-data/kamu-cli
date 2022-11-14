@@ -63,18 +63,21 @@ impl DatasetData {
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
-        let df = query_svc
+        let df = match query_svc
             .tail(&self.dataset_handle.as_local_ref(), limit)
-            .await?;
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => return Ok(e.into()),
+        };
 
-        let record_batches = df.collect().await?;
+        let record_batches = match df.collect().await {
+            Ok(rb) => rb,
+            Err(e) => return Ok(e.into()),
+        };
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult {
-            schema,
-            data,
-            limit,
-        })
+        Ok(DataQueryResult::success(schema, data, limit))
     }
 }

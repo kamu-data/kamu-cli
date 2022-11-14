@@ -96,7 +96,19 @@ type DataQueries {
 	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
 }
 
-type DataQueryResult {
+union DataQueryResult = DataQueryResultSuccess | DataQueryResultError
+
+type DataQueryResultError {
+	errorMessage: String!
+	errorKind: DataQueryResultErrorKind!
+}
+
+enum DataQueryResultErrorKind {
+	INVALID_SQL
+	INTERNAL_ERROR
+}
+
+type DataQueryResultSuccess {
 	schema: DataSchema!
 	data: DataBatch!
 	limit: Int!
