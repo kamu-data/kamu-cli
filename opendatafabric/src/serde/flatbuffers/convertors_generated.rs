@@ -2172,15 +2172,16 @@ fn datetime_to_fb(dt: &DateTime<Utc>) -> fb::Timestamp {
 }
 
 fn fb_to_datetime(dt: &fb::Timestamp) -> DateTime<Utc> {
-    Utc.yo(dt.year(), dt.ordinal() as u32)
+    let naive_date_time = NaiveDate::from_yo_opt(dt.year(), dt.ordinal() as u32)
+        .unwrap()
         .and_time(
             NaiveTime::from_num_seconds_from_midnight_opt(
                 dt.seconds_from_midnight(),
                 dt.nanoseconds(),
             )
             .unwrap(),
-        )
-        .unwrap()
+        );
+    Utc.from_local_datetime(&naive_date_time).unwrap()
 }
 
 fn empty_table<'fb>(

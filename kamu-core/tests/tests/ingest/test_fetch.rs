@@ -410,7 +410,7 @@ async fn test_fetch_files_glob() {
     );
     assert_eq!(
         res.checkpoint.source_event_time,
-        Some(Utc.ymd(2020, 10, 1).and_hms(0, 0, 0))
+        Some(Utc.with_ymd_and_hms(2020, 10, 1, 0, 0, 0).unwrap())
     );
 
     // No modifications
@@ -490,7 +490,7 @@ async fn test_fetch_files_glob() {
     );
     assert_eq!(
         res5.checkpoint.source_event_time,
-        Some(Utc.ymd(2020, 10, 5).and_hms(0, 0, 0))
+        Some(Utc.with_ymd_and_hms(2020, 10, 5, 0, 0, 0).unwrap())
     );
 
     let res6 = fetch_svc
@@ -505,7 +505,7 @@ async fn test_fetch_files_glob() {
     );
     assert_eq!(
         res6.checkpoint.source_event_time,
-        Some(Utc.ymd(2020, 10, 10).and_hms(0, 0, 0))
+        Some(Utc.with_ymd_and_hms(2020, 10, 10, 0, 0, 0).unwrap())
     );
 }
 

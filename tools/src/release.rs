@@ -165,7 +165,8 @@ fn update_makefile_text(text: &str, new_version: &Version) -> String {
 
 fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
     NaiveDate::from_ymd_opt(d.year() + years, d.month(), d.day()).unwrap_or_else(|| {
-        *d + (NaiveDate::from_ymd(d.year() + years, 1, 1) - NaiveDate::from_ymd(d.year(), 1, 1))
+        *d + (NaiveDate::from_ymd_opt(d.year() + years, 1, 1).unwrap()
+            - NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap())
     })
 }
 

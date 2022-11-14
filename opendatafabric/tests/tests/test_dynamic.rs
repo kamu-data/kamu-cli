@@ -16,7 +16,7 @@ const TEST_SEQUENCE_NUMBER: i32 = 132;
 fn load() -> MetadataBlock {
     MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
-        system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
+        system_time: Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap(),
         event: MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {

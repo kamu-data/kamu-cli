@@ -56,7 +56,7 @@ fn serde_dataset_summary() {
                     name: DatasetName::try_from("bar").unwrap(),
                 },
             ],
-            last_pulled: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
+            last_pulled: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             num_records: 100,
             data_size: 1024,
             checkpoints_size: 64,

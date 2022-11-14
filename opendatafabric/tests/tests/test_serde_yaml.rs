@@ -206,7 +206,7 @@ fn serde_metadata_block() {
 
     let expected = MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
-        system_time: Utc.ymd(2020, 1, 1).and_hms(12, 0, 0),
+        system_time: Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap(),
         event: MetadataEvent::ExecuteQuery(ExecuteQuery {
             input_slices: vec![
                 InputSlice {
@@ -234,7 +234,7 @@ fn serde_metadata_block() {
                 size: 10,
             }),
             output_checkpoint: None,
-            output_watermark: Some(Utc.ymd(2020, 1, 1).and_hms(12, 0, 0)),
+            output_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
         }),
         sequence_number: 127,
     };
