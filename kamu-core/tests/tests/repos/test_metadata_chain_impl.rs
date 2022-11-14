@@ -331,7 +331,7 @@ async fn test_append_system_time_non_monotonic() {
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
         .prev(&hash_1, block_1_sequence_number)
-        .system_time(Utc.ymd(2000, 1, 1).and_hms(12, 0, 0))
+        .system_time(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
         .build();
 
     assert_matches!(

@@ -762,7 +762,8 @@ impl FetchService {
                     Err(_) => {
                         let date = chrono::NaiveDate::parse_from_str(group.as_str(), time_fmt)
                             .map_err(|e| EventTimeSourceError::bad_pattern(time_fmt, e))?;
-                        Ok(Utc.from_local_date(&date).and_hms_opt(0, 0, 0).unwrap())
+                        let time = date.and_hms_opt(0, 0, 0).unwrap();
+                        Ok(Utc.from_local_datetime(&time).unwrap())
                     }
                 }
             } else {

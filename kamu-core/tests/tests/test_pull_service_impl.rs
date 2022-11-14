@@ -675,7 +675,7 @@ async fn test_set_watermark() {
             .pull_svc
             .set_watermark(
                 &dataset_name.as_local_ref(),
-                Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
         Ok(PullResult::Updated { .. })
@@ -687,7 +687,7 @@ async fn test_set_watermark() {
             .pull_svc
             .set_watermark(
                 &dataset_name.as_local_ref(),
-                Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+                Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
             )
             .await,
         Ok(PullResult::Updated { .. })
@@ -699,7 +699,7 @@ async fn test_set_watermark() {
             .pull_svc
             .set_watermark(
                 &dataset_name.as_local_ref(),
-                Utc.ymd(2000, 1, 3).and_hms(0, 0, 0)
+                Utc.with_ymd_and_hms(2000, 1, 3, 0, 0, 0).unwrap()
             )
             .await,
         Ok(PullResult::UpToDate)
@@ -711,7 +711,7 @@ async fn test_set_watermark() {
             .pull_svc
             .set_watermark(
                 &dataset_name.as_local_ref(),
-                Utc.ymd(2000, 1, 2).and_hms(0, 0, 0)
+                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
             )
             .await,
         Ok(PullResult::UpToDate)
