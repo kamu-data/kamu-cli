@@ -1,6 +1,6 @@
-# Source: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
-# TODO: Using old version due https://github.com/jupyter-incubator/sparkmagic/issues/492
-FROM jupyter/base-notebook:4a112c0f11eb
+# Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
+# Tags: https://hub.docker.com/r/jupyter/base-notebook/tags
+FROM docker.io/jupyter/base-notebook:2022-11-15
 
 ARG KAMU_VERSION
 ARG dev_mode=false
@@ -55,7 +55,7 @@ RUN wget -q https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSI
     rm -rf kamu-cli-x86_64-unknown-linux-gnu* && \
     echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
 COPY kamu/.kamuconfig /.kamuconfig
-COPY kamu/kamu.py /opt/conda/lib/python3.8/site-packages/kamu.py
+COPY kamu/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
 
 #########################################################################################
@@ -63,8 +63,8 @@ USER $NB_USER
 
 RUN pip install --upgrade pip
 RUN pip install --upgrade --ignore-installed setuptools
-COPY kamu/requirements.in requirements.in
-RUN pip install -r requirements.in && rm requirements.in
+COPY kamu/requirements.txt requirements.txt
+RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
 
 COPY kamu/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
@@ -72,6 +72,11 @@ RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
 RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/pysparkkernel
 #RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
 RUN jupyter serverextension enable --py sparkmagic
+
+# TODO: Issue link
+# Patch Sparkmagic sources to properly import Pandas DataError class
+RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/graphbase.py
+RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/piegraph.py
 
 
 #########################################################################################
@@ -81,4 +86,4 @@ COPY user-home/ /home/$NB_USER/
 RUN chown -R $NB_USER:users /home/$NB_USER
 
 USER $NB_USER
-CMD ["start-notebook.sh", "--NotebookApp.iopub_data_rate_limit=1000000000"]
+CMD ["jupyter", "notebook", "--NotebookApp.iopub_data_rate_limit=1000000000"]

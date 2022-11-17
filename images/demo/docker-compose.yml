@@ -5,10 +5,12 @@ networks:
 
 services:
   jupyter:
-    image: kamudata/kamu-cli-demo-jupyter:0.3.0
+    image: kamudata/kamu-cli-demo-jupyter:0.6.0
     command:
-      - "start-notebook.sh"
+      - "jupyter"
+      - "notebook"
       - "--port=8765"
+      - "--NotebookApp.iopub_data_rate_limit=1000000000"
     environment:
       - AWS_ACCESS_KEY_ID=minio
       - AWS_SECRET_ACCESS_KEY=minio123
@@ -28,7 +30,7 @@ services:
       - minio
 
   minio:
-    image: kamudata/kamu-cli-demo-minio:0.3.0
+    image: kamudata/kamu-cli-demo-minio:0.6.0
     command:
       - "server"
       - "--address"

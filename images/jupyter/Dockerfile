@@ -1,6 +1,6 @@
 # Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
-# TODO: Using old version due https://github.com/jupyter-incubator/sparkmagic/issues/492
-FROM docker.io/jupyter/base-notebook:latest
+# Tags: https://hub.docker.com/r/jupyter/base-notebook/tags
+FROM docker.io/jupyter/base-notebook:2022-11-15
 
 USER root
 
@@ -17,10 +17,10 @@ COPY kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 #########################################################################################
 USER $NB_USER
 
-RUN pip --no-cache-dir install --upgrade pip
-RUN pip --no-cache-dir install --upgrade --ignore-installed setuptools
-COPY requirements.in requirements.in
-RUN pip --no-cache-dir install -r requirements.in && rm requirements.in
+RUN pip install --upgrade pip
+RUN pip install --upgrade --ignore-installed setuptools
+COPY requirements.txt requirements.txt
+RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
 
 COPY sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
@@ -29,9 +29,11 @@ RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cu
 RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
 RUN jupyter serverextension enable --py sparkmagic
 
+# TODO: Issue link
 # Patch Sparkmagic sources to properly import Pandas DataError class
 RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/graphbase.py
 RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/piegraph.py
+
 
 #########################################################################################
 USER root

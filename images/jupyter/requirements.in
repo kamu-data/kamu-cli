@@ -14,9 +14,3 @@ folium
 altair
 mapboxgl
 shapely
-
-hdijupyterutils
-ipywidgets
-jupyter-console
-jupyterlab-widgets
-widgetsnbextension
