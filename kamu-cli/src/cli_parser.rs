@@ -887,8 +887,14 @@ pub fn cli() -> Command {
                                             .index(2)
                                             .value_parser(value_parse_dataset_ref_remote)
                                             .help("Remote dataset name"),
-                                        Arg::new("push").long("push").help("Add a push alias"),
-                                        Arg::new("pull").long("pull").help("Add a pull alias"),
+                                        Arg::new("push")
+                                            .long("push")
+                                            .action(ArgAction::SetTrue)
+                                            .help("Add a push alias"),
+                                        Arg::new("pull")
+                                            .long("pull")
+                                            .action(ArgAction::SetTrue)
+                                            .help("Add a pull alias"),
                                     ]),
                                 Command::new("delete")
                                     .about("Deletes a remote alias associated with a dataset")
@@ -907,8 +913,14 @@ pub fn cli() -> Command {
                                             .index(2)
                                             .value_parser(value_parse_dataset_ref_remote)
                                             .help("Remote dataset name"),
-                                        Arg::new("push").long("push").help("Add a push alias"),
-                                        Arg::new("pull").long("pull").help("Add a pull alias"),
+                                        Arg::new("push")
+                                            .long("push")
+                                            .action(ArgAction::SetTrue)
+                                            .help("Add a push alias"),
+                                        Arg::new("pull")
+                                            .long("pull")
+                                            .action(ArgAction::SetTrue)
+                                            .help("Add a pull alias"),
                                     ]),
                             ])
                             .after_help(indoc::indoc!(
