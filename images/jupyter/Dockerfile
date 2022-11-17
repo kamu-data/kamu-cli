@@ -29,6 +29,9 @@ RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cu
 RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
 RUN jupyter serverextension enable --py sparkmagic
 
+# Patch Sparkmagic sources to properly import Pandas DataError class
+RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/graphbase.py
+RUN sed -i 's/from pandas.core.groupby import DataError/from pandas.errors import DataError/g' /opt/conda/lib/python3.10/site-packages/autovizwidget/plotlygraphs/piegraph.py
 
 #########################################################################################
 USER root
