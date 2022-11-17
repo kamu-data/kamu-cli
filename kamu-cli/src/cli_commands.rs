@@ -317,7 +317,7 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        *(server_matches.get_one("address").unwrap()),
+                        *server_matches.get_one("address").unwrap(),
                         *(server_matches.get_one("port").unwrap()),
                     ))
                 } else {
@@ -325,10 +325,7 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
-                        server_matches
-                            .get_one("address")
-                            .map(String::as_str)
-                            .unwrap(),
+                        *server_matches.get_one("address").unwrap(),
                         *(server_matches.get_one("port").unwrap()),
                     ))
                 }

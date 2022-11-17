@@ -39,7 +39,7 @@ impl SqlServerCommand {
             workspace_layout,
             output_config,
             container_runtime,
-            address: address.to_owned(),
+            address,
             port: port,
         }
     }

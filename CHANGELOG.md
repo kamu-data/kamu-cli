@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.100.1] - 2022-11-14
+### Fixed
+- CLI parser crash on `kamu sql server --livy` subcommand
+
+## [0.100.0] - 2022-11-14
 ### Added
 - More elaborate SQL error messages propagated from DataFusion via GraphQL API
 ### Changed
@@ -14,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Utilized value parsing capabilities from `clap` to simplify argument conversions
 ### Fixed
 - Field 'total_count' in pagination views of GraphQL API should be mandatory
-
 
 ## [0.99.0] - 2022-10-01
 ### Added

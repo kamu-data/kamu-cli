@@ -15,6 +15,7 @@ use container_runtime::ContainerRuntime;
 use kamu::infra::*;
 
 use console::style as s;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -22,7 +23,7 @@ pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
-    address: String,
+    address: IpAddr,
     port: u16,
 }
 
@@ -31,14 +32,14 @@ impl SqlServerLivyCommand {
         workspace_layout: Arc<WorkspaceLayout>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        address: &str,
+        address: IpAddr,
         port: u16,
     ) -> Self {
         Self {
             workspace_layout,
             output_config,
             container_runtime,
-            address: address.to_owned(),
+            address,
             port,
         }
     }
@@ -71,7 +72,7 @@ impl Command for SqlServerLivyCommand {
         let url = format!("{}:{}", self.address, self.port);
 
         livy_server.run(
-            &self.address,
+            &self.address.to_string(),
             self.port,
             &self.workspace_layout,
             self.output_config.verbosity_level > 0,
