@@ -153,6 +153,9 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
 
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
+    // Registrer JupyterConfig used by some commands
+    catalog.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
+
     catalog.add_value(ContainerRuntimeConfig {
         runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
         network_ns,
@@ -174,6 +177,26 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
             .shutdown_timeout
             .unwrap()
             .into(),
+        spark_image: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .images
+            .as_ref()
+            .unwrap()
+            .spark
+            .clone()
+            .unwrap(),
+        flink_image: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .images
+            .as_ref()
+            .unwrap()
+            .flink
+            .clone()
+            .unwrap(),
     });
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();

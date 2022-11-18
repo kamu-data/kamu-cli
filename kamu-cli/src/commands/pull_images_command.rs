@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use crate::JupyterConfig;
+
 use super::{CLIError, Command};
 use container_runtime::ContainerRuntime;
 use kamu::infra::utils::docker_images;
@@ -43,7 +45,7 @@ impl Command for PullImagesCommand {
         let mut images = vec![
             docker_images::SPARK,
             docker_images::FLINK,
-            docker_images::JUPYTER,
+            JupyterConfig::IMAGE,
         ];
 
         if self.pull_test_deps {

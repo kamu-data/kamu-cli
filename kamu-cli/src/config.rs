@@ -11,6 +11,7 @@ use core::panic;
 use std::path::{Path, PathBuf};
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
+use kamu::infra::utils::docker_images;
 use kamu::infra::WorkspaceLayout;
 use opendatafabric::serde::yaml::Manifest;
 
@@ -42,6 +43,9 @@ pub struct CLIConfig {
     /// Network protocols configuration
     #[merge(strategy = merge_recursive)]
     pub protocol: Option<ProtocolConfig>,
+    /// Data access and visualization configuration
+    #[merge(strategy = merge_recursive)]
+    pub frontend: Option<FrontendConfig>,
 }
 
 impl CLIConfig {
@@ -49,6 +53,7 @@ impl CLIConfig {
         Self {
             engine: None,
             protocol: None,
+            frontend: None,
         }
     }
 
@@ -60,6 +65,7 @@ impl CLIConfig {
         Self {
             engine: Some(EngineConfig::sample()),
             protocol: Some(ProtocolConfig::sample()),
+            frontend: Some(FrontendConfig::sample()),
         }
     }
 }
@@ -69,6 +75,7 @@ impl Default for CLIConfig {
         Self {
             engine: Some(EngineConfig::default()),
             protocol: Some(ProtocolConfig::default()),
+            frontend: Some(FrontendConfig::default()),
         }
     }
 }
@@ -89,6 +96,9 @@ pub struct EngineConfig {
     pub start_timeout: Option<DurationString>,
     /// Timeout for waiting the engine container to stop gracefully
     pub shutdown_timeout: Option<DurationString>,
+    /// UNSTABLE: Default engine images
+    #[merge(strategy = merge_recursive)]
+    pub images: Option<EngineImagesConfig>,
 }
 
 impl EngineConfig {
@@ -99,12 +109,14 @@ impl EngineConfig {
             network_ns: None,
             start_timeout: None,
             shutdown_timeout: None,
+            images: None,
         }
     }
 
     fn sample() -> Self {
         Self {
             max_concurrency: Some(0),
+            images: Some(EngineImagesConfig::sample()),
             ..Self::default()
         }
     }
@@ -118,6 +130,41 @@ impl Default for EngineConfig {
             network_ns: Some(NetworkNamespaceType::Private),
             start_timeout: Some(DurationString::from_string("30s".to_owned()).unwrap()),
             shutdown_timeout: Some(DurationString::from_string("5s".to_owned()).unwrap()),
+            images: Some(EngineImagesConfig::default()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EngineImagesConfig {
+    /// UNSTABLE: Flink engine image
+    pub flink: Option<String>,
+    /// UNSTABLE: Flink engine image
+    pub spark: Option<String>,
+}
+
+impl EngineImagesConfig {
+    pub fn new() -> Self {
+        Self {
+            flink: None,
+            spark: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+}
+
+impl Default for EngineImagesConfig {
+    fn default() -> Self {
+        Self {
+            flink: Some(docker_images::FLINK.to_owned()),
+            spark: Some(docker_images::SPARK.to_owned()),
         }
     }
 }
@@ -187,6 +234,74 @@ impl Default for IpfsConfig {
         Self {
             http_gateway: Some(Url::parse("http://localhost:8080").unwrap()),
             pre_resolve_dnslink: Some(true),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FrontendConfig {
+    /// Integrated Jupyter notebook configuration
+    #[merge(strategy = merge_recursive)]
+    pub jupyter: Option<JupyterConfig>,
+}
+
+impl FrontendConfig {
+    pub fn new() -> Self {
+        Self { jupyter: None }
+    }
+
+    fn sample() -> Self {
+        Self {
+            jupyter: Some(JupyterConfig::sample()),
+            ..Self::default()
+        }
+    }
+}
+
+impl Default for FrontendConfig {
+    fn default() -> Self {
+        Self {
+            jupyter: Some(JupyterConfig::default()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct JupyterConfig {
+    /// Jupyter notebook server image
+    pub image: Option<String>,
+    /// UNSTABLE: Livy + Spark server image
+    pub livy_image: Option<String>,
+}
+
+impl JupyterConfig {
+    pub const IMAGE: &str = "docker.io/kamudata/jupyter:0.5.0";
+
+    pub fn new() -> Self {
+        Self {
+            image: None,
+            livy_image: None,
+        }
+    }
+
+    fn sample() -> Self {
+        Self { ..Self::default() }
+    }
+}
+
+impl Default for JupyterConfig {
+    fn default() -> Self {
+        Self {
+            image: Some(Self::IMAGE.to_owned()),
+            livy_image: EngineImagesConfig::default().spark,
         }
     }
 }

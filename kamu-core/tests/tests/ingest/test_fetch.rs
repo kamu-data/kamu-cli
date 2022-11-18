@@ -531,7 +531,7 @@ async fn test_fetch_container_ok() {
     );
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: kamu::infra::utils::docker_images::HTTPD.to_owned(),
+        image: HttpServer::IMAGE.to_owned(),
         command: Some(vec!["/bin/bash".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),

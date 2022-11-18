@@ -55,22 +55,21 @@ impl EngineProvisionerLocal {
         };
 
         Self {
-            config,
             spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
-                docker_images::SPARK,
+                &config.spark_image,
                 workspace_layout.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
-                docker_images::SPARK,
+                &config.spark_image,
                 workspace_layout.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
-                docker_images::FLINK,
+                &config.flink_image,
                 workspace_layout.clone(),
             )),
             container_runtime: container_runtime,
@@ -79,6 +78,7 @@ impl EngineProvisionerLocal {
                 known_images: HashSet::new(),
             }),
             notify: tokio::sync::Notify::new(),
+            config,
         }
     }
 
@@ -193,7 +193,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<IngestEngineHandle, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
-        self.ensure_image(docker_images::SPARK, listener.clone())
+        self.ensure_image(&self.config.spark_image, listener.clone())
             .await?;
 
         listener.begin("spark-ingest");
@@ -216,11 +216,11 @@ impl EngineProvisioner for EngineProvisionerLocal {
         let (engine, image) = match engine_id {
             "spark" => Ok((
                 self.spark_engine.clone() as Arc<dyn Engine>,
-                docker_images::SPARK,
+                &self.config.spark_image,
             )),
             "flink" => Ok((
                 self.flink_engine.clone() as Arc<dyn Engine>,
-                docker_images::FLINK,
+                &self.config.flink_image,
             )),
             _ => Err(EngineProvisioningError::image_not_found(engine_id)),
         }?;
@@ -267,6 +267,10 @@ pub struct EngineProvisionerLocalConfig {
     pub start_timeout: Duration,
     /// Timeout for waiting for engine container to shutdown cleanly
     pub shutdown_timeout: Duration,
+
+    // TODO: Remove in favor of explicit images in ODF protocol
+    pub spark_image: String,
+    pub flink_image: String,
 }
 
 // This is for tests only
@@ -276,6 +280,8 @@ impl Default for EngineProvisionerLocalConfig {
             max_concurrency: None,
             start_timeout: Duration::from_secs(30),
             shutdown_timeout: Duration::from_secs(5),
+            spark_image: docker_images::SPARK.to_owned(),
+            flink_image: docker_images::FLINK.to_owned(),
         }
     }
 }

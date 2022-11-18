@@ -21,6 +21,7 @@ use std::time::Duration;
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
     workspace_layout: Arc<WorkspaceLayout>,
+    engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     command: Option<String>,
@@ -32,6 +33,7 @@ impl SqlShellCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         workspace_layout: Arc<WorkspaceLayout>,
+        engine_prov_config: Arc<EngineProvisionerLocalConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         command: Option<&str>,
@@ -41,6 +43,7 @@ impl SqlShellCommand {
         Self {
             query_svc,
             workspace_layout,
+            engine_prov_config,
             output_config,
             container_runtime,
             command: command.map(|v| v.to_owned()),
@@ -50,7 +53,10 @@ impl SqlShellCommand {
     }
 
     fn run_spark_shell(&self) -> Result<(), CLIError> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+        let sql_shell = SqlShellImpl::new(
+            self.container_runtime.clone(),
+            self.engine_prov_config.spark_image.clone(),
+        );
 
         let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let mut pull_progress = PullImageProgress::new("container");

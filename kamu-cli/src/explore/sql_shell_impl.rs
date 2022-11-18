@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::utils::docker_images;
 use kamu::infra::*;
 
 use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
@@ -21,17 +20,21 @@ use tracing::info;
 
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,
+    image: String,
 }
 
 // TODO: Need to allocate pseudo-terminal to perfectly forward to the shell
 impl SqlShellImpl {
-    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
-        Self { container_runtime }
+    pub fn new(container_runtime: Arc<ContainerRuntime>, image: String) -> Self {
+        Self {
+            container_runtime,
+            image,
+        }
     }
 
     pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
         self.container_runtime
-            .ensure_image(docker_images::SPARK, Some(listener));
+            .ensure_image(&self.image, Some(listener));
     }
 
     pub fn run_server(
@@ -65,7 +68,7 @@ impl SqlShellImpl {
         // Start Spark container in the idle loop
         let spark = {
             let args = RunArgs {
-                image: docker_images::SPARK.to_owned(),
+                image: self.image.clone(),
                 container_name: Some("kamu-spark".to_owned()),
                 user: Some("root".to_owned()),
                 volume_map,
@@ -160,7 +163,7 @@ impl SqlShellImpl {
         info!("Starting SQL shell");
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
-            image: docker_images::SPARK.to_owned(),
+            image: self.image.clone(),
             container_name: Some("kamu-spark-shell".to_owned()),
             user: Some("root".to_owned()),
             network: Some("host".to_owned()),

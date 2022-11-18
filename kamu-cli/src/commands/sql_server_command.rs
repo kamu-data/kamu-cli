@@ -21,6 +21,7 @@ use std::time::Duration;
 
 pub struct SqlServerCommand {
     workspace_layout: Arc<WorkspaceLayout>,
+    engine_prov_config: Arc<EngineProvisionerLocalConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     address: IpAddr,
@@ -30,6 +31,7 @@ pub struct SqlServerCommand {
 impl SqlServerCommand {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
+        engine_prov_config: Arc<EngineProvisionerLocalConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         address: IpAddr,
@@ -37,6 +39,7 @@ impl SqlServerCommand {
     ) -> Self {
         Self {
             workspace_layout,
+            engine_prov_config,
             output_config,
             container_runtime,
             address,
@@ -48,7 +51,10 @@ impl SqlServerCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlServerCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let sql_shell = SqlShellImpl::new(self.container_runtime.clone());
+        let sql_shell = SqlShellImpl::new(
+            self.container_runtime.clone(),
+            self.engine_prov_config.spark_image.clone(),
+        );
 
         let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let mut pull_progress = PullImageProgress::new("engine");

@@ -11,6 +11,7 @@ use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::NotebookServerImpl;
 use crate::output::OutputConfig;
+use crate::JupyterConfig;
 use container_runtime::ContainerRuntime;
 use kamu::infra::*;
 
@@ -20,14 +21,16 @@ use std::time::Duration;
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,
-    container_runtime: Arc<ContainerRuntime>,
+    jupyter_config: Arc<JupyterConfig>,
     output_config: Arc<OutputConfig>,
+    container_runtime: Arc<ContainerRuntime>,
     env_vars: Vec<(String, Option<String>)>,
 }
 
 impl NotebookCommand {
     pub fn new<Iter, Str>(
         workspace_layout: Arc<WorkspaceLayout>,
+        jupyter_config: Arc<JupyterConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         env_vars: Iter,
@@ -38,8 +41,9 @@ impl NotebookCommand {
     {
         Self {
             workspace_layout,
-            container_runtime: container_runtime,
+            jupyter_config,
             output_config,
+            container_runtime,
             env_vars: env_vars
                 .into_iter()
                 .map(|elem| {
@@ -60,7 +64,8 @@ impl NotebookCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for NotebookCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let notebook_server = NotebookServerImpl::new(self.container_runtime.clone());
+        let notebook_server =
+            NotebookServerImpl::new(self.container_runtime.clone(), self.jupyter_config.clone());
 
         let environment_vars = self
             .env_vars

@@ -22,6 +22,8 @@ pub struct FtpServer {
 }
 
 impl FtpServer {
+    pub const IMAGE: &str = docker_images::FTP;
+
     pub fn new(server_dir: &Path) -> Self {
         use rand::Rng;
 
@@ -40,16 +42,16 @@ impl FtpServer {
         }
 
         assert!(
-            container_runtime.has_image(docker_images::FTP),
+            container_runtime.has_image(Self::IMAGE),
             "Please pull {} image before running this test",
-            docker_images::FTP
+            Self::IMAGE
         );
 
         // TODO: this is likely very brittle because of all the port mapping
         // FTP is a crazy protocol :(
         let process = container_runtime
             .run_cmd(RunArgs {
-                image: docker_images::FTP.to_owned(),
+                image: Self::IMAGE.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![21],
                 expose_port_map_range: vec![((47400, 47470), (47400, 47470))],

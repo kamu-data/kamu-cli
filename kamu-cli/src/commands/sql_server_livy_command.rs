@@ -10,7 +10,7 @@
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::LivyServerImpl;
-use crate::output::*;
+use crate::{output::*, JupyterConfig};
 use container_runtime::ContainerRuntime;
 use kamu::infra::*;
 
@@ -21,6 +21,7 @@ use std::time::Duration;
 
 pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,
+    jupyter_config: Arc<JupyterConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
     address: IpAddr,
@@ -30,6 +31,7 @@ pub struct SqlServerLivyCommand {
 impl SqlServerLivyCommand {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
+        jupyter_config: Arc<JupyterConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
         address: IpAddr,
@@ -37,6 +39,7 @@ impl SqlServerLivyCommand {
     ) -> Self {
         Self {
             workspace_layout,
+            jupyter_config,
             output_config,
             container_runtime,
             address,
@@ -48,7 +51,10 @@ impl SqlServerLivyCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlServerLivyCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let livy_server = LivyServerImpl::new(self.container_runtime.clone());
+        let livy_server = LivyServerImpl::new(
+            self.container_runtime.clone(),
+            self.jupyter_config.livy_image.clone().unwrap(),
+        );
 
         let spinner = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0

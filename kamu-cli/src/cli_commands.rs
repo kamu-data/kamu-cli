@@ -157,6 +157,7 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
+            catalog.get_one()?,
             submatches
                 .get_many("env")
                 .unwrap_or_default() // optional
@@ -307,6 +308,7 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
+                catalog.get_one()?,
                 submatches.get_one("command").map(String::as_str),
                 submatches.get_one("url").map(String::as_str),
                 submatches.get_one("engine").map(String::as_str),
@@ -317,11 +319,13 @@ pub fn get_command(
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
+                        catalog.get_one()?,
                         *server_matches.get_one("address").unwrap(),
                         *(server_matches.get_one("port").unwrap()),
                     ))
                 } else {
                     Box::new(SqlServerLivyCommand::new(
+                        catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,
                         catalog.get_one()?,

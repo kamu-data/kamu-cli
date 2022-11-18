@@ -23,6 +23,8 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
+    pub const IMAGE: &str = docker_images::HTTPD;
+
     pub fn new(server_dir: &Path) -> Self {
         use rand::Rng;
 
@@ -42,14 +44,14 @@ impl HttpServer {
         }
 
         assert!(
-            container_runtime.has_image(docker_images::HTTPD),
+            container_runtime.has_image(Self::IMAGE),
             "Please pull {} image before running this test",
-            docker_images::HTTPD
+            Self::IMAGE
         );
 
         let process = container_runtime
             .run_cmd(RunArgs {
-                image: docker_images::HTTPD.to_owned(),
+                image: Self::IMAGE.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![server_port],
                 volume_map: vec![(

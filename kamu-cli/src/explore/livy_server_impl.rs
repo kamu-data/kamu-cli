@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::utils::docker_images;
 use kamu::infra::*;
 
 use container_runtime::{ContainerHandle, ContainerRuntime, PullImageListener, RunArgs};
@@ -21,16 +20,20 @@ use tracing::info;
 
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,
+    image: String,
 }
 
 impl LivyServerImpl {
-    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
-        Self { container_runtime }
+    pub fn new(container_runtime: Arc<ContainerRuntime>, image: String) -> Self {
+        Self {
+            container_runtime,
+            image,
+        }
     }
 
     pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
         self.container_runtime
-            .ensure_image(docker_images::LIVY, Some(listener));
+            .ensure_image(&self.image, Some(listener));
     }
 
     pub fn run<StartedClb>(
@@ -50,7 +53,7 @@ impl LivyServerImpl {
         let livy_stderr_path = workspace_layout.run_info_dir.join("livy.err.txt");
 
         let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: docker_images::LIVY.to_owned(),
+            image: self.image.clone(),
             container_name: Some("kamu-livy".to_owned()),
             entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
             user: Some("root".to_owned()),

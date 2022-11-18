@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::utils::docker_images;
 use kamu::infra::*;
 
 use container_runtime::{
@@ -20,20 +19,31 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::info;
 
+use crate::JupyterConfig;
+
 pub struct NotebookServerImpl {
     container_runtime: Arc<ContainerRuntime>,
+    jupyter_config: Arc<JupyterConfig>,
 }
 
 impl NotebookServerImpl {
-    pub fn new(container_runtime: Arc<ContainerRuntime>) -> Self {
-        Self { container_runtime }
+    pub fn new(
+        container_runtime: Arc<ContainerRuntime>,
+        jupyter_config: Arc<JupyterConfig>,
+    ) -> Self {
+        Self {
+            container_runtime,
+            jupyter_config,
+        }
     }
 
     pub fn ensure_images(&self, listener: &dyn PullImageListener) {
+        self.container_runtime.ensure_image(
+            self.jupyter_config.livy_image.as_ref().unwrap(),
+            Some(listener),
+        );
         self.container_runtime
-            .ensure_image(docker_images::LIVY, Some(listener));
-        self.container_runtime
-            .ensure_image(docker_images::JUPYTER, Some(listener));
+            .ensure_image(self.jupyter_config.image.as_ref().unwrap(), Some(listener));
     }
 
     pub fn run<StartedClb, ShutdownClb>(
@@ -68,7 +78,7 @@ impl NotebookServerImpl {
         let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
 
         let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: docker_images::LIVY.to_owned(),
+            image: self.jupyter_config.livy_image.clone().unwrap(),
             container_name: Some("kamu-livy".to_owned()),
             hostname: Some("kamu-livy".to_owned()),
             network: Some(network_name.to_owned()),
@@ -99,7 +109,7 @@ impl NotebookServerImpl {
         let _drop_livy = ContainerHandle::new(self.container_runtime.clone(), "kamu-livy");
 
         let mut jupyter_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: docker_images::JUPYTER.to_owned(),
+            image: self.jupyter_config.image.clone().unwrap(),
             container_name: Some("kamu-jupyter".to_owned()),
             network: Some(network_name.to_owned()),
             user: Some("root".to_owned()),
@@ -169,7 +179,7 @@ impl NotebookServerImpl {
                     self.container_runtime
                         .run_shell_cmd(
                             RunArgs {
-                                image: docker_images::JUPYTER.to_owned(),
+                                image: self.jupyter_config.image.clone().unwrap(),
                                 user: Some("root".to_owned()),
                                 container_name: Some("kamu-jupyter".to_owned()),
                                 volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],

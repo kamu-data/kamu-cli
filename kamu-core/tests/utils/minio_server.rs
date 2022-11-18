@@ -24,6 +24,8 @@ pub struct MinioServer {
 }
 
 impl MinioServer {
+    pub const IMAGE: &str = docker_images::MINIO;
+
     pub fn new(server_dir: &Path, access_key: &str, secret_key: &str) -> Self {
         use rand::Rng;
 
@@ -43,14 +45,14 @@ impl MinioServer {
         }
 
         assert!(
-            container_runtime.has_image(docker_images::MINIO),
+            container_runtime.has_image(Self::IMAGE),
             "Please pull {} image before running this test",
-            docker_images::MINIO
+            Self::IMAGE
         );
 
         let process = container_runtime
             .run_cmd(RunArgs {
-                image: docker_images::MINIO.to_owned(),
+                image: Self::IMAGE.to_owned(),
                 container_name: Some(server_name.to_owned()),
                 expose_ports: vec![server_port],
                 volume_map: vec![(server_dir.to_owned(), PathBuf::from("/data"))],
