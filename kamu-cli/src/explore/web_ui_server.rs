@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::handler::Handler;
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
@@ -66,7 +65,7 @@ impl WebUIServer {
                 "/assets/runtime-config.json",
                 axum::routing::get(runtime_config_handler),
             )
-            .fallback(app_handler.into_service())
+            .fallback(app_handler)
             .layer(
                 tower::ServiceBuilder::new()
                     .layer(tower_http::trace::TraceLayer::new_for_http())
