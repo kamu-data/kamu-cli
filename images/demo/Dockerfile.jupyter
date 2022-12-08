@@ -5,11 +5,9 @@ FROM docker.io/jupyter/base-notebook:2022-11-15
 ARG KAMU_VERSION
 ARG dev_mode=false
 
+
 #########################################################################################
 USER root
-
-# This is needed because requests-kerberos fails to install on debian due to missing linux headers
-RUN conda install requests-kerberos -y
 
 # Podman
 # Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
@@ -55,16 +53,18 @@ RUN wget -q https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSI
     rm -rf kamu-cli-x86_64-unknown-linux-gnu* && \
     echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
 COPY kamu/.kamuconfig /.kamuconfig
-COPY kamu/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
 
 #########################################################################################
 USER $NB_USER
 
-RUN pip install --upgrade pip
-RUN pip install --upgrade --ignore-installed setuptools
+# This is needed because requests-kerberos fails to install on debian due to missing linux headers
+RUN conda install requests-kerberos -y
+
 COPY kamu/requirements.txt requirements.txt
 RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
+
+COPY kamu/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
 COPY kamu/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension

@@ -8,19 +8,17 @@ RUN apt update \
     && apt -y install curl wget gnupg unzip jq \
     && rm -rf /var/lib/apt/lists/*
 
-# This is needed because requests-kerberos fails to install on debian due to missing linux headers
-RUN conda install requests-kerberos -y
-
-COPY kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
-
 
 #########################################################################################
 USER $NB_USER
 
-RUN pip install --upgrade pip
-RUN pip install --upgrade --ignore-installed setuptools
+# This is needed because requests-kerberos fails to install on debian due to missing linux headers
+RUN conda install requests-kerberos -y
+
 COPY requirements.txt requirements.txt
 RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
+
+COPY kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
 COPY sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
