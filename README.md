@@ -2,9 +2,9 @@
 
 <img alt="kamu" src="docs/readme_files/kamu_logo.png" width=270/>
 
-<p><strong><i>World's first decentralized real-time data warehouse, on your laptop</i></strong></p>
+<p><strong><i>Planet-scale data pipeline</i></strong></p>
 
-[Docs] | [Demo] | [Tutorials] | [Examples] | [FAQ] | [Chat]
+[Website] | [Docs] | [Demo] | [Tutorials] | [Examples] | [FAQ] | [Chat]
 
 [![Release](https://img.shields.io/github/v/release/kamu-data/kamu-cli?include_prereleases&logo=rust&logoColor=orange&style=for-the-badge)](https://github.com/kamu-data/kamu-cli/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/kamu-data/kamu-cli/build.yaml?logo=githubactions&label=CI&logoColor=white&style=for-the-badge&branch=master)](https://github.com/kamu-data/kamu-cli/actions)
@@ -209,7 +209,7 @@ If you'd like to contribute [start here](https://docs.kamu.dev/contrib/).
 
 <div align="center">
   
-[Docs] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Website] | [Contributing] | [Developer Guide] | [License]
+[Website] | [Docs] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Contributing] | [Developer Guide] | [License]
 </div>
 
 [Tutorials]: https://docs.kamu.dev/cli/learn/learning-materials/
