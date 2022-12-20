@@ -128,7 +128,7 @@ pub struct DataSchema {
 
 impl DataSchema {
     pub fn from_data_frame_schema(
-        schema: &datafusion::logical_plan::DFSchema,
+        schema: &datafusion::common::DFSchema,
         format: DataSchemaFormat,
     ) -> Result<DataSchema> {
         let parquet_schema =

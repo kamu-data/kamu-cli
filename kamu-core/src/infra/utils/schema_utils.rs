@@ -10,7 +10,7 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use datafusion::logical_plan::DFSchema;
+use datafusion::common::DFSchema;
 use datafusion::parquet::basic::Type as PhysicalType;
 use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit};
 use datafusion::parquet::schema::types::Type;
@@ -130,35 +130,44 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
     ) -> String {
         match logical_type {
             Some(logical_type) => match logical_type {
-                LogicalType::INTEGER(t) => {
-                    format!("INTEGER({},{})", t.bit_width, t.is_signed)
+                LogicalType::Integer {
+                    bit_width,
+                    is_signed,
+                } => {
+                    format!("INTEGER({},{})", bit_width, is_signed)
                 }
-                LogicalType::DECIMAL(t) => {
-                    format!("DECIMAL({},{})", t.precision, t.scale)
+                LogicalType::Decimal { precision, scale } => {
+                    format!("DECIMAL({},{})", precision, scale)
                 }
-                LogicalType::TIMESTAMP(t) => {
+                LogicalType::Timestamp {
+                    is_adjusted_to_u_t_c,
+                    unit,
+                } => {
                     format!(
                         "TIMESTAMP({},{})",
-                        Self::print_timeunit(&t.unit),
-                        t.is_adjusted_to_u_t_c
+                        Self::print_timeunit(&unit),
+                        is_adjusted_to_u_t_c
                     )
                 }
-                LogicalType::TIME(t) => {
+                LogicalType::Time {
+                    is_adjusted_to_u_t_c,
+                    unit,
+                } => {
                     format!(
                         "TIME({},{})",
-                        Self::print_timeunit(&t.unit),
-                        t.is_adjusted_to_u_t_c
+                        Self::print_timeunit(&unit),
+                        is_adjusted_to_u_t_c
                     )
                 }
-                LogicalType::DATE(_) => "DATE".to_string(),
-                LogicalType::BSON(_) => "BSON".to_string(),
-                LogicalType::JSON(_) => "JSON".to_string(),
-                LogicalType::STRING(_) => "STRING".to_string(),
-                LogicalType::UUID(_) => "UUID".to_string(),
-                LogicalType::ENUM(_) => "ENUM".to_string(),
-                LogicalType::LIST(_) => "LIST".to_string(),
-                LogicalType::MAP(_) => "MAP".to_string(),
-                LogicalType::UNKNOWN(_) => "UNKNOWN".to_string(),
+                LogicalType::Date => "DATE".to_string(),
+                LogicalType::Bson => "BSON".to_string(),
+                LogicalType::Json => "JSON".to_string(),
+                LogicalType::String => "STRING".to_string(),
+                LogicalType::Uuid => "UUID".to_string(),
+                LogicalType::Enum => "ENUM".to_string(),
+                LogicalType::List => "LIST".to_string(),
+                LogicalType::Map => "MAP".to_string(),
+                LogicalType::Unknown => "UNKNOWN".to_string(),
             },
             None => {
                 // Also print converted type if it is available

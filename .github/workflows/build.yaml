@@ -19,6 +19,7 @@ jobs:
         with:
           components: rustfmt
       - uses: ibnesayeed/setup-ipfs@master
+        ipfs_version: "0.17"
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |

@@ -7,15 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::parquet::{
-    basic::LogicalType,
-    file::reader::{FileReader, SerializedFileReader},
-    schema::types::Type,
-};
 use datafusion::{
     catalog::{catalog::CatalogProvider, schema::SchemaProvider},
     datasource::TableProvider,
     prelude::*,
+};
+use datafusion::{
+    execution::context::SessionState,
+    parquet::{
+        basic::LogicalType,
+        file::reader::{FileReader, SerializedFileReader},
+        schema::types::Type,
+    },
 };
 use dill::*;
 use futures::stream::TryStreamExt;
@@ -54,7 +57,7 @@ impl QueryService for QueryServiceImpl {
         &self,
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
-    ) -> Result<Arc<dyn DataFrame>, QueryError> {
+    ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
             .local_repo
@@ -71,10 +74,6 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| sv.into())
             .unwrap_or_default();
 
-        // TODO: This is a workaround for Arrow not supporting any operations on Decimals yet
-        // See: https://github.com/apache/arrow-rs/issues/272
-        let mut has_decimal = false;
-
         // TODO: This is a workaround for Arrow not handling timestamps with explicit timezones.
         // We basically have to re-cast all timestamp fields into timestamps after querying.
         // See:
@@ -86,41 +85,35 @@ impl QueryService for QueryServiceImpl {
                 .iter()
                 .map(|f| match f.as_ref() {
                     pt @ Type::PrimitiveType { .. } => {
-                        if let Some(LogicalType::TIMESTAMP(ts)) = pt.get_basic_info().logical_type()
+                        if let Some(LogicalType::Timestamp {
+                            is_adjusted_to_u_t_c,
+                            ..
+                        }) = pt.get_basic_info().logical_type()
                         {
-                            if ts.is_adjusted_to_u_t_c {
+                            if is_adjusted_to_u_t_c {
                                 return format!(
                                     "CAST(\"{name}\" as TIMESTAMP) as \"{name}\"",
                                     name = pt.get_basic_info().name()
                                 );
                             }
-                        } else if pt.get_precision() > 0 {
-                            has_decimal = true;
                         }
                         format!("\"{}\"", pt.get_basic_info().name())
                     }
-                    Type::GroupType { basic_info, .. } => format!("\"{}\"", basic_info.name()),
+                    Type::GroupType { basic_info, .. } => {
+                        format!("\"{}\"", basic_info.name())
+                    }
                 })
                 .collect(),
             Type::PrimitiveType { .. } => unreachable!(),
         };
 
-        let query = if !has_decimal {
-            format!(
-                r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
-                fields = fields.join(", "),
-                dataset = dataset_handle.name,
-                offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
-                num_records = num_records
-            )
-        } else {
-            format!(
-                r#"SELECT {fields} FROM "{dataset}" DESC LIMIT {num_records}"#,
-                fields = fields.join(", "),
-                dataset = dataset_handle.name,
-                num_records = num_records
-            )
-        };
+        let query = format!(
+            r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
+            fields = fields.join(", "),
+            dataset = dataset_handle.name,
+            offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
+            num_records = num_records
+        );
 
         self.sql_statement(
             &query,
@@ -138,22 +131,22 @@ impl QueryService for QueryServiceImpl {
         &self,
         statement: &str,
         options: QueryOptions,
-    ) -> Result<Arc<dyn DataFrame>, QueryError> {
+    ) -> Result<DataFrame, QueryError> {
         let span = info_span!("Executing SQL query", statement);
         let _span_guard = span.enter();
 
-        let cfg = ExecutionConfig::new()
+        let cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
 
-        let mut ctx = ExecutionContext::with_config(cfg);
-
+        let ctx = SessionContext::with_config(cfg);
         ctx.register_catalog(
             "kamu",
             Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
                 self.local_repo.clone(),
                 self.workspace_layout.clone(),
                 options,
+                ctx.state(),
             )))),
         );
 
@@ -228,6 +221,7 @@ struct KamuSchema {
     local_repo: Arc<dyn LocalDatasetRepository>,
     workspace_layout: Arc<WorkspaceLayout>,
     options: QueryOptions,
+    ctx: SessionState,
 }
 
 impl KamuSchema {
@@ -235,11 +229,13 @@ impl KamuSchema {
         local_repo: Arc<dyn LocalDatasetRepository>,
         workspace_layout: Arc<WorkspaceLayout>,
         options: QueryOptions,
+        ctx: SessionState,
     ) -> Self {
         Self {
             local_repo,
             workspace_layout,
             options,
+            ctx,
         }
     }
 
@@ -365,10 +361,8 @@ impl KamuSchema {
                 if files.is_empty() {
                     None
                 } else {
-                    // TODO: Datafusion made it difficult to lazily create table providers,
-                    // so we have to resort to spawning a thread to call an async function
-                    // See: https://github.com/apache/arrow-datafusion/issues/1792
-                    let table = ListingTableOfFiles::new_with_defaults(
+                    let table = ListingTableOfFiles::try_new(
+                        &self.ctx,
                         files
                             .into_iter()
                             .map(|p| p.to_string_lossy().into())

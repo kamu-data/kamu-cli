@@ -85,7 +85,7 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
         Self::check_version_compatibility(version)?;
 
         let block_proxy =
-            flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap())
+            flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap().bytes())
                 .map_err(|e| Error::serde(e))?;
 
         let block = MetadataBlock::deserialize(block_proxy);

@@ -26,7 +26,7 @@ fn test_write_schema_parquet_json_group() {
         .with_id(1)
         .build();
     let f3 = Type::primitive_type_builder("f3", PhysicalType::BYTE_ARRAY)
-        .with_logical_type(Some(LogicalType::STRING(Default::default())))
+        .with_logical_type(Some(LogicalType::String))
         .with_id(1)
         .build();
     let f4 = Type::primitive_type_builder("f4", PhysicalType::FIXED_LEN_BYTE_ARRAY)

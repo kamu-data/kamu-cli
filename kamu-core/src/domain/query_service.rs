@@ -13,7 +13,6 @@ use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRefLocal;
-use std::sync::Arc;
 use thiserror::Error;
 
 #[async_trait::async_trait]
@@ -24,13 +23,13 @@ pub trait QueryService: Send + Sync {
         &self,
         dataset_ref: &DatasetRefLocal,
         num_records: u64,
-    ) -> Result<Arc<dyn DataFrame>, QueryError>;
+    ) -> Result<DataFrame, QueryError>;
 
     async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
-    ) -> Result<Arc<dyn DataFrame>, QueryError>;
+    ) -> Result<DataFrame, QueryError>;
 
     async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError>;
 }

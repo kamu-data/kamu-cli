@@ -73,7 +73,7 @@ impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
         odf::AddData {
             input_checkpoint: proxy
                 .input_checkpoint()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap()),
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap()),
             output_data: proxy
                 .output_data()
                 .map(|v| odf::DataSlice::deserialize(v))
@@ -136,9 +136,9 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::Attachments> for odf::Attachmen
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::Attachments) -> Self {
         match t {
             fb::Attachments::AttachmentsEmbedded => {
-                odf::Attachments::Embedded(odf::AttachmentsEmbedded::deserialize(
-                    fb::AttachmentsEmbedded::init_from_table(table),
-                ))
+                odf::Attachments::Embedded(odf::AttachmentsEmbedded::deserialize(unsafe {
+                    fb::AttachmentsEmbedded::init_from_table(table)
+                }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -197,11 +197,11 @@ impl<'fb> FlatbuffersDeserializable<fb::BlockInterval<'fb>> for odf::BlockInterv
         odf::BlockInterval {
             start: proxy
                 .start()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             end: proxy
                 .end()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
         }
     }
@@ -229,7 +229,7 @@ impl<'fb> FlatbuffersDeserializable<fb::Checkpoint<'fb>> for odf::Checkpoint {
         odf::Checkpoint {
             physical_hash: proxy
                 .physical_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             size: proxy.size_(),
         }
@@ -262,11 +262,11 @@ impl<'fb> FlatbuffersDeserializable<fb::DataSlice<'fb>> for odf::DataSlice {
         odf::DataSlice {
             logical_hash: proxy
                 .logical_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             physical_hash: proxy
                 .physical_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap())
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             interval: proxy
                 .interval()
@@ -392,9 +392,9 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::EventTimeSource> for odf::Event
         match t {
             fb::EventTimeSource::EventTimeSourceFromMetadata => odf::EventTimeSource::FromMetadata,
             fb::EventTimeSource::EventTimeSourceFromPath => {
-                odf::EventTimeSource::FromPath(odf::EventTimeSourceFromPath::deserialize(
-                    fb::EventTimeSourceFromPath::init_from_table(table),
-                ))
+                odf::EventTimeSource::FromPath(odf::EventTimeSourceFromPath::deserialize(unsafe {
+                    fb::EventTimeSourceFromPath::init_from_table(table)
+                }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -464,7 +464,7 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQuery<'fb>> for odf::ExecuteQuery
                 .unwrap(),
             input_checkpoint: proxy
                 .input_checkpoint()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap()),
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap()),
             output_data: proxy.output_data().map(|v| odf::DataSlice::deserialize(v)),
             output_checkpoint: proxy
                 .output_checkpoint()
@@ -521,7 +521,7 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryInput<'fb>> for odf::Execute
         odf::ExecuteQueryInput {
             dataset_id: proxy
                 .dataset_id()
-                .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .map(|v| odf::DatasetID::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             dataset_name: proxy
                 .dataset_name()
@@ -592,7 +592,7 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryRequest<'fb>> for odf::Execu
         odf::ExecuteQueryRequest {
             dataset_id: proxy
                 .dataset_id()
-                .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .map(|v| odf::DatasetID::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             dataset_name: proxy
                 .dataset_name()
@@ -667,21 +667,21 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ExecuteQueryResponse>
             }
             fb::ExecuteQueryResponse::ExecuteQueryResponseSuccess => {
                 odf::ExecuteQueryResponse::Success(odf::ExecuteQueryResponseSuccess::deserialize(
-                    fb::ExecuteQueryResponseSuccess::init_from_table(table),
+                    unsafe { fb::ExecuteQueryResponseSuccess::init_from_table(table) },
                 ))
             }
             fb::ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => {
                 odf::ExecuteQueryResponse::InvalidQuery(
-                    odf::ExecuteQueryResponseInvalidQuery::deserialize(
-                        fb::ExecuteQueryResponseInvalidQuery::init_from_table(table),
-                    ),
+                    odf::ExecuteQueryResponseInvalidQuery::deserialize(unsafe {
+                        fb::ExecuteQueryResponseInvalidQuery::init_from_table(table)
+                    }),
                 )
             }
             fb::ExecuteQueryResponse::ExecuteQueryResponseInternalError => {
                 odf::ExecuteQueryResponse::InternalError(
-                    odf::ExecuteQueryResponseInternalError::deserialize(
-                        fb::ExecuteQueryResponseInternalError::init_from_table(table),
-                    ),
+                    odf::ExecuteQueryResponseInternalError::deserialize(unsafe {
+                        fb::ExecuteQueryResponseInternalError::init_from_table(table)
+                    }),
                 )
             }
             _ => panic!("Invalid enum value: {}", t.0),
@@ -790,18 +790,20 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::FetchStep> for odf::FetchStep {
 impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::FetchStep> for odf::FetchStep {
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::FetchStep) -> Self {
         match t {
-            fb::FetchStep::FetchStepUrl => odf::FetchStep::Url(odf::FetchStepUrl::deserialize(
-                fb::FetchStepUrl::init_from_table(table),
-            )),
+            fb::FetchStep::FetchStepUrl => {
+                odf::FetchStep::Url(odf::FetchStepUrl::deserialize(unsafe {
+                    fb::FetchStepUrl::init_from_table(table)
+                }))
+            }
             fb::FetchStep::FetchStepFilesGlob => {
-                odf::FetchStep::FilesGlob(odf::FetchStepFilesGlob::deserialize(
-                    fb::FetchStepFilesGlob::init_from_table(table),
-                ))
+                odf::FetchStep::FilesGlob(odf::FetchStepFilesGlob::deserialize(unsafe {
+                    fb::FetchStepFilesGlob::init_from_table(table)
+                }))
             }
             fb::FetchStep::FetchStepContainer => {
-                odf::FetchStep::Container(odf::FetchStepContainer::deserialize(
-                    fb::FetchStepContainer::init_from_table(table),
-                ))
+                odf::FetchStep::Container(odf::FetchStepContainer::deserialize(unsafe {
+                    fb::FetchStepContainer::init_from_table(table)
+                }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -977,7 +979,7 @@ impl<'fb> FlatbuffersDeserializable<fb::InputSlice<'fb>> for odf::InputSlice {
         odf::InputSlice {
             dataset_id: proxy
                 .dataset_id()
-                .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .map(|v| odf::DatasetID::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             block_interval: proxy
                 .block_interval()
@@ -1021,14 +1023,14 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MergeStrategy> for odf::MergeSt
         match t {
             fb::MergeStrategy::MergeStrategyAppend => odf::MergeStrategy::Append,
             fb::MergeStrategy::MergeStrategyLedger => {
-                odf::MergeStrategy::Ledger(odf::MergeStrategyLedger::deserialize(
-                    fb::MergeStrategyLedger::init_from_table(table),
-                ))
+                odf::MergeStrategy::Ledger(odf::MergeStrategyLedger::deserialize(unsafe {
+                    fb::MergeStrategyLedger::init_from_table(table)
+                }))
             }
             fb::MergeStrategy::MergeStrategySnapshot => {
-                odf::MergeStrategy::Snapshot(odf::MergeStrategySnapshot::deserialize(
-                    fb::MergeStrategySnapshot::init_from_table(table),
-                ))
+                odf::MergeStrategy::Snapshot(odf::MergeStrategySnapshot::deserialize(unsafe {
+                    fb::MergeStrategySnapshot::init_from_table(table)
+                }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }
@@ -1146,7 +1148,7 @@ impl<'fb> FlatbuffersDeserializable<fb::MetadataBlock<'fb>> for odf::MetadataBlo
             system_time: proxy.system_time().map(|v| fb_to_datetime(v)).unwrap(),
             prev_block_hash: proxy
                 .prev_block_hash()
-                .map(|v| odf::Multihash::from_bytes(v).unwrap()),
+                .map(|v| odf::Multihash::from_bytes(v.bytes()).unwrap()),
             sequence_number: proxy.sequence_number(),
             event: proxy
                 .event()
@@ -1211,36 +1213,54 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MetadataEvent> for odf::MetadataE
 impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::MetadataEvent {
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::MetadataEvent) -> Self {
         match t {
-            fb::MetadataEvent::AddData => odf::MetadataEvent::AddData(odf::AddData::deserialize(
-                fb::AddData::init_from_table(table),
-            )),
-            fb::MetadataEvent::ExecuteQuery => odf::MetadataEvent::ExecuteQuery(
-                odf::ExecuteQuery::deserialize(fb::ExecuteQuery::init_from_table(table)),
-            ),
-            fb::MetadataEvent::Seed => {
-                odf::MetadataEvent::Seed(odf::Seed::deserialize(fb::Seed::init_from_table(table)))
+            fb::MetadataEvent::AddData => {
+                odf::MetadataEvent::AddData(odf::AddData::deserialize(unsafe {
+                    fb::AddData::init_from_table(table)
+                }))
             }
-            fb::MetadataEvent::SetPollingSource => odf::MetadataEvent::SetPollingSource(
-                odf::SetPollingSource::deserialize(fb::SetPollingSource::init_from_table(table)),
-            ),
-            fb::MetadataEvent::SetTransform => odf::MetadataEvent::SetTransform(
-                odf::SetTransform::deserialize(fb::SetTransform::init_from_table(table)),
-            ),
-            fb::MetadataEvent::SetVocab => odf::MetadataEvent::SetVocab(
-                odf::SetVocab::deserialize(fb::SetVocab::init_from_table(table)),
-            ),
-            fb::MetadataEvent::SetWatermark => odf::MetadataEvent::SetWatermark(
-                odf::SetWatermark::deserialize(fb::SetWatermark::init_from_table(table)),
-            ),
-            fb::MetadataEvent::SetAttachments => odf::MetadataEvent::SetAttachments(
-                odf::SetAttachments::deserialize(fb::SetAttachments::init_from_table(table)),
-            ),
-            fb::MetadataEvent::SetInfo => odf::MetadataEvent::SetInfo(odf::SetInfo::deserialize(
-                fb::SetInfo::init_from_table(table),
-            )),
-            fb::MetadataEvent::SetLicense => odf::MetadataEvent::SetLicense(
-                odf::SetLicense::deserialize(fb::SetLicense::init_from_table(table)),
-            ),
+            fb::MetadataEvent::ExecuteQuery => {
+                odf::MetadataEvent::ExecuteQuery(odf::ExecuteQuery::deserialize(unsafe {
+                    fb::ExecuteQuery::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::Seed => odf::MetadataEvent::Seed(odf::Seed::deserialize(unsafe {
+                fb::Seed::init_from_table(table)
+            })),
+            fb::MetadataEvent::SetPollingSource => {
+                odf::MetadataEvent::SetPollingSource(odf::SetPollingSource::deserialize(unsafe {
+                    fb::SetPollingSource::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetTransform => {
+                odf::MetadataEvent::SetTransform(odf::SetTransform::deserialize(unsafe {
+                    fb::SetTransform::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetVocab => {
+                odf::MetadataEvent::SetVocab(odf::SetVocab::deserialize(unsafe {
+                    fb::SetVocab::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetWatermark => {
+                odf::MetadataEvent::SetWatermark(odf::SetWatermark::deserialize(unsafe {
+                    fb::SetWatermark::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetAttachments => {
+                odf::MetadataEvent::SetAttachments(odf::SetAttachments::deserialize(unsafe {
+                    fb::SetAttachments::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetInfo => {
+                odf::MetadataEvent::SetInfo(odf::SetInfo::deserialize(unsafe {
+                    fb::SetInfo::init_from_table(table)
+                }))
+            }
+            fb::MetadataEvent::SetLicense => {
+                odf::MetadataEvent::SetLicense(odf::SetLicense::deserialize(unsafe {
+                    fb::SetLicense::init_from_table(table)
+                }))
+            }
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -1297,13 +1317,15 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::PrepStep> for odf::PrepStep {
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::PrepStep) -> Self {
         match t {
             fb::PrepStep::PrepStepDecompress => {
-                odf::PrepStep::Decompress(odf::PrepStepDecompress::deserialize(
-                    fb::PrepStepDecompress::init_from_table(table),
-                ))
+                odf::PrepStep::Decompress(odf::PrepStepDecompress::deserialize(unsafe {
+                    fb::PrepStepDecompress::init_from_table(table)
+                }))
             }
-            fb::PrepStep::PrepStepPipe => odf::PrepStep::Pipe(odf::PrepStepPipe::deserialize(
-                fb::PrepStepPipe::init_from_table(table),
-            )),
+            fb::PrepStep::PrepStepPipe => {
+                odf::PrepStep::Pipe(odf::PrepStepPipe::deserialize(unsafe {
+                    fb::PrepStepPipe::init_from_table(table)
+                }))
+            }
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -1409,23 +1431,31 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ReadStep> for odf::ReadStep {
 impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ReadStep> for odf::ReadStep {
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::ReadStep) -> Self {
         match t {
-            fb::ReadStep::ReadStepCsv => odf::ReadStep::Csv(odf::ReadStepCsv::deserialize(
-                fb::ReadStepCsv::init_from_table(table),
-            )),
-            fb::ReadStep::ReadStepJsonLines => odf::ReadStep::JsonLines(
-                odf::ReadStepJsonLines::deserialize(fb::ReadStepJsonLines::init_from_table(table)),
-            ),
-            fb::ReadStep::ReadStepGeoJson => odf::ReadStep::GeoJson(
-                odf::ReadStepGeoJson::deserialize(fb::ReadStepGeoJson::init_from_table(table)),
-            ),
-            fb::ReadStep::ReadStepEsriShapefile => {
-                odf::ReadStep::EsriShapefile(odf::ReadStepEsriShapefile::deserialize(
-                    fb::ReadStepEsriShapefile::init_from_table(table),
-                ))
+            fb::ReadStep::ReadStepCsv => {
+                odf::ReadStep::Csv(odf::ReadStepCsv::deserialize(unsafe {
+                    fb::ReadStepCsv::init_from_table(table)
+                }))
             }
-            fb::ReadStep::ReadStepParquet => odf::ReadStep::Parquet(
-                odf::ReadStepParquet::deserialize(fb::ReadStepParquet::init_from_table(table)),
-            ),
+            fb::ReadStep::ReadStepJsonLines => {
+                odf::ReadStep::JsonLines(odf::ReadStepJsonLines::deserialize(unsafe {
+                    fb::ReadStepJsonLines::init_from_table(table)
+                }))
+            }
+            fb::ReadStep::ReadStepGeoJson => {
+                odf::ReadStep::GeoJson(odf::ReadStepGeoJson::deserialize(unsafe {
+                    fb::ReadStepGeoJson::init_from_table(table)
+                }))
+            }
+            fb::ReadStep::ReadStepEsriShapefile => {
+                odf::ReadStep::EsriShapefile(odf::ReadStepEsriShapefile::deserialize(unsafe {
+                    fb::ReadStepEsriShapefile::init_from_table(table)
+                }))
+            }
+            fb::ReadStep::ReadStepParquet => {
+                odf::ReadStep::Parquet(odf::ReadStepParquet::deserialize(unsafe {
+                    fb::ReadStepParquet::init_from_table(table)
+                }))
+            }
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -1667,7 +1697,7 @@ impl<'fb> FlatbuffersDeserializable<fb::Seed<'fb>> for odf::Seed {
         odf::Seed {
             dataset_id: proxy
                 .dataset_id()
-                .map(|v| odf::DatasetID::from_bytes(v).unwrap())
+                .map(|v| odf::DatasetID::from_bytes(v.bytes()).unwrap())
                 .unwrap(),
             dataset_kind: proxy.dataset_kind().into(),
         }
@@ -2050,9 +2080,11 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::Transform> for odf::Transform {
 impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::Transform> for odf::Transform {
     fn deserialize(table: flatbuffers::Table<'fb>, t: fb::Transform) -> Self {
         match t {
-            fb::Transform::TransformSql => odf::Transform::Sql(odf::TransformSql::deserialize(
-                fb::TransformSql::init_from_table(table),
-            )),
+            fb::Transform::TransformSql => {
+                odf::Transform::Sql(odf::TransformSql::deserialize(unsafe {
+                    fb::TransformSql::init_from_table(table)
+                }))
+            }
             _ => panic!("Invalid enum value: {}", t.0),
         }
     }
@@ -2124,7 +2156,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformInput {
 impl<'fb> FlatbuffersDeserializable<fb::TransformInput<'fb>> for odf::TransformInput {
     fn deserialize(proxy: fb::TransformInput<'fb>) -> Self {
         odf::TransformInput {
-            id: proxy.id().map(|v| odf::DatasetID::from_bytes(v).unwrap()),
+            id: proxy
+                .id()
+                .map(|v| odf::DatasetID::from_bytes(v.bytes()).unwrap()),
             name: proxy
                 .name()
                 .map(|v| odf::DatasetName::try_from(v).unwrap())
