@@ -7,30 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{path::Path, sync::Arc};
+use std::path::Path;
 
+use arrow::record_batch::RecordBatchReader;
 use opendatafabric::{Multicodec, Multihash};
 
-const ARROW_BATCH_SIZE: usize = 10_000;
+const LOGICAL_HASH_BATCH_SIZE: usize = 10_000;
 
-/// Computes a stable hash based on the content (not binary layout) of the Parquet file.
+/// Computes a stable hash based on a content (as opposed to a binary layout) of a Parquet file.
 pub fn get_parquet_logical_hash(
     data_path: &Path,
 ) -> Result<Multihash, datafusion::parquet::errors::ParquetError> {
     use arrow_digest::{RecordDigest, RecordDigestV0};
-    use datafusion::parquet::arrow::ArrowReader;
-    use datafusion::parquet::arrow::ParquetFileArrowReader;
-    use datafusion::parquet::file::reader::SerializedFileReader;
+    use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
     let file = std::fs::File::open(&data_path)?;
-    let parquet_reader = SerializedFileReader::new(file)?;
-    let mut arrow_reader = ParquetFileArrowReader::new(Arc::new(parquet_reader));
+    let parquet_reader = ParquetRecordBatchReaderBuilder::try_new(file)?
+        .with_batch_size(LOGICAL_HASH_BATCH_SIZE)
+        .build()?;
 
-    let mut hasher = RecordDigestV0::<sha3::Sha3_256>::new(&arrow_reader.get_schema()?);
+    let mut hasher = RecordDigestV0::<sha3::Sha3_256>::new(&parquet_reader.schema());
 
-    for res_batch in arrow_reader.get_record_reader(ARROW_BATCH_SIZE)? {
-        let batch = res_batch?;
-        hasher.update(&batch);
+    for res_batch in parquet_reader {
+        let record_batch = res_batch?;
+        hasher.update(&record_batch);
     }
 
     let digest = hasher.finalize();
