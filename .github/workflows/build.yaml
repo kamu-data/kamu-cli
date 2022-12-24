@@ -19,7 +19,7 @@ jobs:
         with:
           components: rustfmt
       - uses: ibnesayeed/setup-ipfs@master
-        ipfs_version: "0.17"
+        ipfs_version: "0.14" # TODO: https://github.com/kamu-data/kamu-cli/issues/108
       # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
       #   with:
       #     path: |
