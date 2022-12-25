@@ -13,6 +13,13 @@
 </p>
 </div>
 
+## Quickstart
+
+Using the installer script _(Linux / MacOSX / WSL2)_:
+```sh
+curl -s "https://get.kamu.dev" | sh
+```
+
 ## Get Started
 
 * Watch [this introductory video](https://www.youtube.com/watch?v=oUTiWW6W78A&list=PLV91cS45lwVG20Hicztbv7hsjN6x69MJk) to see `kamu` in action.
