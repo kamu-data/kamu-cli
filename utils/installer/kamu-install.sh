@@ -92,6 +92,8 @@ main() {
     print_header
 
     download_file --check
+    need_cmd basename
+    need_cmd dirname
     need_cmd uname
     need_cmd mktemp
     need_cmd chmod
@@ -101,7 +103,8 @@ main() {
     need_cmd tar
 
     # Determine install path
-    _install_path="$KAMU_INSTALL_PATH"
+    local _install_path="$KAMU_INSTALL_PATH"
+    local _install_dir=$(dirname $_install_path)
     info_val "Install path" "$_install_path"
 
     # Detect architecture
@@ -186,12 +189,22 @@ main() {
     # Install
     local _bin="${_tmpdir}/kamu-cli-${_arch}/kamu"
     ensure chmod +x "$_bin"
+    mkdir -p $_install_dir
     mv "$_bin" "${_install_path}"
 
     # Clean up
     rm -rf "$_tmpdir"
 
     printf "${green}Installation successful${reset}\n" 1>&2
+
+    # TODO: Update profile automatically
+    case $PATH in
+        *$_install_dir*)
+            ;;
+        *)
+            warn "The $_install_dir directory is not on your PATH - you may need to add it manually to your shell's profile (.bashrc | .zshrc | ...)"
+            ;;
+    esac
     
     # TODO: Install shell completions automatically
     warn "Consider installing shell completions (see: kamu completions --help)"
