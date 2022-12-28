@@ -23,17 +23,16 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
           override: true
+      - name: Install cross
+        run: cargo install cross --locked
       - name: Fetch web UI artifacts # TODO: Add target without UI
         run: |
           wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
           tar -xf kamu-web-ui-any.tar.gz
-      - uses: actions-rs/cargo@v1
+      - name: Build
         env:
           KAMU_WEB_UI_DIR: "../kamu-web-ui-any"
-        with:
-          use-cross: true
-          command: build
-          args: --release --target=${{ matrix.target }} --features kamu-cli/web-ui
+        run: cross build --release --target=${{ matrix.target }} --features kamu-cli/web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
       - uses: actions/upload-artifact@v2
