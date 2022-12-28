@@ -49,7 +49,7 @@ impl Command for TailCommand {
 
         let record_batches = df.collect().await.map_err(|e| CLIError::failure(e))?;
 
-        let mut writer = self.output_cfg.get_records_writer();
+        let mut writer = self.output_cfg.get_records_writer(RecordsFormat::default());
         writer.write_batches(&record_batches)?;
         writer.finish()?;
         Ok(())

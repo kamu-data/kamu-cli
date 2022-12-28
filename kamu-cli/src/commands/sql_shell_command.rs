@@ -108,7 +108,9 @@ impl SqlShellCommand {
 
         let records = df.collect().await.map_err(|e| CLIError::failure(e))?;
 
-        let mut writer = self.output_config.get_records_writer();
+        let mut writer = self
+            .output_config
+            .get_records_writer(RecordsFormat::default());
         writer.write_batches(&records)?;
         writer.finish()?;
 

@@ -10,6 +10,9 @@
 use kamu::infra::utils::records_writers::RecordsWriter;
 
 use super::records_writers::*;
+pub use super::records_writers::{ColumnFormat, RecordsFormat};
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct OutputConfig {
@@ -20,7 +23,7 @@ pub struct OutputConfig {
 }
 
 impl OutputConfig {
-    pub fn get_records_writer(&self) -> Box<dyn RecordsWriter> {
+    pub fn get_records_writer(&self, fmt: RecordsFormat) -> Box<dyn RecordsWriter> {
         match self.format {
             OutputFormat::Csv => Box::new(
                 CsvWriterBuilder::new()
@@ -30,14 +33,12 @@ impl OutputConfig {
             OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
             OutputFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
-            OutputFormat::Table => Box::new(
-                TableWriter::new()
-                    .with_max_cell_len(Some(90))
-                    .with_binary_placeholder(Some("<binary>".to_owned())),
-            ),
+            OutputFormat::Table => Box::new(TableWriter::new(fmt)),
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
