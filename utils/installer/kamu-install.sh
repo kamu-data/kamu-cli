@@ -167,7 +167,9 @@ main() {
     if check_cmd which; then
         if which $_bin_name >/dev/null; then
             local _conflict_path=$(which ${_bin_name})
-            warn "Potentially conflicting binary found in PATH: ${_conflict_path}"
+            if [ "$_conflict_path" != "$_install_path" ]; then
+                warn "Potentially conflicting binary found in PATH: ${_conflict_path}"
+            fi
         fi
     fi
 
