@@ -8,4 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod engine;
-pub(crate) use engine::*;
+pub use engine::*;
