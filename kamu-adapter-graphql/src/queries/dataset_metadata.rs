@@ -91,7 +91,7 @@ impl DatasetMetadata {
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
-            .get_summary(domain::SummaryOptions::default())
+            .get_summary(domain::GetSummaryOpts::default())
             .await?;
         Ok(summary
             .dependencies

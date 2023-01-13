@@ -192,7 +192,18 @@ impl DataBatch {
                 DataBatchFormat::Csv => {
                     Box::new(CsvWriterBuilder::new().has_headers(true).build(&mut buf))
                 }
-                DataBatchFormat::Json => Box::new(JsonArrayWriter::new(&mut buf)),
+                DataBatchFormat::Json => {
+                    // HACK: JsonArrayWriter should be producing [] when there are no rows
+                    if num_records != 0 {
+                        Box::new(JsonArrayWriter::new(&mut buf))
+                    } else {
+                        return Ok(DataBatch {
+                            format,
+                            content: "[]".to_string(),
+                            num_records: num_records as u64,
+                        });
+                    }
+                }
                 DataBatchFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(&mut buf)),
                 DataBatchFormat::JsonSOA => {
                     unimplemented!("SoA Json format is not yet implemented")

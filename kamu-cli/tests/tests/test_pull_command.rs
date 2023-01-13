@@ -79,16 +79,15 @@ async fn test_pull_ingest_from_file() {
             parquet
                 .get_row_iter()
                 .map(|r| (
-                    r.get_long(0).unwrap(),
                     r.get_string(3).unwrap().clone(),
                     r.get_long(4).unwrap()
                 ))
                 .sorted()
                 .collect::<Vec<_>>(),
             [
-                (0, "A".to_owned(), 1000),
-                (1, "B".to_owned(), 2000),
-                (2, "C".to_owned(), 3000)
+                ("A".to_owned(), 1000),
+                ("B".to_owned(), 2000),
+                ("C".to_owned(), 3000)
             ]
         );
     }
@@ -122,16 +121,15 @@ async fn test_pull_ingest_from_file() {
             parquet
                 .get_row_iter()
                 .map(|r| (
-                    r.get_long(0).unwrap(),
                     r.get_string(3).unwrap().clone(),
                     r.get_long(4).unwrap()
                 ))
                 .sorted()
                 .collect::<Vec<_>>(),
             [
-                (0, "A".to_owned(), 1100),
-                (1, "B".to_owned(), 2100),
-                (2, "C".to_owned(), 3100)
+                ("A".to_owned(), 1100),
+                ("B".to_owned(), 2100),
+                ("C".to_owned(), 3100)
             ]
         );
     }

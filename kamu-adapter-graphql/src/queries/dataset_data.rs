@@ -12,8 +12,9 @@ use crate::utils::*;
 
 use async_graphql::*;
 use kamu::domain;
-use kamu::domain::SummaryOptions;
+use kamu::domain::GetSummaryOpts;
 use opendatafabric as odf;
+use tracing::debug;
 
 pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
@@ -34,7 +35,7 @@ impl DatasetData {
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await?;
-        let summary = dataset.get_summary(SummaryOptions::default()).await?;
+        let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
         Ok(summary.num_records)
     }
 
@@ -44,7 +45,7 @@ impl DatasetData {
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await?;
-        let summary = dataset.get_summary(SummaryOptions::default()).await?;
+        let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
         Ok(summary.data_size)
     }
 
@@ -68,7 +69,10 @@ impl DatasetData {
             .await
         {
             Ok(r) => r,
-            Err(e) => return Ok(e.into()),
+            Err(err) => {
+                debug!(?err, "Query error");
+                return Ok(err.into());
+            }
         };
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;

@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.104.0"
+version = "0.105.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 
@@ -28,6 +28,7 @@ datafusion = { git = "https://github.com/apache/arrow-datafusion", rev = "975ff1
 futures = "*"
 serde = "*"
 serde_json = "*"
+tracing = "*"
 # tokio = { version = "*", features = ["macros"] }
 # url = "*"
 
@@ -35,3 +36,6 @@ serde_json = "*"
 [dev-dependencies]
 tempfile = "*"
 tokio = { version = "*" }
+env_logger = "*"
+test-log = { version = "*", features = ["trace"] }
+tracing-subscriber = { version = "*", features = ["env-filter"] }

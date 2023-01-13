@@ -75,7 +75,7 @@ impl Dataset {
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
-            .get_summary(domain::SummaryOptions::default())
+            .get_summary(domain::GetSummaryOpts::default())
             .await?;
         Ok(summary.kind.into())
     }
