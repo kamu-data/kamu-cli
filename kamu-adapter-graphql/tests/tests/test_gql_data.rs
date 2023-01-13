@@ -75,6 +75,7 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
 }
 
 #[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_schema() {
     let tempdir = tempfile::tempdir().unwrap();
     let cat = create_test_dataset(tempdir.path()).await;
@@ -125,6 +126,7 @@ async fn test_dataset_schema() {
 }
 
 #[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail() {
     let tempdir = tempfile::tempdir().unwrap();
     let cat = create_test_dataset(tempdir.path()).await;
@@ -157,6 +159,7 @@ async fn test_dataset_tail() {
 }
 
 #[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_empty() {
     let tempdir = tempfile::tempdir().unwrap();
     let cat = create_test_dataset(tempdir.path()).await;
