@@ -10,10 +10,7 @@
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::basic::Compression;
-use datafusion::parquet::{
-    file::reader::{FileReader, SerializedFileReader},
-    record::RowAccessor,
-};
+use datafusion::parquet::record::RowAccessor;
 use datafusion::{
     arrow::{
         array::{Array, Int32Array, StringArray},
@@ -23,17 +20,17 @@ use datafusion::{
     parquet::file::properties::WriterProperties,
 };
 use indoc::indoc;
+use itertools::Itertools;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
 use std::assert_matches::assert_matches;
-use std::fs::File;
 use std::sync::Arc;
 use tempfile::TempDir;
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_ingest_csv_with_engine() {
     let harness = IngestTestHarness::new();
@@ -81,12 +78,16 @@ async fn test_ingest_csv_with_engine() {
     let parquet_reader = harness.read_datafile(&dataset_name);
 
     assert_eq!(
-        harness.read_columns(&parquet_reader),
+        parquet_reader.get_column_names(),
         ["offset", "system_time", "event_time", "city", "population"]
     );
 
     assert_eq!(
-        harness.read_records(&parquet_reader),
+        parquet_reader
+            .get_row_iter()
+            .map(IngestTestHarness::row_mapper)
+            .sorted()
+            .collect::<Vec<_>>(),
         [
             (0, "A".to_owned(), 1000),
             (1, "B".to_owned(), 2000),
@@ -95,7 +96,7 @@ async fn test_ingest_csv_with_engine() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_ingest_parquet_with_engine() {
     let harness = IngestTestHarness::new();
@@ -156,12 +157,16 @@ async fn test_ingest_parquet_with_engine() {
     let parquet_reader = harness.read_datafile(&dataset_name);
 
     assert_eq!(
-        harness.read_columns(&parquet_reader),
+        parquet_reader.get_column_names(),
         ["offset", "system_time", "event_time", "city", "population"]
     );
 
     assert_eq!(
-        harness.read_records(&parquet_reader),
+        parquet_reader
+            .get_row_iter()
+            .map(IngestTestHarness::row_mapper)
+            .sorted()
+            .collect::<Vec<_>>(),
         [
             (0, "D".to_owned(), 4000),
             (1, "E".to_owned(), 5000),
@@ -219,7 +224,7 @@ impl IngestTestHarness {
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
-    fn read_datafile(&self, dataset_name: &DatasetName) -> SerializedFileReader<File> {
+    fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let dataset_layout = self.workspace_layout.dataset_layout(&dataset_name);
         assert!(dataset_layout.data_dir.exists());
 
@@ -231,31 +236,14 @@ impl IngestTestHarness {
             ),
         };
 
-        SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap()
+        ParquetReaderHelper::open(&part_file)
     }
 
-    fn read_columns(&self, parquet_reader: &SerializedFileReader<File>) -> Vec<String> {
-        parquet_reader
-            .metadata()
-            .file_metadata()
-            .schema_descr()
-            .columns()
-            .iter()
-            .map(|cd| cd.path().string())
-            .collect()
-    }
-
-    fn read_records(&self, parquet_reader: &SerializedFileReader<File>) -> Vec<(i64, String, i32)> {
-        parquet_reader
-            .get_row_iter(None)
-            .unwrap()
-            .map(|r| {
-                (
-                    r.get_long(0).unwrap().clone(),
-                    r.get_string(3).unwrap().clone(),
-                    r.get_int(4).unwrap(),
-                )
-            })
-            .collect()
+    fn row_mapper(r: datafusion::parquet::record::Row) -> (i64, String, i32) {
+        (
+            r.get_long(0).unwrap().clone(),
+            r.get_string(3).unwrap().clone(),
+            r.get_int(4).unwrap(),
+        )
     }
 }

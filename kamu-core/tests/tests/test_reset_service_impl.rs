@@ -192,7 +192,7 @@ impl ResetTestHarness {
     async fn get_dataset_summary(&self, dataset_handle: &DatasetHandle) -> DatasetSummary {
         let dataset = self.resolve_dataset(dataset_handle).await;
         dataset
-            .get_summary(SummaryOptions::default())
+            .get_summary(GetSummaryOpts::default())
             .await
             .unwrap()
     }

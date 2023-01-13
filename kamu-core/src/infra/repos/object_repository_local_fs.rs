@@ -53,6 +53,14 @@ where
         self.root.join(hash.to_multibase_string())
     }
 
+    // TODO: We should newtype Path and ensure repositoris are created for directories that exist
+    fn get_path_write(&self, hash: &Multihash) -> Result<PathBuf, std::io::Error> {
+        if !self.root.exists() {
+            std::fs::create_dir_all(&self.root)?;
+        }
+        Ok(self.get_path(hash))
+    }
+
     // TODO: Cleanup procedure for orphaned staging files?
     fn get_staging_path(&self) -> PathBuf {
         use rand::distributions::Alphanumeric;
@@ -169,7 +177,7 @@ where
             }
         }
 
-        let path = self.get_path(&hash);
+        let path = self.get_path_write(&hash).int_err()?;
 
         debug!(?path, "Inserting object");
 
@@ -223,7 +231,7 @@ where
             }
         }
 
-        let path = self.get_path(&hash);
+        let path = self.get_path_write(&hash).int_err()?;
 
         debug!(?path, "Inserting object stream");
 
@@ -238,6 +246,47 @@ where
 
         // Atomic move
         std::fs::rename(&staging_path, path).int_err()?;
+
+        Ok(InsertResult {
+            hash,
+            already_existed: false,
+        })
+    }
+
+    async fn insert_file_move<'a>(
+        &'a self,
+        src: &Path,
+        options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        let hash = if let Some(hash) = options.precomputed_hash {
+            hash.clone()
+        } else {
+            crate::infra::utils::data_utils::get_file_physical_hash(src).int_err()?
+        };
+
+        if let Some(expected_hash) = options.expected_hash {
+            if *expected_hash != hash {
+                return Err(InsertError::HashMismatch(HashMismatchError {
+                    expected: expected_hash.clone(),
+                    actual: hash,
+                }));
+            }
+        }
+
+        let path = self.get_path_write(&hash).int_err()?;
+
+        debug!(?src, ?path, "Inserting object from file");
+        debug!("{} {}", path.parent().unwrap().exists(), src.exists());
+
+        if path.exists() {
+            return Ok(InsertResult {
+                hash,
+                already_existed: true,
+            });
+        }
+
+        // Atomic move
+        std::fs::rename(src, path).int_err()?;
 
         Ok(InsertResult {
             hash,

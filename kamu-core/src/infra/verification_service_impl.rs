@@ -266,7 +266,7 @@ impl VerificationService for VerificationServiceImpl {
         let _span_guard = span.enter();
 
         let dataset_kind = dataset
-            .get_summary(SummaryOptions::default())
+            .get_summary(GetSummaryOpts::default())
             .await
             .int_err()?
             .kind;

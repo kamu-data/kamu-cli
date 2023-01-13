@@ -207,12 +207,12 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         chain.append(block_too_low, AppendOpts::default()).await,
         Err(AppendError::InvalidBlock(
             AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-                block_hash,
-                block_sequence_number,
+                prev_block_hash,
+                prev_block_sequence_number,
                 next_block_sequence_number
             })
         ))
-        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 1
+        if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 1
     );
 
     let block_too_high = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
@@ -223,12 +223,12 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         chain.append(block_too_high, AppendOpts::default()).await,
         Err(AppendError::InvalidBlock(
             AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-                block_hash,
-                block_sequence_number,
+                prev_block_hash,
+                prev_block_sequence_number,
                 next_block_sequence_number
             })
         ))
-        if block_hash == hash_2 && block_sequence_number == 1 && next_block_sequence_number == 3
+        if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 3
     );
 
     let block_just_right = MetadataFactory::metadata_block(MetadataFactory::add_data().build())

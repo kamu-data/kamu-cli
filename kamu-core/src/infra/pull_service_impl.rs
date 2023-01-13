@@ -176,7 +176,7 @@ impl PullServiceImpl {
                 .get_dataset(&local_handle.as_local_ref())
                 .await
                 .int_err()?
-                .get_summary(SummaryOptions::default())
+                .get_summary(GetSummaryOpts::default())
                 .await
                 .int_err()?;
 
@@ -566,26 +566,19 @@ impl PullService for PullServiceImpl {
             }
         }
 
-        let old_head = chain.get_ref(&BlockRef::Head).await.int_err()?;
-
-        let old_head_block = chain.get_block(&old_head).await.int_err()?;
-
-        let new_block = MetadataBlock {
-            system_time: Utc::now(),
-            prev_block_hash: Some(old_head.clone()),
-            event: MetadataEvent::SetWatermark(SetWatermark {
-                output_watermark: watermark,
-            }),
-            sequence_number: old_head_block.sequence_number + 1,
-        };
-
-        let new_head = chain
-            .append(new_block, AppendOpts::default())
+        let commit_result = dataset
+            .commit_event(
+                MetadataEvent::SetWatermark(SetWatermark {
+                    output_watermark: watermark,
+                }),
+                CommitOpts::default(),
+            )
             .await
             .int_err()?;
+
         Ok(PullResult::Updated {
-            old_head: Some(old_head),
-            new_head,
+            old_head: commit_result.old_head,
+            new_head: commit_result.new_head,
             num_blocks: 1,
         })
     }

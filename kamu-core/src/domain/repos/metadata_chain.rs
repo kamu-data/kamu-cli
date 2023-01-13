@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Display;
+
 use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
 use opendatafabric::{MetadataBlock, Multihash};
@@ -400,11 +402,28 @@ pub enum AppendValidationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("Block {block_hash} with sequence number {block_sequence_number} cannot be followed by block with sequence number {next_block_sequence_number}")]
 pub struct SequenceIntegrityError {
-    pub block_hash: Multihash,
-    pub block_sequence_number: i32,
+    pub prev_block_hash: Option<Multihash>,
+    pub prev_block_sequence_number: Option<i32>,
     pub next_block_sequence_number: i32,
+}
+
+impl Display for SequenceIntegrityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(prev_block_hash) = &self.prev_block_hash {
+            write!(
+                f,
+                "Block {} with sequence number {} cannot be followed by block with sequence number {}",
+                prev_block_hash, self.prev_block_sequence_number.unwrap(), self.next_block_sequence_number
+            )
+        } else {
+            write!(
+                f,
+                "Block sequence has to start with zero, not {}",
+                self.next_block_sequence_number
+            )
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

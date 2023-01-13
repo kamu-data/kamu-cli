@@ -8,17 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::parquet::errors::ParquetError;
 use kamu::domain::*;
 use kamu::infra::utils::data_utils;
 use kamu::infra::*;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
@@ -87,7 +85,8 @@ async fn test_verify_data_consistency() {
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
     let data_path = tempdir.path().join("data");
 
-    let size = write_record_batch_to_parquet(&data_path, &record_batch).unwrap();
+    ParquetWriterHelper::from_record_batch(&data_path, &record_batch).unwrap();
+    let size = std::fs::metadata(&data_path).unwrap().len();
     let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
     let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
 
@@ -144,7 +143,8 @@ async fn test_verify_data_consistency() {
     let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c", "f", "e"]));
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
-    write_record_batch_to_parquet(
+
+    ParquetWriterHelper::from_record_batch(
         &dataset_layout
             .data_dir
             .join(data_physical_hash.to_multibase_string()),
@@ -166,22 +166,4 @@ async fn test_verify_data_consistency() {
             }
         )) if block_hash == head && expected == data_logical_hash,
     );
-}
-
-fn write_record_batch_to_parquet(
-    path: &Path,
-    record_batch: &RecordBatch,
-) -> Result<u64, ParquetError> {
-    use datafusion::parquet::arrow::ArrowWriter;
-
-    let mut arrow_writer = ArrowWriter::try_new(
-        std::fs::File::create(path).unwrap(),
-        record_batch.schema(),
-        None,
-    )?;
-
-    arrow_writer.write(&record_batch)?;
-    arrow_writer.close()?;
-
-    Ok(std::fs::metadata(path).unwrap().len())
 }

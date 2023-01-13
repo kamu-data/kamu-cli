@@ -12,3 +12,9 @@ pub use id_factory::*;
 
 mod metadata_factory;
 pub use metadata_factory::*;
+
+mod parquet_reader_helper;
+pub use parquet_reader_helper::*;
+
+mod parquet_writer_helper;
+pub use parquet_writer_helper::*;

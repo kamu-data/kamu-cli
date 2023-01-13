@@ -8,19 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use container_runtime::ContainerRuntime;
+use datafusion::parquet::record::RowAccessor;
 use indoc::indoc;
+use itertools::Itertools;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
 
-use datafusion::parquet::{
-    file::reader::{FileReader, SerializedFileReader},
-    record::RowAccessor,
-};
 use futures::TryStreamExt;
 use std::assert_matches::assert_matches;
-use std::fs::File;
 use std::sync::Arc;
 
 async fn block_count(
@@ -42,7 +39,7 @@ async fn get_data_of_block(
     dataset_ref: impl Into<DatasetRefLocal>,
     dataset_layout: &DatasetLayout,
     block_hash: &Multihash,
-) -> SerializedFileReader<File> {
+) -> ParquetReaderHelper {
     let dataset = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
     let block = dataset
         .as_metadata_chain()
@@ -57,7 +54,7 @@ async fn get_data_of_block(
             .output_data
             .unwrap(),
     );
-    SerializedFileReader::new(File::open(&part_file).unwrap()).unwrap()
+    ParquetReaderHelper::open(&part_file)
 }
 
 #[tokio::test]
@@ -185,17 +182,9 @@ async fn test_transform_with_engine_spark() {
         &block_hash,
     )
     .await;
-    let columns: Vec<_> = parquet_reader
-        .metadata()
-        .file_metadata()
-        .schema_descr()
-        .columns()
-        .iter()
-        .map(|cd| cd.path().string())
-        .collect();
 
     assert_eq!(
-        columns,
+        parquet_reader.get_column_names(),
         [
             "offset",
             "system_time",
@@ -205,20 +194,18 @@ async fn test_transform_with_engine_spark() {
         ]
     );
 
-    let records: Vec<_> = parquet_reader
-        .get_row_iter(None)
-        .unwrap()
-        .map(|r| {
-            (
-                r.get_long(0).unwrap().clone(),
-                r.get_string(3).unwrap().clone(),
-                r.get_int(4).unwrap(),
-            )
-        })
-        .collect();
-
     assert_eq!(
-        records,
+        parquet_reader
+            .get_row_iter()
+            .map(|r| {
+                (
+                    r.get_long(0).unwrap().clone(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_int(4).unwrap(),
+                )
+            })
+            .sorted()
+            .collect::<Vec<_>>(),
         [
             (0, "A".to_owned(), 10000),
             (1, "B".to_owned(), 20000),
@@ -263,20 +250,19 @@ async fn test_transform_with_engine_spark() {
         &block_hash,
     )
     .await;
-    let records: Vec<_> = parquet_reader
-        .get_row_iter(None)
-        .unwrap()
-        .map(|r| {
-            (
-                r.get_long(0).unwrap().clone(),
-                r.get_string(3).unwrap().clone(),
-                r.get_int(4).unwrap(),
-            )
-        })
-        .collect();
 
     assert_eq!(
-        records,
+        parquet_reader
+            .get_row_iter()
+            .map(|r| {
+                (
+                    r.get_long(0).unwrap().clone(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_int(4).unwrap(),
+                )
+            })
+            .sorted()
+            .collect::<Vec<_>>(),
         [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
     );
 
@@ -421,17 +407,9 @@ async fn test_transform_with_engine_flink() {
         &block_hash,
     )
     .await;
-    let columns: Vec<_> = parquet_reader
-        .metadata()
-        .file_metadata()
-        .schema_descr()
-        .columns()
-        .iter()
-        .map(|cd| cd.path().string())
-        .collect();
 
     assert_eq!(
-        columns,
+        parquet_reader.get_column_names(),
         [
             "offset",
             "system_time",
@@ -441,20 +419,18 @@ async fn test_transform_with_engine_flink() {
         ]
     );
 
-    let records: Vec<_> = parquet_reader
-        .get_row_iter(None)
-        .unwrap()
-        .map(|r| {
-            (
-                r.get_long(0).unwrap().clone(),
-                r.get_string(3).unwrap().clone(),
-                r.get_int(4).unwrap(),
-            )
-        })
-        .collect();
-
     assert_eq!(
-        records,
+        parquet_reader
+            .get_row_iter()
+            .map(|r| {
+                (
+                    r.get_long(0).unwrap().clone(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_int(4).unwrap(),
+                )
+            })
+            .sorted()
+            .collect::<Vec<_>>(),
         [
             (0, "A".to_owned(), 10000),
             (1, "B".to_owned(), 20000),
@@ -499,20 +475,19 @@ async fn test_transform_with_engine_flink() {
         &block_hash,
     )
     .await;
-    let records: Vec<_> = parquet_reader
-        .get_row_iter(None)
-        .unwrap()
-        .map(|r| {
-            (
-                r.get_long(0).unwrap().clone(),
-                r.get_string(3).unwrap().clone(),
-                r.get_int(4).unwrap(),
-            )
-        })
-        .collect();
 
     assert_eq!(
-        records,
+        parquet_reader
+            .get_row_iter()
+            .map(|r| {
+                (
+                    r.get_long(0).unwrap().clone(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_int(4).unwrap(),
+                )
+            })
+            .sorted()
+            .collect::<Vec<_>>(),
         [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
     );
 

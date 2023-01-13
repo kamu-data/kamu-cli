@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
 use crate::domain::{BoxedError, InternalError};
 use opendatafabric::Multihash;
 
@@ -23,7 +25,7 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 /// Represents a content-addressable storage
 #[async_trait]
-pub trait ObjectRepository {
+pub trait ObjectRepository: Send + Sync {
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError>;
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError>;
@@ -39,6 +41,15 @@ pub trait ObjectRepository {
     async fn insert_stream<'a>(
         &'a self,
         src: Box<AsyncReadObj>,
+        options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError>;
+
+    /// Inserts file by atomic move - only valid for local filesystem repository
+    ///
+    /// TODO: Consider to move in a separate trait or access via downcasing.
+    async fn insert_file_move<'a>(
+        &'a self,
+        src: &Path,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError>;
 

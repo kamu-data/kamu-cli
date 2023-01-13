@@ -9,6 +9,7 @@
 
 use kamu::domain::*;
 use kamu::infra::*;
+use kamu::testing::ParquetReaderHelper;
 use kamu_cli::CLIError;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
@@ -18,8 +19,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use datafusion::parquet::file::reader::FileReader;
-use datafusion::parquet::file::serialized_reader::SerializedFileReader;
 use futures::stream::TryStreamExt;
 use thiserror::Error;
 
@@ -67,7 +66,7 @@ impl Kamu {
         self.workspace_layout.dataset_layout(dataset_name)
     }
 
-    pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetHelper {
+    pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let local_repo = LocalDatasetRepositoryImpl::new(Arc::new(self.workspace_layout.clone()));
 
         let dataset = local_repo
@@ -85,7 +84,7 @@ impl Kamu {
             .unwrap()
             .expect("Data file not found");
 
-        ParquetHelper::open(&part_file)
+        ParquetReaderHelper::open(&part_file)
     }
 
     pub async fn execute<I, S>(&self, cmd: I) -> Result<(), CommandError>
@@ -126,47 +125,4 @@ impl Kamu {
 pub struct CommandError {
     cmd: Vec<OsString>,
     error: CLIError,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct ParquetHelper {
-    pub reader: SerializedFileReader<std::fs::File>,
-}
-
-impl ParquetHelper {
-    fn new(reader: SerializedFileReader<std::fs::File>) -> Self {
-        Self { reader }
-    }
-
-    fn open(path: &Path) -> Self {
-        Self::new(SerializedFileReader::new(std::fs::File::open(&path).unwrap()).unwrap())
-    }
-
-    pub fn column_names(&self) -> Vec<String> {
-        self.reader
-            .metadata()
-            .file_metadata()
-            .schema_descr()
-            .columns()
-            .iter()
-            .map(|cd| cd.path().string())
-            .collect()
-    }
-
-    pub fn records<F, R>(&self, row_mapper: F) -> Vec<R>
-    where
-        R: Ord,
-        F: Fn(datafusion::parquet::record::Row) -> R,
-    {
-        let mut records: Vec<_> = self
-            .reader
-            .get_row_iter(None)
-            .unwrap()
-            .map(row_mapper)
-            .collect();
-
-        records.sort();
-        records
-    }
 }

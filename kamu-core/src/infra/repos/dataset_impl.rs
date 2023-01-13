@@ -250,7 +250,7 @@ where
     CacheRepo: NamedObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
-    async fn get_summary(&self, opts: SummaryOptions) -> Result<DatasetSummary, GetSummaryError> {
+    async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
         let summary = self.read_summary().await?;
 
         let summary = if opts.update_if_stale {

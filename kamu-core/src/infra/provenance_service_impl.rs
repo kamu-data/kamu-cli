@@ -41,7 +41,7 @@ impl ProvenanceServiceImpl {
         {
             Some(
                 dataset
-                    .get_summary(SummaryOptions::default())
+                    .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?,
             )

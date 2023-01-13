@@ -57,7 +57,18 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        if new_block.prev_block_hash.is_some() {
+        if !new_block.prev_block_hash.is_some() {
+            if new_block.sequence_number != 0 {
+                return Err(
+                    AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                        prev_block_hash: None,
+                        prev_block_sequence_number: None,
+                        next_block_sequence_number: new_block.sequence_number,
+                    })
+                    .into(),
+                );
+            }
+        } else {
             let block_hash = new_block.prev_block_hash.as_ref().unwrap();
             let block = match self.get_block(block_hash).await {
                 Ok(block) => Ok(block),
@@ -71,8 +82,8 @@ where
             if block.sequence_number != (new_block.sequence_number - 1) {
                 return Err(
                     AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-                        block_hash: block_hash.clone(),
-                        block_sequence_number: block.sequence_number,
+                        prev_block_hash: Some(block_hash.clone()),
+                        prev_block_sequence_number: Some(block.sequence_number),
                         next_block_sequence_number: new_block.sequence_number,
                     })
                     .into(),

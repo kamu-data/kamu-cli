@@ -116,7 +116,7 @@ impl PullCommand {
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?
-            .get_summary(SummaryOptions::default())
+            .get_summary(GetSummaryOpts::default())
             .await?;
 
         if summary.kind != DatasetKind::Root {

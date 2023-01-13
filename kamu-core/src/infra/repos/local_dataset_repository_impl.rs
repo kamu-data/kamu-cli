@@ -181,7 +181,7 @@ impl LocalDatasetRepositoryImpl {
         staging_path: &Path,
         dataset_name: &DatasetName,
     ) -> Result<DatasetHandle, CreateDatasetError> {
-        let summary = match dataset.get_summary(SummaryOptions::default()).await {
+        let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
             Ok(s) => Ok(s),
             Err(GetSummaryError::EmptyDataset) => unreachable!(),
             Err(GetSummaryError::Access(e)) => Err(e.int_err().into()),
@@ -259,7 +259,7 @@ impl LocalDatasetRepositoryImpl {
                     .get_dataset(&hdl.as_local_ref())
                     .await
                     .int_err()?
-                    .get_summary(SummaryOptions::default())
+                    .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
 
@@ -315,7 +315,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 
                 let dataset = self.get_dataset_impl(name)?;
                 let summary = dataset
-                    .get_summary(SummaryOptions::default())
+                    .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
 
@@ -339,7 +339,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                     let summary = self
                         .get_dataset_impl(&name)
                         .int_err()?
-                        .get_summary(SummaryOptions::default())
+                        .get_summary(GetSummaryOpts::default())
                         .await
                         .int_err()?;
                     if summary.id == *id {
@@ -676,7 +676,7 @@ impl<D> Dataset for DatasetBuilderImpl<D>
 where
     D: Dataset,
 {
-    async fn get_summary(&self, opts: SummaryOptions) -> Result<DatasetSummary, GetSummaryError> {
+    async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
         self.dataset.get_summary(opts).await
     }
 

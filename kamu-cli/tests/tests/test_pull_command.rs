@@ -11,6 +11,7 @@ use std::path::Path;
 
 use datafusion::parquet::record::RowAccessor;
 use indoc::indoc;
+use itertools::Itertools;
 use opendatafabric::*;
 use url::Url;
 
@@ -71,15 +72,23 @@ async fn test_pull_ingest_from_file() {
             .get_last_data_slice(&DatasetName::new_unchecked("population"))
             .await;
         assert_eq!(
-            parquet.column_names(),
+            parquet.get_column_names(),
             ["offset", "system_time", "event_time", "city", "population"]
         );
         assert_eq!(
-            parquet.records(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap())),
+            parquet
+                .get_row_iter()
+                .map(|r| (
+                    r.get_long(0).unwrap(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_long(4).unwrap()
+                ))
+                .sorted()
+                .collect::<Vec<_>>(),
             [
-                ("A".to_owned(), 1000),
-                ("B".to_owned(), 2000),
-                ("C".to_owned(), 3000)
+                (0, "A".to_owned(), 1000),
+                (1, "B".to_owned(), 2000),
+                (2, "C".to_owned(), 3000)
             ]
         );
     }
@@ -106,15 +115,23 @@ async fn test_pull_ingest_from_file() {
             .get_last_data_slice(&DatasetName::new_unchecked("population"))
             .await;
         assert_eq!(
-            parquet.column_names(),
+            parquet.get_column_names(),
             ["offset", "system_time", "event_time", "city", "population"]
         );
         assert_eq!(
-            parquet.records(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap())),
+            parquet
+                .get_row_iter()
+                .map(|r| (
+                    r.get_long(0).unwrap(),
+                    r.get_string(3).unwrap().clone(),
+                    r.get_long(4).unwrap()
+                ))
+                .sorted()
+                .collect::<Vec<_>>(),
             [
-                ("A".to_owned(), 1100),
-                ("B".to_owned(), 2100),
-                ("C".to_owned(), 3100)
+                (0, "A".to_owned(), 1100),
+                (1, "B".to_owned(), 2100),
+                (2, "C".to_owned(), 3100)
             ]
         );
     }

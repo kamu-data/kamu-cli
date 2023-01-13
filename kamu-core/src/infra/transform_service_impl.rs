@@ -210,9 +210,8 @@ impl TransformServiceImpl {
     }
 
     async fn commit_transform(
-        meta_chain: &dyn MetadataChain,
         dataset_handle: DatasetHandle,
-        dataset_layout: DatasetLayout,
+        dataset: Arc<dyn Dataset>,
         prev_block_hash: Multihash,
         prev_sequence_number: i32,
         new_block: MetadataBlock,
@@ -228,20 +227,38 @@ impl TransformServiceImpl {
 
         // Commit data
         if let Some(data_slice) = &new_block_t.event.output_data {
-            std::fs::rename(&new_data_path, dataset_layout.data_slice_path(data_slice))
+            dataset
+                .as_data_repo()
+                .insert_file_move(
+                    &new_data_path,
+                    InsertOpts {
+                        precomputed_hash: Some(&data_slice.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(data_slice.size as usize),
+                    },
+                )
+                .await
                 .int_err()?;
         }
 
         // Commit checkpoint
         if let Some(checkpoint) = &new_block_t.event.output_checkpoint {
-            std::fs::rename(
-                &new_checkpoint_path,
-                dataset_layout.checkpoint_path(&checkpoint.physical_hash),
-            )
-            .int_err()?;
+            dataset
+                .as_checkpoint_repo()
+                .insert_file_move(
+                    &new_checkpoint_path,
+                    InsertOpts {
+                        precomputed_hash: Some(&checkpoint.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(checkpoint.size as usize),
+                    },
+                )
+                .await
+                .int_err()?;
         }
 
-        let new_block_hash = meta_chain
+        let new_block_hash = dataset
+            .as_metadata_chain()
             .append(new_block, AppendOpts::default())
             .await
             .int_err()?;
@@ -769,8 +786,6 @@ impl TransformServiceImpl {
         // TODO: There might be more operations to do
         // TODO: Inject time source
         if let Some(operation) = self.get_next_operation(&dataset_handle, Utc::now()).await? {
-            let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
-
             let dataset = self
                 .local_repo
                 .get_dataset(&dataset_handle.as_local_ref())
@@ -786,9 +801,8 @@ impl TransformServiceImpl {
                 operation,
                 move |new_block, new_data_path, new_checkpoint_path| {
                     Self::commit_transform(
-                        meta_chain,
                         dataset_handle,
-                        dataset_layout,
+                        dataset,
                         head,
                         head_block.sequence_number,
                         new_block,

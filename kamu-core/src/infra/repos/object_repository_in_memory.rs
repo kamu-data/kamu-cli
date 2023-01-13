@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{collections::HashMap, sync::Mutex};
+use std::{collections::HashMap, path::Path, sync::Mutex};
 
 use crate::domain::*;
 use async_trait::async_trait;
@@ -91,6 +91,14 @@ impl ObjectRepository for ObjectRepositoryInMemory {
     async fn insert_stream<'a>(
         &'a self,
         _src: Box<AsyncReadObj>,
+        _options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        unimplemented!()
+    }
+
+    async fn insert_file_move<'a>(
+        &'a self,
+        _src: &Path,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         unimplemented!()

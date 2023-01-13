@@ -155,13 +155,6 @@ impl IngestTask {
             .await
             .int_err()?;
 
-        let prev_block = self
-            .dataset
-            .as_metadata_chain()
-            .get_block(&prev_hash)
-            .await
-            .int_err()?;
-
         let fetch_result = self.maybe_fetch().await?;
         let has_more = fetch_result.checkpoint.has_more;
         let cacheable = fetch_result.checkpoint.is_cacheable();
@@ -181,12 +174,7 @@ impl IngestTask {
         self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
         let commit_result = self
-            .maybe_commit(
-                fetch_result,
-                read_result,
-                prev_hash.clone(),
-                prev_block.sequence_number,
-            )
+            .maybe_commit(fetch_result, read_result, prev_hash.clone())
             .await?;
 
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
@@ -385,7 +373,6 @@ impl IngestTask {
         fetch_result: ExecutionResult<FetchCheckpoint>,
         read_result: ExecutionResult<ReadCheckpoint>,
         prev_hash: Multihash,
-        prev_sequence_number: i32,
     ) -> Result<ExecutionResult<CommitCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("commit.yaml");
 
@@ -407,89 +394,59 @@ impl IngestTask {
                         self.layout.cache_dir.join("fetched.bin"),
                         self.layout.cache_dir.join("prepared.bin"),
                     ];
-                    let data_path = self.layout.cache_dir.join("read.bin");
-                    let new_checkpoint_path = self.layout.cache_dir.join("read.checkpoint");
                     let data_interval = read_result.checkpoint.engine_response.data_interval;
                     let output_watermark = read_result.checkpoint.engine_response.output_watermark;
-
-                    // New block might not contain anything new, so we check for data
-                    // and watermark differences to see if commit should be skipped
-                    let metadata_event = if let Some(data_interval) = data_interval {
-                        let span = info_span!("Computing data hashes");
-                        let _span_guard = span.enter();
-
-                        // Advance offset for the next run
-                        self.next_offset = data_interval.end + 1;
-
-                        // TODO: Move out into common data commit procedure of sorts
-                        let output_data = DataSlice {
-                            logical_hash:
-                                crate::infra::utils::data_utils::get_parquet_logical_hash(
-                                    &data_path,
-                                )
-                                .int_err()?,
-                            physical_hash: crate::infra::utils::data_utils::get_file_physical_hash(
-                                &data_path,
-                            )
-                            .int_err()?,
-                            interval: data_interval,
-                            size: std::fs::metadata(&data_path).int_err()?.len() as i64,
-                        };
-
-                        // Commit checkpoint
-                        let output_checkpoint = if new_checkpoint_path.exists() {
-                            let physical_hash =
-                                crate::infra::utils::data_utils::get_file_physical_hash(
-                                    &new_checkpoint_path,
-                                )
-                                .int_err()?;
-
-                            let size =
-                                std::fs::metadata(&new_checkpoint_path).int_err()?.len() as i64;
-
-                            std::fs::create_dir_all(&self.layout.checkpoints_dir).int_err()?;
-                            std::fs::rename(
-                                &new_checkpoint_path,
-                                self.layout.checkpoint_path(&physical_hash),
-                            )
-                            .int_err()?;
-
-                            Some(Checkpoint {
-                                physical_hash,
-                                size,
-                            })
-                        } else {
-                            None
-                        };
-
-                        // Commit data
-                        std::fs::create_dir_all(&self.layout.data_dir).int_err()?;
-                        std::fs::rename(&data_path, self.layout.data_slice_path(&output_data))
-                            .int_err()?;
-
-                        MetadataEvent::AddData(AddData {
-                            input_checkpoint: self.prev_checkpoint.clone(),
-                            output_data,
-                            output_checkpoint,
-                            output_watermark,
-                        })
+                    let new_data_path = if data_interval.is_some() {
+                        Some(self.layout.cache_dir.join("read.bin"))
                     } else {
-                        let prev_watermark = self
-                            .dataset
-                            .as_metadata_chain()
-                            .iter_blocks()
-                            .filter_data_stream_blocks()
-                            .filter_map_ok(|(_, b)| b.event.output_watermark)
-                            .try_first()
-                            .await
-                            .int_err()?;
+                        None
+                    };
+                    let new_checkpoint_path = self.layout.cache_dir.join("read.checkpoint");
+                    let new_checkpoint_path = if new_checkpoint_path.exists() {
+                        Some(new_checkpoint_path)
+                    } else {
+                        None
+                    };
 
-                        if output_watermark.is_none() || output_watermark == prev_watermark {
-                            info!(concat!(
-                                "Skipping commit of new block as ",
-                                "it neither has new data nor an updated watermark"
-                            ));
-                            return Ok(ExecutionResult {
+                    match self
+                        .dataset
+                        .commit_add_data(
+                            self.prev_checkpoint.clone(),
+                            data_interval.clone(),
+                            new_data_path,
+                            new_checkpoint_path,
+                            output_watermark,
+                            CommitOpts {
+                                block_ref: &BlockRef::Head,
+                                system_time: Some(read_result.checkpoint.system_time),
+                                prev_block_hash: Some(Some(&prev_hash)),
+                            },
+                        )
+                        .await
+                    {
+                        Ok(commit_result) => {
+                            // Advance offset for the next run
+                            if let Some(data_interval) = data_interval {
+                                self.next_offset = data_interval.end + 1;
+                            }
+
+                            // Clean up intermediate files
+                            for path in cache_files {
+                                std::fs::remove_file(path).int_err()?;
+                            }
+
+                            Ok(ExecutionResult {
+                                was_up_to_date: false,
+                                checkpoint: CommitCheckpoint {
+                                    last_committed: Utc::now(),
+                                    for_read_at: read_result.checkpoint.last_read,
+                                    for_fetched_at: fetch_result.checkpoint.last_fetched,
+                                    last_hash: Some(commit_result.new_head),
+                                },
+                            })
+                        }
+                        Err(CommitError::EmptyCommit) => {
+                            Ok(ExecutionResult {
                                 was_up_to_date: false, // The checkpoint is not up-to-date but dataset is
                                 checkpoint: CommitCheckpoint {
                                     last_committed: Utc::now(),
@@ -497,45 +454,10 @@ impl IngestTask {
                                     for_fetched_at: fetch_result.checkpoint.last_fetched,
                                     last_hash: None,
                                 },
-                            });
+                            })
                         }
-
-                        MetadataEvent::SetWatermark(SetWatermark {
-                            output_watermark: output_watermark.unwrap(),
-                        })
-                    };
-
-                    let new_block = MetadataBlock {
-                        system_time: read_result.checkpoint.system_time,
-                        prev_block_hash: Some(prev_hash),
-                        event: metadata_event,
-                        sequence_number: prev_sequence_number + 1,
-                    };
-                    info!(?new_block, "Committing new block");
-
-                    let new_head = self
-                        .dataset
-                        .as_metadata_chain()
-                        .append(new_block, AppendOpts::default())
-                        .await
-                        .int_err()?;
-
-                    // Clean up intermediate files
-                    for path in cache_files {
-                        std::fs::remove_file(path).int_err()?;
+                        Err(e) => Err(e.int_err().into()),
                     }
-
-                    info!(%new_head, "Committed new block");
-
-                    Ok(ExecutionResult {
-                        was_up_to_date: false,
-                        checkpoint: CommitCheckpoint {
-                            last_committed: Utc::now(),
-                            for_read_at: read_result.checkpoint.last_read,
-                            for_fetched_at: fetch_result.checkpoint.last_fetched,
-                            last_hash: Some(new_head),
-                        },
-                    })
                 },
             )
             .await

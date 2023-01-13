@@ -14,7 +14,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::*;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, path::Path};
 use tokio::io::AsyncRead;
 use tracing::debug;
 use url::Url;
@@ -289,6 +289,14 @@ where
             hash,
             already_existed: false,
         })
+    }
+
+    async fn insert_file_move<'a>(
+        &'a self,
+        _src: &Path,
+        _options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        unimplemented!()
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {

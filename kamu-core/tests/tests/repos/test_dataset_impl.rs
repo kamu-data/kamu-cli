@@ -21,7 +21,7 @@ async fn test_summary_updates() {
     let ds = DatasetFactoryImpl::get_local_fs(layout);
 
     assert_matches!(
-        ds.get_summary(SummaryOptions::default()).await,
+        ds.get_summary(GetSummaryOpts::default()).await,
         Err(GetSummaryError::EmptyDataset)
     );
 
@@ -39,7 +39,7 @@ async fn test_summary_updates() {
         .unwrap();
 
     assert_eq!(
-        ds.get_summary(SummaryOptions::default()).await.unwrap(),
+        ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
             id: DatasetID::from_pub_key_ed25519(b"foo"),
             kind: DatasetKind::Root,
@@ -70,7 +70,7 @@ async fn test_summary_updates() {
 
     // Get stale
     assert_eq!(
-        ds.get_summary(SummaryOptions {
+        ds.get_summary(GetSummaryOpts {
             update_if_stale: false,
             ..Default::default()
         })
@@ -89,7 +89,7 @@ async fn test_summary_updates() {
     );
 
     assert_eq!(
-        ds.get_summary(SummaryOptions::default()).await.unwrap(),
+        ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
             id: DatasetID::from_pub_key_ed25519(b"foo"),
             kind: DatasetKind::Root,

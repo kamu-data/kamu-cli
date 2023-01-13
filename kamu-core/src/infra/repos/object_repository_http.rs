@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+
 use crate::domain::*;
 use opendatafabric::Multihash;
 
@@ -140,6 +142,14 @@ impl ObjectRepository for ObjectRepositoryHttp {
     async fn insert_stream<'a>(
         &'a self,
         _src: Box<AsyncReadObj>,
+        _options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        Err(AccessError::ReadOnly(None).into())
+    }
+
+    async fn insert_file_move<'a>(
+        &'a self,
+        _src: &Path,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
         Err(AccessError::ReadOnly(None).into())
