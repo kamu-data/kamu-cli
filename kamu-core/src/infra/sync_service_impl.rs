@@ -11,6 +11,7 @@ use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::utils::ipfs_wrapper::*;
 use crate::infra::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use crate::infra::utils::smart_transfer_protocol::SmartTransferProtocol;
 use opendatafabric::*;
 
 use dill::*;
@@ -229,6 +230,7 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
+
         let src_dataset = self.get_dataset_reader(src).await?;
         let src_is_local = src.as_local_ref().is_some();
         let dst_dataset_builder = self
@@ -241,20 +243,46 @@ impl SyncServiceImpl {
             AppendValidation::Full
         };
 
-        info!("Starting sync using Simple Transfer Protocol");
-        match SimpleTransferProtocol
-            .sync(
+        let dst_dataset = dst_dataset_builder.as_dataset();
+
+        let sync_result = if src_dataset.supports_smart_protocol() {
+            self.sync_smart_pull_transfer_protocol(
                 src_dataset.as_ref(),
                 src,
-                dst_dataset_builder.as_dataset(),
+                dst_dataset,
                 dst,
                 validation,
                 opts.trust_source.unwrap_or(src_is_local),
                 opts.force,
                 listener,
-            )
-            .await
-        {
+            ).await
+
+        } else if dst_dataset.supports_smart_protocol() {
+            self.sync_smart_push_transfer_protocol(
+                src_dataset.as_ref(),
+                src,
+                dst_dataset,
+                dst,
+                validation,
+                opts.trust_source.unwrap_or(src_is_local),
+                opts.force,
+                listener,
+            ).await
+
+        } else {
+            self.sync_simple_transfer_protocol(
+                src_dataset.as_ref(),
+                src,
+                dst_dataset,
+                dst,
+                validation,
+                opts.trust_source.unwrap_or(src_is_local),
+                opts.force,
+                listener,
+            ).await
+        };
+
+        match sync_result {
             Ok(result) => {
                 info!(?result, "Sync completed");
                 dst_dataset_builder.finish().await?;
@@ -266,6 +294,87 @@ impl SyncServiceImpl {
                 Err(error)
             }
         }
+    }
+
+    async fn sync_smart_pull_transfer_protocol<'a>(
+        &'a self,
+        src: &'a dyn Dataset,
+        src_ref: &'a DatasetRefAny,
+        dst: &'a dyn Dataset,
+        _dst_ref: &'a DatasetRefAny,
+        validation: AppendValidation,
+        trust_source_hashes: bool,
+        force: bool,
+        listener: Arc<dyn SyncListener + 'static>,
+    ) -> Result<SyncResult, SyncError> {
+
+        info!("Starting sync using Smart Transfer Protocol (Pull flow)");
+        SmartTransferProtocol
+            .sync_smart_src(
+                src,
+                src_ref,
+                dst,
+                _dst_ref,
+                validation,
+                trust_source_hashes,
+                force,
+                listener,
+            )
+            .await
+    }    
+
+    async fn sync_smart_push_transfer_protocol<'a>(
+        &'a self,
+        src: &'a dyn Dataset,
+        src_ref: &'a DatasetRefAny,
+        dst: &'a dyn Dataset,
+        _dst_ref: &'a DatasetRefAny,
+        validation: AppendValidation,
+        trust_source_hashes: bool,
+        force: bool,
+        listener: Arc<dyn SyncListener + 'static>,
+    ) -> Result<SyncResult, SyncError> {
+
+        info!("Starting sync using Smart Transfer Protocol (Push flow)");
+        SmartTransferProtocol
+            .sync_smart_dst(
+                src,
+                src_ref,
+                dst,
+                _dst_ref,
+                validation,
+                trust_source_hashes,
+                force,
+                listener,
+            )
+            .await
+    }    
+
+    async fn sync_simple_transfer_protocol<'a>(
+        &'a self,
+        src: &'a dyn Dataset,
+        src_ref: &'a DatasetRefAny,
+        dst: &'a dyn Dataset,
+        _dst_ref: &'a DatasetRefAny,
+        validation: AppendValidation,
+        trust_source_hashes: bool,
+        force: bool,
+        listener: Arc<dyn SyncListener + 'static>,
+    ) -> Result<SyncResult, SyncError> {
+
+        info!("Starting sync using Simple Transfer Protocol");
+        SimpleTransferProtocol
+            .sync(
+                src,
+                src_ref,
+                dst,
+                _dst_ref,
+                validation,
+                trust_source_hashes,
+                force,
+                listener,
+            )
+            .await
     }
 
     async fn sync_to_ipfs(

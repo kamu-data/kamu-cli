@@ -63,11 +63,11 @@ impl APIServer {
             )
             .route(
                 "/pull", 
-                axum::routing::get(dataset_pull_handler)
+                axum::routing::get(dataset_pull_ws_upgrade_handler)
             )
             .route(
                 "/push", 
-                axum::routing::get(dataset_push_handler)
+                axum::routing::get(dataset_push_ws_upgrade_handler)
             )
             .layer(
                 axum::extract::Extension(local_repo)
@@ -214,30 +214,72 @@ async fn dataset_checkpoints_handler(
         .unwrap()
 }
 
-async fn dataset_push_handler(
+async fn dataset_push_ws_upgrade_handler(
+    ws: axum::extract::ws::WebSocketUpgrade,
     local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
     axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
-) -> String {
+) -> axum::response::Response {
 
-    let _dataset = resolve_dataset(local_dataset_repository, &params)
+    let dataset = resolve_dataset(local_dataset_repository, &params)
         .await
         .unwrap();
 
-    // TODO
-    String::from("not yet supported!")
+    ws.on_upgrade(|socket| dataset_push_ws_handler(socket, dataset))
 }
 
-async fn dataset_pull_handler(
+async fn dataset_pull_ws_upgrade_handler(
+    ws: axum::extract::ws::WebSocketUpgrade,
     local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
     axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
-) -> String {
+) -> axum::response::Response  {
 
-    let _dataset = resolve_dataset(local_dataset_repository, &params)
+    let dataset = resolve_dataset(local_dataset_repository, &params)
         .await
         .unwrap();
 
-    // TODO
-    String::from("not yet supported!")
+    ws.on_upgrade(|socket| dataset_pull_ws_handler(socket, dataset))
+}
+
+async fn dataset_push_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    while let Some(msg) = socket.recv().await {
+        let msg = if let Ok(msg) = msg {
+            msg
+        } else {
+            // client disconnected
+            return;
+        };
+        println!("Push client sent: {}", msg.to_text().unwrap());
+
+        let reply = axum::extract::ws::Message::Text(String::from("Hi push client!"));
+        if socket.send(reply).await.is_err() {
+            // client disconnected
+            return;
+        }
+    }        
+}
+
+async fn dataset_pull_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    while let Some(msg) = socket.recv().await {
+        let msg = if let Ok(msg) = msg {
+            msg
+        } else {
+            // client disconnected
+            return;
+        };
+        println!("Pull client sent: {}", msg.to_text().unwrap());
+
+        let reply = axum::extract::ws::Message::Text(String::from("Hi pull client!"));
+        if socket.send(reply).await.is_err() {
+            // client disconnected
+            return;
+        }
+    }        
 }
 
 async fn resolve_dataset(

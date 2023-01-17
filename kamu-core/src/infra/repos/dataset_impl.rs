@@ -10,6 +10,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use tracing::debug;
+use url::Url;
 
 use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
@@ -19,6 +20,8 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo> {
+    supports_smart_protocol: bool,
+    base_url: Url,
     metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
@@ -38,13 +41,18 @@ where
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     pub fn new(
+        base_url: Url,
+        supports_smart_protocol: bool,
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
         cache_repo: CacheRepo,
         info_repo: InfoRepo,
+
     ) -> Self {
         Self {
+            base_url,
+            supports_smart_protocol,
             metadata_chain,
             data_repo,
             checkpoint_repo,
@@ -276,5 +284,13 @@ where
 
     fn as_cache_repo(&self) -> &dyn NamedObjectRepository {
         &self.cache_repo
+    }
+
+    fn base_url(&self) -> &Url {
+        &self.base_url
+    }
+
+    fn supports_smart_protocol(&self) -> bool {
+        self.supports_smart_protocol
     }
 }

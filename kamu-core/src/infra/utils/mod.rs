@@ -14,3 +14,4 @@ pub mod ipfs_wrapper;
 pub mod records_writers;
 pub mod schema_utils;
 pub mod simple_transfer_protocol;
+pub mod smart_transfer_protocol;

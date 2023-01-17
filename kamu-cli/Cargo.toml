@@ -45,7 +45,7 @@ http = "*"
 hyper = "*"
 tower = { version = "*" }
 tower-http = { version = "*", features = ["trace", "cors"] }
-axum = { version = "*" }
+axum = { version = "*", features = ["ws"] }
 axum-extra = { version = "*", features = ["async-read-body"] }
 async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "*"

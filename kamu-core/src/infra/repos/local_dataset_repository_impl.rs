@@ -692,4 +692,10 @@ where
     fn as_cache_repo(&self) -> &dyn NamedObjectRepository {
         self.dataset.as_cache_repo()
     }
+    fn base_url(&self) -> &Url {
+        self.dataset.base_url()
+    }
+    fn supports_smart_protocol(&self) -> bool {
+        self.dataset.supports_smart_protocol()
+    }
 }
