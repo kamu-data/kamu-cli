@@ -8,7 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use kamu::domain::{Dataset, LocalDatasetRepository, GetDatasetError, BlockRef};
+use opendatafabric::{
+    DatasetRefLocal, 
+    DatasetName, 
+    Multihash, 
+    serde::{
+        flatbuffers::FlatbuffersMetadataBlockSerializer, 
+        MetadataBlockSerializer
+    }
+};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr}, 
+    collections::HashMap, 
+    sync::Arc, 
+    str::FromStr
+};
 
 pub struct APIServer {
     server: axum::Server<
@@ -18,14 +33,57 @@ pub struct APIServer {
 }
 
 impl APIServer {
+
+    const PARAMETER_DATASET_NAME: &'static str = "datasetName";
+    const PARAMETER_REF: &'static str = "ref";
+    const PARAMETER_BLOCK_HASH: &'static str = "blockHash";
+    const PARAMETER_PHYSICAL_HASH: &'static str = "physicalHash";
+
+
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+        let local_repo: Arc<dyn LocalDatasetRepository> = catalog.get_one().unwrap();
         let gql_schema = kamu_adapter_graphql::schema(catalog);
+
+        let dataset_routes = axum::Router::new()
+            .route(
+                format!("/refs/:{}", APIServer::PARAMETER_REF).as_str(), 
+                axum::routing::get(dataset_refs_handler)
+            )
+            .route(
+                format!("/blocks/:{}", APIServer::PARAMETER_BLOCK_HASH).as_str(), 
+                axum::routing::get(dataset_blocks_handler)
+            )
+            .route(
+                format!("/data/:{}", APIServer::PARAMETER_PHYSICAL_HASH).as_str(), 
+                axum::routing::get(dataset_data_handler)
+            )
+            .route(
+                format!("/checkpoints/:{}", APIServer::PARAMETER_PHYSICAL_HASH).as_str(), 
+                axum::routing::get(dataset_checkpoints_handler)
+            )
+            .route(
+                "/pull", 
+                axum::routing::get(dataset_pull_handler)
+            )
+            .route(
+                "/push", 
+                axum::routing::get(dataset_push_handler)
+            )
+            .layer(
+                axum::extract::Extension(local_repo)
+            );
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
             .route(
                 "/graphql",
                 axum::routing::get(graphql_playground).post(graphql_handler),
+            )
+            .nest(
+                format!(
+                    "/:{}", 
+                    APIServer::PARAMETER_DATASET_NAME
+                ).as_str(), dataset_routes
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -80,4 +138,116 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
+}
+
+async fn dataset_refs_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> String {
+
+    let dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    let ref_param = params.get(APIServer::PARAMETER_REF).unwrap();
+    let block_ref = BlockRef::from_str(ref_param.as_str()).unwrap();
+    let hash = dataset.as_metadata_chain().get_ref(&block_ref).await.unwrap();
+
+    hash.to_string()
+}
+
+async fn dataset_blocks_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> Vec<u8> {
+
+    let dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    let block_hash_param = params.get(APIServer::PARAMETER_BLOCK_HASH).unwrap();
+    let block_hash = Multihash::from_multibase_str(block_hash_param.as_str()).unwrap();
+    let block = dataset.as_metadata_chain().get_block(&block_hash).await.unwrap();
+    
+    let block_bytes = FlatbuffersMetadataBlockSerializer
+        .write_manifest(&block)
+        .unwrap();
+
+    block_bytes.collapse_vec()
+}
+
+async fn dataset_data_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> axum::response::Response {
+
+    let dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    let physical_hash_param = params.get(APIServer::PARAMETER_PHYSICAL_HASH).unwrap();
+    let physical_hash = Multihash::from_multibase_str(physical_hash_param.as_str()).unwrap();
+    let data_stream = dataset.as_data_repo().get_stream(&physical_hash).await.unwrap();
+    let body = axum_extra::body::AsyncReadBody::new(data_stream);
+
+    axum::response::Response::builder()
+        .body(axum::body::boxed(body))
+        .unwrap()
+}
+
+async fn dataset_checkpoints_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> axum::response::Response {
+
+    let dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    let physical_hash_param = params.get(APIServer::PARAMETER_PHYSICAL_HASH).unwrap();
+    let physical_hash = Multihash::from_multibase_str(physical_hash_param.as_str()).unwrap();
+    let checkpoint_stream = dataset.as_checkpoint_repo().get_stream(&physical_hash).await.unwrap();
+    let body = axum_extra::body::AsyncReadBody::new(checkpoint_stream);
+
+    axum::response::Response::builder()
+        .body(axum::body::boxed(body))
+        .unwrap()
+}
+
+async fn dataset_push_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> String {
+
+    let _dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    // TODO
+    String::from("not yet supported!")
+}
+
+async fn dataset_pull_handler(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+) -> String {
+
+    let _dataset = resolve_dataset(local_dataset_repository, &params)
+        .await
+        .unwrap();
+
+    // TODO
+    String::from("not yet supported!")
+}
+
+async fn resolve_dataset(
+    local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
+    params: &HashMap<String, String>
+) -> Result<Arc<dyn Dataset>, GetDatasetError> {
+    
+    // TODO: support 'accountName' parameter
+    let dataset_name_param = params.get(APIServer::PARAMETER_DATASET_NAME).unwrap();
+    let dataset_name = DatasetName::from_str(dataset_name_param.as_str()).unwrap();
+    let dataset_ref: DatasetRefLocal = DatasetRefLocal::Name(dataset_name);
+    local_dataset_repository.get_dataset(&dataset_ref).await
 }

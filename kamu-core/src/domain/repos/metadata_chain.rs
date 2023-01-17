@@ -14,6 +14,7 @@ use crate::domain::*;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
+use strum_macros::EnumString;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +109,9 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(EnumString, Clone, PartialEq, Eq, Debug)]
 pub enum BlockRef {
+    #[strum(serialize = "head")]
     Head,
 }
 
