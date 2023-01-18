@@ -18,6 +18,8 @@ use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
+use crate::utils::DummySmartTransferProtocolClient;
+
 macro_rules! n {
     ($s:expr) => {
         DatasetName::try_from($s).unwrap()
@@ -218,6 +220,7 @@ async fn create_graph_remote(
         reg.clone(),
         Arc::new(LocalDatasetRepositoryImpl::new(ws.clone())),
         Arc::new(DatasetFactoryImpl::new()),
+        Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
         IpfsGateway::default(),
     );

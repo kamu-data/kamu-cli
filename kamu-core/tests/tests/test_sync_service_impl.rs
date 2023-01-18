@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::utils::DummySmartTransferProtocolClient;
 use crate::utils::{HttpFileServer, IpfsDaemon, MinioServer};
 use kamu::domain::*;
 use kamu::infra::utils::ipfs_wrapper::IpfsClient;
@@ -142,6 +143,7 @@ async fn do_test_sync(
         remote_repo_reg.clone(),
         local_repo.clone(),
         dataset_factory,
+        Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(ipfs_client),
         ipfs_gateway,
     );

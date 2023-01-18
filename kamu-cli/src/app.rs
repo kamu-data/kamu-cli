@@ -14,6 +14,7 @@ use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
 use kamu::infra::*;
+use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use tracing::error;
 use tracing::info;
 
@@ -138,6 +139,9 @@ pub fn configure_catalog() -> CatalogBuilder {
 
     b.add::<EngineProvisionerLocal>();
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
+
+    b.add::<kamu_adapter_http::WsSmartTransferProtocolClient>();
+    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::WsSmartTransferProtocolClient>();
 
     b
 }

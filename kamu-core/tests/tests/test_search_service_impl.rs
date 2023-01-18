@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::utils::DummySmartTransferProtocolClient;
 use crate::utils::MinioServer;
 use kamu::domain::*;
 use kamu::infra::*;
@@ -31,6 +32,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         remote_repo_reg.clone(),
         local_repo.clone(),
         Arc::new(DatasetFactoryImpl::new()),
+        Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
         IpfsGateway::default(),
     );

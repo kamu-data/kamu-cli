@@ -11,7 +11,6 @@ use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::utils::ipfs_wrapper::*;
 use crate::infra::utils::simple_transfer_protocol::SimpleTransferProtocol;
-use crate::infra::utils::smart_transfer_protocol::SmartTransferProtocol;
 use opendatafabric::*;
 
 use dill::*;
@@ -20,12 +19,15 @@ use thiserror::Error;
 use tracing::*;
 use url::Url;
 
+use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     local_repo: Arc<dyn LocalDatasetRepository>,
     dataset_factory: Arc<dyn DatasetFactory>,
+    smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     ipfs_client: Arc<IpfsClient>,
     ipfs_gateway: IpfsGateway,
 }
@@ -55,6 +57,7 @@ impl SyncServiceImpl {
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         local_repo: Arc<dyn LocalDatasetRepository>,
         dataset_factory: Arc<dyn DatasetFactory>,
+        smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         ipfs_client: Arc<IpfsClient>,
         ipfs_gateway: IpfsGateway,
     ) -> Self {
@@ -62,6 +65,7 @@ impl SyncServiceImpl {
             remote_repo_reg,
             local_repo,
             dataset_factory,
+            smart_transfer_protocol,
             ipfs_client,
             ipfs_gateway,
         }
@@ -248,24 +252,14 @@ impl SyncServiceImpl {
         let sync_result = if src_dataset.supports_smart_protocol() {
             self.sync_smart_pull_transfer_protocol(
                 src_dataset.as_ref(),
-                src,
                 dst_dataset,
-                dst,
-                validation,
-                opts.trust_source.unwrap_or(src_is_local),
-                opts.force,
                 listener,
             ).await
 
         } else if dst_dataset.supports_smart_protocol() {
             self.sync_smart_push_transfer_protocol(
                 src_dataset.as_ref(),
-                src,
                 dst_dataset,
-                dst,
-                validation,
-                opts.trust_source.unwrap_or(src_is_local),
-                opts.force,
                 listener,
             ).await
 
@@ -299,54 +293,24 @@ impl SyncServiceImpl {
     async fn sync_smart_pull_transfer_protocol<'a>(
         &'a self,
         src: &'a dyn Dataset,
-        src_ref: &'a DatasetRefAny,
         dst: &'a dyn Dataset,
-        _dst_ref: &'a DatasetRefAny,
-        validation: AppendValidation,
-        trust_source_hashes: bool,
-        force: bool,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
 
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
-        SmartTransferProtocol
-            .sync_smart_src(
-                src,
-                src_ref,
-                dst,
-                _dst_ref,
-                validation,
-                trust_source_hashes,
-                force,
-                listener,
-            )
+        self.smart_transfer_protocol.pull_protocol_client_flow(src, dst, listener)
             .await
     }    
 
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
         src: &'a dyn Dataset,
-        src_ref: &'a DatasetRefAny,
         dst: &'a dyn Dataset,
-        _dst_ref: &'a DatasetRefAny,
-        validation: AppendValidation,
-        trust_source_hashes: bool,
-        force: bool,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
 
         info!("Starting sync using Smart Transfer Protocol (Push flow)");
-        SmartTransferProtocol
-            .sync_smart_dst(
-                src,
-                src_ref,
-                dst,
-                _dst_ref,
-                validation,
-                trust_source_hashes,
-                force,
-                listener,
-            )
+        self.smart_transfer_protocol.push_protocol_client_flow(src, dst, listener)
             .await
     }    
 

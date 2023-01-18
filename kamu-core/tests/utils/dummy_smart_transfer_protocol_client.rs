@@ -9,27 +9,42 @@
 
 use std::sync::Arc;
 
-use crate::domain::{Dataset, SyncResult, SyncError, SyncListener};
+use kamu::{
+    infra::utils::smart_transfer_protocol::SmartTransferProtocolClient, 
+    domain::{Dataset, SyncListener, SyncResult, SyncError}
+};
 
-/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DummySmartTransferProtocolClient {}
+
+impl DummySmartTransferProtocolClient {
+    pub fn new() -> DummySmartTransferProtocolClient{
+        Self {}
+    }
+}
 
 #[async_trait::async_trait]
-pub trait SmartTransferProtocolClient: Sync + Send {
+impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
 
     async fn pull_protocol_client_flow(
         &self,
         src: & dyn Dataset,
         dst: & dyn Dataset,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncResult, SyncError> {
+
+        unimplemented!("Not supported yet")
+
+    }
 
     async fn push_protocol_client_flow(
         &self,
         src: & dyn Dataset,
         dst: & dyn Dataset,
         listener: Arc<dyn SyncListener>,
-    ) -> Result<SyncResult, SyncError>;
+    ) -> Result<SyncResult, SyncError> {
 
+        unimplemented!("Not supported yet")
+ 
+    }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////

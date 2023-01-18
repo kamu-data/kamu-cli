@@ -3,6 +3,7 @@ members = [
     "opendatafabric",
     "kamu-core",
     "kamu-adapter-graphql",
+    "kamu-adapter-http",
     "kamu-cli",
     "tools",
     "utils/container-runtime",

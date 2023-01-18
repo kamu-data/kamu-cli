@@ -53,7 +53,6 @@ async-stream = "*"
 tokio = { version = "*", features=["fs"] }
 tokio-stream = { version = "*" }
 tokio-util = { version = "*", features=["codec", "compat", "io"] }
-tokio-tungstenite = { version = "*" }
 trust-dns-resolver = "*"  # TODO: Needed for DNSLink resolution with IPFS
 rusoto_core = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
 rusoto_s3 = {version = "0.47.0", default_features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980

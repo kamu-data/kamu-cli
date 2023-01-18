@@ -1,0 +1,33 @@
+[package]
+name = "kamu-adapter-http"
+version = "0.105.0"
+authors = ["Sergei Zaychenko <szaychenko@kamu.dev>"]
+edition = "2021"
+
+[lib]
+doctest = false
+
+[dependencies]
+# Kamu
+dill = "~0.3"
+opendatafabric = { path = "../opendatafabric" }
+kamu = { path = "../kamu-core" }
+
+# HTTP
+axum = { version = "*", features = ["ws"] }
+axum-extra = { version = "*", features = ["async-read-body"] }
+
+# IO
+futures = "*"
+tokio-stream = { version = "*" }
+tokio-tungstenite = { version = "*" }
+
+# Utils
+async-trait = "*"
+
+[dev-dependencies]
+tempfile = "*"
+tokio = { version = "*" }
+env_logger = "*"
+test-log = { version = "*", features = ["trace"] }
+tracing-subscriber = { version = "*", features = ["env-filter"] }

@@ -25,6 +25,7 @@ dill = ">= 0.5.0"
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 kamu-adapter-graphql = { path = "../kamu-adapter-graphql" }
+kamu-adapter-http = { path = "../kamu-adapter-http" }
 container-runtime = { path = "../utils/container-runtime" }
 
 # CLI
