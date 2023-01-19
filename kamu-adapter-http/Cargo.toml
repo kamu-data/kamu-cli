@@ -24,6 +24,7 @@ tokio-tungstenite = { version = "*" }
 
 # Utils
 async-trait = "*"
+chrono = { version = "*", features = ["serde"] }
 url = { version = "*", features = ["serde"] }
 
 
