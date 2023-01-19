@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use url::Url;
 
 use kamu::{
     infra::utils::smart_transfer_protocol::SmartTransferProtocolClient, 
@@ -28,23 +29,21 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
 
     async fn pull_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
-        listener: Arc<dyn SyncListener>,
+        _src_url: &Url,
+        _dst: &dyn Dataset,
+        _listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
 
         unimplemented!("Not supported yet")
-
     }
 
     async fn push_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
-        listener: Arc<dyn SyncListener>,
+        _src: &dyn Dataset,
+        _dst_url: &Url,
+        _listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
 
         unimplemented!("Not supported yet")
- 
     }
 }

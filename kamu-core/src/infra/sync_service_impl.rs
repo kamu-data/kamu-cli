@@ -251,7 +251,7 @@ impl SyncServiceImpl {
 
         let sync_result = if src_dataset.supports_smart_protocol() {
             self.sync_smart_pull_transfer_protocol(
-                src_dataset.as_ref(),
+                src_dataset.base_url(),
                 dst_dataset,
                 listener,
             ).await
@@ -259,7 +259,7 @@ impl SyncServiceImpl {
         } else if dst_dataset.supports_smart_protocol() {
             self.sync_smart_push_transfer_protocol(
                 src_dataset.as_ref(),
-                dst_dataset,
+                dst_dataset.base_url(),
                 listener,
             ).await
 
@@ -292,25 +292,25 @@ impl SyncServiceImpl {
 
     async fn sync_smart_pull_transfer_protocol<'a>(
         &'a self,
-        src: &'a dyn Dataset,
+        src_url: &Url,
         dst: &'a dyn Dataset,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
 
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
-        self.smart_transfer_protocol.pull_protocol_client_flow(src, dst, listener)
+        self.smart_transfer_protocol.pull_protocol_client_flow(src_url, dst, listener)
             .await
     }    
 
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
         src: &'a dyn Dataset,
-        dst: &'a dyn Dataset,
+        dst_url: &Url,
         listener: Arc<dyn SyncListener + 'static>,
     ) -> Result<SyncResult, SyncError> {
 
         info!("Starting sync using Smart Transfer Protocol (Push flow)");
-        self.smart_transfer_protocol.push_protocol_client_flow(src, dst, listener)
+        self.smart_transfer_protocol.push_protocol_client_flow(src, dst_url, listener)
             .await
     }    
 

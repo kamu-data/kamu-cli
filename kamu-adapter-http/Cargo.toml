@@ -24,6 +24,8 @@ tokio-tungstenite = { version = "*" }
 
 # Utils
 async-trait = "*"
+url = { version = "*", features = ["serde"] }
+
 
 [dev-dependencies]
 tempfile = "*"

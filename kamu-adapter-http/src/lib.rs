@@ -13,11 +13,10 @@ pub use http_server_constants::*;
 mod http_server_dataset_router;
 pub use http_server_dataset_router::*;
 
-mod ws_server_smart_pull_protocol;
-mod ws_server_smart_push_protocol;
+mod ws_smart_transfer_protocol_server;
 
-mod ws_client_smart_transfer_protocol;
-pub use ws_client_smart_transfer_protocol::*;
+mod ws_smart_transfer_protocol_client;
+pub use ws_smart_transfer_protocol_client::*;
 
 mod http_server_simple_transfer_protocol;
 pub use http_server_simple_transfer_protocol::*;

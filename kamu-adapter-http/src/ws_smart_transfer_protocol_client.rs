@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use url::Url;
 use dill::component;
 use futures::SinkExt;
 
@@ -31,14 +32,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn pull_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
+        src_url: &Url,
+        dst: &dyn Dataset,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
 
         listener.begin();
 
-        let mut pull_url = src.base_url().join("pull").unwrap();
+        let mut pull_url = src_url.join("pull").unwrap();
         let pull_url_res = pull_url.set_scheme("ws");
         assert!(pull_url_res.is_ok());
     
@@ -63,13 +64,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
+        src: &dyn Dataset,
+        dst_url: &Url,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
-        let mut push_url = src.base_url().join("push").unwrap();
+        let mut push_url = dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");
         assert!(push_url_res.is_ok());
     

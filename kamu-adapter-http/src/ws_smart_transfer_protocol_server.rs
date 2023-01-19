@@ -32,3 +32,24 @@ pub async fn dataset_pull_ws_handler(
         }
     }        
 }
+
+pub async fn dataset_push_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    while let Some(msg) = socket.recv().await {
+        let msg = if let Ok(msg) = msg {
+            msg
+        } else {
+            // client disconnected
+            return;
+        };
+        println!("Push client sent: {}", msg.to_text().unwrap());
+
+        let reply = axum::extract::ws::Message::Text(String::from("Hi push client!"));
+        if socket.send(reply).await.is_err() {
+            // client disconnected
+            return;
+        }
+    }        
+}

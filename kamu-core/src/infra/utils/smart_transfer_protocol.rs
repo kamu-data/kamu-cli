@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
+use url::Url;
 
 use crate::domain::{Dataset, SyncResult, SyncError, SyncListener};
 
@@ -18,15 +19,15 @@ pub trait SmartTransferProtocolClient: Sync + Send {
 
     async fn pull_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
+        src_url: &Url,
+        dst: &dyn Dataset,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError>;
 
     async fn push_protocol_client_flow(
         &self,
-        src: & dyn Dataset,
-        dst: & dyn Dataset,
+        src: &dyn Dataset,
+        dst_url: &Url,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError>;
 
