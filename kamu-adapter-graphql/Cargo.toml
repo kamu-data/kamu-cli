@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.105.0"
+version = "0.106.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 
@@ -23,8 +23,7 @@ async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] 
 # Utils
 indoc = "*"
 chrono = "*"
-# TODO: Using git version until v16 is released containing this fix https://github.com/apache/arrow-datafusion/pull/4530
-datafusion = { git = "https://github.com/apache/arrow-datafusion", rev = "975ff15b25bdfe198db8c5b440f08cca45b2f482" }  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = "16"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 futures = "*"
 serde = "*"
 serde_json = "*"

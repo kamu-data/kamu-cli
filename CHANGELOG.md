@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.106.0] - 2023-01-19
+### Changed
+- Upgrade to stable version of `arrow-datafusion`
+
 ## [0.105.0] - 2023-01-13
 ### Fixed
-- Upgraded `sparkmagic` dependency and removed hacks to make it work with latest `pandas`.
+- Upgraded `sparkmagic` dependency and removed hacks to make it work with latest `pandas`
 - Returning `[]` instead of empty string for no data in GQL
 ### Changed
 - Improved testing utilities
@@ -19,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.103.0] - 2022-12-23
 ### Changed
-- Major upgrade to latest versions of `flatbuffers`, `arrow`, `datafusion`, and many more dependencies.
+- Major upgrade to latest versions of `flatbuffers`, `arrow`, `datafusion`, and many more dependencies
 
 ## [0.102.2] - 2022-12-08
 ### Change

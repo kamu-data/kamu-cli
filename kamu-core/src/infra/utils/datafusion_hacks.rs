@@ -43,17 +43,17 @@ pub struct ListingTableOfFiles {
 
 impl ListingTableOfFiles {
     pub async fn try_new(ctx: &SessionState, files: Vec<String>) -> Result<Self> {
-        let format = Arc::new(ParquetFormat::new(ctx.config_options()));
+        let format = Arc::new(ParquetFormat::new());
 
         // Infer schema
         let store = ctx
-            .runtime_env
+            .runtime_env()
             .object_store(ObjectStoreUrl::local_filesystem())?;
 
         let file_path = object_store::path::Path::parse(files.first().unwrap()).unwrap();
         let file_meta = store.head(&file_path).await?;
 
-        let file_schema = format.infer_schema(&store, &[file_meta]).await?;
+        let file_schema = format.infer_schema(ctx, &store, &[file_meta]).await?;
 
         Ok(Self {
             format,
@@ -98,6 +98,7 @@ impl TableProvider for ListingTableOfFiles {
         // create an execution plan
         self.format
             .create_physical_plan(
+                ctx,
                 FileScanConfig {
                     object_store_url: ObjectStoreUrl::local_filesystem(),
                     file_schema: Arc::clone(&self.file_schema),
@@ -107,7 +108,7 @@ impl TableProvider for ListingTableOfFiles {
                     limit,
                     output_ordering: self.try_create_output_ordering()?,
                     table_partition_cols: Vec::new(),
-                    config_options: ctx.config.config_options(),
+                    infinite_source: false,
                 },
                 filters,
             )
@@ -136,7 +137,7 @@ impl ListingTableOfFiles {
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
         // NOTE: We don't have access to datafusion::datasource::listing::helpers, so have to remove parititioning
         let store = ctx
-            .runtime_env
+            .runtime_env()
             .object_store(ObjectStoreUrl::local_filesystem())?;
 
         let mut file_list = Vec::new();
@@ -162,7 +163,7 @@ impl ListingTableOfFiles {
         .await?;
 
         Ok((
-            Self::split_files(files, ctx.config.target_partitions()),
+            Self::split_files(files, ctx.config().target_partitions()),
             statistics,
         ))
     }

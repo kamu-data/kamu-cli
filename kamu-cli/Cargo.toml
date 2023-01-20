@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.105.0"
+version = "0.106.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -74,8 +74,7 @@ async-trait = "*"
 chrono = "*"
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions
-# TODO: Using git version until v16 is released containing this fix https://github.com/apache/arrow-datafusion/pull/4530
-datafusion = { git = "https://github.com/apache/arrow-datafusion", rev = "975ff15b25bdfe198db8c5b440f08cca45b2f482" }  # Reading data + SQL
+datafusion = "16"
 dirs = "*"
 futures = "*"
 indoc = "*"

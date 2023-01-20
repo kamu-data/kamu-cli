@@ -341,8 +341,39 @@ impl KamuSchema {
             .unwrap()
             .is_some()
     }
+}
 
-    async fn table_impl(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
+#[async_trait::async_trait]
+impl SchemaProvider for KamuSchema {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    // TODO: Datafusion should make this function async
+    fn table_names(&self) -> Vec<String> {
+        let this = self.clone();
+
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(this.table_names_impl())
+        })
+        .join()
+        .unwrap()
+    }
+
+    fn table_exist(&self, name: &str) -> bool {
+        let this = self.clone();
+        let name = name.to_owned();
+
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(this.table_exist_impl(&name))
+        })
+        .join()
+        .unwrap()
+    }
+
+    async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
         let dataset_name = DatasetName::try_from(name);
         if let Err(_) = dataset_name {
             return None;
@@ -375,50 +406,5 @@ impl KamuSchema {
                 }
             }
         }
-    }
-}
-
-impl SchemaProvider for KamuSchema {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
-    // TODO: Datafusion should make this function async
-    fn table_names(&self) -> Vec<String> {
-        let this = self.clone();
-
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(this.table_names_impl())
-        })
-        .join()
-        .unwrap()
-    }
-
-    fn table_exist(&self, name: &str) -> bool {
-        let this = self.clone();
-        let name = name.to_owned();
-
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(this.table_exist_impl(&name))
-        })
-        .join()
-        .unwrap()
-    }
-
-    fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let this = self.clone();
-        let name = name.to_owned();
-
-        // TODO: Datafusion made it difficult to lazily create table providers,
-        // so we have to resort to spawning a thread to call an async function
-        // See: https://github.com/apache/arrow-datafusion/issues/1792
-        std::thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().unwrap();
-            runtime.block_on(this.table_impl(&name))
-        })
-        .join()
-        .unwrap()
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.105.0"
+version = "0.106.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -41,8 +41,7 @@ zip = "*"
 # Data
 arrow = "29"
 arrow-digest = "29"  # Data hashing (in-house library)
-# TODO: Using git version until v16 is released containing this fix https://github.com/apache/arrow-datafusion/pull/4530
-datafusion = { git = "https://github.com/apache/arrow-datafusion", rev = "975ff15b25bdfe198db8c5b440f08cca45b2f482" }  # Reading data + SQL
+datafusion = "16"  # Reading data + SQL
 object_store = "*"  # Datafusion internals
 digest = "*"
 sha3 = "*"
