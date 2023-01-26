@@ -14,7 +14,7 @@ content:
         temporalTables:
           - name: ca.bankofcanada.exchange-rates.daily
             primaryKey:
-            - currency_base
+              - currency_base
         query: >
           SELECT
             tr.`event_time`,
@@ -24,7 +24,6 @@ content:
             tr.`price` * exc.`rate` as `price_cad`,
             tr.`settlement` as `settlement_usd`,
             tr.`settlement` * exc.`rate` as `settlement_cad`
-          FROM
-            `my.trading.transactions` as tr,
-            LATERAL TABLE (`ca.bankofcanada.exchange-rates.daily`(tr.`event_time`)) as exc
-          WHERE tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'
+          FROM `my.trading.transactions` as tr
+          LEFT JOIN `ca.bankofcanada.exchange-rates.daily` FOR SYSTEM_TIME AS OF tr.`event_time` as exc
+          ON tr.`currency` = exc.`currency_base` AND exc.`currency_target` = 'CAD'

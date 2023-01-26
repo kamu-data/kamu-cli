@@ -35,12 +35,9 @@ content:
                 (
                   -tr.eth_amount_as_usd / spy2usd.`close`
                 ) as alt_spy_amount
-              from `account.tokens.portfolio.usd` as tr,
-              lateral table (`alphavantage.tickers.daily.spy`(tr.block_time)) as spy2usd
-              where 
-                spy2usd.to_symbol = tr.account_anchor_symbol
-                and spy2usd.from_symbol = 'spy'
-                and tr.token_symbol = 'rETH'
+              from `account.tokens.portfolio.usd` as tr
+              join `alphavantage.tickers.daily.spy` for system_time as of tr.block_time as spy2usd
+              on spy2usd.to_symbol = tr.account_anchor_symbol and spy2usd.from_symbol = 'spy' and tr.token_symbol = 'rETH'
           - alias: account.whatif.reth-vs-snp500.portfolio
             query: >
               select 

@@ -34,10 +34,9 @@ content:
                   rp.eth_amount / rp.amount * tr.token_balance
                 ) as token_market_value_eth,
                 tr.token_book_value_eth_as_usd
-              from `rocketpool.reth.mint-burn` as rp,
-              lateral table (`account.tokens.portfolio.usd`(rp.block_time)) as tr
-              where
-                rp.token_symbol = tr.token_symbol
+              from `rocketpool.reth.mint-burn` as rp
+              join `account.tokens.portfolio.usd` for system_time as of rp.block_time as tr
+              on rp.token_symbol = tr.token_symbol
           - alias: account.tokens.portfolio.market-value
             query: >
               select
@@ -51,8 +50,6 @@ content:
                 (
                   rp.token_market_value_eth * eth2usd.`close`
                 ) as token_market_value_usd
-              from market_value_reth2eth as rp,
-              lateral table (`cryptocompare.ohlcv.eth-usd`(rp.event_time)) as eth2usd
-              where
-                eth2usd.from_symbol = rp.account_symbol 
-                and eth2usd.to_symbol = 'usd'
+              from market_value_reth2eth as rp
+              join `cryptocompare.ohlcv.eth-usd` for system_time as of rp.event_time as eth2usd
+              on eth2usd.from_symbol = rp.account_symbol and eth2usd.to_symbol = 'usd'
