@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.107.0] - 2023-01-25
+### Changed
+- **Breaking:** Major upgrade of Apache Flink version
+- No updates to exisitng datasets needed, but the verifiability of some datasets may be broken (since we don't yet implement engine versioning as per ODF spec)
+### Added
+- Flink now supports a much nicer temporal table join syntax:
+  ```sql
+  SELECT
+    t.event_time,
+    t.symbol,
+    p.volume as volume,
+    t.price as current_price,
+    p.volume * t.price as current_value
+  FROM tickers as t
+  JOIN portfolio FOR SYSTEM_TIME AS OF t.event_time AS p
+  WHERE t.symbol = p.symbol
+  ```
+- We recommend using `FOR SYSTEM_TIME AS OF` join syntax as replacement for old `LATERAL TABLE` joins 
+- Determinism of Flink computation should be improved
+
 ## [0.106.0] - 2023-01-19
 ### Changed
 - Upgrade to stable version of `arrow-datafusion`

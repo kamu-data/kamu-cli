@@ -22,7 +22,6 @@ content:
             holdings.`cum_quantity`,
             holdings.`quantity` as `quantity`,
             tickers.`close_adj` * holdings.`cum_quantity` as `market_value`
-          FROM
-            `com.yahoo.finance.tickers.daily` as tickers,
-            LATERAL TABLE (`my.trading.holdings`(tickers.`event_time`)) as holdings
-          WHERE tickers.`symbol` = holdings.`symbol`
+          FROM `com.yahoo.finance.tickers.daily` as tickers
+          JOIN `my.trading.holdings` FOR SYSTEM_TIME AS OF tickers.`event_time` AS holdings
+          ON tickers.`symbol` = holdings.`symbol`

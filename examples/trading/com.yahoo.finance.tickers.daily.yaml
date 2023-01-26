@@ -14,12 +14,12 @@ content:
         schema:
           - "`Date` TIMESTAMP"
           - "`Symbol` STRING"
-          - "`Adj Close` DECIMAL(18,4)"
-          - "`Close` DECIMAL(18,4)"
-          - "`High` DECIMAL(18,4)"
-          - "`Low` DECIMAL(18,4)"
-          - "`Open` DECIMAL(18,4)"
-          - "`Volume` DECIMAL(18,4)"
+          - "`Adj Close` DOUBLE"
+          - "`Close` DOUBLE"
+          - "`High` DOUBLE"
+          - "`Low` DOUBLE"
+          - "`Open` DOUBLE"
+          - "`Volume` DOUBLE"
       preprocess:
         kind: sql
         engine: spark

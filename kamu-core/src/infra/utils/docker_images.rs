@@ -9,7 +9,7 @@
 
 pub const SPARK: &str = "docker.io/kamudata/engine-spark:0.17.0-spark_3.1.2";
 pub const LIVY: &str = SPARK;
-pub const FLINK: &str = "docker.io/kamudata/engine-flink:0.14.0-flink_1.13.1-scala_2.12-java8";
+pub const FLINK: &str = "docker.io/kamudata/engine-flink:0.15.0-flink_1.16.0-scala_2.12-java8";
 pub const JUPYTER: &str = "docker.io/kamudata/jupyter:0.5.0";
 
 // Test Images

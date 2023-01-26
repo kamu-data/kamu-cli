@@ -36,11 +36,9 @@ content:
                 (
                   tr.eth_amount * eth2usd.`close`
                 ) as eth_amount_as_usd
-              from `account.tokens.portfolio` as tr,
-              lateral table (`cryptocompare.ohlcv.eth-usd`(tr.block_time)) as eth2usd
-              where
-                tr.account_symbol = eth2usd.from_symbol 
-                and eth2usd.to_symbol = 'usd'
+              from `account.tokens.portfolio` as tr
+              join `cryptocompare.ohlcv.eth-usd` for system_time as of tr.block_time as eth2usd
+              on tr.account_symbol = eth2usd.from_symbol and eth2usd.to_symbol = 'usd'
           - alias: account.tokens.portfolio.usd
             query: >
               select

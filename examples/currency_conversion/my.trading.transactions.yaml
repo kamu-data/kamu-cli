@@ -12,13 +12,13 @@ content:
         kind: csv
         header: true
         schema:
-        - "event_time TIMESTAMP"
-        - "symbol STRING"
-        - "quantity BIGINT"
-        - "price DECIMAL(18,4)"
-        - "settlement DECIMAL(18,4)"
-        - "currency STRING"
+          - "event_time TIMESTAMP"
+          - "symbol STRING"
+          - "quantity BIGINT"
+          - "price DOUBLE"
+          - "settlement DOUBLE"
+          - "currency STRING"
       merge:
         kind: ledger
         primaryKey:
-        - event_time
+          - event_time
