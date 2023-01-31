@@ -8,5 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod test_api_server_command;
+mod test_complete_command;
 mod test_new_dataset_command;
 mod test_pull_command;

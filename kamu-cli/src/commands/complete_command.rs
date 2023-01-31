@@ -16,6 +16,7 @@ use chrono::prelude::*;
 use futures::TryStreamExt;
 use glob;
 use std::fs;
+use std::io::Write;
 use std::path;
 use std::sync::Arc;
 
@@ -32,60 +33,68 @@ pub struct CompleteCommand {
 // TODO: This is an extremely hacky way to implement the completion
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
-    pub fn new(
+    pub fn new<S>(
         local_repo: Option<Arc<dyn LocalDatasetRepository>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
         cli: clap::Command,
-        input: String,
+        input: S,
         current: usize,
-    ) -> Self {
+    ) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             local_repo,
             remote_repo_reg,
             remote_alias_reg,
             config_service,
             cli,
-            input,
+            input: input.into(),
             current,
         }
     }
 
-    fn complete_timestamp(&self) {
-        println!("{}", Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true));
+    fn complete_timestamp(&self, output: &mut impl Write) {
+        writeln!(
+            output,
+            "{}",
+            Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true)
+        )
+        .unwrap();
     }
 
-    fn complete_env_var(&self, prefix: &str) {
+    fn complete_env_var(&self, output: &mut impl Write, prefix: &str) {
         for (k, _) in std::env::vars() {
             if k.starts_with(prefix) {
-                println!("{}", k);
+                writeln!(output, "{}", k).unwrap();
             }
         }
     }
 
-    async fn complete_dataset(&self, prefix: &str) {
+    async fn complete_dataset(&self, output: &mut impl Write, prefix: &str) {
         if let Some(repo) = self.local_repo.as_ref() {
             let mut datasets = repo.get_all_datasets();
             while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                 if dataset_handle.name.starts_with(prefix) {
-                    println!("{}", dataset_handle.name);
+                    writeln!(output, "{}", dataset_handle.name).unwrap();
                 }
             }
         }
     }
 
-    fn complete_repository(&self, prefix: &str) {
+    fn complete_repository(&self, output: &mut impl Write, prefix: &str) {
         if let Some(reg) = self.remote_repo_reg.as_ref() {
             for repo_id in reg.get_all_repositories() {
                 if repo_id.starts_with(prefix) {
-                    println!("{}", repo_id);
+                    writeln!(output, "{}", repo_id).unwrap();
                 }
             }
         }
     }
 
-    async fn complete_alias(&self, prefix: &str) {
+    async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
         if let Some(repo) = self.local_repo.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
                 let mut datasets = repo.get_all_datasets();
@@ -96,12 +105,12 @@ impl CompleteCommand {
                         .unwrap();
                     for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                         if alias.to_string().starts_with(prefix) {
-                            println!("{}", alias);
+                            writeln!(output, "{}", alias).unwrap();
                         }
                     }
                     for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
                         if alias.to_string().starts_with(prefix) {
-                            println!("{}", alias);
+                            writeln!(output, "{}", alias).unwrap();
                         }
                     }
                 }
@@ -109,15 +118,15 @@ impl CompleteCommand {
         }
     }
 
-    fn complete_config_key(&self, prefix: &str) {
+    fn complete_config_key(&self, output: &mut impl Write, prefix: &str) {
         for key in self.config_service.all_keys() {
             if key.starts_with(prefix) {
-                println!("{}", key);
+                writeln!(output, "{}", key).unwrap();
             }
         }
     }
 
-    fn complete_path(&self, prefix: &str) {
+    fn complete_path(&self, output: &mut impl Write, prefix: &str) {
         let path = path::Path::new(prefix);
         let mut matched_dirs = 0;
         let mut last_matched_dir: path::PathBuf = path::PathBuf::new();
@@ -129,16 +138,16 @@ impl CompleteCommand {
             for entry in glob::glob(&glb).unwrap() {
                 let p = entry.unwrap();
                 if p.is_dir() {
-                    println!("{}{}", p.display(), std::path::MAIN_SEPARATOR);
+                    writeln!(output, "{}{}", p.display(), std::path::MAIN_SEPARATOR).unwrap();
                     matched_dirs += 1;
                     last_matched_dir = p;
                 } else {
-                    println!("{}", p.display());
+                    writeln!(output, "{}", p.display()).unwrap();
                 }
             }
         } else if path.is_dir() {
             for entry in fs::read_dir(path).unwrap() {
-                println!("{}", entry.unwrap().path().display());
+                writeln!(output, "{}", entry.unwrap().path().display()).unwrap();
             }
         }
 
@@ -146,22 +155,17 @@ impl CompleteCommand {
         // we add an extra result that should advance the completion
         // but not finish it.
         if matched_dirs == 1 && !last_matched_dir.to_str().unwrap().is_empty() {
-            println!(
+            writeln!(
+                output,
                 "{}{}...",
                 last_matched_dir.display(),
                 std::path::MAIN_SEPARATOR
-            );
+            )
+            .unwrap();
         }
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl Command for CompleteCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
-    async fn run(&mut self) -> Result<(), CLIError> {
+    pub async fn complete(&mut self, output: &mut impl Write) -> Result<(), CLIError> {
         let mut args = match shlex::split(&self.input) {
             Some(v) => v,
             _ => return Ok(()),
@@ -192,17 +196,17 @@ impl Command for CompleteCommand {
                     if let Some(val_names) = opt.get_value_names() {
                         for name in val_names {
                             match name.as_str() {
-                                "REPO" => self.complete_repository(to_complete),
-                                "TIME" => self.complete_timestamp(),
-                                "VAR" => self.complete_env_var(to_complete),
-                                "SRC" => self.complete_path(to_complete),
+                                "REPO" => self.complete_repository(output, to_complete),
+                                "TIME" => self.complete_timestamp(output),
+                                "VAR" => self.complete_env_var(output, to_complete),
+                                "SRC" => self.complete_path(output, to_complete),
                                 _ => (),
                             }
                         }
                     }
                     for pval in opt.get_possible_values() {
                         if pval.get_name().starts_with(to_complete) {
-                            println!("{}", pval.get_name());
+                            writeln!(output, "{}", pval.get_name()).int_err()?;
                         }
                     }
                     return Ok(());
@@ -213,18 +217,18 @@ impl Command for CompleteCommand {
         // Complete commands
         for s in last_cmd.get_subcommands() {
             if !s.is_hide_set() && s.get_name().starts_with(to_complete) {
-                println!("{}", s.get_name());
+                writeln!(output, "{}", s.get_name()).int_err()?;
             }
         }
 
         // Complete positionals
         for pos in last_cmd.get_positionals() {
             match pos.get_id().as_str() {
-                "dataset" => self.complete_dataset(to_complete).await,
-                "repository" => self.complete_repository(to_complete),
-                "alias" => self.complete_alias(to_complete).await,
-                "manifest" => self.complete_path(to_complete),
-                "cfgkey" => self.complete_config_key(to_complete),
+                "dataset" => self.complete_dataset(output, to_complete).await,
+                "repository" => self.complete_repository(output, to_complete),
+                "alias" => self.complete_alias(output, to_complete).await,
+                "manifest" => self.complete_path(output, to_complete),
+                "cfgkey" => self.complete_config_key(output, to_complete),
                 _ => (),
             }
         }
@@ -240,11 +244,22 @@ impl Command for CompleteCommand {
                     "".into()
                 };
                 if full_name.starts_with(to_complete) {
-                    println!("{}", full_name);
+                    writeln!(output, "{}", full_name).int_err()?;
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Command for CompleteCommand {
+    fn needs_workspace(&self) -> bool {
+        false
+    }
+
+    async fn run(&mut self) -> Result<(), CLIError> {
+        self.complete(&mut std::io::stdout()).await
     }
 }

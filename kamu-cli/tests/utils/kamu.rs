@@ -106,6 +106,40 @@ impl Kamu {
             })
     }
 
+    // TODO: Generalize into execute with overridden STDOUT/ERR/IN
+    pub async fn complete<S>(&self, input: S, current: usize) -> Result<Vec<String>, CLIError>
+    where
+        S: Into<String>,
+    {
+        use kamu_cli::{CompleteCommand, ConfigService};
+
+        let cli = kamu_cli::cli();
+        let dataset_repo = Arc::new(LocalDatasetRepositoryImpl::new(Arc::new(
+            self.workspace_layout.clone(),
+        )));
+        let config_service = Arc::new(ConfigService::new(&self.workspace_layout));
+
+        let mut buf = Vec::new();
+        CompleteCommand::new(
+            Some(dataset_repo),
+            None,
+            None,
+            config_service,
+            cli,
+            input,
+            current,
+        )
+        .complete(&mut buf)
+        .await?;
+
+        let output = String::from_utf8_lossy(&buf);
+        Ok(output
+            .trim_end()
+            .split('\n')
+            .map(|s| s.to_string())
+            .collect())
+    }
+
     pub async fn add_dataset(&self, dataset_snapshot: DatasetSnapshot) -> Result<(), CommandError> {
         let content = YamlDatasetSnapshotSerializer
             .write_manifest(&dataset_snapshot)
