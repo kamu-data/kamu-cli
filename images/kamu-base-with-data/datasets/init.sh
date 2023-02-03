@@ -1,9 +1,6 @@
 #/bin/sh
 set -eux
 
-DATASETS_DIR=/tmp/datasets
-#DATASETS_DIR=.
-
 
 get_dataset_id() {
     local name=$1
@@ -19,11 +16,11 @@ patch_yaml() {
 
 
 # Init example datasets
-$DATASETS_DIR/examples/covid/init-s3.sh
-kamu add -r $DATASETS_DIR/examples/covid/
+examples/covid/init-s3.sh
+kamu add -r examples/covid/
 
-$DATASETS_DIR/examples/reth-vs-snp500/init-s3.sh
-kamu add -r $DATASETS_DIR/examples/reth-vs-snp500/
+examples/reth-vs-snp500/init-s3.sh
+kamu add -r examples/reth-vs-snp500/
 
 kamu pull --all
 
@@ -32,8 +29,9 @@ kamu pull --all
 get_dataset_id "com.cryptocompare.ohlcv.eth-usd"
 dataset_id="$RETVAL"
 
-file="${DATASETS_DIR}/testing/testing.set-transform-input-by-id.yaml"
+file="testing/testing.set-transform-input-by-id.yaml"
 cp "$file.tpl" "$file"
 patch_yaml "$file" ".content.metadata[0].inputs[0].id = \"${dataset_id}\""
 
+kamu add -r testing/
 kamu pull testing.set-transform-input-by-id
