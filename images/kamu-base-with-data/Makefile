@@ -15,7 +15,7 @@ image-push:
 	docker push $(IMAGE_REPO)/kamu-base:latest-with-data
 
 
-workspace: sync-datasets
+workspace: datasets
 	docker run \
 		--rm \
 		--privileged \
@@ -24,5 +24,6 @@ workspace: sync-datasets
 		bash -c "cd /tmp/datasets && ./init.sh"
 
 
-sync-datasets:
+.PHONY: datasets
+datasets:
 	rsync -avu --delete --exclude=".*/" "$(EXAMPLES_DIR)/" datasets/examples
