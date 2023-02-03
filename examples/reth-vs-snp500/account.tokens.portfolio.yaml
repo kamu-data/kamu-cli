@@ -14,7 +14,7 @@ content:
         engine: flink
         queries:
           - alias: token_transfers
-            query: >
+            query: |
               select
                 *,
                 case
@@ -29,7 +29,7 @@ content:
                 from `account.tokens.transfers`
               )
           - alias: transactions
-            query: >
+            query: |
               select
                 *,
                 case
@@ -44,7 +44,7 @@ content:
                 from `account.transactions`
               )
           - alias: token_transactions
-            query: >
+            query: |
               select
                 tr.block_time,
                 tr.block_number,
@@ -59,7 +59,7 @@ content:
                 tr.transaction_hash = tx.transaction_hash
                 and tr.block_time = tx.block_time
           - alias: account.tokens.portfolio
-            query: >
+            query: |
               select
                 *,
                 sum(token_amount) over (partition by token_symbol order by block_time) as token_balance,

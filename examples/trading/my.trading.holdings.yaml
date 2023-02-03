@@ -10,7 +10,7 @@ content:
       transform:
         kind: sql
         engine: flink
-        query: >
+        query: |
           SELECT
             event_time,
             symbol,

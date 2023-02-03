@@ -16,7 +16,7 @@ content:
       transform:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT
             "AB" as province,
             id,

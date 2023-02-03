@@ -8,12 +8,12 @@ content:
     - kind: setTransform
       inputs:
         - name: account.tokens.portfolio
-        - name: cryptocompare.ohlcv.eth-usd
+        - name: com.cryptocompare.ohlcv.eth-usd
       transform:
         kind: sql
         engine: flink
         temporalTables:
-          - name: cryptocompare.ohlcv.eth-usd
+          - name: com.cryptocompare.ohlcv.eth-usd
             primaryKey:
               - from_symbol
         queries:
@@ -21,7 +21,7 @@ content:
             # TODO: `account_anchor_symbol` column is a technical necessity
             # for temporal table join in `accounts.whatif.reth-vs-snp500`
             # and should be removed
-            query: >
+            query: |
               select
                 tr.block_time,
                 tr.block_number,
@@ -37,10 +37,10 @@ content:
                   tr.eth_amount * eth2usd.`close`
                 ) as eth_amount_as_usd
               from `account.tokens.portfolio` as tr
-              join `cryptocompare.ohlcv.eth-usd` for system_time as of tr.block_time as eth2usd
+              join `com.cryptocompare.ohlcv.eth-usd` for system_time as of tr.block_time as eth2usd
               on tr.account_symbol = eth2usd.from_symbol and eth2usd.to_symbol = 'usd'
           - alias: account.tokens.portfolio.usd
-            query: >
+            query: |
               select
                 *,
                 sum(-eth_amount_as_usd) over (partition by token_symbol order by block_time) as token_book_value_eth_as_usd

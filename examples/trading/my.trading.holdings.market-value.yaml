@@ -15,7 +15,7 @@ content:
           - name: my.trading.holdings
             primaryKey:
               - symbol
-        query: >
+        query: |
           SELECT
             tickers.`event_time`,
             holdings.`symbol`,

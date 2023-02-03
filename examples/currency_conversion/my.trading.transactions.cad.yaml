@@ -15,7 +15,7 @@ content:
           - name: ca.bankofcanada.exchange-rates.daily
             primaryKey:
               - currency_base
-        query: >
+        query: |
           SELECT
             tr.`event_time`,
             tr.`symbol`,

@@ -13,7 +13,7 @@ content:
       transform:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT
             row_id as id,
             date_reported as reported_date,

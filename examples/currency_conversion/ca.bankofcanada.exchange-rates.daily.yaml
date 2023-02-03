@@ -52,7 +52,7 @@ content:
       preprocess:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT 
             date,
             "USD" as currency_base,

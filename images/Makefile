@@ -30,6 +30,8 @@ kamu-base:
 .PHONY: kamu-base-push
 kamu-base-push:
 	docker push $(IMAGE_REPO)/kamu-base:$(KAMU_VERSION)
+	docker tag $(IMAGE_REPO)/kamu-base:$(KAMU_VERSION) $(IMAGE_REPO)/kamu-base:latest
+	docker push $(IMAGE_REPO)/kamu-base:latest
 
 
 #########################################################################################
@@ -37,6 +39,8 @@ kamu-base-push:
 
 .PHONY: kamu-base-with-data
 kamu-base-with-data:
+	make -C kamu-base-with-data sync-datasets
+	
 	docker build \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
 		-t $(IMAGE_REPO)/kamu-base:latest-with-data \

@@ -17,7 +17,7 @@ content:
       preprocess:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT
             Row_ID as id,
             CAST(IFNULL(Case_Reported_Date, Test_Reported_Date) as TIMESTAMP) as case_reported_date,

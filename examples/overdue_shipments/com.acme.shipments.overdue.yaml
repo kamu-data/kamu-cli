@@ -13,7 +13,7 @@ content:
         engine: flink
         queries:
           - alias: order_shipments
-            query: >
+            query: |
               SELECT
                 o.event_time as order_time,
                 o.order_id,
@@ -26,7 +26,7 @@ content:
                 o.order_id = s.order_id
                 AND s.event_time BETWEEN o.event_time AND o.event_time + INTERVAL '2' DAY
           - alias: order_shipments_agg
-            query: >
+            query: |
               SELECT
                 TUMBLE_START(order_time, INTERVAL '1' DAY) as order_time,
                 order_id,
@@ -38,7 +38,7 @@ content:
               FROM order_shipments
               GROUP BY TUMBLE(order_time, INTERVAL '1' DAY), order_id
           - alias: com.acme.shipments.overdue
-            query: >
+            query: |
               SELECT *
               FROM order_shipments_agg
               WHERE order_quantity <> shipped_quantity_total
