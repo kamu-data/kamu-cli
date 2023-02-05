@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.109.0] - 2023-02-05
+### Fixed
+- Lineage and transform now respect names of datasets in the `SetTransform` metadata events, that may be different from names in a workspace
+
 ## [0.108.0] - 2023-01-30
 ### Fixed
 - Upgrade to Flink engine prevents it from crashing on checkpoints over 5 MiB large

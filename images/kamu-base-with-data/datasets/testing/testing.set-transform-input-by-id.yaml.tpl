@@ -11,4 +11,4 @@ content:
       transform:
         kind: sql
         engine: flink
-        query: "select * from foo"
+        query: "select event_time from foo"

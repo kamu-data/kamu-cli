@@ -314,6 +314,7 @@ impl TransformServiceImpl {
         let source = sources.pop().unwrap();
         debug!(?source, "Transforming using source");
 
+        // Check if all inputs are non-empty
         if futures::stream::iter(&source.inputs)
             .map(|input| input.id.as_ref().unwrap().as_local_ref())
             .then(|input_ref| async move { self.is_never_pulled(&input_ref).await })
@@ -332,7 +333,8 @@ impl TransformServiceImpl {
             .int_err()?;
 
         let query_inputs: Vec<_> = futures::stream::iter(&input_slices)
-            .then(|i| self.to_query_input(i, None))
+            .zip(futures::stream::iter(&source.inputs))
+            .then(|(slice, input)| self.to_query_input(slice, &input.name, None))
             .try_collect()
             .await
             .int_err()?;
@@ -508,6 +510,8 @@ impl TransformServiceImpl {
     async fn to_query_input(
         &self,
         slice: &InputSlice,
+        // Note: The name of the input in metadata can be different from the name in the workspace
+        name: &DatasetName,
         vocab_hint: Option<DatasetVocabulary>,
     ) -> Result<ExecuteQueryInput, InternalError> {
         let input_handle = self
@@ -582,7 +586,7 @@ impl TransformServiceImpl {
 
         let input = ExecuteQueryInput {
             dataset_id: input_handle.id.clone(),
-            dataset_name: input_handle.name.clone(),
+            dataset_name: name.clone(),
             vocab,
             data_interval: slice.data_interval.clone(),
             data_paths,
@@ -716,22 +720,28 @@ impl TransformServiceImpl {
             .try_collect()
             .await?;
 
+        let input_names: BTreeMap<_, _> = source
+            .inputs
+            .iter()
+            .map(|i| (i.id.clone().unwrap(), i.name.clone()))
+            .collect();
+
         let mut plan = Vec::new();
 
         for (block_hash, block) in blocks.into_iter().rev() {
             let block_t = block.as_typed::<ExecuteQuery>().unwrap();
 
             let inputs = futures::stream::iter(&block_t.event.input_slices)
-                .map(|slice| {
-                    (
-                        slice,
-                        dataset_vocabs
-                            .get(&slice.dataset_id)
-                            .map(|v| v.clone())
-                            .unwrap(),
-                    )
+                .then(|slice| {
+                    let name = input_names.get(&slice.dataset_id).unwrap();
+
+                    let vocab = dataset_vocabs
+                        .get(&slice.dataset_id)
+                        .map(|v| v.clone())
+                        .unwrap();
+
+                    self.to_query_input(slice, name, Some(vocab))
                 })
-                .then(|(slice, vocab)| self.to_query_input(slice, Some(vocab)))
                 .try_collect()
                 .await?;
 

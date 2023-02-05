@@ -34,50 +34,57 @@ impl ProvenanceServiceImpl {
         dataset_handle: &DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
-        let summary = if let Some(dataset) = self
+        if let Some(dataset) = self
             .local_repo
             .try_get_dataset(&dataset_handle.as_local_ref())
             .await?
         {
-            Some(
-                dataset
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .int_err()?,
-            )
-        } else {
-            None
-        };
+            let summary = dataset
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .int_err()?;
 
-        let dataset_info = summary
-            .as_ref()
-            .map(|s| NodeInfo::Local {
-                id: s.id.clone(),
+            // Resolving by ID because name of the input
+            // can be different than the dataset name in the workspace
+            let mut resolved_inputs = Vec::new();
+            for input in &summary.dependencies {
+                let input_id = input.id.as_ref().unwrap();
+
+                let handle = self
+                    .local_repo
+                    .resolve_dataset_ref(&input_id.as_local_ref())
+                    .await?;
+
+                resolved_inputs.push(ResolvedTransformInput {
+                    handle,
+                    name: input.name.clone(),
+                })
+            }
+
+            let dataset_info = NodeInfo::Local {
+                id: summary.id.clone(),
                 name: dataset_handle.name.clone(),
-                kind: s.kind,
-                dependencies: &s.dependencies,
-            })
-            .unwrap_or_else(|| NodeInfo::Remote {
+                kind: summary.kind,
+                dependencies: &resolved_inputs,
+            };
+
+            if visitor.enter(&dataset_info) {
+                for input in &resolved_inputs {
+                    self.visit_upstream_dependencies_rec(&input.handle, visitor)
+                        .await?;
+                }
+
+                visitor.exit(&dataset_info);
+            }
+        } else {
+            // Remote dataset
+            let dataset_info = NodeInfo::Remote {
                 id: dataset_handle.id.clone(),
                 name: dataset_handle.name.clone(),
-            });
+            };
 
-        if !visitor.enter(&dataset_info) {
-            return Ok(());
+            visitor.enter(&dataset_info);
         }
-
-        if let Some(s) = &summary {
-            for input in &s.dependencies {
-                let input_handle = DatasetHandle {
-                    id: input.id.clone().unwrap(),
-                    name: input.name.clone(),
-                };
-                self.visit_upstream_dependencies_rec(&input_handle, visitor)
-                    .await?;
-            }
-        }
-
-        visitor.exit(&dataset_info);
 
         Ok(())
     }
@@ -157,7 +164,13 @@ impl<W: Write, S: DotStyle> LineageVisitor for DotVisitor<W, S> {
 
         if let &NodeInfo::Local { dependencies, .. } = dataset {
             for dep in dependencies {
-                writeln!(self.writer, "\"{}\" -> \"{}\";", dep.name, dataset.name()).unwrap();
+                writeln!(
+                    self.writer,
+                    "\"{}\" -> \"{}\";",
+                    dep.handle.name,
+                    dataset.name()
+                )
+                .unwrap();
             }
         }
 

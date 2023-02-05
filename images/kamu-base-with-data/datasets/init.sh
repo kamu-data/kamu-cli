@@ -22,7 +22,7 @@ kamu add -r examples/covid/
 examples/reth-vs-snp500/init-s3.sh
 kamu add -r examples/reth-vs-snp500/
 
-kamu pull --all
+kamu -v pull --all
 
 
 # Setup test datasets
@@ -34,4 +34,4 @@ cp "$file.tpl" "$file"
 patch_yaml "$file" ".content.metadata[0].inputs[0].id = \"${dataset_id}\""
 
 kamu add -r testing/
-kamu pull testing.set-transform-input-by-id
+kamu -v pull testing.set-transform-input-by-id

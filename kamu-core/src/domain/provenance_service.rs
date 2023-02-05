@@ -41,7 +41,7 @@ pub enum NodeInfo<'a> {
         id: DatasetID,
         name: DatasetName,
         kind: DatasetKind,
-        dependencies: &'a [TransformInput],
+        dependencies: &'a [ResolvedTransformInput],
     },
     Remote {
         id: DatasetID,
@@ -63,6 +63,14 @@ impl<'a> NodeInfo<'a> {
             NodeInfo::Remote { name, .. } => name,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedTransformInput {
+    /// Resolved input handle
+    pub handle: DatasetHandle,
+    /// An alias of this input to be used in queries.
+    pub name: DatasetName,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
