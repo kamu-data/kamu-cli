@@ -13,6 +13,7 @@ use crate::utils::*;
 use async_graphql::*;
 use kamu::domain;
 use kamu::domain::GetSummaryOpts;
+use kamu::domain::QueryError;
 use opendatafabric as odf;
 use tracing::debug;
 
@@ -70,8 +71,12 @@ impl DatasetData {
         {
             Ok(r) => r,
             Err(err) => {
-                debug!(?err, "Query error");
-                return Ok(err.into());
+                if let QueryError::DatasetSchemaNotAvailable(_) = err {
+                    return Ok(DataQueryResult::success(None, DataBatch::empty(data_format), limit));
+                } else {
+                    debug!(?err, "Query error");
+                    return Ok(err.into());
+                }
             }
         };
 
@@ -82,6 +87,6 @@ impl DatasetData {
         };
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult::success(schema, data, limit))
+        Ok(DataQueryResult::success(Some(schema), data, limit))
     }
 }

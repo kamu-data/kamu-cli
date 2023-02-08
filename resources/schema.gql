@@ -109,7 +109,7 @@ enum DataQueryResultErrorKind {
 }
 
 type DataQueryResultSuccess {
-	schema: DataSchema!
+	schema: DataSchema
 	data: DataBatch!
 	limit: Int!
 }

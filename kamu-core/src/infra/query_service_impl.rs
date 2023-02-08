@@ -79,8 +79,14 @@ impl QueryService for QueryServiceImpl {
         // See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
-        let schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
-        let fields: Vec<String> = match schema {
+        let res_schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
+        if let None = res_schema {
+            return Err(QueryError::DatasetSchemaNotAvailable(
+                DatasetSchemaNotAvailableError { dataset_ref: dataset_handle.as_local_ref() }
+            ));
+        }
+
+        let fields: Vec<String> = match res_schema.unwrap() {
             Type::GroupType { fields, .. } => fields
                 .iter()
                 .map(|f| match f.as_ref() {
@@ -153,7 +159,7 @@ impl QueryService for QueryServiceImpl {
         Ok(ctx.sql(statement).await?)
     }
 
-    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError> {
+    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Option<Type>, QueryError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
             .local_repo
@@ -163,7 +169,7 @@ impl QueryService for QueryServiceImpl {
         // TODO: This service shouldn't know the specifics of dataset layouts
         let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
-        let last_data_file = dataset
+        let last_data_file_opt = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
@@ -171,14 +177,17 @@ impl QueryService for QueryServiceImpl {
             .map_ok(|slice| dataset_layout.data_slice_path(&slice))
             .try_first()
             .await
-            .int_err()?
-            .ok_or_else(|| {
-                "Obtaining schema from datasets with no data is not yet supported".int_err()
-            })?;
+            .int_err()?;
 
-        let file = std::fs::File::open(&last_data_file).int_err()?;
-        let reader = SerializedFileReader::new(file).int_err()?;
-        Ok(reader.metadata().file_metadata().schema().clone())
+        match last_data_file_opt {
+            Some(last_data_file) => {
+                let file = std::fs::File::open(&last_data_file).int_err()?;
+                let reader = SerializedFileReader::new(file).int_err()?;
+                Ok(Some(reader.metadata().file_metadata().schema().clone()))
+            }
+            None => Ok(None)
+        }
+
     }
 }
 

@@ -31,7 +31,8 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError>;
 
-    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Type, QueryError>;
+    /// Returns the schema of the given dataset, if it is already defined by this moment, None otherwise
+    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Option<Type>, QueryError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -62,6 +63,12 @@ pub enum QueryError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    DatasetSchemaNotAvailable(
+        #[from]
+        #[backtrace]
+        DatasetSchemaNotAvailableError,
+    ),
+    #[error(transparent)]
     DataFusionError(
         #[from]
         #[backtrace]
@@ -74,6 +81,16 @@ pub enum QueryError {
         InternalError,
     ),
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Dataset schema is not available yet: {dataset_ref}")]
+pub struct DatasetSchemaNotAvailableError {
+    pub dataset_ref: DatasetRefLocal,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<GetDatasetError> for QueryError {
     fn from(v: GetDatasetError) -> Self {
