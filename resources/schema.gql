@@ -222,7 +222,7 @@ type DatasetMetadata {
 	"""
 	Latest data schema
 	"""
-	currentSchema(format: DataSchemaFormat): DataSchema!
+	currentSchema(format: DataSchemaFormat): DataSchema
 	"""
 	Current upstream dependencies of a dataset
 	"""
