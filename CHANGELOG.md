@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2023-02-09
+### Changed
+- Improved reaction of `kamu inspect schema` and `kamu tail` on datasets without schema yet
+- GraphQL schema and corresponding schema/tail responses now assume there might not be a dataset schema yet
+
 ## [0.109.0] - 2023-02-05
 ### Fixed
 - Lineage and transform now respect names of datasets in the `SetTransform` metadata events, that may be different from names in a workspace

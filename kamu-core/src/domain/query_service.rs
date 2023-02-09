@@ -85,7 +85,7 @@ pub enum QueryError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset schema is not available yet: {dataset_ref}")]
+#[error("Dataset schema is not yet available: {dataset_ref}")]
 pub struct DatasetSchemaNotAvailableError {
     pub dataset_ref: DatasetRefLocal,
 }

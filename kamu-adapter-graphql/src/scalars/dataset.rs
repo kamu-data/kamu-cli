@@ -181,7 +181,12 @@ impl DataBatch {
     pub fn empty(format: DataBatchFormat) -> DataBatch {
         DataBatch {
             format,
-            content: String::from("{}"),
+            content: match format {
+                DataBatchFormat::Csv => String::from(""),
+                DataBatchFormat::Json |
+                DataBatchFormat::JsonLD |
+                DataBatchFormat::JsonSOA => String::from("{}"),
+            },
             num_records: 0
         }
     }
@@ -264,6 +269,14 @@ impl DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
             schema,
             data,
+            limit,
+        })
+    }
+
+    pub fn no_schema_yet(format: DataBatchFormat, limit: u64) -> DataQueryResult {
+        DataQueryResult::Success(DataQueryResultSuccess {
+            schema: None, 
+            data: DataBatch::empty(format), 
             limit,
         })
     }

@@ -72,7 +72,7 @@ impl DatasetData {
             Ok(r) => r,
             Err(err) => {
                 if let QueryError::DatasetSchemaNotAvailable(_) = err {
-                    return Ok(DataQueryResult::success(None, DataBatch::empty(data_format), limit));
+                    return Ok(DataQueryResult::no_schema_yet(data_format, limit));
                 } else {
                     debug!(?err, "Query error");
                     return Ok(err.into());

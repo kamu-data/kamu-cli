@@ -107,7 +107,7 @@ impl InspectSchemaCommand {
 
     fn print_schema_unavailable(&self) {
         eprintln!(
-            "{}: Dataset schema is not available yet: {}",
+            "{}: Dataset schema is not yet available: {}",
             console::style("Warning").yellow(),
             self.dataset_ref.name().unwrap(),
         );
@@ -118,7 +118,7 @@ impl InspectSchemaCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let schema_or_none = self
+        let maybe_schema = self
             .query_svc
             .get_schema(&self.dataset_ref)
             .await
@@ -129,7 +129,7 @@ impl Command for InspectSchemaCommand {
                 e @ QueryError::Internal(_) => CLIError::critical(e),
             })?;
 
-        match schema_or_none {
+        match maybe_schema {
             Some(schema) => {
                 match self.output_format.as_ref().map(|s| s.as_str()) {
                     None | Some("ddl") => self.print_schema_ddl(&schema),
