@@ -58,6 +58,6 @@ impl DataQueries {
         };
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
-        Ok(DataQueryResult::success(schema, data, limit))
+        Ok(DataQueryResult::success(Some(schema), data, limit))
     }
 }

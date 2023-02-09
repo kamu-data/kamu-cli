@@ -104,26 +104,41 @@ impl InspectSchemaCommand {
         )?;
         Ok(())
     }
+
+    fn print_schema_unavailable(&self) {
+        eprintln!(
+            "{}: Dataset schema is not yet available: {}",
+            console::style("Warning").yellow(),
+            self.dataset_ref.name().unwrap(),
+        );
+    }
+
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let schema = self
+        let maybe_schema = self
             .query_svc
             .get_schema(&self.dataset_ref)
             .await
             .map_err(|e| match e {
                 QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
+                QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
                 e @ QueryError::DataFusionError(_) => CLIError::failure(e),
                 e @ QueryError::Internal(_) => CLIError::critical(e),
             })?;
 
-        match self.output_format.as_ref().map(|s| s.as_str()) {
-            None | Some("ddl") => self.print_schema_ddl(&schema),
-            Some("parquet") => self.print_schema_parquet(&schema)?,
-            Some("json") => self.print_schema_json(&schema)?,
-            _ => unreachable!(),
+        match maybe_schema {
+            Some(schema) => {
+                match self.output_format.as_ref().map(|s| s.as_str()) {
+                    None | Some("ddl") => self.print_schema_ddl(&schema),
+                    Some("parquet") => self.print_schema_parquet(&schema)?,
+                    Some("json") => self.print_schema_json(&schema)?,
+                    _ => unreachable!(),
+                }
+            }
+            None => self.print_schema_unavailable(),
         }
 
         Ok(())

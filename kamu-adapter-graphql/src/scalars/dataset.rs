@@ -178,6 +178,19 @@ pub struct DataBatch {
 }
 
 impl DataBatch {
+    pub fn empty(format: DataBatchFormat) -> DataBatch {
+        DataBatch {
+            format,
+            content: match format {
+                DataBatchFormat::Csv => String::from(""),
+                DataBatchFormat::Json |
+                DataBatchFormat::JsonLD |
+                DataBatchFormat::JsonSOA => String::from("{}"),
+            },
+            num_records: 0
+        }
+    }
+
     pub fn from_records(
         record_batches: &Vec<datafusion::arrow::record_batch::RecordBatch>,
         format: DataBatchFormat,
@@ -228,7 +241,7 @@ impl DataBatch {
 
 #[derive(SimpleObject)]
 pub struct DataQueryResultSuccess {
-    pub schema: DataSchema,
+    pub schema: Option<DataSchema>,
     pub data: DataBatch,
     pub limit: u64,
 }
@@ -252,10 +265,18 @@ pub enum DataQueryResult {
 }
 
 impl DataQueryResult {
-    pub fn success(schema: DataSchema, data: DataBatch, limit: u64) -> DataQueryResult {
+    pub fn success(schema: Option<DataSchema>, data: DataBatch, limit: u64) -> DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
             schema,
             data,
+            limit,
+        })
+    }
+
+    pub fn no_schema_yet(format: DataBatchFormat, limit: u64) -> DataQueryResult {
+        DataQueryResult::Success(DataQueryResultSuccess {
+            schema: None, 
+            data: DataBatch::empty(format), 
             limit,
         })
     }
@@ -273,6 +294,7 @@ impl DataQueryResult {
             error_kind: DataQueryResultErrorKind::InternalError,
         })
     }
+    
 }
 
 impl From<QueryError> for DataQueryResult {
@@ -280,6 +302,7 @@ impl From<QueryError> for DataQueryResult {
         match e {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
             QueryError::DataFusionError(e) => e.into(),
+            QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
         }
     }

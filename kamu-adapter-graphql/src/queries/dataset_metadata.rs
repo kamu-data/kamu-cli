@@ -76,15 +76,18 @@ impl DatasetMetadata {
         &self,
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
-    ) -> Result<DataSchema> {
+    ) -> Result<Option<DataSchema>> {
         let format = format.unwrap_or(DataSchemaFormat::Parquet);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
-        let schema = query_svc
+        let res_schema = query_svc
             .get_schema(&self.dataset_handle.as_local_ref())
             .await?;
 
-        Ok(DataSchema::from_parquet_schema(&schema, format)?)
+        match res_schema {
+            Some(schema) => Ok(Some(DataSchema::from_parquet_schema(&schema, format)?)),
+            None => Ok(None)
+        }
     }
 
     /// Current upstream dependencies of a dataset

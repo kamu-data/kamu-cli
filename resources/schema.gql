@@ -109,7 +109,7 @@ enum DataQueryResultErrorKind {
 }
 
 type DataQueryResultSuccess {
-	schema: DataSchema!
+	schema: DataSchema
 	data: DataBatch!
 	limit: Int!
 }
@@ -222,7 +222,7 @@ type DatasetMetadata {
 	"""
 	Latest data schema
 	"""
-	currentSchema(format: DataSchemaFormat): DataSchema!
+	currentSchema(format: DataSchemaFormat): DataSchema
 	"""
 	Current upstream dependencies of a dataset
 	"""
