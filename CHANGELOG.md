@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Improved reaction of `kamu inspect schema` and `kamu tail` on datasets without schema yet
 - GraphQL schema and corresponding schema/tail responses now assume there might not be a dataset schema yet
+- Web-platform version upgraded after GraphQL API changes
 
 ## [0.109.0] - 2023-02-05
 ### Fixed
