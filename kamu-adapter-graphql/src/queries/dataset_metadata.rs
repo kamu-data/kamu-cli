@@ -15,6 +15,7 @@ use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::LocalDatasetRepositoryExt;
 use kamu::domain::{MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};
@@ -92,20 +93,27 @@ impl DatasetMetadata {
 
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
             .get_summary(domain::GetSummaryOpts::default())
             .await?;
-        Ok(summary
-            .dependencies
-            .into_iter()
-            .map(|i| {
+
+        let mut dependencies: Vec<_> = Vec::new();
+        for input in summary.dependencies.into_iter() {
+            let dataset_id = input.id.unwrap().clone();
+            dependencies.push(
                 Dataset::new(
-                    Account::mock(),
-                    odf::DatasetHandle::new(i.id.unwrap(), i.name),
+                    Account::mock(), 
+                    local_repo
+                        .try_resolve_dataset_ref(&dataset_id.as_local_ref())
+                        .await?
+                        .unwrap()
                 )
-            })
-            .collect())
+            );
+        }
+        Ok(dependencies)
     }
 
     // TODO: Convert to collection

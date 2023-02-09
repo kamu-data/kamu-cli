@@ -1224,8 +1224,7 @@ pub struct TransformInput {
 #[ComplexObject]
 impl TransformInput {
     async fn dataset(&self, ctx: &Context<'_>) -> Result<Dataset> {
-        let dref =
-            odf::DatasetHandle::new(self.id.clone().unwrap().into(), self.name.clone().into());
+        let dref = self.id.clone().unwrap();
         Dataset::from_ref(ctx, &dref.as_local_ref()).await
     }
 }
