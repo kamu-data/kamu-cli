@@ -10,7 +10,7 @@
 use kamu::domain::{Dataset, LocalDatasetRepository, GetDatasetError, BlockRef};
 use crate::{
     http_server_constants::*, 
-    ws_smart_transfer_protocol_server,
+    ws_smart_transfer_protocol_axum_server,
 };
 
 use opendatafabric::{
@@ -111,7 +111,7 @@ pub async fn dataset_push_ws_upgrade_handler(
         .unwrap();
 
     ws.on_upgrade(
-        |socket| ws_smart_transfer_protocol_server::dataset_push_ws_handler(socket, dataset)
+        |socket| ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset)
     )
 }
 
@@ -126,7 +126,7 @@ pub async fn dataset_pull_ws_upgrade_handler(
         .unwrap();
 
     ws.on_upgrade(
-        |socket| ws_smart_transfer_protocol_server::dataset_pull_ws_handler(socket, dataset)
+        |socket| ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset)
     )
 }
 

@@ -19,6 +19,7 @@ axum-extra = { version = "*", features = ["async-read-body"] }
 
 # IO
 futures = "*"
+tokio = { version = "*"}
 tokio-stream = { version = "*" }
 tokio-tungstenite = { version = "*" }
 
@@ -26,11 +27,12 @@ tokio-tungstenite = { version = "*" }
 async-trait = "*"
 chrono = { version = "*", features = ["serde"] }
 url = { version = "*", features = ["serde"] }
-
+thiserror = "*"  # Structured error derivations
+serde = "*"
+serde_json = "*"
 
 [dev-dependencies]
 tempfile = "*"
-tokio = { version = "*" }
 env_logger = "*"
 test-log = { version = "*", features = ["trace"] }
 tracing-subscriber = { version = "*", features = ["env-filter"] }

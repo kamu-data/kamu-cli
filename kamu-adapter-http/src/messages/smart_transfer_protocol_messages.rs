@@ -9,12 +9,12 @@
 
 use url::Url;
 use chrono::{DateTime, Utc};
-
+use serde::{Deserialize, Serialize};
 use opendatafabric::Multihash;
 
 
 /// Initial dataset pull request message
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {
     pub begin_after: Option<Multihash>,
     pub stop_at: Option<Multihash>,
@@ -22,40 +22,40 @@ pub struct DatasetPullRequest {
 
 
 /// Response to initial dataset pull request
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullResponse {
     pub size_estimation: TransferSizeEstimation,
 }
 
 
 /// Pull stage 1: request metadata update
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullMetadataRequest {}
 
 
 /// Pull stage 1: metadata update response
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetMetadataPullResponse {
     pub blocks: ObjectsBatch,
 }
 
 
 /// Pull stage 2: object transfer request
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
 }
 
 
 // Pull stage 2: object transfer response
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferResponse {
     object_transfer_strategies: Vec<PullObjectTransferStrategy>,
 }
 
 
 /// Pull object transfer strategy
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct PullObjectTransferStrategy {
     pub object_file: ObjectFileReference,
     pub pull_strategy: ObjectPullStrategy,
@@ -64,14 +64,14 @@ pub struct PullObjectTransferStrategy {
 
 
 // Object pull strategy enumeration
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum ObjectPullStrategy {
     HttpDownload,
 }
 
 
 /// Initial dataset push request message
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequest {
     pub current_head: Multihash,
     pub size_estimation: TransferSizeEstimation,
@@ -79,38 +79,38 @@ pub struct DatasetPushRequest {
 
 
 /// Response to initial dataset push request
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequestAccepted {}
 
 
 /// Push phase 1: push metadata request
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadata {
     pub new_blocks: ObjectsBatch,
 }
 
 
 /// Push phase 1: push metadata accepted
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataAccepted {}
 
 
 /// Push phase 2: object transfer request
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
 }
 
 
 /// Push phase 2: object transfer response
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferResponse {
     pub object_transfer_strategies: Vec<PushObjectTransferStrategy>,
 }
 
 
 /// Push object transfer strategy
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct PushObjectTransferStrategy {
     pub object_file: ObjectFileReference,
     pub push_strategy: ObjectPushStrategy,
@@ -120,7 +120,7 @@ pub struct PushObjectTransferStrategy {
 
 
 // Object push strategy enumeration
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum ObjectPushStrategy {
     SkipUpload,
     HttpUpload,
@@ -128,31 +128,31 @@ pub enum ObjectPushStrategy {
 
 
 /// Push stage 3: complete handshake indication
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushComplete {}
 
 
 /// Push stage 3: complete handshake acknowledge
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 
 
 /// Error message
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetError {
     pub error_details: ErrorDetails,
 }
 
 
 /// Error message details
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ErrorDetails {
     pub error_code: String,
     pub description: String,
 }
 
 /// Packed object batch
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ObjectsBatch {
     pub objects_count: u32,
     pub object_type: ObjectType,
@@ -163,7 +163,7 @@ pub struct ObjectsBatch {
 
 
 /// Transfer size estimation
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct TransferSizeEstimation {
     pub num_blocks: u32,
     pub num_objects: u32,
@@ -173,7 +173,7 @@ pub struct TransferSizeEstimation {
 
 
 // Object file reference
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ObjectFileReference {
     pub object_type: ObjectType,
     pub physical_hash: Multihash,
@@ -181,7 +181,7 @@ pub struct ObjectFileReference {
 
 
 // Object type enumeration
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum ObjectType {
     MetadataBlock,
     DataSlice,
@@ -190,7 +190,7 @@ pub enum ObjectType {
 
 
 // Transfer URL
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct TransferUrl {
     pub url: Url,
     pub expires_at: Option<DateTime<Utc>>,

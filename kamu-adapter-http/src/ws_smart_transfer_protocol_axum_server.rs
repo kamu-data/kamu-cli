@@ -1,0 +1,143 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use axum::extract::ws::Message;
+use serde::{de::DeserializeOwned, Serialize};
+
+use kamu::domain::{Dataset, BlockRef};
+use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}};
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+pub async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
+    socket: &mut axum::extract::ws::WebSocket
+) -> Result<TMessagePayload, ReadMessageError>{
+
+    match socket.recv().await {
+        Some(msg) => {
+            match msg {
+                Ok(Message::Text(raw_message)) => {
+                    ws_common::parse_payload::<TMessagePayload>(raw_message)
+                },
+                Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
+                Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
+            }
+        },
+        None => Err(ReadMessageError::ClientDisconnected)
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+pub async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
+    socket: &mut axum::extract::ws::WebSocket,
+    payload: TMessagePayload
+) -> Result<(), WriteMessageError>{
+
+    let payload_as_json_string = 
+        ws_common::payload_to_json::<TMessagePayload>(payload)?;
+
+    let message = axum::extract::ws::Message::Text(payload_as_json_string);
+    let send_result = socket.send(message).await;
+    match send_result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(WriteMessageError::SocketError(Box::new(e)))
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+pub async fn dataset_pull_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    let maybe_pull_request = axum_ws_read_generic_payload::<DatasetPullRequest>(&mut socket).await;
+    match maybe_pull_request {
+        Ok(pull_request) => {
+            // TODO: professional logging
+            println!(
+                "Pull client sent a pull request: beginAfter={:?} stopAt={:?}", 
+                pull_request.begin_after.as_ref().map(|ba| ba.to_string()).ok_or("None"),
+                pull_request.stop_at.as_ref().map(|sa| sa.to_string()).ok_or("None")
+            );
+            
+            let metadata_chain = dataset.as_metadata_chain();
+
+            let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
+            let start_at = pull_request.stop_at.as_ref().or(
+                Some(&head)
+            ).unwrap();
+
+            use kamu::domain::TryStreamExtExt;
+            let block_count = 
+                metadata_chain
+                    .iter_blocks_interval(&start_at, pull_request.begin_after.as_ref(), false)
+                    .try_count()
+                    .await
+                    .unwrap();
+
+            let pull_response= DatasetPullResponse {
+                size_estimation: TransferSizeEstimation { 
+                    num_blocks: block_count as u32, 
+                    num_objects: 0 /* TODO */, 
+                    bytes_in_raw_blocks: 0 /* TODO */,
+                    bytes_in_raw_objects: 0 /* TODO */
+                }
+            };
+            let response_result = 
+                axum_ws_write_generic_payload::<DatasetPullResponse>(
+                    & mut socket, pull_response
+                ).await;
+            if let Err(e) = response_result {
+                println!("Error {}", e);
+            }
+
+            // TODO: Continue protocol
+        },
+        Err(e) => {
+            println!("Error {}", e);
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+
+pub async fn dataset_push_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    while let Some(msg) = socket.recv().await {
+        let msg = if let Ok(msg) = msg {
+            msg
+        } else {
+            // client disconnected
+            return;
+        };
+        println!("Push client sent: {}", msg.to_text().unwrap());
+
+        let reply = axum::extract::ws::Message::Text(String::from("Hi push client!"));
+        if socket.send(reply).await.is_err() {
+            // client disconnected
+            return;
+        }
+    }        
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
