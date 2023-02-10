@@ -220,7 +220,7 @@ dependencies = [
  "arrow-cast",
  "arrow-data",
  "arrow-schema",
- "flatbuffers",
+ "flatbuffers 22.9.29",
 ]
 
 [[package]]
@@ -1534,6 +1534,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "flatbuffers"
+version = "23.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77f5399c2c9c50ae9418e522842ad362f61ee48b346ac106807bd355a8a7c619"
+dependencies = [
+ "bitflags",
+ "rustc_version",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2253,7 +2263,7 @@ dependencies = [
  "curl",
  "curl-sys",
  "datafusion",
- "digest 0.9.0",
+ "digest 0.10.6",
  "dill",
  "env_logger",
  "filetime",
@@ -3008,9 +3018,9 @@ dependencies = [
  "bs58",
  "byteorder",
  "chrono",
- "digest 0.9.0",
+ "digest 0.10.6",
  "ed25519-dalek",
- "flatbuffers",
+ "flatbuffers 23.1.21",
  "hex",
  "indoc",
  "prost",
@@ -4619,9 +4629,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb2e075f03b3d66d8d8785356224ba688d2906a371015e225beeb65ca92c740"
+checksum = "7e267c18a719545b481171952a79f8c25c80361463ba44bc7fa9eba7c742ef4f"
 dependencies = [
  "bytes",
  "futures-core",
