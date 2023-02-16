@@ -251,6 +251,10 @@ type DatasetMetadata {
 	Current license associated with the dataset
 	"""
 	currentLicense: SetLicense
+	"""
+	Current vocabulary associated with the dataset
+	"""
+	currentVocab: SetVocab
 }
 
 scalar DatasetName

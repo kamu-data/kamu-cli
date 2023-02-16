@@ -184,4 +184,12 @@ impl DatasetMetadata {
             .await?
             .map(|b| b.event.into()))
     }
+
+    /// Current vocabulary associated with the dataset
+    async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
+        Ok(self
+            .get_last_block_of_type::<odf::SetVocab>(ctx)
+            .await?
+            .map(|b| b.event.into()))
+    }
 }
