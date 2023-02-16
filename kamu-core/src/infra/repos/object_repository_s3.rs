@@ -149,6 +149,10 @@ where
         }
     }
 
+    async fn get_size(&self, _hash: &Multihash) -> Result<u64, GetError> {
+        panic!("get_size unsupported for S3 object repository");
+    }
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         use tokio::io::AsyncReadExt;
         let mut stream = self.get_stream(hash).await?;

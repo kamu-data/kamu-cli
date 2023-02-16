@@ -28,3 +28,4 @@ mod http_server_simple_transfer_protocol;
 pub use http_server_simple_transfer_protocol::*;
 
 mod ws_common;
+mod dataset_protocol_helper;

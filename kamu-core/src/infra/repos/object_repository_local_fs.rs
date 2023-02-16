@@ -125,6 +125,20 @@ where
 
         Ok(path.exists())
     }
+    
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        let path = self.get_path(hash);
+
+        debug!(?path, "Reading object size");
+
+        if !path.exists() {
+            return Err(GetError::NotFound(ObjectNotFoundError {
+                hash: hash.clone(),
+            }));
+        }
+        let metadata = tokio::fs::metadata(path).await.int_err()?;
+        Ok(metadata.len())
+    }
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let path = self.get_path(hash);

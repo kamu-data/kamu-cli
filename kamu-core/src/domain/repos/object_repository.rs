@@ -28,6 +28,8 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 pub trait ObjectRepository: Send + Sync {
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError>;
 
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError>;
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError>;
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;

@@ -44,6 +44,17 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         Ok(blocks_by_hash.contains_key(hash))
     }
 
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
+        let res = blocks_by_hash.get(hash);
+        match res {
+            Some(bytes) => Ok(bytes.len() as u64),
+            None => Err(GetError::NotFound(ObjectNotFoundError {
+                hash: hash.clone(),
+            })),
+        }
+    }
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         let res = blocks_by_hash.get(hash);

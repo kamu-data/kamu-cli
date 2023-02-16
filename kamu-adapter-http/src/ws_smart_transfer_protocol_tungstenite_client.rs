@@ -73,8 +73,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     
         let dataset_pull_response: DatasetPullResponse = read_result.unwrap();
         println!(
-            "Pull response estimate: {} blocks to synchronize", 
-            dataset_pull_response.size_estimation.num_blocks
+            "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
+            dataset_pull_response.size_estimation.num_blocks,
+            dataset_pull_response.size_estimation.bytes_in_raw_blocks,
+            dataset_pull_response.size_estimation.num_objects,
+            dataset_pull_response.size_estimation.bytes_in_raw_objects,
         );
     
         unimplemented!("Not supported yet")
@@ -83,7 +86,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        src: &dyn Dataset,
+        _src: &dyn Dataset,
         dst_url: &Url,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {

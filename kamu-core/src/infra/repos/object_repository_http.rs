@@ -68,6 +68,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
         }
     }
 
+    async fn get_size(&self, _hash: &Multihash) -> Result<u64, GetError> {
+        panic!("get_size unsupported for HTTP object repository");
+    }
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 

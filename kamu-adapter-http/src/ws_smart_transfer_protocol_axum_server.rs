@@ -13,7 +13,7 @@ use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
 use kamu::domain::{Dataset, BlockRef};
-use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}};
+use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}, dataset_protocol_helper::prepare_dataset_transfer_estimaton};
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -74,33 +74,19 @@ pub async fn dataset_pull_ws_handler(
                 pull_request.begin_after.as_ref().map(|ba| ba.to_string()).ok_or("None"),
                 pull_request.stop_at.as_ref().map(|sa| sa.to_string()).ok_or("None")
             );
-            
+
             let metadata_chain = dataset.as_metadata_chain();
-
             let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
-            let start_at = pull_request.stop_at.as_ref().or(
-                Some(&head)
-            ).unwrap();
 
-            use kamu::domain::TryStreamExtExt;
-            let block_count = 
-                metadata_chain
-                    .iter_blocks_interval(&start_at, pull_request.begin_after.as_ref(), false)
-                    .try_count()
-                    .await
-                    .unwrap();
+            let size_estimation = prepare_dataset_transfer_estimaton(
+                dataset,
+                pull_request.stop_at.as_ref().or(Some(&head)).unwrap().clone(),
+                pull_request.begin_after.clone(),
+            ).await;
 
-            let pull_response= DatasetPullResponse {
-                size_estimation: TransferSizeEstimation { 
-                    num_blocks: block_count as u32, 
-                    num_objects: 0 /* TODO */, 
-                    bytes_in_raw_blocks: 0 /* TODO */,
-                    bytes_in_raw_objects: 0 /* TODO */
-                }
-            };
             let response_result = 
                 axum_ws_write_generic_payload::<DatasetPullResponse>(
-                    & mut socket, pull_response
+                    & mut socket, DatasetPullResponse { size_estimation }
                 ).await;
             if let Err(e) = response_result {
                 println!("Error {}", e);
@@ -120,7 +106,7 @@ pub async fn dataset_pull_ws_handler(
 
 pub async fn dataset_push_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
-    dataset: Arc<dyn Dataset>
+    _dataset: Arc<dyn Dataset>
 ) {
     while let Some(msg) = socket.recv().await {
         let msg = if let Ok(msg) = msg {

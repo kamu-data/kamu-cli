@@ -380,6 +380,10 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.get_block(hash).await
     }
 
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
+        self.chain.get_block_size(hash).await
+    }
+
     fn iter_blocks_interval<'b>(
         &'b self,
         head: &'b Multihash,

@@ -187,6 +187,18 @@ where
         }
     }
 
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
+        let size_result = self.obj_repo.get_size(hash).await;
+        match size_result {
+            Ok(size) => Ok(size),
+            Err(GetError::NotFound(e)) => {
+                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
+            }
+            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
+            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
+        }
+    }
+
     fn iter_blocks_interval<'a>(
         &'a self,
         head_hash: &'a Multihash,

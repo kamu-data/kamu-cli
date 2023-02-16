@@ -27,6 +27,9 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Returns size of the specified block in bytes
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError>;
+
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
