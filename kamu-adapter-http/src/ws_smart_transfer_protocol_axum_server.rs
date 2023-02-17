@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
+use thiserror::Error;
 
 use kamu::domain::{Dataset, BlockRef};
 use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}, dataset_protocol_helper::{prepare_dataset_transfer_estimaton, prepare_dataset_metadata_batch}};
@@ -19,7 +20,7 @@ use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self},
 /////////////////////////////////////////////////////////////////////////////////
 
 
-pub async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
+async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
     socket: &mut axum::extract::ws::WebSocket
 ) -> Result<TMessagePayload, ReadMessageError>{
 
@@ -41,7 +42,7 @@ pub async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
 /////////////////////////////////////////////////////////////////////////////////
 
 
-pub async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
+async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload
 ) -> Result<(), WriteMessageError>{
@@ -61,11 +62,32 @@ pub async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
 /////////////////////////////////////////////////////////////////////////////////
 
 
-pub async fn dataset_pull_ws_handler(
-    mut socket: axum::extract::ws::WebSocket,
-    dataset: Arc<dyn Dataset>
-) {
-    let maybe_pull_request = axum_ws_read_generic_payload::<DatasetPullRequest>(&mut socket).await;
+#[derive(Error, Debug)]
+enum SmartProtocolPullServerError {
+    #[error(transparent)]
+    PullRequestReadFailed(ReadMessageError),
+    
+    #[error(transparent)]
+    PullResponseWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PullMetadataRequestReadFailed(ReadMessageError),
+        
+    #[error(transparent)]
+    PullMetadataResponseWriteFailed(WriteMessageError)
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn handle_pull_request_initiation(
+    socket: &mut axum::extract::ws::WebSocket,
+    dataset: &dyn Dataset
+) -> Result<DatasetPullRequest, SmartProtocolPullServerError> {
+
+    let maybe_pull_request = 
+        axum_ws_read_generic_payload::<DatasetPullRequest>(socket).await;
+
     match maybe_pull_request {
         Ok(pull_request) => {
             // TODO: professional logging
@@ -86,51 +108,77 @@ pub async fn dataset_pull_ws_handler(
 
             let response_result = 
                 axum_ws_write_generic_payload::<DatasetPullResponse>(
-                    & mut socket, DatasetPullResponse { size_estimation }
+                    socket, DatasetPullResponse { size_estimation }
                 ).await;
             if let Err(e) = response_result {
-                panic!("WriteMessageError DatasetPullResponse {:?}", e);
+                Err(SmartProtocolPullServerError::PullResponseWriteFailed(e))
+            } else {
+                Ok(pull_request)
             }
-
-            let maybe_pull_metadata_request = axum_ws_read_generic_payload::<DatasetPullMetadataRequest>(&mut socket).await;
-            match maybe_pull_metadata_request {
-                Ok(_) => {
-                    // TODO: professional logging
-                    println!(
-                        "Pull client sent a pull metadata request"
-                    );
-
-                    let metadata_batch = prepare_dataset_metadata_batch(
-                        dataset.as_metadata_chain(),
-                        pull_request.stop_at.or(Some(head)).unwrap(),
-                        pull_request.begin_after,
-                    ).await;
-
-                    let response_result_metadata = 
-                    axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
-                        & mut socket, DatasetMetadataPullResponse { blocks: metadata_batch }
-                    ).await;
-
-                    if let Err(e) = response_result_metadata {
-                        panic!("WriteMessageError DatasetMetadataPullResponse {:?}", e);
-                    }
-
-                    // TODO: Continue protocol
-                }
-                Err(e) => {
-                    panic!("ReadMessageError DatasetPullMetadataRequest {:?}", e);
-                }
-            }
-
-
         },
         Err(e) => {
-            println!("Error {}", e);
-            panic!("ReadMessageError DatasetPullRequest");
+            Err(SmartProtocolPullServerError::PullRequestReadFailed(e))
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn handle_pull_metadata_request(
+    socket: &mut axum::extract::ws::WebSocket,
+    dataset: &dyn Dataset,
+    pull_request: DatasetPullRequest
+) -> Result<(), SmartProtocolPullServerError> {
+
+    let maybe_pull_metadata_request = 
+        axum_ws_read_generic_payload::<DatasetPullMetadataRequest>(socket).await;
+
+    match maybe_pull_metadata_request {
+        Ok(_) => {
+            // TODO: professional logging
+            println!(
+                "Pull client sent a pull metadata request"
+            );
+
+            let metadata_chain = dataset.as_metadata_chain();
+            let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
+
+            let metadata_batch = prepare_dataset_metadata_batch(
+                dataset.as_metadata_chain(),
+                pull_request.stop_at.or(Some(head)).unwrap(),
+                pull_request.begin_after,
+            ).await;
+
+            let response_result_metadata = 
+            axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
+                socket, DatasetMetadataPullResponse { blocks: metadata_batch }
+            ).await;
+
+            if let Err(e) = response_result_metadata {
+                Err(SmartProtocolPullServerError::PullMetadataResponseWriteFailed(e))
+            } else {
+                Ok(())
+            }
+        }
+        Err(e) => {
+            Err(SmartProtocolPullServerError::PullMetadataRequestReadFailed(e))
+        }
+    }
+}
 
 
+/////////////////////////////////////////////////////////////////////////////////
+
+
+pub async fn dataset_pull_ws_handler(
+    mut socket: axum::extract::ws::WebSocket,
+    dataset: Arc<dyn Dataset>
+) {
+    // TODO: error handling
+    let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref()).await.unwrap();
+    handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request).await.unwrap();
+
+    // TODO: Continue protocol - transfer objects, until client stops
 }
 
 
