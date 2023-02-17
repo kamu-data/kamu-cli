@@ -18,6 +18,9 @@ pub enum ReadMessageError {
     #[error("Client has disconnected unexpetedly")]
     ClientDisconnected,
 
+    #[error("Close message received")]
+    Closed,
+
     #[error("Message is not in text format")]
     NonTextMessageReceived,
 

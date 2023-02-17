@@ -50,7 +50,7 @@ pub struct DatasetPullObjectsTransferRequest {
 // Pull stage 2: object transfer response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullObjectsTransferResponse {
-    object_transfer_strategies: Vec<PullObjectTransferStrategy>,
+    pub object_transfer_strategies: Vec<PullObjectTransferStrategy>,
 }
 
 

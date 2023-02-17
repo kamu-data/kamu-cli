@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use chrono::{DateTime, Utc};
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
@@ -17,6 +18,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
+use url::Url;
 use tracing::debug;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -169,6 +171,15 @@ where
         let file = tokio::fs::File::open(path).await.int_err()?;
 
         Ok(Box::new(file))
+    }
+
+    async fn get_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+        match prefix_url.join(&hash.to_multibase_string()) {
+            Ok(url) => {
+                Ok((url, None))
+            }
+            Err(e) => Err(GetError::Internal(e.int_err()))
+        }
     }
 
     async fn insert_bytes<'a>(

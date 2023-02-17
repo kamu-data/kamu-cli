@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use axum::{TypedHeader, headers::Host};
 use kamu::domain::{Dataset, LocalDatasetRepository, GetDatasetError, BlockRef};
+use url::Url;
 use crate::{
     http_server_constants::*, 
     ws_smart_transfer_protocol_axum_server,
@@ -118,15 +120,28 @@ pub async fn dataset_push_ws_upgrade_handler(
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     local_dataset_repository: axum::extract::Extension<Arc<dyn LocalDatasetRepository>>,
-    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
+    TypedHeader(host): TypedHeader<Host>,
 ) -> axum::response::Response  {
 
     let dataset = resolve_dataset(local_dataset_repository, &params)
         .await
         .unwrap();
 
+    let host_ptr = Box::from(host.clone());
+    
     ws.on_upgrade(
-        |socket| ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset)
+        move |socket| {
+            let mut prefix_url_str = String::from("http://");
+            prefix_url_str += host_ptr.hostname();
+            if let Some(port) = host_ptr.port() {
+                prefix_url_str += ":";
+                prefix_url_str += &port.to_string();
+            }
+            let prefix_url = Url::parse(prefix_url_str.as_str()).unwrap();
+
+            ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset, prefix_url)
+        }
     )
 }
 

@@ -9,10 +9,12 @@
 
 use crate::domain::*;
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
 use thiserror::Error;
+use url::Url;
 use tokio_stream::StreamExt;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -390,6 +392,10 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.get_block_bytes(hash).await
     }
 
+    async fn get_block_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
+        self.chain.get_block_download_url(prefix_url, hash).await
+    }
+
     fn iter_blocks_interval<'b>(
         &'b self,
         head: &'b Multihash,
@@ -423,7 +429,15 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         hash: &Multihash,
         opts: SetRefOpts<'b>,
     ) -> Result<(), SetRefError> {
-        self.set_ref(r, hash, opts).await
+        self.chain.set_ref(r, hash, opts).await
+    }
+
+    async fn construct_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+    ) -> Result<MetadataBlock, GetBlockError> {
+        self.chain.construct_block_from_bytes(hash, block_bytes).await
     }
 
     async fn append<'b>(
@@ -431,7 +445,7 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         block: MetadataBlock,
         opts: AppendOpts<'b>,
     ) -> Result<Multihash, AppendError> {
-        self.append(block, opts).await
+        self.chain.append(block, opts).await
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {

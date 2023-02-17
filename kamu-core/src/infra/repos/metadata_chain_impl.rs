@@ -9,9 +9,11 @@
 
 use crate::domain::*;
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
+use url::Url;
 use async_trait::async_trait;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -158,27 +160,7 @@ where
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         let data = self.get_block_bytes(hash).await?;
-
-        match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
-            Ok(block) => return Ok(block),
-            Err(e) => match e {
-                Error::UnsupportedVersion { .. } => {
-                    return Err(GetBlockError::BlockVersion(BlockVersionError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }));
-                }
-                _ => {
-                    return Err(GetBlockError::Internal(
-                        BlockMalformedError {
-                            hash: hash.clone(),
-                            source: e.into(),
-                        }
-                        .int_err(),
-                    ));
-                }
-            },
-        }
+        self.construct_block_from_bytes(hash, data).await
     }
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
@@ -196,6 +178,17 @@ where
     async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError> {
         match self.obj_repo.get_bytes(hash).await {
             Ok(data) => Ok(data),
+            Err(GetError::NotFound(e)) => {
+                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
+            }
+            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
+            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
+        }
+    }
+
+    async fn get_block_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
+        match self.obj_repo.get_download_url(prefix_url, hash).await {
+            Ok(url) => Ok(url),
             Err(GetError::NotFound(e)) => {
                 Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
             }
@@ -297,6 +290,34 @@ where
         self.ref_repo.set(r, hash).await?;
 
         Ok(())
+    }
+
+    async fn construct_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+    ) -> Result<MetadataBlock, GetBlockError> {
+
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
+            Ok(block) => return Ok(block),
+            Err(e) => match e {
+                Error::UnsupportedVersion { .. } => {
+                    return Err(GetBlockError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }));
+                }
+                _ => {
+                    return Err(GetBlockError::Internal(
+                        BlockMalformedError {
+                            hash: hash.clone(),
+                            source: e.into(),
+                        }
+                        .int_err(),
+                    ));
+                }
+            },
+        }
     }
 
     async fn append<'a>(

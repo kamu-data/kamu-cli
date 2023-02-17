@@ -8,12 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use chrono::{DateTime, Utc};
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use rusoto_core::{Region, RusotoError};
-use rusoto_s3::*;
+use rusoto_core::{Region, RusotoError, credential::{ChainProvider, ProvideAwsCredentials}};
+use rusoto_s3::{*, util::{PreSignedRequest, PreSignedRequestOption}};
 use std::{marker::PhantomData, path::Path};
 use tokio::io::AsyncRead;
 use tracing::debug;
@@ -189,6 +190,29 @@ where
 
         let stream = resp.body.expect("Response with no body").into_async_read();
         Ok(Box::new(stream))
+    }
+
+    async fn get_download_url(&self, _prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+        let key = self.get_key(hash);
+        let get_object_request = GetObjectRequest {
+            bucket: self.bucket.clone(),
+            key,
+            ..GetObjectRequest::default()
+        };
+
+        let provider = ChainProvider::new();
+        let credentials = provider.credentials().await.unwrap();
+
+        let validity_period_seconds: u64 = 3600;
+        let options = PreSignedRequestOption {
+            expires_in: std::time::Duration::from_secs(validity_period_seconds),
+        };
+        
+        let presigned_url = get_object_request.get_presigned_url(&(Region::default()), &credentials, &options);
+        match Url::parse(presigned_url.as_str()) {
+            Ok(url) => Ok((url, Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds as i64)))),
+            Err(e) => Err(GetError::Internal(e.int_err()))
+        }
     }
 
     async fn insert_bytes<'a>(

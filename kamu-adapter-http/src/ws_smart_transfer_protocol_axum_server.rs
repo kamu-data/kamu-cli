@@ -14,7 +14,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
 use kamu::domain::{Dataset, BlockRef};
-use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}, dataset_protocol_helper::{prepare_dataset_transfer_estimaton, prepare_dataset_metadata_batch}};
+use url::Url;
+use crate::{
+    messages::*, 
+    ws_common::{WriteMessageError, ReadMessageError, self}, 
+    dataset_protocol_helper::*
+};
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +34,9 @@ async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
             match msg {
                 Ok(Message::Text(raw_message)) => {
                     ws_common::parse_payload::<TMessagePayload>(raw_message)
+                },
+                Ok(Message::Close(_)) => {
+                    Err(ReadMessageError::Closed)
                 },
                 Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
                 Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
@@ -74,7 +82,13 @@ enum SmartProtocolPullServerError {
     PullMetadataRequestReadFailed(ReadMessageError),
         
     #[error(transparent)]
-    PullMetadataResponseWriteFailed(WriteMessageError)
+    PullMetadataResponseWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PullObjectRequestReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PullObjectResponseWriteFailed(WriteMessageError)
 }
 
 
@@ -169,16 +183,72 @@ async fn handle_pull_metadata_request(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+async fn try_handle_pull_objects_request(
+    socket: &mut axum::extract::ws::WebSocket,
+    dataset: &dyn Dataset,
+    prefix_url: &Url,
+) -> Result<bool, SmartProtocolPullServerError> {
+    
+    let maybe_pull_objects_transfer_request = 
+        axum_ws_read_generic_payload::<DatasetPullObjectsTransferRequest>(socket).await;
+
+    match maybe_pull_objects_transfer_request {
+        Ok(request) => {
+            // TODO: professional logging
+            println!(
+                "Pull client sent a pull objects request for {} objects",
+                request.object_files.len(),
+            );
+            let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
+            for r in request.object_files {
+                let transfer_strategy = prepare_object_transfer_strategy(
+                    dataset, prefix_url, &r
+                ).await;
+                object_transfer_strategies.push(transfer_strategy);
+            }
+
+            let response_result_objects = 
+            axum_ws_write_generic_payload::<DatasetPullObjectsTransferResponse>(
+                socket, DatasetPullObjectsTransferResponse { object_transfer_strategies }
+            ).await;
+
+            if let Err(e) = response_result_objects {
+                Err(SmartProtocolPullServerError::PullObjectResponseWriteFailed(e))
+            } else {
+                Ok(true)
+            }
+        }
+        Err(ReadMessageError::Closed) => {
+            Ok(false)
+        }
+        Err(e) => {
+            Err(SmartProtocolPullServerError::PullObjectRequestReadFailed(e))
+        }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
 
 pub async fn dataset_pull_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
-    dataset: Arc<dyn Dataset>
+    dataset: Arc<dyn Dataset>,
+    prefix_url: Url,
 ) {
     // TODO: error handling
     let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref()).await.unwrap();
     handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request).await.unwrap();
 
-    // TODO: Continue protocol - transfer objects, until client stops
+    loop {
+        let should_continue = try_handle_pull_objects_request(& mut socket, dataset.as_ref(), &prefix_url).await.unwrap();
+        if !should_continue {
+            break;
+        }
+    }
+
+    // Success
+    println!("Pull process succeded");
 }
 
 

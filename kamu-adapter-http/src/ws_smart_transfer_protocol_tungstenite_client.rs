@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{sync::Arc};
+use std::{sync::Arc, io::Read};
+use bytes::Bytes;
+use opendatafabric::{Multihash, MetadataEvent};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::net::TcpStream;
 use url::Url;
@@ -108,18 +110,101 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let tar = flate2::read::GzDecoder::new(dataset_metadata_pull_response.blocks.payload.as_slice());
         let mut archive = tar::Archive::new(tar);
-        archive
+        let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
             .entries()
             .unwrap()
             .filter_map(|e| e.ok())
-            .map(|entry| {
+            .map(|mut entry| {
+                let entry_size = entry.size();
+                let mut buf = vec![0 as u8; entry_size as usize];
+                entry.read(buf.as_mut_slice()).unwrap();
+                
                 let path = entry.path().unwrap().to_owned();
-                (String::from(path.to_str().unwrap()), entry.size())
-            })
-            .for_each(|(path, size)| println!("> {} - {} bytes", path, size));
-        
+                let hash = Multihash::from_multibase_str(path.to_str().unwrap()).unwrap();
 
-        unimplemented!("Not supported yet")
+                (hash, buf)
+            })
+            .collect();
+
+        let mut object_files: Vec<ObjectFileReference> = Vec::new();
+        for (hash, block_data) in blocks_data {
+            println!("> {} - {} bytes", hash, block_data.len());
+            let block = dst.as_metadata_chain().construct_block_from_bytes(
+                &hash, Bytes::copy_from_slice(block_data.as_slice())
+            ).await.unwrap();
+
+            match block.event {
+                MetadataEvent::AddData(e) => {
+                    object_files.push(
+                        ObjectFileReference {
+                            object_type: ObjectType::DataSlice,
+                            physical_hash: e.output_data.physical_hash.clone(),
+                        }
+                    );
+                    if let Some(checkpoint) = e.output_checkpoint {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::Checkpoint,
+                                physical_hash: checkpoint.physical_hash.clone()
+                            }
+                        );
+                    }
+                },
+                MetadataEvent::ExecuteQuery(e) => {
+                    if let Some(data_slice) = e.output_data {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::DataSlice,
+                                physical_hash: data_slice.physical_hash.clone(),
+                            }
+                        );
+                    }
+                    if let Some(checkpoint) = e.output_checkpoint {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::Checkpoint,
+                                physical_hash: checkpoint.physical_hash.clone()
+                            }
+                        );
+                    }
+                },
+                _ => (),
+            }
+        }
+
+        println!("Need to query {} data objects", object_files.len());
+
+        let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
+        let write_result_objects = 
+            tungstenite_ws_write_generic_payload(&mut ws_stream, pull_objects_request).await;
+        if write_result_objects.is_err() {
+            panic!("write problem")
+        }
+
+        let read_result_objects = 
+            tungstenite_ws_read_generic_payload::<DatasetPullObjectsTransferResponse>(&mut ws_stream).await;
+        
+        if read_result_objects.is_err() {
+            panic!("read problem")
+        }
+
+        let dataset_objects_pull_response = read_result_objects.unwrap();
+        dataset_objects_pull_response.object_transfer_strategies.iter()
+            .for_each(
+                |s| {
+                    println!(
+                        "Object file {} needs to download from {} via {:?} method, expires at {:?}",
+                        s.object_file.physical_hash.to_string(),
+                        s.download_from.url,
+                        s.pull_strategy,
+                        s.download_from.expires_at
+                    )
+                }
+            );
+
+        ws_stream.close(None).await.unwrap();
+        
+        unimplemented!("Saving downloaded blocks not supported yet")
 
     }
 

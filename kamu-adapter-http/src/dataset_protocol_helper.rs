@@ -9,12 +9,13 @@
 
 
 use flate2::Compression;
-use kamu::domain::{MetadataChain};
+use kamu::domain::{MetadataChain, Dataset};
 use opendatafabric::{Multihash, MetadataEvent};
 use futures::TryStreamExt;
 use tar::Header;
 use bytes::Bytes;
-use crate::messages::{TransferSizeEstimation, ObjectsBatch, ObjectType};
+use url::Url;
+use crate::messages::{TransferSizeEstimation, ObjectsBatch, ObjectType, ObjectFileReference, PullObjectTransferStrategy, TransferUrl};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,6 +114,48 @@ pub async fn prepare_dataset_metadata_batch(
         encoding: String::from("raw"),
         payload: tarball_data,
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn prepare_object_transfer_strategy(
+    dataset: &dyn Dataset,
+    prefix_url: &Url,
+    object_file_ref: &ObjectFileReference
+) -> PullObjectTransferStrategy {
+
+    PullObjectTransferStrategy {
+        object_file: object_file_ref.clone(),
+        pull_strategy: crate::messages::ObjectPullStrategy::HttpDownload,
+        download_from: {
+            let (url, expires_at) = match object_file_ref.object_type {
+                ObjectType::MetadataBlock => {
+                    let blocks_url = prefix_url.join("blocks/").unwrap();
+                    dataset.as_metadata_chain()
+                        .get_block_download_url(&blocks_url, &object_file_ref.physical_hash)
+                        .await
+                        .unwrap()
+                }
+                ObjectType::DataSlice => {
+                    let data_url = prefix_url.join("data/").unwrap();
+                    dataset.as_data_repo()
+                        .get_download_url(&data_url, &object_file_ref.physical_hash)
+                        .await
+                        .unwrap()
+                }
+                ObjectType::Checkpoint => {
+                    let checkpoints_url = prefix_url.join("checkpoints/").unwrap();
+                    dataset.as_checkpoint_repo()
+                        .get_download_url(&checkpoints_url, &object_file_ref.physical_hash)
+                        .await
+                        .unwrap()
+                }
+            };
+            TransferUrl { url, expires_at }
+        }
+        
+    }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
