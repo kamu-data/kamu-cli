@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use bytes::Bytes;
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
@@ -156,14 +157,7 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let data = match self.obj_repo.get_bytes(hash).await {
-            Ok(data) => Ok(data),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
-        }?;
+        let data = self.get_block_bytes(hash).await?;
 
         match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
             Ok(block) => return Ok(block),
@@ -191,6 +185,17 @@ where
         let size_result = self.obj_repo.get_size(hash).await;
         match size_result {
             Ok(size) => Ok(size),
+            Err(GetError::NotFound(e)) => {
+                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
+            }
+            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
+            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
+        }
+    }
+
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError> {
+        match self.obj_repo.get_bytes(hash).await {
+            Ok(data) => Ok(data),
             Err(GetError::NotFound(e)) => {
                 Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
             }

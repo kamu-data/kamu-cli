@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::{sync::Arc};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::net::TcpStream;
 use url::Url;
@@ -79,7 +79,46 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             dataset_pull_response.size_estimation.num_objects,
             dataset_pull_response.size_estimation.bytes_in_raw_objects,
         );
+
+        let pull_metadata_request = DatasetPullMetadataRequest {};
+        let write_result_metadata = 
+            tungstenite_ws_write_generic_payload(&mut ws_stream, pull_metadata_request).await;
+        if write_result_metadata.is_err() {
+            panic!("write problem")
+        }
+
+
+        let read_result_metadata = 
+            tungstenite_ws_read_generic_payload::<DatasetMetadataPullResponse>(&mut ws_stream).await;
+        
+        if read_result_metadata.is_err() {
+            panic!("read problem")
+        }            
     
+        let dataset_metadata_pull_response: DatasetMetadataPullResponse = read_result_metadata.unwrap();
+        println!(
+            "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
+            dataset_metadata_pull_response.blocks.objects_count,
+            dataset_metadata_pull_response.blocks.object_type,
+            dataset_metadata_pull_response.blocks.media_type,
+            dataset_metadata_pull_response.blocks.encoding,
+            dataset_metadata_pull_response.blocks.payload.len()
+        );
+
+
+        let tar = flate2::read::GzDecoder::new(dataset_metadata_pull_response.blocks.payload.as_slice());
+        let mut archive = tar::Archive::new(tar);
+        archive
+            .entries()
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|entry| {
+                let path = entry.path().unwrap().to_owned();
+                (String::from(path.to_str().unwrap()), entry.size())
+            })
+            .for_each(|(path, size)| println!("> {} - {} bytes", path, size));
+        
+
         unimplemented!("Not supported yet")
 
     }

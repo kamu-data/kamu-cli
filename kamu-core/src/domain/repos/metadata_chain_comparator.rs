@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use bytes::Bytes;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
@@ -382,6 +383,11 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
         self.chain.get_block_size(hash).await
+    }
+
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError> {
+        (self.on_read)(1);
+        self.chain.get_block_bytes(hash).await
     }
 
     fn iter_blocks_interval<'b>(

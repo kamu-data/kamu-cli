@@ -22,6 +22,9 @@ futures = "*"
 tokio = { version = "*"}
 tokio-stream = { version = "*" }
 tokio-tungstenite = { version = "*" }
+bytes = "*"
+flate2 = "*"  # GZip decoder
+tar = "*" 
 
 # Utils
 async-trait = "*"

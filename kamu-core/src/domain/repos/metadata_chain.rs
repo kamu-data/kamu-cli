@@ -11,6 +11,7 @@ use std::fmt::Display;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
+use bytes::Bytes;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
@@ -29,6 +30,9 @@ pub trait MetadataChain: Send + Sync {
 
     /// Returns size of the specified block in bytes
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError>;
+
+    /// Returns raw bytes associated with the block
+    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError>;
 
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.

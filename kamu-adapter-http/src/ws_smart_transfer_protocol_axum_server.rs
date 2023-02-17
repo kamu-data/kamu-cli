@@ -13,7 +13,7 @@ use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
 use kamu::domain::{Dataset, BlockRef};
-use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}, dataset_protocol_helper::prepare_dataset_transfer_estimaton};
+use crate::{messages::*, ws_common::{WriteMessageError, ReadMessageError, self}, dataset_protocol_helper::{prepare_dataset_transfer_estimaton, prepare_dataset_metadata_batch}};
 
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +79,7 @@ pub async fn dataset_pull_ws_handler(
             let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
 
             let size_estimation = prepare_dataset_transfer_estimaton(
-                dataset,
+                dataset.as_metadata_chain(),
                 pull_request.stop_at.as_ref().or(Some(&head)).unwrap().clone(),
                 pull_request.begin_after.clone(),
             ).await;
@@ -89,15 +89,48 @@ pub async fn dataset_pull_ws_handler(
                     & mut socket, DatasetPullResponse { size_estimation }
                 ).await;
             if let Err(e) = response_result {
-                println!("Error {}", e);
+                panic!("WriteMessageError DatasetPullResponse {:?}", e);
             }
 
-            // TODO: Continue protocol
+            let maybe_pull_metadata_request = axum_ws_read_generic_payload::<DatasetPullMetadataRequest>(&mut socket).await;
+            match maybe_pull_metadata_request {
+                Ok(_) => {
+                    // TODO: professional logging
+                    println!(
+                        "Pull client sent a pull metadata request"
+                    );
+
+                    let metadata_batch = prepare_dataset_metadata_batch(
+                        dataset.as_metadata_chain(),
+                        pull_request.stop_at.or(Some(head)).unwrap(),
+                        pull_request.begin_after,
+                    ).await;
+
+                    let response_result_metadata = 
+                    axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
+                        & mut socket, DatasetMetadataPullResponse { blocks: metadata_batch }
+                    ).await;
+
+                    if let Err(e) = response_result_metadata {
+                        panic!("WriteMessageError DatasetMetadataPullResponse {:?}", e);
+                    }
+
+                    // TODO: Continue protocol
+                }
+                Err(e) => {
+                    panic!("ReadMessageError DatasetPullMetadataRequest {:?}", e);
+                }
+            }
+
+
         },
         Err(e) => {
             println!("Error {}", e);
+            panic!("ReadMessageError DatasetPullRequest");
         }
     }
+
+
 }
 
 
