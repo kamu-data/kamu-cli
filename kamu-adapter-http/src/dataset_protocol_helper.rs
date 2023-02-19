@@ -12,12 +12,17 @@ use std::io::Read;
 
 use flate2::Compression;
 use kamu::domain::{MetadataChain, Dataset};
-use opendatafabric::{Multihash, MetadataEvent};
+use opendatafabric::{Multihash, MetadataEvent, MetadataBlock};
 use futures::TryStreamExt;
 use tar::Header;
 use bytes::Bytes;
 use url::Url;
 use crate::messages::{TransferSizeEstimation, ObjectsBatch, ObjectType, ObjectFileReference, PullObjectTransferStrategy, TransferUrl};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+const MEDIA_TAR_GZ: &str = "application/tar+gzip";
+const ENCODING_RAW: &str = "raw";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,11 +94,14 @@ pub async fn prepare_dataset_metadata_batch(
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
-    let mut block_stream = 
+    let blocks_for_transfer: Vec<(Multihash, MetadataBlock)> = 
         metadata_chain
-            .iter_blocks_interval(&stop_at, begin_after.as_ref(), false);
+            .iter_blocks_interval(&stop_at, begin_after.as_ref(), false)
+            .try_collect()
+            .await
+            .unwrap();
 
-    while let Some((hash, _)) = block_stream.try_next().await.unwrap() {
+    for (hash, _) in blocks_for_transfer.iter().rev() {
         blocks_count += 1;
 
         // TODO: error handling of get_block_bytes
@@ -106,14 +114,13 @@ pub async fn prepare_dataset_metadata_batch(
         tarball_builder.append_data(&mut header, hash.to_multibase_string(), block_data).unwrap();
     }
 
-
     let tarball_data = tarball_builder.into_inner().unwrap().finish().unwrap();
 
     ObjectsBatch {
         objects_count: blocks_count,
         object_type: ObjectType::MetadataBlock,
-        media_type: String::from("application/tar+gzip"),
-        encoding: String::from("raw"),
+        media_type: String::from(MEDIA_TAR_GZ),
+        encoding: String::from(ENCODING_RAW),
         payload: tarball_data,
     }
 }
@@ -121,9 +128,22 @@ pub async fn prepare_dataset_metadata_batch(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn unpack_dataset_metadata_batch(
-    objects_batch_archived: &[u8],
+    objects_batch: ObjectsBatch
 ) -> Vec<(Multihash, Vec<u8>)> {
-    let decoder = flate2::read::GzDecoder::new(objects_batch_archived);
+
+    if !objects_batch.media_type.eq(MEDIA_TAR_GZ) {
+        panic!("Unsupported media type {}", objects_batch.media_type);
+    }
+
+    if !objects_batch.encoding.eq(ENCODING_RAW) {
+        panic!("Unsupported batch encoding type {}", objects_batch.encoding);
+    }
+
+    if objects_batch.object_type != ObjectType::MetadataBlock {
+        panic!("Unexpected object type {:?}", objects_batch.object_type);
+    }
+
+    let decoder = flate2::read::GzDecoder::new(objects_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
     let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
         .entries()
@@ -146,10 +166,14 @@ pub async fn unpack_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn collect_object_references_from_metadata(
-    metadata_chain: &dyn MetadataChain,
+pub async fn collect_missing_object_references_from_metadata(
+    dataset: &dyn Dataset,
     blocks_data: Vec<(Multihash, Vec<u8>)>
 ) -> Vec<ObjectFileReference> {
+
+    let metadata_chain = dataset.as_metadata_chain();
+    let data_repo = dataset.as_data_repo();
+    let checkpoint_repo = dataset.as_checkpoint_repo();
 
     let mut object_files: Vec<ObjectFileReference> = Vec::new();
     for (hash, block_data) in blocks_data {
@@ -160,37 +184,45 @@ pub async fn collect_object_references_from_metadata(
 
         match block.event {
             MetadataEvent::AddData(e) => {
-                object_files.push(
-                    ObjectFileReference {
-                        object_type: ObjectType::DataSlice,
-                        physical_hash: e.output_data.physical_hash.clone(),
-                    }
-                );
-                if let Some(checkpoint) = e.output_checkpoint {
+                if !data_repo.contains(&e.output_data.physical_hash).await.unwrap() {
                     object_files.push(
                         ObjectFileReference {
-                            object_type: ObjectType::Checkpoint,
-                            physical_hash: checkpoint.physical_hash.clone()
+                            object_type: ObjectType::DataSlice,
+                            physical_hash: e.output_data.physical_hash.clone(),
                         }
                     );
+                }
+                if let Some(checkpoint) = e.output_checkpoint {
+                    if !checkpoint_repo.contains(&checkpoint.physical_hash).await.unwrap() {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::Checkpoint,
+                                physical_hash: checkpoint.physical_hash.clone()
+                            }
+                        );
+                    }
                 }
             },
             MetadataEvent::ExecuteQuery(e) => {
                 if let Some(data_slice) = e.output_data {
-                    object_files.push(
-                        ObjectFileReference {
-                            object_type: ObjectType::DataSlice,
-                            physical_hash: data_slice.physical_hash.clone(),
-                        }
-                    );
+                    if !data_repo.contains(&data_slice.physical_hash).await.unwrap() {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::DataSlice,
+                                physical_hash: data_slice.physical_hash.clone(),
+                            }
+                        );
+                    }
                 }
                 if let Some(checkpoint) = e.output_checkpoint {
-                    object_files.push(
-                        ObjectFileReference {
-                            object_type: ObjectType::Checkpoint,
-                            physical_hash: checkpoint.physical_hash.clone()
-                        }
-                    );
+                    if !checkpoint_repo.contains(&checkpoint.physical_hash).await.unwrap() {
+                        object_files.push(
+                            ObjectFileReference {
+                                object_type: ObjectType::Checkpoint,
+                                physical_hash: checkpoint.physical_hash.clone()
+                            }
+                        );
+                    }
                 }
             },
             _ => (),

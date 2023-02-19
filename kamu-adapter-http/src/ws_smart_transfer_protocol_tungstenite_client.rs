@@ -28,7 +28,7 @@ use kamu::domain::{Dataset, SyncError, SyncResult, SyncListener};
 use crate::{
     messages::*, 
     ws_common::{ReadMessageError, WriteMessageError, self}, 
-    dataset_protocol_helper::{unpack_dataset_metadata_batch, collect_object_references_from_metadata}
+    dataset_protocol_helper::{unpack_dataset_metadata_batch, collect_missing_object_references_from_metadata}
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -211,12 +211,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let blocks_data = 
             unpack_dataset_metadata_batch(
-                dataset_pull_metadata_response.blocks.payload.as_slice()
+                dataset_pull_metadata_response.blocks
             )
             .await;
 
         let object_files = 
-            collect_object_references_from_metadata(dst.as_metadata_chain(), blocks_data)
+            collect_missing_object_references_from_metadata(dst, blocks_data)
                 .await;
 
         println!("Need to query {} data objects", object_files.len());
