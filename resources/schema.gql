@@ -324,7 +324,7 @@ type Datasets {
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(accountId: AccountID!, datasetSnapshot: String!, datasetSnapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(accountId: AccountID!, snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -455,7 +455,7 @@ type MetadataChain {
 	"""
 	Returns a metadata block corresponding to the specified hash and encoded in desired format
 	"""
-	blockByHashRaw(hash: Multihash!, blockFormat: MetadataManifestFormat!): String
+	blockByHashEncoded(hash: Multihash!, format: MetadataManifestFormat!): String
 	"""
 	Iterates all metadata blocks in the reverse chronological order
 	"""
@@ -463,7 +463,7 @@ type MetadataChain {
 	"""
 	Commits new event to the metadata chain
 	"""
-	commitEvent(metadataEvent: String!, metadataEventFormat: MetadataManifestFormat!): CommitResult!
+	commitEvent(event: String!, eventFormat: MetadataManifestFormat!): CommitResult!
 }
 
 union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense

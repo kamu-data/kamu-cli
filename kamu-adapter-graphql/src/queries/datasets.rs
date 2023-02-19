@@ -12,7 +12,6 @@ use crate::scalars::*;
 use crate::utils::*;
 
 use async_graphql::*;
-use chrono::Utc;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::domain::LocalDatasetRepositoryExt;
@@ -106,9 +105,7 @@ impl Datasets {
         self.by_account_impl(ctx, account, page, per_page).await
     }
 
-    // TODO: Multitenancy
     /// Creates a new empty dataset
-    #[allow(unused_variables)]
     async fn create_empty(
         &self,
         ctx: &Context<'_>,
@@ -116,65 +113,43 @@ impl Datasets {
         dataset_kind: DatasetKind,
         dataset_name: DatasetName,
     ) -> Result<CreateDatasetResult> {
-        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
-        let dataset_builder = local_repo.create_dataset(&dataset_name).await?;
-
-        // We are generating a key pair and deriving a dataset ID from it.
-        // The key pair is discarded for now, but in future can be used for
-        // proof of control over dataset and metadata signing.
-        let (_keypair, dataset_id) = odf::DatasetID::from_new_keypair_ed25519();
-
-        dataset_builder
-            .as_dataset()
-            .as_metadata_chain()
-            .append(
-                odf::MetadataBlock {
-                    system_time: Utc::now(),
-                    prev_block_hash: None,
-                    sequence_number: 0,
-                    event: odf::MetadataEvent::Seed(odf::Seed {
-                        dataset_id,
-                        dataset_kind: dataset_kind.into(),
-                    }),
+        match self
+            .create_from_snapshot_impl(
+                ctx,
+                account_id,
+                odf::DatasetSnapshot {
+                    name: dataset_name.into(),
+                    kind: dataset_kind.into(),
+                    metadata: Vec::new(),
                 },
-                domain::AppendOpts::default(),
             )
-            .await?;
-
-        let result = match dataset_builder.finish().await {
-            Ok(dataset_handle) => {
-                let dataset = Dataset::from_ref(ctx, &dataset_handle.as_local_ref()).await?;
-                CreateDatasetResult::Success(CreateDatasetResultSuccess { dataset })
+            .await?
+        {
+            CreateDatasetFromSnapshotResult::Success(s) => Ok(CreateDatasetResult::Success(s)),
+            CreateDatasetFromSnapshotResult::NameCollision(e) => {
+                Ok(CreateDatasetResult::NameCollision(e))
             }
-            Err(domain::CreateDatasetError::NameCollision(e)) => {
-                CreateDatasetResult::NameCollision(CreateDatasetResultNameCollision {
-                    dataset_name: e.name.into(),
-                })
-            }
-            Err(domain::CreateDatasetError::EmptyDataset) => unreachable!(),
-            Err(domain::CreateDatasetError::Internal(e)) => return Err(e.into()),
-        };
-
-        Ok(result)
+            CreateDatasetFromSnapshotResult::InvalidSnapshot(_)
+            | CreateDatasetFromSnapshotResult::Malformed(_)
+            | CreateDatasetFromSnapshotResult::UnsupportedVersion(_)
+            | CreateDatasetFromSnapshotResult::MissingInputs(_) => unreachable!(),
+        }
     }
 
-    // TODO: Multitenancy
-    // TODO: Multitenant resolution for derivative dataset inputs (should it only work by ID?)
     /// Creates a new dataset from provided DatasetSnapshot manifest
-    #[allow(unused_variables)]
     async fn create_from_snapshot(
         &self,
         ctx: &Context<'_>,
         account_id: AccountID,
-        dataset_snapshot: String,
-        dataset_snapshot_format: MetadataManifestFormat,
+        snapshot: String,
+        snapshot_format: MetadataManifestFormat,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         use odf::serde::DatasetSnapshotDeserializer;
 
-        let snapshot = match dataset_snapshot_format {
+        let snapshot = match snapshot_format {
             MetadataManifestFormat::Yaml => {
                 let de = odf::serde::yaml::YamlDatasetSnapshotDeserializer;
-                match de.read_manifest(dataset_snapshot.as_bytes()) {
+                match de.read_manifest(snapshot.as_bytes()) {
                     Ok(snapshot) => snapshot,
                     Err(e @ odf::serde::Error::SerdeError { .. }) => {
                         return Ok(CreateDatasetFromSnapshotResult::Malformed(
@@ -193,6 +168,20 @@ impl Datasets {
             }
         };
 
+        self.create_from_snapshot_impl(ctx, account_id, snapshot)
+            .await
+    }
+
+    // TODO: Multitenancy
+    // TODO: Multitenant resolution for derivative dataset inputs (should it only work by ID?)
+    #[allow(unused_variables)]
+    #[graphql(skip)]
+    async fn create_from_snapshot_impl(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        snapshot: odf::DatasetSnapshot,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
         let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
 
         let result = match local_repo.create_dataset_from_snapshot(snapshot).await {

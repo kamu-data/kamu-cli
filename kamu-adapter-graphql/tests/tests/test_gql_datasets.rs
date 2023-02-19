@@ -174,7 +174,7 @@ async fn dataset_create_from_snapshot() {
         .execute(indoc!(
             r#"{
                 datasets {
-                    createFromSnapshot (accountId: "kamu", datasetSnapshot: "<content>", datasetSnapshotFormat: YAML) {
+                    createFromSnapshot (accountId: "kamu", snapshot: "<content>", snapshotFormat: YAML) {
                         ... on CreateDatasetResultSuccess { 
                             dataset {
                                 name

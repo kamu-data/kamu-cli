@@ -58,8 +58,8 @@ async fn metadata_chain_append_event() {
                         metadata {
                             chain {
                                 commitEvent (
-                                    metadataEvent: "<content>", 
-                                    metadataEventFormat: YAML,
+                                    event: "<content>",
+                                    eventFormat: YAML,
                                 ) {
                                     ... on CommitResultSuccess {
                                         oldHead

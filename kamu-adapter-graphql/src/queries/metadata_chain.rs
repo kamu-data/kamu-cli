@@ -79,18 +79,18 @@ impl MetadataChain {
     }
 
     /// Returns a metadata block corresponding to the specified hash and encoded in desired format
-    async fn block_by_hash_raw(
+    async fn block_by_hash_encoded(
         &self,
         ctx: &Context<'_>,
         hash: Multihash,
-        block_format: MetadataManifestFormat,
+        format: MetadataManifestFormat,
     ) -> Result<Option<String>> {
         use odf::serde::MetadataBlockSerializer;
 
         let dataset = self.get_dataset(ctx).await?;
         match dataset.as_metadata_chain().try_get_block(&hash).await? {
             None => Ok(None),
-            Some(block) => match block_format {
+            Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
                     let ser = odf::serde::yaml::YamlMetadataBlockSerializer;
                     let buffer = ser.write_manifest(&block)?;
@@ -143,13 +143,13 @@ impl MetadataChain {
     async fn commit_event(
         &self,
         ctx: &Context<'_>,
-        metadata_event: String,
-        metadata_event_format: MetadataManifestFormat,
+        event: String,
+        event_format: MetadataManifestFormat,
     ) -> Result<CommitResult> {
-        let event = match metadata_event_format {
+        let event = match event_format {
             MetadataManifestFormat::Yaml => {
                 let de = odf::serde::yaml::YamlMetadataEventDeserializer;
-                match de.read_manifest(metadata_event.as_bytes()) {
+                match de.read_manifest(event.as_bytes()) {
                     Ok(event) => event,
                     Err(e @ odf::serde::Error::SerdeError { .. }) => {
                         return Ok(CommitResult::Malformed(MetadataManifestMalformed {
