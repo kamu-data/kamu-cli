@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 
+use std::io::Read;
+
 use flate2::Compression;
 use kamu::domain::{MetadataChain, Dataset};
 use opendatafabric::{Multihash, MetadataEvent};
@@ -114,6 +116,89 @@ pub async fn prepare_dataset_metadata_batch(
         encoding: String::from("raw"),
         payload: tarball_data,
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn unpack_dataset_metadata_batch(
+    objects_batch_archived: &[u8],
+) -> Vec<(Multihash, Vec<u8>)> {
+    let decoder = flate2::read::GzDecoder::new(objects_batch_archived);
+    let mut archive = tar::Archive::new(decoder);
+    let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
+        .entries()
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .map(|mut entry| {
+            let entry_size = entry.size();
+            let mut buf = vec![0 as u8; entry_size as usize];
+            entry.read(buf.as_mut_slice()).unwrap();
+            
+            let path = entry.path().unwrap().to_owned();
+            let hash = Multihash::from_multibase_str(path.to_str().unwrap()).unwrap();
+
+            (hash, buf)
+        })
+        .collect();
+
+    blocks_data
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn collect_object_references_from_metadata(
+    metadata_chain: &dyn MetadataChain,
+    blocks_data: Vec<(Multihash, Vec<u8>)>
+) -> Vec<ObjectFileReference> {
+
+    let mut object_files: Vec<ObjectFileReference> = Vec::new();
+    for (hash, block_data) in blocks_data {
+        println!("> {} - {} bytes", hash, block_data.len());
+        let block = metadata_chain.construct_block_from_bytes(
+            &hash, Bytes::copy_from_slice(block_data.as_slice())
+        ).await.unwrap();
+
+        match block.event {
+            MetadataEvent::AddData(e) => {
+                object_files.push(
+                    ObjectFileReference {
+                        object_type: ObjectType::DataSlice,
+                        physical_hash: e.output_data.physical_hash.clone(),
+                    }
+                );
+                if let Some(checkpoint) = e.output_checkpoint {
+                    object_files.push(
+                        ObjectFileReference {
+                            object_type: ObjectType::Checkpoint,
+                            physical_hash: checkpoint.physical_hash.clone()
+                        }
+                    );
+                }
+            },
+            MetadataEvent::ExecuteQuery(e) => {
+                if let Some(data_slice) = e.output_data {
+                    object_files.push(
+                        ObjectFileReference {
+                            object_type: ObjectType::DataSlice,
+                            physical_hash: data_slice.physical_hash.clone(),
+                        }
+                    );
+                }
+                if let Some(checkpoint) = e.output_checkpoint {
+                    object_files.push(
+                        ObjectFileReference {
+                            object_type: ObjectType::Checkpoint,
+                            physical_hash: checkpoint.physical_hash.clone()
+                        }
+                    );
+                }
+            },
+            _ => (),
+        }
+    }
+
+    object_files
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

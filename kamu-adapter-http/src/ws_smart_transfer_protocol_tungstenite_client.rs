@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{sync::Arc, io::Read};
-use bytes::Bytes;
-use opendatafabric::{Multihash, MetadataEvent};
+use std::{sync::Arc};
+use opendatafabric::{Multihash};
 use serde::{de::DeserializeOwned, Serialize};
+use thiserror::Error;
 use tokio::net::TcpStream;
 use url::Url;
 use dill::component;
@@ -25,7 +25,11 @@ use tokio_tungstenite::{
 use kamu::{infra::utils::smart_transfer_protocol::SmartTransferProtocolClient, domain::BlockRef};
 use kamu::domain::{Dataset, SyncError, SyncResult, SyncListener};
 
-use crate::{messages::*, ws_common::{ReadMessageError, WriteMessageError, self}};
+use crate::{
+    messages::*, 
+    ws_common::{ReadMessageError, WriteMessageError, self}, 
+    dataset_protocol_helper::{unpack_dataset_metadata_batch, collect_object_references_from_metadata}
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,6 +37,146 @@ use crate::{messages::*, ws_common::{ReadMessageError, WriteMessageError, self}}
 pub struct WsSmartTransferProtocolClient {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+
+#[derive(Error, Debug)]
+enum SmartProtocolPullClientError {
+    #[error(transparent)]
+    PullRequestWriteFailed(WriteMessageError),
+    
+    #[error(transparent)]
+    PullResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PullMetadataRequestWriteFailed(WriteMessageError),
+        
+    #[error(transparent)]
+    PullMetadataResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PullObjectRequestWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PullObjectResponseReadFailed(ReadMessageError)
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+impl WsSmartTransferProtocolClient {
+
+    async fn pull_send_request(
+        &self,
+        socket: &mut TungsteniteStream,
+        dst_head: Multihash
+    ) -> Result<DatasetPullResponse, SmartProtocolPullClientError> {
+
+        let pull_request_message = DatasetPullRequest {
+            begin_after: Some(dst_head),
+            stop_at: None,
+        };
+
+        let write_result = 
+            tungstenite_ws_write_generic_payload(socket, pull_request_message).await;
+        if let Err(e) = write_result {
+            return Err(SmartProtocolPullClientError::PullRequestWriteFailed(e));
+        }
+
+        let read_result = 
+            tungstenite_ws_read_generic_payload::<DatasetPullResponse>(socket).await;
+        
+        if let Err(e) = read_result {
+            return Err(SmartProtocolPullClientError::PullResponseReadFailed(e));
+        }           
+
+        let dataset_pull_response = read_result.unwrap();
+
+        println!(
+            "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
+            dataset_pull_response.size_estimation.num_blocks,
+            dataset_pull_response.size_estimation.bytes_in_raw_blocks,
+            dataset_pull_response.size_estimation.num_objects,
+            dataset_pull_response.size_estimation.bytes_in_raw_objects,
+        );
+    
+        Ok(dataset_pull_response)
+    }
+
+    async fn pull_send_metadata_request(
+        &self,
+        socket: &mut TungsteniteStream,
+    ) -> Result<DatasetMetadataPullResponse, SmartProtocolPullClientError> {
+
+        let pull_metadata_request = DatasetPullMetadataRequest {};
+        let write_result_metadata = 
+            tungstenite_ws_write_generic_payload(socket, pull_metadata_request).await;
+        if let Err(e) = write_result_metadata {
+            return Err(SmartProtocolPullClientError::PullMetadataRequestWriteFailed(e));
+        }
+
+        let read_result_metadata = 
+            tungstenite_ws_read_generic_payload::<DatasetMetadataPullResponse>(socket).await;
+        
+        if let Err(e) = read_result_metadata {
+            return Err(SmartProtocolPullClientError::PullMetadataResponseReadFailed(e));
+        }            
+    
+        let dataset_metadata_pull_response: DatasetMetadataPullResponse = read_result_metadata.unwrap();
+        println!(
+            "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
+            dataset_metadata_pull_response.blocks.objects_count,
+            dataset_metadata_pull_response.blocks.object_type,
+            dataset_metadata_pull_response.blocks.media_type,
+            dataset_metadata_pull_response.blocks.encoding,
+            dataset_metadata_pull_response.blocks.payload.len()
+        );
+
+        Ok(dataset_metadata_pull_response)
+
+    }
+
+    async fn pull_send_objects_request(
+        &self,
+        socket: &mut TungsteniteStream,
+        object_files: Vec<ObjectFileReference>
+    ) -> Result<DatasetPullObjectsTransferResponse, SmartProtocolPullClientError> {
+
+        let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
+        let write_result_objects = 
+            tungstenite_ws_write_generic_payload(socket, pull_objects_request).await;
+        if let Err(e) = write_result_objects {
+            return Err(SmartProtocolPullClientError::PullObjectRequestWriteFailed(e));
+        }
+
+        let read_result_objects = 
+            tungstenite_ws_read_generic_payload::<DatasetPullObjectsTransferResponse>(socket).await;
+        
+        if let Err(e) = read_result_objects {
+            return Err(SmartProtocolPullClientError::PullObjectResponseReadFailed(e));
+        }
+
+        let dataset_objects_pull_response = read_result_objects.unwrap();
+        
+        dataset_objects_pull_response.object_transfer_strategies.iter()
+            .for_each(
+                |s| {
+                    println!(
+                        "Object file {} needs to download from {} via {:?} method, expires at {:?}",
+                        s.object_file.physical_hash.to_string(),
+                        s.download_from.url,
+                        s.pull_strategy,
+                        s.download_from.expires_at
+                    )
+                }
+            );
+
+        Ok(dataset_objects_pull_response)
+    }
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 
 #[async_trait::async_trait]
 impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
@@ -49,158 +193,38 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let mut pull_url = src_url.join("pull").unwrap();
         let pull_url_res = pull_url.set_scheme("ws");
         assert!(pull_url_res.is_ok());
-    
-    
+        
         let (mut ws_stream, _) = connect_async(pull_url).await.unwrap();
 
         let dst_head = dst.as_metadata_chain().get_ref(&BlockRef::Head).await.unwrap();
 
-        let pull_request_message = DatasetPullRequest {
-            begin_after: Some(dst_head),
-            stop_at: None,
-        };
+        let _dataset_pull_response = 
+            self.pull_send_request(&mut ws_stream, dst_head)
+                .await
+                .unwrap();
 
-        let write_result = 
-            tungstenite_ws_write_generic_payload(&mut ws_stream, pull_request_message).await;
-        if write_result.is_err() {
-            panic!("write problem")
-        }
-
-        let read_result = 
-            tungstenite_ws_read_generic_payload::<DatasetPullResponse>(&mut ws_stream).await;
-        
-        if read_result.is_err() {
-            panic!("read problem")
-        }            
-    
-        let dataset_pull_response: DatasetPullResponse = read_result.unwrap();
-        println!(
-            "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
-            dataset_pull_response.size_estimation.num_blocks,
-            dataset_pull_response.size_estimation.bytes_in_raw_blocks,
-            dataset_pull_response.size_estimation.num_objects,
-            dataset_pull_response.size_estimation.bytes_in_raw_objects,
-        );
-
-        let pull_metadata_request = DatasetPullMetadataRequest {};
-        let write_result_metadata = 
-            tungstenite_ws_write_generic_payload(&mut ws_stream, pull_metadata_request).await;
-        if write_result_metadata.is_err() {
-            panic!("write problem")
-        }
+        let dataset_pull_metadata_response =
+            self.pull_send_metadata_request(&mut ws_stream)
+                .await
+                .unwrap();
 
 
-        let read_result_metadata = 
-            tungstenite_ws_read_generic_payload::<DatasetMetadataPullResponse>(&mut ws_stream).await;
-        
-        if read_result_metadata.is_err() {
-            panic!("read problem")
-        }            
-    
-        let dataset_metadata_pull_response: DatasetMetadataPullResponse = read_result_metadata.unwrap();
-        println!(
-            "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
-            dataset_metadata_pull_response.blocks.objects_count,
-            dataset_metadata_pull_response.blocks.object_type,
-            dataset_metadata_pull_response.blocks.media_type,
-            dataset_metadata_pull_response.blocks.encoding,
-            dataset_metadata_pull_response.blocks.payload.len()
-        );
+        let blocks_data = 
+            unpack_dataset_metadata_batch(
+                dataset_pull_metadata_response.blocks.payload.as_slice()
+            )
+            .await;
 
-
-        let tar = flate2::read::GzDecoder::new(dataset_metadata_pull_response.blocks.payload.as_slice());
-        let mut archive = tar::Archive::new(tar);
-        let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
-            .entries()
-            .unwrap()
-            .filter_map(|e| e.ok())
-            .map(|mut entry| {
-                let entry_size = entry.size();
-                let mut buf = vec![0 as u8; entry_size as usize];
-                entry.read(buf.as_mut_slice()).unwrap();
-                
-                let path = entry.path().unwrap().to_owned();
-                let hash = Multihash::from_multibase_str(path.to_str().unwrap()).unwrap();
-
-                (hash, buf)
-            })
-            .collect();
-
-        let mut object_files: Vec<ObjectFileReference> = Vec::new();
-        for (hash, block_data) in blocks_data {
-            println!("> {} - {} bytes", hash, block_data.len());
-            let block = dst.as_metadata_chain().construct_block_from_bytes(
-                &hash, Bytes::copy_from_slice(block_data.as_slice())
-            ).await.unwrap();
-
-            match block.event {
-                MetadataEvent::AddData(e) => {
-                    object_files.push(
-                        ObjectFileReference {
-                            object_type: ObjectType::DataSlice,
-                            physical_hash: e.output_data.physical_hash.clone(),
-                        }
-                    );
-                    if let Some(checkpoint) = e.output_checkpoint {
-                        object_files.push(
-                            ObjectFileReference {
-                                object_type: ObjectType::Checkpoint,
-                                physical_hash: checkpoint.physical_hash.clone()
-                            }
-                        );
-                    }
-                },
-                MetadataEvent::ExecuteQuery(e) => {
-                    if let Some(data_slice) = e.output_data {
-                        object_files.push(
-                            ObjectFileReference {
-                                object_type: ObjectType::DataSlice,
-                                physical_hash: data_slice.physical_hash.clone(),
-                            }
-                        );
-                    }
-                    if let Some(checkpoint) = e.output_checkpoint {
-                        object_files.push(
-                            ObjectFileReference {
-                                object_type: ObjectType::Checkpoint,
-                                physical_hash: checkpoint.physical_hash.clone()
-                            }
-                        );
-                    }
-                },
-                _ => (),
-            }
-        }
+        let object_files = 
+            collect_object_references_from_metadata(dst.as_metadata_chain(), blocks_data)
+                .await;
 
         println!("Need to query {} data objects", object_files.len());
 
-        let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
-        let write_result_objects = 
-            tungstenite_ws_write_generic_payload(&mut ws_stream, pull_objects_request).await;
-        if write_result_objects.is_err() {
-            panic!("write problem")
-        }
-
-        let read_result_objects = 
-            tungstenite_ws_read_generic_payload::<DatasetPullObjectsTransferResponse>(&mut ws_stream).await;
-        
-        if read_result_objects.is_err() {
-            panic!("read problem")
-        }
-
-        let dataset_objects_pull_response = read_result_objects.unwrap();
-        dataset_objects_pull_response.object_transfer_strategies.iter()
-            .for_each(
-                |s| {
-                    println!(
-                        "Object file {} needs to download from {} via {:?} method, expires at {:?}",
-                        s.object_file.physical_hash.to_string(),
-                        s.download_from.url,
-                        s.pull_strategy,
-                        s.download_from.expires_at
-                    )
-                }
-            );
+        let _dataset_objects_pull_response =
+            self.pull_send_objects_request(&mut ws_stream, object_files)
+                .await
+                .unwrap();
 
         ws_stream.close(None).await.unwrap();
         
