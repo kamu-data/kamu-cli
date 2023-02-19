@@ -8,15 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-
+use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra;
 use kamu::testing::MetadataFactory;
+use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
+use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
 
 use std::sync::Arc;
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
@@ -28,9 +30,18 @@ async fn dataset_by_id_does_not_exist() {
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema 
-        .execute("{ datasets { byId (datasetId: \"did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM\") { name } } }")
+    let res = schema
+        .execute(indoc!(
+            r#"{
+                datasets {
+                    byId (datasetId: "did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM") {
+                        name
+                    }
+                }
+            }"#
+        ))
         .await;
+    assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
         value!({
@@ -41,7 +52,7 @@ async fn dataset_by_id_does_not_exist() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn dataset_by_id() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
@@ -66,18 +77,125 @@ async fn dataset_by_id() {
 
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
-        .execute(format!(
-            "{{ datasets {{ byId (datasetId: \"{}\") {{ name }} }} }}",
-            create_result.dataset_handle.id
-        ))
+        .execute(
+            indoc!(
+                r#"{
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            name
+                        }
+                    }
+                }"#
+            )
+            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+        )
         .await;
-    assert!(res.is_ok());
+    assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
         value!({
             "datasets": {
                 "byId": {
                     "name": "foo",
+                }
+            }
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn dataset_create_empty() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(local_repo)
+        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .build();
+
+    let schema = kamu_adapter_graphql::schema(cat);
+    let res = schema
+        .execute(indoc::indoc!(
+            r#"{
+                datasets {
+                    createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
+                        ... on CreateDatasetResultSuccess { 
+                            dataset { 
+                                name 
+                            } 
+                        } 
+                    } 
+                } 
+            }"#
+        ))
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "createEmpty": {
+                    "dataset": {
+                        "name": "foo",
+                    }
+                }
+            }
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn dataset_create_from_snapshot() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(local_repo)
+        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .build();
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo")
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    let snapshot_yaml = String::from_utf8_lossy(
+        &YamlDatasetSnapshotSerializer
+            .write_manifest(&snapshot)
+            .unwrap(),
+    )
+    .to_string();
+
+    let schema = kamu_adapter_graphql::schema(cat);
+    let res = schema
+        .execute(indoc!(
+            r#"{
+                datasets {
+                    createFromSnapshot (accountId: "kamu", datasetSnapshot: "<content>", datasetSnapshotFormat: YAML) {
+                        ... on CreateDatasetResultSuccess { 
+                            dataset {
+                                name
+                                kind
+                            } 
+                        } 
+                    } 
+                } 
+            }"#
+        ).replace("<content>", &snapshot_yaml.escape_default().to_string()))
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "createFromSnapshot": {
+                    "dataset": {
+                        "name": "foo",
+                        "kind": "ROOT",
+                    }
                 }
             }
         })

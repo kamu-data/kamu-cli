@@ -94,6 +94,12 @@ impl Deref for DatasetName {
     }
 }
 
+impl std::fmt::Display for DatasetName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[Scalar]
 impl ScalarType for DatasetName {
     fn parse(value: Value) -> InputValueResult<Self> {
@@ -183,11 +189,11 @@ impl DataBatch {
             format,
             content: match format {
                 DataBatchFormat::Csv => String::from(""),
-                DataBatchFormat::Json |
-                DataBatchFormat::JsonLD |
-                DataBatchFormat::JsonSOA => String::from("{}"),
+                DataBatchFormat::Json | DataBatchFormat::JsonLD | DataBatchFormat::JsonSOA => {
+                    String::from("{}")
+                }
             },
-            num_records: 0
+            num_records: 0,
         }
     }
 
@@ -275,8 +281,8 @@ impl DataQueryResult {
 
     pub fn no_schema_yet(format: DataBatchFormat, limit: u64) -> DataQueryResult {
         DataQueryResult::Success(DataQueryResultSuccess {
-            schema: None, 
-            data: DataBatch::empty(format), 
+            schema: None,
+            data: DataBatch::empty(format),
             limit,
         })
     }
@@ -294,7 +300,6 @@ impl DataQueryResult {
             error_kind: DataQueryResultErrorKind::InternalError,
         })
     }
-    
 }
 
 impl From<QueryError> for DataQueryResult {

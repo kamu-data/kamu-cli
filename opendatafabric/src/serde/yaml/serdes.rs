@@ -21,6 +21,9 @@ use ::serde::{Deserialize, Serialize};
 struct MetadataBlockWrapper(#[serde(with = "MetadataBlockDef")] MetadataBlock);
 
 #[derive(Deserialize, Serialize)]
+struct MetadataEventWrapper(#[serde(with = "MetadataEventDef")] MetadataEvent);
+
+#[derive(Deserialize, Serialize)]
 struct DatasetSnapshotWrapper(#[serde(with = "DatasetSnapshotDef")] DatasetSnapshot);
 
 #[derive(Serialize, Deserialize)]
@@ -35,12 +38,6 @@ struct ExecuteQueryResponseWrapper(#[serde(with = "ExecuteQueryResponseDef")] Ex
 
 pub struct YamlMetadataBlockSerializer;
 
-///////////////////////////////////////////////////////////////////////////////
-
-impl YamlMetadataBlockSerializer {}
-
-///////////////////////////////////////////////////////////////////////////////
-
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         let manifest = Manifest {
@@ -52,6 +49,7 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
         let buf = serde_yaml::to_string(&manifest)
             .map_err(|e| Error::serde(e))?
             .into_bytes();
+
         Ok(Buffer::new(0, buf.len(), buf))
     }
 }
@@ -61,12 +59,6 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct YamlMetadataBlockDeserializer;
-
-///////////////////////////////////////////////////////////////////////////////
-
-impl YamlMetadataBlockDeserializer {}
-
-///////////////////////////////////////////////////////////////////////////////
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
@@ -84,6 +76,47 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
         // Re-read full manifest with content definition
         let manifest: Manifest<MetadataBlockWrapper> =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+
+        Ok(manifest.content.0)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// YamlMetadataEventSerializer
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct YamlMetadataEventSerializer;
+
+impl YamlMetadataEventSerializer {
+    pub fn write_manifest(&self, event: &MetadataEvent) -> Result<Buffer<u8>, Error> {
+        let manifest = Manifest {
+            version: 1,
+            kind: "MetadataEvent".to_owned(),
+            content: MetadataEventWrapper(event.clone()),
+        };
+
+        let buf = serde_yaml::to_string(&manifest)
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
+
+        Ok(Buffer::new(0, buf.len(), buf))
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// YamlMetadataEventDeserializer
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct YamlMetadataEventDeserializer;
+
+impl YamlMetadataEventDeserializer {
+    pub fn read_manifest(&self, data: &[u8]) -> Result<MetadataEvent, Error> {
+        let manifest: Manifest<MetadataEventWrapper> =
+            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+
+        // TODO: Handle conversions?
+        assert_eq!(manifest.kind, "MetadataEvent");
+        assert_eq!(manifest.version, 1);
 
         Ok(manifest.content.0)
     }

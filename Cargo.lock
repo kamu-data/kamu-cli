@@ -220,7 +220,7 @@ dependencies = [
  "arrow-cast",
  "arrow-data",
  "arrow-schema",
- "flatbuffers 22.9.29",
+ "flatbuffers",
 ]
 
 [[package]]
@@ -454,9 +454,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e246206a63c9830e118d12c894f56a82033da1a2361f5544deeee3df85c99d9"
+checksum = "2fb79c228270dcf2426e74864cabc94babb5dbab01a4314e702d2f16540e1591"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -806,7 +806,7 @@ checksum = "f3ad85c1f65dc7b37604eb0e89748faf0b9653065f2a8ef69f96a687ec1e9279"
 
 [[package]]
 name = "container-runtime"
-version = "0.111.0"
+version = "0.112.0"
 dependencies = [
  "dill",
  "regex",
@@ -1515,16 +1515,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "flatbuffers"
-version = "23.1.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77f5399c2c9c50ae9418e522842ad362f61ee48b346ac106807bd355a8a7c619"
-dependencies = [
- "bitflags",
- "rustc_version",
-]
-
-[[package]]
 name = "flate2"
 version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1861,9 +1851,9 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75f43d41e26995c17e71ee126451dd3941010b0514a81a9d11f3b341debc2399"
+checksum = "bd6effc99afb63425aff9b05836f029929e345a6148a14b7ecd5ab67af944482"
 dependencies = [
  "bytes",
  "fnv",
@@ -2223,7 +2213,7 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "kamu"
-version = "0.111.0"
+version = "0.112.0"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -2287,7 +2277,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.111.0"
+version = "0.112.0"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -2310,7 +2300,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.111.0"
+version = "0.112.0"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2460,9 +2450,9 @@ checksum = "201de327520df007757c1f0adce6e827fe8562fbc28bfd9c15571c66ca1f5f79"
 
 [[package]]
 name = "libflate"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05605ab2bce11bcfc0e9c635ff29ef8b2ea83f29be257ee7d730cac3ee373093"
+checksum = "97822bf791bd4d5b403713886a5fbe8bf49520fe78e323b0dc480ca1a03e50b0"
 dependencies = [
  "adler32",
  "crc32fast",
@@ -2471,9 +2461,9 @@ dependencies = [
 
 [[package]]
 name = "libflate_lz77"
-version = "1.1.0"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39a734c0493409afcd49deee13c006a04e3586b9761a03543c6272c9c51f2f5a"
+checksum = "a52d3a8bfc85f250440e4424db7d857e241a3aebbbe301f3eb606ab15c39acbf"
 dependencies = [
  "rle-decode-fast",
 ]
@@ -2988,14 +2978,14 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.111.0"
+version = "0.112.0"
 dependencies = [
  "bs58",
  "byteorder",
  "chrono",
  "digest 0.10.6",
  "ed25519-dalek",
- "flatbuffers 23.1.21",
+ "flatbuffers",
  "hex",
  "indoc",
  "prost",
@@ -4054,7 +4044,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with_macros",
- "time 0.3.18",
+ "time 0.3.19",
 ]
 
 [[package]]
@@ -4458,9 +4448,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.18"
+version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af0097eaf301d576d0b2aead7a59facab6d53cc636340f0291fab8446a2e8613"
+checksum = "53250a3b3fed8ff8fd988587d8925d26a83ac3845d9e03b220b37f34c2b8d6c2"
 dependencies = [
  "itoa",
  "serde",
@@ -4476,9 +4466,9 @@ checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "time-macros"
-version = "0.2.6"
+version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d967f99f534ca7e495c575c62638eebc2898a8c84c119b89e250477bc4ba16b2"
+checksum = "a460aeb8de6dcb0f381e1ee05f1cd56fcf5a5f6eb8187ff3d8f0b11078d38b7c"
 dependencies = [
  "time-core",
 ]
@@ -4795,7 +4785,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
 dependencies = [
  "crossbeam-channel",
- "time 0.3.18",
+ "time 0.3.19",
  "tracing-subscriber",
 ]
 
@@ -4821,7 +4811,7 @@ dependencies = [
  "log",
  "serde",
  "serde_json",
- "time 0.3.18",
+ "time 0.3.19",
  "tracing",
  "tracing-core",
  "tracing-log",
@@ -5467,7 +5457,7 @@ dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
  "sha1",
- "time 0.3.18",
+ "time 0.3.19",
  "zstd 0.11.2+zstd.1.5.2",
 ]
 

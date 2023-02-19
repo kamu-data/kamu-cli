@@ -178,6 +178,15 @@ impl From<odf::DatasetKind> for DatasetKind {
     }
 }
 
+impl Into<odf::DatasetKind> for DatasetKind {
+    fn into(self) -> odf::DatasetKind {
+        match self {
+            Self::Root => odf::DatasetKind::Root,
+            Self::Derivative => odf::DatasetKind::Derivative,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
@@ -544,6 +553,15 @@ impl From<odf::SourceOrdering> for SourceOrdering {
     }
 }
 
+impl Into<odf::SourceOrdering> for SourceOrdering {
+    fn into(self) -> odf::SourceOrdering {
+        match self {
+            Self::ByEventTime => odf::SourceOrdering::ByEventTime,
+            Self::ByName => odf::SourceOrdering::ByName,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // InputSlice
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
@@ -770,6 +788,15 @@ impl From<odf::CompressionFormat> for CompressionFormat {
         match v {
             odf::CompressionFormat::Gzip => Self::Gzip,
             odf::CompressionFormat::Zip => Self::Zip,
+        }
+    }
+}
+
+impl Into<odf::CompressionFormat> for CompressionFormat {
+    fn into(self) -> odf::CompressionFormat {
+        match self {
+            Self::Gzip => odf::CompressionFormat::Gzip,
+            Self::Zip => odf::CompressionFormat::Zip,
         }
     }
 }

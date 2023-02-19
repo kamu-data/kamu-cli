@@ -12,6 +12,7 @@ use crate::scalars::*;
 
 use async_graphql::*;
 use chrono::{DateTime, Utc};
+use opendatafabric as odf;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // MetadataBlockExtended
@@ -41,6 +42,53 @@ impl MetadataBlockExtended {
             author,
             event: b.event,
             sequence_number: b.sequence_number,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// MetadataFormat
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetadataManifestFormat {
+    Yaml,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// MetadataFormat serde errors
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct MetadataManifestMalformed {
+    pub message: String,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct MetadataManifestUnsupportedVersion {
+    pub manifest_version: i32,
+    pub supported_version_from: i32,
+    pub supported_version_to: i32,
+}
+
+#[Object]
+impl MetadataManifestUnsupportedVersion {
+    pub async fn message(&self) -> String {
+        format!(
+            "Unsupported manifest version {}, supported range is [{}, {}]",
+            self.manifest_version, self.supported_version_from, self.supported_version_to
+        )
+    }
+}
+
+impl From<odf::serde::UnsupportedVersionError> for MetadataManifestUnsupportedVersion {
+    fn from(e: odf::serde::UnsupportedVersionError) -> Self {
+        Self {
+            manifest_version: e.manifest_version,
+            supported_version_from: e.supported_version_range.0 as i32,
+            supported_version_to: e.supported_version_range.1 as i32,
         }
     }
 }

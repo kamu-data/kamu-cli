@@ -71,9 +71,50 @@ type Checkpoint {
 	size: Int!
 }
 
+interface CommitResult {
+	message: String!
+}
+
+type CommitResultAppendError implements CommitResult {
+	message: String!
+}
+
+type CommitResultSuccess implements CommitResult {
+	oldHead: Multihash
+	newHead: Multihash!
+	message: String!
+}
+
 enum CompressionFormat {
 	GZIP
 	ZIP
+}
+
+interface CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+interface CreateDatasetResult {
+	message: String!
+}
+
+type CreateDatasetResultInvalidSnapshot implements CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult {
+	missingInputs: [String!]!
+	message: String!
+}
+
+type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	datasetName: DatasetName!
+	message: String!
+}
+
+type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	dataset: Dataset!
+	message: String!
 }
 
 type DataBatch {
@@ -276,6 +317,14 @@ type Datasets {
 	Returns datasets belonging to the specified account
 	"""
 	byAccountName(accountName: AccountName!, page: Int, perPage: Int): DatasetConnection!
+	"""
+	Creates a new empty dataset
+	"""
+	createEmpty(accountId: AccountID!, datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
+	"""
+	Creates a new dataset from provided DatasetSnapshot manifest
+	"""
+	createFromSnapshot(accountId: AccountID!, datasetSnapshot: String!, datasetSnapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -404,12 +453,32 @@ type MetadataChain {
 	"""
 	blockByHash(hash: Multihash!): MetadataBlockExtended
 	"""
+	Returns a metadata block corresponding to the specified hash and encoded in desired format
+	"""
+	blockByHashRaw(hash: Multihash!, blockFormat: MetadataManifestFormat!): String
+	"""
 	Iterates all metadata blocks in the reverse chronological order
 	"""
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
+	"""
+	Commits new event to the metadata chain
+	"""
+	commitEvent(metadataEvent: String!, metadataEventFormat: MetadataManifestFormat!): CommitResult!
 }
 
 union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
+
+enum MetadataManifestFormat {
+	YAML
+}
+
+type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
+
+type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
+	message: String!
+}
 
 scalar Multihash
 

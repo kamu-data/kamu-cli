@@ -12,9 +12,11 @@ use crate::scalars::*;
 use crate::utils::*;
 
 use async_graphql::*;
+use chrono::Utc;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::domain::LocalDatasetRepositoryExt;
+use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +104,206 @@ impl Datasets {
     ) -> Result<DatasetConnection> {
         let account = Account::mock();
         self.by_account_impl(ctx, account, page, per_page).await
+    }
+
+    // TODO: Multitenancy
+    /// Creates a new empty dataset
+    #[allow(unused_variables)]
+    async fn create_empty(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        dataset_kind: DatasetKind,
+        dataset_name: DatasetName,
+    ) -> Result<CreateDatasetResult> {
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let dataset_builder = local_repo.create_dataset(&dataset_name).await?;
+
+        // We are generating a key pair and deriving a dataset ID from it.
+        // The key pair is discarded for now, but in future can be used for
+        // proof of control over dataset and metadata signing.
+        let (_keypair, dataset_id) = odf::DatasetID::from_new_keypair_ed25519();
+
+        dataset_builder
+            .as_dataset()
+            .as_metadata_chain()
+            .append(
+                odf::MetadataBlock {
+                    system_time: Utc::now(),
+                    prev_block_hash: None,
+                    sequence_number: 0,
+                    event: odf::MetadataEvent::Seed(odf::Seed {
+                        dataset_id,
+                        dataset_kind: dataset_kind.into(),
+                    }),
+                },
+                domain::AppendOpts::default(),
+            )
+            .await?;
+
+        let result = match dataset_builder.finish().await {
+            Ok(dataset_handle) => {
+                let dataset = Dataset::from_ref(ctx, &dataset_handle.as_local_ref()).await?;
+                CreateDatasetResult::Success(CreateDatasetResultSuccess { dataset })
+            }
+            Err(domain::CreateDatasetError::NameCollision(e)) => {
+                CreateDatasetResult::NameCollision(CreateDatasetResultNameCollision {
+                    dataset_name: e.name.into(),
+                })
+            }
+            Err(domain::CreateDatasetError::EmptyDataset) => unreachable!(),
+            Err(domain::CreateDatasetError::Internal(e)) => return Err(e.into()),
+        };
+
+        Ok(result)
+    }
+
+    // TODO: Multitenancy
+    // TODO: Multitenant resolution for derivative dataset inputs (should it only work by ID?)
+    /// Creates a new dataset from provided DatasetSnapshot manifest
+    #[allow(unused_variables)]
+    async fn create_from_snapshot(
+        &self,
+        ctx: &Context<'_>,
+        account_id: AccountID,
+        dataset_snapshot: String,
+        dataset_snapshot_format: MetadataManifestFormat,
+    ) -> Result<CreateDatasetFromSnapshotResult> {
+        use odf::serde::DatasetSnapshotDeserializer;
+
+        let snapshot = match dataset_snapshot_format {
+            MetadataManifestFormat::Yaml => {
+                let de = odf::serde::yaml::YamlDatasetSnapshotDeserializer;
+                match de.read_manifest(dataset_snapshot.as_bytes()) {
+                    Ok(snapshot) => snapshot,
+                    Err(e @ odf::serde::Error::SerdeError { .. }) => {
+                        return Ok(CreateDatasetFromSnapshotResult::Malformed(
+                            MetadataManifestMalformed {
+                                message: e.to_string(),
+                            },
+                        ))
+                    }
+                    Err(odf::serde::Error::UnsupportedVersion(e)) => {
+                        return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(
+                            e.into(),
+                        ))
+                    }
+                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.into()),
+                }
+            }
+        };
+
+        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+
+        let result = match local_repo.create_dataset_from_snapshot(snapshot).await {
+            Ok(result) => {
+                let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
+                CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
+            }
+            Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
+                CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
+                    dataset_name: e.name.into(),
+                })
+            }
+            Err(domain::CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {
+                CreateDatasetFromSnapshotResult::InvalidSnapshot(
+                    CreateDatasetResultInvalidSnapshot { message: e.reason },
+                )
+            }
+            Err(domain::CreateDatasetFromSnapshotError::MissingInputs(e)) => {
+                CreateDatasetFromSnapshotResult::MissingInputs(CreateDatasetResultMissingInputs {
+                    missing_inputs: e
+                        .missing_inputs
+                        .into_iter()
+                        .map(|r| r.to_string())
+                        .collect(),
+                })
+            }
+            Err(domain::CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
+        };
+
+        Ok(result)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// CreateDatasetResult
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", type = "String"))]
+pub enum CreateDatasetResult {
+    Success(CreateDatasetResultSuccess),
+    NameCollision(CreateDatasetResultNameCollision),
+}
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", type = "String"))]
+pub enum CreateDatasetFromSnapshotResult {
+    Success(CreateDatasetResultSuccess),
+    NameCollision(CreateDatasetResultNameCollision),
+    Malformed(MetadataManifestMalformed),
+    UnsupportedVersion(MetadataManifestUnsupportedVersion),
+    InvalidSnapshot(CreateDatasetResultInvalidSnapshot),
+    // TODO: This error should probably be generalized along with other
+    // errors that can occur during the metadata evolution
+    MissingInputs(CreateDatasetResultMissingInputs),
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CreateDatasetResultSuccess {
+    pub dataset: Dataset,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultSuccess {
+    async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CreateDatasetResultNameCollision {
+    pub dataset_name: DatasetName,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultNameCollision {
+    async fn message(&self) -> String {
+        format!("Dataset with name '{}' already exists", self.dataset_name)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct CreateDatasetResultInvalidSnapshot {
+    pub message: String,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CreateDatasetResultMissingInputs {
+    // TODO: Input can be referenced by ID or by name
+    // do we need DatasetRef-style scalar for GQL?
+    pub missing_inputs: Vec<String>,
+}
+
+#[ComplexObject]
+impl CreateDatasetResultMissingInputs {
+    async fn message(&self) -> String {
+        format!(
+            "Dataset is referencing non-existing inputs: {}",
+            self.missing_inputs.join(", ")
+        )
     }
 }
 

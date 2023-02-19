@@ -7,16 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
 use std::path::PathBuf;
 
 #[test_log::test(tokio::test)]
-async fn test_update_graphql_schema() {
+async fn update_graphql_schema() {
     let mut schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     schema_path.push("../resources/schema.gql");
 
-    let cmd = kamu_cli::commands::APIServerGqlSchemaCommand::new(CatalogBuilder::new().build());
-    let schema = cmd.get_schema();
+    let cat = dill::CatalogBuilder::new().build();
 
-    std::fs::write(&schema_path, schema).unwrap();
+    let schema = kamu_adapter_graphql::schema(cat);
+    std::fs::write(&schema_path, schema.sdl()).unwrap();
 }

@@ -157,8 +157,6 @@ impl From<MetadataBlockVersionError> for Error {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-//    #[error("Unsupported version: manifest has version {manifest_version} while maximum supported version is {supported_version}")]
-//    #[error("Obsolete version: manifest has version {manifest_version} while minimum supported version is {minimum_supported_version}")]
 
 #[derive(Error, PartialEq, Eq, Debug)]
 pub struct UnsupportedVersionError {

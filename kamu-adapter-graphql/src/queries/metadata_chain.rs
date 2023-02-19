@@ -14,6 +14,7 @@ use crate::utils::*;
 use async_graphql::*;
 use futures::TryStreamExt;
 use kamu::domain;
+use kamu::domain::DatasetExt;
 use kamu::domain::MetadataChainExt;
 use opendatafabric as odf;
 
@@ -77,6 +78,29 @@ impl MetadataChain {
         Ok(block.map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
     }
 
+    /// Returns a metadata block corresponding to the specified hash and encoded in desired format
+    async fn block_by_hash_raw(
+        &self,
+        ctx: &Context<'_>,
+        hash: Multihash,
+        block_format: MetadataManifestFormat,
+    ) -> Result<Option<String>> {
+        use odf::serde::MetadataBlockSerializer;
+
+        let dataset = self.get_dataset(ctx).await?;
+        match dataset.as_metadata_chain().try_get_block(&hash).await? {
+            None => Ok(None),
+            Some(block) => match block_format {
+                MetadataManifestFormat::Yaml => {
+                    let ser = odf::serde::yaml::YamlMetadataBlockSerializer;
+                    let buffer = ser.write_manifest(&block)?;
+                    let content = std::str::from_utf8(&buffer)?;
+                    Ok(Some(content.to_string()))
+                }
+            },
+        }
+    }
+
     // TODO: Add ref parameter (defaulting to "head")
     // TODO: Support before/after style iteration
     // TODO: PERF: Avoid traversing entire chain
@@ -114,7 +138,90 @@ impl MetadataChain {
             total_count,
         ))
     }
+
+    /// Commits new event to the metadata chain
+    async fn commit_event(
+        &self,
+        ctx: &Context<'_>,
+        metadata_event: String,
+        metadata_event_format: MetadataManifestFormat,
+    ) -> Result<CommitResult> {
+        let event = match metadata_event_format {
+            MetadataManifestFormat::Yaml => {
+                let de = odf::serde::yaml::YamlMetadataEventDeserializer;
+                match de.read_manifest(metadata_event.as_bytes()) {
+                    Ok(event) => event,
+                    Err(e @ odf::serde::Error::SerdeError { .. }) => {
+                        return Ok(CommitResult::Malformed(MetadataManifestMalformed {
+                            message: e.to_string(),
+                        }))
+                    }
+                    Err(odf::serde::Error::UnsupportedVersion(e)) => {
+                        return Ok(CommitResult::UnsupportedVersion(e.into()))
+                    }
+                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.into()),
+                }
+            }
+        };
+
+        let dataset = self.get_dataset(ctx).await?;
+
+        let result = match dataset
+            .commit_event(event, domain::CommitOpts::default())
+            .await
+        {
+            Ok(result) => CommitResult::Success(CommitResultSuccess {
+                old_head: result.old_head.map(Into::into),
+                new_head: result.new_head.into(),
+            }),
+            Err(domain::CommitError::MetadataAppendError(e)) => {
+                CommitResult::AppendError(CommitResultAppendError {
+                    message: e.to_string(),
+                })
+            }
+            Err(e @ domain::CommitError::Internal(_)) => return Err(e.into()),
+            Err(e @ domain::CommitError::EmptyCommit) => return Err(e.into()),
+        };
+
+        Ok(result)
+    }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", type = "String"))]
+pub enum CommitResult {
+    Success(CommitResultSuccess),
+    Malformed(MetadataManifestMalformed),
+    UnsupportedVersion(MetadataManifestUnsupportedVersion),
+    AppendError(CommitResultAppendError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CommitResultSuccess {
+    pub old_head: Option<Multihash>,
+    pub new_head: Multihash,
+}
+
+#[ComplexObject]
+impl CommitResultSuccess {
+    async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct CommitResultAppendError {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(
     MetadataBlockExtended,
