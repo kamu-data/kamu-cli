@@ -16,11 +16,13 @@ kamu = { path = "../kamu-core" }
 # HTTP
 axum = { version = "*", features = ["ws"] }
 axum-extra = { version = "*", features = ["async-read-body"] }
+reqwest = { version = "*", features = ["json"] }
 
 # IO
 futures = "*"
 tokio = { version = "*"}
 tokio-stream = { version = "*" }
+tokio-util = { version = "*", features=["codec", "compat", "io"] }
 tokio-tungstenite = { version = "*" }
 bytes = "*"
 flate2 = "*"  # GZip decoder

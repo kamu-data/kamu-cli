@@ -2403,6 +2403,7 @@ dependencies = [
  "futures",
  "kamu",
  "opendatafabric",
+ "reqwest",
  "serde",
  "serde_json",
  "tar",
@@ -2412,6 +2413,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite",
+ "tokio-util",
  "tracing-subscriber",
  "url",
 ]

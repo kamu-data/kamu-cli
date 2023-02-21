@@ -11,13 +11,13 @@
 use std::io::Read;
 
 use flate2::Compression;
-use kamu::domain::{MetadataChain, Dataset};
+use kamu::domain::{MetadataChain, Dataset, InsertOpts, InsertError, CorruptedSourceError, SyncError};
 use opendatafabric::{Multihash, MetadataEvent, MetadataBlock};
 use futures::TryStreamExt;
 use tar::Header;
 use bytes::Bytes;
 use url::Url;
-use crate::messages::{TransferSizeEstimation, ObjectsBatch, ObjectType, ObjectFileReference, PullObjectTransferStrategy, TransferUrl};
+use crate::messages::{TransferSizeEstimation, ObjectsBatch, ObjectType, ObjectFileReference, PullObjectTransferStrategy, TransferUrl, ObjectPullStrategy};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,7 +127,27 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn unpack_dataset_metadata_batch(
+pub async fn dataset_import_pulled_metadata(
+    dataset: &dyn Dataset,
+    objects_batch: ObjectsBatch
+) -> Vec<Vec<ObjectFileReference>> {
+
+    let blocks_data = 
+        unpack_dataset_metadata_batch(dataset.as_metadata_chain(), objects_batch).await;
+
+    let object_files = 
+        collect_missing_object_references_from_metadata(dataset, blocks_data)
+            .await;
+
+    // Future: analyze sizes and split on stages
+
+    vec![object_files]
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn unpack_dataset_metadata_batch(
+    metadata_chain: &dyn MetadataChain,
     objects_batch: ObjectsBatch
 ) -> Vec<(Multihash, Vec<u8>)> {
 
@@ -166,7 +186,7 @@ pub async fn unpack_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn collect_missing_object_references_from_metadata(
+async fn collect_missing_object_references_from_metadata(
     dataset: &dyn Dataset,
     blocks_data: Vec<(Multihash, Vec<u8>)>
 ) -> Vec<ObjectFileReference> {
@@ -189,6 +209,7 @@ pub async fn collect_missing_object_references_from_metadata(
                         ObjectFileReference {
                             object_type: ObjectType::DataSlice,
                             physical_hash: e.output_data.physical_hash.clone(),
+                            size: e.output_data.size,
                         }
                     );
                 }
@@ -197,7 +218,8 @@ pub async fn collect_missing_object_references_from_metadata(
                         object_files.push(
                             ObjectFileReference {
                                 object_type: ObjectType::Checkpoint,
-                                physical_hash: checkpoint.physical_hash.clone()
+                                physical_hash: checkpoint.physical_hash.clone(),
+                                size: checkpoint.size,
                             }
                         );
                     }
@@ -210,6 +232,7 @@ pub async fn collect_missing_object_references_from_metadata(
                             ObjectFileReference {
                                 object_type: ObjectType::DataSlice,
                                 physical_hash: data_slice.physical_hash.clone(),
+                                size: data_slice.size,
                             }
                         );
                     }
@@ -219,7 +242,8 @@ pub async fn collect_missing_object_references_from_metadata(
                         object_files.push(
                             ObjectFileReference {
                                 object_type: ObjectType::Checkpoint,
-                                physical_hash: checkpoint.physical_hash.clone()
+                                physical_hash: checkpoint.physical_hash.clone(),
+                                size: checkpoint.size
                             }
                         );
                     }
@@ -273,6 +297,71 @@ pub async fn prepare_object_transfer_strategy(
         
     }
 
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_import_object_file(
+    dataset: &dyn Dataset,
+    object_transfer_strategy: &PullObjectTransferStrategy
+) -> Result<(), SyncError> {
+    
+    if object_transfer_strategy.pull_strategy != ObjectPullStrategy::HttpDownload {
+        panic!("Unsupported pull strategy {:?}", object_transfer_strategy.pull_strategy);
+    }
+
+    let object_file_reference = &object_transfer_strategy.object_file;
+
+    let client = reqwest::Client::new();
+
+    // TODO: error handling
+    let response = client.get(
+        object_transfer_strategy.download_from.url.clone()
+    ).send()
+        .await
+        .unwrap();
+
+    let stream = response.bytes_stream();
+
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+    let reader = stream
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .into_async_read()
+        .compat();
+
+    let target_object_repository = match object_file_reference.object_type {
+        ObjectType::MetadataBlock => panic!("Metadata block unexpected at objects import stage"),
+        ObjectType::DataSlice => dataset.as_data_repo(),
+        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
+    };
+
+    let res = target_object_repository
+        .insert_stream(
+            Box::new(reader), 
+            InsertOpts {
+                precomputed_hash: None,
+                expected_hash: Some(&object_file_reference.physical_hash),
+                size_hint: Some(object_file_reference.size as usize),
+            }
+        )
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+            message: concat!(
+                "Data file hash declared by the source didn't match ",
+                "the computed - this may be an indication of hashing ",
+                "algorithm mismatch or an attempted tampering",
+            )
+            .to_owned(),
+            source: Some(e.into()),
+        }
+        .into()),
+        Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
+        Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+    }
+    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

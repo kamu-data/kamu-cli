@@ -11,7 +11,7 @@ use std::{sync::Arc};
 use opendatafabric::{Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
-use tokio::net::TcpStream;
+use tokio::{net::TcpStream};
 use url::Url;
 use dill::component;
 use futures::SinkExt;
@@ -28,7 +28,7 @@ use kamu::domain::{Dataset, SyncError, SyncResult, SyncListener};
 use crate::{
     messages::*, 
     ws_common::{ReadMessageError, WriteMessageError, self}, 
-    dataset_protocol_helper::{unpack_dataset_metadata_batch, collect_missing_object_references_from_metadata}
+    dataset_protocol_helper::{dataset_import_pulled_metadata, dataset_import_object_file}
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -208,23 +208,29 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 .await
                 .unwrap();
 
-
-        let blocks_data = 
-            unpack_dataset_metadata_batch(
-                dataset_pull_metadata_response.blocks
-            )
-            .await;
-
-        let object_files = 
-            collect_missing_object_references_from_metadata(dst, blocks_data)
+        let object_files_transfer_plan = 
+            dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks)
                 .await;
 
-        println!("Need to query {} data objects", object_files.len());
+        println!("Object files transfer plan consist of {} stages", object_files_transfer_plan.len());
 
-        let _dataset_objects_pull_response =
-            self.pull_send_objects_request(&mut ws_stream, object_files)
+        let mut stage_index = 0;
+        for stage_object_files in object_files_transfer_plan {
+            stage_index += 1;
+            println!("Stage #{}: querying {} data objects", stage_index, stage_object_files.len());
+
+            let dataset_objects_pull_response =
+            self.pull_send_objects_request(&mut ws_stream, stage_object_files)
                 .await
                 .unwrap();
+
+            // TODO: parallelism
+            for s in dataset_objects_pull_response.object_transfer_strategies {
+                dataset_import_object_file(dst, &s)
+                    .await
+                    .unwrap();
+            }
+        }
 
         ws_stream.close(None).await.unwrap();
         
