@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-http"
-version = "0.111.0"
+version = "0.112.0"
 authors = ["Sergei Zaychenko <szaychenko@kamu.dev>"]
 edition = "2021"
 
