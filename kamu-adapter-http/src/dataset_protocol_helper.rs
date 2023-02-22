@@ -11,9 +11,9 @@
 use std::io::Read;
 
 use flate2::Compression;
-use kamu::domain::{MetadataChain, Dataset, InsertOpts, InsertError, CorruptedSourceError, SyncError};
+use kamu::domain::{MetadataChain, Dataset, InsertOpts, InsertError, CorruptedSourceError, SyncError, AppendOpts};
 use opendatafabric::{Multihash, MetadataEvent, MetadataBlock};
-use futures::TryStreamExt;
+use futures::{TryStreamExt, stream, StreamExt};
 use tar::Header;
 use bytes::Bytes;
 use url::Url;
@@ -133,10 +133,12 @@ pub async fn dataset_import_pulled_metadata(
 ) -> Vec<Vec<ObjectFileReference>> {
 
     let blocks_data = 
-        unpack_dataset_metadata_batch(dataset.as_metadata_chain(), objects_batch).await;
+        unpack_dataset_metadata_batch(objects_batch).await;
+
+    let loaded_blocks = load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await;
 
     let object_files = 
-        collect_missing_object_references_from_metadata(dataset, blocks_data)
+        collect_missing_object_references_from_metadata(dataset, loaded_blocks)
             .await;
 
     // Future: analyze sizes and split on stages
@@ -147,7 +149,6 @@ pub async fn dataset_import_pulled_metadata(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn unpack_dataset_metadata_batch(
-    metadata_chain: &dyn MetadataChain,
     objects_batch: ObjectsBatch
 ) -> Vec<(Multihash, Vec<u8>)> {
 
@@ -186,22 +187,42 @@ async fn unpack_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+
+async fn load_dataset_blocks(
+    metadata_chain: &dyn MetadataChain,
+    blocks_data: Vec<(Multihash, Vec<u8>)>
+) -> Vec<MetadataBlock> {
+
+    stream::iter(blocks_data)
+        .then(
+            |(hash, block_buf)| async move  {
+                println!("> {} - {} bytes", hash, block_buf.len());
+                let block = metadata_chain.append_block_from_bytes(
+                    &hash, Bytes::copy_from_slice(block_buf.as_slice()),
+                    AppendOpts {
+                        expected_hash: Some(&hash),
+                        ..AppendOpts::default()
+                    },
+                ).await.unwrap();
+                block
+            }
+        )
+        .collect()
+        .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn collect_missing_object_references_from_metadata(
     dataset: &dyn Dataset,
-    blocks_data: Vec<(Multihash, Vec<u8>)>
+    blocks: Vec<MetadataBlock>
 ) -> Vec<ObjectFileReference> {
 
-    let metadata_chain = dataset.as_metadata_chain();
     let data_repo = dataset.as_data_repo();
     let checkpoint_repo = dataset.as_checkpoint_repo();
 
     let mut object_files: Vec<ObjectFileReference> = Vec::new();
-    for (hash, block_data) in blocks_data {
-        println!("> {} - {} bytes", hash, block_data.len());
-        let block = metadata_chain.construct_block_from_bytes(
-            &hash, Bytes::copy_from_slice(block_data.as_slice())
-        ).await.unwrap();
-
+    for block in blocks {
         match block.event {
             MetadataEvent::AddData(e) => {
                 if !data_repo.contains(&e.output_data.physical_hash).await.unwrap() {

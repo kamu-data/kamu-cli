@@ -11,7 +11,7 @@ use std::{sync::Arc};
 use opendatafabric::{Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
-use tokio::{net::TcpStream};
+use tokio::{net::TcpStream, stream};
 use url::Url;
 use dill::component;
 use futures::SinkExt;

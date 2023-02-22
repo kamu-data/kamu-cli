@@ -65,19 +65,20 @@ pub trait MetadataChain: Send + Sync {
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetRefError>;
 
-    /// Constructs block from raw bytes
-    async fn construct_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: Bytes,
-    ) -> Result<MetadataBlock, GetBlockError>;
-
     /// Appends the block to the chain
     async fn append<'a>(
         &'a self,
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
+
+    /// Loads the block from bytes and appends it to the chain
+    async fn append_block_from_bytes<'a>(
+        &'a self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+        opts: AppendOpts<'a>,
+    ) -> Result<MetadataBlock, AppendFromBytesError>;
 
     fn as_object_repo(&self) -> &dyn ObjectRepository;
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
@@ -247,6 +248,20 @@ pub enum GetBlockError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum ConstructBlockFromBytesError {
+    #[error(transparent)]
+    BlockVersion(BlockVersionError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum IterBlocksError {
     #[error(transparent)]
     RefNotFound(RefNotFoundError),
@@ -353,6 +368,17 @@ impl From<super::reference_repository::SetRefError> for AppendError {
             super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendFromBytesError {
+    #[error(transparent)]
+    Append(#[from] AppendError),
+
+    #[error(transparent)]
+    BlockVersion(#[from] BlockVersionError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

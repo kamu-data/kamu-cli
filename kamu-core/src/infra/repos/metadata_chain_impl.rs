@@ -144,6 +144,35 @@ where
         }
         Ok(())
     }
+
+    async fn construct_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+    ) -> Result<MetadataBlock, ConstructBlockFromBytesError> {
+
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
+            Ok(block) => Ok(block),
+            Err(e) => match e {
+                Error::UnsupportedVersion { .. } => {
+                    Err(ConstructBlockFromBytesError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }))
+                }
+                _ => {
+                    Err(ConstructBlockFromBytesError::Internal(
+                        BlockMalformedError {
+                            hash: hash.clone(),
+                            source: e.into(),
+                        }
+                        .int_err(),
+                    ))
+                }
+            },
+        }
+    }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -160,7 +189,14 @@ where
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         let data = self.get_block_bytes(hash).await?;
-        self.construct_block_from_bytes(hash, data).await
+
+        match self.construct_block_from_bytes(hash, data).await {
+            Ok(block) => Ok(block),
+            Err(e) => match e {
+                ConstructBlockFromBytesError::BlockVersion(e) => Err(GetBlockError::BlockVersion(e)),
+                ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
+            }
+        }
     }
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
@@ -292,34 +328,6 @@ where
         Ok(())
     }
 
-    async fn construct_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: Bytes,
-    ) -> Result<MetadataBlock, GetBlockError> {
-
-        match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
-            Ok(block) => return Ok(block),
-            Err(e) => match e {
-                Error::UnsupportedVersion { .. } => {
-                    return Err(GetBlockError::BlockVersion(BlockVersionError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }));
-                }
-                _ => {
-                    return Err(GetBlockError::Internal(
-                        BlockMalformedError {
-                            hash: hash.clone(),
-                            source: e.into(),
-                        }
-                        .int_err(),
-                    ));
-                }
-            },
-        }
-    }
-
     async fn append<'a>(
         &'a self,
         block: MetadataBlock,
@@ -391,6 +399,26 @@ where
         Ok(res.hash)
     }
 
+    async fn append_block_from_bytes<'a>(
+        &'a self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+        opts: AppendOpts<'a>,
+    ) -> Result<MetadataBlock, AppendFromBytesError> {
+
+        let block = match self.construct_block_from_bytes(hash, block_bytes).await {
+            Ok(block) => Ok(block),
+            Err(e) => Err(
+                match e {
+                    ConstructBlockFromBytesError::BlockVersion(e) => AppendFromBytesError::BlockVersion(e),
+                    ConstructBlockFromBytesError::Internal(e) => AppendFromBytesError::Append(AppendError::Internal(e)),
+                }
+            ),
+        }?;
+        self.append(block.clone(), opts).await?;
+        Ok(block)
+    }
+    
     fn as_object_repo(&self) -> &dyn ObjectRepository {
         &self.obj_repo
     }

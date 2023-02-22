@@ -432,20 +432,21 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.set_ref(r, hash, opts).await
     }
 
-    async fn construct_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: Bytes,
-    ) -> Result<MetadataBlock, GetBlockError> {
-        self.chain.construct_block_from_bytes(hash, block_bytes).await
-    }
-
     async fn append<'b>(
         &'b self,
         block: MetadataBlock,
         opts: AppendOpts<'b>,
     ) -> Result<Multihash, AppendError> {
         self.chain.append(block, opts).await
+    }
+
+    async fn append_block_from_bytes<'b>(
+        &'b self,
+        hash: &Multihash,
+        block_bytes: Bytes,
+        opts: AppendOpts<'b>,
+    ) -> Result<MetadataBlock, AppendFromBytesError> {
+        self.chain.append_block_from_bytes(hash, block_bytes, opts).await
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {
