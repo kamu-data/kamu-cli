@@ -27,7 +27,6 @@ pub trait Dataset: Send + Sync {
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
     fn as_cache_repo(&self) -> &dyn NamedObjectRepository;
 
-    fn supports_smart_protocol(&self) -> bool;
     fn base_url(&self) -> &Url;
 
     /// Returns a brief summary of the dataset

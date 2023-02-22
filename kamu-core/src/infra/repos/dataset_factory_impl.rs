@@ -43,7 +43,6 @@ impl DatasetFactoryImpl {
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
         DatasetImpl::new(
             Url::parse(format!("file://{}", layout.root_dir.to_str().unwrap()).as_str()).unwrap(),
-            false,
             MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(layout.blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
@@ -55,19 +54,10 @@ impl DatasetFactoryImpl {
         )
     }
 
-    pub fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
-        DatasetFactoryImpl::get_http_common(base_url, false)
-    }
-
-    pub fn get_odf_http(base_url: Url) -> Result<impl Dataset, InternalError> {
-        DatasetFactoryImpl::get_http_common(base_url, true)
-    }
-
-    fn get_http_common(base_url: Url, supports_smart_protocol: bool) -> Result<impl Dataset, InternalError> {
+    fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
             base_url.clone(),
-            supports_smart_protocol,
             MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(client.clone(), base_url.join("blocks/").unwrap()),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
@@ -105,7 +95,6 @@ impl DatasetFactoryImpl {
 
         Ok(DatasetImpl::new(
             base_url,
-            false,
             MetadataChainImpl::new(
                 ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
                     client.clone(),
@@ -166,17 +155,12 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let ds = Self::get_local_fs(layout);
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            "http" | "https" => {
+            "http" | "https" | "odf+http" | "odf+https" => {
                 let ds = Self::get_http(url.clone())?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "s3" | "s3+http" | "s3+https" => {
                 let ds = Self::get_s3(url.clone())?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
-            }
-            "odf+http" | "odf+https" => {
-                let res = Url::parse(&(url.as_str())[4..]);
-                let ds = Self::get_odf_http(res.unwrap())?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             _ => Err(UnsupportedProtocolError {

@@ -11,12 +11,12 @@ use std::{sync::Arc};
 use opendatafabric::{Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
-use tokio::{net::TcpStream, stream};
+use tokio::{net::TcpStream};
 use url::Url;
 use dill::component;
 use futures::SinkExt;
 
-use tokio_stream::StreamExt;
+
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{Message}, WebSocketStream, MaybeTlsStream,
@@ -198,43 +198,58 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let dst_head = dst.as_metadata_chain().get_ref(&BlockRef::Head).await.unwrap();
 
-        let _dataset_pull_response = 
-            self.pull_send_request(&mut ws_stream, dst_head)
+        let dataset_pull_response = 
+            self.pull_send_request(&mut ws_stream, dst_head.clone())
                 .await
                 .unwrap();
 
-        let dataset_pull_metadata_response =
+        let sync_result = if dataset_pull_response.size_estimation.num_blocks > 0 {
+
+            let dataset_pull_metadata_response =
             self.pull_send_metadata_request(&mut ws_stream)
                 .await
                 .unwrap();
 
-        let object_files_transfer_plan = 
-            dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks)
-                .await;
+            let object_files_transfer_plan = 
+                dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks)
+                    .await;
 
-        println!("Object files transfer plan consist of {} stages", object_files_transfer_plan.len());
+            println!("Object files transfer plan consist of {} stages", object_files_transfer_plan.len());
 
-        let mut stage_index = 0;
-        for stage_object_files in object_files_transfer_plan {
-            stage_index += 1;
-            println!("Stage #{}: querying {} data objects", stage_index, stage_object_files.len());
+            let mut stage_index = 0;
+            for stage_object_files in object_files_transfer_plan {
+                stage_index += 1;
+                println!("Stage #{}: querying {} data objects", stage_index, stage_object_files.len());
 
-            let dataset_objects_pull_response =
-            self.pull_send_objects_request(&mut ws_stream, stage_object_files)
-                .await
-                .unwrap();
-
-            // TODO: parallelism
-            for s in dataset_objects_pull_response.object_transfer_strategies {
-                dataset_import_object_file(dst, &s)
+                let dataset_objects_pull_response =
+                self.pull_send_objects_request(&mut ws_stream, stage_object_files)
                     .await
                     .unwrap();
+
+                use futures::StreamExt;
+                futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
+                    .for_each_concurrent(
+                        /* limit */ 4, // TODO: external configuration?
+                        |s| async move {
+                            dataset_import_object_file(dst, &s).await.unwrap()
+                        }
+                    ).await;
             }
-        }
+
+            let new_dst_head = dst.as_metadata_chain().get_ref(&BlockRef::Head).await.unwrap();
+
+            SyncResult::Updated {
+                old_head: Some(dst_head),
+                new_head: new_dst_head,
+                num_blocks: dataset_pull_response.size_estimation.num_blocks as usize,
+            }
+        } else {
+            SyncResult::UpToDate
+        };
 
         ws_stream.close(None).await.unwrap();
-        
-        unimplemented!("Saving downloaded blocks not supported yet")
+
+        Ok(sync_result)
 
     }
 
@@ -257,6 +272,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if ws_stream.send(hello_message).await.is_err() {
             // server disconnected
         }
+
+        use tokio_stream::StreamExt;
         while let Some(msg) = ws_stream.next().await {
             let msg = msg.unwrap();
             if msg.is_text() || msg.is_binary() {
@@ -280,6 +297,7 @@ pub async fn tungstenite_ws_read_generic_payload<TMessagePayload: DeserializeOwn
     stream: &mut TungsteniteStream,
 ) -> Result<TMessagePayload, ReadMessageError>{
 
+    use tokio_stream::StreamExt;
     match stream.next().await {
         Some(msg) => {
             match msg {

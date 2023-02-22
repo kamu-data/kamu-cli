@@ -20,7 +20,6 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo> {
-    supports_smart_protocol: bool,
     base_url: Url,
     metadata_chain: MetaChain,
     data_repo: DataRepo,
@@ -42,7 +41,6 @@ where
 {
     pub fn new(
         base_url: Url,
-        supports_smart_protocol: bool,
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
@@ -52,7 +50,6 @@ where
     ) -> Self {
         Self {
             base_url,
-            supports_smart_protocol,
             metadata_chain,
             data_repo,
             checkpoint_repo,
@@ -288,9 +285,5 @@ where
 
     fn base_url(&self) -> &Url {
         &self.base_url
-    }
-
-    fn supports_smart_protocol(&self) -> bool {
-        self.supports_smart_protocol
     }
 }

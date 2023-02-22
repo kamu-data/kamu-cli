@@ -138,6 +138,10 @@ pub async fn dataset_pull_ws_upgrade_handler(
                 prefix_url_str += ":";
                 prefix_url_str += &port.to_string();
             }
+            prefix_url_str += "/";
+            prefix_url_str += params.get(PARAMETER_DATASET_NAME).unwrap();
+            prefix_url_str += "/";
+
             let prefix_url = Url::parse(prefix_url_str.as_str()).unwrap();
 
             ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset, prefix_url)

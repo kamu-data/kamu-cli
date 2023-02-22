@@ -249,22 +249,7 @@ impl SyncServiceImpl {
 
         let dst_dataset = dst_dataset_builder.as_dataset();
 
-        let sync_result = if src_dataset.supports_smart_protocol() {
-            self.sync_smart_pull_transfer_protocol(
-                src_dataset.base_url(),
-                dst_dataset,
-                listener,
-            ).await
-
-        } else if dst_dataset.supports_smart_protocol() {
-            self.sync_smart_push_transfer_protocol(
-                src_dataset.as_ref(),
-                dst_dataset.base_url(),
-                listener,
-            ).await
-
-        } else {
-            self.sync_simple_transfer_protocol(
+        let sync_result = self.sync_simple_transfer_protocol(
                 src_dataset.as_ref(),
                 src,
                 dst_dataset,
@@ -273,8 +258,7 @@ impl SyncServiceImpl {
                 opts.trust_source.unwrap_or(src_is_local),
                 opts.force,
                 listener,
-            ).await
-        };
+            ).await;
 
         match sync_result {
             Ok(result) => {
@@ -292,25 +276,42 @@ impl SyncServiceImpl {
 
     async fn sync_smart_pull_transfer_protocol<'a>(
         &'a self,
-        src_url: &Url,
-        dst: &'a dyn Dataset,
-        listener: Arc<dyn SyncListener + 'static>,
+        odf_src: &DatasetRefAny,
+        dst: &DatasetRefAny,
+        opts: SyncOptions,
+        listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
 
+        let odf_src_remote_ref = odf_src.as_remote_ref().unwrap();
+        let odf_src_url = self.resolve_remote_dataset_url(&odf_src_remote_ref).await?;
+        let http_src_url = Url::parse(&(odf_src_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
+
+        let dst_dataset_builder = self
+            .get_dataset_writer(dst, opts.create_if_not_exists)
+            .await?;
+
+        let dst_dataset = dst_dataset_builder.as_dataset();
+
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
-        self.smart_transfer_protocol.pull_protocol_client_flow(src_url, dst, listener)
+        self.smart_transfer_protocol.pull_protocol_client_flow(&http_src_url, dst_dataset, listener)
             .await
     }    
 
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
-        src: &'a dyn Dataset,
-        dst_url: &Url,
-        listener: Arc<dyn SyncListener + 'static>,
+        src: &DatasetRefAny,
+        odf_dst: &DatasetRefAny,
+        listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
 
+        let src_dataset = self.get_dataset_reader(src).await?;
+
+        let odf_dst_remote_ref = odf_dst.as_remote_ref().unwrap();
+        let odf_dst_url = self.resolve_remote_dataset_url(&odf_dst_remote_ref).await?;
+        let http_dst_url = Url::parse(&(odf_dst_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
+
         info!("Starting sync using Smart Transfer Protocol (Push flow)");
-        self.smart_transfer_protocol.push_protocol_client_flow(src, dst_url, listener)
+        self.smart_transfer_protocol.push_protocol_client_flow(src_dataset.as_ref(), &http_dst_url, listener)
             .await
     }    
 
@@ -594,6 +595,27 @@ impl SyncServiceImpl {
                     .into())
                 }
             }
+            (DatasetRefAny::Url(src_url), DatasetRefAny::Url(dst_url)) 
+                if src_url.scheme().starts_with("odf+") && dst_url.scheme().starts_with("odf+") => {
+                    Err(UnsupportedProtocolError {
+                        url: dst_url.as_ref().clone(),
+                        message: Some(
+                            concat!(
+                                "Syncing from a remote ODF repository directly to remote ODF repository ",
+                                "is not currently supported. Consider pulling the dataset ",
+                                "locally and then pushing to ODF repository.",
+                            )
+                            .to_owned(),
+                        ),
+                    }
+                    .into())
+            }
+            (DatasetRefAny::Url(src_url), _) if src_url.scheme().starts_with("odf+") =>
+                self.sync_smart_pull_transfer_protocol(src, dst, opts, listener).await,
+
+            (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme().starts_with("odf+") =>
+                self.sync_smart_push_transfer_protocol(src, dst, listener).await,
+
             (_, _) => self.sync_generic(src, dst, opts, listener).await,
         }
     }

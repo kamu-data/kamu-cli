@@ -695,7 +695,4 @@ where
     fn base_url(&self) -> &Url {
         self.dataset.base_url()
     }
-    fn supports_smart_protocol(&self) -> bool {
-        self.dataset.supports_smart_protocol()
-    }
 }
