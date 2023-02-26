@@ -236,6 +236,8 @@ pub async fn dataset_pull_ws_handler(
     let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref())
         .await
         .unwrap();
+
+    // TODO: the flow might abort at this point, handle optionality
     handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request)
         .await
         .unwrap();

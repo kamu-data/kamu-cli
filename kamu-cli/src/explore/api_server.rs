@@ -34,7 +34,7 @@ impl APIServer {
             )
             .nest(
                 format!("/:{}", kamu_adapter_http::PARAMETER_DATASET_NAME).as_str(),
-                kamu_adapter_http::create_dataset_routes(local_repo),
+                kamu_adapter_http::create_dataset_transfer_protocol_routes(local_repo),
             )
             .layer(
                 tower::ServiceBuilder::new()

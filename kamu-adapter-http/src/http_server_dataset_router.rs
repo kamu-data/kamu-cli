@@ -14,7 +14,9 @@ use kamu::domain::LocalDatasetRepository;
 use crate::http_server_constants::*;
 use crate::http_server_simple_transfer_protocol::*;
 
-pub fn create_dataset_routes(local_repo: Arc<dyn LocalDatasetRepository>) -> axum::Router {
+pub fn create_dataset_transfer_protocol_routes(
+    local_repo: Arc<dyn LocalDatasetRepository>,
+) -> axum::Router {
     axum::Router::new()
         .route(
             format!("/refs/:{}", PARAMETER_REF).as_str(),
