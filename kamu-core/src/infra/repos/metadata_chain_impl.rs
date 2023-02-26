@@ -13,6 +13,21 @@ use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use async_trait::async_trait;
+use thiserror::Error;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+enum ConstructBlockFromBytesError {
+    #[error(transparent)]
+    BlockVersion(BlockVersionError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

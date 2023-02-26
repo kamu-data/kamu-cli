@@ -237,20 +237,6 @@ pub enum GetBlockError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum ConstructBlockFromBytesError {
-    #[error(transparent)]
-    BlockVersion(BlockVersionError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
 pub enum IterBlocksError {
     #[error(transparent)]
     RefNotFound(RefNotFoundError),
