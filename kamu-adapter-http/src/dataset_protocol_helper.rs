@@ -49,8 +49,12 @@ pub async fn prepare_dataset_transfer_estimaton(
     while let Some((hash, block)) = block_stream.try_next().await.unwrap() {
         blocks_count += 1;
 
-        // TODO: error handling of get_block_size
-        bytes_in_blocks += metadata_chain.get_block_size(&hash).await.unwrap();
+        // TODO: error handling of get_size
+        bytes_in_blocks += metadata_chain
+            .as_object_repo()
+            .get_size(&hash)
+            .await
+            .unwrap();
 
         match block.event {
             MetadataEvent::AddData(add_data) => {
@@ -104,8 +108,12 @@ pub async fn prepare_dataset_metadata_batch(
     for (hash, _) in blocks_for_transfer.iter().rev() {
         blocks_count += 1;
 
-        // TODO: error handling of get_block_bytes
-        let block_bytes: Bytes = metadata_chain.get_block_bytes(&hash).await.unwrap();
+        // TODO: error handling of get_bytes
+        let block_bytes: Bytes = metadata_chain
+            .as_object_repo()
+            .get_bytes(&hash)
+            .await
+            .unwrap();
         let block_data: &[u8] = &(*block_bytes);
 
         let mut header = Header::new_gnu();
@@ -292,7 +300,8 @@ pub async fn prepare_object_transfer_strategy(
                     let blocks_url = prefix_url.join("blocks/").unwrap();
                     dataset
                         .as_metadata_chain()
-                        .get_block_download_url(&blocks_url, &object_file_ref.physical_hash)
+                        .as_object_repo()
+                        .get_download_url(&blocks_url, &object_file_ref.physical_hash)
                         .await
                         .unwrap()
                 }

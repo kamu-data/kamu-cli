@@ -12,13 +12,11 @@ use std::fmt::Display;
 use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
 use strum_macros::EnumString;
 use thiserror::Error;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,19 +27,6 @@ pub trait MetadataChain: Send + Sync {
 
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
-
-    /// Returns size of the specified block in bytes
-    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError>;
-
-    /// Returns raw bytes associated with the block
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError>;
-
-    /// Returns block download URL
-    async fn get_block_download_url(
-        &self,
-        prefix_url: &Url,
-        hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError>;
 
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.

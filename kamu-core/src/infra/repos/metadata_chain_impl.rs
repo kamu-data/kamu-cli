@@ -9,12 +9,10 @@
 
 use crate::domain::*;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use async_trait::async_trait;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -184,7 +182,14 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let data = self.get_block_bytes(hash).await?;
+        let data = match self.obj_repo.get_bytes(hash).await {
+            Ok(data) => Ok(data),
+            Err(GetError::NotFound(e)) => {
+                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
+            }
+            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
+            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
+        }?;
 
         match self.construct_block_from_bytes(hash, data).await {
             Ok(block) => Ok(block),
@@ -194,44 +199,6 @@ where
                 }
                 ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
             },
-        }
-    }
-
-    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
-        let size_result = self.obj_repo.get_size(hash).await;
-        match size_result {
-            Ok(size) => Ok(size),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
-        }
-    }
-
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError> {
-        match self.obj_repo.get_bytes(hash).await {
-            Ok(data) => Ok(data),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
-        }
-    }
-
-    async fn get_block_download_url(
-        &self,
-        prefix_url: &Url,
-        hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
-        match self.obj_repo.get_download_url(prefix_url, hash).await {
-            Ok(url) => Ok(url),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }
     }
 

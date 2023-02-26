@@ -9,13 +9,11 @@
 
 use crate::domain::*;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
 use thiserror::Error;
 use tokio_stream::StreamExt;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -381,23 +379,6 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         (self.on_read)(1);
         self.chain.get_block(hash).await
-    }
-
-    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockError> {
-        self.chain.get_block_size(hash).await
-    }
-
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError> {
-        (self.on_read)(1);
-        self.chain.get_block_bytes(hash).await
-    }
-
-    async fn get_block_download_url(
-        &self,
-        prefix_url: &Url,
-        hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
-        self.chain.get_block_download_url(prefix_url, hash).await
     }
 
     fn iter_blocks_interval<'b>(
