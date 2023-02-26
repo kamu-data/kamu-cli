@@ -42,7 +42,7 @@ impl DatasetFactoryImpl {
 
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
         DatasetImpl::new(
-            Url::parse(format!("file://{}", layout.root_dir.to_str().unwrap()).as_str()).unwrap(),
+            Url::from_directory_path(layout.root_dir).unwrap(),
             MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(layout.blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
