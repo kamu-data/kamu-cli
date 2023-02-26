@@ -29,7 +29,7 @@ async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
     match socket.recv().await {
         Some(msg) => match msg {
             Ok(Message::Text(raw_message)) => {
-                ws_common::parse_payload::<TMessagePayload>(raw_message)
+                ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
             }
             Ok(Message::Close(_)) => Err(ReadMessageError::Closed),
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),

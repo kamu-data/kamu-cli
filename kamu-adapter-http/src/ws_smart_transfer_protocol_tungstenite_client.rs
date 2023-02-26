@@ -297,7 +297,7 @@ pub async fn tungstenite_ws_read_generic_payload<TMessagePayload: DeserializeOwn
     match stream.next().await {
         Some(msg) => match msg {
             Ok(Message::Text(raw_message)) => {
-                ws_common::parse_payload::<TMessagePayload>(raw_message)
+                ws_common::parse_payload::<TMessagePayload>(raw_message.as_str())
             }
             Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
             Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),

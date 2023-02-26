@@ -61,9 +61,9 @@ pub enum WriteMessageError {
 /////////////////////////////////////////////////////////////////////////////////
 
 pub fn parse_payload<TMessagePayload: DeserializeOwned>(
-    raw_message: String,
+    raw_message: &str,
 ) -> Result<TMessagePayload, ReadMessageError> {
-    let parse_result = serde_json::from_str::<TMessagePayload>(raw_message.as_str());
+    let parse_result = serde_json::from_str::<TMessagePayload>(raw_message);
 
     match parse_result {
         Ok(payload) => Ok(payload),
