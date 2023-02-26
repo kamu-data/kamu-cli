@@ -136,10 +136,14 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(Box::new(reader))
     }
 
-    async fn get_download_url(&self, _prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+    async fn get_download_url(
+        &self,
+        _prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
         match self.base_url.join(&hash.to_multibase_string()) {
             Ok(url) => Ok((url, None)),
-            Err(e) => Err(GetError::Internal(e.int_err()))
+            Err(e) => Err(GetError::Internal(e.int_err())),
         }
     }
 

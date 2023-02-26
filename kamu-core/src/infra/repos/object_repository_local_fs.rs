@@ -18,8 +18,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
-use url::Url;
 use tracing::debug;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,7 +127,7 @@ where
 
         Ok(path.exists())
     }
-    
+
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let path = self.get_path(hash);
 
@@ -173,12 +173,14 @@ where
         Ok(Box::new(file))
     }
 
-    async fn get_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+    async fn get_download_url(
+        &self,
+        prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
         match prefix_url.join(&hash.to_multibase_string()) {
-            Ok(url) => {
-                Ok((url, None))
-            }
-            Err(e) => Err(GetError::Internal(e.int_err()))
+            Ok(url) => Ok((url, None)),
+            Err(e) => Err(GetError::Internal(e.int_err())),
         }
     }
 

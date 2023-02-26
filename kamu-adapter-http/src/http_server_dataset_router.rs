@@ -14,35 +14,25 @@ use kamu::domain::LocalDatasetRepository;
 use crate::http_server_constants::*;
 use crate::http_server_simple_transfer_protocol::*;
 
-
 pub fn create_dataset_routes(local_repo: Arc<dyn LocalDatasetRepository>) -> axum::Router {
     axum::Router::new()
         .route(
-            format!("/refs/:{}", PARAMETER_REF).as_str(), 
-            axum::routing::get(dataset_refs_handler)
+            format!("/refs/:{}", PARAMETER_REF).as_str(),
+            axum::routing::get(dataset_refs_handler),
         )
         .route(
-            format!("/blocks/:{}", PARAMETER_BLOCK_HASH).as_str(), 
-            axum::routing::get(dataset_blocks_handler)
+            format!("/blocks/:{}", PARAMETER_BLOCK_HASH).as_str(),
+            axum::routing::get(dataset_blocks_handler),
         )
         .route(
-            format!("/data/:{}", PARAMETER_PHYSICAL_HASH).as_str(), 
-            axum::routing::get(dataset_data_handler)
+            format!("/data/:{}", PARAMETER_PHYSICAL_HASH).as_str(),
+            axum::routing::get(dataset_data_handler),
         )
         .route(
-            format!("/checkpoints/:{}", PARAMETER_PHYSICAL_HASH).as_str(), 
-            axum::routing::get(dataset_checkpoints_handler)
+            format!("/checkpoints/:{}", PARAMETER_PHYSICAL_HASH).as_str(),
+            axum::routing::get(dataset_checkpoints_handler),
         )
-        .route(
-            "/pull", 
-            axum::routing::get(dataset_pull_ws_upgrade_handler)
-        )
-        .route(
-            "/push", 
-            axum::routing::get(dataset_push_ws_upgrade_handler)
-        )
-        .layer(
-            axum::extract::Extension(local_repo)
-        )
+        .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))
+        .route("/push", axum::routing::get(dataset_push_ws_upgrade_handler))
+        .layer(axum::extract::Extension(local_repo))
 }
-

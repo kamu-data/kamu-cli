@@ -70,7 +70,7 @@ impl DatasetFactoryImpl {
             NamedObjectRepositoryHttp::new(client.clone(), base_url.join("cache/").unwrap()),
             NamedObjectRepositoryHttp::new(client.clone(), base_url.join("info/").unwrap()),
         ))
-    } 
+    }
 
     pub fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
         use rusoto_core::Region;

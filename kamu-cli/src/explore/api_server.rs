@@ -10,8 +10,8 @@
 use dill::Catalog;
 use kamu::domain::LocalDatasetRepository;
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr}, 
-    sync::Arc
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
 };
 
 pub struct APIServer {
@@ -22,7 +22,6 @@ pub struct APIServer {
 }
 
 impl APIServer {
-
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         let local_repo: Arc<dyn LocalDatasetRepository> = catalog.get_one().unwrap();
         let gql_schema = kamu_adapter_graphql::schema(catalog);
@@ -34,10 +33,8 @@ impl APIServer {
                 axum::routing::get(graphql_playground).post(graphql_handler),
             )
             .nest(
-                format!(
-                    "/:{}", 
-                    kamu_adapter_http::PARAMETER_DATASET_NAME
-                ).as_str(), kamu_adapter_http::create_dataset_routes(local_repo)
+                format!("/:{}", kamu_adapter_http::PARAMETER_DATASET_NAME).as_str(),
+                kamu_adapter_http::create_dataset_routes(local_repo),
             )
             .layer(
                 tower::ServiceBuilder::new()

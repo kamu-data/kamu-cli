@@ -10,13 +10,12 @@
 use std::sync::Arc;
 use url::Url;
 
-use crate::domain::{Dataset, SyncResult, SyncError, SyncListener};
+use crate::domain::{Dataset, SyncError, SyncListener, SyncResult};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait SmartTransferProtocolClient: Sync + Send {
-
     async fn pull_protocol_client_flow(
         &self,
         src_url: &Url,
@@ -30,7 +29,6 @@ pub trait SmartTransferProtocolClient: Sync + Send {
         dst_url: &Url,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError>;
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -423,8 +423,8 @@ impl RemoteDatasetName {
 
     pub fn as_name_with_owner(&self) -> DatasetNameWithOwner {
         DatasetNameWithOwner::new(
-            self.account_name.as_ref().map(|a| a.clone()), 
-            self.dataset_name.clone()
+            self.account_name.as_ref().map(|a| a.clone()),
+            self.dataset_name.clone(),
         )
     }
 

@@ -10,7 +10,6 @@
 #![feature(error_generic_member_access)]
 #![feature(provide_any)]
 
-
 pub(crate) mod messages;
 
 mod http_server_constants;
@@ -27,5 +26,5 @@ pub use ws_smart_transfer_protocol_tungstenite_client::*;
 mod http_server_simple_transfer_protocol;
 pub use http_server_simple_transfer_protocol::*;
 
-mod ws_common;
 mod dataset_protocol_helper;
+mod ws_common;

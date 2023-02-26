@@ -339,7 +339,6 @@ impl DatasetRefAny {
             false
         }
     }
-
 }
 
 impl std::str::FromStr for DatasetRefAny {

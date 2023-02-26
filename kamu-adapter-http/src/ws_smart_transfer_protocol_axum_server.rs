@@ -13,74 +13,61 @@ use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
 
-use kamu::domain::{Dataset, BlockRef};
-use url::Url;
 use crate::{
-    messages::*, 
-    ws_common::{WriteMessageError, ReadMessageError, self}, 
-    dataset_protocol_helper::*
+    dataset_protocol_helper::*,
+    messages::*,
+    ws_common::{self, ReadMessageError, WriteMessageError},
 };
-
+use kamu::domain::{BlockRef, Dataset};
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////
 
-
 async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
-    socket: &mut axum::extract::ws::WebSocket
-) -> Result<TMessagePayload, ReadMessageError>{
-
+    socket: &mut axum::extract::ws::WebSocket,
+) -> Result<TMessagePayload, ReadMessageError> {
     match socket.recv().await {
-        Some(msg) => {
-            match msg {
-                Ok(Message::Text(raw_message)) => {
-                    ws_common::parse_payload::<TMessagePayload>(raw_message)
-                },
-                Ok(Message::Close(_)) => {
-                    Err(ReadMessageError::Closed)
-                },
-                Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
-                Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
+        Some(msg) => match msg {
+            Ok(Message::Text(raw_message)) => {
+                ws_common::parse_payload::<TMessagePayload>(raw_message)
             }
+            Ok(Message::Close(_)) => Err(ReadMessageError::Closed),
+            Ok(_) => Err(ReadMessageError::NonTextMessageReceived),
+            Err(e) => Err(ReadMessageError::SocketError(Box::new(e))),
         },
-        None => Err(ReadMessageError::ClientDisconnected)
+        None => Err(ReadMessageError::ClientDisconnected),
     }
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////
-
 
 async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
-    payload: TMessagePayload
-) -> Result<(), WriteMessageError>{
-
-    let payload_as_json_string = 
-        ws_common::payload_to_json::<TMessagePayload>(payload)?;
+    payload: TMessagePayload,
+) -> Result<(), WriteMessageError> {
+    let payload_as_json_string = ws_common::payload_to_json::<TMessagePayload>(payload)?;
 
     let message = axum::extract::ws::Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
     match send_result {
         Ok(_) => Ok(()),
-        Err(e) => Err(WriteMessageError::SocketError(Box::new(e)))
+        Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////
-
 
 #[derive(Error, Debug)]
 enum SmartProtocolPullServerError {
     #[error(transparent)]
     PullRequestReadFailed(ReadMessageError),
-    
+
     #[error(transparent)]
     PullResponseWriteFailed(WriteMessageError),
 
     #[error(transparent)]
     PullMetadataRequestReadFailed(ReadMessageError),
-        
+
     #[error(transparent)]
     PullMetadataResponseWriteFailed(WriteMessageError),
 
@@ -88,27 +75,32 @@ enum SmartProtocolPullServerError {
     PullObjectRequestReadFailed(ReadMessageError),
 
     #[error(transparent)]
-    PullObjectResponseWriteFailed(WriteMessageError)
+    PullObjectResponseWriteFailed(WriteMessageError),
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////
 
 async fn handle_pull_request_initiation(
     socket: &mut axum::extract::ws::WebSocket,
-    dataset: &dyn Dataset
+    dataset: &dyn Dataset,
 ) -> Result<DatasetPullRequest, SmartProtocolPullServerError> {
-
-    let maybe_pull_request = 
-        axum_ws_read_generic_payload::<DatasetPullRequest>(socket).await;
+    let maybe_pull_request = axum_ws_read_generic_payload::<DatasetPullRequest>(socket).await;
 
     match maybe_pull_request {
         Ok(pull_request) => {
             // TODO: professional logging
             println!(
-                "Pull client sent a pull request: beginAfter={:?} stopAt={:?}", 
-                pull_request.begin_after.as_ref().map(|ba| ba.to_string()).ok_or("None"),
-                pull_request.stop_at.as_ref().map(|sa| sa.to_string()).ok_or("None")
+                "Pull client sent a pull request: beginAfter={:?} stopAt={:?}",
+                pull_request
+                    .begin_after
+                    .as_ref()
+                    .map(|ba| ba.to_string())
+                    .ok_or("None"),
+                pull_request
+                    .stop_at
+                    .as_ref()
+                    .map(|sa| sa.to_string())
+                    .ok_or("None")
             );
 
             let metadata_chain = dataset.as_metadata_chain();
@@ -116,23 +108,28 @@ async fn handle_pull_request_initiation(
 
             let size_estimation = prepare_dataset_transfer_estimaton(
                 dataset.as_metadata_chain(),
-                pull_request.stop_at.as_ref().or(Some(&head)).unwrap().clone(),
+                pull_request
+                    .stop_at
+                    .as_ref()
+                    .or(Some(&head))
+                    .unwrap()
+                    .clone(),
                 pull_request.begin_after.clone(),
-            ).await;
+            )
+            .await;
 
-            let response_result = 
-                axum_ws_write_generic_payload::<DatasetPullResponse>(
-                    socket, DatasetPullResponse { size_estimation }
-                ).await;
+            let response_result = axum_ws_write_generic_payload::<DatasetPullResponse>(
+                socket,
+                DatasetPullResponse { size_estimation },
+            )
+            .await;
             if let Err(e) = response_result {
                 Err(SmartProtocolPullServerError::PullResponseWriteFailed(e))
             } else {
                 Ok(pull_request)
             }
-        },
-        Err(e) => {
-            Err(SmartProtocolPullServerError::PullRequestReadFailed(e))
         }
+        Err(e) => Err(SmartProtocolPullServerError::PullRequestReadFailed(e)),
     }
 }
 
@@ -141,18 +138,15 @@ async fn handle_pull_request_initiation(
 async fn handle_pull_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
-    pull_request: DatasetPullRequest
+    pull_request: DatasetPullRequest,
 ) -> Result<(), SmartProtocolPullServerError> {
-
-    let maybe_pull_metadata_request = 
+    let maybe_pull_metadata_request =
         axum_ws_read_generic_payload::<DatasetPullMetadataRequest>(socket).await;
 
     match maybe_pull_metadata_request {
         Ok(_) => {
             // TODO: professional logging
-            println!(
-                "Pull client sent a pull metadata request"
-            );
+            println!("Pull client sent a pull metadata request");
 
             let metadata_chain = dataset.as_metadata_chain();
             let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
@@ -161,12 +155,17 @@ async fn handle_pull_metadata_request(
                 dataset.as_metadata_chain(),
                 pull_request.stop_at.or(Some(head)).unwrap(),
                 pull_request.begin_after,
-            ).await;
+            )
+            .await;
 
-            let response_result_metadata = 
-            axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
-                socket, DatasetMetadataPullResponse { blocks: metadata_batch }
-            ).await;
+            let response_result_metadata =
+                axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
+                    socket,
+                    DatasetMetadataPullResponse {
+                        blocks: metadata_batch,
+                    },
+                )
+                .await;
 
             if let Err(e) = response_result_metadata {
                 Err(SmartProtocolPullServerError::PullMetadataResponseWriteFailed(e))
@@ -174,12 +173,11 @@ async fn handle_pull_metadata_request(
                 Ok(())
             }
         }
-        Err(e) => {
-            Err(SmartProtocolPullServerError::PullMetadataRequestReadFailed(e))
-        }
+        Err(e) => Err(SmartProtocolPullServerError::PullMetadataRequestReadFailed(
+            e,
+        )),
     }
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -188,8 +186,7 @@ async fn try_handle_pull_objects_request(
     dataset: &dyn Dataset,
     prefix_url: &Url,
 ) -> Result<bool, SmartProtocolPullServerError> {
-    
-    let maybe_pull_objects_transfer_request = 
+    let maybe_pull_objects_transfer_request =
         axum_ws_read_generic_payload::<DatasetPullObjectsTransferRequest>(socket).await;
 
     match maybe_pull_objects_transfer_request {
@@ -201,35 +198,34 @@ async fn try_handle_pull_objects_request(
             );
             let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
             for r in request.object_files {
-                let transfer_strategy = prepare_object_transfer_strategy(
-                    dataset, prefix_url, &r
-                ).await;
+                let transfer_strategy =
+                    prepare_object_transfer_strategy(dataset, prefix_url, &r).await;
                 object_transfer_strategies.push(transfer_strategy);
             }
 
-            let response_result_objects = 
-            axum_ws_write_generic_payload::<DatasetPullObjectsTransferResponse>(
-                socket, DatasetPullObjectsTransferResponse { object_transfer_strategies }
-            ).await;
+            let response_result_objects =
+                axum_ws_write_generic_payload::<DatasetPullObjectsTransferResponse>(
+                    socket,
+                    DatasetPullObjectsTransferResponse {
+                        object_transfer_strategies,
+                    },
+                )
+                .await;
 
             if let Err(e) = response_result_objects {
-                Err(SmartProtocolPullServerError::PullObjectResponseWriteFailed(e))
+                Err(SmartProtocolPullServerError::PullObjectResponseWriteFailed(
+                    e,
+                ))
             } else {
                 Ok(true)
             }
         }
-        Err(ReadMessageError::Closed) => {
-            Ok(false)
-        }
-        Err(e) => {
-            Err(SmartProtocolPullServerError::PullObjectRequestReadFailed(e))
-        }
+        Err(ReadMessageError::Closed) => Ok(false),
+        Err(e) => Err(SmartProtocolPullServerError::PullObjectRequestReadFailed(e)),
     }
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////
-
 
 pub async fn dataset_pull_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
@@ -237,11 +233,18 @@ pub async fn dataset_pull_ws_handler(
     prefix_url: Url,
 ) {
     // TODO: error handling
-    let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref()).await.unwrap();
-    handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request).await.unwrap();
+    let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref())
+        .await
+        .unwrap();
+    handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request)
+        .await
+        .unwrap();
 
     loop {
-        let should_continue = try_handle_pull_objects_request(& mut socket, dataset.as_ref(), &prefix_url).await.unwrap();
+        let should_continue =
+            try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &prefix_url)
+                .await
+                .unwrap();
         if !should_continue {
             break;
         }
@@ -251,13 +254,11 @@ pub async fn dataset_pull_ws_handler(
     println!("Pull process succeded");
 }
 
-
 /////////////////////////////////////////////////////////////////////////////////
-
 
 pub async fn dataset_push_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
-    _dataset: Arc<dyn Dataset>
+    _dataset: Arc<dyn Dataset>,
 ) {
     while let Some(msg) = socket.recv().await {
         let msg = if let Ok(msg) = msg {
@@ -273,8 +274,7 @@ pub async fn dataset_push_ws_handler(
             // client disconnected
             return;
         }
-    }        
+    }
 }
-
 
 /////////////////////////////////////////////////////////////////////////////////

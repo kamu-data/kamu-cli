@@ -13,8 +13,8 @@ use std::sync::Arc;
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::infra::*;
 use tracing::error;
 use tracing::info;
 

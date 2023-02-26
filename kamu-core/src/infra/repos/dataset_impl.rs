@@ -46,7 +46,6 @@ where
         checkpoint_repo: CheckpointRepo,
         cache_repo: CacheRepo,
         info_repo: InfoRepo,
-
     ) -> Self {
         Self {
             base_url,

@@ -13,8 +13,14 @@ use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use rusoto_core::{Region, RusotoError, credential::{ChainProvider, ProvideAwsCredentials}};
-use rusoto_s3::{*, util::{PreSignedRequest, PreSignedRequestOption}};
+use rusoto_core::{
+    credential::{ChainProvider, ProvideAwsCredentials},
+    Region, RusotoError,
+};
+use rusoto_s3::{
+    util::{PreSignedRequest, PreSignedRequestOption},
+    *,
+};
 use std::{marker::PhantomData, path::Path};
 use tokio::io::AsyncRead;
 use tracing::debug;
@@ -192,7 +198,11 @@ where
         Ok(Box::new(stream))
     }
 
-    async fn get_download_url(&self, _prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+    async fn get_download_url(
+        &self,
+        _prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
         let key = self.get_key(hash);
         let get_object_request = GetObjectRequest {
             bucket: self.bucket.clone(),
@@ -207,11 +217,15 @@ where
         let options = PreSignedRequestOption {
             expires_in: std::time::Duration::from_secs(validity_period_seconds),
         };
-        
-        let presigned_url = get_object_request.get_presigned_url(&(Region::default()), &credentials, &options);
+
+        let presigned_url =
+            get_object_request.get_presigned_url(&(Region::default()), &credentials, &options);
         match Url::parse(presigned_url.as_str()) {
-            Ok(url) => Ok((url, Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds as i64)))),
-            Err(e) => Err(GetError::Internal(e.int_err()))
+            Ok(url) => Ok((
+                url,
+                Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds as i64)),
+            )),
+            Err(e) => Err(GetError::Internal(e.int_err())),
         }
     }
 

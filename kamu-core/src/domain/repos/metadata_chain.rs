@@ -17,8 +17,8 @@ use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
 use strum_macros::EnumString;
-use url::Url;
 use thiserror::Error;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +37,11 @@ pub trait MetadataChain: Send + Sync {
     async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockError>;
 
     /// Returns block download URL
-    async fn get_block_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> ;
+    async fn get_block_download_url(
+        &self,
+        prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError>;
 
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.

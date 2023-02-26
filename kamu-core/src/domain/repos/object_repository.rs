@@ -36,8 +36,12 @@ pub trait ObjectRepository: Send + Sync {
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;
 
-    async fn get_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError>;
-    
+    async fn get_download_url(
+        &self,
+        prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetError>;
+
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],

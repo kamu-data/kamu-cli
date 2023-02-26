@@ -72,7 +72,11 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         unimplemented!()
     }
 
-    async fn get_download_url(&self, _prefix_url: &Url, _hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+    async fn get_download_url(
+        &self,
+        _prefix_url: &Url,
+        _hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
         unimplemented!()
     }
 

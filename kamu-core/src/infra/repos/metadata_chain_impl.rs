@@ -13,8 +13,8 @@ use chrono::{DateTime, Utc};
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
-use url::Url;
 use async_trait::async_trait;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -150,29 +150,25 @@ where
         hash: &Multihash,
         block_bytes: Bytes,
     ) -> Result<MetadataBlock, ConstructBlockFromBytesError> {
-
         match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
             Ok(block) => Ok(block),
             Err(e) => match e {
-                Error::UnsupportedVersion { .. } => {
-                    Err(ConstructBlockFromBytesError::BlockVersion(BlockVersionError {
+                Error::UnsupportedVersion { .. } => Err(
+                    ConstructBlockFromBytesError::BlockVersion(BlockVersionError {
                         hash: hash.clone(),
                         source: e.into(),
-                    }))
-                }
-                _ => {
-                    Err(ConstructBlockFromBytesError::Internal(
-                        BlockMalformedError {
-                            hash: hash.clone(),
-                            source: e.into(),
-                        }
-                        .int_err(),
-                    ))
-                }
+                    }),
+                ),
+                _ => Err(ConstructBlockFromBytesError::Internal(
+                    BlockMalformedError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }
+                    .int_err(),
+                )),
             },
         }
     }
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -193,9 +189,11 @@ where
         match self.construct_block_from_bytes(hash, data).await {
             Ok(block) => Ok(block),
             Err(e) => match e {
-                ConstructBlockFromBytesError::BlockVersion(e) => Err(GetBlockError::BlockVersion(e)),
+                ConstructBlockFromBytesError::BlockVersion(e) => {
+                    Err(GetBlockError::BlockVersion(e))
+                }
                 ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
-            }
+            },
         }
     }
 
@@ -222,7 +220,11 @@ where
         }
     }
 
-    async fn get_block_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
+    async fn get_block_download_url(
+        &self,
+        prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
         match self.obj_repo.get_download_url(prefix_url, hash).await {
             Ok(url) => Ok(url),
             Err(GetError::NotFound(e)) => {
@@ -405,20 +407,21 @@ where
         block_bytes: Bytes,
         opts: AppendOpts<'a>,
     ) -> Result<MetadataBlock, AppendFromBytesError> {
-
         let block = match self.construct_block_from_bytes(hash, block_bytes).await {
             Ok(block) => Ok(block),
-            Err(e) => Err(
-                match e {
-                    ConstructBlockFromBytesError::BlockVersion(e) => AppendFromBytesError::BlockVersion(e),
-                    ConstructBlockFromBytesError::Internal(e) => AppendFromBytesError::Append(AppendError::Internal(e)),
+            Err(e) => Err(match e {
+                ConstructBlockFromBytesError::BlockVersion(e) => {
+                    AppendFromBytesError::BlockVersion(e)
                 }
-            ),
+                ConstructBlockFromBytesError::Internal(e) => {
+                    AppendFromBytesError::Append(AppendError::Internal(e))
+                }
+            }),
         }?;
         self.append(block.clone(), opts).await?;
         Ok(block)
     }
-    
+
     fn as_object_repo(&self) -> &dyn ObjectRepository {
         &self.obj_repo
     }

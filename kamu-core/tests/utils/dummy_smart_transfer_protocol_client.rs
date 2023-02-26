@@ -11,29 +11,26 @@ use std::sync::Arc;
 use url::Url;
 
 use kamu::{
-    infra::utils::smart_transfer_protocol::SmartTransferProtocolClient, 
-    domain::{Dataset, SyncListener, SyncResult, SyncError}
+    domain::{Dataset, SyncError, SyncListener, SyncResult},
+    infra::utils::smart_transfer_protocol::SmartTransferProtocolClient,
 };
-
 
 pub struct DummySmartTransferProtocolClient {}
 
 impl DummySmartTransferProtocolClient {
-    pub fn new() -> DummySmartTransferProtocolClient{
+    pub fn new() -> DummySmartTransferProtocolClient {
         Self {}
     }
 }
 
 #[async_trait::async_trait]
 impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
-
     async fn pull_protocol_client_flow(
         &self,
         _src_url: &Url,
         _dst: &dyn Dataset,
         _listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-
         unimplemented!("Not supported yet")
     }
 
@@ -43,7 +40,6 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
         _dst_url: &Url,
         _listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-
         unimplemented!("Not supported yet")
     }
 }

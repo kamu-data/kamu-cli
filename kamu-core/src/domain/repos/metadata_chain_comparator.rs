@@ -14,8 +14,8 @@ use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
 use thiserror::Error;
-use url::Url;
 use tokio_stream::StreamExt;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -392,7 +392,11 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.get_block_bytes(hash).await
     }
 
-    async fn get_block_download_url(&self, prefix_url: &Url, hash: &Multihash) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
+    async fn get_block_download_url(
+        &self,
+        prefix_url: &Url,
+        hash: &Multihash,
+    ) -> Result<(Url, Option<DateTime<Utc>>), GetBlockError> {
         self.chain.get_block_download_url(prefix_url, hash).await
     }
 
@@ -446,7 +450,9 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         block_bytes: Bytes,
         opts: AppendOpts<'b>,
     ) -> Result<MetadataBlock, AppendFromBytesError> {
-        self.chain.append_block_from_bytes(hash, block_bytes, opts).await
+        self.chain
+            .append_block_from_bytes(hash, block_bytes, opts)
+            .await
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {
