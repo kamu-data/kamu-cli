@@ -23,7 +23,7 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////
 
-async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
+async fn read_payload<TMessagePayload: DeserializeOwned>(
     socket: &mut axum::extract::ws::WebSocket,
 ) -> Result<TMessagePayload, ReadMessageError> {
     match socket.recv().await {
@@ -41,7 +41,7 @@ async fn axum_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-async fn axum_ws_write_generic_payload<TMessagePayload: Serialize>(
+async fn write_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
@@ -84,7 +84,7 @@ async fn handle_pull_request_initiation(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
 ) -> Result<DatasetPullRequest, SmartProtocolPullServerError> {
-    let maybe_pull_request = axum_ws_read_generic_payload::<DatasetPullRequest>(socket).await;
+    let maybe_pull_request = read_payload::<DatasetPullRequest>(socket).await;
 
     match maybe_pull_request {
         Ok(pull_request) => {
@@ -118,7 +118,7 @@ async fn handle_pull_request_initiation(
             )
             .await;
 
-            let response_result = axum_ws_write_generic_payload::<DatasetPullResponse>(
+            let response_result = write_payload::<DatasetPullResponse>(
                 socket,
                 DatasetPullResponse { size_estimation },
             )
@@ -140,8 +140,7 @@ async fn handle_pull_metadata_request(
     dataset: &dyn Dataset,
     pull_request: DatasetPullRequest,
 ) -> Result<(), SmartProtocolPullServerError> {
-    let maybe_pull_metadata_request =
-        axum_ws_read_generic_payload::<DatasetPullMetadataRequest>(socket).await;
+    let maybe_pull_metadata_request = read_payload::<DatasetPullMetadataRequest>(socket).await;
 
     match maybe_pull_metadata_request {
         Ok(_) => {
@@ -158,14 +157,13 @@ async fn handle_pull_metadata_request(
             )
             .await;
 
-            let response_result_metadata =
-                axum_ws_write_generic_payload::<DatasetMetadataPullResponse>(
-                    socket,
-                    DatasetMetadataPullResponse {
-                        blocks: metadata_batch,
-                    },
-                )
-                .await;
+            let response_result_metadata = write_payload::<DatasetMetadataPullResponse>(
+                socket,
+                DatasetMetadataPullResponse {
+                    blocks: metadata_batch,
+                },
+            )
+            .await;
 
             if let Err(e) = response_result_metadata {
                 Err(SmartProtocolPullServerError::PullMetadataResponseWriteFailed(e))
@@ -187,7 +185,7 @@ async fn try_handle_pull_objects_request(
     prefix_url: &Url,
 ) -> Result<bool, SmartProtocolPullServerError> {
     let maybe_pull_objects_transfer_request =
-        axum_ws_read_generic_payload::<DatasetPullObjectsTransferRequest>(socket).await;
+        read_payload::<DatasetPullObjectsTransferRequest>(socket).await;
 
     match maybe_pull_objects_transfer_request {
         Ok(request) => {
@@ -203,14 +201,13 @@ async fn try_handle_pull_objects_request(
                 object_transfer_strategies.push(transfer_strategy);
             }
 
-            let response_result_objects =
-                axum_ws_write_generic_payload::<DatasetPullObjectsTransferResponse>(
-                    socket,
-                    DatasetPullObjectsTransferResponse {
-                        object_transfer_strategies,
-                    },
-                )
-                .await;
+            let response_result_objects = write_payload::<DatasetPullObjectsTransferResponse>(
+                socket,
+                DatasetPullObjectsTransferResponse {
+                    object_transfer_strategies,
+                },
+            )
+            .await;
 
             if let Err(e) = response_result_objects {
                 Err(SmartProtocolPullServerError::PullObjectResponseWriteFailed(

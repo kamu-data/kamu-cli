@@ -68,12 +68,12 @@ impl WsSmartTransferProtocolClient {
             stop_at: None,
         };
 
-        let write_result = tungstenite_ws_write_generic_payload(socket, pull_request_message).await;
+        let write_result = write_payload(socket, pull_request_message).await;
         if let Err(e) = write_result {
             return Err(SmartProtocolPullClientError::PullRequestWriteFailed(e));
         }
 
-        let read_result = tungstenite_ws_read_generic_payload::<DatasetPullResponse>(socket).await;
+        let read_result = read_payload::<DatasetPullResponse>(socket).await;
 
         if let Err(e) = read_result {
             return Err(SmartProtocolPullClientError::PullResponseReadFailed(e));
@@ -97,14 +97,12 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
     ) -> Result<DatasetMetadataPullResponse, SmartProtocolPullClientError> {
         let pull_metadata_request = DatasetPullMetadataRequest {};
-        let write_result_metadata =
-            tungstenite_ws_write_generic_payload(socket, pull_metadata_request).await;
+        let write_result_metadata = write_payload(socket, pull_metadata_request).await;
         if let Err(e) = write_result_metadata {
             return Err(SmartProtocolPullClientError::PullMetadataRequestWriteFailed(e));
         }
 
-        let read_result_metadata =
-            tungstenite_ws_read_generic_payload::<DatasetMetadataPullResponse>(socket).await;
+        let read_result_metadata = read_payload::<DatasetMetadataPullResponse>(socket).await;
 
         if let Err(e) = read_result_metadata {
             return Err(SmartProtocolPullClientError::PullMetadataResponseReadFailed(e));
@@ -130,16 +128,14 @@ impl WsSmartTransferProtocolClient {
         object_files: Vec<ObjectFileReference>,
     ) -> Result<DatasetPullObjectsTransferResponse, SmartProtocolPullClientError> {
         let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
-        let write_result_objects =
-            tungstenite_ws_write_generic_payload(socket, pull_objects_request).await;
+        let write_result_objects = write_payload(socket, pull_objects_request).await;
         if let Err(e) = write_result_objects {
             return Err(SmartProtocolPullClientError::PullObjectRequestWriteFailed(
                 e,
             ));
         }
 
-        let read_result_objects =
-            tungstenite_ws_read_generic_payload::<DatasetPullObjectsTransferResponse>(socket).await;
+        let read_result_objects = read_payload::<DatasetPullObjectsTransferResponse>(socket).await;
 
         if let Err(e) = read_result_objects {
             return Err(SmartProtocolPullClientError::PullObjectResponseReadFailed(
@@ -290,7 +286,7 @@ type TungsteniteStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn tungstenite_ws_read_generic_payload<TMessagePayload: DeserializeOwned>(
+async fn read_payload<TMessagePayload: DeserializeOwned>(
     stream: &mut TungsteniteStream,
 ) -> Result<TMessagePayload, ReadMessageError> {
     use tokio_stream::StreamExt;
@@ -308,7 +304,7 @@ pub async fn tungstenite_ws_read_generic_payload<TMessagePayload: DeserializeOwn
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn tungstenite_ws_write_generic_payload<TMessagePayload: Serialize>(
+async fn write_payload<TMessagePayload: Serialize>(
     socket: &mut TungsteniteStream,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
