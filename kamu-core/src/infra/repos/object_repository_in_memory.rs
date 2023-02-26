@@ -69,7 +69,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
     }
 
     async fn get_stream(&self, _hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        unimplemented!()
+        panic!("get_stream not allowed for in-memory repository");
     }
 
     async fn get_download_url(
@@ -77,7 +77,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _prefix_url: &Url,
         _hash: &Multihash,
     ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
-        unimplemented!()
+        panic!("get_download_url not allowed for in-memory repository");
     }
 
     async fn insert_bytes<'a>(
@@ -114,7 +114,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _src: Box<AsyncReadObj>,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        panic!("insert_stream not allowed for in-memory repository");
     }
 
     async fn insert_file_move<'a>(
@@ -122,7 +122,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _src: &Path,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        panic!("insert_file_move not allowed for in-memory repository");
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
