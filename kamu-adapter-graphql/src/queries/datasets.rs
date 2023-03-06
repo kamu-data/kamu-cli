@@ -156,7 +156,7 @@ impl Datasets {
                             MetadataManifestMalformed {
                                 message: e.to_string(),
                             },
-                        ))
+                        ));
                     }
                     Err(odf::serde::Error::UnsupportedVersion(e)) => {
                         return Ok(CreateDatasetFromSnapshotResult::UnsupportedVersion(

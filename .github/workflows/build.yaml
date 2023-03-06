@@ -1,12 +1,5 @@
 name: build
 on: [push]
-#on:
-#  push:
-#    branches:
-#      - master
-#  pull_request:
-#    branches:
-#      - master
 env:
   RUST_BACKTRACE: "1"
 jobs:

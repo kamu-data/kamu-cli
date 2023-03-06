@@ -179,10 +179,10 @@ async fn dataset_create_from_snapshot() {
                             dataset {
                                 name
                                 kind
-                            } 
-                        } 
-                    } 
-                } 
+                            }
+                        }
+                    }
+                }
             }"#
         ).replace("<content>", &snapshot_yaml.escape_default().to_string()))
         .await;
@@ -196,6 +196,44 @@ async fn dataset_create_from_snapshot() {
                         "name": "foo",
                         "kind": "ROOT",
                     }
+                }
+            }
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn dataset_create_from_snapshot_malformed() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(local_repo)
+        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .build();
+
+    let schema = kamu_adapter_graphql::schema(cat);
+    let res = schema
+        .execute(indoc!(
+            r#"{
+                datasets {
+                    createFromSnapshot (accountId: "kamu", snapshot: "version: 1", snapshotFormat: YAML) {
+                        ... on MetadataManifestMalformed {
+                            __typename
+                        }
+                    }
+                }
+            }"#
+        ))
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "createFromSnapshot": {
+                    "__typename": "MetadataManifestMalformed",
                 }
             }
         })
