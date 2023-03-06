@@ -40,15 +40,28 @@ impl DatasetFactoryImpl {
         Self {}
     }
 
-    pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
+    pub fn get_local_fs(layout: DatasetLayout, external_url: Option<Url>) -> DatasetImplLocalFS {
         DatasetImpl::new(
             Url::from_directory_path(layout.root_dir).unwrap(),
             MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(layout.blocks_dir),
+                ObjectRepositoryLocalFS::new(
+                    layout.blocks_dir,
+                    external_url
+                        .as_ref()
+                        .map(|url| url.join("blocks/").unwrap()),
+                ),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
-            ObjectRepositoryLocalFS::new(layout.data_dir),
-            ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
+            ObjectRepositoryLocalFS::new(
+                layout.data_dir,
+                external_url.as_ref().map(|url| url.join("data/").unwrap()),
+            ),
+            ObjectRepositoryLocalFS::new(
+                layout.checkpoints_dir,
+                external_url
+                    .as_ref()
+                    .map(|url| url.join("checkpoints/").unwrap()),
+            ),
             NamedObjectRepositoryLocalFS::new(layout.cache_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
         )
@@ -152,7 +165,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 } else {
                     DatasetLayout::new(path)
                 };
-                let ds = Self::get_local_fs(layout);
+                let ds = Self::get_local_fs(layout, None);
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {

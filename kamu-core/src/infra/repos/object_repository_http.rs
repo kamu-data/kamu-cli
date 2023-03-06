@@ -10,7 +10,6 @@
 use std::path::Path;
 
 use crate::domain::*;
-use chrono::{DateTime, Utc};
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
@@ -138,12 +137,15 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
     async fn get_download_url(
         &self,
-        _prefix_url: &Url,
         hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+        _opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
         match self.base_url.join(&hash.to_multibase_string()) {
-            Ok(url) => Ok((url, None)),
-            Err(e) => Err(GetError::Internal(e.int_err())),
+            Ok(url) => Ok(GetDownloadUrlResult {
+                url,
+                expires_at: None,
+            }),
+            Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
         }
     }
 

@@ -54,9 +54,13 @@ impl LocalDatasetRepositoryImpl {
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
-    fn get_dataset_impl(&self, dataset_name: &DatasetName) -> Result<impl Dataset, InternalError> {
+    fn get_dataset_impl(
+        &self,
+        dataset_name: &DatasetName,
+        external_url: Option<Url>,
+    ) -> Result<impl Dataset, InternalError> {
         let layout = DatasetLayout::new(self.root.join(&dataset_name));
-        Ok(DatasetFactoryImpl::get_local_fs(layout))
+        Ok(DatasetFactoryImpl::get_local_fs(layout, external_url))
     }
 
     /*async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
@@ -313,7 +317,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
                     }));
                 }
 
-                let dataset = self.get_dataset_impl(name)?;
+                let dataset = self.get_dataset_impl(name, None)?;
                 let summary = dataset
                     .get_summary(GetSummaryOpts::default())
                     .await
@@ -337,7 +341,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 
                     let name = DatasetName::try_from(&entry.file_name()).int_err()?;
                     let summary = self
-                        .get_dataset_impl(&name)
+                        .get_dataset_impl(&name, None)
                         .int_err()?
                         .get_summary(GetSummaryOpts::default())
                         .await
@@ -379,7 +383,17 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         dataset_ref: &DatasetRefLocal,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.name)?;
+        let dataset = self.get_dataset_impl(&handle.name, None)?;
+        Ok(Arc::new(dataset))
+    }
+
+    async fn get_dataset_with_external_url(
+        &self,
+        dataset_ref: &DatasetRefLocal,
+        external_url: Url,
+    ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
+        let handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&handle.name, Some(external_url))?;
         Ok(Arc::new(dataset))
     }
 
@@ -390,7 +404,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         let staging_path = self.root.join(self.get_staging_name());
 
         let layout = DatasetLayout::create(&staging_path).int_err()?;
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, None);
 
         Ok(Box::new(DatasetBuilderImpl::new(
             self.clone(),

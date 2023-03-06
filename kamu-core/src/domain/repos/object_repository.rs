@@ -10,7 +10,7 @@
 use std::path::Path;
 
 use crate::domain::{BoxedError, InternalError};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
@@ -38,9 +38,9 @@ pub trait ObjectRepository: Send + Sync {
 
     async fn get_download_url(
         &self,
-        prefix_url: &Url,
         hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetError>;
+        opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError>;
 
     async fn insert_bytes<'a>(
         &'a self,
@@ -88,6 +88,25 @@ pub struct InsertOpts<'a> {
 
     /// Hints the size of an object
     pub size_hint: Option<usize>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct DownloadOpts {
+    pub expiration: Option<Duration>,
+}
+
+impl DownloadOpts {
+    pub fn default() -> DownloadOpts {
+        DownloadOpts { expiration: None }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct GetDownloadUrlResult {
+    pub url: Url,
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -141,6 +160,20 @@ impl From<ContainsError> for GetError {
             ContainsError::Internal(e) => GetError::Internal(e),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDownloadUrlError {
+    #[error("Repository does not support external downloads")]
+    NotSupported,
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

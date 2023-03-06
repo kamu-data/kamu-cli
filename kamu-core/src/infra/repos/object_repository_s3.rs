@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
@@ -200,9 +200,9 @@ where
 
     async fn get_download_url(
         &self,
-        _prefix_url: &Url,
         hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+        opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
         let key = self.get_key(hash);
         let get_object_request = GetObjectRequest {
             bucket: self.bucket.clone(),
@@ -213,19 +213,22 @@ where
         let provider = ChainProvider::new();
         let credentials = provider.credentials().await.unwrap();
 
-        let validity_period_seconds: u64 = 3600;
+        let validity_period_seconds: i64 = match opts.expiration {
+            Some(expiration) => expiration.num_seconds(),
+            None => 3600, /* default expiration */
+        };
         let options = PreSignedRequestOption {
-            expires_in: std::time::Duration::from_secs(validity_period_seconds),
+            expires_in: std::time::Duration::from_secs(validity_period_seconds as u64),
         };
 
         let presigned_url =
             get_object_request.get_presigned_url(&(Region::default()), &credentials, &options);
         match Url::parse(presigned_url.as_str()) {
-            Ok(url) => Ok((
+            Ok(url) => Ok(GetDownloadUrlResult {
                 url,
-                Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds as i64)),
-            )),
-            Err(e) => Err(GetError::Internal(e.int_err())),
+                expires_at: Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds)),
+            }),
+            Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
         }
     }
 

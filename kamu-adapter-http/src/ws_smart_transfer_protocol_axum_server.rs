@@ -19,7 +19,6 @@ use crate::{
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
 use kamu::domain::{BlockRef, Dataset};
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -182,7 +181,6 @@ async fn handle_pull_metadata_request(
 async fn try_handle_pull_objects_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
-    prefix_url: &Url,
 ) -> Result<bool, SmartProtocolPullServerError> {
     let maybe_pull_objects_transfer_request =
         read_payload::<DatasetPullObjectsTransferRequest>(socket).await;
@@ -196,8 +194,7 @@ async fn try_handle_pull_objects_request(
             );
             let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
             for r in request.object_files {
-                let transfer_strategy =
-                    prepare_object_transfer_strategy(dataset, prefix_url, &r).await;
+                let transfer_strategy = prepare_object_transfer_strategy(dataset, &r).await;
                 object_transfer_strategies.push(transfer_strategy);
             }
 
@@ -227,7 +224,6 @@ async fn try_handle_pull_objects_request(
 pub async fn dataset_pull_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
     dataset: Arc<dyn Dataset>,
-    prefix_url: Url,
 ) {
     // TODO: error handling
     let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref())
@@ -240,10 +236,9 @@ pub async fn dataset_pull_ws_handler(
         .unwrap();
 
     loop {
-        let should_continue =
-            try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &prefix_url)
-                .await
-                .unwrap();
+        let should_continue = try_handle_pull_objects_request(&mut socket, dataset.as_ref())
+            .await
+            .unwrap();
         if !should_continue {
             break;
         }

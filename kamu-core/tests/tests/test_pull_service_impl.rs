@@ -139,7 +139,7 @@ async fn create_graph_in_repository(
 ) {
     for (dataset_name, deps) in &datasets {
         let layout = DatasetLayout::create(repo_path.join(&dataset_name)).unwrap();
-        let ds = DatasetFactoryImpl::get_local_fs(layout);
+        let ds = DatasetFactoryImpl::get_local_fs(layout, None);
         let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {

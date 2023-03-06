@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use chrono::{DateTime, Utc};
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
@@ -30,6 +29,7 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 // TODO: Pass a single type that configures digest algo, multicodec, and hash base
 pub struct ObjectRepositoryLocalFS<D, const C: u32> {
     root: PathBuf,
+    external_base_url: Option<Url>,
     _phantom: PhantomData<D>,
 }
 
@@ -40,13 +40,14 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    pub fn new<P>(root: P) -> Self
+    pub fn new<P>(root: P, external_base_url: Option<Url>) -> Self
     where
         P: Into<PathBuf>,
     {
         let root = root.into();
         Self {
             root,
+            external_base_url,
             _phantom: PhantomData,
         }
     }
@@ -175,12 +176,18 @@ where
 
     async fn get_download_url(
         &self,
-        prefix_url: &Url,
         hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
-        match prefix_url.join(&hash.to_multibase_string()) {
-            Ok(url) => Ok((url, None)),
-            Err(e) => Err(GetError::Internal(e.int_err())),
+        _opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
+        match &self.external_base_url {
+            Some(url) => match url.join(&hash.to_multibase_string()) {
+                Ok(url) => Ok(GetDownloadUrlResult {
+                    url,
+                    expires_at: None,
+                }),
+                Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
+            },
+            None => Err(GetDownloadUrlError::NotSupported),
         }
     }
 

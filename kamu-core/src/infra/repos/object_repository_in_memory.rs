@@ -12,10 +12,8 @@ use std::{collections::HashMap, path::Path, sync::Mutex};
 use crate::domain::*;
 use async_trait::async_trait;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::AsyncRead;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,9 +72,9 @@ impl ObjectRepository for ObjectRepositoryInMemory {
 
     async fn get_download_url(
         &self,
-        _prefix_url: &Url,
         _hash: &Multihash,
-    ) -> Result<(Url, Option<DateTime<Utc>>), GetError> {
+        _opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
         panic!("get_download_url not allowed for in-memory repository");
     }
 
