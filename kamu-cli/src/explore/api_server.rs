@@ -24,6 +24,9 @@ pub struct APIServer {
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         let local_repo: Arc<dyn LocalDatasetRepository> = catalog.get_one().unwrap();
+        let local_dataset_resolver: Arc<dyn kamu_adapter_http::DatasetResolver> = Arc::new(
+            kamu_adapter_http::DatasetResolverLocalRepository::new(local_repo),
+        );
         let gql_schema = kamu_adapter_graphql::schema(catalog);
 
         let app = axum::Router::new()
@@ -34,7 +37,11 @@ impl APIServer {
             )
             .nest(
                 format!("/:{}", kamu_adapter_http::PARAMETER_DATASET_NAME).as_str(),
-                kamu_adapter_http::create_dataset_transfer_protocol_routes(local_repo),
+                kamu_adapter_http::create_dataset_transfer_protocol_routes()
+                    .layer(axum::middleware::from_fn(
+                        kamu_adapter_http::resolve_dataset_by_name,
+                    ))
+                    .layer(axum::extract::Extension(local_dataset_resolver)),
             )
             .layer(
                 tower::ServiceBuilder::new()

@@ -7,16 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use kamu::domain::LocalDatasetRepository;
-
 use crate::http_server_constants::*;
 use crate::http_server_simple_transfer_protocol::*;
 
-pub fn create_dataset_transfer_protocol_routes(
-    local_repo: Arc<dyn LocalDatasetRepository>,
-) -> axum::Router {
+pub fn create_dataset_transfer_protocol_routes() -> axum::Router {
     axum::Router::new()
         .route(
             format!("/refs/:{}", PARAMETER_REF).as_str(),
@@ -36,5 +30,4 @@ pub fn create_dataset_transfer_protocol_routes(
         )
         .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))
         .route("/push", axum::routing::get(dataset_push_ws_upgrade_handler))
-        .layer(axum::extract::Extension(local_repo))
 }

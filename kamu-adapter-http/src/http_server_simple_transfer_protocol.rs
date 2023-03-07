@@ -7,30 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ws_smart_transfer_protocol_axum_server;
-use axum::{
-    extract::{Extension, Path},
-    headers::Host,
-    TypedHeader,
+use crate::{
+    ws_smart_transfer_protocol_axum_server, DatasetResolver, PARAMETER_BLOCK_HASH,
+    PARAMETER_DATASET_NAME, PARAMETER_PHYSICAL_HASH, PARAMETER_REF,
 };
-use kamu::domain::{BlockRef, Dataset, GetDatasetError, LocalDatasetRepository};
+use axum::extract::Extension;
+use kamu::domain::{BlockRef, Dataset};
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
-    DatasetName, DatasetRefLocal, Multihash,
+    Multihash,
 };
-use std::{str::FromStr, sync::Arc};
+use std::{collections::HashMap, str::FromStr, sync::Arc};
 use url::Url;
 
 pub async fn dataset_refs_handler(
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path((dataset_name_param, ref_param)): Path<(String, String)>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
 ) -> String {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
+    let ref_param = params.get(PARAMETER_REF).unwrap();
     let block_ref = BlockRef::from_str(ref_param.as_str()).unwrap();
     let hash = dataset
         .as_metadata_chain()
@@ -42,14 +37,10 @@ pub async fn dataset_refs_handler(
 }
 
 pub async fn dataset_blocks_handler(
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path((dataset_name_param, block_hash_param)): Path<(String, String)>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
 ) -> Vec<u8> {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
+    let block_hash_param = params.get(PARAMETER_BLOCK_HASH).unwrap();
     let block_hash = Multihash::from_multibase_str(block_hash_param.as_str()).unwrap();
     let block = dataset
         .as_metadata_chain()
@@ -65,14 +56,10 @@ pub async fn dataset_blocks_handler(
 }
 
 pub async fn dataset_data_handler(
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path((dataset_name_param, physical_hash_param)): Path<(String, String)>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
 ) -> axum::response::Response {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
+    let physical_hash_param = params.get(PARAMETER_PHYSICAL_HASH).unwrap();
     let physical_hash = Multihash::from_multibase_str(physical_hash_param.as_str()).unwrap();
     let data_stream = dataset
         .as_data_repo()
@@ -87,14 +74,10 @@ pub async fn dataset_data_handler(
 }
 
 pub async fn dataset_checkpoints_handler(
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path((dataset_name_param, physical_hash_param)): Path<(String, String)>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
 ) -> axum::response::Response {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
+    let physical_hash_param = params.get(PARAMETER_PHYSICAL_HASH).unwrap();
     let physical_hash = Multihash::from_multibase_str(physical_hash_param.as_str()).unwrap();
     let checkpoint_stream = dataset
         .as_checkpoint_repo()
@@ -110,39 +93,52 @@ pub async fn dataset_checkpoints_handler(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path(dataset_name_param): Path<String>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
 ) -> axum::response::Response {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
     ws.on_upgrade(|socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset)
+        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset.0)
     })
 }
 
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    Path(dataset_name_param): Path<String>,
-    TypedHeader(host): TypedHeader<Host>,
+    dataset: Extension<Arc<dyn Dataset>>,
 ) -> axum::response::Response {
-    let dataset = resolve_dataset(local_dataset_repository, &dataset_name_param, host)
-        .await
-        .unwrap();
-
     ws.on_upgrade(move |socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset)
+        ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset.0)
     })
 }
 
-async fn resolve_dataset(
-    local_dataset_repository: Extension<Arc<dyn LocalDatasetRepository>>,
-    dataset_name_param: &String,
-    api_host: Host,
-) -> Result<Arc<dyn Dataset>, GetDatasetError> {
+pub async fn resolve_dataset_by_name(
+    dataset_resolver: axum::Extension<Arc<dyn DatasetResolver>>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
+    axum::TypedHeader(api_host): axum::TypedHeader<axum::headers::Host>,
+    mut req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next<axum::body::Body>,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    let base_url = resolve_base_api_url(api_host);
+
+    let dataset_name_param = params.get(PARAMETER_DATASET_NAME).unwrap();
+    let dataset_resolution = dataset_resolver
+        .resolve_dataset(dataset_name_param.as_str(), base_url)
+        .await;
+
+    match dataset_resolution {
+        Ok(dataset) => {
+            req.extensions_mut().insert(dataset);
+            Ok(next.run(req).await)
+        }
+        Err(e) => match e {
+            kamu::domain::GetDatasetError::NotFound(_) => Err(axum::http::StatusCode::NOT_FOUND),
+            kamu::domain::GetDatasetError::Internal(_) => {
+                println!("Dataset resolution error");
+                Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        },
+    }
+}
+
+fn resolve_base_api_url(api_host: axum::headers::Host) -> Url {
     let mut base_url_str = String::from("http://");
     base_url_str += api_host.hostname();
     if let Some(port) = api_host.port() {
@@ -150,15 +146,6 @@ async fn resolve_dataset(
         base_url_str += &port.to_string();
     }
     base_url_str += "/";
-    base_url_str += dataset_name_param.as_str();
-    base_url_str += "/";
 
-    let base_url = Url::parse(base_url_str.as_str()).unwrap();
-
-    // TODO: support 'accountName' parameter
-    let dataset_name = DatasetName::from_str(dataset_name_param.as_str()).unwrap();
-    let dataset_ref: DatasetRefLocal = DatasetRefLocal::Name(dataset_name);
-    local_dataset_repository
-        .get_dataset_with_external_url(&dataset_ref, base_url)
-        .await
+    Url::parse(base_url_str.as_str()).unwrap()
 }

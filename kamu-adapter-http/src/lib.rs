@@ -10,6 +10,9 @@
 #![feature(error_generic_member_access)]
 #![feature(provide_any)]
 
+pub(crate) mod dataset_resolvers;
+pub use dataset_resolvers::*;
+
 pub(crate) mod messages;
 
 mod http_server_constants;
