@@ -41,21 +41,5 @@ impl DatasetResolver for DatasetResolverLocalRepository {
         self.local_repo
             .get_dataset_with_external_url(&dataset_ref, dataset_url)
             .await
-
-        /*
-                /*let mut base_url_str = String::from("http://");
-        base_url_str += api_host.hostname();
-        if let Some(port) = api_host.port() {
-            base_url_str += ":";
-            base_url_str += &port.to_string();
-        }
-        base_url_str += "/";
-
-        let base_url = Url::parse(base_url_str.as_str()).unwrap();
-
-        // TODO: support 'accountName' parameter
-        let dataset_name = DatasetName::from_str(dataset_name_param.as_str()).unwrap();
-        let dataset_ref: DatasetRefLocal = DatasetRefLocal::Name(dataset_name); */
-         */
     }
 }
