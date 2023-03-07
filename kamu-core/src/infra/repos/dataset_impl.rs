@@ -10,7 +10,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use tracing::debug;
-use url::Url;
 
 use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
@@ -20,7 +19,6 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo> {
-    base_url: Url,
     metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
@@ -40,7 +38,6 @@ where
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     pub fn new(
-        base_url: Url,
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
@@ -48,7 +45,6 @@ where
         info_repo: InfoRepo,
     ) -> Self {
         Self {
-            base_url,
             metadata_chain,
             data_repo,
             checkpoint_repo,
@@ -280,9 +276,5 @@ where
 
     fn as_cache_repo(&self) -> &dyn NamedObjectRepository {
         &self.cache_repo
-    }
-
-    fn base_url(&self) -> &Url {
-        &self.base_url
     }
 }

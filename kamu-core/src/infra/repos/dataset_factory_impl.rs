@@ -42,7 +42,6 @@ impl DatasetFactoryImpl {
 
     pub fn get_local_fs(layout: DatasetLayout, external_url: Option<Url>) -> DatasetImplLocalFS {
         DatasetImpl::new(
-            Url::from_directory_path(layout.root_dir).unwrap(),
             MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(
                     layout.blocks_dir,
@@ -70,7 +69,6 @@ impl DatasetFactoryImpl {
     fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
-            base_url.clone(),
             MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(client.clone(), base_url.join("blocks/").unwrap()),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
@@ -107,7 +105,6 @@ impl DatasetFactoryImpl {
         let client = S3Client::new(region);
 
         Ok(DatasetImpl::new(
-            base_url,
             MetadataChainImpl::new(
                 ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
                     client.clone(),
