@@ -15,7 +15,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio_stream::Stream;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,12 +49,6 @@ pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
     async fn get_dataset(
         &self,
         dataset_ref: &DatasetRefLocal,
-    ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
-
-    async fn get_dataset_with_external_url(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-        external_url: Url,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
 
     async fn create_dataset(

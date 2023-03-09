@@ -40,27 +40,14 @@ impl DatasetFactoryImpl {
         Self {}
     }
 
-    pub fn get_local_fs(layout: DatasetLayout, external_url: Option<Url>) -> DatasetImplLocalFS {
+    pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
         DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(
-                    layout.blocks_dir,
-                    external_url
-                        .as_ref()
-                        .map(|url| url.join("blocks/").unwrap()),
-                ),
+                ObjectRepositoryLocalFS::new(layout.blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
-            ObjectRepositoryLocalFS::new(
-                layout.data_dir,
-                external_url.as_ref().map(|url| url.join("data/").unwrap()),
-            ),
-            ObjectRepositoryLocalFS::new(
-                layout.checkpoints_dir,
-                external_url
-                    .as_ref()
-                    .map(|url| url.join("checkpoints/").unwrap()),
-            ),
+            ObjectRepositoryLocalFS::new(layout.data_dir),
+            ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
             NamedObjectRepositoryLocalFS::new(layout.cache_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
         )
@@ -162,7 +149,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 } else {
                     DatasetLayout::new(path)
                 };
-                let ds = Self::get_local_fs(layout, None);
+                let ds = Self::get_local_fs(layout);
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {

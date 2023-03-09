@@ -18,7 +18,6 @@ use std::{
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
 use tracing::debug;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,7 +28,6 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 // TODO: Pass a single type that configures digest algo, multicodec, and hash base
 pub struct ObjectRepositoryLocalFS<D, const C: u32> {
     root: PathBuf,
-    external_base_url: Option<Url>,
     _phantom: PhantomData<D>,
 }
 
@@ -40,14 +38,13 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    pub fn new<P>(root: P, external_base_url: Option<Url>) -> Self
+    pub fn new<P>(root: P) -> Self
     where
         P: Into<PathBuf>,
     {
         let root = root.into();
         Self {
             root,
-            external_base_url,
             _phantom: PhantomData,
         }
     }
@@ -176,19 +173,10 @@ where
 
     async fn get_download_url(
         &self,
-        hash: &Multihash,
+        _hash: &Multihash,
         _opts: DownloadOpts,
     ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
-        match &self.external_base_url {
-            Some(url) => match url.join(&hash.to_multibase_string()) {
-                Ok(url) => Ok(GetDownloadUrlResult {
-                    url,
-                    expires_at: None,
-                }),
-                Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
-            },
-            None => Err(GetDownloadUrlError::NotSupported),
-        }
+        Err(GetDownloadUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

@@ -103,24 +103,34 @@ pub async fn dataset_push_ws_upgrade_handler(
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     dataset: Extension<Arc<dyn Dataset>>,
+    axum::TypedHeader(api_host): axum::TypedHeader<axum::headers::Host>,
+    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
 ) -> axum::response::Response {
+    let base_url = resolve_base_api_url(api_host);
+
+    let dataset_name_param = params.get(PARAMETER_DATASET_NAME).unwrap();
+    let dataset_url = base_url
+        .join((String::from(dataset_name_param) + "/").as_str())
+        .unwrap();
+
     ws.on_upgrade(move |socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(socket, dataset.0)
+        ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(
+            socket,
+            dataset.0,
+            dataset_url,
+        )
     })
 }
 
 pub async fn resolve_dataset_by_name(
     dataset_resolver: axum::Extension<Arc<dyn DatasetResolver>>,
     axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
-    axum::TypedHeader(api_host): axum::TypedHeader<axum::headers::Host>,
     mut req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next<axum::body::Body>,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
-    let base_url = resolve_base_api_url(api_host);
-
     let dataset_name_param = params.get(PARAMETER_DATASET_NAME).unwrap();
     let dataset_resolution = dataset_resolver
-        .resolve_dataset(dataset_name_param.as_str(), base_url)
+        .resolve_dataset(dataset_name_param.as_str())
         .await;
 
     match dataset_resolution {

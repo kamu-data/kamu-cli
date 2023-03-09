@@ -17,11 +17,13 @@ use bytes::Bytes;
 use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
 use kamu::domain::{
-    AppendOpts, CorruptedSourceError, Dataset, DownloadOpts, InsertError, InsertOpts,
-    MetadataChain, SyncError,
+    AppendOpts, CorruptedSourceError, Dataset, DownloadOpts, GetDownloadUrlError, InsertError,
+    InsertOpts, InternalError, MetadataChain, SyncError,
 };
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
+use thiserror::Error;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -286,38 +288,86 @@ async fn collect_missing_object_references_from_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+pub enum PrepareObjectTransferStrategyError {
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
 pub async fn prepare_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
-) -> PullObjectTransferStrategy {
-    PullObjectTransferStrategy {
-        object_file: object_file_ref.clone(),
-        pull_strategy: crate::messages::ObjectPullStrategy::HttpDownload,
-        download_from: {
-            let result = match object_file_ref.object_type {
-                ObjectType::MetadataBlock => dataset
-                    .as_metadata_chain()
-                    .as_object_repo()
-                    .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
-                    .await
-                    .unwrap(),
-                ObjectType::DataSlice => dataset
-                    .as_data_repo()
-                    .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
-                    .await
-                    .unwrap(),
-                ObjectType::Checkpoint => dataset
-                    .as_checkpoint_repo()
-                    .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
-                    .await
-                    .unwrap(),
-            };
-            TransferUrl {
-                url: result.url,
-                expires_at: result.expires_at,
+    dataset_url: &Url,
+) -> Result<PullObjectTransferStrategy, PrepareObjectTransferStrategyError> {
+    let get_download_url_result = match object_file_ref.object_type {
+        ObjectType::MetadataBlock => {
+            dataset
+                .as_metadata_chain()
+                .as_object_repo()
+                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .await
+        }
+        ObjectType::DataSlice => {
+            dataset
+                .as_data_repo()
+                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .await
+        }
+        ObjectType::Checkpoint => {
+            dataset
+                .as_checkpoint_repo()
+                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .await
+        }
+    };
+
+    let transfer_url_result = match get_download_url_result {
+        Ok(result) => Ok(TransferUrl {
+            url: result.url,
+            expires_at: result.expires_at,
+        }),
+        Err(error) => match error {
+            GetDownloadUrlError::NotSupported => Ok(TransferUrl {
+                url: get_simple_transfer_protocool_download_url(object_file_ref, dataset_url),
+                expires_at: None,
+            }),
+            GetDownloadUrlError::Internal(e) => {
+                Err(PrepareObjectTransferStrategyError::Internal(e))
             }
         },
+    };
+
+    match transfer_url_result {
+        Ok(transfer_url) => Ok(PullObjectTransferStrategy {
+            object_file: object_file_ref.clone(),
+            pull_strategy: crate::messages::ObjectPullStrategy::HttpDownload,
+            download_from: transfer_url,
+        }),
+        Err(e) => Err(e),
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn get_simple_transfer_protocool_download_url(
+    object_file_ref: &ObjectFileReference,
+    dataset_url: &Url,
+) -> Url {
+    let path_suffix = match object_file_ref.object_type {
+        ObjectType::MetadataBlock => "blocks/",
+        ObjectType::DataSlice => "data/",
+        ObjectType::Checkpoint => "checkpoints/",
+    };
+
+    dataset_url
+        .join(path_suffix)
+        .unwrap()
+        .join(object_file_ref.physical_hash.to_multibase_string().as_str())
+        .unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

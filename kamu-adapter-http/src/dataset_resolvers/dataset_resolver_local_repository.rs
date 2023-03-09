@@ -12,7 +12,6 @@ use std::{str::FromStr, sync::Arc};
 use async_trait::async_trait;
 use kamu::domain::{Dataset, GetDatasetError, LocalDatasetRepository};
 use opendatafabric::{DatasetName, DatasetRefLocal};
-use url::Url;
 
 use super::DatasetResolver;
 
@@ -31,15 +30,9 @@ impl DatasetResolver for DatasetResolverLocalRepository {
     async fn resolve_dataset(
         &self,
         dataset_name: &str,
-        base_external_url: Url,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let dataset_url_suffix = String::from(dataset_name) + "/";
-        let dataset_url = base_external_url.join(dataset_url_suffix.as_str()).unwrap();
-
         let dataset_ref: DatasetRefLocal =
             DatasetRefLocal::Name(DatasetName::from_str(dataset_name).unwrap());
-        self.local_repo
-            .get_dataset_with_external_url(&dataset_ref, dataset_url)
-            .await
+        self.local_repo.get_dataset(&dataset_ref).await
     }
 }

@@ -75,7 +75,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _hash: &Multihash,
         _opts: DownloadOpts,
     ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
-        panic!("get_download_url not allowed for in-memory repository");
+        Err(GetDownloadUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

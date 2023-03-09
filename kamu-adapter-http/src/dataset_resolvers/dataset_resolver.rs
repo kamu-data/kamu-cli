@@ -11,13 +11,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use kamu::domain::{Dataset, GetDatasetError};
-use url::Url;
 
 #[async_trait]
 pub trait DatasetResolver: Send + Sync {
     async fn resolve_dataset(
         &self,
         dataset_name: &str,
-        base_external_url: Url,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
 }

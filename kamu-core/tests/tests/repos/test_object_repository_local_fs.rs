@@ -20,14 +20,14 @@ use super::test_object_repository_shared;
 #[tokio::test]
 async fn test_insert_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path(), None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
 
 #[tokio::test]
 async fn test_insert_stream() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path(), None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
     assert_matches!(
@@ -57,21 +57,21 @@ async fn test_insert_stream() {
 #[tokio::test]
 async fn test_delete() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path(), None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     test_object_repository_shared::test_delete(&repo, true).await;
 }
 
 #[tokio::test]
 async fn test_insert_precomputed() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path(), None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
 
 #[tokio::test]
 async fn test_insert_expect() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path(), None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
 

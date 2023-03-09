@@ -12,13 +12,14 @@ use std::sync::Arc;
 use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
 use thiserror::Error;
+use url::Url;
 
 use crate::{
     dataset_protocol_helper::*,
     messages::*,
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
-use kamu::domain::{BlockRef, Dataset};
+use kamu::domain::{BlockRef, Dataset, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -75,6 +76,13 @@ enum SmartProtocolPullServerError {
 
     #[error(transparent)]
     PullObjectResponseWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -181,6 +189,7 @@ async fn handle_pull_metadata_request(
 async fn try_handle_pull_objects_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
+    dataset_url: &Url,
 ) -> Result<bool, SmartProtocolPullServerError> {
     let maybe_pull_objects_transfer_request =
         read_payload::<DatasetPullObjectsTransferRequest>(socket).await;
@@ -194,8 +203,17 @@ async fn try_handle_pull_objects_request(
             );
             let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
             for r in request.object_files {
-                let transfer_strategy = prepare_object_transfer_strategy(dataset, &r).await;
-                object_transfer_strategies.push(transfer_strategy);
+                let transfer_strategy =
+                    prepare_object_transfer_strategy(dataset, &r, dataset_url).await;
+
+                match transfer_strategy {
+                    Ok(strategy) => object_transfer_strategies.push(strategy),
+                    Err(e) => match e {
+                        PrepareObjectTransferStrategyError::Internal(e) => {
+                            return Err(SmartProtocolPullServerError::Internal(e))
+                        }
+                    },
+                }
             }
 
             let response_result_objects = write_payload::<DatasetPullObjectsTransferResponse>(
@@ -224,6 +242,7 @@ async fn try_handle_pull_objects_request(
 pub async fn dataset_pull_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
     dataset: Arc<dyn Dataset>,
+    dataset_url: Url,
 ) {
     // TODO: error handling
     let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref())
@@ -236,9 +255,10 @@ pub async fn dataset_pull_ws_handler(
         .unwrap();
 
     loop {
-        let should_continue = try_handle_pull_objects_request(&mut socket, dataset.as_ref())
-            .await
-            .unwrap();
+        let should_continue =
+            try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &dataset_url)
+                .await
+                .unwrap();
         if !should_continue {
             break;
         }

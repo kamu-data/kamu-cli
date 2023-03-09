@@ -101,7 +101,7 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
 
     std::fs::create_dir_all(root).unwrap();
 
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(root, None);
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(root);
     let hash = repo
         .insert_bytes(&data, InsertOpts::default())
         .await
