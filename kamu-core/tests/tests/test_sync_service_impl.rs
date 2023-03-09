@@ -22,7 +22,7 @@ use std::sync::Arc;
 use url::Url;
 
 async fn append_block(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRefLocal>,
     block: MetadataBlock,
 ) -> Multihash {
@@ -134,7 +134,7 @@ async fn do_test_sync(
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
     let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new());
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();

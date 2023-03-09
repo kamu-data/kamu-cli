@@ -13,12 +13,12 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct ResetServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 impl ResetServiceImpl {
-    pub fn new(local_repo: Arc<dyn LocalDatasetRepository>) -> Self {
+    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
         Self { local_repo }
     }
 }

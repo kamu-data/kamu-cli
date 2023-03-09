@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct RemoteAliasesRegistryImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     workspace_layout: Arc<WorkspaceLayout>,
 }
 
@@ -29,7 +29,7 @@ pub struct RemoteAliasesRegistryImpl {
 #[component(pub)]
 impl RemoteAliasesRegistryImpl {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {

@@ -25,7 +25,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 pub struct LogCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRefLocal,
     outout_format: Option<String>,
     filter: Option<String>,
@@ -35,7 +35,7 @@ pub struct LogCommand {
 
 impl LogCommand {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRefLocal,
         outout_format: Option<&str>,
         filter: Option<&str>,

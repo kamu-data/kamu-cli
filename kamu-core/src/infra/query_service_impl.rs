@@ -34,14 +34,14 @@ use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
 use crate::infra::*;
 
 pub struct QueryServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     workspace_layout: Arc<WorkspaceLayout>,
 }
 
 #[component(pub)]
 impl QueryServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
@@ -228,7 +228,7 @@ impl CatalogProvider for KamuCatalog {
 // and in some cases (like 'show tables') even twice
 #[derive(Clone)]
 struct KamuSchema {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     workspace_layout: Arc<WorkspaceLayout>,
     options: QueryOptions,
     ctx: SessionState,
@@ -236,7 +236,7 @@ struct KamuSchema {
 
 impl KamuSchema {
     fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         workspace_layout: Arc<WorkspaceLayout>,
         options: QueryOptions,
         ctx: SessionState,

@@ -10,17 +10,17 @@
 use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use kamu::domain::{Dataset, GetDatasetError, LocalDatasetRepository};
+use kamu::domain::{Dataset, DatasetRepository, GetDatasetError};
 use opendatafabric::{DatasetName, DatasetRefLocal};
 
 use super::DatasetResolver;
 
 pub struct DatasetResolverLocalRepository {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
 }
 
 impl DatasetResolverLocalRepository {
-    pub fn new(local_repo: Arc<dyn LocalDatasetRepository>) -> DatasetResolverLocalRepository {
+    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> DatasetResolverLocalRepository {
         DatasetResolverLocalRepository { local_repo }
     }
 }

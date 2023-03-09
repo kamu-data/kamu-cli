@@ -25,7 +25,7 @@ use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     ipfs_client: Arc<IpfsClient>,
@@ -55,7 +55,7 @@ impl Default for IpfsGateway {
 impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         ipfs_client: Arc<IpfsClient>,

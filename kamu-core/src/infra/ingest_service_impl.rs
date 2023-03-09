@@ -19,7 +19,7 @@ use tracing::info;
 
 pub struct IngestServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     container_runtime: Arc<ContainerRuntime>,
 }
@@ -28,7 +28,7 @@ pub struct IngestServiceImpl {
 impl IngestServiceImpl {
     pub fn new(
         workspace_layout: Arc<WorkspaceLayout>,
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
     ) -> Self {

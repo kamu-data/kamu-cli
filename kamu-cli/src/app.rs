@@ -92,8 +92,8 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
 
-    b.add::<LocalDatasetRepositoryImpl>();
-    b.bind::<dyn LocalDatasetRepository, LocalDatasetRepositoryImpl>();
+    b.add::<DatasetRepositoryLocalFs>();
+    b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();

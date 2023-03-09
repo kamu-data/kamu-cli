@@ -15,7 +15,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct DeleteCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     dataset_refs: Vec<DatasetRefLocal>,
     all: bool,
     recursive: bool,
@@ -24,7 +24,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         dataset_refs: I,
         all: bool,
         recursive: bool,

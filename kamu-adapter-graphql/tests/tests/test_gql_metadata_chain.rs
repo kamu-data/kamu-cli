@@ -21,14 +21,14 @@ use std::sync::Arc;
 async fn metadata_chain_append_event() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
         .build();
 
-    let local_repo = cat.get_one::<dyn LocalDatasetRepository>().unwrap();
+    let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
     let create_result = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()

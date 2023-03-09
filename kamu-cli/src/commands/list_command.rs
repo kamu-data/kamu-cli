@@ -17,7 +17,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct ListCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
@@ -25,7 +25,7 @@ pub struct ListCommand {
 
 impl ListCommand {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         detail_level: u8,

@@ -69,7 +69,7 @@ macro_rules! refs {
 }
 
 async fn create_graph(
-    repo: &LocalDatasetRepositoryImpl,
+    repo: &DatasetRepositoryLocalFs,
     datasets: Vec<(DatasetName, Vec<DatasetName>)>,
 ) {
     for (dataset_name, deps) in &datasets {
@@ -218,7 +218,7 @@ async fn create_graph_remote(
 
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        Arc::new(LocalDatasetRepositoryImpl::new(ws.clone())),
+        Arc::new(DatasetRepositoryLocalFs::new(ws.clone())),
         Arc::new(DatasetFactoryImpl::new()),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
@@ -727,7 +727,7 @@ async fn test_set_watermark() {
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     workspace_layout: Arc<WorkspaceLayout>,
-    local_repo: Arc<LocalDatasetRepositoryImpl>,
+    local_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
     pull_svc: PullServiceImpl,
@@ -737,7 +737,7 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
-        let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
             local_repo.clone(),
@@ -972,11 +972,11 @@ impl TransformService for TestTransformService {
 
 struct TestSyncService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
 }
 
 impl TestSyncService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, local_repo: Arc<dyn LocalDatasetRepository>) -> Self {
+    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, local_repo: Arc<dyn DatasetRepository>) -> Self {
         Self { calls, local_repo }
     }
 }

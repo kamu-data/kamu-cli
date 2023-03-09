@@ -23,14 +23,14 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LocalDatasetRepositoryImpl {
+pub struct DatasetRepositoryLocalFs {
     root: PathBuf,
     //info_repo: NamedObjectRepositoryLocalFS,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
 // TODO: Find a better way to share state with dataset builder
-impl Clone for LocalDatasetRepositoryImpl {
+impl Clone for DatasetRepositoryLocalFs {
     fn clone(&self) -> Self {
         Self::from(self.root.clone())
     }
@@ -39,7 +39,7 @@ impl Clone for LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-impl LocalDatasetRepositoryImpl {
+impl DatasetRepositoryLocalFs {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
         Self::from(&workspace_layout.datasets_dir)
     }
@@ -278,7 +278,7 @@ impl LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetRegistry for LocalDatasetRepositoryImpl {
+impl DatasetRegistry for DatasetRepositoryLocalFs {
     async fn get_dataset_url(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -291,7 +291,7 @@ impl DatasetRegistry for LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
+impl DatasetRepository for DatasetRepositoryLocalFs {
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing all summaries
@@ -592,7 +592,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct DatasetBuilderImpl<D> {
-    repo: LocalDatasetRepositoryImpl,
+    repo: DatasetRepositoryLocalFs,
     dataset: D,
     staging_path: PathBuf,
     dataset_name: DatasetName,
@@ -602,7 +602,7 @@ struct DatasetBuilderImpl<D> {
 
 impl<D> DatasetBuilderImpl<D> {
     fn new(
-        repo: LocalDatasetRepositoryImpl,
+        repo: DatasetRepositoryLocalFs,
         dataset: D,
         staging_path: PathBuf,
         dataset_name: DatasetName,

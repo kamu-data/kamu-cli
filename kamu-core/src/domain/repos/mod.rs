@@ -35,5 +35,5 @@ pub use dataset_registry::*;
 pub mod dataset_factory;
 pub use dataset_factory::*;
 
-pub mod local_dataset_repository;
-pub use local_dataset_repository::*;
+pub mod dataset_repository;
+pub use dataset_repository::*;

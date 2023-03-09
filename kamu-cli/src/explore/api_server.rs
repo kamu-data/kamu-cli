@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use kamu::domain::LocalDatasetRepository;
+use kamu::domain::DatasetRepository;
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -23,7 +23,7 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        let local_repo: Arc<dyn LocalDatasetRepository> = catalog.get_one().unwrap();
+        let local_repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
         let local_dataset_resolver: Arc<dyn kamu_adapter_http::DatasetResolver> = Arc::new(
             kamu_adapter_http::DatasetResolverLocalRepository::new(local_repo),
         );

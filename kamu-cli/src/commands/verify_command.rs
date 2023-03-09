@@ -34,7 +34,7 @@ type GenericVerificationResult = Result<
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefLocal>,
@@ -44,7 +44,7 @@ pub struct VerifyCommand {
 
 impl VerifyCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
         refs: I,

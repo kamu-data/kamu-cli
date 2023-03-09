@@ -25,7 +25,7 @@ use std::time::Duration;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
@@ -41,7 +41,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, SS>(
         pull_svc: Arc<dyn PullService>,
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,

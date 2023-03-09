@@ -14,7 +14,7 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct ResetCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     reset_svc: Arc<dyn ResetService>,
     dataset_ref: DatasetRefLocal,
     block_hash: Multihash,
@@ -23,7 +23,7 @@ pub struct ResetCommand {
 
 impl ResetCommand {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         reset_svc: Arc<dyn ResetService>,
         dataset_ref: DatasetRefLocal,
         block_hash: Multihash,

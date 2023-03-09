@@ -38,7 +38,7 @@ impl CreateDatasetResult {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait LocalDatasetRepository: DatasetRegistry + Sync + Send {
+pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -103,7 +103,7 @@ pub trait DatasetBuilder: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
+pub trait LocalDatasetRepositoryExt: DatasetRepository {
     async fn try_resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -181,7 +181,7 @@ pub trait LocalDatasetRepositoryExt: LocalDatasetRepository {
 
 impl<T> LocalDatasetRepositoryExt for T
 where
-    T: LocalDatasetRepository,
+    T: DatasetRepository,
     T: ?Sized,
 {
 }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
+use crate::{domain::*, infra::utils::s3_context::S3Context};
 use chrono::Utc;
 use opendatafabric::{Multicodec, Multihash};
 
@@ -35,91 +35,26 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 // TODO: Pass a single type that configures digest algo, multicodec, and hash base
 // TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
-    client: S3Client,
-    bucket: String,
-    key_prefix: String,
+    s3_context: S3Context,
     _phantom: PhantomData<D>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-impl<D, const C: u32> ObjectRepositoryS3<D, C> {
-    pub fn split_url(url: &Url) -> (Option<String>, String, String) {
-        // TODO: Support virtual hosted style URLs once rusoto supports them
-        // See: https://github.com/rusoto/rusoto/issues/1482
-        let (endpoint, path): (Option<String>, String) =
-            match (url.scheme(), url.host_str(), url.port(), url.path()) {
-                ("s3", Some(host), None, path) => {
-                    return (
-                        None,
-                        host.to_owned(),
-                        path.trim_start_matches('/').to_owned(),
-                    )
-                }
-                ("s3+http", Some(host), None, path) => {
-                    (Some(format!("http://{}", host)), path.to_owned())
-                }
-                ("s3+http", Some(host), Some(port), path) => {
-                    (Some(format!("http://{}:{}", host, port)), path.to_owned())
-                }
-                ("s3+https", Some(host), None, path) => {
-                    (Some(format!("https://{}", host)), path.to_owned())
-                }
-                ("s3+https", Some(host), Some(port), path) => {
-                    (Some(format!("https://{}:{}", host, port)), path.to_owned())
-                }
-                _ => panic!("Unsupported S3 url format: {}", url),
-            };
-
-        let (bucket, key_prefix) = match path.trim_start_matches('/').split_once('/') {
-            Some((b, p)) => (b.to_owned(), p.to_owned()),
-            None => (path.trim_start_matches('/').to_owned(), String::new()),
-        };
-
-        (endpoint, bucket, key_prefix)
-    }
-}
 
 impl<D, const C: u32> ObjectRepositoryS3<D, C>
 where
     D: Send + Sync,
     D: digest::Digest,
 {
-    pub fn new<S1, S2>(client: S3Client, bucket: S1, key_prefix: S2) -> Self
-    where
-        S1: Into<String>,
-        S2: Into<String>,
-    {
+    pub fn new(s3_context: S3Context) -> Self {
         Self {
-            client,
-            bucket: bucket.into(),
-            key_prefix: key_prefix.into(),
+            s3_context,
             _phantom: PhantomData,
         }
     }
 
-    pub fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
-        let region = match endpoint {
-            None => Region::default(),
-            Some(endpoint) => Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint,
-            },
-        };
-        Self::new(S3Client::new(region), bucket, key_prefix)
-    }
-
-    pub fn from_url(url: &Url) -> Self {
-        let (endpoint, bucket, key_prefix) = Self::split_url(url);
-        Self::from_items(endpoint, bucket, key_prefix)
-    }
-
     fn get_key(&self, hash: &Multihash) -> String {
-        if self.key_prefix.is_empty() {
-            hash.to_multibase_string()
-        } else {
-            format!("{}{}", self.key_prefix, hash)
-        }
+        self.s3_context.get_key(hash.to_multibase_string().as_str())
     }
 }
 
@@ -137,9 +72,10 @@ where
         debug!(?key, "Checking for object");
 
         match self
+            .s3_context
             .client
             .head_object(HeadObjectRequest {
-                bucket: self.bucket.clone(),
+                bucket: self.s3_context.bucket.clone(),
                 key,
                 ..HeadObjectRequest::default()
             })
@@ -176,9 +112,10 @@ where
         debug!(?key, "Reading object stream");
 
         let resp = match self
+            .s3_context
             .client
             .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
+                bucket: self.s3_context.bucket.clone(),
                 key,
                 ..GetObjectRequest::default()
             })
@@ -205,7 +142,7 @@ where
     ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
         let key = self.get_key(hash);
         let get_object_request = GetObjectRequest {
-            bucket: self.bucket.clone(),
+            bucket: self.s3_context.bucket.clone(),
             key,
             ..GetObjectRequest::default()
         };
@@ -258,9 +195,10 @@ where
 
         // TODO: PERF: Avoid copying data into a buffer
         match self
+            .s3_context
             .client
             .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
+                bucket: self.s3_context.bucket.clone(),
                 key,
                 body: Some(rusoto_core::ByteStream::from(Vec::from(data))),
                 content_length: Some(data.len() as i64),
@@ -313,9 +251,10 @@ where
         let stream = ReaderStream::new(src);
 
         match self
+            .s3_context
             .client
             .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
+                bucket: self.s3_context.bucket.clone(),
                 key,
                 body: Some(rusoto_core::ByteStream::new(stream)),
                 content_length: Some(size as i64),
@@ -350,9 +289,10 @@ where
         debug!(?key, "Deleting object");
 
         match self
+            .s3_context
             .client
             .delete_object(DeleteObjectRequest {
-                bucket: self.bucket.clone(),
+                bucket: self.s3_context.bucket.clone(),
                 key,
                 ..DeleteObjectRequest::default()
             })

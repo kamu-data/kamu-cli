@@ -12,6 +12,7 @@ pub mod datafusion_hacks;
 pub mod docker_images;
 pub mod ipfs_wrapper;
 pub mod records_writers;
+pub mod s3_context;
 pub mod schema_utils;
 pub mod simple_transfer_protocol;
 pub mod smart_transfer_protocol;

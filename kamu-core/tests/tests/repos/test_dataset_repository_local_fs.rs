@@ -20,7 +20,7 @@ use std::assert_matches::assert_matches;
 async fn test_create_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
 
     let dataset_name = DatasetName::new_unchecked("foo");
 
@@ -63,7 +63,7 @@ async fn test_create_dataset() {
 async fn test_create_dataset_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
     let dataset_name = DatasetName::new_unchecked("foo");
 
     assert_matches!(
@@ -105,7 +105,7 @@ async fn test_rename_dataset() {
     let name_baz = DatasetName::new_unchecked("baz");
 
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -152,7 +152,7 @@ async fn test_delete_dataset() {
     let name_bar = DatasetName::new_unchecked("bar");
 
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()

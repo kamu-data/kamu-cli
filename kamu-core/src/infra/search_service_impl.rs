@@ -11,7 +11,7 @@ use dill::*;
 use opendatafabric::*;
 use tracing::info;
 
-use crate::domain::*;
+use crate::{domain::*, infra::utils::s3_context::S3Context};
 
 use std::sync::Arc;
 use url::Url;
@@ -53,12 +53,11 @@ impl SearchServiceImpl {
                 }
             }
             "s3" | "s3+http" | "s3+https" => {
-                use crate::infra::ObjectRepositoryS3;
                 use rusoto_core::Region;
                 use rusoto_s3::*;
 
                 // TODO: Support prefix?
-                let (endpoint, bucket, _) = ObjectRepositoryS3::<(), 0>::split_url(url);
+                let (endpoint, bucket, _) = S3Context::split_url(url);
 
                 let region = match endpoint {
                     None => Region::default(),

@@ -180,7 +180,7 @@ async fn test_ingest_parquet_with_engine() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     workspace_layout: Arc<WorkspaceLayout>,
-    local_repo: Arc<LocalDatasetRepositoryImpl>,
+    local_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
 }
 
@@ -188,7 +188,7 @@ impl IngestTestHarness {
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path()).unwrap());
-        let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
 
         let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
             EngineProvisionerLocalConfig::default(),

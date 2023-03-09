@@ -14,14 +14,14 @@ use opendatafabric::*;
 use std::sync::Arc;
 
 pub struct RenameCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRefLocal,
     new_name: DatasetName,
 }
 
 impl RenameCommand {
     pub fn new<N>(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRefLocal,
         new_name: N,
     ) -> Self
