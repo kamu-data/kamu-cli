@@ -116,7 +116,7 @@ jobs:
           - x86_64-apple-darwin
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
@@ -141,7 +141,7 @@ jobs:
           - x86_64-pc-windows-msvc
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
