@@ -82,7 +82,9 @@ impl QueryService for QueryServiceImpl {
         let res_schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
         if let None = res_schema {
             return Err(QueryError::DatasetSchemaNotAvailable(
-                DatasetSchemaNotAvailableError { dataset_ref: dataset_handle.as_local_ref() }
+                DatasetSchemaNotAvailableError {
+                    dataset_ref: dataset_handle.as_local_ref(),
+                },
             ));
         }
 
@@ -185,9 +187,8 @@ impl QueryService for QueryServiceImpl {
                 let reader = SerializedFileReader::new(file).int_err()?;
                 Ok(Some(reader.metadata().file_metadata().schema().clone()))
             }
-            None => Ok(None)
+            None => Ok(None),
         }
-
     }
 }
 

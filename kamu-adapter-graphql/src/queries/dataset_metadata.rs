@@ -87,7 +87,7 @@ impl DatasetMetadata {
 
         match res_schema {
             Some(schema) => Ok(Some(DataSchema::from_parquet_schema(&schema, format)?)),
-            None => Ok(None)
+            None => Ok(None),
         }
     }
 
@@ -103,15 +103,13 @@ impl DatasetMetadata {
         let mut dependencies: Vec<_> = Vec::new();
         for input in summary.dependencies.into_iter() {
             let dataset_id = input.id.unwrap().clone();
-            dependencies.push(
-                Dataset::new(
-                    Account::mock(), 
-                    local_repo
-                        .try_resolve_dataset_ref(&dataset_id.as_local_ref())
-                        .await?
-                        .unwrap()
-                )
-            );
+            dependencies.push(Dataset::new(
+                Account::mock(),
+                local_repo
+                    .try_resolve_dataset_ref(&dataset_id.as_local_ref())
+                    .await?
+                    .unwrap(),
+            ));
         }
         Ok(dependencies)
     }

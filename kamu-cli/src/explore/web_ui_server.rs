@@ -16,7 +16,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-
 #[derive(RustEmbed)]
 #[folder = "$KAMU_WEB_UI_DIR"]
 struct HttpRoot;

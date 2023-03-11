@@ -78,10 +78,7 @@ async fn test_pull_ingest_from_file() {
         assert_eq!(
             parquet
                 .get_row_iter()
-                .map(|r| (
-                    r.get_string(3).unwrap().clone(),
-                    r.get_long(4).unwrap()
-                ))
+                .map(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap()))
                 .sorted()
                 .collect::<Vec<_>>(),
             [
@@ -120,10 +117,7 @@ async fn test_pull_ingest_from_file() {
         assert_eq!(
             parquet
                 .get_row_iter()
-                .map(|r| (
-                    r.get_string(3).unwrap().clone(),
-                    r.get_long(4).unwrap()
-                ))
+                .map(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap()))
                 .sorted()
                 .collect::<Vec<_>>(),
             [

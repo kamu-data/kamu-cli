@@ -10,7 +10,7 @@
 pub mod data_utils;
 pub mod datafusion_hacks;
 pub mod docker_images;
+pub mod ipfs_wrapper;
 pub mod records_writers;
 pub mod schema_utils;
 pub mod simple_transfer_protocol;
-pub mod ipfs_wrapper;
