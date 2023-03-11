@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: daily
+    ignore:
+      # For now we use dependabot to notify us only about major library updates
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-minor"
