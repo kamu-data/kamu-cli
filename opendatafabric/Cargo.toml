@@ -26,7 +26,7 @@ ed25519-dalek = "*"
 
 # Serialization
 byteorder = "*"
-flatbuffers = "22"  # TODO: Automate keeping in sync with arrow crate
+flatbuffers = "23"  # TODO: Automate keeping in sync with arrow crate
 hex = "*"
 serde = { version = "*", features = ["derive"] }
 serde_with = "*"

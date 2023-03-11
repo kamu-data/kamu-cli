@@ -220,7 +220,7 @@ dependencies = [
  "arrow-cast",
  "arrow-data",
  "arrow-schema",
- "flatbuffers",
+ "flatbuffers 22.9.29",
 ]
 
 [[package]]
@@ -1512,6 +1512,16 @@ checksum = "8ce016b9901aef3579617931fbb2df8fc9a9f7cb95a16eb8acc8148209bb9e70"
 dependencies = [
  "bitflags",
  "thiserror",
+]
+
+[[package]]
+name = "flatbuffers"
+version = "23.1.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77f5399c2c9c50ae9418e522842ad362f61ee48b346ac106807bd355a8a7c619"
+dependencies = [
+ "bitflags",
+ "rustc_version",
 ]
 
 [[package]]
@@ -2985,7 +2995,7 @@ dependencies = [
  "chrono",
  "digest 0.10.6",
  "ed25519-dalek",
- "flatbuffers",
+ "flatbuffers 23.1.21",
  "hex",
  "indoc",
  "prost",
