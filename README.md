@@ -217,6 +217,10 @@ If you'd like to contribute [start here](https://docs.kamu.dev/contrib/).
 <div align="center">
   
 [Website] | [Docs] | [Tutorials] | [Examples] | [FAQ] | [Chat] | [Contributing] | [Developer Guide] | [License]
+
+[![dependency status](https://deps.rs/repo/github/kamu-data/kamu-cli/status.svg?&style=for-the-badge)](https://deps.rs/repo/github/kamu-data/kamu-cli)
+
+
 </div>
 
 [Tutorials]: https://docs.kamu.dev/cli/learn/learning-materials/
