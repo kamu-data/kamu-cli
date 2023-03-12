@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.112.0"
+version = "0.113.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -74,7 +74,7 @@ async-trait = "*"
 chrono = "*"
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions
-datafusion = "16"
+datafusion = "19"
 dirs = "*"
 futures = "*"
 indoc = "*"

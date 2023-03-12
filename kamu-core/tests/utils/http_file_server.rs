@@ -33,14 +33,7 @@ impl HttpFileServer {
         let app = axum::Router::new()
             .route(
                 "/*path",
-                axum::routing::get_service(tower_http::services::ServeDir::new(path)).handle_error(
-                    |error: std::io::Error| async move {
-                        (
-                            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Unhandled internal error: {}", error),
-                        )
-                    },
-                ),
+                axum::routing::get_service(tower_http::services::ServeDir::new(path)),
             )
             .layer(
                 tower::ServiceBuilder::new().layer(tower_http::trace::TraceLayer::new_for_http()),
