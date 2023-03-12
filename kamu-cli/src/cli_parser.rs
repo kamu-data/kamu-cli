@@ -111,9 +111,12 @@ pub fn cli() -> Command {
                             .long("replace")
                             .action(ArgAction::SetTrue)
                             .help("Delete and re-add datasets that already exist"),
+                        Arg::new("stdin")
+                            .long("stdin")
+                            .action(ArgAction::SetTrue)
+                            .help("Read manifests from standard input"),
                         Arg::new("manifest")
                             .action(ArgAction::Append)
-                            .required(true)
                             .index(1)
                             .help("Dataset manifest reference(s) (path, or URL)"),
                     ])

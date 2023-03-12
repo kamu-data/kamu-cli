@@ -12,7 +12,6 @@ use super::{BatchError, CLIError, Command};
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::io::Read;
 use std::sync::Arc;
 
 pub struct AddCommand {
@@ -21,6 +20,7 @@ pub struct AddCommand {
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
+    stdin: bool,
 }
 
 impl AddCommand {
@@ -30,6 +30,7 @@ impl AddCommand {
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
+        stdin: bool,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
@@ -40,6 +41,7 @@ impl AddCommand {
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
+            stdin,
         }
     }
 
@@ -64,7 +66,10 @@ impl AddCommand {
                     .unwrap_or_else(|e| panic!("Failed to read glob {}: {}", p.display(), e))
             })
             .map(|e| e.unwrap())
-            .filter(|p| self.is_snapshot_file(p))
+            .filter(|p| {
+                self.is_snapshot_file(p)
+                    .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))
+            })
             .map(|p| {
                 (
                     p.to_str().unwrap().to_owned(),
@@ -74,25 +79,68 @@ impl AddCommand {
             .collect()
     }
 
-    fn is_snapshot_file(&self, path: &std::path::Path) -> bool {
-        let mut file = std::fs::File::open(path)
-            .unwrap_or_else(|e| panic!("Failed to read file {}: {}", path.display(), e));
-        let mut buf = [0; 64];
-        let read = file.read(&mut buf).unwrap();
-        match std::str::from_utf8(&buf[0..read]) {
-            Ok(s) => s.contains("DatasetSnapshot"),
-            Err(_) => false,
+    fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+        match opendatafabric::serde::yaml::YamlDatasetSnapshotDeserializer
+            .read_manifests(std::io::stdin())
+        {
+            Ok(v) => v
+                .into_iter()
+                .enumerate()
+                .map(|(i, ds)| (format!("STDIN[{}]", i), Ok(ds)))
+                .collect(),
+            Err(e) => vec![("STDIN".to_string(), Err(ResourceError::serde(e)))],
         }
+    }
+
+    fn is_snapshot_file(&self, path: &std::path::Path) -> Result<bool, std::io::Error> {
+        use std::io::BufRead;
+        let file = std::fs::File::open(path)?;
+
+        let mut lines_read = 0;
+
+        for line_res in std::io::BufReader::new(file).lines() {
+            let line = line_res?;
+            let line = line.trim();
+
+            // Allow any number of comments in (what is supposedly) a YAML file
+            if line.is_empty() || line.starts_with("#") {
+                continue;
+            }
+
+            if line.contains("DatasetSnapshot") {
+                return Ok(true);
+            }
+
+            lines_read += 1;
+            if lines_read > 3 {
+                break;
+            }
+        }
+
+        Ok(false)
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let load_results = if !self.recursive {
-            self.load_specific()
-        } else {
+        if self.stdin && !self.snapshot_refs.is_empty() {
+            return Err(CLIError::usage_error(
+                "Cannot specify --stdin and positional arguments at the same time",
+            ));
+        }
+        if !self.stdin && self.snapshot_refs.is_empty() {
+            return Err(CLIError::usage_error(
+                "No manifest references or paths were provided",
+            ));
+        }
+
+        let load_results = if self.recursive {
             self.load_recursive()
+        } else if self.stdin {
+            self.load_stdin()
+        } else {
+            self.load_specific()
         };
 
         let (snapshots, mut errors): (Vec<_>, Vec<_>) =

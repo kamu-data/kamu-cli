@@ -88,17 +88,18 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
 pub struct YamlMetadataEventSerializer;
 
 impl YamlMetadataEventSerializer {
-    pub fn write_manifest(&self, event: &MetadataEvent) -> Result<Buffer<u8>, Error> {
+    pub fn write_manifest_str(&self, event: &MetadataEvent) -> Result<String, Error> {
         let manifest = Manifest {
             version: 1,
             kind: "MetadataEvent".to_owned(),
             content: MetadataEventWrapper(event.clone()),
         };
 
-        let buf = serde_yaml::to_string(&manifest)
-            .map_err(|e| Error::serde(e))?
-            .into_bytes();
+        serde_yaml::to_string(&manifest).map_err(|e| Error::serde(e))
+    }
 
+    pub fn write_manifest(&self, event: &MetadataEvent) -> Result<Buffer<u8>, Error> {
+        let buf = self.write_manifest_str(event)?.into_bytes();
         Ok(Buffer::new(0, buf.len(), buf))
     }
 }
@@ -128,17 +129,21 @@ impl YamlMetadataEventDeserializer {
 
 pub struct YamlDatasetSnapshotSerializer;
 
-impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
-    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error> {
+impl YamlDatasetSnapshotSerializer {
+    pub fn write_manifest_str(&self, snapshot: &DatasetSnapshot) -> Result<String, Error> {
         let manifest = Manifest {
             version: 1,
             kind: "DatasetSnapshot".to_owned(),
             content: DatasetSnapshotWrapper(snapshot.clone()),
         };
 
-        let buf = serde_yaml::to_string(&manifest)
-            .map_err(|e| Error::serde(e))?
-            .into_bytes();
+        serde_yaml::to_string(&manifest).map_err(|e| Error::serde(e))
+    }
+}
+
+impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
+    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error> {
+        let buf = self.write_manifest_str(snapshot)?.into_bytes();
         Ok(Buffer::new(0, buf.len(), buf))
     }
 }
@@ -148,6 +153,27 @@ impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct YamlDatasetSnapshotDeserializer;
+
+impl YamlDatasetSnapshotDeserializer {
+    pub fn read_manifests(
+        &self,
+        reader: impl std::io::Read,
+    ) -> Result<Vec<DatasetSnapshot>, Error> {
+        let mut ret = Vec::new();
+
+        for document in serde_yaml::Deserializer::from_reader(reader) {
+            let manifest = Manifest::<DatasetSnapshotWrapper>::deserialize(document)
+                .map_err(|e| Error::serde(e))?;
+
+            assert_eq!(manifest.kind, "DatasetSnapshot");
+            assert_eq!(manifest.version, 1);
+
+            ret.push(manifest.content.0);
+        }
+
+        Ok(ret)
+    }
+}
 
 impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<DatasetSnapshot, Error> {

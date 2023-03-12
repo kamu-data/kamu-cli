@@ -84,7 +84,8 @@ pub async fn run(
 // Catalog
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_catalog() -> CatalogBuilder {
+// Public only for tests
+pub fn configure_catalog() -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
     b.add::<ConfigService>();

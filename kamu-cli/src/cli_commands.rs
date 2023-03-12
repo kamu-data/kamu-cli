@@ -26,9 +26,13 @@ pub fn get_command(
         Some(("add", submatches)) => Box::new(AddCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.get_many("manifest").unwrap().map(String::as_str), // required
+            submatches
+                .get_many("manifest")
+                .unwrap_or_default()
+                .map(String::as_str),
             submatches.get_flag("recursive"),
             submatches.get_flag("replace"),
+            submatches.get_flag("stdin"),
         )),
         Some(("complete", submatches)) => Box::new(CompleteCommand::new(
             if in_workspace(catalog.get_one()?) {

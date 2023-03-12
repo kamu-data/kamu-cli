@@ -150,6 +150,12 @@ impl Kamu {
 
         self.execute(["add".as_ref(), f.path().as_os_str()]).await
     }
+
+    pub fn catalog(&self) -> dill::Catalog {
+        let mut builder = kamu_cli::configure_catalog();
+        builder.add_value(self.workspace_layout.clone());
+        builder.build()
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
