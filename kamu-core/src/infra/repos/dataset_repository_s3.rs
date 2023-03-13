@@ -11,6 +11,7 @@ use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use dill::*;
+use futures::TryStreamExt;
 use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal};
 use rusoto_s3::*;
 use thiserror::Error;
@@ -18,7 +19,7 @@ use url::Url;
 
 use crate::{domain::*, infra::utils::s3_context::S3Context};
 
-use super::{get_staging_name, DatasetFactoryImpl};
+use super::{get_downstream_dependencies_impl, get_staging_name, DatasetFactoryImpl};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +54,7 @@ impl DatasetRepositoryS3 {
         DatasetFactoryImpl::get_s3(dataset_url)
     }
 
-    async fn discard_create_dataset(
+    async fn eliminate_bucket_items(
         &self,
         dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
@@ -168,6 +169,10 @@ impl DatasetRepositoryS3 {
             })
             .await
             .int_err()?;
+
+        // TODO: concurrency safety.
+        // It is important not to allow parallel writes of Head reference file in the same bucket.
+        // Consider optimistic locking (comparing old head with expected before final commit).
 
         if let Some(contents) = list_response.contents {
             for obj in &contents {
@@ -329,16 +334,37 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     async fn delete_dataset(
         &self,
-        _dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRefLocal,
     ) -> Result<(), DeleteDatasetError> {
-        unimplemented!("delete_dataset not supported by S3 repository")
+        let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
+            Ok(dataset_handle) => dataset_handle,
+            Err(GetDatasetError::NotFound(e)) => return Err(DeleteDatasetError::NotFound(e)),
+            Err(GetDatasetError::Internal(e)) => return Err(DeleteDatasetError::Internal(e)),
+        };
+
+        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
+            .try_collect()
+            .await?;
+
+        if !children.is_empty() {
+            return Err(DanglingReferenceError {
+                dataset_handle,
+                children,
+            }
+            .into());
+        }
+
+        match self.eliminate_bucket_items(&dataset_handle.name).await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DeleteDatasetError::Internal(e)),
+        }
     }
 
     fn get_downstream_dependencies<'s>(
         &'s self,
-        _dataset_ref: &'s DatasetRefLocal,
+        dataset_ref: &'s DatasetRefLocal,
     ) -> DatasetHandleStream<'s> {
-        unimplemented!("get_downstream_dependencies not supported by S3 repository")
+        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
 }
 
@@ -403,7 +429,7 @@ impl DatasetBuilder for DatasetS3BuilderImpl {
     }
 
     async fn discard(&self) -> Result<(), InternalError> {
-        self.repo.discard_create_dataset(&self.dataset_name).await
+        self.repo.eliminate_bucket_items(&self.dataset_name).await
     }
 }
 

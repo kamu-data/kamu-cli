@@ -10,11 +10,11 @@
 use super::dataset_repository_helpers::get_staging_name;
 use crate::domain::*;
 use crate::infra::*;
+use futures::TryStreamExt;
 use opendatafabric::*;
 
 use async_trait::async_trait;
 use dill::*;
-use futures::{Stream, StreamExt, TryStreamExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
@@ -146,39 +146,6 @@ impl DatasetRepositoryLocalFs {
         //     .map_err(|e| CreateDatasetError::Internal(e.into()))?;
 
         Ok(handle)
-    }
-
-    // TODO: PERF: This is super inefficient
-    fn get_downstream_dependencies_impl<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRefLocal,
-    ) -> impl Stream<Item = Result<DatasetHandle, InternalError>> + 's {
-        async_stream::try_stream! {
-            let dataset_handle = self.resolve_dataset_ref(dataset_ref).await.int_err()?;
-
-            let mut dataset_handles = self.get_all_datasets();
-            while let Some(hdl) = dataset_handles.try_next().await? {
-                if hdl.id == dataset_handle.id {
-                    continue;
-                }
-
-                let summary = self
-                    .get_dataset(&hdl.as_local_ref())
-                    .await
-                    .int_err()?
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                if summary
-                    .dependencies
-                    .iter()
-                    .any(|d| d.id.as_ref() == Some(&dataset_handle.id))
-                {
-                    yield hdl;
-                }
-            }
-        }
     }
 }
 
@@ -340,8 +307,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        let children: Vec<_> = self
-            .get_downstream_dependencies_impl(dataset_ref)
+        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
             .try_collect()
             .await?;
 
@@ -373,7 +339,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &'s self,
         dataset_ref: &'s DatasetRefLocal,
     ) -> DatasetHandleStream<'s> {
-        Box::pin(self.get_downstream_dependencies_impl(dataset_ref))
+        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
 }
 

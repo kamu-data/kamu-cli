@@ -7,6 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use futures::Stream;
+use opendatafabric::{DatasetHandle, DatasetRefLocal};
+use tokio_stream::StreamExt;
+
+use crate::domain::{DatasetRepository, GetSummaryOpts, InternalError, ResultIntoInternal};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Cleanup procedure for orphaned staged datasets?
 pub fn get_staging_name() -> String {
     use rand::distributions::Alphanumeric;
@@ -23,3 +31,39 @@ pub fn get_staging_name() -> String {
 
     name
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn get_downstream_dependencies_impl<'s>(
+    repo: &'s dyn DatasetRepository,
+    dataset_ref: &'s DatasetRefLocal,
+) -> impl Stream<Item = Result<DatasetHandle, InternalError>> + 's {
+    async_stream::try_stream! {
+        let dataset_handle = repo.resolve_dataset_ref(dataset_ref).await.int_err()?;
+
+        let mut dataset_handles = repo.get_all_datasets();
+        while let Some(hdl) = dataset_handles.try_next().await? {
+            if hdl.id == dataset_handle.id {
+                continue;
+            }
+
+            let summary = repo
+                .get_dataset(&hdl.as_local_ref())
+                .await
+                .int_err()?
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            if summary
+                .dependencies
+                .iter()
+                .any(|d| d.id.as_ref() == Some(&dataset_handle.id))
+            {
+                yield hdl;
+            }
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

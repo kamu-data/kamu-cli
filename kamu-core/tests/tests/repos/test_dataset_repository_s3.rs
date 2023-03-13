@@ -13,12 +13,16 @@ use url::Url;
 
 use crate::utils::MinioServer;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[allow(dead_code)]
 struct S3 {
     tmp_dir: tempfile::TempDir,
     minio: MinioServer,
     url: Url,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 fn run_s3_server() -> S3 {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
@@ -45,6 +49,8 @@ fn run_s3_server() -> S3 {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     DatasetRepositoryS3::new(
@@ -52,6 +58,8 @@ fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
         endpoint.unwrap(),
     )
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
 async fn test_create_dataset() {
@@ -61,6 +69,8 @@ async fn test_create_dataset() {
     test_dataset_repository_shared::test_create_dataset(&repo).await;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let s3 = run_s3_server();
@@ -69,6 +79,8 @@ async fn test_create_dataset_from_snapshot() {
     test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_rename_dataset() {
     let s3 = run_s3_server();
@@ -76,3 +88,15 @@ async fn test_rename_dataset() {
 
     test_dataset_repository_shared::test_rename_dataset(&repo).await;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_delete_dataset() {
+    let s3 = run_s3_server();
+    let repo = s3_repo(&s3);
+
+    test_dataset_repository_shared::test_delete_dataset(&repo).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
