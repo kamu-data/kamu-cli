@@ -29,7 +29,7 @@ pub struct IngestTask {
     listener: Arc<dyn IngestListener>,
 
     next_offset: i64,
-    source: SetPollingSource,
+    source: Option<SetPollingSource>,
     prev_checkpoint: Option<Multihash>,
     vocab: DatasetVocabulary,
     checkpointing_executor: CheckpointingExecutor,
@@ -93,15 +93,15 @@ impl IngestTask {
             }
         }
 
-        let source = source.ok_or_else(|| "Failed to find source definition".int_err())?;
-
-        if fetch_override.is_some() {
-            if let FetchStep::FilesGlob(_) = source.fetch {
-                return Err(concat!(
-                    "Fetch override use is not supported for glob sources, ",
-                    "as globs maintain strict ordering and state"
-                )
-                .int_err());
+        if let Some(source) = &source {
+            if fetch_override.is_some() {
+                if let FetchStep::FilesGlob(_) = &source.fetch {
+                    return Err(concat!(
+                        "Fetch override use is not supported for glob sources, ",
+                        "as globs maintain strict ordering and state"
+                    )
+                    .int_err());
+                }
             }
         }
 
@@ -145,6 +145,14 @@ impl IngestTask {
     }
 
     pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
+        if self.source.is_none() {
+            return Ok(IngestResult::UpToDate {
+                no_polling_source: true,
+                uncacheable: false,
+                has_more: false,
+            });
+        }
+
         self.listener
             .on_stage_progress(IngestStage::CheckCache, 0, 1);
 
@@ -179,6 +187,7 @@ impl IngestTask {
 
         let res = if commit_result.was_up_to_date || commit_result.checkpoint.last_hash.is_none() {
             IngestResult::UpToDate {
+                no_polling_source: false,
                 uncacheable: !cacheable,
                 has_more,
             }
@@ -265,7 +274,7 @@ impl IngestTask {
 
                     self.fetch_service
                         .fetch(
-                            &self.source.fetch,
+                            &self.source.as_ref().unwrap().fetch,
                             old_checkpoint,
                             &self.layout.cache_dir.join("fetched.bin"),
                             Some(Arc::new(FetchProgressListenerBridge {
@@ -301,7 +310,13 @@ impl IngestTask {
                     }
 
                     let null_steps = Vec::new();
-                    let prep_steps = self.source.prepare.as_ref().unwrap_or(&null_steps);
+                    let prep_steps = self
+                        .source
+                        .as_ref()
+                        .unwrap()
+                        .prepare
+                        .as_ref()
+                        .unwrap_or(&null_steps);
 
                     let span = info_span!("Preparing the data");
                     let _span_guard = span.enter();
@@ -347,7 +362,7 @@ impl IngestTask {
                         .read(
                             &self.dataset_handle,
                             &self.layout,
-                            &self.source,
+                            self.source.as_ref().unwrap(),
                             self.prev_checkpoint.clone(),
                             &self.vocab,
                             Utc::now(), // TODO: inject

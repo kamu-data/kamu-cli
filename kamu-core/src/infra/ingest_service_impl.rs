@@ -56,6 +56,7 @@ impl IngestServiceImpl {
                     ..
                 }),
                 IngestResult::UpToDate {
+                    no_polling_source: _,
                     has_more,
                     uncacheable,
                 },
@@ -110,7 +111,7 @@ impl IngestServiceImpl {
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
-        // TODO create via DI to avoid passing through all dependencies
+        // TODO: create via DI to avoid passing through all dependencies
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
             dataset,

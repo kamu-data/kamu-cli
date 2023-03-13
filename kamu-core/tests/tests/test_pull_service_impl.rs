@@ -893,6 +893,7 @@ impl IngestService for TestIngestService {
                 (
                     r.dataset_ref.clone(),
                     Ok(IngestResult::UpToDate {
+                        no_polling_source: false,
                         uncacheable: false,
                         has_more: false,
                     }),

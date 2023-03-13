@@ -546,6 +546,7 @@ impl IngestListener for PrettyIngestProgress {
 
         match result {
             IngestResult::UpToDate {
+                no_polling_source,
                 uncacheable,
                 has_more,
             } => {
@@ -554,7 +555,10 @@ impl IngestListener for PrettyIngestProgress {
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
                         IngestStage::Commit as u32,
-                        if *uncacheable {
+                        if *no_polling_source {
+                            console::style("Dataset does not specify a polling source".to_owned())
+                                .yellow()
+                        } else if *uncacheable {
                             console::style(
                                 "Dataset is uncachable (use --fetch-uncacheable to update)"
                                     .to_owned(),

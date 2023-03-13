@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.114.1] - 2023-03-12
+### Fixed
+- `kamu pull` will not panic on root datasets that don't define a polling source and will consider them up-to-date
+
 ## [0.114.0] - 2023-03-12
 ### Added
 - `kamu add` command now supports reading from STDIN

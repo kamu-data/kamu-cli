@@ -77,6 +77,7 @@ impl Default for IngestOptions {
 #[derive(Debug)]
 pub enum IngestResult {
     UpToDate {
+        no_polling_source: bool,
         uncacheable: bool,
         has_more: bool,
     },

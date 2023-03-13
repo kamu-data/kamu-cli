@@ -110,6 +110,7 @@ impl From<IngestResult> for PullResult {
     fn from(other: IngestResult) -> Self {
         match other {
             IngestResult::UpToDate {
+                no_polling_source: _,
                 uncacheable: _,
                 has_more: _,
             } => PullResult::UpToDate,
