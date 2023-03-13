@@ -37,27 +37,27 @@ async fn test_verify_data_consistency() {
         workspace_layout.clone(),
     ));
 
-    local_repo
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    create_dataset_from_snapshot(
+        local_repo.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name("foo")
+            .kind(DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+    )
+    .await
+    .unwrap();
 
-    let create_result = local_repo
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(&dataset_name)
-                .kind(DatasetKind::Derivative)
-                .push_event(MetadataFactory::set_transform(["foo"]).build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    let create_result = create_dataset_from_snapshot(
+        local_repo.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(&dataset_name)
+            .kind(DatasetKind::Derivative)
+            .push_event(MetadataFactory::set_transform(["foo"]).build())
+            .build(),
+    )
+    .await
+    .unwrap();
 
     assert_matches!(
         verification_svc

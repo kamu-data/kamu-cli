@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal, DatasetSnapshot};
+use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal};
 use rusoto_s3::*;
 use url::Url;
 
@@ -280,23 +280,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
             ))),
             Err(e) => Err(BeginCreateDatasetError::Internal(e)),
         }
-    }
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        _snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        unimplemented!("create_dataset_from_snapshot not supported by S3 repository")
-    }
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        _snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetName,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )> {
-        unimplemented!("create_datasets_from_snapshots not supported by S3 repository")
     }
 
     async fn rename_dataset(

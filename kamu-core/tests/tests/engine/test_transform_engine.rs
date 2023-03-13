@@ -124,8 +124,7 @@ async fn test_transform_with_engine_spark() {
 
     let root_name = root_snapshot.name.clone();
 
-    local_repo
-        .create_dataset_from_snapshot(root_snapshot)
+    create_dataset_from_snapshot(local_repo.as_ref(), root_snapshot)
         .await
         .unwrap();
 
@@ -157,8 +156,7 @@ async fn test_transform_with_engine_spark() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    local_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+    create_dataset_from_snapshot(local_repo.as_ref(), deriv_snapshot)
         .await
         .unwrap();
 
@@ -349,8 +347,7 @@ async fn test_transform_with_engine_flink() {
 
     let root_name = root_snapshot.name.clone();
 
-    local_repo
-        .create_dataset_from_snapshot(root_snapshot)
+    create_dataset_from_snapshot(local_repo.as_ref(), root_snapshot)
         .await
         .unwrap();
 
@@ -382,8 +379,7 @@ async fn test_transform_with_engine_flink() {
 
     let deriv_name = deriv_snapshot.name.clone();
 
-    local_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+    create_dataset_from_snapshot(local_repo.as_ref(), deriv_snapshot)
         .await
         .unwrap();
 

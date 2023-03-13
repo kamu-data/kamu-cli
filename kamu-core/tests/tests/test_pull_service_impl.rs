@@ -651,15 +651,14 @@ async fn test_set_watermark() {
 
     let dataset_name = n!("foo");
 
-    harness
-        .local_repo
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(&dataset_name)
-                .build(),
-        )
-        .await
-        .unwrap();
+    create_dataset_from_snapshot(
+        harness.local_repo.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(&dataset_name)
+            .build(),
+    )
+    .await
+    .unwrap();
 
     let num_blocks = || async {
         let ds = harness
@@ -1017,12 +1016,12 @@ impl SyncService for TestSyncService {
                 .unwrap()
             {
                 None => {
-                    self.local_repo
-                        .create_dataset_from_snapshot(
-                            MetadataFactory::dataset_snapshot().name(local_name).build(),
-                        )
-                        .await
-                        .unwrap();
+                    create_dataset_from_snapshot(
+                        self.local_repo.as_ref(),
+                        MetadataFactory::dataset_snapshot().name(local_name).build(),
+                    )
+                    .await
+                    .unwrap();
                 }
                 Some(_) => (),
             }

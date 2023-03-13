@@ -56,19 +56,6 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError>;
 
-    async fn create_dataset_from_snapshot(
-        &self,
-        snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetName,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )>;
-
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRefLocal,

@@ -15,14 +15,19 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
+use tempfile::TempDir;
 
 use std::assert_matches::assert_matches;
+
+fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
+    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+    DatasetRepositoryLocalFs::new(Arc::new(workspace_layout))
+}
 
 #[tokio::test]
 async fn test_create_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
+    let repo = local_fs_repo(&tempdir);
 
     test_dataset_repository_shared::test_create_dataset(&repo).await;
 }
@@ -30,38 +35,9 @@ async fn test_create_dataset() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
-    let dataset_name = DatasetName::new_unchecked("foo");
+    let repo = local_fs_repo(&tempdir);
 
-    assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_)
-    );
-
-    let snapshot = MetadataFactory::dataset_snapshot()
-        .name("foo")
-        .kind(DatasetKind::Root)
-        .push_event(MetadataFactory::set_polling_source().build())
-        .build();
-
-    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
-
-    let dataset = repo
-        .get_dataset(&create_result.dataset_handle.into())
-        .await
-        .unwrap();
-
-    let actual_head = dataset
-        .as_metadata_chain()
-        .get_ref(&BlockRef::Head)
-        .await
-        .unwrap();
-
-    assert_eq!(actual_head, create_result.head);
+    test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
 }
 
 #[tokio::test]
@@ -88,7 +64,7 @@ async fn test_rename_dataset() {
             .build(),
     ];
 
-    repo.create_datasets_from_snapshots(snapshots).await;
+    create_datasets_from_snapshots(&repo, snapshots).await;
 
     assert_matches!(
         repo.rename_dataset(&name_baz.as_local_ref(), &name_foo)
@@ -135,8 +111,7 @@ async fn test_delete_dataset() {
             .build(),
     ];
 
-    let handles: Vec<_> = repo
-        .create_datasets_from_snapshots(snapshots)
+    let handles: Vec<_> = create_datasets_from_snapshots(&repo, snapshots)
         .await
         .into_iter()
         .map(|(_, r)| r.unwrap().dataset_handle)

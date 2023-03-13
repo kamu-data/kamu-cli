@@ -180,8 +180,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = local_repo
-        .create_dataset_from_snapshot(snapshot)
+    let create_result = create_dataset_from_snapshot(local_repo.as_ref(), snapshot)
         .await
         .unwrap();
     let b1 = create_result.head;

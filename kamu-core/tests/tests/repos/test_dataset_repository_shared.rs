@@ -51,3 +51,38 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
 
     assert!(repo.get_dataset(&dataset_name.as_local_ref()).await.is_ok());
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
+    let dataset_name = DatasetName::new_unchecked("foo");
+
+    assert_matches!(
+        repo.get_dataset(&dataset_name.as_local_ref())
+            .await
+            .err()
+            .unwrap(),
+        GetDatasetError::NotFound(_)
+    );
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo")
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    let create_result = create_dataset_from_snapshot(repo, snapshot).await.unwrap();
+
+    let dataset = repo
+        .get_dataset(&create_result.dataset_handle.into())
+        .await
+        .unwrap();
+
+    let actual_head = dataset
+        .as_metadata_chain()
+        .get_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_eq!(actual_head, create_result.head);
+}

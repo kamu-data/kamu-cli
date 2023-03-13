@@ -45,14 +45,26 @@ fn run_s3_server() -> S3 {
     }
 }
 
+fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
+    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
+    DatasetRepositoryS3::new(
+        S3Context::from_items(endpoint.clone(), bucket, key_prefix),
+        endpoint.unwrap(),
+    )
+}
+
 #[tokio::test]
 async fn test_create_dataset() {
     let s3 = run_s3_server();
-    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
-    let repo = DatasetRepositoryS3::new(
-        S3Context::from_items(endpoint.clone(), bucket, key_prefix),
-        endpoint.unwrap(),
-    );
+    let repo = s3_repo(&s3);
 
     test_dataset_repository_shared::test_create_dataset(&repo).await;
+}
+
+#[tokio::test]
+async fn test_create_dataset_from_snapshot() {
+    let s3 = run_s3_server();
+    let repo = s3_repo(&s3);
+
+    test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
 }

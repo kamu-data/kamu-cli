@@ -45,16 +45,16 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    local_repo
-        .create_dataset_from_snapshot(
-            MetadataFactory::dataset_snapshot()
-                .name(&dataset_local_name)
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    create_dataset_from_snapshot(
+        local_repo.as_ref(),
+        MetadataFactory::dataset_snapshot()
+            .name(&dataset_local_name)
+            .kind(DatasetKind::Root)
+            .push_event(MetadataFactory::set_polling_source().build())
+            .build(),
+    )
+    .await
+    .unwrap();
 
     sync_svc
         .sync(

@@ -193,10 +193,8 @@ impl Command for AddCommand {
             }
         };
 
-        let mut add_results = self
-            .local_repo
-            .create_datasets_from_snapshots(snapshots)
-            .await;
+        let mut add_results =
+            create_datasets_from_snapshots(self.local_repo.as_ref(), snapshots).await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
 

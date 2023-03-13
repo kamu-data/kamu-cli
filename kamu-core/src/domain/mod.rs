@@ -28,6 +28,9 @@ pub use remote_repository_registry::*;
 
 // Services
 
+pub mod dataset_repository_utils;
+pub use dataset_repository_utils::*;
+
 pub mod engine;
 pub use engine::*;
 
