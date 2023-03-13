@@ -7,16 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::{
-    domain::{AppendOpts, DatasetRepository, GetDatasetError},
-    infra::{utils::s3_context::S3Context, DatasetRepositoryS3},
-    testing::MetadataFactory,
-};
-use opendatafabric::{DatasetKind, DatasetName};
+use super::test_dataset_repository_shared;
+use kamu::infra::{utils::s3_context::S3Context, DatasetRepositoryS3};
 use url::Url;
 
 use crate::utils::MinioServer;
-use std::assert_matches::assert_matches;
 
 #[allow(dead_code)]
 struct S3 {
@@ -59,30 +54,5 @@ async fn test_create_dataset() {
         endpoint.unwrap(),
     );
 
-    let dataset_name = DatasetName::new_unchecked("foo");
-
-    assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_)
-    );
-
-    let builder = repo.create_dataset(&dataset_name).await.unwrap();
-    let chain = builder.as_dataset().as_metadata_chain();
-
-    chain
-        .append(
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                .build(),
-            AppendOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    let hdl = builder.finish().await.unwrap();
-    assert_eq!(hdl.name, dataset_name);
-
-    assert!(repo.get_dataset(&dataset_name.as_local_ref()).await.is_ok());
+    test_dataset_repository_shared::test_create_dataset(&repo).await;
 }

@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use super::test_dataset_repository_shared;
+
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
@@ -22,41 +24,7 @@ async fn test_create_dataset() {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
     let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
 
-    let dataset_name = DatasetName::new_unchecked("foo");
-
-    assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_)
-    );
-
-    let builder = repo.create_dataset(&dataset_name).await.unwrap();
-    let chain = builder.as_dataset().as_metadata_chain();
-
-    chain
-        .append(
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                .build(),
-            AppendOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    // Not finalized yet
-    assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_)
-    );
-
-    let hdl = builder.finish().await.unwrap();
-    assert_eq!(hdl.name, dataset_name);
-
-    assert!(repo.get_dataset(&dataset_name.as_local_ref()).await.is_ok());
+    test_dataset_repository_shared::test_create_dataset(&repo).await;
 }
 
 #[tokio::test]

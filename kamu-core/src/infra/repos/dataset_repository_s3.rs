@@ -17,7 +17,7 @@ use url::Url;
 
 use crate::{domain::*, infra::utils::s3_context::S3Context};
 
-use super::DatasetFactoryImpl;
+use super::{get_staging_name, DatasetFactoryImpl};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -95,6 +95,7 @@ impl DatasetRepositoryS3 {
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
+        staging_name: &str,
         dataset_name: &DatasetName,
     ) -> Result<DatasetHandle, CreateDatasetError> {
         let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
@@ -106,8 +107,8 @@ impl DatasetRepositoryS3 {
 
         let handle = DatasetHandle::new(summary.id, dataset_name.clone());
 
-        // Check for late name collision - this seems to have sense with staging functin only
-        /*if let Some(existing_dataset) = self
+        // Check for late name collision
+        if let Some(existing_dataset) = self
             .try_resolve_dataset_ref(&dataset_name.as_local_ref())
             .await?
         {
@@ -115,7 +116,65 @@ impl DatasetRepositoryS3 {
                 name: existing_dataset.name,
             }
             .into());
-        }*/
+        }
+
+        let staging_key_prefix = self.s3_context.get_key(staging_name);
+        let list_response = self
+            .s3_context
+            .client
+            .list_objects(ListObjectsRequest {
+                bucket: self.s3_context.bucket.clone(),
+                prefix: Some(staging_key_prefix.clone()),
+                ..ListObjectsRequest::default()
+            })
+            .await
+            .int_err()?;
+
+        let target_key_prefix = self.s3_context.get_key(dataset_name.as_str());
+
+        if let Some(contents) = list_response.contents {
+            for obj in &contents {
+                let copy_source = format!(
+                    "{}/{}",
+                    self.s3_context.bucket.clone(),
+                    obj.key.clone().unwrap()
+                );
+                let new_key = obj
+                    .key
+                    .clone()
+                    .unwrap()
+                    .replace(staging_key_prefix.as_str(), target_key_prefix.as_str());
+                self.s3_context
+                    .client
+                    .copy_object(CopyObjectRequest {
+                        bucket: self.s3_context.bucket.clone(),
+                        copy_source,
+                        key: new_key,
+                        ..CopyObjectRequest::default()
+                    })
+                    .await
+                    .int_err()?;
+            }
+
+            self.s3_context
+                .client
+                .delete_objects(DeleteObjectsRequest {
+                    bucket: self.s3_context.bucket.clone(),
+                    delete: Delete {
+                        objects: contents
+                            .iter()
+                            .map(|obj| ObjectIdentifier {
+                                key: obj.key.clone().unwrap(),
+                                version_id: None,
+                            })
+                            .collect(),
+                        quiet: Some(true),
+                    },
+                    ..DeleteObjectsRequest::default()
+                })
+                .await
+                .int_err()?;
+        }
 
         Ok(handle)
     }
@@ -209,12 +268,14 @@ impl DatasetRepository for DatasetRepositoryS3 {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let dataset_url = self.get_s3_bucket_path(dataset_name.as_str());
+        let staging_name = get_staging_name();
+        let dataset_url = self.get_s3_bucket_path(staging_name.as_str());
         let dataset_result = DatasetFactoryImpl::get_s3(dataset_url);
         match dataset_result {
             Ok(dataset) => Ok(Box::new(DatasetS3BuilderImpl::new(
                 self.clone(),
                 Arc::new(dataset),
+                staging_name,
                 dataset_name.clone(),
             ))),
             Err(e) => Err(BeginCreateDatasetError::Internal(e)),
@@ -268,6 +329,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 struct DatasetS3BuilderImpl {
     repo: DatasetRepositoryS3,
     dataset: Arc<dyn Dataset>,
+    staging_name: String,
     dataset_name: DatasetName,
 }
 
@@ -277,11 +339,13 @@ impl DatasetS3BuilderImpl {
     fn new(
         repo: DatasetRepositoryS3,
         dataset: Arc<dyn Dataset>,
+        staging_name: String,
         dataset_name: DatasetName,
     ) -> Self {
         Self {
             repo,
             dataset,
+            staging_name,
             dataset_name,
         }
     }
@@ -310,7 +374,11 @@ impl DatasetBuilder for DatasetS3BuilderImpl {
         }?;
 
         self.repo
-            .finish_create_dataset(self.dataset.as_ref(), &self.dataset_name)
+            .finish_create_dataset(
+                self.dataset.as_ref(),
+                self.staging_name.as_str(),
+                &self.dataset_name,
+            )
             .await
     }
 
