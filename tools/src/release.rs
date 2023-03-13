@@ -69,7 +69,10 @@ fn main() {
 
     update_makefile(&Path::new("images/demo/Makefile"), &new_version);
 
-    update_workflow(&Path::new(".github/workflows/release-images.yaml"), &new_version);
+    update_workflow(
+        &Path::new(".github/workflows/release-images.yaml"),
+        &new_version,
+    );
 }
 
 fn get_all_crates() -> Vec<Crate> {
