@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::dataset_repository_helpers::get_staging_name;
 use crate::domain::*;
 use crate::infra::*;
 use opendatafabric::*;
@@ -224,23 +225,6 @@ impl DatasetRepositoryLocalFs {
         Ok(handle)
     }
 
-    // TODO: Cleanup procedure for orphaned staged datasets?
-    fn get_staging_name(&self) -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut name = String::with_capacity(16);
-        name.push_str(".pending-");
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        name
-    }
-
     // TODO: PERF: This is super inefficient
     fn get_downstream_dependencies_impl<'s>(
         &'s self,
@@ -387,7 +371,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_path = self.root.join(self.get_staging_name());
+        let staging_path = self.root.join(get_staging_name());
 
         let layout = DatasetLayout::create(&staging_path).int_err()?;
         let dataset = DatasetFactoryImpl::get_local_fs(layout);

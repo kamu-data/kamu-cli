@@ -43,6 +43,9 @@ pub use dataset_impl::*;
 mod dataset_repository_local_fs;
 pub use dataset_repository_local_fs::*;
 
+mod dataset_repository_helpers;
+pub use dataset_repository_helpers::*;
+
 mod dataset_repository_s3;
 pub use dataset_repository_s3::*;
 

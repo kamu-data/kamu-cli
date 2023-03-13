@@ -206,11 +206,11 @@ async fn dataset_create_from_snapshot() {
 async fn dataset_create_from_snapshot_malformed() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);

@@ -100,7 +100,7 @@ impl IngestServiceImpl {
         let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         // TODO: This service should not know the dataset layout specifics
-        // Consider getting layout from LocalDatasetRepository
+        // Consider getting layout from DatasetRepository
         let layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
 
         let dataset = self
