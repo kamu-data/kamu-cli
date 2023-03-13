@@ -1,9 +1,10 @@
 # Inputs:
 # - IMAGE_REPO
 # - KAMU_VERSION
-EXAMPLES_DIR=../../examples
+KAMU_S3_URL=s3://datasets.kamu.dev/example/
 
 
+.PHONY: image
 image:
 	docker build \
 		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
@@ -11,19 +12,13 @@ image:
 		.
 
 
+.PHONY: image-push
 image-push:
 	docker push $(IMAGE_REPO)/kamu-base:latest-with-data
 
 
-workspace: datasets
-	docker run \
-		--rm \
-		--privileged \
-		-v `pwd`/datasets:/tmp/datasets \
-		$(IMAGE_REPO)/kamu-base:$(KAMU_VERSION) \
-		bash -c "cd /tmp/datasets && ./init.sh"
-
-
-.PHONY: datasets
-datasets:
-	rsync -avu --delete --exclude=".*/" "$(EXAMPLES_DIR)/" datasets/examples
+.PHONY: workspace
+workspace:
+	mkdir -p workspace && \
+	cd workspace/ && \
+	KAMU_S3_URL=$(KAMU_S3_URL) ../init-workspace.sh
