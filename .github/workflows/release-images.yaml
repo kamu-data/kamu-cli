@@ -19,6 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Install kamu
+        env:
+          KAMU_VERSION: "0.114.1"
+        shell: bash
+        run: |
+          curl -s "https://get.kamu.dev" | sh
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
