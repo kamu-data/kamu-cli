@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.114.1"
+version = "0.114.2"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -39,7 +39,7 @@ tar = "*"  # Checkpoint archival
 zip = "*"
 
 # Data
-arrow = "33"
+arrow = { version = "33", features = ["chrono-tz"] }
 arrow-digest = "33"  # Data hashing (in-house library)
 datafusion = "19"  # Reading data + SQL
 object_store = "*"  # Datafusion internals
