@@ -68,3 +68,11 @@ async fn test_create_dataset_from_snapshot() {
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
 }
+
+#[tokio::test]
+async fn test_rename_dataset() {
+    let s3 = run_s3_server();
+    let repo = s3_repo(&s3);
+
+    test_dataset_repository_shared::test_rename_dataset(&repo).await;
+}

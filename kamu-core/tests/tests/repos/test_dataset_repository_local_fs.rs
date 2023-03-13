@@ -43,49 +43,9 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 async fn test_rename_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir);
 
-    let name_foo = DatasetName::new_unchecked("foo");
-    let name_bar = DatasetName::new_unchecked("bar");
-    let name_baz = DatasetName::new_unchecked("baz");
-
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = DatasetRepositoryLocalFs::new(Arc::new(workspace_layout));
-
-    let snapshots = vec![
-        MetadataFactory::dataset_snapshot()
-            .name("foo")
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-        MetadataFactory::dataset_snapshot()
-            .name("bar")
-            .kind(DatasetKind::Derivative)
-            .push_event(MetadataFactory::set_transform(["foo"]).build())
-            .build(),
-    ];
-
-    create_datasets_from_snapshots(&repo, snapshots).await;
-
-    assert_matches!(
-        repo.rename_dataset(&name_baz.as_local_ref(), &name_foo)
-            .await,
-        Err(RenameDatasetError::NotFound(_))
-    );
-
-    assert_matches!(
-        repo.rename_dataset(&name_foo.as_local_ref(), &name_bar)
-            .await,
-        Err(RenameDatasetError::NameCollision(_))
-    );
-
-    repo.rename_dataset(&name_foo.as_local_ref(), &name_baz)
-        .await
-        .unwrap();
-
-    let baz = repo.get_dataset(&name_baz.as_local_ref()).await.unwrap();
-
-    use futures::StreamExt;
-    assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
+    test_dataset_repository_shared::test_rename_dataset(&repo).await; 
 }
 
 #[tokio::test]

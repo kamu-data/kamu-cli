@@ -14,7 +14,7 @@ use opendatafabric::*;
 
 use async_trait::async_trait;
 use dill::*;
-use futures::{Stream, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;

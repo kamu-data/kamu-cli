@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
 use dill::*;
 use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal};
 use rusoto_s3::*;
+use thiserror::Error;
 use url::Url;
 
 use crate::{domain::*, infra::utils::s3_context::S3Context};
@@ -107,30 +108,66 @@ impl DatasetRepositoryS3 {
 
         let handle = DatasetHandle::new(summary.id, dataset_name.clone());
 
-        // Check for late name collision
-        if let Some(existing_dataset) = self
-            .try_resolve_dataset_ref(&dataset_name.as_local_ref())
-            .await?
+        match self
+            .move_bucket_items_on_dataset_rename(staging_name, dataset_name.as_str())
+            .await
         {
-            return Err(NameCollisionError {
-                name: existing_dataset.name,
+            Ok(_) => Ok(handle),
+            Err(MoveBucketItemsOnRenameError::NameCollision(e)) => {
+                Err(CreateDatasetError::NameCollision(e))
             }
-            .into());
+            Err(MoveBucketItemsOnRenameError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
+        }
+    }
+
+    async fn bucket_path_exists(&self, key_prefix: &str) -> Result<bool, InternalError> {
+        let listing = self
+            .s3_context
+            .client
+            .list_objects(ListObjectsRequest {
+                bucket: self.s3_context.bucket.clone(),
+                prefix: Some(self.s3_context.get_key(key_prefix)),
+                max_keys: Some(1),
+                ..ListObjectsRequest::default()
+            })
+            .await;
+
+        match listing {
+            Ok(resp) => Ok(resp.contents.is_some()),
+            Err(e) => Err(e.int_err().into()),
+        }
+    }
+
+    async fn move_bucket_items_on_dataset_rename(
+        &self,
+        old_dataset_name: &str,
+        new_dataset_name: &str,
+    ) -> Result<(), MoveBucketItemsOnRenameError> {
+        let target_key_prefix = self.s3_context.get_key(new_dataset_name);
+        match self.bucket_path_exists(target_key_prefix.as_str()).await {
+            Ok(resp) => {
+                if resp {
+                    return Err(MoveBucketItemsOnRenameError::NameCollision(
+                        NameCollisionError {
+                            name: DatasetName::from_str(new_dataset_name).unwrap(),
+                        },
+                    ));
+                }
+            }
+            Err(e) => return Err(MoveBucketItemsOnRenameError::Internal(e)),
         }
 
-        let staging_key_prefix = self.s3_context.get_key(staging_name);
+        let old_key_prefix = self.s3_context.get_key(old_dataset_name);
         let list_response = self
             .s3_context
             .client
             .list_objects(ListObjectsRequest {
                 bucket: self.s3_context.bucket.clone(),
-                prefix: Some(staging_key_prefix.clone()),
+                prefix: Some(old_key_prefix.clone()),
                 ..ListObjectsRequest::default()
             })
             .await
             .int_err()?;
-
-        let target_key_prefix = self.s3_context.get_key(dataset_name.as_str());
 
         if let Some(contents) = list_response.contents {
             for obj in &contents {
@@ -143,7 +180,7 @@ impl DatasetRepositoryS3 {
                     .key
                     .clone()
                     .unwrap()
-                    .replace(staging_key_prefix.as_str(), target_key_prefix.as_str());
+                    .replace(old_key_prefix.as_str(), target_key_prefix.as_str());
                 self.s3_context
                     .client
                     .copy_object(CopyObjectRequest {
@@ -176,7 +213,7 @@ impl DatasetRepositoryS3 {
                 .int_err()?;
         }
 
-        Ok(handle)
+        Ok(())
     }
 }
 
@@ -214,19 +251,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
         match dataset_ref {
             DatasetRefLocal::Handle(h) => Ok(h.clone()),
             DatasetRefLocal::Name(name) => {
-                match self
-                    .s3_context
-                    .client
-                    .list_objects(ListObjectsRequest {
-                        bucket: self.s3_context.bucket.clone(),
-                        prefix: Some(self.s3_context.get_key(name.as_str())),
-                        max_keys: Some(1),
-                        ..ListObjectsRequest::default()
-                    })
-                    .await
-                {
+                match self.bucket_path_exists(name.as_str()).await {
                     Ok(resp) => {
-                        if resp.contents.is_some() {
+                        if resp {
                             Ok(())
                         } else {
                             Err(GetDatasetError::NotFound(DatasetNotFoundError {
@@ -284,10 +311,20 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     async fn rename_dataset(
         &self,
-        _dataset_ref: &DatasetRefLocal,
-        _new_name: &DatasetName,
+        dataset_ref: &DatasetRefLocal,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
-        unimplemented!("rename_dataset not supported by S3 repository")
+        let old_name = self.resolve_dataset_ref(dataset_ref).await?.name;
+        match self
+            .move_bucket_items_on_dataset_rename(old_name.as_str(), new_name.as_str())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(MoveBucketItemsOnRenameError::NameCollision(e)) => {
+                Err(RenameDatasetError::NameCollision(e))
+            }
+            Err(MoveBucketItemsOnRenameError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
+        }
     }
 
     async fn delete_dataset(
@@ -368,4 +405,21 @@ impl DatasetBuilder for DatasetS3BuilderImpl {
     async fn discard(&self) -> Result<(), InternalError> {
         self.repo.discard_create_dataset(&self.dataset_name).await
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// MoveBucketItemsOnRenameError
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+enum MoveBucketItemsOnRenameError {
+    #[error(transparent)]
+    NameCollision(#[from] NameCollisionError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
