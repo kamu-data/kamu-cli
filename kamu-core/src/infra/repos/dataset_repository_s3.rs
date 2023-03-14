@@ -284,7 +284,29 @@ impl DatasetRepository for DatasetRepositoryS3 {
     }
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
-        unimplemented!("get_all_datasets not supported by S3 repository")
+        Box::pin(async_stream::try_stream! {
+            let list_objects_resp = self
+                .s3_context
+                .client
+                .list_objects_v2(ListObjectsV2Request {
+                    bucket: self.s3_context.bucket.clone(),
+                    delimiter: Some("/".to_owned()),
+                    ..ListObjectsV2Request::default()
+                })
+                .await
+                .int_err()?;
+
+            for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
+                let mut prefix = prefix.prefix.unwrap();
+                while prefix.ends_with('/') {
+                    prefix.pop();
+                }
+
+                let name = DatasetName::try_from(prefix).int_err()?;
+                let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
+                yield hdl;
+            }
+        })
     }
 
     async fn get_dataset(
