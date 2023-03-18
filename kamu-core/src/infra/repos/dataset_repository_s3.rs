@@ -62,10 +62,10 @@ impl DatasetRepositoryS3 {
         let list_response = self
             .s3_context
             .client
-            .list_objects(ListObjectsRequest {
+            .list_objects_v2(ListObjectsV2Request {
                 bucket: self.s3_context.bucket.clone(),
                 prefix: Some(dataset_key_prefix),
-                ..ListObjectsRequest::default()
+                ..ListObjectsV2Request::default()
             })
             .await
             .int_err()?;
@@ -125,11 +125,11 @@ impl DatasetRepositoryS3 {
         let listing = self
             .s3_context
             .client
-            .list_objects(ListObjectsRequest {
+            .list_objects_v2(ListObjectsV2Request {
                 bucket: self.s3_context.bucket.clone(),
                 prefix: Some(self.s3_context.get_key(key_prefix)),
                 max_keys: Some(1),
-                ..ListObjectsRequest::default()
+                ..ListObjectsV2Request::default()
             })
             .await;
 
@@ -162,10 +162,10 @@ impl DatasetRepositoryS3 {
         let list_response = self
             .s3_context
             .client
-            .list_objects(ListObjectsRequest {
+            .list_objects_v2(ListObjectsV2Request {
                 bucket: self.s3_context.bucket.clone(),
                 prefix: Some(old_key_prefix.clone()),
-                ..ListObjectsRequest::default()
+                ..ListObjectsV2Request::default()
             })
             .await
             .int_err()?;
