@@ -28,16 +28,17 @@ async fn query() {
         .build();
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
-    create_dataset_from_snapshot(
-        local_repo.as_ref(),
-        MetadataFactory::dataset_snapshot()
-            .name("foo")
-            .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
-            .build(),
-    )
-    .await
-    .unwrap();
+    local_repo
+        .as_ref()
+        .create_dataset_from_snapshot(
+            MetadataFactory::dataset_snapshot()
+                .name("foo")
+                .kind(DatasetKind::Root)
+                .push_event(MetadataFactory::set_polling_source().build())
+                .build(),
+        )
+        .await
+        .unwrap();
 
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema

@@ -29,15 +29,16 @@ async fn metadata_chain_append_event() {
         .build();
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
-    let create_result = create_dataset_from_snapshot(
-        local_repo.as_ref(),
-        MetadataFactory::dataset_snapshot()
-            .name("foo")
-            .kind(DatasetKind::Root)
-            .build(),
-    )
-    .await
-    .unwrap();
+    let create_result = local_repo
+        .as_ref()
+        .create_dataset_from_snapshot(
+            MetadataFactory::dataset_snapshot()
+                .name("foo")
+                .kind(DatasetKind::Root)
+                .build(),
+        )
+        .await
+        .unwrap();
 
     let event = MetadataFactory::set_polling_source().build();
 

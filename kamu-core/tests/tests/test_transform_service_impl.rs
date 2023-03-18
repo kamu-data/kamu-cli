@@ -24,9 +24,7 @@ async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHand
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_dataset_from_snapshot(local_repo, snap)
-        .await
-        .unwrap();
+    let create_result = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
     create_result.dataset_handle
 }
 
@@ -43,9 +41,7 @@ async fn new_deriv(
         .push_event(transform.clone())
         .build();
 
-    let create_result = create_dataset_from_snapshot(local_repo, snap)
-        .await
-        .unwrap();
+    let create_result = local_repo.create_dataset_from_snapshot(snap).await.unwrap();
     (create_result.dataset_handle, transform)
 }
 

@@ -71,7 +71,7 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = create_dataset_from_snapshot(repo, snapshot).await.unwrap();
+    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
 
     let dataset = repo
         .get_dataset(&create_result.dataset_handle.into())
