@@ -15,7 +15,7 @@ use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu::domain;
-use kamu::domain::LocalDatasetRepositoryExt;
+use kamu::domain::DatasetRepositoryExt;
 use kamu::domain::{MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};

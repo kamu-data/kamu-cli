@@ -326,7 +326,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         let dataset_url = self.get_s3_bucket_path(staging_name.as_str());
         let dataset_result = DatasetFactoryImpl::get_s3(dataset_url);
         match dataset_result {
-            Ok(dataset) => Ok(Box::new(DatasetS3BuilderImpl::new(
+            Ok(dataset) => Ok(Box::new(DatasetBuildS3::new(
                 self.clone(),
                 Arc::new(dataset),
                 staging_name,
@@ -394,7 +394,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 // DatasetS3BuilderImpl
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct DatasetS3BuilderImpl {
+struct DatasetBuildS3 {
     repo: DatasetRepositoryS3,
     dataset: Arc<dyn Dataset>,
     staging_name: String,
@@ -403,7 +403,7 @@ struct DatasetS3BuilderImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetS3BuilderImpl {
+impl DatasetBuildS3 {
     fn new(
         repo: DatasetRepositoryS3,
         dataset: Arc<dyn Dataset>,
@@ -420,7 +420,7 @@ impl DatasetS3BuilderImpl {
 }
 
 #[async_trait]
-impl DatasetBuilder for DatasetS3BuilderImpl {
+impl DatasetBuilder for DatasetBuildS3 {
     fn as_dataset(&self) -> &dyn Dataset {
         self.dataset.as_ref()
     }

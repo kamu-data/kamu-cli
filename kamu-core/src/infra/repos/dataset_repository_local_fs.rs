@@ -266,7 +266,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         let layout = DatasetLayout::create(&staging_path).int_err()?;
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
-        Ok(Box::new(DatasetBuilderImpl::new(
+        Ok(Box::new(DatasetBuilderLocalFs::new(
             self.clone(),
             dataset,
             staging_path,
@@ -347,7 +347,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 // DatasetBuilderImpl
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct DatasetBuilderImpl<D> {
+struct DatasetBuilderLocalFs<D> {
     repo: DatasetRepositoryLocalFs,
     dataset: D,
     staging_path: PathBuf,
@@ -356,7 +356,7 @@ struct DatasetBuilderImpl<D> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<D> DatasetBuilderImpl<D> {
+impl<D> DatasetBuilderLocalFs<D> {
     fn new(
         repo: DatasetRepositoryLocalFs,
         dataset: D,
@@ -381,7 +381,7 @@ impl<D> DatasetBuilderImpl<D> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<D> Drop for DatasetBuilderImpl<D> {
+impl<D> Drop for DatasetBuilderLocalFs<D> {
     fn drop(&mut self) {
         let _ = self.discard_impl();
     }
@@ -390,7 +390,7 @@ impl<D> Drop for DatasetBuilderImpl<D> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<D> DatasetBuilder for DatasetBuilderImpl<D>
+impl<D> DatasetBuilder for DatasetBuilderLocalFs<D>
 where
     D: Dataset,
 {
@@ -428,7 +428,7 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<D> Dataset for DatasetBuilderImpl<D>
+impl<D> Dataset for DatasetBuilderLocalFs<D>
 where
     D: Dataset,
 {

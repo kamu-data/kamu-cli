@@ -14,7 +14,7 @@ use crate::utils::*;
 use async_graphql::*;
 use futures::TryStreamExt;
 use kamu::domain;
-use kamu::domain::LocalDatasetRepositoryExt;
+use kamu::domain::DatasetRepositoryExt;
 use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////

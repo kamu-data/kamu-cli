@@ -90,7 +90,7 @@ pub trait DatasetBuilder: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait LocalDatasetRepositoryExt: DatasetRepository {
+pub trait DatasetRepositoryExt: DatasetRepository {
     async fn try_resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -166,7 +166,7 @@ pub trait LocalDatasetRepositoryExt: DatasetRepository {
     }
 }
 
-impl<T> LocalDatasetRepositoryExt for T
+impl<T> DatasetRepositoryExt for T
 where
     T: DatasetRepository,
     T: ?Sized,
