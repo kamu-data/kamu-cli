@@ -11,8 +11,8 @@
 /// Generated client implementations.
 pub mod engine_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
     use tonic::codegen::http::Uri;
+    use tonic::codegen::*;
     #[derive(Debug, Clone)]
     pub struct EngineClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -56,9 +56,8 @@ pub mod engine_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + Send + Sync,
         {
             EngineClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -84,20 +83,17 @@ pub mod engine_client {
             tonic::Response<tonic::codec::Streaming<super::ExecuteQueryResponse>>,
             tonic::Status,
         > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/engine.Engine/ExecuteQuery",
-            );
-            self.inner.server_streaming(request.into_request(), path, codec).await
+            let path = http::uri::PathAndQuery::from_static("/engine.Engine/ExecuteQuery");
+            self.inner
+                .server_streaming(request.into_request(), path, codec)
+                .await
         }
     }
 }
@@ -109,9 +105,7 @@ pub mod engine_server {
     #[async_trait]
     pub trait Engine: Send + Sync + 'static {
         /// Server streaming response type for the ExecuteQuery method.
-        type ExecuteQueryStream: futures_core::Stream<
-                Item = Result<super::ExecuteQueryResponse, tonic::Status>,
-            >
+        type ExecuteQueryStream: futures_core::Stream<Item = Result<super::ExecuteQueryResponse, tonic::Status>>
             + Send
             + 'static;
         async fn execute_query(
@@ -138,10 +132,7 @@ pub mod engine_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -169,10 +160,7 @@ pub mod engine_server {
         type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(
-            &mut self,
-            _cx: &mut Context<'_>,
-        ) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -181,24 +169,20 @@ pub mod engine_server {
                 "/engine.Engine/ExecuteQuery" => {
                     #[allow(non_camel_case_types)]
                     struct ExecuteQuerySvc<T: Engine>(pub Arc<T>);
-                    impl<
-                        T: Engine,
-                    > tonic::server::ServerStreamingService<super::ExecuteQueryRequest>
-                    for ExecuteQuerySvc<T> {
+                    impl<T: Engine>
+                        tonic::server::ServerStreamingService<super::ExecuteQueryRequest>
+                        for ExecuteQuerySvc<T>
+                    {
                         type Response = super::ExecuteQueryResponse;
                         type ResponseStream = T::ExecuteQueryStream;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::ResponseStream>,
-                            tonic::Status,
-                        >;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ExecuteQueryRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move {
-                                (*inner).execute_query(request).await
-                            };
+                            let fut = async move { (*inner).execute_query(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -209,28 +193,23 @@ pub mod engine_server {
                         let inner = inner.0;
                         let method = ExecuteQuerySvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            );
+                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
+                            accept_compression_encodings,
+                            send_compression_encodings,
+                        );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => {
-                    Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
-                    })
-                }
+                _ => Box::pin(async move {
+                    Ok(http::Response::builder()
+                        .status(200)
+                        .header("grpc-status", "12")
+                        .header("content-type", "application/grpc")
+                        .body(empty_body())
+                        .unwrap())
+                }),
             }
         }
     }

@@ -1,5 +1,5 @@
 ODF_DIR=../open-data-fabric
-RUSTFMT=rustfmt --edition 2018
+RUSTFMT=rustfmt --edition 2021
 LICENSE_HEADER=docs/license_header.txt
 
 define add_license_header
@@ -36,6 +36,9 @@ codegen-engine-tonic:
 		--prost_out=opendatafabric/src/engine/grpc_generated \
 		--tonic_out=opendatafabric/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
+
+	$(RUSTFMT) opendatafabric/src/engine/grpc_generated/engine.rs
+	$(RUSTFMT) opendatafabric/src/engine/grpc_generated/engine.tonic.rs
 
 	$(call add_license_header, "opendatafabric/src/engine/grpc_generated/engine.rs")
 	$(call add_license_header, "opendatafabric/src/engine/grpc_generated/engine.tonic.rs")
