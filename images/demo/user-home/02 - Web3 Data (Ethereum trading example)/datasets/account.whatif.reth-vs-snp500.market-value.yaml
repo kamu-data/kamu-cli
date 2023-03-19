@@ -8,7 +8,7 @@ content:
     - kind: setTransform
       inputs:
         - name: account.whatif.reth-vs-snp500.portfolio
-        - name: alphavantage.tickers.daily.spy
+        - name: co.alphavantage.tickers.daily.spy
       transform:
         kind: sql
         engine: flink
@@ -16,7 +16,7 @@ content:
           - name: account.whatif.reth-vs-snp500.portfolio
             primaryKey:
               - account_anchor_symbol
-        query: >
+        query: |
           select
             spy2usd.event_time,
             tr.account_symbol,
@@ -25,8 +25,6 @@ content:
             (
               tr.alt_spy_balance * spy2usd.`close`
             ) as alt_spy_market_value_usd
-          from `alphavantage.tickers.daily.spy` as spy2usd,
-          lateral table (`account.whatif.reth-vs-snp500.portfolio`(spy2usd.event_time)) as tr
-          where
-            spy2usd.to_symbol = tr.account_anchor_symbol
-            and spy2usd.from_symbol = 'spy'
+          from `co.alphavantage.tickers.daily.spy` as spy2usd
+          join `account.whatif.reth-vs-snp500.portfolio` for system_time as of spy2usd.event_time as tr
+          on spy2usd.to_symbol = tr.account_anchor_symbol and spy2usd.from_symbol = 'spy'

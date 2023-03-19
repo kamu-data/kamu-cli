@@ -2,14 +2,14 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: cryptocompare.ohlcv.eth-usd
+  name: com.cryptocompare.ohlcv.eth-usd
   kind: root
   metadata:
     - kind: setPollingSource
       fetch:
         kind: container
         # Image src: https://github.com/kamu-data/kamu-contrib/tree/ee8b5943f5696c0868adbd8eb1682028ad4e54c2/com.cryptocompare
-        image: "docker.io/kamudata/example-cryptocompare-ingest:0.1.0"
+        image: "ghcr.io/kamu-data/fetch-com.cryptocompare.ohlcv.eth-usd:0.1.0"
       read:
         kind: jsonLines
         schema:

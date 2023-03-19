@@ -1,6 +1,6 @@
-IMAGE_REPO = docker.io/kamudata
-KAMU_VERSION = 0.114.2
-DEMO_VERSION = 0.6.1
+IMAGE_REPO = ghcr.io/kamu-data
+KAMU_VERSION = 0.114.3
+DEMO_VERSION = 0.6.2
 
 #########################################################################################
 

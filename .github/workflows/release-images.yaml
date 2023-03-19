@@ -26,23 +26,24 @@ jobs:
 
       - name: Install kamu
         env:
-          KAMU_VERSION: "0.114.2"
+          KAMU_VERSION: "0.114.3"
         shell: bash
         run: |
           curl -s "https://get.kamu.dev" | sh
 
-      - name: Log in to Docker Hub
+      - name: Log in to GitHub Container Registry
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Base Image
+      - name: Build base image
         run: |
           cd images/
           make kamu-base
 
-      - name: Build Base Image With Sample Data
+      - name: Build base image with sample data
         run: |
           cd images/
           make kamu-base-with-data

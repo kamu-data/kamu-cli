@@ -8,7 +8,7 @@ content:
     - kind: setPollingSource
       fetch:
         kind: container
-        image: "docker.io/kamudata/example-rocketpool-ingest:0.1.0"
+        image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.1.0"
         env:
           - name: ETH_NODE_PROVIDER_URL
       read:

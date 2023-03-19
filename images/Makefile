@@ -1,7 +1,7 @@
-IMAGE_REPO = docker.io/kamudata
+IMAGE_REPO = ghcr.io/kamu-data
 IMAGE_JUPYTER_TAG = 0.5.0
 
-KAMU_VERSION = 0.114.2
+KAMU_VERSION = 0.114.3
 
 
 .PHONY: jupyter

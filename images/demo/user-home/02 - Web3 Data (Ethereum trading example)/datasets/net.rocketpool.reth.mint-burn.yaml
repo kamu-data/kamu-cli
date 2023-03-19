@@ -2,14 +2,14 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: rocketpool.reth.mint-burn
+  name: net.rocketpool.reth.mint-burn
   kind: root
   metadata:
     - kind: setPollingSource
       fetch:
         kind: container
         # Image src: https://github.com/kamu-data/kamu-contrib/tree/7f368e88e75d1d4eab95ca9c8697eafd80b3f283/net.rocketpool
-        image: "docker.io/kamudata/example-rocketpool-ingest:0.1.0"
+        image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.1.0"
         env:
           - name: ETH_NODE_PROVIDER_URL
       read:
@@ -27,7 +27,7 @@ content:
       preprocess:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT
             'rETH' as token_symbol,
             eventName as event_name,

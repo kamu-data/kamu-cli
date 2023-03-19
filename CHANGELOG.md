@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.114.3] - 2023-03-18
+### Changed
+- Migrated engine images from Docker Hub to `ghcr.io`
+
 ## [0.114.2] - 2023-03-13
 ### Fixed
 - Fixed JSON serialization of some datasets by enabling `chrono-tz` feature in `arrow` that became optional
@@ -195,7 +199,7 @@ fetch:
 ```yaml
 fetch:
   kind: container
-  image: "docker.io/kamudata/example:0.1.0"
+  image: "ghcr.io/kamu-data/example:0.1.0"
   env:
     - name: SOME_API_KEY
 ```

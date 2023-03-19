@@ -857,7 +857,7 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
 name = "container-runtime"
-version = "0.114.2"
+version = "0.114.3"
 dependencies = [
  "dill",
  "regex",
@@ -2258,7 +2258,7 @@ checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
 
 [[package]]
 name = "kamu"
-version = "0.114.2"
+version = "0.114.3"
 dependencies = [
  "arrow",
  "arrow-digest",
@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.114.2"
+version = "0.114.3"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.114.2"
+version = "0.114.3"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2994,7 +2994,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.114.2"
+version = "0.114.3"
 dependencies = [
  "bs58",
  "byteorder",

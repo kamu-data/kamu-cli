@@ -283,7 +283,7 @@ pub struct JupyterConfig {
 }
 
 impl JupyterConfig {
-    pub const IMAGE: &str = "docker.io/kamudata/jupyter:0.5.0";
+    pub const IMAGE: &str = docker_images::JUPYTER;
 
     pub fn new() -> Self {
         Self {

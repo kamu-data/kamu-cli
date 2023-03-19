@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub const SPARK: &str = "docker.io/kamudata/engine-spark:0.17.0-spark_3.1.2";
+pub const SPARK: &str = "ghcr.io/kamu-data/engine-spark:0.17.0-spark_3.1.2";
 pub const LIVY: &str = SPARK;
-pub const FLINK: &str = "docker.io/kamudata/engine-flink:0.15.1-flink_1.16.0-scala_2.12-java8";
-pub const JUPYTER: &str = "docker.io/kamudata/jupyter:0.5.0";
+pub const FLINK: &str = "ghcr.io/kamu-data/engine-flink:0.15.1-flink_1.16.0-scala_2.12-java8";
+pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.5.0";
 
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";
