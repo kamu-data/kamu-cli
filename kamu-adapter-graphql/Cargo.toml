@@ -9,7 +9,7 @@ doctest = false
 
 [dependencies]
 # Kamu
-dill = "~0.3"
+dill = ">= 0.5.0"
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 
@@ -23,7 +23,7 @@ async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] 
 # Utils
 indoc = "*"
 chrono = "*"
-datafusion = "19"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = "20"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 futures = "*"
 serde = "*"
 serde_json = "*"

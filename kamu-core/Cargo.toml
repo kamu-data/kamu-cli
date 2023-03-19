@@ -12,7 +12,7 @@ doctest = false
 skip_docker_tests = []
 
 [dependencies]
-dill = "~0.3"
+dill = ">= 0.5.0"
 # dill = { path = "../../dill" }
 opendatafabric = { path = "../opendatafabric" }
 container-runtime = { path = "../utils/container-runtime" }
@@ -39,9 +39,9 @@ tar = "*"  # Checkpoint archival
 zip = "*"
 
 # Data
-arrow = { version = "33", features = ["chrono-tz"] }
-arrow-digest = "33"  # Data hashing (in-house library)
-datafusion = "19"  # Reading data + SQL
+arrow = { version = "34", features = ["chrono-tz"] }
+arrow-digest = "34"  # Data hashing (in-house library)
+datafusion = "20"  # Reading data + SQL
 object_store = "*"  # Datafusion internals
 digest = "*"
 sha3 = "*"

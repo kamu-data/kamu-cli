@@ -105,10 +105,10 @@ pub mod engine_client {
 pub mod engine_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    ///Generated trait containing gRPC methods that should be implemented for use with EngineServer.
+    /// Generated trait containing gRPC methods that should be implemented for use with EngineServer.
     #[async_trait]
     pub trait Engine: Send + Sync + 'static {
-        ///Server streaming response type for the ExecuteQuery method.
+        /// Server streaming response type for the ExecuteQuery method.
         type ExecuteQueryStream: futures_core::Stream<
                 Item = Result<super::ExecuteQueryResponse, tonic::Status>,
             >

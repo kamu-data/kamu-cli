@@ -20,7 +20,7 @@ web-ui = []
 skip_docker_tests = []
 
 [dependencies]
-dill = "~0.3"
+dill = ">= 0.5.0"
 # dill = { path = "../../dill" }
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
@@ -35,7 +35,7 @@ clap_complete = "*"
 console = "*"  # Terminal colors
 humansize = "*"  # Human readable data sizes
 indicatif = "*"  # Progress bars and spinners
-minus = { version = "= 5.0.3", features = ["static_output", "search"] }  # Terminal paginator # TODO: https://github.com/arijit79/minus/issues/78
+minus = { version = "5", features = ["static_output", "search"] }
 num-format = "*"  # Human-readable number formatting
 prettytable-rs = "*"  # ASCII table formatting
 webbrowser = "*"  # For opening URLs in default system browser
@@ -74,7 +74,7 @@ async-trait = "*"
 chrono = "*"
 cfg-if = "*"  # Conditional compilation
 glob = "*"  # Used for path completions
-datafusion = "19"
+datafusion = "20"
 dirs = "*"
 futures = "*"
 indoc = "*"

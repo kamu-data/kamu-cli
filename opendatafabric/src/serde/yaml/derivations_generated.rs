@@ -29,9 +29,7 @@ macro_rules! implement_serde_as {
             where
                 S: Serializer,
             {
-                #[derive(Serialize)]
-                struct Helper<'a>(#[serde(with = $impl_name)] &'a $dto);
-                Helper(source).serialize(serializer)
+                <$impl>::serialize(source, serializer)
             }
         }
 
@@ -40,11 +38,7 @@ macro_rules! implement_serde_as {
             where
                 D: Deserializer<'de>,
             {
-                #[derive(Deserialize)]
-                struct Helper(#[serde(with = $impl_name)] $dto);
-                let helper = Helper::deserialize(deserializer)?;
-                let Helper(v) = helper;
-                Ok(v)
+                <$impl>::deserialize(deserializer)
             }
         }
     };

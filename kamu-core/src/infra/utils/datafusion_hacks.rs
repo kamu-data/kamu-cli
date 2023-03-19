@@ -110,7 +110,7 @@ impl TableProvider for ListingTableOfFiles {
                     table_partition_cols: Vec::new(),
                     infinite_source: false,
                 },
-                filters,
+                None,
             )
             .await
     }
