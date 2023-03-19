@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.115.0] - 2023-03-19
+### Changed
+- Updated to new `rustc`
+- Updated to latest `datafusion` and `arrow`
+- Improved release procedure
+
 ## [0.114.3] - 2023-03-18
 ### Changed
 - Migrated engine images from Docker Hub to `ghcr.io`

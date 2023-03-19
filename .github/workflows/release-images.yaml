@@ -26,7 +26,7 @@ jobs:
 
       - name: Install kamu
         env:
-          KAMU_VERSION: "0.114.3"
+          KAMU_VERSION: "0.115.0"
         shell: bash
         run: |
           curl -s "https://get.kamu.dev" | sh

@@ -6,6 +6,7 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
+#![feature(exit_status_error)]
 
 extern crate semver;
 extern crate toml_edit;
@@ -58,10 +59,7 @@ fn main() {
 
     eprintln!("New version: {}", new_version);
 
-    for cr in crates.iter().rev() {
-        eprintln!("Bumping version in: {}", cr.name);
-        set_version(&cr.cargo_toml_path, &new_version);
-    }
+    update_crates(&new_version);
 
     update_license(&Path::new("LICENSE.txt"), &current_version, &new_version);
 
@@ -89,7 +87,6 @@ fn get_all_crates() -> Vec<Crate> {
         .map(|v| v.as_str().unwrap())
         .filter(|s| *s != "tools")
         .map(|name| Crate {
-            name: name.to_owned(),
             cargo_toml_path: Path::new(name).join("Cargo.toml"),
         })
         .collect()
@@ -106,17 +103,16 @@ fn get_version(cargo_toml_path: &Path) -> Version {
         .unwrap()
 }
 
-fn set_version(cargo_toml_path: &Path, version: &Version) {
-    use toml_edit::{value, Document};
-
-    let content =
-        std::fs::read_to_string(cargo_toml_path).expect("Could not read a Cargo.toml file");
-
-    let mut doc: Document = content.parse().expect("Invalid toml");
-    assert_eq!(doc.to_string(), content);
-    doc["package"]["version"] = value(version.to_string());
-
-    std::fs::write(cargo_toml_path, doc.to_string()).expect("Failed to write to Cargo.toml");
+fn update_crates(new_version: &Version) {
+    std::process::Command::new("cargo")
+        .args([
+            "set-version".to_string(),
+            "--workspace".to_string(),
+            new_version.to_string(),
+        ])
+        .status()
+        .expect("Failed to execute `cargo set-version` - make sure `cago-edit` is installed (`cargo install cargo-edit`)")
+        .exit_ok().expect("`cargo set-version` returned non-zero exit code");
 }
 
 fn update_license(license_path: &Path, current_version: &Version, new_version: &Version) {
@@ -193,7 +189,6 @@ fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
 
 #[derive(Debug, Clone)]
 struct Crate {
-    name: String,
     cargo_toml_path: PathBuf,
 }
 
