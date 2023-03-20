@@ -6,7 +6,7 @@ argon2-cffi-bindings==21.2.0
 asttokens==2.1.0
 async-generator==1.10
 attrs==22.1.0
-autovizwidget==0.20.0
+autovizwidget==0.20.3
 Babel==2.11.0
 backcall==0.2.0
 backports.functools-lru-cache==1.6.4
@@ -49,7 +49,7 @@ fsspec==2022.11.0
 geojson==2.5.0
 geopandas==0.12.1
 greenlet==2.0.1
-hdijupyterutils==0.20.0
+hdijupyterutils==0.20.3
 holoviews==1.15.2
 hvplot==0.8.1
 idna==3.4
