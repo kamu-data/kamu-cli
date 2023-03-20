@@ -39,7 +39,7 @@ tar = "*"  # Checkpoint archival
 zip = "*"
 
 # Data
-arrow = { version = "34", features = ["chrono-tz"] }
+arrow = { version = "35", features = ["chrono-tz"] }
 arrow-digest = "34"  # Data hashing (in-house library)
 datafusion = "20"  # Reading data + SQL
 object_store = "*"  # Datafusion internals
