@@ -184,11 +184,7 @@ impl Datasets {
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        let result = match local_repo
-            .as_ref()
-            .create_dataset_from_snapshot(snapshot)
-            .await
-        {
+        let result = match local_repo.create_dataset_from_snapshot(snapshot).await {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })

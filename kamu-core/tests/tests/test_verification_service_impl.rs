@@ -38,7 +38,6 @@ async fn test_verify_data_consistency() {
     ));
 
     local_repo
-        .as_ref()
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -50,7 +49,6 @@ async fn test_verify_data_consistency() {
         .unwrap();
 
     let create_result = local_repo
-        .as_ref()
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_name)

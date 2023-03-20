@@ -213,7 +213,6 @@ impl IngestTestHarness {
 
     async fn ingest_snapshot(&self, dataset_snapshot: DatasetSnapshot, dataset_name: &DatasetName) {
         self.local_repo
-            .as_ref()
             .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap();

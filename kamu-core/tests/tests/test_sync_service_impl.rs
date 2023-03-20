@@ -181,7 +181,6 @@ async fn do_test_sync(
         .build();
 
     let create_result = local_repo
-        .as_ref()
         .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap();
