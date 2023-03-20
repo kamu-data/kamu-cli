@@ -145,17 +145,12 @@ impl DatasetRepositoryS3 {
         new_dataset_name: &str,
     ) -> Result<(), MoveBucketItemsOnRenameError> {
         let target_key_prefix = self.s3_context.get_key(new_dataset_name);
-        match self.bucket_path_exists(target_key_prefix.as_str()).await {
-            Ok(resp) => {
-                if resp {
-                    return Err(MoveBucketItemsOnRenameError::NameCollision(
-                        NameCollisionError {
-                            name: DatasetName::from_str(new_dataset_name).unwrap(),
-                        },
-                    ));
-                }
-            }
-            Err(e) => return Err(MoveBucketItemsOnRenameError::Internal(e)),
+        if self.bucket_path_exists(target_key_prefix.as_str()).await? {
+            return Err(MoveBucketItemsOnRenameError::NameCollision(
+                NameCollisionError {
+                    name: DatasetName::from_str(new_dataset_name).unwrap(),
+                },
+            ));
         }
 
         let old_key_prefix = self.s3_context.get_key(old_dataset_name);
