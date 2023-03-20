@@ -52,3 +52,14 @@ async fn test_rename_dataset() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_delete_dataset() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir);
+
+    test_dataset_repository_shared::test_delete_dataset(&repo).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
