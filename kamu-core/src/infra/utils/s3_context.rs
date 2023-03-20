@@ -28,6 +28,8 @@ pub struct S3Context {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl S3Context {
+    const MAX_LISTED_OBJECTS: i64 = 1000;
+
     pub fn new<S1, S2>(client: S3Client, bucket: S1, key_prefix: S2) -> Self
     where
         S1: Into<String>,
@@ -131,34 +133,42 @@ impl S3Context {
     }
 
     pub async fn recursive_delete(&self, key_prefix: String) -> Result<(), InternalError> {
-        let list_response = self
-            .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(key_prefix),
-                ..ListObjectsV2Request::default()
-            })
-            .await
-            .int_err()?;
-
-        if let Some(contents) = list_response.contents {
-            self.client
-                .delete_objects(DeleteObjectsRequest {
+        // ListObjectsV2Request returns at most S3Context::MAX_LISTED_OBJECTS=1000 items
+        let mut has_next_page = true;
+        while has_next_page {
+            let list_response = self
+                .client
+                .list_objects_v2(ListObjectsV2Request {
                     bucket: self.bucket.clone(),
-                    delete: Delete {
-                        objects: contents
-                            .iter()
-                            .map(|obj| ObjectIdentifier {
-                                key: obj.key.clone().unwrap(),
-                                version_id: None,
-                            })
-                            .collect(),
-                        quiet: Some(true),
-                    },
-                    ..DeleteObjectsRequest::default()
+                    prefix: Some(key_prefix.clone()),
+                    max_keys: Some(S3Context::MAX_LISTED_OBJECTS),
+                    ..ListObjectsV2Request::default()
                 })
                 .await
                 .int_err()?;
+
+            if let Some(contents) = list_response.contents {
+                has_next_page = (contents.len() as i64) == S3Context::MAX_LISTED_OBJECTS;
+                self.client
+                    .delete_objects(DeleteObjectsRequest {
+                        bucket: self.bucket.clone(),
+                        delete: Delete {
+                            objects: contents
+                                .iter()
+                                .map(|obj| ObjectIdentifier {
+                                    key: obj.key.clone().unwrap(),
+                                    version_id: None,
+                                })
+                                .collect(),
+                            quiet: Some(true),
+                        },
+                        ..DeleteObjectsRequest::default()
+                    })
+                    .await
+                    .int_err()?;
+            } else {
+                has_next_page = false;
+            }
         }
 
         Ok(())
@@ -169,56 +179,65 @@ impl S3Context {
         old_key_prefix: String,
         new_key_prefix: String,
     ) -> Result<(), InternalError> {
-        let list_response = self
-            .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(old_key_prefix.clone()),
-                ..ListObjectsV2Request::default()
-            })
-            .await
-            .int_err()?;
-
-        // TODO: concurrency safety.
-        // It is important not to allow parallel writes of Head reference file in the same bucket.
-        // Consider optimistic locking (comparing old head with expected before final commit).
-
-        if let Some(contents) = list_response.contents {
-            for obj in &contents {
-                let copy_source = format!("{}/{}", self.bucket.clone(), obj.key.clone().unwrap());
-                let new_key = obj
-                    .key
-                    .clone()
-                    .unwrap()
-                    .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
-                self.client
-                    .copy_object(CopyObjectRequest {
-                        bucket: self.bucket.clone(),
-                        copy_source,
-                        key: new_key,
-                        ..CopyObjectRequest::default()
-                    })
-                    .await
-                    .int_err()?;
-            }
-
-            self.client
-                .delete_objects(DeleteObjectsRequest {
+        // ListObjectsV2Request returns at most S3Context::MAX_LISTED_OBJECTS=1000 items
+        let mut has_next_page = true;
+        while has_next_page {
+            let list_response = self
+                .client
+                .list_objects_v2(ListObjectsV2Request {
                     bucket: self.bucket.clone(),
-                    delete: Delete {
-                        objects: contents
-                            .iter()
-                            .map(|obj| ObjectIdentifier {
-                                key: obj.key.clone().unwrap(),
-                                version_id: None,
-                            })
-                            .collect(),
-                        quiet: Some(true),
-                    },
-                    ..DeleteObjectsRequest::default()
+                    prefix: Some(old_key_prefix.clone()),
+                    max_keys: Some(S3Context::MAX_LISTED_OBJECTS),
+                    ..ListObjectsV2Request::default()
                 })
                 .await
                 .int_err()?;
+
+            // TODO: concurrency safety.
+            // It is important not to allow parallel writes of Head reference file in the same bucket.
+            // Consider optimistic locking (comparing old head with expected before final commit).
+
+            if let Some(contents) = list_response.contents {
+                has_next_page = (contents.len() as i64) == S3Context::MAX_LISTED_OBJECTS;
+                for obj in &contents {
+                    let copy_source =
+                        format!("{}/{}", self.bucket.clone(), obj.key.clone().unwrap());
+                    let new_key = obj
+                        .key
+                        .clone()
+                        .unwrap()
+                        .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
+                    self.client
+                        .copy_object(CopyObjectRequest {
+                            bucket: self.bucket.clone(),
+                            copy_source,
+                            key: new_key,
+                            ..CopyObjectRequest::default()
+                        })
+                        .await
+                        .int_err()?;
+                }
+
+                self.client
+                    .delete_objects(DeleteObjectsRequest {
+                        bucket: self.bucket.clone(),
+                        delete: Delete {
+                            objects: contents
+                                .iter()
+                                .map(|obj| ObjectIdentifier {
+                                    key: obj.key.clone().unwrap(),
+                                    version_id: None,
+                                })
+                                .collect(),
+                            quiet: Some(true),
+                        },
+                        ..DeleteObjectsRequest::default()
+                    })
+                    .await
+                    .int_err()?;
+            } else {
+                has_next_page = false;
+            }
         }
 
         Ok(())
