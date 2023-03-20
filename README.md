@@ -1,8 +1,6 @@
 <div align="center">
 
-<img alt="kamu" src="docs/readme_files/kamu_logo.png" width=270/>
-
-<p><strong><i>Planet-scale data pipeline</i></strong></p>
+<img alt="kamu - planet-scale data pipeline" src="docs/readme_files/kamu_logo.png" width=400/>
 
 [Website] | [Docs] | [Demo] | [Tutorials] | [Examples] | [FAQ] | [Chat]
 
