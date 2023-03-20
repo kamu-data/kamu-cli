@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use bytes::Bytes;
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
@@ -161,7 +160,7 @@ where
     async fn construct_block_from_bytes(
         &self,
         hash: &Multihash,
-        block_bytes: Bytes,
+        block_bytes: &[u8],
     ) -> Result<MetadataBlock, ConstructBlockFromBytesError> {
         match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
             Ok(block) => Ok(block),
@@ -206,7 +205,7 @@ where
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
-        match self.construct_block_from_bytes(hash, data).await {
+        match self.construct_block_from_bytes(hash, &data).await {
             Ok(block) => Ok(block),
             Err(e) => match e {
                 ConstructBlockFromBytesError::BlockVersion(e) => {
@@ -386,7 +385,7 @@ where
     async fn append_block_from_bytes<'a>(
         &'a self,
         hash: &Multihash,
-        block_bytes: Bytes,
+        block_bytes: &[u8],
         opts: AppendOpts<'a>,
     ) -> Result<MetadataBlock, AppendFromBytesError> {
         let block = match self.construct_block_from_bytes(hash, block_bytes).await {

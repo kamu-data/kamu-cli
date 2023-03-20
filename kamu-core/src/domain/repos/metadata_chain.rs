@@ -11,7 +11,6 @@ use std::fmt::Display;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
-use bytes::Bytes;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
@@ -65,7 +64,7 @@ pub trait MetadataChain: Send + Sync {
     async fn append_block_from_bytes<'a>(
         &'a self,
         hash: &Multihash,
-        block_bytes: Bytes,
+        block_bytes: &[u8],
         opts: AppendOpts<'a>,
     ) -> Result<MetadataBlock, AppendFromBytesError>;
 

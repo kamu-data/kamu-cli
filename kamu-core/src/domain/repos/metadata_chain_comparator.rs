@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use bytes::Bytes;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
@@ -428,7 +427,7 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
     async fn append_block_from_bytes<'b>(
         &'b self,
         hash: &Multihash,
-        block_bytes: Bytes,
+        block_bytes: &[u8],
         opts: AppendOpts<'b>,
     ) -> Result<MetadataBlock, AppendFromBytesError> {
         self.chain

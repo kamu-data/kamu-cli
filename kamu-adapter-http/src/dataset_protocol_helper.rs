@@ -203,7 +203,7 @@ async fn load_dataset_blocks(
             let block = metadata_chain
                 .append_block_from_bytes(
                     &hash,
-                    Bytes::copy_from_slice(block_buf.as_slice()),
+                    block_buf.as_slice(),
                     AppendOpts {
                         expected_hash: Some(&hash),
                         ..AppendOpts::default()
