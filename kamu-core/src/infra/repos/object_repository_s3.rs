@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{domain::*, infra::utils::s3_context::S3Context};
+use crate::{
+    domain::*,
+    infra::utils::s3_context::{AsyncReadObj, S3Context},
+};
 use chrono::Utc;
 use opendatafabric::{Multicodec, Multihash};
 
@@ -22,13 +25,8 @@ use rusoto_s3::{
     *,
 };
 use std::{marker::PhantomData, path::Path};
-use tokio::io::AsyncRead;
 use tracing::debug;
 use url::Url;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,16 +69,7 @@ where
 
         debug!(?key, "Checking for object");
 
-        match self
-            .s3_context
-            .client
-            .head_object(HeadObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                ..HeadObjectRequest::default()
-            })
-            .await
-        {
+        match self.s3_context.head_object(key).await {
             Ok(_) => {
                 return Ok(true);
             }
@@ -111,16 +100,7 @@ where
 
         debug!(?key, "Reading object stream");
 
-        let resp = match self
-            .s3_context
-            .client
-            .get_object(GetObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                ..GetObjectRequest::default()
-            })
-            .await
-        {
+        let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
             Err(RusotoError::Service(GetObjectError::NoSuchKey(_))) => {
                 Err(GetError::NotFound(ObjectNotFoundError {
@@ -193,19 +173,7 @@ where
 
         debug!(?key, "Inserting object");
 
-        // TODO: PERF: Avoid copying data into a buffer
-        match self
-            .s3_context
-            .client
-            .put_object(PutObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                body: Some(rusoto_core::ByteStream::from(Vec::from(data))),
-                content_length: Some(data.len() as i64),
-                ..PutObjectRequest::default()
-            })
-            .await
-        {
+        match self.s3_context.put_object(key, data).await {
             Ok(_) => Ok(()),
             Err(e @ RusotoError::Credentials(_)) => {
                 Err(InsertError::Access(AccessError::Unauthorized(e.into())))
@@ -252,14 +220,7 @@ where
 
         match self
             .s3_context
-            .client
-            .put_object(PutObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                body: Some(rusoto_core::ByteStream::new(stream)),
-                content_length: Some(size as i64),
-                ..PutObjectRequest::default()
-            })
+            .put_object_stream(key, stream, size as i64)
             .await
         {
             Ok(_) => Ok(()),
@@ -288,16 +249,7 @@ where
 
         debug!(?key, "Deleting object");
 
-        match self
-            .s3_context
-            .client
-            .delete_object(DeleteObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                ..DeleteObjectRequest::default()
-            })
-            .await
-        {
+        match self.s3_context.delete_object(key).await {
             Ok(_) => Ok(()),
             Err(e @ RusotoError::Credentials(_)) => {
                 Err(DeleteError::Access(AccessError::Unauthorized(e.into())))

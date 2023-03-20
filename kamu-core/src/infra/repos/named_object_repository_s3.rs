@@ -44,16 +44,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         debug!(?key, "Reading object stream");
 
-        let resp = match self
-            .s3_context
-            .client
-            .get_object(GetObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                ..GetObjectRequest::default()
-            })
-            .await
-        {
+        let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
             Err(RusotoError::Service(GetObjectError::NoSuchKey(_))) => {
                 Err(GetError::NotFound(NotFoundError {
@@ -80,18 +71,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         debug!(?key, "Inserting object");
 
-        // TODO: PERF: Avoid copying data into a buffer
-        match self
-            .s3_context
-            .client
-            .put_object(PutObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                body: Some(rusoto_core::ByteStream::from(Vec::from(data))),
-                ..PutObjectRequest::default()
-            })
-            .await
-        {
+        match self.s3_context.put_object(key, data).await {
             Ok(_) => Ok(()),
             Err(e @ RusotoError::Credentials(_)) => {
                 Err(SetError::Access(AccessError::Unauthorized(e.into())))
@@ -107,16 +87,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         debug!(?key, "Deleting object");
 
-        match self
-            .s3_context
-            .client
-            .delete_object(DeleteObjectRequest {
-                bucket: self.s3_context.bucket.clone(),
-                key,
-                ..DeleteObjectRequest::default()
-            })
-            .await
-        {
+        match self.s3_context.delete_object(key).await {
             Ok(_) => Ok(()),
             Err(e @ RusotoError::Credentials(_)) => {
                 Err(DeleteError::Access(AccessError::Unauthorized(e.into())))

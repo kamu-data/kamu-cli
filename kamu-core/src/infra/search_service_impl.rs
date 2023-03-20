@@ -53,39 +53,12 @@ impl SearchServiceImpl {
                 }
             }
             "s3" | "s3+http" | "s3+https" => {
-                use rusoto_core::Region;
-                use rusoto_s3::*;
-
-                // TODO: Support prefix?
-                let (endpoint, bucket, _) = S3Context::split_url(url);
-
-                let region = match endpoint {
-                    None => Region::default(),
-                    Some(endpoint) => Region::Custom {
-                        name: "custom".to_owned(),
-                        endpoint: endpoint,
-                    },
-                };
-                let client = S3Client::new(region);
+                let s3_context = S3Context::from_url(&url);
+                let folders_common_prefixes = s3_context.bucket_list_folders().await?;
 
                 let query = query.unwrap_or_default();
 
-                let list_objects_resp = client
-                    .list_objects_v2(ListObjectsV2Request {
-                        bucket,
-                        delimiter: Some("/".to_owned()),
-                        ..ListObjectsV2Request::default()
-                    })
-                    .await
-                    .int_err()?;
-
-                // TODO: Support iteration
-                assert!(
-                    !list_objects_resp.is_truncated.unwrap_or(false),
-                    "Cannot handle truncated response"
-                );
-
-                for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
+                for prefix in folders_common_prefixes {
                     let mut prefix = prefix.prefix.unwrap();
                     while prefix.ends_with('/') {
                         prefix.pop();
