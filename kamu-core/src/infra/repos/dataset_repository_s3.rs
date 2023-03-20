@@ -13,7 +13,6 @@ use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
 use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal};
-use rusoto_s3::*;
 use thiserror::Error;
 use url::Url;
 
@@ -54,44 +53,12 @@ impl DatasetRepositoryS3 {
         DatasetFactoryImpl::get_s3(dataset_url)
     }
 
-    async fn delete_s3_objects_by_prefix(
+    async fn delete_dataset_s3_objects(
         &self,
         dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
         let dataset_key_prefix = self.s3_context.get_key(dataset_name.as_str());
-        let list_response = self
-            .s3_context
-            .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.s3_context.bucket.clone(),
-                prefix: Some(dataset_key_prefix),
-                ..ListObjectsV2Request::default()
-            })
-            .await
-            .int_err()?;
-
-        if let Some(contents) = list_response.contents {
-            self.s3_context
-                .client
-                .delete_objects(DeleteObjectsRequest {
-                    bucket: self.s3_context.bucket.clone(),
-                    delete: Delete {
-                        objects: contents
-                            .iter()
-                            .map(|obj| ObjectIdentifier {
-                                key: obj.key.clone().unwrap(),
-                                version_id: None,
-                            })
-                            .collect(),
-                        quiet: Some(true),
-                    },
-                    ..DeleteObjectsRequest::default()
-                })
-                .await
-                .int_err()?;
-        }
-
-        Ok(())
+        self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
     async fn finish_create_dataset(
@@ -121,31 +88,17 @@ impl DatasetRepositoryS3 {
         }
     }
 
-    async fn bucket_path_exists(&self, key_prefix: &str) -> Result<bool, InternalError> {
-        let listing = self
-            .s3_context
-            .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.s3_context.bucket.clone(),
-                prefix: Some(self.s3_context.get_key(key_prefix)),
-                max_keys: Some(1),
-                ..ListObjectsV2Request::default()
-            })
-            .await;
-
-        match listing {
-            Ok(resp) => Ok(resp.contents.is_some()),
-            Err(e) => Err(e.int_err().into()),
-        }
-    }
-
     async fn move_bucket_items_on_dataset_rename(
         &self,
         old_dataset_name: &str,
         new_dataset_name: &str,
     ) -> Result<(), MoveBucketItemsOnRenameError> {
-        let target_key_prefix = self.s3_context.get_key(new_dataset_name);
-        if self.bucket_path_exists(target_key_prefix.as_str()).await? {
+        let new_key_prefix = self.s3_context.get_key(new_dataset_name);
+        if self
+            .s3_context
+            .bucket_path_exists(new_key_prefix.as_str())
+            .await?
+        {
             return Err(MoveBucketItemsOnRenameError::NameCollision(
                 NameCollisionError {
                     name: DatasetName::from_str(new_dataset_name).unwrap(),
@@ -154,64 +107,9 @@ impl DatasetRepositoryS3 {
         }
 
         let old_key_prefix = self.s3_context.get_key(old_dataset_name);
-        let list_response = self
-            .s3_context
-            .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.s3_context.bucket.clone(),
-                prefix: Some(old_key_prefix.clone()),
-                ..ListObjectsV2Request::default()
-            })
-            .await
-            .int_err()?;
-
-        // TODO: concurrency safety.
-        // It is important not to allow parallel writes of Head reference file in the same bucket.
-        // Consider optimistic locking (comparing old head with expected before final commit).
-
-        if let Some(contents) = list_response.contents {
-            for obj in &contents {
-                let copy_source = format!(
-                    "{}/{}",
-                    self.s3_context.bucket.clone(),
-                    obj.key.clone().unwrap()
-                );
-                let new_key = obj
-                    .key
-                    .clone()
-                    .unwrap()
-                    .replace(old_key_prefix.as_str(), target_key_prefix.as_str());
-                self.s3_context
-                    .client
-                    .copy_object(CopyObjectRequest {
-                        bucket: self.s3_context.bucket.clone(),
-                        copy_source,
-                        key: new_key,
-                        ..CopyObjectRequest::default()
-                    })
-                    .await
-                    .int_err()?;
-            }
-
-            self.s3_context
-                .client
-                .delete_objects(DeleteObjectsRequest {
-                    bucket: self.s3_context.bucket.clone(),
-                    delete: Delete {
-                        objects: contents
-                            .iter()
-                            .map(|obj| ObjectIdentifier {
-                                key: obj.key.clone().unwrap(),
-                                version_id: None,
-                            })
-                            .collect(),
-                        quiet: Some(true),
-                    },
-                    ..DeleteObjectsRequest::default()
-                })
-                .await
-                .int_err()?;
-        }
+        self.s3_context
+            .recursive_move(old_key_prefix, new_key_prefix)
+            .await?;
 
         Ok(())
     }
@@ -251,26 +149,19 @@ impl DatasetRepository for DatasetRepositoryS3 {
         match dataset_ref {
             DatasetRefLocal::Handle(h) => Ok(h.clone()),
             DatasetRefLocal::Name(name) => {
-                match self.bucket_path_exists(name.as_str()).await {
-                    Ok(resp) => {
-                        if resp {
-                            Ok(())
-                        } else {
-                            Err(GetDatasetError::NotFound(DatasetNotFoundError {
-                                dataset_ref: dataset_ref.clone(),
-                            }))
-                        }
-                    }
-                    Err(e) => Err(e.int_err().into()),
-                }?;
+                if self.s3_context.bucket_path_exists(name.as_str()).await? {
+                    let dataset = self.get_dataset_impl(name)?;
+                    let summary = dataset
+                        .get_summary(GetSummaryOpts::default())
+                        .await
+                        .int_err()?;
 
-                let dataset = self.get_dataset_impl(name)?;
-                let summary = dataset
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                Ok(DatasetHandle::new(summary.id, name.clone()))
+                    Ok(DatasetHandle::new(summary.id, name.clone()))
+                } else {
+                    Err(GetDatasetError::NotFound(DatasetNotFoundError {
+                        dataset_ref: dataset_ref.clone(),
+                    }))
+                }
             }
             DatasetRefLocal::ID(_idd) => {
                 unimplemented!("Querying S3 bucket not supported yet");
@@ -280,18 +171,8 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
-            let list_objects_resp = self
-                .s3_context
-                .client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.s3_context.bucket.clone(),
-                    delimiter: Some("/".to_owned()),
-                    ..ListObjectsV2Request::default()
-                })
-                .await
-                .int_err()?;
-
-            for prefix in list_objects_resp.common_prefixes.unwrap_or_default() {
+            let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
+            for prefix in folders_common_prefixes {
                 let mut prefix = prefix.prefix.unwrap();
                 while prefix.ends_with('/') {
                     prefix.pop();
@@ -371,7 +252,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .into());
         }
 
-        match self.delete_s3_objects_by_prefix(&dataset_handle.name).await {
+        match self.delete_dataset_s3_objects(&dataset_handle.name).await {
             Ok(_) => Ok(()),
             Err(e) => Err(DeleteDatasetError::Internal(e)),
         }
@@ -447,7 +328,7 @@ impl DatasetBuilder for DatasetBuildS3 {
 
     async fn discard(&self) -> Result<(), InternalError> {
         self.repo
-            .delete_s3_objects_by_prefix(&self.dataset_name)
+            .delete_dataset_s3_objects(&self.dataset_name)
             .await
     }
 }
