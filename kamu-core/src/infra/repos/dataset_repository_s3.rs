@@ -54,7 +54,7 @@ impl DatasetRepositoryS3 {
         DatasetFactoryImpl::get_s3(dataset_url)
     }
 
-    async fn eliminate_bucket_items(
+    async fn delete_s3_objects_by_prefix(
         &self,
         dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
@@ -376,7 +376,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .into());
         }
 
-        match self.eliminate_bucket_items(&dataset_handle.name).await {
+        match self.delete_s3_objects_by_prefix(&dataset_handle.name).await {
             Ok(_) => Ok(()),
             Err(e) => Err(DeleteDatasetError::Internal(e)),
         }
@@ -451,7 +451,9 @@ impl DatasetBuilder for DatasetBuildS3 {
     }
 
     async fn discard(&self) -> Result<(), InternalError> {
-        self.repo.eliminate_bucket_items(&self.dataset_name).await
+        self.repo
+            .delete_s3_objects_by_prefix(&self.dataset_name)
+            .await
     }
 }
 
