@@ -32,8 +32,8 @@ macro_rules! await_client_server_flow {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 #[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_new_dataset() {
     let server_harness = server_side_harness();
 
@@ -81,8 +81,8 @@ async fn test_smart_pull_new_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 #[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_up_to_date_dataset() {
     let server_harness = server_side_harness();
 
@@ -136,8 +136,8 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 #[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_evolved_dataset() {
     let server_harness = server_side_harness();
 
@@ -216,8 +216,8 @@ async fn test_smart_pull_existing_evolved_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 #[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_advanced_dataset_fails() {
     let server_harness = server_side_harness();
 
