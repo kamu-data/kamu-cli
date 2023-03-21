@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use super::test_dataset_repository_shared;
-use kamu::infra::{utils::s3_context::S3Context, DatasetRepositoryS3};
+use kamu::{
+    infra::{utils::s3_context::S3Context, DatasetRepositoryS3},
+    testing::MinioServer,
+};
 use url::Url;
-
-use crate::utils::MinioServer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

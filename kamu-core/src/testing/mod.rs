@@ -13,6 +13,9 @@ pub use id_factory::*;
 mod metadata_factory;
 pub use metadata_factory::*;
 
+mod minio_server;
+pub use minio_server::*;
+
 mod parquet_reader_helper;
 pub use parquet_reader_helper::*;
 

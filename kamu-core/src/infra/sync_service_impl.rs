@@ -261,18 +261,7 @@ impl SyncServiceImpl {
             )
             .await;
 
-        match sync_result {
-            Ok(result) => {
-                info!(?result, "Sync completed");
-                dst_dataset_builder.finish().await?;
-                Ok(result)
-            }
-            Err(error) => {
-                info!(?error, "Sync failed");
-                dst_dataset_builder.discard().await?;
-                Err(error)
-            }
-        }
+        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_ref()).await
     }
 
     async fn sync_smart_pull_transfer_protocol<'a>(
@@ -293,9 +282,30 @@ impl SyncServiceImpl {
         let dst_dataset = dst_dataset_builder.as_dataset();
 
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
-        self.smart_transfer_protocol
+        let sync_result = self
+            .smart_transfer_protocol
             .pull_protocol_client_flow(&http_src_url, dst_dataset, listener)
-            .await
+            .await;
+
+        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_ref()).await
+    }
+
+    async fn finish_building_dataset(
+        sync_result: Result<SyncResult, SyncError>,
+        dataset_builder: &dyn DatasetBuilder,
+    ) -> Result<SyncResult, SyncError> {
+        match sync_result {
+            Ok(result) => {
+                info!(?result, "Sync completed");
+                dataset_builder.finish().await?;
+                Ok(result)
+            }
+            Err(error) => {
+                info!(?error, "Sync failed");
+                dataset_builder.discard().await?;
+                Err(error)
+            }
+        }
     }
 
     async fn sync_smart_push_transfer_protocol<'a>(

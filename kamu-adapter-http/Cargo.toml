@@ -12,9 +12,10 @@ doctest = false
 dill = ">= 0.5.0"
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
+container-runtime = { path = "../utils/container-runtime" }
 
 # HTTP
-axum = { version = "*", features = ["ws"] }
+axum = { version = "*", features = ["ws", "headers"] }
 axum-extra = { version = "*", features = ["async-read-body"] }
 reqwest = { version = "*", features = ["json"] }
 
@@ -35,9 +36,14 @@ url = { version = "*", features = ["serde"] }
 thiserror = "*"  # Structured error derivations
 serde = "*"
 serde_json = "*"
+tracing = "*"
 
 [dev-dependencies]
 tempfile = "*"
 env_logger = "*"
 test-log = { version = "*", features = ["trace"] }
 tracing-subscriber = { version = "*", features = ["env-filter"] }
+http = "*"
+hyper = "*"
+tower = { version = "*" }
+tower-http = { version = "*", features = ["trace", "cors"] }

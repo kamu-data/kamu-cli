@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::infra::utils::docker_images;
 use container_runtime::{ContainerRuntime, RunArgs};
-use kamu::infra::utils::docker_images;
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;

@@ -7,17 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ftp_server;
-pub use ftp_server::*;
+mod client_side_harness;
+pub use client_side_harness::*;
 
-mod http_server;
-pub use http_server::*;
-
-mod http_file_server;
-pub use http_file_server::*;
-
-mod ipfs_daemon;
-pub use ipfs_daemon::*;
-
-mod dummy_smart_transfer_protocol_client;
-pub use dummy_smart_transfer_protocol_client::*;
+mod server_side_harness;
+pub use server_side_harness::*;

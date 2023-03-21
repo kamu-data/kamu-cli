@@ -2397,10 +2397,13 @@ dependencies = [
  "axum-extra",
  "bytes",
  "chrono",
+ "container-runtime",
  "dill",
  "env_logger",
  "flate2",
  "futures",
+ "http",
+ "hyper",
  "kamu",
  "opendatafabric",
  "reqwest",
@@ -2414,6 +2417,9 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite",
  "tokio-util",
+ "tower",
+ "tower-http 0.3.5",
+ "tracing",
  "tracing-subscriber",
  "url",
 ]
@@ -4885,6 +4891,7 @@ dependencies = [
  "pin-project-lite",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

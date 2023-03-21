@@ -81,8 +81,25 @@ where
         }
     }
 
-    async fn get_size(&self, _hash: &Multihash) -> Result<u64, GetError> {
-        panic!("get_size unsupported for S3 object repository");
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        let key = self.get_key(hash);
+
+        debug!(?key, "Checking for object");
+
+        match self.s3_context.head_object(key).await {
+            Ok(output) => {
+                return Ok(output.content_length.unwrap_or_default() as u64);
+            }
+            // TODO: This error type doesn't work
+            // See: https://github.com/rusoto/rusoto/issues/716
+            Err(RusotoError::Service(HeadObjectError::NoSuchKey(_))) => {
+                Err(GetError::NotFound(ObjectNotFoundError {
+                    hash: hash.clone(),
+                }))
+            }
+            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
+            Err(e) => Err(e.int_err().into()),
+        }
     }
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {

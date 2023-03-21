@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use crate::utils::DummySmartTransferProtocolClient;
-use crate::utils::MinioServer;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;

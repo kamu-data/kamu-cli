@@ -18,7 +18,7 @@ use url::Url;
 
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use kamu::domain::{Dataset, SyncError, SyncListener, SyncResult};
+use kamu::domain::{Dataset, GetRefError, SyncError, SyncListener, SyncResult};
 use kamu::{domain::BlockRef, infra::utils::smart_transfer_protocol::SmartTransferProtocolClient};
 
 use crate::{
@@ -61,10 +61,10 @@ impl WsSmartTransferProtocolClient {
     async fn pull_send_request(
         &self,
         socket: &mut TungsteniteStream,
-        dst_head: Multihash,
+        dst_head: Option<Multihash>,
     ) -> Result<DatasetPullResponse, SmartProtocolPullClientError> {
         let pull_request_message = DatasetPullRequest {
-            begin_after: Some(dst_head),
+            begin_after: dst_head,
             stop_at: None,
         };
 
@@ -180,11 +180,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let (mut ws_stream, _) = connect_async(pull_url).await.unwrap();
 
-        let dst_head = dst
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-            .unwrap();
+        let dst_head_result = dst.as_metadata_chain().get_ref(&BlockRef::Head).await;
+        let dst_head = match dst_head_result {
+            Ok(head) => Ok(Some(head)),
+            Err(GetRefError::NotFound(_)) => Ok(None),
+            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
 
         let dataset_pull_response = self
             .pull_send_request(&mut ws_stream, dst_head.clone())
@@ -235,7 +237,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 .unwrap();
 
             SyncResult::Updated {
-                old_head: Some(dst_head),
+                old_head: dst_head,
                 new_head: new_dst_head,
                 num_blocks: dataset_pull_response.size_estimation.num_blocks as usize,
             }

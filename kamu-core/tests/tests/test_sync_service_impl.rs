@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::utils::DummySmartTransferProtocolClient;
-use crate::utils::{HttpFileServer, IpfsDaemon, MinioServer};
+use crate::utils::{HttpFileServer, IpfsDaemon};
 use kamu::domain::*;
 use kamu::infra::utils::ipfs_wrapper::IpfsClient;
 use kamu::infra::*;

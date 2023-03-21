@@ -10,12 +10,11 @@
 use kamu::domain::*;
 use kamu::infra::utils::s3_context::S3Context;
 use kamu::infra::*;
+use kamu::testing::MinioServer;
 use opendatafabric::*;
 
 use std::assert_matches::assert_matches;
 use url::Url;
-
-use crate::utils::MinioServer;
 
 use super::test_object_repository_shared;
 
