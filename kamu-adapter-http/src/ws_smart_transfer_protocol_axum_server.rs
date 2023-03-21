@@ -124,14 +124,26 @@ async fn handle_pull_request_initiation(
                 pull_request.begin_after.clone(),
             )
             .await;
-            if let Err(e) = size_estimation_result {
-                return Err(SmartProtocolPullServerError::Internal(e));
-            }
 
             let response_result = write_payload::<DatasetPullResponse>(
                 socket,
-                DatasetPullResponse {
-                    size_estimation: size_estimation_result.unwrap(),
+                match size_estimation_result {
+                    Ok(size_estimation) => {
+                        DatasetPullResponse::Ok(DatasetPullSuccessResponse { size_estimation })
+                    }
+                    Err(PrepareDatasetTransferEstimationError::InvalidInterval(e)) => {
+                        DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval {
+                            head: e.head.clone(),
+                            tail: e.tail.clone(),
+                        })
+                    }
+                    Err(PrepareDatasetTransferEstimationError::Internal(e)) => {
+                        DatasetPullResponse::Err(DatasetPullRequestError::Internal(
+                            DatasetInternalError {
+                                error_message: e.to_string(),
+                            },
+                        ))
+                    }
                 },
             )
             .await;

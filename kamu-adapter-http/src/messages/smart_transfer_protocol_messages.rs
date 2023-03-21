@@ -19,10 +19,20 @@ pub struct DatasetPullRequest {
     pub stop_at: Option<Multihash>,
 }
 
-/// Response to initial dataset pull request
+/// Response to initial dataset pull request message
+pub type DatasetPullResponse = Result<DatasetPullSuccessResponse, DatasetPullRequestError>;
+
+/// Succesful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPullResponse {
+pub struct DatasetPullSuccessResponse {
     pub size_estimation: TransferSizeEstimation,
+}
+
+// Unsuccesful response to initial dataset pull request
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPullRequestError {
+    Internal(DatasetInternalError),
+    InvalidInterval { head: Multihash, tail: Multihash },
 }
 
 /// Pull stage 1: request metadata update
@@ -117,19 +127,6 @@ pub struct DatasetPushComplete {}
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 
-/// Error message
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetError {
-    pub error_details: ErrorDetails,
-}
-
-/// Error message details
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct ErrorDetails {
-    pub error_code: String,
-    pub description: String,
-}
-
 /// Packed object batch
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct ObjectsBatch {
@@ -170,4 +167,10 @@ pub enum ObjectType {
 pub struct TransferUrl {
     pub url: Url,
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+// Transfer URL
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetInternalError {
+    pub error_message: String,
 }

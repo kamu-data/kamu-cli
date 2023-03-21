@@ -9,17 +9,11 @@
 
 use std::io::Read;
 
-use crate::messages::{
-    ObjectFileReference, ObjectPullStrategy, ObjectType, ObjectsBatch, PullObjectTransferStrategy,
-    TransferSizeEstimation, TransferUrl,
-};
+use crate::messages::*;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
-use kamu::domain::{
-    AppendOpts, CorruptedSourceError, Dataset, DownloadOpts, GetDownloadUrlError, InsertError,
-    InsertOpts, InternalError, MetadataChain, SyncError,
-};
+use kamu::domain::*;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
 use thiserror::Error;
@@ -32,11 +26,36 @@ const ENCODING_RAW: &str = "raw";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+pub enum PrepareDatasetTransferEstimationError {
+    #[error(transparent)]
+    InvalidInterval(
+        #[from]
+        #[backtrace]
+        InvalidIntervalError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<IterBlocksError> for PrepareDatasetTransferEstimationError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            _ => Self::Internal(v.int_err()),
+        }
+    }
+}
+
 pub async fn prepare_dataset_transfer_estimaton(
     metadata_chain: &dyn MetadataChain,
     stop_at: Multihash,
     begin_after: Option<Multihash>,
-) -> Result<TransferSizeEstimation, InternalError> {
+) -> Result<TransferSizeEstimation, PrepareDatasetTransferEstimationError> {
     let mut block_stream =
         metadata_chain.iter_blocks_interval(&stop_at, begin_after.as_ref(), false);
 
@@ -48,8 +67,7 @@ pub async fn prepare_dataset_transfer_estimaton(
     let mut bytes_in_data_objects: i64 = 0;
     let mut bytes_in_checkpoint_objects: i64 = 0;
 
-    use kamu::domain::ResultIntoInternal;
-    while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
+    while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
 
         bytes_in_blocks += metadata_chain

@@ -11,7 +11,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use container_runtime::ContainerRuntime;
 use kamu::{
-    domain::{DatasetRepository, PullOptions, PullResult, PullService, SyncOptions},
+    domain::{DatasetRepository, PullOptions, PullResponse, PullService, SyncOptions},
     infra::{
         self, DatasetFactoryImpl, DatasetRepositoryLocalFs, EngineProvisionerNull,
         IngestServiceImpl, IpfsGateway, PullServiceImpl, RemoteAliasesRegistryImpl,
@@ -36,9 +36,8 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    pub async fn pull_dataset(&self, dataset_ref: DatasetRefAny) -> PullResult {
-        let pull_responses = self
-            .pull_service
+    pub async fn pull_dataset(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
+        self.pull_service
             .pull_multi(
                 &mut vec![dataset_ref].into_iter(),
                 PullOptions {
@@ -53,14 +52,7 @@ impl ClientSideHarness {
                 None,
             )
             .await
-            .unwrap();
-        pull_responses
-            .get(0)
             .unwrap()
-            .result
-            .as_ref()
-            .unwrap()
-            .clone()
     }
 
     pub fn internal_datasets_folder_path(&self) -> PathBuf {

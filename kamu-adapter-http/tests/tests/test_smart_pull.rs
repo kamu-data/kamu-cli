@@ -58,7 +58,14 @@ async fn test_smart_pull_new_dataset() {
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await;
+            .await
+            .get(0)
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .clone();
+
         assert_eq!(
             PullResult::Updated {
                 old_head: None,
@@ -113,7 +120,14 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await;
+            .await
+            .get(0)
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .clone();
+
         assert_eq!(PullResult::UpToDate {}, pull_result)
     };
 
@@ -179,7 +193,14 @@ async fn test_smart_pull_existing_evolved_dataset() {
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await;
+            .await
+            .get(0)
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .clone();
+
         assert_eq!(
             PullResult::Updated {
                 old_head: Some(create_result.head),
@@ -195,7 +216,6 @@ async fn test_smart_pull_existing_evolved_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[ignore = "Error handling in Smart Transfer Protocol to be completely revised"]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 #[test_log::test(tokio::test)]
 async fn test_smart_pull_existing_advanced_dataset_fails() {
@@ -252,10 +272,12 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
 
     let api_server_handle = async { server_harness.api_server_run().await };
     let client_handle = async {
-        let pull_result = client_harness
+        let pull_responses = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
             .await;
-        assert_eq!(PullResult::UpToDate {}, pull_result)
+
+        // TODO: try expecting better error message
+        assert!(pull_responses[0].result.is_err());
     };
 
     await_client_server_flow!(api_server_handle, client_handle)

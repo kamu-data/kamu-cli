@@ -11,6 +11,7 @@ use dill::component;
 use futures::SinkExt;
 use opendatafabric::Multihash;
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::TcpStream;
@@ -18,7 +19,10 @@ use url::Url;
 
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use kamu::domain::{Dataset, GetRefError, SyncError, SyncListener, SyncResult};
+use kamu::domain::{
+    Dataset, ErrorIntoInternal, GetRefError, InternalError, InvalidIntervalError, SyncError,
+    SyncListener, SyncResult,
+};
 use kamu::{domain::BlockRef, infra::utils::smart_transfer_protocol::SmartTransferProtocolClient};
 
 use crate::{
@@ -43,6 +47,9 @@ enum SmartProtocolPullClientError {
     PullResponseReadFailed(ReadMessageError),
 
     #[error(transparent)]
+    PullResponseInvalidInterval(InvalidIntervalError),
+
+    #[error(transparent)]
     PullMetadataRequestWriteFailed(WriteMessageError),
 
     #[error(transparent)]
@@ -53,6 +60,13 @@ enum SmartProtocolPullClientError {
 
     #[error(transparent)]
     PullObjectResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +76,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         socket: &mut TungsteniteStream,
         dst_head: Option<Multihash>,
-    ) -> Result<DatasetPullResponse, SmartProtocolPullClientError> {
+    ) -> Result<DatasetPullSuccessResponse, SmartProtocolPullClientError> {
         let pull_request_message = DatasetPullRequest {
             begin_after: dst_head,
             stop_at: None,
@@ -80,16 +94,29 @@ impl WsSmartTransferProtocolClient {
         }
 
         let dataset_pull_response = read_result.unwrap();
-
-        println!(
-            "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
-            dataset_pull_response.size_estimation.num_blocks,
-            dataset_pull_response.size_estimation.bytes_in_raw_blocks,
-            dataset_pull_response.size_estimation.num_objects,
-            dataset_pull_response.size_estimation.bytes_in_raw_objects,
-        );
-
-        Ok(dataset_pull_response)
+        match dataset_pull_response {
+            Ok(success) => {
+                println!(
+                    "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
+                    success.size_estimation.num_blocks,
+                    success.size_estimation.bytes_in_raw_blocks,
+                    success.size_estimation.num_objects,
+                    success.size_estimation.bytes_in_raw_objects,
+                );
+                Ok(success)
+            }
+            Err(DatasetPullRequestError::Internal(e)) => {
+                Err(SmartProtocolPullClientError::Internal(InternalError::new(
+                    Box::new(ClientInternalError::new(e.error_message.as_str())),
+                )))
+            }
+            Err(DatasetPullRequestError::InvalidInterval { head, tail }) => Err(
+                SmartProtocolPullClientError::PullResponseInvalidInterval(InvalidIntervalError {
+                    head: head.clone(),
+                    tail: tail.clone(),
+                }),
+            ),
+        }
     }
 
     async fn pull_send_metadata_request(
@@ -188,62 +215,69 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
-        let dataset_pull_response = self
+        let dataset_pull_result = self
             .pull_send_request(&mut ws_stream, dst_head.clone())
-            .await
-            .unwrap();
+            .await;
 
-        let sync_result = if dataset_pull_response.size_estimation.num_blocks > 0 {
-            let dataset_pull_metadata_response = self
-                .pull_send_metadata_request(&mut ws_stream)
-                .await
-                .unwrap();
+        let sync_result = match dataset_pull_result {
+            Ok(success) => {
+                if success.size_estimation.num_blocks > 0 {
+                    let dataset_pull_metadata_response = self
+                        .pull_send_metadata_request(&mut ws_stream)
+                        .await
+                        .unwrap();
 
-            let object_files_transfer_plan =
-                dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks).await;
+                    let object_files_transfer_plan =
+                        dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks)
+                            .await;
 
-            println!(
-                "Object files transfer plan consist of {} stages",
-                object_files_transfer_plan.len()
-            );
+                    println!(
+                        "Object files transfer plan consist of {} stages",
+                        object_files_transfer_plan.len()
+                    );
 
-            let mut stage_index = 0;
-            for stage_object_files in object_files_transfer_plan {
-                stage_index += 1;
-                println!(
-                    "Stage #{}: querying {} data objects",
-                    stage_index,
-                    stage_object_files.len()
-                );
+                    let mut stage_index = 0;
+                    for stage_object_files in object_files_transfer_plan {
+                        stage_index += 1;
+                        println!(
+                            "Stage #{}: querying {} data objects",
+                            stage_index,
+                            stage_object_files.len()
+                        );
 
-                let dataset_objects_pull_response = self
-                    .pull_send_objects_request(&mut ws_stream, stage_object_files)
-                    .await
-                    .unwrap();
+                        let dataset_objects_pull_response = self
+                            .pull_send_objects_request(&mut ws_stream, stage_object_files)
+                            .await
+                            .unwrap();
 
-                use futures::StreamExt;
-                futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
-                    .for_each_concurrent(
-                        /* limit */ 4, // TODO: external configuration?
-                        |s| async move { dataset_import_object_file(dst, &s).await.unwrap() },
-                    )
-                    .await;
+                        use futures::StreamExt;
+                        futures::stream::iter(
+                            dataset_objects_pull_response.object_transfer_strategies,
+                        )
+                        .for_each_concurrent(
+                            /* limit */ 4, // TODO: external configuration?
+                            |s| async move { dataset_import_object_file(dst, &s).await.unwrap() },
+                        )
+                        .await;
+                    }
+
+                    let new_dst_head = dst
+                        .as_metadata_chain()
+                        .get_ref(&BlockRef::Head)
+                        .await
+                        .unwrap();
+
+                    Ok(SyncResult::Updated {
+                        old_head: dst_head,
+                        new_head: new_dst_head,
+                        num_blocks: success.size_estimation.num_blocks as usize,
+                    })
+                } else {
+                    Ok(SyncResult::UpToDate)
+                }
             }
-
-            let new_dst_head = dst
-                .as_metadata_chain()
-                .get_ref(&BlockRef::Head)
-                .await
-                .unwrap();
-
-            SyncResult::Updated {
-                old_head: dst_head,
-                new_head: new_dst_head,
-                num_blocks: dataset_pull_response.size_estimation.num_blocks as usize,
-            }
-        } else {
-            SyncResult::UpToDate
-        };
+            Err(e) => Err(SyncError::Internal(e.int_err())),
+        }?;
 
         ws_stream.close(None).await.unwrap();
 
@@ -317,6 +351,33 @@ async fn write_payload<TMessagePayload: Serialize>(
     match send_result {
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+struct ClientInternalError {
+    details: String,
+}
+
+impl ClientInternalError {
+    fn new(msg: &str) -> Self {
+        Self {
+            details: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for ClientInternalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl std::error::Error for ClientInternalError {
+    fn description(&self) -> &str {
+        &self.details
     }
 }
 
