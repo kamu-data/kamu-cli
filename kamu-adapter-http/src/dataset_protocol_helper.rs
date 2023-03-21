@@ -36,7 +36,7 @@ pub async fn prepare_dataset_transfer_estimaton(
     metadata_chain: &dyn MetadataChain,
     stop_at: Multihash,
     begin_after: Option<Multihash>,
-) -> TransferSizeEstimation {
+) -> Result<TransferSizeEstimation, InternalError> {
     let mut block_stream =
         metadata_chain.iter_blocks_interval(&stop_at, begin_after.as_ref(), false);
 
@@ -48,15 +48,15 @@ pub async fn prepare_dataset_transfer_estimaton(
     let mut bytes_in_data_objects: i64 = 0;
     let mut bytes_in_checkpoint_objects: i64 = 0;
 
-    while let Some((hash, block)) = block_stream.try_next().await.unwrap() {
+    use kamu::domain::ResultIntoInternal;
+    while let Some((hash, block)) = block_stream.try_next().await.int_err()? {
         blocks_count += 1;
 
-        // TODO: error handling of get_size
         bytes_in_blocks += metadata_chain
             .as_object_repo()
             .get_size(&hash)
             .await
-            .unwrap();
+            .int_err()?;
 
         match block.event {
             MetadataEvent::AddData(add_data) => {
@@ -82,12 +82,12 @@ pub async fn prepare_dataset_transfer_estimaton(
         }
     }
 
-    TransferSizeEstimation {
+    Ok(TransferSizeEstimation {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         bytes_in_raw_blocks: bytes_in_blocks,
         bytes_in_raw_objects: (bytes_in_data_objects + bytes_in_checkpoint_objects) as u64,
-    }
+    })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use container_runtime::ContainerRuntime;
 use kamu::{
@@ -32,6 +32,10 @@ pub struct ClientSideHarness {
 }
 
 impl ClientSideHarness {
+    pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
+        self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
     pub async fn pull_dataset(&self, dataset_ref: DatasetRefAny) -> PullResult {
         let pull_responses = self
             .pull_service
@@ -57,6 +61,10 @@ impl ClientSideHarness {
             .as_ref()
             .unwrap()
             .clone()
+    }
+
+    pub fn internal_datasets_folder_path(&self) -> PathBuf {
+        self.tempdir.path().join("datasets")
     }
 }
 

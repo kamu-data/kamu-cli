@@ -9,6 +9,7 @@
 
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
     str::FromStr,
     sync::Arc,
 };
@@ -28,6 +29,7 @@ pub struct S3 {
     tmp_dir: tempfile::TempDir,
     minio: MinioServer,
     url: Url,
+    bucket_name: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +56,7 @@ fn run_s3_server() -> S3 {
         tmp_dir,
         minio,
         url,
+        bucket_name: String::from(bucket),
     }
 }
 
@@ -69,6 +72,10 @@ pub struct ServerSideHarness {
 impl ServerSideHarness {
     pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    pub fn internal_bucket_folder_path(&self) -> PathBuf {
+        self.s3.tmp_dir.path().join(self.s3.bucket_name.clone())
     }
 
     fn api_server_addr(&self) -> String {

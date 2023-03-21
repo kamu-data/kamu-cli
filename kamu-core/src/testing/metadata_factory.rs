@@ -21,6 +21,10 @@ impl MetadataFactory {
         SeedBuilder::new(kind)
     }
 
+    pub fn set_info() -> SetInfoBuilder {
+        SetInfoBuilder::new()
+    }
+
     pub fn transform() -> TransformSqlBuilder {
         TransformSqlBuilder::new()
     }
@@ -80,6 +84,47 @@ impl SeedBuilder {
     }
 
     pub fn build(self) -> Seed {
+        self.v
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// SetInfo Builder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SetInfoBuilder {
+    v: SetInfo,
+}
+
+impl SetInfoBuilder {
+    fn new() -> Self {
+        Self {
+            v: SetInfo {
+                description: None,
+                keywords: None,
+            },
+        }
+    }
+
+    pub fn description(mut self, description: &str) -> Self {
+        self.v.description = Some(String::from(description));
+        self
+    }
+
+    pub fn keyword(mut self, keyword: &str) -> Self {
+        if self.v.keywords.is_none() {
+            self.v.keywords = Some(vec![String::from(keyword)]);
+        } else {
+            self.v
+                .keywords
+                .as_mut()
+                .unwrap()
+                .push(String::from(keyword));
+        }
+        self
+    }
+
+    pub fn build(self) -> SetInfo {
         self.v
     }
 }

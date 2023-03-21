@@ -113,7 +113,7 @@ async fn handle_pull_request_initiation(
             let metadata_chain = dataset.as_metadata_chain();
             let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
 
-            let size_estimation = prepare_dataset_transfer_estimaton(
+            let size_estimation_result = prepare_dataset_transfer_estimaton(
                 dataset.as_metadata_chain(),
                 pull_request
                     .stop_at
@@ -124,10 +124,15 @@ async fn handle_pull_request_initiation(
                 pull_request.begin_after.clone(),
             )
             .await;
+            if let Err(e) = size_estimation_result {
+                return Err(SmartProtocolPullServerError::Internal(e));
+            }
 
             let response_result = write_payload::<DatasetPullResponse>(
                 socket,
-                DatasetPullResponse { size_estimation },
+                DatasetPullResponse {
+                    size_estimation: size_estimation_result.unwrap(),
+                },
             )
             .await;
             if let Err(e) = response_result {
