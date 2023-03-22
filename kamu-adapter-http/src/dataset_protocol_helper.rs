@@ -114,7 +114,7 @@ pub async fn prepare_dataset_metadata_batch(
     metadata_chain: &dyn MetadataChain,
     stop_at: Multihash,
     begin_after: Option<Multihash>,
-) -> ObjectsBatch {
+) -> Result<ObjectsBatch, InternalError> {
     let mut blocks_count: u32 = 0;
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
@@ -123,17 +123,17 @@ pub async fn prepare_dataset_metadata_batch(
         .iter_blocks_interval(&stop_at, begin_after.as_ref(), false)
         .try_collect()
         .await
-        .unwrap();
+        .int_err()?;
 
     for (hash, _) in blocks_for_transfer.iter().rev() {
         blocks_count += 1;
 
-        // TODO: error handling of get_bytes
         let block_bytes: Bytes = metadata_chain
             .as_object_repo()
             .get_bytes(&hash)
             .await
-            .unwrap();
+            .int_err()?;
+
         let block_data: &[u8] = &(*block_bytes);
 
         let mut header = Header::new_gnu();
@@ -141,18 +141,18 @@ pub async fn prepare_dataset_metadata_batch(
 
         tarball_builder
             .append_data(&mut header, hash.to_multibase_string(), block_data)
-            .unwrap();
+            .int_err()?;
     }
 
-    let tarball_data = tarball_builder.into_inner().unwrap().finish().unwrap();
+    let tarball_data = tarball_builder.into_inner().int_err()?.finish().int_err()?;
 
-    ObjectsBatch {
+    Ok(ObjectsBatch {
         objects_count: blocks_count,
         object_type: ObjectType::MetadataBlock,
         media_type: String::from(MEDIA_TAR_GZ),
         encoding: String::from(ENCODING_RAW),
         payload: tarball_data,
-    }
+    })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -309,21 +309,11 @@ async fn collect_missing_object_references_from_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-pub enum PrepareObjectTransferStrategyError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
 pub async fn prepare_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
-) -> Result<PullObjectTransferStrategy, PrepareObjectTransferStrategyError> {
+) -> Result<PullObjectTransferStrategy, InternalError> {
     let get_download_url_result = match object_file_ref.object_type {
         ObjectType::MetadataBlock => {
             dataset
@@ -356,9 +346,7 @@ pub async fn prepare_object_transfer_strategy(
                 url: get_simple_transfer_protocool_download_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
-            GetDownloadUrlError::Internal(e) => {
-                Err(PrepareObjectTransferStrategyError::Internal(e))
-            }
+            GetDownloadUrlError::Internal(e) => Err(e),
         },
     };
 

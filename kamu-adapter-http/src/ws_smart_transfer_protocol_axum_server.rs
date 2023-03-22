@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
@@ -19,7 +19,7 @@ use crate::{
     messages::*,
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
-use kamu::domain::{BlockRef, Dataset, InternalError};
+use kamu::domain::{BlockRef, Dataset, ErrorIntoInternal, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +53,21 @@ async fn write_payload<TMessagePayload: Serialize>(
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn send_internal_error(
+    socket: &mut axum::extract::ws::WebSocket,
+    e: SmartProtocolPullServerError,
+) {
+    socket
+        .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+            code: CLOSE_CODE_INTERNAL_ERROR,
+            reason: Cow::Owned(e.to_string()),
+        })))
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -95,8 +110,7 @@ async fn handle_pull_request_initiation(
 
     match maybe_pull_request {
         Ok(pull_request) => {
-            // TODO: professional logging
-            println!(
+            tracing::debug!(
                 "Pull client sent a pull request: beginAfter={:?} stopAt={:?}",
                 pull_request
                     .begin_after
@@ -111,7 +125,10 @@ async fn handle_pull_request_initiation(
             );
 
             let metadata_chain = dataset.as_metadata_chain();
-            let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
+            let head = match metadata_chain.get_ref(&BlockRef::Head).await {
+                Ok(head) => head,
+                Err(e) => return Err(SmartProtocolPullServerError::Internal(e.int_err())),
+            };
 
             let size_estimation_result = prepare_dataset_transfer_estimaton(
                 dataset.as_metadata_chain(),
@@ -129,15 +146,18 @@ async fn handle_pull_request_initiation(
                 socket,
                 match size_estimation_result {
                     Ok(size_estimation) => {
+                        tracing::debug!("Sending size estimation: {:?}", size_estimation);
                         DatasetPullResponse::Ok(DatasetPullSuccessResponse { size_estimation })
                     }
                     Err(PrepareDatasetTransferEstimationError::InvalidInterval(e)) => {
+                        tracing::debug!("Sending invalid interval error: {:?}", e);
                         DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval {
                             head: e.head.clone(),
                             tail: e.tail.clone(),
                         })
                     }
                     Err(PrepareDatasetTransferEstimationError::Internal(e)) => {
+                        tracing::debug!("Sending internal error: {:?}", e);
                         DatasetPullResponse::Err(DatasetPullRequestError::Internal(
                             DatasetInternalError {
                                 error_message: e.to_string(),
@@ -168,18 +188,30 @@ async fn try_handle_pull_metadata_request(
 
     match maybe_pull_metadata_request {
         Ok(_) => {
-            // TODO: professional logging
-            println!("Pull client sent a pull metadata request");
+            tracing::debug!("Pull client sent a pull metadata request");
 
             let metadata_chain = dataset.as_metadata_chain();
-            let head = metadata_chain.get_ref(&BlockRef::Head).await.unwrap();
+            let head = match metadata_chain.get_ref(&BlockRef::Head).await {
+                Ok(head) => head,
+                Err(e) => return Err(SmartProtocolPullServerError::Internal(e.int_err())),
+            };
 
-            let metadata_batch = prepare_dataset_metadata_batch(
+            let metadata_batch = match prepare_dataset_metadata_batch(
                 dataset.as_metadata_chain(),
                 pull_request.stop_at.or(Some(head)).unwrap(),
                 pull_request.begin_after,
             )
-            .await;
+            .await
+            {
+                Ok(metadata_batch) => metadata_batch,
+                Err(e) => return Err(SmartProtocolPullServerError::Internal(e)),
+            };
+
+            tracing::debug!(
+                "Metadata batch of {} blocks formed, payload size {} bytes",
+                metadata_batch.objects_count,
+                metadata_batch.payload.len()
+            );
 
             let response_result_metadata = write_payload::<DatasetMetadataPullResponse>(
                 socket,
@@ -214,11 +246,11 @@ async fn try_handle_pull_objects_request(
 
     match maybe_pull_objects_transfer_request {
         Ok(request) => {
-            // TODO: professional logging
-            println!(
+            tracing::debug!(
                 "Pull client sent a pull objects request for {} objects",
                 request.object_files.len(),
             );
+
             let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
             for r in request.object_files {
                 let transfer_strategy =
@@ -226,13 +258,11 @@ async fn try_handle_pull_objects_request(
 
                 match transfer_strategy {
                     Ok(strategy) => object_transfer_strategies.push(strategy),
-                    Err(e) => match e {
-                        PrepareObjectTransferStrategyError::Internal(e) => {
-                            return Err(SmartProtocolPullServerError::Internal(e))
-                        }
-                    },
-                }
+                    Err(e) => return Err(SmartProtocolPullServerError::Internal(e)),
+                };
             }
+
+            tracing::debug!("Object transfer strategies defined");
 
             let response_result_objects = write_payload::<DatasetPullObjectsTransferResponse>(
                 socket,
@@ -262,20 +292,38 @@ pub async fn dataset_pull_ws_handler(
     dataset: Arc<dyn Dataset>,
     dataset_url: Url,
 ) {
-    // TODO: error handling
-    let pull_request = handle_pull_request_initiation(&mut socket, dataset.as_ref())
-        .await
-        .unwrap();
+    let pull_request = match handle_pull_request_initiation(&mut socket, dataset.as_ref()).await {
+        Ok(pull_request) => pull_request,
+        Err(e) => {
+            tracing::debug!("Pull process aborted with error: {}", e);
+            send_internal_error(&mut socket, e).await;
+            return;
+        }
+    };
 
-    if try_handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request)
-        .await
-        .unwrap()
-    {
+    let received_pull_metadata_request =
+        match try_handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request).await {
+            Ok(received) => received,
+            Err(e) => {
+                tracing::debug!("Pull process aborted with error: {}", e);
+                send_internal_error(&mut socket, e).await;
+                return;
+            }
+        };
+
+    if received_pull_metadata_request {
         loop {
             let should_continue =
-                try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &dataset_url)
+                match try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &dataset_url)
                     .await
-                    .unwrap();
+                {
+                    Ok(should_continue) => should_continue,
+                    Err(e) => {
+                        tracing::debug!("Pull process aborted with error: {}", e);
+                        send_internal_error(&mut socket, e).await;
+                        return;
+                    }
+                };
             if !should_continue {
                 break;
             }
@@ -283,30 +331,16 @@ pub async fn dataset_pull_ws_handler(
     }
 
     // Success
-    println!("Pull process succeded");
+    tracing::debug!("Pull process success");
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_push_ws_handler(
-    mut socket: axum::extract::ws::WebSocket,
+    mut _socket: axum::extract::ws::WebSocket,
     _dataset: Arc<dyn Dataset>,
 ) {
-    while let Some(msg) = socket.recv().await {
-        let msg = if let Ok(msg) = msg {
-            msg
-        } else {
-            // client disconnected
-            return;
-        };
-        println!("Push client sent: {}", msg.to_text().unwrap());
-
-        let reply = axum::extract::ws::Message::Text(String::from("Hi push client!"));
-        if socket.send(reply).await.is_err() {
-            // client disconnected
-            return;
-        }
-    }
+    unimplemented!("Push smart protocol flow to be implemented")
 }
 
 /////////////////////////////////////////////////////////////////////////////////
