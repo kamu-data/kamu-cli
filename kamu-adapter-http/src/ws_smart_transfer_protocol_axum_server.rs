@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use axum::extract::ws::Message;
 use serde::{de::DeserializeOwned, Serialize};
@@ -53,21 +53,6 @@ async fn write_payload<TMessagePayload: Serialize>(
         Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-async fn send_internal_error(
-    socket: &mut axum::extract::ws::WebSocket,
-    e: SmartProtocolPullServerError,
-) {
-    socket
-        .send(Message::Close(Some(axum::extract::ws::CloseFrame {
-            code: CLOSE_CODE_INTERNAL_ERROR,
-            reason: Cow::Owned(e.to_string()),
-        })))
-        .await
-        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -296,7 +281,6 @@ pub async fn dataset_pull_ws_handler(
         Ok(pull_request) => pull_request,
         Err(e) => {
             tracing::debug!("Pull process aborted with error: {}", e);
-            send_internal_error(&mut socket, e).await;
             return;
         }
     };
@@ -306,7 +290,6 @@ pub async fn dataset_pull_ws_handler(
             Ok(received) => received,
             Err(e) => {
                 tracing::debug!("Pull process aborted with error: {}", e);
-                send_internal_error(&mut socket, e).await;
                 return;
             }
         };
@@ -320,7 +303,6 @@ pub async fn dataset_pull_ws_handler(
                     Ok(should_continue) => should_continue,
                     Err(e) => {
                         tracing::debug!("Pull process aborted with error: {}", e);
-                        send_internal_error(&mut socket, e).await;
                         return;
                     }
                 };

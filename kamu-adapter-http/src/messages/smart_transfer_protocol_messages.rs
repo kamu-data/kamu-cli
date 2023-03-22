@@ -12,9 +12,6 @@ use opendatafabric::Multihash;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-/// Internal error closing code
-pub const CLOSE_CODE_INTERNAL_ERROR: u16 = 500;
-
 /// Initial dataset pull request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {

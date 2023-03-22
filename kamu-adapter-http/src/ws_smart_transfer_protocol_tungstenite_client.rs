@@ -11,6 +11,7 @@ use dill::component;
 use futures::SinkExt;
 use opendatafabric::Multihash;
 use serde::{de::DeserializeOwned, Serialize};
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 use thiserror::Error;
@@ -20,8 +21,8 @@ use url::Url;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use kamu::domain::{
-    Dataset, ErrorIntoInternal, GetRefError, InternalError, InvalidIntervalError, SyncError,
-    SyncListener, SyncResult,
+    Dataset, ErrorIntoInternal, GetRefError, InternalError, InvalidIntervalError,
+    ResultIntoInternal, SyncError, SyncListener, SyncResult,
 };
 use kamu::{domain::BlockRef, infra::utils::smart_transfer_protocol::SmartTransferProtocolClient};
 
@@ -82,21 +83,23 @@ impl WsSmartTransferProtocolClient {
             stop_at: None,
         };
 
+        tracing::debug!("Sending pull request: {:?}", pull_request_message);
+
         let write_result = write_payload(socket, pull_request_message).await;
         if let Err(e) = write_result {
             return Err(SmartProtocolPullClientError::PullRequestWriteFailed(e));
         }
 
-        let read_result = read_payload::<DatasetPullResponse>(socket).await;
+        tracing::debug!("Reading pull request response");
 
-        if let Err(e) = read_result {
-            return Err(SmartProtocolPullClientError::PullResponseReadFailed(e));
-        }
+        let dataset_pull_response = match read_payload::<DatasetPullResponse>(socket).await {
+            Ok(dataset_pull_response) => dataset_pull_response,
+            Err(e) => return Err(SmartProtocolPullClientError::PullResponseReadFailed(e)),
+        };
 
-        let dataset_pull_response = read_result.unwrap();
         match dataset_pull_response {
             Ok(success) => {
-                println!(
+                tracing::debug!(
                     "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
                     success.size_estimation.num_blocks,
                     success.size_estimation.bytes_in_raw_blocks,
@@ -124,20 +127,24 @@ impl WsSmartTransferProtocolClient {
         socket: &mut TungsteniteStream,
     ) -> Result<DatasetMetadataPullResponse, SmartProtocolPullClientError> {
         let pull_metadata_request = DatasetPullMetadataRequest {};
+        tracing::debug!("Sending pull metadata request");
+
         let write_result_metadata = write_payload(socket, pull_metadata_request).await;
         if let Err(e) = write_result_metadata {
             return Err(SmartProtocolPullClientError::PullMetadataRequestWriteFailed(e));
         }
 
-        let read_result_metadata = read_payload::<DatasetMetadataPullResponse>(socket).await;
+        tracing::debug!("Reading pull metadata request response");
 
-        if let Err(e) = read_result_metadata {
-            return Err(SmartProtocolPullClientError::PullMetadataResponseReadFailed(e));
-        }
+        let dataset_metadata_pull_response =
+            match read_payload::<DatasetMetadataPullResponse>(socket).await {
+                Ok(dataset_metadata_pull_response) => dataset_metadata_pull_response,
+                Err(e) => {
+                    return Err(SmartProtocolPullClientError::PullMetadataResponseReadFailed(e));
+                }
+            };
 
-        let dataset_metadata_pull_response: DatasetMetadataPullResponse =
-            read_result_metadata.unwrap();
-        println!(
+        tracing::debug!(
             "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
             dataset_metadata_pull_response.blocks.objects_count,
             dataset_metadata_pull_response.blocks.object_type,
@@ -155,6 +162,11 @@ impl WsSmartTransferProtocolClient {
         object_files: Vec<ObjectFileReference>,
     ) -> Result<DatasetPullObjectsTransferResponse, SmartProtocolPullClientError> {
         let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
+        tracing::debug!(
+            "Sending pull objects request for {} objects",
+            pull_objects_request.object_files.len()
+        );
+
         let write_result_objects = write_payload(socket, pull_objects_request).await;
         if let Err(e) = write_result_objects {
             return Err(SmartProtocolPullClientError::PullObjectRequestWriteFailed(
@@ -162,21 +174,30 @@ impl WsSmartTransferProtocolClient {
             ));
         }
 
-        let read_result_objects = read_payload::<DatasetPullObjectsTransferResponse>(socket).await;
+        tracing::debug!("Reading pull objects request response");
 
-        if let Err(e) = read_result_objects {
-            return Err(SmartProtocolPullClientError::PullObjectResponseReadFailed(
-                e,
-            ));
-        }
+        let dataset_objects_pull_response =
+            match read_payload::<DatasetPullObjectsTransferResponse>(socket).await {
+                Ok(dataset_objects_pull_response) => dataset_objects_pull_response,
+                Err(e) => {
+                    return Err(SmartProtocolPullClientError::PullObjectResponseReadFailed(
+                        e,
+                    ));
+                }
+            };
 
-        let dataset_objects_pull_response = read_result_objects.unwrap();
+        tracing::debug!(
+            "Obtained transfer strategies for {} objects",
+            dataset_objects_pull_response
+                .object_transfer_strategies
+                .len()
+        );
 
         dataset_objects_pull_response
             .object_transfer_strategies
             .iter()
             .for_each(|s| {
-                println!(
+                tracing::debug!(
                     "Object file {} needs to download from {} via {:?} method, expires at {:?}",
                     s.object_file.physical_hash.to_string(),
                     s.download_from.url,
@@ -205,7 +226,15 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         let pull_url_res = pull_url.set_scheme("ws");
         assert!(pull_url_res.is_ok());
 
-        let (mut ws_stream, _) = connect_async(pull_url).await.unwrap();
+        tracing::debug!("Connecting to pull URL: {}", pull_url);
+
+        let mut ws_stream = match connect_async(pull_url).await {
+            Ok((ws_stream, _)) => ws_stream,
+            Err(e) => {
+                tracing::debug!("Failed to connect to pull URL: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
 
         let dst_head_result = dst.as_metadata_chain().get_ref(&BlockRef::Head).await;
         let dst_head = match dst_head_result {
@@ -215,71 +244,88 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
         }?;
 
-        let dataset_pull_result = self
+        let dataset_pull_result = match self
             .pull_send_request(&mut ws_stream, dst_head.clone())
-            .await;
-
-        let sync_result = match dataset_pull_result {
-            Ok(success) => {
-                if success.size_estimation.num_blocks > 0 {
-                    let dataset_pull_metadata_response = self
-                        .pull_send_metadata_request(&mut ws_stream)
-                        .await
-                        .unwrap();
-
-                    let object_files_transfer_plan =
-                        dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks)
-                            .await;
-
-                    println!(
-                        "Object files transfer plan consist of {} stages",
-                        object_files_transfer_plan.len()
-                    );
-
-                    let mut stage_index = 0;
-                    for stage_object_files in object_files_transfer_plan {
-                        stage_index += 1;
-                        println!(
-                            "Stage #{}: querying {} data objects",
-                            stage_index,
-                            stage_object_files.len()
-                        );
-
-                        let dataset_objects_pull_response = self
-                            .pull_send_objects_request(&mut ws_stream, stage_object_files)
-                            .await
-                            .unwrap();
-
-                        use futures::StreamExt;
-                        futures::stream::iter(
-                            dataset_objects_pull_response.object_transfer_strategies,
-                        )
-                        .for_each_concurrent(
-                            /* limit */ 4, // TODO: external configuration?
-                            |s| async move { dataset_import_object_file(dst, &s).await.unwrap() },
-                        )
-                        .await;
-                    }
-
-                    let new_dst_head = dst
-                        .as_metadata_chain()
-                        .get_ref(&BlockRef::Head)
-                        .await
-                        .unwrap();
-
-                    Ok(SyncResult::Updated {
-                        old_head: dst_head,
-                        new_head: new_dst_head,
-                        num_blocks: success.size_estimation.num_blocks as usize,
-                    })
-                } else {
-                    Ok(SyncResult::UpToDate)
-                }
+            .await
+        {
+            Ok(dataset_pull_result) => dataset_pull_result,
+            Err(e) => {
+                tracing::debug!("Pull process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
             }
-            Err(e) => Err(SyncError::Internal(e.int_err())),
-        }?;
+        };
 
-        ws_stream.close(None).await.unwrap();
+        let sync_result = if dataset_pull_result.size_estimation.num_blocks > 0 {
+            let dataset_pull_metadata_response =
+                match self.pull_send_metadata_request(&mut ws_stream).await {
+                    Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
+                    Err(e) => {
+                        tracing::debug!("Pull process aborted with error: {}", e);
+                        Err(SyncError::Internal(e.int_err()))
+                    }
+                }?;
+
+            let object_files_transfer_plan =
+                dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks).await;
+
+            tracing::debug!(
+                "Object files transfer plan consist of {} stages",
+                object_files_transfer_plan.len()
+            );
+
+            let mut stage_index = 0;
+            for stage_object_files in object_files_transfer_plan {
+                stage_index += 1;
+                tracing::debug!(
+                    "Stage #{}: querying {} data objects",
+                    stage_index,
+                    stage_object_files.len()
+                );
+
+                let dataset_objects_pull_response = match self
+                    .pull_send_objects_request(&mut ws_stream, stage_object_files)
+                    .await
+                {
+                    Ok(dataset_objects_pull_response) => Ok(dataset_objects_pull_response),
+                    Err(e) => {
+                        tracing::debug!("Pull process aborted with error: {}", e);
+                        Err(SyncError::Internal(e.int_err()))
+                    }
+                }?;
+
+                use futures::stream::{StreamExt, TryStreamExt};
+                futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
+                    .map(Ok)
+                    .try_for_each_concurrent(
+                        /* limit */ 4, // TODO: external configuration?
+                        |s| async move { dataset_import_object_file(dst, &s).await },
+                    )
+                    .await?;
+            }
+
+            let new_dst_head = dst
+                .as_metadata_chain()
+                .get_ref(&BlockRef::Head)
+                .await
+                .int_err()?;
+
+            SyncResult::Updated {
+                old_head: dst_head,
+                new_head: new_dst_head,
+                num_blocks: dataset_pull_result.size_estimation.num_blocks as usize,
+            }
+        } else {
+            SyncResult::UpToDate
+        };
+
+        use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
+        ws_stream
+            .close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: Cow::Borrowed("Client pull flow succeeded"),
+            }))
+            .await
+            .int_err()?;
 
         Ok(sync_result)
     }
@@ -287,32 +333,10 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn push_protocol_client_flow(
         &self,
         _src: &dyn Dataset,
-        dst_url: &Url,
-        listener: Arc<dyn SyncListener>,
+        _dst_url: &Url,
+        _listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        listener.begin();
-
-        let mut push_url = dst_url.join("push").unwrap();
-        let push_url_res = push_url.set_scheme("ws");
-        assert!(push_url_res.is_ok());
-
-        let (mut ws_stream, _) = connect_async(push_url).await.unwrap();
-
-        let hello_message = Message::Text(String::from("Hello push server!"));
-        if ws_stream.send(hello_message).await.is_err() {
-            // server disconnected
-        }
-
-        use tokio_stream::StreamExt;
-        while let Some(msg) = ws_stream.next().await {
-            let msg = msg.unwrap();
-            if msg.is_text() || msg.is_binary() {
-                println!("Push server sent: {}", msg);
-                ws_stream.close(None).await.unwrap();
-            }
-        }
-
-        unimplemented!("Not supported yet")
+        unimplemented!("Smart push protocol not supported yet")
     }
 }
 

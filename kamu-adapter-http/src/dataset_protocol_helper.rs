@@ -396,12 +396,14 @@ pub async fn dataset_import_object_file(
 
     let client = reqwest::Client::new();
 
-    // TODO: error handling
-    let response = client
+    let response = match client
         .get(object_transfer_strategy.download_from.url.clone())
         .send()
         .await
-        .unwrap();
+    {
+        Ok(response) => response,
+        Err(e) => return Err(SyncError::Internal(e.int_err())),
+    };
 
     let stream = response.bytes_stream();
 
