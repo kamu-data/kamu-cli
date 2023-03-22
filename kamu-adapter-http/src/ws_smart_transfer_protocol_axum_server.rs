@@ -159,11 +159,11 @@ async fn handle_pull_request_initiation(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-async fn handle_pull_metadata_request(
+async fn try_handle_pull_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     pull_request: DatasetPullRequest,
-) -> Result<(), SmartProtocolPullServerError> {
+) -> Result<bool, SmartProtocolPullServerError> {
     let maybe_pull_metadata_request = read_payload::<DatasetPullMetadataRequest>(socket).await;
 
     match maybe_pull_metadata_request {
@@ -192,9 +192,10 @@ async fn handle_pull_metadata_request(
             if let Err(e) = response_result_metadata {
                 Err(SmartProtocolPullServerError::PullMetadataResponseWriteFailed(e))
             } else {
-                Ok(())
+                Ok(true)
             }
         }
+        Err(ReadMessageError::Closed) => Ok(false),
         Err(e) => Err(SmartProtocolPullServerError::PullMetadataRequestReadFailed(
             e,
         )),
@@ -266,18 +267,18 @@ pub async fn dataset_pull_ws_handler(
         .await
         .unwrap();
 
-    // TODO: the flow might abort at this point, handle optionality
-    handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request)
+    if try_handle_pull_metadata_request(&mut socket, dataset.as_ref(), pull_request)
         .await
-        .unwrap();
-
-    loop {
-        let should_continue =
-            try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &dataset_url)
-                .await
-                .unwrap();
-        if !should_continue {
-            break;
+        .unwrap()
+    {
+        loop {
+            let should_continue =
+                try_handle_pull_objects_request(&mut socket, dataset.as_ref(), &dataset_url)
+                    .await
+                    .unwrap();
+            if !should_continue {
+                break;
+            }
         }
     }
 

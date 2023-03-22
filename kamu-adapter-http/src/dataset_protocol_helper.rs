@@ -168,9 +168,12 @@ pub async fn dataset_import_pulled_metadata(
     let object_files =
         collect_missing_object_references_from_metadata(dataset, loaded_blocks).await;
 
-    // Future: analyze sizes and split on stages
-
-    vec![object_files]
+    // TODO: analyze sizes and split on stages
+    if object_files.is_empty() {
+        vec![]
+    } else {
+        vec![object_files]
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +220,7 @@ async fn load_dataset_blocks(
 ) -> Vec<MetadataBlock> {
     stream::iter(blocks_data)
         .then(|(hash, block_buf)| async move {
-            println!("> {} - {} bytes", hash, block_buf.len());
+            tracing::debug!("> {} - {} bytes", hash, block_buf.len());
             let block = metadata_chain
                 .append_block_from_bytes(
                     &hash,
