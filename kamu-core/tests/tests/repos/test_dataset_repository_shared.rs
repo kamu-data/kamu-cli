@@ -107,7 +107,7 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
             .build(),
     ];
 
-    create_datasets_from_snapshots(repo, snapshots).await;
+    repo.create_datasets_from_snapshots(snapshots).await;
 
     assert_matches!(
         repo.rename_dataset(&name_baz.as_local_ref(), &name_foo)
@@ -150,7 +150,8 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository) {
             .build(),
     ];
 
-    let handles: Vec<_> = create_datasets_from_snapshots(repo, snapshots)
+    let handles: Vec<_> = repo
+        .create_datasets_from_snapshots(snapshots)
         .await
         .into_iter()
         .map(|(_, r)| r.unwrap().dataset_handle)

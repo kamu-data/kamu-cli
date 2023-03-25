@@ -121,33 +121,14 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         &self,
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
-}
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// This function needs to be global. Moving it to become an extension method results in weird errors about lifetimes
-pub async fn create_datasets_from_snapshots<T>(
-    repo: &T,
-    snapshots: Vec<DatasetSnapshot>,
-) -> Vec<(
-    DatasetName,
-    Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-)>
-where
-    T: DatasetRepository,
-    T: ?Sized,
-{
-    let snapshots_ordered = sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
-
-    use tokio_stream::StreamExt;
-    futures::stream::iter(snapshots_ordered)
-        .then(|s| async {
-            let name = s.name.clone();
-            let res = repo.create_dataset_from_snapshot(s).await;
-            (name, res)
-        })
-        .collect()
-        .await
+    async fn create_datasets_from_snapshots(
+        &self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(
+        DatasetName,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
+    )>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -326,6 +307,24 @@ where
 
         let hdl = builder.finish().await?;
         Ok(CreateDatasetResult::new(hdl, head, sequence_number))
+    }
+
+    async fn create_datasets_from_snapshots(
+        &self,
+        snapshots: Vec<DatasetSnapshot>,
+    ) -> Vec<(
+        DatasetName,
+        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
+    )> {
+        let snapshots_ordered = sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
+
+        let mut ret = Vec::new();
+        for snapshot in snapshots_ordered {
+            let name = snapshot.name.clone();
+            let res = self.create_dataset_from_snapshot(snapshot).await;
+            ret.push((name, res));
+        }
+        ret
     }
 }
 
