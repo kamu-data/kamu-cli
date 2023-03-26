@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::{
-    ws_smart_transfer_protocol_axum_server, DatasetResolver, PARAMETER_BLOCK_HASH,
-    PARAMETER_DATASET_NAME, PARAMETER_PHYSICAL_HASH, PARAMETER_REF,
+    ws_smart_transfer_protocol_axum_server, PARAMETER_BLOCK_HASH, PARAMETER_PHYSICAL_HASH,
+    PARAMETER_REF,
 };
 use axum::extract::Extension;
 use kamu::domain::*;
@@ -162,15 +162,10 @@ pub async fn dataset_push_ws_upgrade_handler(
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     dataset: Extension<Arc<dyn Dataset>>,
-    axum::TypedHeader(api_host): axum::TypedHeader<axum::headers::Host>,
-    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
+    host: axum::extract::Host,
+    uri: axum::extract::OriginalUri,
 ) -> axum::response::Response {
-    let base_url = resolve_base_api_url(api_host);
-
-    let dataset_name_param = params.get(PARAMETER_DATASET_NAME).unwrap();
-    let dataset_url = base_url
-        .join((String::from(dataset_name_param) + "/").as_str())
-        .unwrap();
+    let dataset_url = get_base_dataset_url(host, uri, 1);
 
     ws.on_upgrade(move |socket| {
         ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(
@@ -183,47 +178,20 @@ pub async fn dataset_pull_ws_upgrade_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn resolve_dataset_by_name(
-    dataset_resolver: axum::Extension<Arc<dyn DatasetResolver>>,
-    axum::extract::Path(params): axum::extract::Path<HashMap<String, String>>,
-    mut req: axum::http::Request<axum::body::Body>,
-    next: axum::middleware::Next<axum::body::Body>,
-) -> Result<axum::response::Response, axum::http::StatusCode> {
-    let dataset_name_param = params.get(PARAMETER_DATASET_NAME).unwrap();
-    let dataset_resolution = dataset_resolver
-        .resolve_dataset(dataset_name_param.as_str())
-        .await;
+fn get_base_dataset_url(
+    host: axum::extract::Host,
+    uri: axum::extract::OriginalUri,
+    depth: usize,
+) -> Url {
+    // TODO: HTTP is hardcoded
+    let url = Url::parse(&format!("http://{}", host.0)).unwrap();
 
-    match dataset_resolution {
-        Ok(dataset) => {
-            req.extensions_mut().insert(dataset);
-            Ok(next.run(req).await)
-        }
-        Err(e) => match e {
-            kamu::domain::GetDatasetError::NotFound(_) => Err(axum::http::StatusCode::NOT_FOUND),
-            kamu::domain::GetDatasetError::Internal(_) => {
-                tracing::debug!(
-                    "Internal error while resolving dataset '{}'",
-                    dataset_name_param
-                );
-                Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
-            }
-        },
+    let mut path: Vec<_> = uri.0.path().split('/').collect();
+    for _ in 0..depth {
+        path.pop();
     }
-}
 
-/////////////////////////////////////////////////////////////////////////////////
-
-fn resolve_base_api_url(api_host: axum::headers::Host) -> Url {
-    let mut base_url_str = String::from("http://");
-    base_url_str += api_host.hostname();
-    if let Some(port) = api_host.port() {
-        base_url_str += ":";
-        base_url_str += &port.to_string();
-    }
-    base_url_str += "/";
-
-    Url::parse(base_url_str.as_str()).unwrap()
+    url.join(&path.join("/")).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

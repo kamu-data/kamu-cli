@@ -10,9 +10,6 @@
 #![feature(error_generic_member_access)]
 #![feature(provide_any)]
 
-pub(crate) mod dataset_resolvers;
-pub use dataset_resolvers::*;
-
 pub(crate) mod messages;
 
 mod http_server_constants;
@@ -20,6 +17,9 @@ pub use http_server_constants::*;
 
 mod http_server_dataset_router;
 pub use http_server_dataset_router::*;
+
+mod http_server_middleware;
+pub use http_server_middleware::*;
 
 mod ws_smart_transfer_protocol_axum_server;
 

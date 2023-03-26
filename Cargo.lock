@@ -2402,7 +2402,6 @@ dependencies = [
  "env_logger",
  "flate2",
  "futures",
- "http",
  "hyper",
  "kamu",
  "opendatafabric",
