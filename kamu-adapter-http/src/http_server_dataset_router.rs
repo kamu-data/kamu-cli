@@ -12,7 +12,7 @@ use crate::http_server_simple_transfer_protocol::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub fn create_dataset_transfer_protocol_routes() -> axum::Router {
+pub fn smart_transfer_protocol_routes() -> axum::Router {
     axum::Router::new()
         .route(
             format!("/refs/:{}", PARAMETER_REF).as_str(),
