@@ -7,27 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::http_server_constants::*;
 use crate::http_server_simple_transfer_protocol::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
 pub fn smart_transfer_protocol_routes() -> axum::Router {
     axum::Router::new()
+        .route("/refs/:reference", axum::routing::get(dataset_refs_handler))
         .route(
-            format!("/refs/:{}", PARAMETER_REF).as_str(),
-            axum::routing::get(dataset_refs_handler),
-        )
-        .route(
-            format!("/blocks/:{}", PARAMETER_BLOCK_HASH).as_str(),
+            "/blocks/:block_hash",
             axum::routing::get(dataset_blocks_handler),
         )
         .route(
-            format!("/data/:{}", PARAMETER_PHYSICAL_HASH).as_str(),
+            "/data/:physical_hash",
             axum::routing::get(dataset_data_handler),
         )
         .route(
-            format!("/checkpoints/:{}", PARAMETER_PHYSICAL_HASH).as_str(),
+            "/checkpoints/:physical_hash",
             axum::routing::get(dataset_checkpoints_handler),
         )
         .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))

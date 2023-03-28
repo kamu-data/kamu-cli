@@ -12,9 +12,6 @@
 
 pub(crate) mod messages;
 
-mod http_server_constants;
-pub use http_server_constants::*;
-
 mod http_server_dataset_router;
 pub use http_server_dataset_router::*;
 
