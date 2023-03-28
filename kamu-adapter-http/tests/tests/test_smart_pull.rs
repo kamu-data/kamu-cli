@@ -54,7 +54,7 @@ async fn test_smart_pull_new_dataset() {
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
-    let api_server_handle = async { server_harness.api_server_run().await };
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
@@ -116,7 +116,7 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
-    let api_server_handle = async { server_harness.api_server_run().await };
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
@@ -189,7 +189,7 @@ async fn test_smart_pull_existing_evolved_dataset() {
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
-    let api_server_handle = async { server_harness.api_server_run().await };
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
@@ -270,7 +270,7 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
-    let api_server_handle = async { server_harness.api_server_run().await };
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_responses = client_harness
             .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
