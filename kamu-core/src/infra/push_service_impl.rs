@@ -14,7 +14,7 @@ use dill::*;
 use std::sync::Arc;
 
 pub struct PushServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     sync_svc: Arc<dyn SyncService>,
 }
@@ -22,7 +22,7 @@ pub struct PushServiceImpl {
 #[component(pub)]
 impl PushServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {

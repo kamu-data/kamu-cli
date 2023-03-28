@@ -16,7 +16,7 @@ use futures::TryStreamExt;
 use std::sync::Arc;
 
 pub struct AliasListCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     dataset_ref: Option<DatasetRefLocal>,
@@ -24,7 +24,7 @@ pub struct AliasListCommand {
 
 impl AliasListCommand {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         dataset_ref: Option<DatasetRefLocal>,

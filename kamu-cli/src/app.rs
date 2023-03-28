@@ -13,6 +13,7 @@ use std::sync::Arc;
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
+use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::infra::*;
 use tracing::error;
 use tracing::info;
@@ -91,8 +92,8 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
 
-    b.add::<LocalDatasetRepositoryImpl>();
-    b.bind::<dyn LocalDatasetRepository, LocalDatasetRepositoryImpl>();
+    b.add::<DatasetRepositoryLocalFs>();
+    b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
@@ -138,6 +139,9 @@ pub fn configure_catalog() -> CatalogBuilder {
 
     b.add::<EngineProvisionerLocal>();
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
+
+    b.add::<kamu_adapter_http::WsSmartTransferProtocolClient>();
+    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::WsSmartTransferProtocolClient>();
 
     b
 }

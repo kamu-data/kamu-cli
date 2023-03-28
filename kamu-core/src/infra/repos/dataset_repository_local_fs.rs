@@ -7,30 +7,28 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::dataset_repository_helpers::get_staging_name;
 use crate::domain::*;
 use crate::infra::*;
+use futures::TryStreamExt;
 use opendatafabric::*;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use dill::*;
-use futures::{Stream, StreamExt, TryStreamExt};
-use std::collections::HashSet;
-use std::collections::LinkedList;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LocalDatasetRepositoryImpl {
+pub struct DatasetRepositoryLocalFs {
     root: PathBuf,
     //info_repo: NamedObjectRepositoryLocalFS,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
 // TODO: Find a better way to share state with dataset builder
-impl Clone for LocalDatasetRepositoryImpl {
+impl Clone for DatasetRepositoryLocalFs {
     fn clone(&self) -> Self {
         Self::from(self.root.clone())
     }
@@ -39,7 +37,7 @@ impl Clone for LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-impl LocalDatasetRepositoryImpl {
+impl DatasetRepositoryLocalFs {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
         Self::from(&workspace_layout.datasets_dir)
     }
@@ -101,80 +99,6 @@ impl LocalDatasetRepositoryImpl {
         Ok(())
     }*/
 
-    async fn resolve_transform_inputs(
-        &self,
-        dataset_name: &DatasetName,
-        inputs: &mut Vec<TransformInput>,
-    ) -> Result<(), CreateDatasetFromSnapshotError> {
-        for input in inputs.iter_mut() {
-            if let Some(input_id) = &input.id {
-                // Input is referenced by ID - in this case we allow any name
-                match self.resolve_dataset_ref(&input_id.as_local_ref()).await {
-                    Ok(_) => Ok(()),
-                    Err(GetDatasetError::NotFound(_)) => Err(
-                        CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                            dataset_ref: dataset_name.into(),
-                            missing_inputs: vec![input_id.as_local_ref()],
-                        }),
-                    ),
-                    Err(GetDatasetError::Internal(e)) => Err(e.into()),
-                }?;
-            } else {
-                // When ID is not specified we try resolving it by name
-                let hdl = match self.resolve_dataset_ref(&input.name.as_local_ref()).await {
-                    Ok(hdl) => Ok(hdl),
-                    Err(GetDatasetError::NotFound(_)) => Err(
-                        CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                            dataset_ref: dataset_name.into(),
-                            missing_inputs: vec![input.name.as_local_ref()],
-                        }),
-                    ),
-                    Err(GetDatasetError::Internal(e)) => Err(e.into()),
-                }?;
-
-                input.id = Some(hdl.id);
-            }
-        }
-        Ok(())
-    }
-
-    fn sort_snapshots_in_dependency_order(
-        &self,
-        mut snapshots: LinkedList<DatasetSnapshot>,
-    ) -> Vec<DatasetSnapshot> {
-        let mut ordered = Vec::with_capacity(snapshots.len());
-        let mut pending: HashSet<DatasetName> = snapshots.iter().map(|s| s.name.clone()).collect();
-        let mut added: HashSet<DatasetName> = HashSet::new();
-
-        // TODO: cycle detection
-        while !snapshots.is_empty() {
-            let snapshot = snapshots.pop_front().unwrap();
-
-            let transform = snapshot
-                .metadata
-                .iter()
-                .find_map(|e| e.as_variant::<SetTransform>());
-
-            let has_pending_deps = if let Some(transform) = transform {
-                transform
-                    .inputs
-                    .iter()
-                    .any(|input| pending.contains(&input.name))
-            } else {
-                false
-            };
-
-            if !has_pending_deps {
-                pending.remove(&snapshot.name);
-                added.insert(snapshot.name.clone());
-                ordered.push(snapshot);
-            } else {
-                snapshots.push_back(snapshot);
-            }
-        }
-        ordered
-    }
-
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
@@ -223,62 +147,12 @@ impl LocalDatasetRepositoryImpl {
 
         Ok(handle)
     }
-
-    // TODO: Cleanup procedure for orphaned staged datasets?
-    fn get_staging_name(&self) -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut name = String::with_capacity(16);
-        name.push_str(".pending-");
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        name
-    }
-
-    // TODO: PERF: This is super inefficient
-    fn get_downstream_dependencies_impl<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRefLocal,
-    ) -> impl Stream<Item = Result<DatasetHandle, InternalError>> + 's {
-        async_stream::try_stream! {
-            let dataset_handle = self.resolve_dataset_ref(dataset_ref).await.int_err()?;
-
-            let mut dataset_handles = self.get_all_datasets();
-            while let Some(hdl) = dataset_handles.try_next().await? {
-                if hdl.id == dataset_handle.id {
-                    continue;
-                }
-
-                let summary = self
-                    .get_dataset(&hdl.as_local_ref())
-                    .await
-                    .int_err()?
-                    .get_summary(GetSummaryOpts::default())
-                    .await
-                    .int_err()?;
-
-                if summary
-                    .dependencies
-                    .iter()
-                    .any(|d| d.id.as_ref() == Some(&dataset_handle.id))
-                {
-                    yield hdl;
-                }
-            }
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl DatasetRegistry for LocalDatasetRepositoryImpl {
+impl DatasetRegistry for DatasetRepositoryLocalFs {
     async fn get_dataset_url(
         &self,
         dataset_ref: &DatasetRefLocal,
@@ -291,7 +165,7 @@ impl DatasetRegistry for LocalDatasetRepositoryImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
+impl DatasetRepository for DatasetRepositoryLocalFs {
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing all summaries
@@ -387,134 +261,17 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         &self,
         dataset_name: &DatasetName,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_path = self.root.join(self.get_staging_name());
+        let staging_path = self.root.join(get_staging_name());
 
         let layout = DatasetLayout::create(&staging_path).int_err()?;
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
-        Ok(Box::new(DatasetBuilderImpl::new(
+        Ok(Box::new(DatasetBuilderLocalFs::new(
             self.clone(),
             dataset,
             staging_path,
             dataset_name.clone(),
         )))
-    }
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        mut snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        // Validate / resolve events
-        for event in snapshot.metadata.iter_mut() {
-            match event {
-                MetadataEvent::Seed(_) => Err(InvalidSnapshotError {
-                    reason: "Seed event is generated and cannot be specified explicitly".to_owned(),
-                }
-                .into()),
-                MetadataEvent::SetPollingSource(_) => {
-                    if snapshot.kind != DatasetKind::Root {
-                        Err(InvalidSnapshotError {
-                            reason: "SetPollingSource is only allowed on root datasets".to_owned(),
-                        }
-                        .into())
-                    } else {
-                        Ok(())
-                    }
-                }
-                MetadataEvent::SetTransform(e) => {
-                    if snapshot.kind != DatasetKind::Derivative {
-                        Err(InvalidSnapshotError {
-                            reason: "SetTransform is only allowed on derivative datasets"
-                                .to_owned(),
-                        }
-                        .into())
-                    } else {
-                        self.resolve_transform_inputs(&snapshot.name, &mut e.inputs)
-                            .await
-                    }
-                }
-                MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetVocab(_) => Ok(()),
-                MetadataEvent::AddData(_)
-                | MetadataEvent::ExecuteQuery(_)
-                | MetadataEvent::SetWatermark(_) => Err(InvalidSnapshotError {
-                    reason: format!(
-                        "Event is not allowed to appear in a DatasetSnapshot: {:?}",
-                        event
-                    ),
-                }
-                .into()),
-            }?;
-        }
-
-        let system_time = Utc::now();
-
-        let builder = self.create_dataset(&snapshot.name).await?;
-        let chain = builder.as_dataset().as_metadata_chain();
-
-        // We are generating a key pair and deriving a dataset ID from it.
-        // The key pair is discarded for now, but in future can be used for
-        // proof of control over dataset and metadata signing.
-        let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
-
-        let mut sequence_number = 0;
-
-        let mut head = chain
-            .append(
-                MetadataBlock {
-                    system_time,
-                    prev_block_hash: None,
-                    event: MetadataEvent::Seed(Seed {
-                        dataset_id,
-                        dataset_kind: snapshot.kind,
-                    }),
-                    sequence_number: sequence_number,
-                },
-                AppendOpts::default(),
-            )
-            .await
-            .int_err()?;
-
-        for event in snapshot.metadata {
-            sequence_number += 1;
-            head = chain
-                .append(
-                    MetadataBlock {
-                        system_time,
-                        prev_block_hash: Some(head),
-                        event,
-                        sequence_number: sequence_number,
-                    },
-                    AppendOpts::default(),
-                )
-                .await
-                .int_err()?;
-        }
-
-        let hdl = builder.finish().await?;
-        Ok(CreateDatasetResult::new(hdl, head, sequence_number))
-    }
-
-    async fn create_datasets_from_snapshots(
-        &self,
-        snapshots: Vec<DatasetSnapshot>,
-    ) -> Vec<(
-        DatasetName,
-        Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
-    )> {
-        let snapshots_ordered =
-            self.sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
-
-        futures::stream::iter(snapshots_ordered)
-            .then(|s| async {
-                let name = s.name.clone();
-                let res = self.create_dataset_from_snapshot(s).await;
-                (name, res)
-            })
-            .collect()
-            .await
     }
 
     async fn rename_dataset(
@@ -550,8 +307,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        let children: Vec<_> = self
-            .get_downstream_dependencies_impl(dataset_ref)
+        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
             .try_collect()
             .await?;
 
@@ -583,7 +339,7 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
         &'s self,
         dataset_ref: &'s DatasetRefLocal,
     ) -> DatasetHandleStream<'s> {
-        Box::pin(self.get_downstream_dependencies_impl(dataset_ref))
+        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
 }
 
@@ -591,8 +347,8 @@ impl LocalDatasetRepository for LocalDatasetRepositoryImpl {
 // DatasetBuilderImpl
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct DatasetBuilderImpl<D> {
-    repo: LocalDatasetRepositoryImpl,
+struct DatasetBuilderLocalFs<D> {
+    repo: DatasetRepositoryLocalFs,
     dataset: D,
     staging_path: PathBuf,
     dataset_name: DatasetName,
@@ -600,9 +356,9 @@ struct DatasetBuilderImpl<D> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<D> DatasetBuilderImpl<D> {
+impl<D> DatasetBuilderLocalFs<D> {
     fn new(
-        repo: LocalDatasetRepositoryImpl,
+        repo: DatasetRepositoryLocalFs,
         dataset: D,
         staging_path: PathBuf,
         dataset_name: DatasetName,
@@ -625,7 +381,7 @@ impl<D> DatasetBuilderImpl<D> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<D> Drop for DatasetBuilderImpl<D> {
+impl<D> Drop for DatasetBuilderLocalFs<D> {
     fn drop(&mut self) {
         let _ = self.discard_impl();
     }
@@ -634,7 +390,7 @@ impl<D> Drop for DatasetBuilderImpl<D> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<D> DatasetBuilder for DatasetBuilderImpl<D>
+impl<D> DatasetBuilder for DatasetBuilderLocalFs<D>
 where
     D: Dataset,
 {
@@ -672,7 +428,7 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<D> Dataset for DatasetBuilderImpl<D>
+impl<D> Dataset for DatasetBuilderLocalFs<D>
 where
     D: Dataset,
 {

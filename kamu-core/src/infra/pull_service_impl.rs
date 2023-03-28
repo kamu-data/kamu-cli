@@ -19,7 +19,7 @@ use tracing::{debug, info, info_span};
 use url::Url;
 
 pub struct PullServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
@@ -29,7 +29,7 @@ pub struct PullServiceImpl {
 #[component(pub)]
 impl PullServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,

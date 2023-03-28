@@ -21,7 +21,7 @@ use std::path;
 use std::sync::Arc;
 
 pub struct CompleteCommand {
-    local_repo: Option<Arc<dyn LocalDatasetRepository>>,
+    local_repo: Option<Arc<dyn DatasetRepository>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
@@ -34,7 +34,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new<S>(
-        local_repo: Option<Arc<dyn LocalDatasetRepository>>,
+        local_repo: Option<Arc<dyn DatasetRepository>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,

@@ -10,6 +10,12 @@
 use dill::Catalog;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
+// Extractor of dataset identity for smart transfer protocol
+#[derive(serde::Deserialize)]
+struct DatasetByName {
+    dataset_name: opendatafabric::DatasetName,
+}
+
 pub struct APIServer {
     server: axum::Server<
         hyper::server::conn::AddrIncoming,
@@ -19,13 +25,24 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        let gql_schema = kamu_adapter_graphql::schema(catalog);
+        use axum::extract::Extension;
+        use axum::extract::Path;
+
+        let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
             .route(
                 "/graphql",
                 axum::routing::get(graphql_playground).post(graphql_handler),
+            )
+            .nest(
+                "/:dataset_name",
+                kamu_adapter_http::smart_transfer_protocol_routes()
+                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
+                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+                    ))
+                    .layer(Extension(catalog)),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -36,7 +53,7 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(axum::extract::Extension(gql_schema)),
+                    .layer(Extension(gql_schema)),
             );
 
         let addr = SocketAddr::from((

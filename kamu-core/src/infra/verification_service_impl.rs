@@ -17,7 +17,7 @@ use std::sync::Arc;
 use tracing::info_span;
 
 pub struct VerificationServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     transform_service: Arc<dyn TransformService>,
     workspace_layout: Arc<WorkspaceLayout>,
 }
@@ -25,7 +25,7 @@ pub struct VerificationServiceImpl {
 #[component(pub)]
 impl VerificationServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         transform_service: Arc<dyn TransformService>,
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {

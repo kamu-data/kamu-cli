@@ -67,7 +67,7 @@ impl Kamu {
     }
 
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let local_repo = LocalDatasetRepositoryImpl::new(Arc::new(self.workspace_layout.clone()));
+        let local_repo = DatasetRepositoryLocalFs::new(Arc::new(self.workspace_layout.clone()));
 
         let dataset = local_repo
             .get_dataset(&dataset_name.as_local_ref())
@@ -114,7 +114,7 @@ impl Kamu {
         use kamu_cli::{CompleteCommand, ConfigService};
 
         let cli = kamu_cli::cli();
-        let dataset_repo = Arc::new(LocalDatasetRepositoryImpl::new(Arc::new(
+        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(Arc::new(
             self.workspace_layout.clone(),
         )));
         let config_service = Arc::new(ConfigService::new(&self.workspace_layout));

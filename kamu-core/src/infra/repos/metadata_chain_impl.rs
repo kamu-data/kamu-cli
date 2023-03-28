@@ -12,6 +12,21 @@ use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use async_trait::async_trait;
+use thiserror::Error;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+enum ConstructBlockFromBytesError {
+    #[error(transparent)]
+    BlockVersion(BlockVersionError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -141,6 +156,31 @@ where
         }
         Ok(())
     }
+
+    async fn construct_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: &[u8],
+    ) -> Result<MetadataBlock, ConstructBlockFromBytesError> {
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
+            Ok(block) => Ok(block),
+            Err(e) => match e {
+                Error::UnsupportedVersion { .. } => Err(
+                    ConstructBlockFromBytesError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }),
+                ),
+                _ => Err(ConstructBlockFromBytesError::Internal(
+                    BlockMalformedError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    }
+                    .int_err(),
+                )),
+            },
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -165,24 +205,13 @@ where
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
-        match FlatbuffersMetadataBlockDeserializer.read_manifest(&data) {
-            Ok(block) => return Ok(block),
+        match self.construct_block_from_bytes(hash, &data).await {
+            Ok(block) => Ok(block),
             Err(e) => match e {
-                Error::UnsupportedVersion { .. } => {
-                    return Err(GetBlockError::BlockVersion(BlockVersionError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }));
+                ConstructBlockFromBytesError::BlockVersion(e) => {
+                    Err(GetBlockError::BlockVersion(e))
                 }
-                _ => {
-                    return Err(GetBlockError::Internal(
-                        BlockMalformedError {
-                            hash: hash.clone(),
-                            source: e.into(),
-                        }
-                        .int_err(),
-                    ));
-                }
+                ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
             },
         }
     }
@@ -351,6 +380,27 @@ where
         }
 
         Ok(res.hash)
+    }
+
+    async fn append_block_from_bytes<'a>(
+        &'a self,
+        hash: &Multihash,
+        block_bytes: &[u8],
+        opts: AppendOpts<'a>,
+    ) -> Result<MetadataBlock, AppendFromBytesError> {
+        let block = match self.construct_block_from_bytes(hash, block_bytes).await {
+            Ok(block) => Ok(block),
+            Err(e) => Err(match e {
+                ConstructBlockFromBytesError::BlockVersion(e) => {
+                    AppendFromBytesError::BlockVersion(e)
+                }
+                ConstructBlockFromBytesError::Internal(e) => {
+                    AppendFromBytesError::Append(AppendError::Internal(e))
+                }
+            }),
+        }?;
+        self.append(block.clone(), opts).await?;
+        Ok(block)
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {

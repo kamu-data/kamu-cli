@@ -68,6 +68,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
         }
     }
 
+    async fn get_size(&self, _hash: &Multihash) -> Result<u64, GetError> {
+        panic!("get_size unsupported for HTTP object repository");
+    }
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
@@ -129,6 +133,20 @@ impl ObjectRepository for ObjectRepositoryHttp {
             .compat();
 
         Ok(Box::new(reader))
+    }
+
+    async fn get_download_url(
+        &self,
+        hash: &Multihash,
+        _opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
+        match self.base_url.join(&hash.to_multibase_string()) {
+            Ok(url) => Ok(GetDownloadUrlResult {
+                url,
+                expires_at: None,
+            }),
+            Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
+        }
     }
 
     async fn insert_bytes<'a>(

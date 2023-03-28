@@ -23,17 +23,17 @@ use std::sync::Arc;
 
 async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
-    let local_repo = infra::LocalDatasetRepositoryImpl::new(workspace_layout.clone());
+    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
         .add_value(workspace_layout.as_ref().clone())
-        .bind::<dyn LocalDatasetRepository, infra::LocalDatasetRepositoryImpl>()
+        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
         .add::<infra::QueryServiceImpl>()
         .bind::<dyn QueryService, infra::QueryServiceImpl>()
         .build();
 
-    let local_repo = cat.get_one::<dyn LocalDatasetRepository>().unwrap();
+    let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_builder = local_repo
         .create_dataset(&DatasetName::new_unchecked("foo"))
         .await

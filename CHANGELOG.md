@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.116.0] - 2023-03-28
+### Added
+- Smart Transfer Protocol: implemented Pull flow based on web-sockets. It can be activated via:
+   `kamu pull odf+http://<server-address>:<port>/<dataset_name>`.
+  I.e., run API server in one Kamu workspace directory, where a `my-dataset` dataset is present:
+   `kamu system api-server --http-port=35433`
+  and pull from another Kamu workspace directory:
+   `kamu pull odf+http://localhost::35433/my-dataset`
+- S3-based dataset repository implementation
+### Changed
+- Improved status codes and error handling in API server's routes for Simple Transfer Protocol
+
 ## [0.115.0] - 2023-03-19
 ### Changed
 - Updated to new `rustc`

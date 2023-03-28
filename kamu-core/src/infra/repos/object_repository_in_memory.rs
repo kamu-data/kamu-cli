@@ -44,6 +44,17 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         Ok(blocks_by_hash.contains_key(hash))
     }
 
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
+        let res = blocks_by_hash.get(hash);
+        match res {
+            Some(bytes) => Ok(bytes.len() as u64),
+            None => Err(GetError::NotFound(ObjectNotFoundError {
+                hash: hash.clone(),
+            })),
+        }
+    }
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         let res = blocks_by_hash.get(hash);
@@ -56,7 +67,15 @@ impl ObjectRepository for ObjectRepositoryInMemory {
     }
 
     async fn get_stream(&self, _hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        unimplemented!()
+        panic!("get_stream not allowed for in-memory repository");
+    }
+
+    async fn get_download_url(
+        &self,
+        _hash: &Multihash,
+        _opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
+        Err(GetDownloadUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(
@@ -93,7 +112,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _src: Box<AsyncReadObj>,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        panic!("insert_stream not allowed for in-memory repository");
     }
 
     async fn insert_file_move<'a>(
@@ -101,7 +120,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         _src: &Path,
         _options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        panic!("insert_file_move not allowed for in-memory repository");
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {

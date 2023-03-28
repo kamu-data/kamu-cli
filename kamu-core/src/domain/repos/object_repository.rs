@@ -10,12 +10,14 @@
 use std::path::Path;
 
 use crate::domain::{BoxedError, InternalError};
+use chrono::{DateTime, Duration, Utc};
 use opendatafabric::Multihash;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
 use tokio::io::AsyncRead;
+use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,9 +30,17 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 pub trait ObjectRepository: Send + Sync {
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError>;
 
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError>;
+
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError>;
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;
+
+    async fn get_download_url(
+        &self,
+        hash: &Multihash,
+        opts: DownloadOpts,
+    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError>;
 
     async fn insert_bytes<'a>(
         &'a self,
@@ -78,6 +88,21 @@ pub struct InsertOpts<'a> {
 
     /// Hints the size of an object
     pub size_hint: Option<usize>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Clone)]
+pub struct DownloadOpts {
+    pub expiration: Option<Duration>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct GetDownloadUrlResult {
+    pub url: Url,
+    pub expires_at: Option<DateTime<Utc>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -131,6 +156,20 @@ impl From<ContainsError> for GetError {
             ContainsError::Internal(e) => GetError::Internal(e),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetDownloadUrlError {
+    #[error("Repository does not support external downloads")]
+    NotSupported,
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

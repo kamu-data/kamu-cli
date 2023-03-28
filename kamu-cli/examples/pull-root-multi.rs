@@ -23,7 +23,7 @@ async fn main() {
     let pull_svc = Arc::new(TestPullService {});
     let mut cmd = PullCommand::new(
         pull_svc,
-        Arc::new(LocalDatasetRepositoryImpl::new(Arc::new(
+        Arc::new(DatasetRepositoryLocalFs::new(Arc::new(
             WorkspaceLayout::create(tempdir.path()).unwrap(),
         ))),
         Arc::new(RemoteAliasesRegistryNull),

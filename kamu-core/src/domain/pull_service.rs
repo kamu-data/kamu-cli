@@ -96,7 +96,7 @@ impl Default for PullOptions {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum PullResult {
     UpToDate,
     Updated {

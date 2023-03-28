@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 use crate::infra::*;
 
 use dill::*;
@@ -53,7 +54,7 @@ impl DatasetFactoryImpl {
         )
     }
 
-    pub fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
+    fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
@@ -74,7 +75,7 @@ impl DatasetFactoryImpl {
         use rusoto_core::Region;
         use rusoto_s3::S3Client;
 
-        let (endpoint, bucket, key_prefix) = ObjectRepositoryS3::<(), 0>::split_url(&base_url);
+        let (endpoint, bucket, key_prefix) = S3Context::split_url(&base_url);
         assert!(
             key_prefix.is_empty() || key_prefix.ends_with('/'),
             "Base URL does not contain a trailing slash: {}",
@@ -93,37 +94,37 @@ impl DatasetFactoryImpl {
 
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+                ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                     client.clone(),
                     bucket.clone(),
                     format!("{}blocks/", key_prefix),
-                ),
-                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(
+                )),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
                     bucket.clone(),
                     format!("{}refs/", key_prefix),
-                )),
+                ))),
             ),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
                 bucket.clone(),
                 format!("{}data/", key_prefix),
-            ),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+            )),
+            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
                 bucket.clone(),
                 format!("{}checkpoints/", key_prefix),
-            ),
-            NamedObjectRepositoryS3::new(
+            )),
+            NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
                 bucket.clone(),
                 format!("{}cache/", key_prefix),
-            ),
-            NamedObjectRepositoryS3::new(
+            )),
+            NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
                 bucket.clone(),
                 format!("{}info/", key_prefix),
-            ),
+            )),
         ))
     }
 }
@@ -152,7 +153,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let ds = Self::get_local_fs(layout);
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            "http" | "https" => {
+            "http" | "https" | "odf+http" | "odf+https" => {
                 let ds = Self::get_http(url.clone())?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }

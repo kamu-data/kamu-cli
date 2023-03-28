@@ -29,7 +29,7 @@ async fn test_verify_data_consistency() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
     let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
 
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
         local_repo.clone(),

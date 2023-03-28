@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.115.0"
+version = "0.116.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
@@ -69,6 +69,8 @@ itertools = "*"
 libc = "*"  # Signal names
 pathdiff = "*"  # Relative paths
 pin-project = "*"
+strum = "*"  # Enum from string
+strum_macros = "*"
 thiserror = "*"  # Structured error derivations
 tracing = "*"
 tempfile = "*"

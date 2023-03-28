@@ -7,21 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use kamu::domain::*;
-use kamu::infra::*;
-use kamu::testing::*;
-use opendatafabric::*;
-
 use std::assert_matches::assert_matches;
 
-#[tokio::test]
-async fn test_create_dataset() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+use kamu::{domain::*, testing::MetadataFactory};
+use opendatafabric::{DatasetKind, DatasetName};
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
     let dataset_name = DatasetName::new_unchecked("foo");
 
     assert_matches!(
@@ -59,11 +52,9 @@ async fn test_create_dataset() {
     assert!(repo.get_dataset(&dataset_name.as_local_ref()).await.is_ok());
 }
 
-#[tokio::test]
-async fn test_create_dataset_from_snapshot() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
     let dataset_name = DatasetName::new_unchecked("foo");
 
     assert_matches!(
@@ -96,16 +87,12 @@ async fn test_create_dataset_from_snapshot() {
     assert_eq!(actual_head, create_result.head);
 }
 
-#[tokio::test]
-async fn test_rename_dataset() {
-    let tempdir = tempfile::tempdir().unwrap();
+/////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
     let name_foo = DatasetName::new_unchecked("foo");
     let name_bar = DatasetName::new_unchecked("bar");
     let name_baz = DatasetName::new_unchecked("baz");
-
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -144,15 +131,11 @@ async fn test_rename_dataset() {
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
 }
 
-#[tokio::test]
-async fn test_delete_dataset() {
-    let tempdir = tempfile::tempdir().unwrap();
+/////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_delete_dataset(repo: &dyn DatasetRepository) {
     let name_foo = DatasetName::new_unchecked("foo");
     let name_bar = DatasetName::new_unchecked("bar");
-
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    let repo = LocalDatasetRepositoryImpl::new(Arc::new(workspace_layout));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -193,3 +176,5 @@ async fn test_delete_dataset() {
         GetDatasetError::NotFound(_),
     )
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

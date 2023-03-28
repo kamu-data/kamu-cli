@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -26,7 +26,7 @@ pub struct AddCommand {
 impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,

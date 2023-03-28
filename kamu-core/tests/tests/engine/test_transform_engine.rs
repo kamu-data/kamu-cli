@@ -21,7 +21,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 async fn block_count(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRefLocal>,
 ) -> usize {
     let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
@@ -35,7 +35,7 @@ async fn block_count(
 }
 
 async fn get_data_of_block(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRefLocal>,
     dataset_layout: &DatasetLayout,
     block_hash: &Multihash,
@@ -64,7 +64,7 @@ async fn test_transform_with_engine_spark() {
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
 
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
@@ -289,7 +289,7 @@ async fn test_transform_with_engine_flink() {
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
 
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),

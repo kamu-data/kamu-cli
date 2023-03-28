@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.115.0"
+version = "0.116.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition = "2021"
@@ -25,6 +25,7 @@ dill = ">= 0.5.0"
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 kamu-adapter-graphql = { path = "../kamu-adapter-graphql" }
+kamu-adapter-http = { path = "../kamu-adapter-http" }
 container-runtime = { path = "../utils/container-runtime" }
 
 # CLI
@@ -45,7 +46,8 @@ http = "*"
 hyper = "*"
 tower = { version = "*" }
 tower-http = { version = "*", features = ["trace", "cors"] }
-axum = { version = "*" }
+axum = { version = "*", features = ["ws"] }
+axum-extra = { version = "*", features = ["async-read-body"] }
 async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "*"
 serde_json = "*"

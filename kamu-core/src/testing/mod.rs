@@ -7,11 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_test_helper;
+pub use dataset_test_helper::*;
+
 mod id_factory;
 pub use id_factory::*;
 
 mod metadata_factory;
 pub use metadata_factory::*;
+
+mod minio_server;
+pub use minio_server::*;
 
 mod parquet_reader_helper;
 pub use parquet_reader_helper::*;

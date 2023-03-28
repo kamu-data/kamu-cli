@@ -73,7 +73,7 @@ async fn test_add_recursive() {
 
     let local_repo = kamu
         .catalog()
-        .get_one::<dyn domain::LocalDatasetRepository>()
+        .get_one::<dyn domain::DatasetRepository>()
         .unwrap();
 
     let mut datasets: Vec<_> = local_repo

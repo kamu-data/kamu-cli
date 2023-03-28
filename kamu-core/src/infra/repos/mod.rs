@@ -40,8 +40,14 @@ pub use metadata_chain_impl::*;
 mod dataset_impl;
 pub use dataset_impl::*;
 
-mod local_dataset_repository_impl;
-pub use local_dataset_repository_impl::*;
+mod dataset_repository_local_fs;
+pub use dataset_repository_local_fs::*;
+
+mod dataset_repository_helpers;
+pub use dataset_repository_helpers::*;
+
+mod dataset_repository_s3;
+pub use dataset_repository_s3::*;
 
 mod dataset_factory_impl;
 pub use dataset_factory_impl::*;

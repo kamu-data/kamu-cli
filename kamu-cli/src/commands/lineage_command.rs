@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct LineageCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRefLocal>,
@@ -33,7 +33,7 @@ pub struct LineageCommand {
 
 impl LineageCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,

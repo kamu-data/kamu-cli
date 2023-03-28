@@ -19,14 +19,14 @@ use futures::TryStreamExt;
 use std::{io::Write, sync::Arc};
 
 pub struct InspectQueryCommand {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRefLocal,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
-        local_repo: Arc<dyn LocalDatasetRepository>,
+        local_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRefLocal,
         output_config: Arc<OutputConfig>,
     ) -> Self {

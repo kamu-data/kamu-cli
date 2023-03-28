@@ -11,4 +11,5 @@
 #![feature(exit_status_error)]
 
 mod tests;
-mod utils;
+pub mod utils;
+pub use utils::*;

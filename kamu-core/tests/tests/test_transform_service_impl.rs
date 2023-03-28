@@ -16,7 +16,7 @@ use chrono::{TimeZone, Utc};
 use futures::TryStreamExt;
 use std::sync::Arc;
 
-async fn new_root(local_repo: &dyn LocalDatasetRepository, name: &str) -> DatasetHandle {
+async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHandle {
     let name = DatasetName::try_from(name).unwrap();
     let snap = MetadataFactory::dataset_snapshot()
         .name(name)
@@ -29,7 +29,7 @@ async fn new_root(local_repo: &dyn LocalDatasetRepository, name: &str) -> Datase
 }
 
 async fn new_deriv(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     name: &str,
     inputs: &[DatasetName],
 ) -> (DatasetHandle, SetTransform) {
@@ -46,7 +46,7 @@ async fn new_deriv(
 }
 
 async fn append_block(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRefLocal>,
     block: MetadataBlock,
 ) -> Multihash {
@@ -58,7 +58,7 @@ async fn append_block(
 }
 
 async fn append_data_block(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     name: &DatasetName,
     records: i64,
 ) -> (Multihash, MetadataBlockTyped<AddData>) {
@@ -96,7 +96,7 @@ async fn append_data_block(
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
@@ -143,7 +143,7 @@ async fn test_get_next_operation() {
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),

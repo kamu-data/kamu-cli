@@ -14,6 +14,7 @@ use crate::domain::*;
 use opendatafabric::{MetadataBlock, Multihash};
 
 use async_trait::async_trait;
+use strum_macros::EnumString;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -58,6 +59,14 @@ pub trait MetadataChain: Send + Sync {
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
+
+    /// Loads the block from bytes and appends it to the chain
+    async fn append_block_from_bytes<'a>(
+        &'a self,
+        hash: &Multihash,
+        block_bytes: &[u8],
+        opts: AppendOpts<'a>,
+    ) -> Result<MetadataBlock, AppendFromBytesError>;
 
     fn as_object_repo(&self) -> &dyn ObjectRepository;
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
@@ -108,8 +117,9 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(EnumString, Clone, PartialEq, Eq, Debug)]
 pub enum BlockRef {
+    #[strum(serialize = "head")]
     Head,
 }
 
@@ -332,6 +342,17 @@ impl From<super::reference_repository::SetRefError> for AppendError {
             super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum AppendFromBytesError {
+    #[error(transparent)]
+    Append(#[from] AppendError),
+
+    #[error(transparent)]
+    BlockVersion(#[from] BlockVersionError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

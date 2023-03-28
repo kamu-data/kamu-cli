@@ -19,12 +19,12 @@ use std::sync::Arc;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    local_repo: Arc<dyn LocalDatasetRepository>,
+    local_repo: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(local_repo: Arc<dyn LocalDatasetRepository>) -> Self {
+    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
         Self { local_repo }
     }
 

@@ -331,6 +331,14 @@ impl DatasetRefAny {
             DatasetRefAny::Url(v) => Some(DatasetRefRemote::Url(v.clone())),
         }
     }
+
+    pub fn is_odf_remote_ref(&self) -> bool {
+        if let DatasetRefAny::Url(v) = self {
+            v.as_str().starts_with("odf+")
+        } else {
+            false
+        }
+    }
 }
 
 impl std::str::FromStr for DatasetRefAny {

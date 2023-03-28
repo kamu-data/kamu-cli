@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::{HttpFileServer, IpfsDaemon, MinioServer};
+use crate::utils::DummySmartTransferProtocolClient;
+use crate::utils::{HttpFileServer, IpfsDaemon};
 use kamu::domain::*;
 use kamu::infra::utils::ipfs_wrapper::IpfsClient;
 use kamu::infra::*;
@@ -15,13 +16,13 @@ use kamu::testing::*;
 use opendatafabric::*;
 
 use std::assert_matches::assert_matches;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 
 async fn append_block(
-    local_repo: &dyn LocalDatasetRepository,
+    local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRefLocal>,
     block: MetadataBlock,
 ) -> Multihash {
@@ -32,36 +33,6 @@ async fn append_block(
         .unwrap()
 }
 
-fn list_files(dir: &Path) -> Vec<PathBuf> {
-    if !dir.exists() {
-        return Vec::new();
-    }
-
-    let mut v = _list_files_rec(dir);
-
-    for path in v.iter_mut() {
-        *path = path.strip_prefix(dir).unwrap().to_owned();
-    }
-
-    v.sort();
-    v
-}
-
-fn _list_files_rec(dir: &Path) -> Vec<PathBuf> {
-    std::fs::read_dir(dir)
-        .unwrap()
-        .flat_map(|e| {
-            let entry = e.unwrap();
-            let path = entry.path();
-            if path.is_dir() {
-                _list_files_rec(&path)
-            } else {
-                vec![path]
-            }
-        })
-        .collect()
-}
-
 fn assert_in_sync(
     workspace_layout: &WorkspaceLayout,
     dataset_name_1: &DatasetName,
@@ -70,26 +41,7 @@ fn assert_in_sync(
     let dataset_1_layout = workspace_layout.dataset_layout(dataset_name_1);
     let dataset_2_layout = workspace_layout.dataset_layout(dataset_name_2);
 
-    assert_eq!(
-        list_files(&dataset_1_layout.blocks_dir),
-        list_files(&dataset_2_layout.blocks_dir)
-    );
-    assert_eq!(
-        list_files(&dataset_1_layout.refs_dir),
-        list_files(&dataset_2_layout.refs_dir)
-    );
-    assert_eq!(
-        list_files(&dataset_1_layout.data_dir),
-        list_files(&dataset_2_layout.data_dir)
-    );
-    assert_eq!(
-        list_files(&dataset_1_layout.checkpoints_dir),
-        list_files(&dataset_2_layout.checkpoints_dir)
-    );
-
-    let head_1 = std::fs::read_to_string(dataset_1_layout.refs_dir.join("head")).unwrap();
-    let head_2 = std::fs::read_to_string(dataset_2_layout.refs_dir.join("head")).unwrap();
-    assert_eq!(head_1, head_2);
+    DatasetTestHelper::assert_datasets_in_sync(&dataset_1_layout, &dataset_2_layout);
 }
 
 async fn create_random_file(root: &Path) -> (Multihash, usize) {
@@ -133,7 +85,7 @@ async fn do_test_sync(
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
     let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
-    let local_repo = Arc::new(LocalDatasetRepositoryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new());
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
@@ -142,6 +94,7 @@ async fn do_test_sync(
         remote_repo_reg.clone(),
         local_repo.clone(),
         dataset_factory,
+        Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(ipfs_client),
         ipfs_gateway,
     );

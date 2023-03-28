@@ -14,7 +14,7 @@ use crate::utils::*;
 use async_graphql::*;
 use futures::TryStreamExt;
 use kamu::domain;
-use kamu::domain::LocalDatasetRepositoryExt;
+use kamu::domain::DatasetRepositoryExt;
 use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ impl Datasets {
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = local_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
@@ -44,7 +44,7 @@ impl Datasets {
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
         let account = Account::mock();
-        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = local_repo
             .try_resolve_dataset_ref(&dataset_name.as_local_ref())
             .await?;
@@ -60,7 +60,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
@@ -182,7 +182,7 @@ impl Datasets {
         account_id: AccountID,
         snapshot: odf::DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        let local_repo = from_catalog::<dyn domain::LocalDatasetRepository>(ctx).unwrap();
+        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         let result = match local_repo.create_dataset_from_snapshot(snapshot).await {
             Ok(result) => {
