@@ -231,7 +231,7 @@ impl S3Context {
                 .int_err()?;
 
             if let Some(contents) = list_response.contents {
-                has_next_page = (contents.len() as i64) == S3Context::MAX_LISTED_OBJECTS;
+                has_next_page = list_response.is_truncated.unwrap_or(false);
                 self.client
                     .delete_objects(DeleteObjectsRequest {
                         bucket: self.bucket.clone(),
