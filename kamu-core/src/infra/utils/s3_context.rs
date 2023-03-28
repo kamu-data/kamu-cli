@@ -237,9 +237,9 @@ impl S3Context {
                         bucket: self.bucket.clone(),
                         delete: Delete {
                             objects: contents
-                                .iter()
+                                .into_iter()
                                 .map(|obj| ObjectIdentifier {
-                                    key: obj.key.clone().unwrap(),
+                                    key: obj.key.unwrap(),
                                     version_id: None,
                                 })
                                 .collect(),
@@ -306,9 +306,9 @@ impl S3Context {
                         bucket: self.bucket.clone(),
                         delete: Delete {
                             objects: contents
-                                .iter()
+                                .into_iter()
                                 .map(|obj| ObjectIdentifier {
-                                    key: obj.key.clone().unwrap(),
+                                    key: obj.key.unwrap(),
                                     version_id: None,
                                 })
                                 .collect(),
