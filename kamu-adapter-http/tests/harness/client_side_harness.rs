@@ -32,6 +32,55 @@ pub struct ClientSideHarness {
 }
 
 impl ClientSideHarness {
+    pub fn new() -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+        let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+
+        let catalog = dill::CatalogBuilder::new()
+            .add_value(DatasetRepositoryLocalFs::new(workspace_layout.clone()))
+            .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+            .build();
+
+        let client_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
+        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
+            client_repo.clone(),
+            workspace_layout.clone(),
+        ));
+        let ingest_svc = Arc::new(IngestServiceImpl::new(
+            workspace_layout.clone(),
+            client_repo.clone(),
+            Arc::new(EngineProvisionerNull),
+            Arc::new(ContainerRuntime::default()),
+        ));
+        let transform_svc = Arc::new(TransformServiceImpl::new(
+            client_repo.clone(),
+            Arc::new(EngineProvisionerNull),
+            workspace_layout.clone(),
+        ));
+        let sync_svc = Arc::new(SyncServiceImpl::new(
+            remote_repo_reg.clone(),
+            client_repo.clone(),
+            Arc::new(DatasetFactoryImpl::new()),
+            Arc::new(WsSmartTransferProtocolClient {}),
+            Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
+            IpfsGateway::default(),
+        ));
+        let pull_service = Arc::new(PullServiceImpl::new(
+            client_repo.clone(),
+            remote_alias_reg.clone(),
+            ingest_svc,
+            transform_svc,
+            sync_svc,
+        ));
+
+        Self {
+            tempdir,
+            catalog,
+            pull_service,
+        }
+    }
+
     pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
@@ -57,57 +106,6 @@ impl ClientSideHarness {
 
     pub fn internal_datasets_folder_path(&self) -> PathBuf {
         self.tempdir.path().join("datasets")
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn client_side_harness() -> ClientSideHarness {
-    let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-
-    let catalog = dill::CatalogBuilder::new()
-        .add_value(DatasetRepositoryLocalFs::new(workspace_layout.clone()))
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
-        .build();
-
-    let client_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
-        client_repo.clone(),
-        workspace_layout.clone(),
-    ));
-    let ingest_svc = Arc::new(IngestServiceImpl::new(
-        workspace_layout.clone(),
-        client_repo.clone(),
-        Arc::new(EngineProvisionerNull),
-        Arc::new(ContainerRuntime::default()),
-    ));
-    let transform_svc = Arc::new(TransformServiceImpl::new(
-        client_repo.clone(),
-        Arc::new(EngineProvisionerNull),
-        workspace_layout.clone(),
-    ));
-    let sync_svc = Arc::new(SyncServiceImpl::new(
-        remote_repo_reg.clone(),
-        client_repo.clone(),
-        Arc::new(DatasetFactoryImpl::new()),
-        Arc::new(WsSmartTransferProtocolClient {}),
-        Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
-        IpfsGateway::default(),
-    ));
-    let pull_service = Arc::new(PullServiceImpl::new(
-        client_repo.clone(),
-        remote_alias_reg.clone(),
-        ingest_svc,
-        transform_svc,
-        sync_svc,
-    ));
-
-    ClientSideHarness {
-        tempdir,
-        catalog,
-        pull_service,
     }
 }
 

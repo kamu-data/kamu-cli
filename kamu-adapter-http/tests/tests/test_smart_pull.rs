@@ -16,7 +16,7 @@ use opendatafabric::{
 };
 use std::{fs, io, path::Path, time};
 
-use crate::harness::{client_side_harness, server_side_harness};
+use crate::harness::{ClientSideHarness, ServerSideHarness};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +35,7 @@ macro_rules! await_client_server_flow {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_new_dataset() {
-    let server_harness = server_side_harness();
+    let server_harness = ServerSideHarness::new();
 
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
@@ -49,7 +49,7 @@ async fn test_smart_pull_new_dataset() {
         .await
         .unwrap();
 
-    let client_harness = client_side_harness();
+    let client_harness = ClientSideHarness::new();
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -84,7 +84,7 @@ async fn test_smart_pull_new_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_up_to_date_dataset() {
-    let server_harness = server_side_harness();
+    let server_harness = ServerSideHarness::new();
 
     let server_repo = server_harness.dataset_repository();
     server_repo
@@ -98,7 +98,7 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
         .await
         .unwrap();
 
-    let client_harness = client_side_harness();
+    let client_harness = ClientSideHarness::new();
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -139,7 +139,7 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_evolved_dataset() {
-    let server_harness = server_side_harness();
+    let server_harness = ServerSideHarness::new();
 
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
@@ -153,7 +153,7 @@ async fn test_smart_pull_existing_evolved_dataset() {
         .await
         .unwrap();
 
-    let client_harness = client_side_harness();
+    let client_harness = ClientSideHarness::new();
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -219,7 +219,7 @@ async fn test_smart_pull_existing_evolved_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_advanced_dataset_fails() {
-    let server_harness = server_side_harness();
+    let server_harness = ServerSideHarness::new();
 
     let server_repo = server_harness.dataset_repository();
     server_repo
@@ -233,7 +233,7 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
         .await
         .unwrap();
 
-    let client_harness = client_side_harness();
+    let client_harness = ClientSideHarness::new();
 
     // Hard folder synchronization
     copy_folder_recursively(

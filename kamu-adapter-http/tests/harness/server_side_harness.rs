@@ -70,6 +70,26 @@ pub struct ServerSideHarness {
 }
 
 impl ServerSideHarness {
+    pub fn new() -> Self {
+        let s3 = run_s3_server();
+        let catalog = dill::CatalogBuilder::new()
+            .add_value(s3_repo(&s3))
+            .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+            .build();
+
+        let api_server = TestAPIServer::new(
+            catalog.clone(),
+            Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            None,
+        );
+
+        Self {
+            s3,
+            catalog,
+            api_server,
+        }
+    }
+
     pub fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
@@ -90,28 +110,6 @@ impl ServerSideHarness {
 
     pub async fn api_server_run(self) -> Result<(), InternalError> {
         self.api_server.run().await.int_err()
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn server_side_harness() -> ServerSideHarness {
-    let s3 = run_s3_server();
-    let catalog = dill::CatalogBuilder::new()
-        .add_value(s3_repo(&s3))
-        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-        .build();
-
-    let api_server = TestAPIServer::new(
-        catalog.clone(),
-        Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-        None,
-    );
-
-    ServerSideHarness {
-        s3,
-        catalog,
-        api_server,
     }
 }
 
