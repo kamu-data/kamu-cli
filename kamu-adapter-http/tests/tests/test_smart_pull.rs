@@ -57,14 +57,8 @@ async fn test_smart_pull_new_dataset() {
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
-            .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await
-            .get(0)
-            .unwrap()
-            .result
-            .as_ref()
-            .unwrap()
-            .clone();
+            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+            .await;
 
         assert_eq!(
             PullResult::Updated {
@@ -119,14 +113,8 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
-            .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await
-            .get(0)
-            .unwrap()
-            .result
-            .as_ref()
-            .unwrap()
-            .clone();
+            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+            .await;
 
         assert_eq!(PullResult::UpToDate {}, pull_result)
     };
@@ -192,14 +180,8 @@ async fn test_smart_pull_existing_evolved_dataset() {
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
-            .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
-            .await
-            .get(0)
-            .unwrap()
-            .result
-            .as_ref()
-            .unwrap()
-            .clone();
+            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+            .await;
 
         assert_eq!(
             PullResult::Updated {
@@ -273,7 +255,7 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_responses = client_harness
-            .pull_dataset(DatasetRefAny::from(foo_dataset_ref))
+            .pull_datasets(DatasetRefAny::from(foo_dataset_ref))
             .await;
 
         // TODO: try expecting better error message

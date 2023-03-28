@@ -84,7 +84,7 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    pub async fn pull_dataset(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
+    pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
         self.pull_service
             .pull_multi(
                 &mut vec![dataset_ref].into_iter(),
@@ -101,6 +101,17 @@ impl ClientSideHarness {
             )
             .await
             .unwrap()
+    }
+
+    pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny) -> PullResult {
+        self.pull_datasets(dataset_ref)
+            .await
+            .get(0)
+            .unwrap()
+            .result
+            .as_ref()
+            .unwrap()
+            .clone()
     }
 
     pub fn internal_datasets_folder_path(&self) -> PathBuf {
