@@ -20,6 +20,7 @@ use kamu::{
     infra::{utils::s3_context::S3Context, DatasetRepositoryS3},
     testing::MinioServer,
 };
+use opendatafabric::DatasetName;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -134,25 +135,27 @@ struct TestAPIServer {
 
 impl TestAPIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        let local_repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
-        let local_dataset_resolver: Arc<dyn kamu_adapter_http::DatasetResolver> = Arc::new(
-            kamu_adapter_http::DatasetResolverLocalRepository::new(local_repo),
-        );
+        use axum::extract::Path;
+
+        #[derive(serde::Deserialize)]
+        struct DatasetByName {
+            dataset_name: DatasetName,
+        }
 
         let app = axum::Router::new()
             .nest(
-                format!("/:{}", kamu_adapter_http::PARAMETER_DATASET_NAME).as_str(),
-                kamu_adapter_http::create_dataset_transfer_protocol_routes()
-                    .layer(axum::middleware::from_fn(
-                        kamu_adapter_http::resolve_dataset_by_name,
+                "/:dataset_name",
+                kamu_adapter_http::smart_transfer_protocol_routes()
+                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
+                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
                     ))
-                    .layer(axum::extract::Extension(local_dataset_resolver)),
+                    .layer(axum::extract::Extension(catalog)),
             )
             .layer(
                 tower::ServiceBuilder::new().layer(
                     tower_http::cors::CorsLayer::new()
                         .allow_origin(tower_http::cors::Any)
-                        .allow_methods(vec![http::Method::GET, http::Method::POST])
+                        .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
                         .allow_headers(tower_http::cors::Any),
                 ),
             );

@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use dill::Catalog;
-use kamu::domain::DatasetRepository;
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+// Extractor of dataset identity for smart transfer protocol
+#[derive(serde::Deserialize)]
+struct DatasetByName {
+    dataset_name: opendatafabric::DatasetName,
+}
 
 pub struct APIServer {
     server: axum::Server<
@@ -23,11 +25,10 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        let local_repo: Arc<dyn DatasetRepository> = catalog.get_one().unwrap();
-        let local_dataset_resolver: Arc<dyn kamu_adapter_http::DatasetResolver> = Arc::new(
-            kamu_adapter_http::DatasetResolverLocalRepository::new(local_repo),
-        );
-        let gql_schema = kamu_adapter_graphql::schema(catalog);
+        use axum::extract::Extension;
+        use axum::extract::Path;
+
+        let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
@@ -36,12 +37,12 @@ impl APIServer {
                 axum::routing::get(graphql_playground).post(graphql_handler),
             )
             .nest(
-                format!("/:{}", kamu_adapter_http::PARAMETER_DATASET_NAME).as_str(),
-                kamu_adapter_http::create_dataset_transfer_protocol_routes()
-                    .layer(axum::middleware::from_fn(
-                        kamu_adapter_http::resolve_dataset_by_name,
+                "/:dataset_name",
+                kamu_adapter_http::smart_transfer_protocol_routes()
+                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
+                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
                     ))
-                    .layer(axum::extract::Extension(local_dataset_resolver)),
+                    .layer(Extension(catalog)),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -52,7 +53,7 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(axum::extract::Extension(gql_schema)),
+                    .layer(Extension(gql_schema)),
             );
 
         let addr = SocketAddr::from((

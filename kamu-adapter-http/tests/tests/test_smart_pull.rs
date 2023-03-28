@@ -14,21 +14,9 @@ use kamu::{
 use opendatafabric::{
     DatasetKind, DatasetName, DatasetRefAny, DatasetRefLocal, DatasetRefRemote, MetadataEvent,
 };
-use std::{fs, io, path::Path, time};
+use std::{fs, io, path::Path};
 
-use crate::harness::{ClientSideHarness, ServerSideHarness};
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-macro_rules! await_client_server_flow {
-    ($api_server_handle: expr, $client_handle: expr) => {
-        tokio::select! {
-            _ = tokio::time::sleep(time::Duration::from_secs(60)) => panic!("test timeout!"),
-            _ = $api_server_handle => panic!("server-side aborted"),
-            _ = $client_handle => {} // Pass, do nothing
-        }
-    };
-}
+use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarness};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

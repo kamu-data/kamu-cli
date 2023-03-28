@@ -18,6 +18,7 @@ kamu = { path = "../kamu-core" }
 container-runtime = { path = "../utils/container-runtime" }
 
 # HTTP
+tower = { version = "*" }
 axum = { version = "*", features = ["ws", "headers"] }
 axum-extra = { version = "*", features = ["async-read-body"] }
 reqwest = { version = "*", features = ["json"] }
@@ -46,7 +47,7 @@ tempfile = "*"
 env_logger = "*"
 test-log = { version = "*", features = ["trace"] }
 tracing-subscriber = { version = "*", features = ["env-filter"] }
-http = "*"
 hyper = "*"
 tower = { version = "*" }
 tower-http = { version = "*", features = ["trace", "cors"] }
+serde = { version = "*", features = ["derive"] }
