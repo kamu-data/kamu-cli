@@ -92,18 +92,14 @@ pub struct InsertOpts<'a> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default, Debug, Clone)]
 pub struct DownloadOpts {
     pub expiration: Option<Duration>,
 }
 
-impl DownloadOpts {
-    pub fn default() -> DownloadOpts {
-        DownloadOpts { expiration: None }
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct GetDownloadUrlResult {
     pub url: Url,
     pub expires_at: Option<DateTime<Utc>>,
