@@ -180,8 +180,8 @@ fn get_base_dataset_url(
     uri: axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
-    // TODO: HTTP is hardcoded
-    let url = Url::parse(&format!("http://{}", host.0)).unwrap();
+    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+    let url = Url::parse(&format!("{}://{}", scheme, host.0)).unwrap();
 
     let mut path: Vec<_> = uri.0.path().split('/').collect();
     for _ in 0..depth {
