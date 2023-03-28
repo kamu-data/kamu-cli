@@ -51,3 +51,4 @@ hyper = "*"
 tower = { version = "*" }
 tower-http = { version = "*", features = ["trace", "cors"] }
 serde = { version = "*", features = ["derive"] }
+fs_extra = "*"  # Recursive folder copy

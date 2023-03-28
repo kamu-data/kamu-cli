@@ -257,15 +257,8 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
 
 fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
     fs::create_dir_all(&dst)?;
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            copy_folder_recursively(&entry.path(), &dst.join(entry.file_name()))?;
-        } else {
-            fs::copy(entry.path(), dst.join(entry.file_name()))?;
-        }
-    }
+    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+    fs_extra::dir::copy(src, dst, &copy_options).unwrap();
     Ok(())
 }
 

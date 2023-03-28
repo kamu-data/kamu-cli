@@ -2402,6 +2402,7 @@ dependencies = [
  "dill",
  "env_logger",
  "flate2",
+ "fs_extra",
  "futures",
  "hyper",
  "kamu",
