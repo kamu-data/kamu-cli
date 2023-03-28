@@ -17,7 +17,7 @@ use std::{
 use dill::Catalog;
 use kamu::{
     domain::{DatasetRepository, InternalError, ResultIntoInternal},
-    infra::{utils::s3_context::S3Context, DatasetRepositoryS3},
+    infra::{utils::s3_context::S3Context, DatasetLayout, DatasetRepositoryS3},
     testing::MinioServer,
 };
 use opendatafabric::DatasetName;
@@ -107,6 +107,14 @@ impl ServerSideHarness {
         let api_server_address = self.api_server_addr();
         Url::from_str(format!("odf+http://{}/{}", api_server_address, dataset_name).as_str())
             .unwrap()
+    }
+
+    pub fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout {
+        DatasetLayout::new(
+            self.internal_bucket_folder_path()
+                .join(dataset_name)
+                .as_path(),
+        )
     }
 
     pub async fn api_server_run(self) -> Result<(), InternalError> {

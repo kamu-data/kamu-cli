@@ -84,6 +84,14 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
+    pub fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout {
+        DatasetLayout::new(
+            self.internal_datasets_folder_path()
+                .join(dataset_name)
+                .as_path(),
+        )
+    }
+
     pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
         self.pull_service
             .pull_multi(

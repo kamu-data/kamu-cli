@@ -9,7 +9,7 @@
 
 use kamu::{
     domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult},
-    testing::MetadataFactory,
+    testing::{DatasetTestHelper, MetadataFactory},
 };
 use opendatafabric::{
     DatasetKind, DatasetName, DatasetRefAny, DatasetRefLocal, DatasetRefRemote, MetadataEvent,
@@ -37,7 +37,10 @@ async fn test_smart_pull_new_dataset() {
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout("foo");
+
     let client_harness = ClientSideHarness::new();
+    let client_dataset_layout = client_harness.dataset_layout("foo");
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -55,10 +58,12 @@ async fn test_smart_pull_new_dataset() {
                 num_blocks: 2
             },
             pull_result
-        )
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -80,18 +85,15 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout("foo");
+
     let client_harness = ClientSideHarness::new();
+    let client_dataset_layout = client_harness.dataset_layout("foo");
 
     // Hard folder synchronization
     copy_folder_recursively(
-        server_harness
-            .internal_bucket_folder_path()
-            .join("foo")
-            .as_path(),
-        client_harness
-            .internal_datasets_folder_path()
-            .join("foo")
-            .as_path(),
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
     )
     .unwrap();
 
@@ -104,7 +106,9 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
             .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
             .await;
 
-        assert_eq!(PullResult::UpToDate {}, pull_result)
+        assert_eq!(PullResult::UpToDate {}, pull_result);
+
+        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
@@ -129,18 +133,15 @@ async fn test_smart_pull_existing_evolved_dataset() {
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout("foo");
+
     let client_harness = ClientSideHarness::new();
+    let client_dataset_layout = client_harness.dataset_layout("foo");
 
     // Hard folder synchronization
     copy_folder_recursively(
-        server_harness
-            .internal_bucket_folder_path()
-            .join("foo")
-            .as_path(),
-        client_harness
-            .internal_datasets_folder_path()
-            .join("foo")
-            .as_path(),
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
     )
     .unwrap();
 
@@ -178,7 +179,9 @@ async fn test_smart_pull_existing_evolved_dataset() {
                 num_blocks: 1
             },
             pull_result
-        )
+        );
+
+        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
@@ -203,18 +206,15 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout("foo");
+
     let client_harness = ClientSideHarness::new();
+    let client_dataset_layout = client_harness.dataset_layout("foo");
 
     // Hard folder synchronization
     copy_folder_recursively(
-        server_harness
-            .internal_bucket_folder_path()
-            .join("foo")
-            .as_path(),
-        client_harness
-            .internal_datasets_folder_path()
-            .join("foo")
-            .as_path(),
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
     )
     .unwrap();
 
