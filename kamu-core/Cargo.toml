@@ -40,7 +40,7 @@ zip = "*"
 
 # Data
 arrow = { version = "34", features = ["chrono-tz"] }
-arrow-digest = "34"  # Data hashing (in-house library)
+arrow-digest = "36"  # Data hashing (in-house library)
 datafusion = "21"  # Reading data + SQL
 object_store = "*"  # Datafusion internals
 digest = "*"
