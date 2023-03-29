@@ -10,10 +10,11 @@
 use axum::extract::FromRequestParts;
 use axum::RequestExt;
 use axum::{body::Body, http::Request, http::StatusCode, response::Response};
-use kamu::domain::{DatasetRepository, GetDatasetError};
+use kamu::domain::{DatasetRepository, DatasetRepositoryExt, GetDatasetError};
 use opendatafabric::DatasetRefLocal;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -71,6 +72,13 @@ where
 pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
     inner: Svc,
     layer: DatasetResolverLayer<IdExt, Extractor>,
+}
+
+impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
+    // TODO: use to create dataset if necessary
+    fn is_allowed_to_create_dataset(request: &Request<Body>) -> bool {
+        "/push" == request.uri().path()
+    }
 }
 
 impl<Svc, IdExt, Extractor> Clone for DatasetResolverMiddleware<Svc, IdExt, Extractor>
@@ -132,25 +140,41 @@ where
 
             let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-            let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
-                Ok(ds) => ds,
-                Err(GetDatasetError::NotFound(err)) => {
-                    tracing::warn!("Dataset not found: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::NOT_FOUND)
-                        .body(Default::default())
-                        .unwrap());
-                }
-                Err(err) => {
-                    tracing::error!("Could not get dataset: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Default::default())
-                        .unwrap());
-                }
-            };
+            if Self::is_allowed_to_create_dataset(&request) {
+                let dataset_builder = match dataset_repo.get_or_create_dataset(&dataset_ref).await {
+                    Ok(dsb) => Arc::new(dsb),
+                    Err(err) => {
+                        tracing::error!("Could not get dataset builder: {:?}", err);
+                        return Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Default::default())
+                            .unwrap());
+                    }
+                };
 
-            request.extensions_mut().insert(dataset);
+                request.extensions_mut().insert(dataset_builder);
+            } else {
+                let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
+                    Ok(ds) => ds,
+                    Err(GetDatasetError::NotFound(err)) => {
+                        tracing::warn!("Dataset not found: {:?}", err);
+                        return Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .body(Default::default())
+                            .unwrap());
+                    }
+                    Err(err) => {
+                        tracing::error!("Could not get dataset: {:?}", err);
+                        return Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Default::default())
+                            .unwrap());
+                    }
+                };
+
+                request.extensions_mut().insert(dataset);
+            }
+
             inner.call(request).await
         })
     }

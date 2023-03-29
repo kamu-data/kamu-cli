@@ -19,7 +19,7 @@ use crate::{
     messages::*,
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
-use kamu::domain::{BlockRef, Dataset, ErrorIntoInternal, InternalError};
+use kamu::domain::{BlockRef, Dataset, DatasetBuilder, ErrorIntoInternal, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -320,7 +320,7 @@ pub async fn dataset_pull_ws_handler(
 
 pub async fn dataset_push_ws_handler(
     mut _socket: axum::extract::ws::WebSocket,
-    _dataset: Arc<dyn Dataset>,
+    _dataset_builder: Arc<Box<dyn DatasetBuilder>>,
 ) {
     unimplemented!("Push smart protocol flow to be implemented")
 }

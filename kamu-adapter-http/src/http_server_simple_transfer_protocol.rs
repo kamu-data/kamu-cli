@@ -147,10 +147,10 @@ pub async fn dataset_checkpoints_handler(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    dataset: Extension<Arc<dyn Dataset>>,
+    dataset_builder: Extension<Arc<Box<dyn DatasetBuilder>>>,
 ) -> axum::response::Response {
     ws.on_upgrade(|socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset.0)
+        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset_builder.0)
     })
 }
 

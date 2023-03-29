@@ -62,7 +62,7 @@ impl Default for SyncOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SyncResult {
     UpToDate,
     Updated {

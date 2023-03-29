@@ -333,10 +333,36 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn push_protocol_client_flow(
         &self,
         _src: &dyn Dataset,
-        _dst_url: &Url,
-        _listener: Arc<dyn SyncListener>,
+        dst_url: &Url,
+        listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        unimplemented!("Smart push protocol not supported yet")
+        listener.begin();
+
+        let mut push_url = dst_url.join("push").unwrap();
+        let push_url_res = push_url.set_scheme("ws");
+        assert!(push_url_res.is_ok());
+
+        tracing::debug!("Connecting to push URL: {}", push_url);
+
+        let mut ws_stream = match connect_async(push_url).await {
+            Ok((ws_stream, _)) => ws_stream,
+            Err(e) => {
+                tracing::debug!("Failed to connect to push URL: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
+        use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
+        ws_stream
+            .close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: Cow::Borrowed("Client push flow succeeded"),
+            }))
+            .await
+            .int_err()?;
+
+        // TODO the main protocol part
+        unimplemented!("Smart push protocol not supported yet");
     }
 }
 

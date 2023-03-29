@@ -9,3 +9,4 @@
 
 mod test_routing;
 mod test_smart_pull;
+mod test_smart_push;
