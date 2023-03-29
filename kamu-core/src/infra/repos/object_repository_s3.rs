@@ -126,8 +126,8 @@ where
     async fn get_download_url(
         &self,
         hash: &Multihash,
-        opts: DownloadOpts,
-    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
+        opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -136,7 +136,6 @@ where
             .expect("Invalid presigning config");
 
         let expires_at = presigned_conf.start_time() + presigned_conf.expires();
-
         let res = self
             .s3_context
             .client
@@ -147,7 +146,36 @@ where
             .await
             .int_err()?;
 
-        Ok(GetDownloadUrlResult {
+        Ok(GetTransferUrlResult {
+            url: Url::parse(&res.uri().to_string()).int_err()?,
+            expires_at: Some(expires_at.into()),
+        })
+    }
+
+    async fn get_upload_url(
+        &self,
+        hash: &Multihash,
+        opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
+
+        let presigned_conf = PresigningConfig::builder()
+            .expires_in(expires_in.to_std().unwrap())
+            .build()
+            .expect("Invalid presigning config");
+
+        let expires_at = presigned_conf.start_time() + presigned_conf.expires();
+        let res = self
+            .s3_context
+            .client
+            .put_object()
+            .bucket(&self.s3_context.bucket)
+            .key(self.get_key(hash))
+            .presigned(presigned_conf)
+            .await
+            .int_err()?;
+
+        Ok(GetTransferUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })

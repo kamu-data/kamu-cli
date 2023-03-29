@@ -138,15 +138,23 @@ impl ObjectRepository for ObjectRepositoryHttp {
     async fn get_download_url(
         &self,
         hash: &Multihash,
-        _opts: DownloadOpts,
-    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
+        _opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
         match self.base_url.join(&hash.to_multibase_string()) {
-            Ok(url) => Ok(GetDownloadUrlResult {
+            Ok(url) => Ok(GetTransferUrlResult {
                 url,
                 expires_at: None,
             }),
-            Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
+            Err(e) => Err(GetTransferUrlError::Internal(e.int_err())),
         }
+    }
+
+    async fn get_upload_url(
+        &self,
+        _hash: &Multihash,
+        _opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        Err(AccessError::ReadOnly(None).into())
     }
 
     async fn insert_bytes<'a>(

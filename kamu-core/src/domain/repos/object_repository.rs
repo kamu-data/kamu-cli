@@ -39,8 +39,14 @@ pub trait ObjectRepository: Send + Sync {
     async fn get_download_url(
         &self,
         hash: &Multihash,
-        opts: DownloadOpts,
-    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError>;
+        opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError>;
+
+    async fn get_upload_url(
+        &self,
+        hash: &Multihash,
+        opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError>;
 
     async fn insert_bytes<'a>(
         &'a self,
@@ -93,14 +99,14 @@ pub struct InsertOpts<'a> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default, Debug, Clone)]
-pub struct DownloadOpts {
+pub struct TransferOpts {
     pub expiration: Option<Duration>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct GetDownloadUrlResult {
+pub struct GetTransferUrlResult {
     pub url: Url,
     pub expires_at: Option<DateTime<Utc>>,
 }
@@ -161,9 +167,15 @@ impl From<ContainsError> for GetError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDownloadUrlError {
-    #[error("Repository does not support external downloads")]
+pub enum GetTransferUrlError {
+    #[error("Repository does not support external transfers")]
     NotSupported,
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]

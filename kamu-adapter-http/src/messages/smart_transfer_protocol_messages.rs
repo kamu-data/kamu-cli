@@ -74,17 +74,30 @@ pub enum ObjectPullStrategy {
 /// Initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequest {
-    pub current_head: Multihash,
+    pub current_head: Option<Multihash>,
     pub size_estimation: TransferSizeEstimation,
 }
 
-/// Response to initial dataset push request
+/// Response to initial dataset push request message
+pub type DatasetPushResponse = Result<DatasetPushRequestAccepted, DatasetPushRequestError>;
+
+/// Succes response to initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequestAccepted {}
 
+// Unsuccesful response to initial dataset push request
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushRequestError {
+    Internal(DatasetInternalError),
+    InvalidHead {
+        suggested_head: Option<Multihash>,
+        actual_head: Option<Multihash>,
+    },
+}
+
 /// Push phase 1: push metadata request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushMetadata {
+pub struct DatasetPushMetadataRequest {
     pub new_blocks: ObjectsBatch,
 }
 
@@ -96,6 +109,7 @@ pub struct DatasetPushMetadataAccepted {}
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
+    pub is_truncated: bool,
 }
 
 /// Push phase 2: object transfer response

@@ -148,9 +148,17 @@ pub async fn dataset_checkpoints_handler(
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
     dataset_builder: Extension<Arc<Box<dyn DatasetBuilder>>>,
+    host: axum::extract::Host,
+    uri: axum::extract::OriginalUri,
 ) -> axum::response::Response {
+    let dataset_url = get_base_dataset_url(host, uri, 1);
+
     ws.on_upgrade(|socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(socket, dataset_builder.0)
+        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(
+            socket,
+            dataset_builder.0,
+            dataset_url,
+        )
     })
 }
 

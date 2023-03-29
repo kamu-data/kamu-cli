@@ -178,6 +178,16 @@ pub async fn dataset_import_pulled_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn dataset_import_pushed_metadata(
+    dataset: &dyn Dataset,
+    objects_batch: ObjectsBatch,
+) -> Vec<MetadataBlock> {
+    let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
+    load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
     if !objects_batch.media_type.eq(MEDIA_TAR_GZ) {
         panic!("Unsupported media type {}", objects_batch.media_type);
@@ -309,7 +319,7 @@ async fn collect_missing_object_references_from_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn prepare_object_transfer_strategy(
+pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
@@ -319,19 +329,19 @@ pub async fn prepare_object_transfer_strategy(
             dataset
                 .as_metadata_chain()
                 .as_object_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
         ObjectType::DataSlice => {
             dataset
                 .as_data_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
         ObjectType::Checkpoint => {
             dataset
                 .as_checkpoint_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
     };
@@ -342,11 +352,12 @@ pub async fn prepare_object_transfer_strategy(
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
-            GetDownloadUrlError::NotSupported => Ok(TransferUrl {
-                url: get_simple_transfer_protocool_download_url(object_file_ref, dataset_url),
+            GetTransferUrlError::NotSupported => Ok(TransferUrl {
+                url: get_simple_transfer_protocool_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
-            GetDownloadUrlError::Internal(e) => Err(e),
+            GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
+            GetTransferUrlError::Internal(e) => Err(e),
         },
     };
 
@@ -362,7 +373,7 @@ pub async fn prepare_object_transfer_strategy(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_simple_transfer_protocool_download_url(
+fn get_simple_transfer_protocool_url(
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
 ) -> Url {
@@ -377,6 +388,59 @@ fn get_simple_transfer_protocool_download_url(
         .unwrap()
         .join(object_file_ref.physical_hash.to_multibase_string().as_str())
         .unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn prepare_push_object_transfer_strategy(
+    dataset: &dyn Dataset,
+    object_file_ref: &ObjectFileReference,
+    dataset_url: &Url,
+) -> Result<PushObjectTransferStrategy, InternalError> {
+    let object_repo = match object_file_ref.object_type {
+        ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
+        ObjectType::DataSlice => dataset.as_data_repo(),
+        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
+    };
+
+    let contains = match object_repo.contains(&object_file_ref.physical_hash).await {
+        Ok(contains) => contains,
+        Err(e) => return Err(e.int_err()),
+    };
+
+    if contains {
+        Ok(PushObjectTransferStrategy {
+            object_file: object_file_ref.clone(),
+            push_strategy: ObjectPushStrategy::SkipUpload,
+            upload_to: None,
+        })
+    } else {
+        let get_upload_url_result = object_repo
+            .get_upload_url(&object_file_ref.physical_hash, TransferOpts::default())
+            .await;
+        let transfer_url_result = match get_upload_url_result {
+            Ok(result) => Ok(TransferUrl {
+                url: result.url,
+                expires_at: result.expires_at,
+            }),
+            Err(error) => match error {
+                GetTransferUrlError::NotSupported => Ok(TransferUrl {
+                    url: get_simple_transfer_protocool_url(object_file_ref, dataset_url),
+                    expires_at: None,
+                }),
+                GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
+                GetTransferUrlError::Internal(e) => Err(e),
+            },
+        };
+        match transfer_url_result {
+            Ok(transfer_url) => Ok(PushObjectTransferStrategy {
+                object_file: object_file_ref.clone(),
+                push_strategy: ObjectPushStrategy::HttpUpload,
+                upload_to: Some(transfer_url),
+            }),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
