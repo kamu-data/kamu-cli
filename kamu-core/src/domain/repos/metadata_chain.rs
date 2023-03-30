@@ -394,6 +394,15 @@ pub struct InvalidIntervalError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Error, Debug)]
+#[error("Invalid head, expected {suggested_head:?}, actually {actual_head:?}")]
+pub struct InvalidHeadError {
+    pub suggested_head: Option<Multihash>,
+    pub actual_head: Option<Multihash>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, PartialEq, Eq, Debug)]
 #[error("{reference} expected to point at {expected:?} but points at {actual:?}")]
 pub struct RefCASError {

@@ -232,9 +232,27 @@ impl SyncServiceImpl {
         let odf_dst_url = self.resolve_remote_dataset_url(&odf_dst_remote_ref).await?;
         let http_dst_url = Url::parse(&(odf_dst_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
 
+        let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
+        let http_dst_dataset_view = self.get_dataset_reader(&http_dst_ref).await?;
+        let maybe_dst_head = match http_dst_dataset_view
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+        {
+            Ok(head) => Ok(Some(head)),
+            Err(GetRefError::NotFound(_)) => Ok(None),
+            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
+
         info!("Starting sync using Smart Transfer Protocol (Push flow)");
         self.smart_transfer_protocol
-            .push_protocol_client_flow(src_dataset.as_ref(), &http_dst_url, listener)
+            .push_protocol_client_flow(
+                src_dataset.as_ref(),
+                &http_dst_url,
+                maybe_dst_head.as_ref(),
+                listener,
+            )
             .await
     }
 

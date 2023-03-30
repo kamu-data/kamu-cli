@@ -20,14 +20,11 @@ use url::Url;
 
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use kamu::domain::{
-    Dataset, ErrorIntoInternal, GetRefError, InternalError, InvalidIntervalError,
-    ResultIntoInternal, SyncError, SyncListener, SyncResult,
-};
-use kamu::{domain::BlockRef, infra::utils::smart_transfer_protocol::SmartTransferProtocolClient};
+use kamu::domain::*;
+use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 
 use crate::{
-    dataset_protocol_helper::{dataset_import_object_file, dataset_import_pulled_metadata},
+    dataset_protocol_helper::*,
     messages::*,
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
@@ -61,6 +58,45 @@ enum SmartProtocolPullClientError {
 
     #[error(transparent)]
     PullObjectResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+enum SmartProtocolPushClientError {
+    #[error(transparent)]
+    PushRequestWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PushResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PushResponseInvalidHead(InvalidHeadError),
+
+    #[error(transparent)]
+    PushMetadataRequestWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PushMetadataResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PushObjectRequestWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PushObjectResponseReadFailed(ReadMessageError),
+
+    #[error(transparent)]
+    PushCompleteRequestWriteFailed(WriteMessageError),
+
+    #[error(transparent)]
+    PushCompleteResponseReadFailed(ReadMessageError),
 
     #[error(transparent)]
     Internal(
@@ -208,6 +244,186 @@ impl WsSmartTransferProtocolClient {
 
         Ok(dataset_objects_pull_response)
     }
+
+    async fn push_send_request(
+        &self,
+        socket: &mut TungsteniteStream,
+        size_estimation: TransferSizeEstimation,
+        dst_head: Option<&Multihash>,
+    ) -> Result<DatasetPushRequestAccepted, SmartProtocolPushClientError> {
+        let push_request_message = DatasetPushRequest {
+            current_head: dst_head.cloned(),
+            size_estimation,
+        };
+
+        tracing::debug!("Sending push request: {:?}", push_request_message);
+
+        let write_result = write_payload(socket, push_request_message).await;
+        if let Err(e) = write_result {
+            return Err(SmartProtocolPushClientError::PushRequestWriteFailed(e));
+        }
+
+        tracing::debug!("Reading push request response");
+
+        let dataset_push_response = match read_payload::<DatasetPushResponse>(socket).await {
+            Ok(dataset_push_response) => dataset_push_response,
+            Err(e) => return Err(SmartProtocolPushClientError::PushResponseReadFailed(e)),
+        };
+
+        match dataset_push_response {
+            Ok(success) => {
+                tracing::debug!("Push response accepted");
+                Ok(success)
+            }
+            Err(DatasetPushRequestError::Internal(e)) => {
+                Err(SmartProtocolPushClientError::Internal(InternalError::new(
+                    Box::new(ClientInternalError::new(e.error_message.as_str())),
+                )))
+            }
+            Err(DatasetPushRequestError::InvalidHead {
+                suggested_head,
+                actual_head,
+            }) => Err(SmartProtocolPushClientError::PushResponseInvalidHead(
+                InvalidHeadError {
+                    suggested_head: suggested_head.clone(),
+                    actual_head: actual_head.clone(),
+                },
+            )),
+        }
+    }
+
+    async fn push_send_metadata_request(
+        &self,
+        socket: &mut TungsteniteStream,
+        src_dataset: &dyn Dataset,
+        src_head: &Multihash,
+        dst_head: Option<&Multihash>,
+    ) -> Result<DatasetPushMetadataAccepted, SmartProtocolPushClientError> {
+        tracing::debug!("Sending push metadata request");
+
+        let metadata_batch = match prepare_dataset_metadata_batch(
+            src_dataset.as_metadata_chain(),
+            src_head,
+            dst_head,
+        )
+        .await
+        {
+            Ok(metadata_batch) => metadata_batch,
+            Err(e) => return Err(SmartProtocolPushClientError::Internal(e)),
+        };
+
+        tracing::debug!(
+            "Metadata batch of {} blocks formed, payload size {} bytes",
+            metadata_batch.objects_count,
+            metadata_batch.payload.len()
+        );
+
+        let write_result_metadata = write_payload(
+            socket,
+            DatasetPushMetadataRequest {
+                new_blocks: metadata_batch,
+            },
+        )
+        .await;
+        if let Err(e) = write_result_metadata {
+            return Err(SmartProtocolPushClientError::PushMetadataRequestWriteFailed(e));
+        }
+
+        tracing::debug!("Reading push metadata response");
+
+        let dataset_metadata_push_response =
+            match read_payload::<DatasetPushMetadataAccepted>(socket).await {
+                Ok(dataset_metadata_push_response) => dataset_metadata_push_response,
+                Err(e) => {
+                    return Err(SmartProtocolPushClientError::PushMetadataResponseReadFailed(e));
+                }
+            };
+
+        Ok(dataset_metadata_push_response)
+    }
+
+    async fn push_send_objects_request(
+        &self,
+        socket: &mut TungsteniteStream,
+        object_files: Vec<ObjectFileReference>,
+    ) -> Result<DatasetPushObjectsTransferResponse, SmartProtocolPushClientError> {
+        let push_objects_request = DatasetPushObjectsTransferRequest {
+            object_files,
+            is_truncated: false, // TODO: split on pages to avoid links expiry
+        };
+        tracing::debug!(
+            "Sending push objects request for {} objects",
+            push_objects_request.object_files.len()
+        );
+
+        let write_result_objects = write_payload(socket, push_objects_request).await;
+        if let Err(e) = write_result_objects {
+            return Err(SmartProtocolPushClientError::PushObjectRequestWriteFailed(
+                e,
+            ));
+        }
+
+        tracing::debug!("Reading push objects request response");
+
+        let dataset_objects_push_response =
+            match read_payload::<DatasetPushObjectsTransferResponse>(socket).await {
+                Ok(dataset_objects_push_response) => dataset_objects_push_response,
+                Err(e) => {
+                    return Err(SmartProtocolPushClientError::PushObjectResponseReadFailed(
+                        e,
+                    ));
+                }
+            };
+
+        tracing::debug!(
+            "Obtained transfer strategies for {} objects",
+            dataset_objects_push_response
+                .object_transfer_strategies
+                .len()
+        );
+
+        dataset_objects_push_response
+            .object_transfer_strategies
+            .iter()
+            .for_each(|s| match s.upload_to.as_ref() {
+                Some(transfer_url) => {
+                    tracing::debug!(
+                        "Object file {} needs to upload to {} via {:?} method, expires at {:?}",
+                        s.object_file.physical_hash.to_string(),
+                        transfer_url.url,
+                        s.push_strategy,
+                        transfer_url.expires_at
+                    );
+                }
+                None => {
+                    tracing::debug!(
+                        "Object file {} does not need an upload",
+                        s.object_file.physical_hash.to_string(),
+                    );
+                }
+            });
+
+        Ok(dataset_objects_push_response)
+    }
+
+    async fn push_send_complete_request(
+        &self,
+        socket: &mut TungsteniteStream,
+    ) -> Result<DatasetPushCompleteConfirmed, SmartProtocolPushClientError> {
+        tracing::debug!("Sending push complete request");
+
+        let write_result = write_payload(socket, DatasetPushComplete {}).await;
+        if let Err(e) = write_result {
+            return Err(SmartProtocolPushClientError::PushCompleteRequestWriteFailed(e));
+        }
+
+        tracing::debug!("Reading push complete response");
+
+        match read_payload::<DatasetPushCompleteConfirmed>(socket).await {
+            Ok(complete_response) => Ok(complete_response),
+            Err(e) => Err(SmartProtocolPushClientError::PushCompleteResponseReadFailed(e)),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -216,13 +432,13 @@ impl WsSmartTransferProtocolClient {
 impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
-        src_url: &Url,
+        http_src_url: &Url,
         dst: &dyn Dataset,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
-        let mut pull_url = src_url.join("pull").unwrap();
+        let mut pull_url = http_src_url.join("pull").unwrap();
         let pull_url_res = pull_url.set_scheme("ws");
         assert!(pull_url_res.is_ok());
 
@@ -332,13 +548,32 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        _src: &dyn Dataset,
-        dst_url: &Url,
+        src: &dyn Dataset,
+        http_dst_url: &Url,
+        dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
-        let mut push_url = dst_url.join("push").unwrap();
+        let src_head = src
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .int_err()?;
+
+        let size_estimation =
+            match prepare_dataset_transfer_estimaton(src.as_metadata_chain(), &src_head, dst_head)
+                .await
+            {
+                Ok(size_estimation) => size_estimation,
+                Err(e) => return Err(SyncError::Internal(e.int_err())),
+            };
+
+        if size_estimation.num_blocks == 0 {
+            return Ok(SyncResult::UpToDate);
+        }
+
+        let mut push_url = http_dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");
         assert!(push_url_res.is_ok());
 
@@ -352,6 +587,65 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
+        match self
+            .push_send_request(&mut ws_stream, size_estimation, dst_head)
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
+        match self
+            .push_send_metadata_request(&mut ws_stream, src, &src_head, dst_head)
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
+        let missing_objects =
+            match collect_missing_object_references_from_interval(src, &src_head, dst_head).await {
+                Ok(object_references) => object_references,
+                Err(e) => {
+                    tracing::debug!("Push process aborted with error: {}", e);
+                    return Err(SyncError::Internal(e.int_err()));
+                }
+            };
+
+        let push_objects_response = match self
+            .push_send_objects_request(&mut ws_stream, missing_objects)
+            .await
+        {
+            Ok(push_objects_response) => push_objects_response,
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
+        use futures::stream::{StreamExt, TryStreamExt};
+        futures::stream::iter(push_objects_response.object_transfer_strategies)
+            .map(Ok)
+            .try_for_each_concurrent(
+                /* limit */ 4, // TODO: external configuration?
+                |s| async move { dataset_export_object_file(src, &s).await },
+            )
+            .await?;
+
+        match self.push_send_complete_request(&mut ws_stream).await {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
         use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
         ws_stream
             .close(Some(CloseFrame {
@@ -361,8 +655,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        // TODO the main protocol part
-        unimplemented!("Smart push protocol not supported yet");
+        Ok(SyncResult::Updated {
+            old_head: dst_head.cloned(),
+            new_head: src_head,
+            num_blocks: size_estimation.num_blocks as usize,
+        })
     }
 }
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use opendatafabric::Multihash;
 use std::sync::Arc;
 use url::Url;
 
@@ -18,7 +19,7 @@ use crate::domain::{Dataset, SyncError, SyncListener, SyncResult};
 pub trait SmartTransferProtocolClient: Sync + Send {
     async fn pull_protocol_client_flow(
         &self,
-        src_url: &Url,
+        http_src_url: &Url,
         dst: &dyn Dataset,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError>;
@@ -26,7 +27,8 @@ pub trait SmartTransferProtocolClient: Sync + Send {
     async fn push_protocol_client_flow(
         &self,
         src: &dyn Dataset,
-        dst_url: &Url,
+        http_dst_url: &Url,
+        dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError>;
 }

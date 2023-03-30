@@ -154,13 +154,8 @@ async fn handle_pull_request_initiation(
 
             let size_estimation_result = prepare_dataset_transfer_estimaton(
                 dataset.as_metadata_chain(),
-                pull_request
-                    .stop_at
-                    .as_ref()
-                    .or(Some(&head))
-                    .unwrap()
-                    .clone(),
-                pull_request.begin_after.clone(),
+                pull_request.stop_at.as_ref().or(Some(&head)).unwrap(),
+                pull_request.begin_after.as_ref(),
             )
             .await;
 
@@ -220,8 +215,8 @@ async fn try_handle_pull_metadata_request(
 
             let metadata_batch = match prepare_dataset_metadata_batch(
                 dataset.as_metadata_chain(),
-                pull_request.stop_at.or(Some(head)).unwrap(),
-                pull_request.begin_after,
+                pull_request.stop_at.as_ref().or(Some(&head)).unwrap(),
+                pull_request.begin_after.as_ref(),
             )
             .await
             {
