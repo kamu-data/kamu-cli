@@ -233,16 +233,19 @@ impl SyncServiceImpl {
         let http_dst_url = Url::parse(&(odf_dst_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
-        let http_dst_dataset_view = self.get_dataset_reader(&http_dst_ref).await?;
-        let maybe_dst_head = match http_dst_dataset_view
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-        {
-            Ok(head) => Ok(Some(head)),
-            Err(GetRefError::NotFound(_)) => Ok(None),
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+        let maybe_dst_head = match self.get_dataset_reader(&http_dst_ref).await {
+            Ok(http_dst_dataset_view) => match http_dst_dataset_view
+                .as_metadata_chain()
+                .get_ref(&BlockRef::Head)
+                .await
+            {
+                Ok(head) => Ok(Some(head)),
+                Err(GetRefError::NotFound(_)) => Ok(None),
+                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            },
+            Err(SyncError::DatasetNotFound(_)) => Ok(None),
+            Err(e) => Err(e),
         }?;
 
         info!("Starting sync using Smart Transfer Protocol (Push flow)");

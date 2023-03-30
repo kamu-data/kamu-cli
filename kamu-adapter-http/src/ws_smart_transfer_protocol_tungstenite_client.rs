@@ -569,7 +569,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 Err(e) => return Err(SyncError::Internal(e.int_err())),
             };
 
-        if size_estimation.num_blocks == 0 {
+        let num_blocks = size_estimation.num_blocks;
+        if num_blocks == 0 {
             return Ok(SyncResult::UpToDate);
         }
 
@@ -658,7 +659,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         Ok(SyncResult::Updated {
             old_head: dst_head.cloned(),
             new_head: src_head,
-            num_blocks: size_estimation.num_blocks as usize,
+            num_blocks: num_blocks as usize,
         })
     }
 }

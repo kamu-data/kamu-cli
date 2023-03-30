@@ -19,7 +19,6 @@ use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarn
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[ignore = "Not fully implemented yet"]
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_push_new_dataset() {

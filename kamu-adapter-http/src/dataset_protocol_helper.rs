@@ -15,7 +15,6 @@ use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
 use kamu::domain::*;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
-use reqwest::Body;
 use tar::Header;
 use thiserror::Error;
 use url::Url;
@@ -602,7 +601,7 @@ pub async fn dataset_export_object_file(
 
     let client = reqwest::Client::new();
 
-    let response = match client
+    match client
         .put(
             object_transfer_strategy
                 .upload_to
@@ -612,7 +611,7 @@ pub async fn dataset_export_object_file(
                 .clone(),
         )
         .header("content-type", "application/octet-stream")
-        .body(Body::wrap_stream(reader_stream))
+        .body(hyper::Body::wrap_stream(reader_stream))
         .send()
         .await
     {
