@@ -229,6 +229,6 @@ If you'd like to contribute [start here](https://docs.kamu.dev/contrib/).
 [FAQ]: https://docs.kamu.dev/cli/get-started/faq/
 [Chat]: https://discord.gg/nU6TXRQNXC
 [Contributing]: https://docs.kamu.dev/contrib/
-[Developer Guide]: https://docs.kamu.dev/cli/developer-guide/
+[Developer Guide]: ./DEVELOPER.md
 [License]: https://docs.kamu.dev/contrib/license/
 [Website]: https://kamu.dev
