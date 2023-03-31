@@ -3,9 +3,10 @@ name = "kamu-cli"
 version = "0.116.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2021"
+edition.workspace = true
 readme = "../README.md"
 license-file = "../LICENSE.txt"
+publish = false
 homepage = "https://github.com/kamu-data/kamu-cli"
 repository = "https://github.com/kamu-data/kamu-cli"
 keywords = ["cli", "data", "collaboration", "pipeline", "management", "provenance"]
@@ -20,8 +21,7 @@ web-ui = []
 skip_docker_tests = []
 
 [dependencies]
-dill = ">= 0.5.0"
-# dill = { path = "../../dill" }
+dill = { workspace = true }
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 kamu-adapter-graphql = { path = "../kamu-adapter-graphql" }
@@ -29,75 +29,75 @@ kamu-adapter-http = { path = "../kamu-adapter-http" }
 container-runtime = { path = "../utils/container-runtime" }
 
 # CLI
-read_input = "*"  # Basic user input
-chrono-humanize = "*"  # Human readable durations
-clap = "*"
-clap_complete = "*"
-console = "*"  # Terminal colors
-humansize = "*"  # Human readable data sizes
-indicatif = "*"  # Progress bars and spinners
+read_input = "0.8"  # Basic user input
+chrono-humanize = "0.2"  # Human readable durations
+clap = { workspace = true }
+clap_complete = "4.2"
+console = "0.15"  # Terminal colors
+humansize = "2"  # Human readable data sizes
+indicatif = "0.17"  # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
-num-format = "*"  # Human-readable number formatting
-prettytable-rs = "*"  # ASCII table formatting
-webbrowser = "*"  # For opening URLs in default system browser
+num-format = "0.4"  # Human-readable number formatting
+prettytable-rs = "0.10"  # ASCII table formatting
+webbrowser = "0.8"  # For opening URLs in default system browser
 
 # API / GraphQL
-http = "*"
-hyper = "*"
-tower = { version = "*" }
-tower-http = { version = "*", features = ["trace", "cors"] }
-axum = { version = "*", features = ["ws"] }
-axum-extra = { version = "*", features = ["async-read-body"] }
-async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
-async-graphql-axum = "*"
-serde_json = "*"
+http = { workspace = true }
+hyper = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true, features = ["trace", "cors"] }
+axum = { workspace = true, features = ["ws"] }
+axum-extra = { workspace = true, features = ["async-read-body"] }
+async-graphql = { workspace = true, features = ["chrono", "url", "apollo_tracing"] }
+async-graphql-axum = { workspace = true }
+serde_json = { workspace = true }
 
 # Web UI
-rust-embed = { version = "*", features = ["interpolate-folder-path", "compression"] }
-mime = "*"
-mime_guess = "*"
+rust-embed = { version = "6", features = ["interpolate-folder-path", "compression"] }
+mime = "0.3"
+mime_guess = "2"
 
 # Config
-merge = "*"
-serde = { version = "*", features = ["derive"] }
-serde_with = "*"
-serde_yaml = "*"
-duration-string = { version = "*", features = ["serde"] }
+merge = "0.1"
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true }
+duration-string = { version = "0.3", features = ["serde"] }
 
 # Tracing / logging / telemetry
-tracing = "*"
-tracing-appender = "*"
-tracing-subscriber = { version = "*", features = ["env-filter"] }
-tracing-log = "*"
-tracing-bunyan-formatter = "*"
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tracing-log = { workspace = true }
+tracing-bunyan-formatter = { workspace = true }
 
 # Utils
-async-trait = "*"
-chrono = "*"
-cfg-if = "*"  # Conditional compilation
-glob = "*"  # Used for path completions
-datafusion = "21"
-dirs = "*"
-futures = "*"
-indoc = "*"
-itertools = "*"
-libc = "*"  # Signal names
-regex = "*"
-shlex = "*"  # Parsing partial input for custom completions
-signal-hook = "*"  # Signal handling
-tokio = { version = "*", features = [] }
-tempfile = "*"
-thiserror = "*"  # Structured error derivations
-url = "*"
-urlencoding = "*"
+async-trait = { workspace = true }
+chrono = { workspace = true }
+cfg-if = "1"  # Conditional compilation
+glob = "0.3"  # Used for path completions
+datafusion = { workspace = true }
+dirs = "5"
+futures = { workspace = true }
+indoc = { workspace = true }
+itertools = { workspace = true }
+libc = "0.2"  # Signal names
+regex = { workspace = true }
+shlex = "1"  # Parsing partial input for custom completions
+signal-hook = "0.3"  # Signal handling
+tokio = { workspace = true, features = [] }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+urlencoding = "2"
 
 
 [target.'cfg(unix)'.dependencies]
-users = "*"  # For getting uid:gid
+users = "0.11"  # For getting uid:gid
 
 
 [dev-dependencies]
-rand = "^0.8"
-indoc = "*"  # Compile-time unindent
-env_logger = "*"
-test-log = { version = "*", features = ["trace"] }
+rand = "0.8"
+indoc = { workspace = true }
+env_logger = { workspace = true }
+test-log = { workspace = true, features = ["trace"] }

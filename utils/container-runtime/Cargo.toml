@@ -2,15 +2,15 @@
 name = "container-runtime"
 version = "0.116.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2021"
-license-file = "../../LICENSE.txt"
+edition.workspace = true
+license = "Apache-2.0"
 
 [features]
 skip_docker_tests = []
 
 [dependencies]
-dill = ">= 0.5.0"
-regex = "*"
-serde = { version = "*", features = ["derive"] }
-thiserror = "*"
-url = "*"
+dill = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+url = { workspace = true }

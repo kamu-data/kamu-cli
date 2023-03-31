@@ -2,40 +2,40 @@
 name = "opendatafabric"
 version = "0.116.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2021"
-license-file = "../LICENSE.txt"
+edition.workspace = true
+license = "Apache-2.0"
 
 [lib]
 doctest = false
 
 [dependencies]
 # Domain
-chrono = { version = "*", features = ["serde"] }
-rust-crypto = "*"  # Data and metadata hashing
+chrono = { workspace = true, features = ["serde"] }
+rust-crypto = "0.2"  # Data and metadata hashing
 
 # Multiformats
-bs58 = "*"  # base58 codec
-digest = "*"
-sha3 = "*"
-unsigned-varint = "*"
-url = "*"
+bs58 = "0.4"  # base58 codec
+digest = { workspace = true }
+sha3 = { workspace = true }
+unsigned-varint = "0.7"
+url = { workspace = true }
 
 # Crypto
 rand = "0.7"  # TODO: Pinned for ed25519-dalek compatibility
-ed25519-dalek = "*"
+ed25519-dalek = "1"
 
 # Serialization
-byteorder = "*"
-flatbuffers = "23"  # TODO: Automate keeping in sync with arrow crate
-hex = "*"
-serde = { version = "*", features = ["derive"] }
-serde_with = "*"
-serde_yaml = "*"
+byteorder = "1"
+flatbuffers = { workspace = true }
+hex = "0.4"
+serde = { workspace = true, features = ["derive"] }
+serde_with = { workspace = true }
+serde_yaml = { workspace = true }
 
 # gRPC
-tonic = "*"
-prost = "*"
+tonic = "0.9"
+prost = "0.11"
 
 # Utils
-indoc = "*"  # Compile-time unindent
-thiserror = "*"  # Structured error derivations
+indoc = { workspace = true }
+thiserror = { workspace = true }
