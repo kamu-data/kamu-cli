@@ -216,7 +216,8 @@ impl RunInfo {
         let reader = std::io::BufReader::new(file);
         for line in reader.lines() {
             let line = line?;
-            let obj = json::parse(&line).unwrap_or(json::Null);
+            let obj: serde_json::Value =
+                serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
             let process = &obj["process"];
             let stream = &obj["stream"];
             if process.is_null() || !process.is_string() || stream.is_null() || !stream.is_string()
