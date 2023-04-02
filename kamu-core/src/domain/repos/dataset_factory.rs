@@ -18,7 +18,7 @@ use url::Url;
 
 #[async_trait]
 pub trait DatasetFactory: Send + Sync {
-    fn get_dataset(
+    async fn get_dataset(
         &self,
         url: &Url,
         create_if_not_exists: bool,

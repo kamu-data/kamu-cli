@@ -21,7 +21,7 @@ async fn test_insert_bytes() {
 #[tokio::test]
 async fn test_delete() {
     let repo = ObjectRepositoryInMemory::new();
-    test_object_repository_shared::test_delete(&repo, true).await;
+    test_object_repository_shared::test_delete(&repo).await;
 }
 
 #[tokio::test]

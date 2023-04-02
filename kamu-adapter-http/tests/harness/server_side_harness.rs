@@ -71,10 +71,10 @@ pub struct ServerSideHarness {
 }
 
 impl ServerSideHarness {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let s3 = run_s3_server();
         let catalog = dill::CatalogBuilder::new()
-            .add_value(s3_repo(&s3))
+            .add_value(s3_repo(&s3).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .build();
 
@@ -124,10 +124,10 @@ impl ServerSideHarness {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
+async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     DatasetRepositoryS3::new(
-        S3Context::from_items(endpoint.clone(), bucket, key_prefix),
+        S3Context::from_items(endpoint.clone(), bucket, key_prefix).await,
         endpoint.unwrap(),
     )
 }

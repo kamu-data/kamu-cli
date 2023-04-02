@@ -23,7 +23,7 @@ use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarn
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_new_dataset() {
-    let server_harness = ServerSideHarness::new();
+    let server_harness = ServerSideHarness::new().await;
 
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
@@ -71,7 +71,7 @@ async fn test_smart_pull_new_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_up_to_date_dataset() {
-    let server_harness = ServerSideHarness::new();
+    let server_harness = ServerSideHarness::new().await;
 
     let server_repo = server_harness.dataset_repository();
     server_repo
@@ -119,7 +119,7 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_evolved_dataset() {
-    let server_harness = ServerSideHarness::new();
+    let server_harness = ServerSideHarness::new().await;
 
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
@@ -192,7 +192,7 @@ async fn test_smart_pull_existing_evolved_dataset() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_existing_advanced_dataset_fails() {
-    let server_harness = ServerSideHarness::new();
+    let server_harness = ServerSideHarness::new().await;
 
     let server_repo = server_harness.dataset_repository();
     server_repo

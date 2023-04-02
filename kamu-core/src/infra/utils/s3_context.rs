@@ -7,19 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use rusoto_core::{Region, RusotoError};
-use rusoto_s3::*;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::{
+    delete_object::{DeleteObjectError, DeleteObjectOutput},
+    get_object::{GetObjectError, GetObjectOutput},
+    head_object::{HeadObjectError, HeadObjectOutput},
+    put_object::{PutObjectError, PutObjectOutput},
+};
+use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
+use aws_sdk_s3::Client;
+use aws_smithy_http::byte_stream::ByteStream;
 use tokio::io::AsyncRead;
 use tokio_util::io::ReaderStream;
 use url::Url;
 
-use crate::domain::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
 pub struct S3Context {
-    pub client: S3Client,
+    pub client: Client,
     pub bucket: String,
     pub root_folder_key: String,
 }
@@ -31,9 +39,9 @@ pub type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl S3Context {
-    const MAX_LISTED_OBJECTS: i64 = 1000;
+    const MAX_LISTED_OBJECTS: i32 = 1000;
 
-    pub fn new<S1, S2>(client: S3Client, bucket: S1, root_folder_key: S2) -> Self
+    pub fn new<S1, S2>(client: Client, bucket: S1, root_folder_key: S2) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
@@ -45,25 +53,46 @@ impl S3Context {
         }
     }
 
-    pub fn from_items(endpoint: Option<String>, bucket: String, root_folder_key: String) -> Self {
-        let region = match endpoint {
-            None => Region::default(),
-            Some(endpoint) => Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint,
-            },
+    pub async fn from_items(
+        endpoint: Option<String>,
+        bucket: String,
+        root_folder_key: String,
+    ) -> Self {
+        // Note: Falling back to `unspecified` region as SDK errors out when the region not set
+        // even if using custom endpoint
+        let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
+            .or_else("unspecified");
+        let sdk_config = aws_config::from_env().region(region_provider).load().await;
+        let s3_config = if let Some(endpoint) = endpoint {
+            aws_sdk_s3::config::Builder::from(&sdk_config)
+                .endpoint_url(endpoint)
+                .force_path_style(true)
+                .build()
+        } else {
+            aws_sdk_s3::config::Builder::from(&sdk_config).build()
         };
-        Self::new(S3Client::new(region), bucket, root_folder_key)
+
+        // TODO: PERF: Client construction is expensive and should only be done once
+        let client = Client::from_conf(s3_config);
+
+        Self::new(client, bucket, root_folder_key)
     }
 
-    pub fn from_url(url: &Url) -> Self {
+    pub async fn from_url(url: &Url) -> Self {
         let (endpoint, bucket, root_folder_key) = Self::split_url(url);
-        Self::from_items(endpoint, bucket, root_folder_key)
+
+        assert!(
+            root_folder_key.is_empty() || root_folder_key.ends_with('/'),
+            "Base URL does not contain a trailing slash: {}",
+            url
+        );
+
+        Self::from_items(endpoint, bucket, root_folder_key).await
     }
 
     pub fn split_url(url: &Url) -> (Option<String>, String, String) {
-        // TODO: Support virtual hosted style URLs once rusoto supports them
-        // See: https://github.com/rusoto/rusoto/issues/1482
+        // TODO: Support virtual hosted style URLs
+        // See https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
         let (endpoint, path): (Option<String>, String) =
             match (url.scheme(), url.host_str(), url.port(), url.path()) {
                 ("s3", Some(host), None, path) => {
@@ -107,26 +136,24 @@ impl S3Context {
     pub async fn head_object(
         &self,
         key: String,
-    ) -> Result<HeadObjectOutput, RusotoError<HeadObjectError>> {
+    ) -> Result<HeadObjectOutput, SdkError<HeadObjectError>> {
         self.client
-            .head_object(HeadObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                ..HeadObjectRequest::default()
-            })
+            .head_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
             .await
     }
 
     pub async fn get_object(
         &self,
         key: String,
-    ) -> Result<GetObjectOutput, RusotoError<GetObjectError>> {
+    ) -> Result<GetObjectOutput, SdkError<GetObjectError>> {
         self.client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                ..GetObjectRequest::default()
-            })
+            .get_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
             .await
     }
 
@@ -134,16 +161,15 @@ impl S3Context {
         &self,
         key: String,
         data: &[u8],
-    ) -> Result<PutObjectOutput, RusotoError<PutObjectError>> {
+    ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
         self.client
-            .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                // TODO: PERF: Avoid copying data into a buffer
-                body: Some(rusoto_core::ByteStream::from(Vec::from(data))),
-                content_length: Some(data.len() as i64),
-                ..PutObjectRequest::default()
-            })
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key)
+            // TODO: PERF: Avoid copying data into a buffer
+            .body(ByteStream::from(Vec::from(data)))
+            .content_length(data.len() as i64)
+            .send()
             .await
     }
 
@@ -152,41 +178,38 @@ impl S3Context {
         key: String,
         stream: ReaderStream<Box<AsyncReadObj>>,
         size: i64,
-    ) -> Result<PutObjectOutput, RusotoError<PutObjectError>> {
+    ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+        let body = hyper::Body::wrap_stream(stream);
         self.client
-            .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                // TODO: PERF: Avoid copying data into a buffer
-                body: Some(rusoto_core::ByteStream::new(stream)),
-                content_length: Some(size),
-                ..PutObjectRequest::default()
-            })
+            .put_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .body(ByteStream::from(body))
+            .content_length(size)
+            .send()
             .await
     }
 
     pub async fn delete_object(
         &self,
         key: String,
-    ) -> Result<DeleteObjectOutput, RusotoError<DeleteObjectError>> {
+    ) -> Result<DeleteObjectOutput, SdkError<DeleteObjectError>> {
         self.client
-            .delete_object(DeleteObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                ..DeleteObjectRequest::default()
-            })
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
             .await
     }
 
     pub async fn bucket_path_exists(&self, key_prefix: &str) -> Result<bool, InternalError> {
         let listing = self
             .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(self.get_key(key_prefix)),
-                max_keys: Some(1),
-                ..ListObjectsV2Request::default()
-            })
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(self.get_key(key_prefix))
+            .max_keys(1)
+            .send()
             .await;
 
         match listing {
@@ -198,17 +221,16 @@ impl S3Context {
     pub async fn bucket_list_folders(&self) -> Result<Vec<CommonPrefix>, InternalError> {
         let list_objects_resp = self
             .client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                delimiter: Some("/".to_owned()),
-                ..ListObjectsV2Request::default()
-            })
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .delimiter("/")
+            .send()
             .await
             .int_err()?;
 
         // TODO: Support iteration
         assert!(
-            !list_objects_resp.is_truncated.unwrap_or(false),
+            !list_objects_resp.is_truncated,
             "Cannot handle truncated response"
         );
 
@@ -221,32 +243,31 @@ impl S3Context {
         while has_next_page {
             let list_response = self
                 .client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(key_prefix.clone()),
-                    max_keys: Some(S3Context::MAX_LISTED_OBJECTS),
-                    ..ListObjectsV2Request::default()
-                })
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&key_prefix)
+                .max_keys(Self::MAX_LISTED_OBJECTS)
+                .send()
                 .await
                 .int_err()?;
 
             if let Some(contents) = list_response.contents {
-                has_next_page = list_response.is_truncated.unwrap_or(false);
+                let object_identifiers: Vec<_> = contents
+                    .into_iter()
+                    .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
+                    .collect();
+
+                has_next_page = list_response.is_truncated;
                 self.client
-                    .delete_objects(DeleteObjectsRequest {
-                        bucket: self.bucket.clone(),
-                        delete: Delete {
-                            objects: contents
-                                .into_iter()
-                                .map(|obj| ObjectIdentifier {
-                                    key: obj.key.unwrap(),
-                                    version_id: None,
-                                })
-                                .collect(),
-                            quiet: Some(true),
-                        },
-                        ..DeleteObjectsRequest::default()
-                    })
+                    .delete_objects()
+                    .bucket(&self.bucket)
+                    .delete(
+                        Delete::builder()
+                            .set_objects(Some(object_identifiers))
+                            .quiet(true)
+                            .build(),
+                    )
+                    .send()
                     .await
                     .int_err()?;
             } else {
@@ -267,12 +288,11 @@ impl S3Context {
         while has_next_page {
             let list_response = self
                 .client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(old_key_prefix.clone()),
-                    max_keys: Some(S3Context::MAX_LISTED_OBJECTS),
-                    ..ListObjectsV2Request::default()
-                })
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&old_key_prefix)
+                .max_keys(Self::MAX_LISTED_OBJECTS)
+                .send()
                 .await
                 .int_err()?;
 
@@ -280,8 +300,8 @@ impl S3Context {
             // It is important not to allow parallel writes of Head reference file in the same bucket.
             // Consider optimistic locking (comparing old head with expected before final commit).
 
+            has_next_page = list_response.is_truncated();
             if let Some(contents) = list_response.contents {
-                has_next_page = (contents.len() as i64) == S3Context::MAX_LISTED_OBJECTS;
                 for obj in &contents {
                     let copy_source =
                         format!("{}/{}", self.bucket.clone(), obj.key.clone().unwrap());
@@ -291,31 +311,30 @@ impl S3Context {
                         .unwrap()
                         .replace(old_key_prefix.as_str(), new_key_prefix.as_str());
                     self.client
-                        .copy_object(CopyObjectRequest {
-                            bucket: self.bucket.clone(),
-                            copy_source,
-                            key: new_key,
-                            ..CopyObjectRequest::default()
-                        })
+                        .copy_object()
+                        .bucket(&self.bucket)
+                        .copy_source(copy_source)
+                        .key(new_key)
+                        .send()
                         .await
                         .int_err()?;
                 }
 
+                let object_identifiers: Vec<_> = contents
+                    .into_iter()
+                    .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
+                    .collect();
+
                 self.client
-                    .delete_objects(DeleteObjectsRequest {
-                        bucket: self.bucket.clone(),
-                        delete: Delete {
-                            objects: contents
-                                .into_iter()
-                                .map(|obj| ObjectIdentifier {
-                                    key: obj.key.unwrap(),
-                                    version_id: None,
-                                })
-                                .collect(),
-                            quiet: Some(true),
-                        },
-                        ..DeleteObjectsRequest::default()
-                    })
+                    .delete_objects()
+                    .bucket(&self.bucket)
+                    .delete(
+                        Delete::builder()
+                            .set_objects(Some(object_identifiers))
+                            .quiet(true)
+                            .build(),
+                    )
+                    .send()
                     .await
                     .int_err()?;
             } else {

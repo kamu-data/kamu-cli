@@ -175,7 +175,7 @@ impl SyncServiceImpl {
         } else {
             let remote_ref = dataset_ref.as_remote_ref().unwrap();
             let url = self.resolve_remote_dataset_url(&remote_ref).await?;
-            self.dataset_factory.get_dataset(&url, false)?
+            self.dataset_factory.get_dataset(&url, false).await?
         };
 
         match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
@@ -209,7 +209,8 @@ impl SyncServiceImpl {
             let url = self.resolve_remote_dataset_url(&remote_ref).await?;
             let dataset = self
                 .dataset_factory
-                .get_dataset(&url, create_if_not_exists)?;
+                .get_dataset(&url, create_if_not_exists)
+                .await?;
 
             if !create_if_not_exists {
                 match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
@@ -397,7 +398,10 @@ impl SyncServiceImpl {
                     let dst_http_url = self
                         .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
                         .await?;
-                    let dst_dataset = self.dataset_factory.get_dataset(&dst_http_url, false)?;
+                    let dst_dataset = self
+                        .dataset_factory
+                        .get_dataset(&dst_http_url, false)
+                        .await?;
                     match dst_dataset
                         .as_metadata_chain()
                         .get_ref(&BlockRef::Head)

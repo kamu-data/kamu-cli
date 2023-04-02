@@ -52,12 +52,10 @@ fn run_s3_server() -> S3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
+async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
-    DatasetRepositoryS3::new(
-        S3Context::from_items(endpoint.clone(), bucket, key_prefix),
-        endpoint.unwrap(),
-    )
+    let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
+    DatasetRepositoryS3::new(s3_context, endpoint.unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +64,7 @@ fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset() {
     let s3 = run_s3_server();
-    let repo = s3_repo(&s3);
+    let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_create_dataset(&repo).await;
 }
@@ -77,7 +75,7 @@ async fn test_create_dataset() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset_from_snapshot() {
     let s3 = run_s3_server();
-    let repo = s3_repo(&s3);
+    let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
 }
@@ -88,7 +86,7 @@ async fn test_create_dataset_from_snapshot() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_rename_dataset() {
     let s3 = run_s3_server();
-    let repo = s3_repo(&s3);
+    let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_rename_dataset(&repo).await;
 }
@@ -99,7 +97,7 @@ async fn test_rename_dataset() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete_dataset() {
     let s3 = run_s3_server();
-    let repo = s3_repo(&s3);
+    let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_delete_dataset(&repo).await;
 }

@@ -70,8 +70,8 @@ pub trait ObjectRepository: Send + Sync {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct InsertResult {
+    /// Hash of the inserted object
     pub hash: Multihash,
-    pub already_existed: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
