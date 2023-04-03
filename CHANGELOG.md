@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.117.0] - 2023-04-03
 ### Changed
-- Migrated to official S3 SDK
+- Revised workspace dependencies management:
+  - Sharing single definition of common dependencies between modules
+  - Using `cargo-deny` utility for dependencies linting
+- Migrated to official S3 SDK (got rid of untamintained `Rusoto` package)
+- Moved developer's guide to this repository
 
 ## [0.116.0] - 2023-03-28
 ### Added

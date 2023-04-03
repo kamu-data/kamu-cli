@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.116.0"
+version = "0.117.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
