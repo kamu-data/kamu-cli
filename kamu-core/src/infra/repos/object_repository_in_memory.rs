@@ -100,11 +100,8 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         }
 
         let bytes = Bytes::copy_from_slice(data);
-        let already_existed = blocks_by_hash.insert(hash.clone(), bytes).is_some();
-        Ok(InsertResult {
-            hash,
-            already_existed,
-        })
+        blocks_by_hash.insert(hash.clone(), bytes);
+        Ok(InsertResult { hash })
     }
 
     async fn insert_stream<'a>(

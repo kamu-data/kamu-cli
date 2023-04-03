@@ -71,26 +71,11 @@ impl DatasetFactoryImpl {
         ))
     }
 
-    pub fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
-        use rusoto_core::Region;
-        use rusoto_s3::S3Client;
-
-        let (endpoint, bucket, key_prefix) = S3Context::split_url(&base_url);
-        assert!(
-            key_prefix.is_empty() || key_prefix.ends_with('/'),
-            "Base URL does not contain a trailing slash: {}",
-            base_url
-        );
-
-        let region = match endpoint {
-            None => Region::default(),
-            Some(endpoint) => Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: endpoint,
-            },
-        };
-
-        let client = S3Client::new(region);
+    pub async fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
+        let s3_context = S3Context::from_url(&base_url).await;
+        let client = s3_context.client;
+        let bucket = s3_context.bucket;
+        let key_prefix = s3_context.root_folder_key;
 
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
@@ -131,8 +116,9 @@ impl DatasetFactoryImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
-    fn get_dataset(
+    async fn get_dataset(
         &self,
         url: &Url,
         create_if_not_exists: bool,
@@ -158,7 +144,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3(url.clone())?;
+                let ds = Self::get_s3(url.clone()).await?;
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             _ => Err(UnsupportedProtocolError {

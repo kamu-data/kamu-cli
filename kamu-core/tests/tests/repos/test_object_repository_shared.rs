@@ -27,7 +27,6 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
             .unwrap(),
         InsertResult {
             hash: hash_foo.clone(),
-            already_existed: false
         }
     );
     assert_eq!(
@@ -36,7 +35,6 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
             .unwrap(),
         InsertResult {
             hash: hash_bar.clone(),
-            already_existed: false
         }
     );
 
@@ -48,10 +46,7 @@ pub async fn test_insert_bytes(repo: &dyn ObjectRepository) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_delete(
-    repo: &dyn ObjectRepository,
-    expected_already_existed_after_reinsert: bool,
-) {
+pub async fn test_delete(repo: &dyn ObjectRepository) {
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
     assert_eq!(
@@ -60,7 +55,6 @@ pub async fn test_delete(
             .unwrap(),
         InsertResult {
             hash: hash_foo.clone(),
-            already_existed: false
         }
     );
 
@@ -72,7 +66,6 @@ pub async fn test_delete(
             .unwrap(),
         InsertResult {
             hash: hash_foo.clone(),
-            already_existed: expected_already_existed_after_reinsert
         }
     );
 
@@ -104,7 +97,6 @@ pub async fn test_insert_precomputed(repo: &dyn ObjectRepository) {
         .unwrap(),
         InsertResult {
             hash: hash_bar.clone(),
-            already_existed: false
         }
     );
     assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"foo");
@@ -129,7 +121,6 @@ pub async fn test_insert_expect(repo: &dyn ObjectRepository) {
         .unwrap(),
         InsertResult {
             hash: hash_foo.clone(),
-            already_existed: false
         }
     );
     assert_eq!(&repo.get_bytes(&hash_foo).await.unwrap()[..], b"foo");

@@ -24,9 +24,9 @@ url = { workspace = true, features = ["serde"] }
 # Serialization
 hex = "0.4"
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 serde_with = { workspace = true }
 serde_yaml = { workspace = true }
-json = "0.12"
 
 # Ingest
 flate2 = "1"  # GZip decoder
@@ -47,15 +47,17 @@ digest = { workspace = true }
 sha3 = { workspace = true }
 
 # Repositories
+async-stream = { workspace = true }
+aws-config = { version = "0.55.0" }
+aws-sdk-s3 = { version = "0.25" }
+aws-smithy-http = { version = "0.55.0", features = ["rt-tokio"] }
 bytes = { workspace = true }
 futures = { workspace = true }
-async-stream = { workspace = true }
-tokio = { workspace = true, features=["fs"] }
+hyper = { workspace = true }
+tokio = { workspace = true, features=["fs", "process"] }
 tokio-stream = { workspace = true }
 tokio-util = { workspace = true, features=["codec", "compat", "io"] }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
-rusoto_core = { version = "0.47.0", default-features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
-rusoto_s3 = { version = "0.47.0", default-features = false, features=["rustls"] }  # TODO: Pinned due to https://github.com/rusoto/rusoto/issues/1980
 
 # Utils
 async-trait = { workspace = true }

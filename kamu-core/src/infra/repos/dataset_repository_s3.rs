@@ -48,9 +48,12 @@ impl DatasetRepositoryS3 {
         Url::parse(dataset_url_string.as_str()).unwrap()
     }
 
-    fn get_dataset_impl(&self, dataset_name: &DatasetName) -> Result<impl Dataset, InternalError> {
+    async fn get_dataset_impl(
+        &self,
+        dataset_name: &DatasetName,
+    ) -> Result<impl Dataset, InternalError> {
         let dataset_url = self.get_s3_bucket_path(dataset_name.as_str());
-        DatasetFactoryImpl::get_s3(dataset_url)
+        DatasetFactoryImpl::get_s3(dataset_url).await
     }
 
     async fn delete_dataset_s3_objects(
@@ -150,7 +153,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             DatasetRefLocal::Handle(h) => Ok(h.clone()),
             DatasetRefLocal::Name(name) => {
                 if self.s3_context.bucket_path_exists(name.as_str()).await? {
-                    let dataset = self.get_dataset_impl(name)?;
+                    let dataset = self.get_dataset_impl(name).await?;
                     let summary = dataset
                         .get_summary(GetSummaryOpts::default())
                         .await
@@ -190,7 +193,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_ref: &DatasetRefLocal,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.name)?;
+        let dataset = self.get_dataset_impl(&handle.name).await?;
         Ok(Arc::new(dataset))
     }
 
@@ -200,7 +203,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
         let staging_name = get_staging_name();
         let dataset_url = self.get_s3_bucket_path(staging_name.as_str());
-        let dataset_result = DatasetFactoryImpl::get_s3(dataset_url);
+        let dataset_result = DatasetFactoryImpl::get_s3(dataset_url).await;
         match dataset_result {
             Ok(dataset) => Ok(Box::new(DatasetBuildS3::new(
                 self.clone(),

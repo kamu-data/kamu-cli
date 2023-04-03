@@ -12,9 +12,8 @@ use crate::domain::*;
 use crate::infra::utils::s3_context::S3Context;
 
 use async_trait::async_trait;
+use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
-use rusoto_core::RusotoError;
-use rusoto_s3::*;
 use tracing::debug;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,18 +45,16 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
-            Err(RusotoError::Service(GetObjectError::NoSuchKey(_))) => {
-                Err(GetError::NotFound(NotFoundError {
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(NotFoundError {
                     name: name.to_owned(),
-                }))
-            }
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(GetError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
+                })),
+                err @ _ => Err(err.int_err().into()),
+            },
         }?;
 
-        let mut stream = resp.body.expect("Response with no body").into_async_read();
+        let mut stream = resp.body.into_async_read();
 
         use tokio::io::AsyncReadExt;
         let mut data: Vec<u8> = Vec::new();
@@ -72,12 +69,12 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         debug!(?key, "Inserting object");
 
         match self.s3_context.put_object(key, data).await {
-            Ok(_) => Ok(()),
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(SetError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
-        }?;
+            Ok(_) => {}
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                err @ _ => return Err(err.int_err().into()),
+            },
+        }
 
         Ok(())
     }
@@ -88,12 +85,12 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         debug!(?key, "Deleting object");
 
         match self.s3_context.delete_object(key).await {
-            Ok(_) => Ok(()),
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(DeleteError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
-        }?;
+            Ok(_) => {}
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                err @ _ => return Err(err.int_err().into()),
+            },
+        }
 
         Ok(())
     }

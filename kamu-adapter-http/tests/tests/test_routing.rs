@@ -102,6 +102,7 @@ where
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
     let dataset = DatasetFactoryImpl::new()
         .get_dataset(&dataset_url, false)
+        .await
         .unwrap();
 
     let head_actual = dataset

@@ -204,10 +204,7 @@ where
         debug!(?path, "Inserting object");
 
         if path.exists() {
-            return Ok(InsertResult {
-                hash,
-                already_existed: true,
-            });
+            return Ok(InsertResult { hash });
         }
 
         let staging_path = self.get_staging_path();
@@ -218,10 +215,7 @@ where
         // Atomic move
         std::fs::rename(&staging_path, path).int_err()?;
 
-        Ok(InsertResult {
-            hash,
-            already_existed: false,
-        })
+        Ok(InsertResult { hash })
     }
 
     async fn insert_stream<'a>(
@@ -260,19 +254,13 @@ where
         if path.exists() {
             tokio::fs::remove_file(&staging_path).await.int_err()?;
 
-            return Ok(InsertResult {
-                hash,
-                already_existed: true,
-            });
+            return Ok(InsertResult { hash });
         }
 
         // Atomic move
         std::fs::rename(&staging_path, path).int_err()?;
 
-        Ok(InsertResult {
-            hash,
-            already_existed: false,
-        })
+        Ok(InsertResult { hash })
     }
 
     async fn insert_file_move<'a>(
@@ -301,19 +289,13 @@ where
         debug!("{} {}", path.parent().unwrap().exists(), src.exists());
 
         if path.exists() {
-            return Ok(InsertResult {
-                hash,
-                already_existed: true,
-            });
+            return Ok(InsertResult { hash });
         }
 
         // Atomic move
         std::fs::rename(src, path).int_err()?;
 
-        Ok(InsertResult {
-            hash,
-            already_existed: false,
-        })
+        Ok(InsertResult { hash })
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {

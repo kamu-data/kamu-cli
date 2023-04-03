@@ -11,19 +11,14 @@ use crate::{
     domain::*,
     infra::utils::s3_context::{AsyncReadObj, S3Context},
 };
-use chrono::Utc;
-use opendatafabric::{Multicodec, Multihash};
-
 use async_trait::async_trait;
+use aws_sdk_s3::{
+    operation::{get_object::GetObjectError, head_object::HeadObjectError},
+    presigning::PresigningConfig,
+};
 use bytes::Bytes;
-use rusoto_core::{
-    credential::{ChainProvider, ProvideAwsCredentials},
-    Region, RusotoError,
-};
-use rusoto_s3::{
-    util::{PreSignedRequest, PreSignedRequestOption},
-    *,
-};
+
+use opendatafabric::{Multicodec, Multihash};
 use std::{marker::PhantomData, path::Path};
 use tracing::debug;
 use url::Url;
@@ -70,14 +65,12 @@ where
         debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(_) => {
-                return Ok(true);
-            }
-            // TODO: This error type doesn't work
-            // See: https://github.com/rusoto/rusoto/issues/716
-            Err(RusotoError::Service(HeadObjectError::NoSuchKey(_))) => Ok(false),
-            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
-            Err(_) => Ok(false), // return Err(e.into()),
+            Ok(_) => Ok(true),
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                HeadObjectError::NotFound(_) => Ok(false),
+                err @ _ => return Err(err.int_err().into()),
+            },
         }
     }
 
@@ -88,17 +81,15 @@ where
 
         match self.s3_context.head_object(key).await {
             Ok(output) => {
-                return Ok(output.content_length.unwrap_or_default() as u64);
+                return Ok(output.content_length as u64);
             }
-            // TODO: This error type doesn't work
-            // See: https://github.com/rusoto/rusoto/issues/716
-            Err(RusotoError::Service(HeadObjectError::NoSuchKey(_))) => {
-                Err(GetError::NotFound(ObjectNotFoundError {
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
-                }))
-            }
-            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
-            Err(e) => Err(e.int_err().into()),
+                })),
+                err @ _ => return Err(err.int_err().into()),
+            },
         }
     }
 
@@ -119,16 +110,16 @@ where
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
-            Err(RusotoError::Service(GetObjectError::NoSuchKey(_))) => {
-                Err(GetError::NotFound(ObjectNotFoundError {
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
-                }))
-            }
-            Err(e @ RusotoError::Credentials(_)) => Err(AccessError::Unauthorized(e.into()).into()),
-            Err(e) => Err(e.int_err().into()),
+                })),
+                err @ _ => return Err(err.int_err().into()),
+            },
         }?;
 
-        let stream = resp.body.expect("Response with no body").into_async_read();
+        let stream = resp.body.into_async_read();
         Ok(Box::new(stream))
     }
 
@@ -137,33 +128,29 @@ where
         hash: &Multihash,
         opts: DownloadOpts,
     ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
-        let key = self.get_key(hash);
-        let get_object_request = GetObjectRequest {
-            bucket: self.s3_context.bucket.clone(),
-            key,
-            ..GetObjectRequest::default()
-        };
+        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
-        let provider = ChainProvider::new();
-        let credentials = provider.credentials().await.unwrap();
+        let presigned_conf = PresigningConfig::builder()
+            .expires_in(expires_in.to_std().unwrap())
+            .build()
+            .expect("Invalid presigning config");
 
-        let validity_period_seconds: i64 = match opts.expiration {
-            Some(expiration) => expiration.num_seconds(),
-            None => 3600, /* default expiration */
-        };
-        let options = PreSignedRequestOption {
-            expires_in: std::time::Duration::from_secs(validity_period_seconds as u64),
-        };
+        let expires_at = presigned_conf.start_time() + presigned_conf.expires();
 
-        let presigned_url =
-            get_object_request.get_presigned_url(&(Region::default()), &credentials, &options);
-        match Url::parse(presigned_url.as_str()) {
-            Ok(url) => Ok(GetDownloadUrlResult {
-                url,
-                expires_at: Some(Utc::now() + chrono::Duration::seconds(validity_period_seconds)),
-            }),
-            Err(e) => Err(GetDownloadUrlError::Internal(e.int_err())),
-        }
+        let res = self
+            .s3_context
+            .client
+            .get_object()
+            .bucket(&self.s3_context.bucket)
+            .key(self.get_key(hash))
+            .presigned(presigned_conf)
+            .await
+            .int_err()?;
+
+        Ok(GetDownloadUrlResult {
+            url: Url::parse(&res.uri().to_string()).int_err()?,
+            expires_at: Some(expires_at.into()),
+        })
     }
 
     async fn insert_bytes<'a>(
@@ -191,17 +178,14 @@ where
         debug!(?key, "Inserting object");
 
         match self.s3_context.put_object(key, data).await {
-            Ok(_) => Ok(()),
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(InsertError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
-        }?;
+            Ok(_) => {}
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                err @ _ => return Err(err.int_err().into()),
+            },
+        }
 
-        Ok(InsertResult {
-            hash,
-            already_existed: false,
-        })
+        Ok(InsertResult { hash })
     }
 
     async fn insert_stream<'a>(
@@ -225,13 +209,6 @@ where
 
         debug!(?key, size, "Inserting object stream");
 
-        if self.contains(&hash).await? {
-            return Ok(InsertResult {
-                hash,
-                already_existed: true,
-            });
-        }
-
         use tokio_util::io::ReaderStream;
         let stream = ReaderStream::new(src);
 
@@ -240,17 +217,14 @@ where
             .put_object_stream(key, stream, size as i64)
             .await
         {
-            Ok(_) => Ok(()),
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(InsertError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
-        }?;
+            Ok(_) => {}
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                err @ _ => return Err(err.int_err().into()),
+            },
+        }
 
-        Ok(InsertResult {
-            hash,
-            already_existed: false,
-        })
+        Ok(InsertResult { hash })
     }
 
     async fn insert_file_move<'a>(
@@ -267,12 +241,12 @@ where
         debug!(?key, "Deleting object");
 
         match self.s3_context.delete_object(key).await {
-            Ok(_) => Ok(()),
-            Err(e @ RusotoError::Credentials(_)) => {
-                Err(DeleteError::Access(AccessError::Unauthorized(e.into())))
-            }
-            Err(e) => Err(e.int_err().into()),
-        }?;
+            Ok(_) => {}
+            Err(err) => match err.into_service_error() {
+                // TODO: Detect credentials error
+                err @ _ => return Err(err.int_err().into()),
+            },
+        }
 
         Ok(())
     }
