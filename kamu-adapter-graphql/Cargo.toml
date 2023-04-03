@@ -2,39 +2,37 @@
 name = "kamu-adapter-graphql"
 version = "0.116.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition = "2021"
+edition.workspace = true
+publish = false
 
 [lib]
 doctest = false
 
 [dependencies]
 # Kamu
-dill = ">= 0.5.0"
+dill = { workspace = true }
 opendatafabric = { path = "../opendatafabric" }
 kamu = { path = "../kamu-core" }
 
 # HTTP
-# TODO: Remove from this crate
-reqwest = { version = "*", features = ["json"] }
+# TODO: Remove from this crate (needed by GitHub auth)
+reqwest = { workspace = true, features = ["json"] }
 
 # GraphQL
-async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
+async-graphql = { workspace = true, features = ["chrono", "url", "apollo_tracing"] }
 
 # Utils
-indoc = "*"
-chrono = "*"
-datafusion = "21"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-futures = "*"
-serde = "*"
-serde_json = "*"
-tracing = "*"
-# tokio = { version = "*", features = ["macros"] }
-# url = "*"
-
+indoc = { workspace = true }
+chrono = { workspace = true }
+datafusion = { workspace = true }  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
-tempfile = "*"
-tokio = { version = "*" }
-env_logger = "*"
-test-log = { version = "*", features = ["trace"] }
-tracing-subscriber = { version = "*", features = ["env-filter"] }
+tempfile = { workspace = true }
+tokio = { workspace = true }
+env_logger = { workspace = true }
+test-log = { workspace = true, features = ["trace"] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
