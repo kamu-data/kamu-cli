@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod common_harness;
+pub use common_harness::*;
+
 mod client_side_harness;
 pub use client_side_harness::*;
 

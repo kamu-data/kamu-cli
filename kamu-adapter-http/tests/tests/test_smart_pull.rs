@@ -14,9 +14,10 @@ use kamu::{
 use opendatafabric::{
     DatasetKind, DatasetName, DatasetRefAny, DatasetRefLocal, DatasetRefRemote, MetadataEvent,
 };
-use std::{fs, io, path::Path};
 
-use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarness};
+use crate::harness::{
+    await_client_server_flow, copy_folder_recursively, ClientSideHarness, ServerSideHarness,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -251,15 +252,6 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
-    fs::create_dir_all(&dst)?;
-    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-    fs_extra::dir::copy(src, dst, &copy_options).unwrap();
-    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
