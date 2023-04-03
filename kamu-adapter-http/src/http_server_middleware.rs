@@ -75,7 +75,6 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 }
 
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
-    // TODO: use to create dataset if necessary
     fn is_allowed_to_create_dataset(request: &Request<Body>) -> bool {
         "/push" == request.uri().path()
     }
