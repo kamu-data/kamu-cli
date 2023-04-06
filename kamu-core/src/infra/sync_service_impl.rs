@@ -15,7 +15,6 @@ use opendatafabric::*;
 
 use dill::*;
 use std::sync::Arc;
-use thiserror::Error;
 use tracing::*;
 use url::Url;
 
@@ -29,24 +28,6 @@ pub struct SyncServiceImpl {
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     ipfs_client: Arc<IpfsClient>,
-    ipfs_gateway: IpfsGateway,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug)]
-pub struct IpfsGateway {
-    pub url: Url,
-    pub pre_resolve_dnslink: bool,
-}
-
-impl Default for IpfsGateway {
-    fn default() -> Self {
-        Self {
-            url: Url::parse("http://localhost:8080").unwrap(),
-            pre_resolve_dnslink: true,
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +40,6 @@ impl SyncServiceImpl {
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         ipfs_client: Arc<IpfsClient>,
-        ipfs_gateway: IpfsGateway,
     ) -> Self {
         Self {
             remote_repo_reg,
@@ -67,7 +47,6 @@ impl SyncServiceImpl {
             dataset_factory,
             smart_transfer_protocol,
             ipfs_client,
-            ipfs_gateway,
         }
     }
 
@@ -76,7 +55,7 @@ impl SyncServiceImpl {
         remote_ref: &DatasetRefRemote,
     ) -> Result<Url, SyncError> {
         // TODO: REMOTE ID
-        let dataset_url = match remote_ref {
+        match remote_ref {
             DatasetRefRemote::ID(_) => {
                 unimplemented!("Syncing remote dataset by ID is not yet supported")
             }
@@ -85,85 +64,17 @@ impl SyncServiceImpl {
                 let mut repo = self.remote_repo_reg.get_repository(name.repository())?;
 
                 repo.url.ensure_trailing_slash();
-                repo.url
+                Ok(repo
+                    .url
                     .join(&format!("{}/", name.as_name_with_owner()))
-                    .unwrap()
+                    .unwrap())
             }
             DatasetRefRemote::Url(url) => {
                 let mut dataset_url = url.as_ref().clone();
                 dataset_url.ensure_trailing_slash();
-                dataset_url
-            }
-        };
-
-        // Resolve IPNS DNSLink names if configured
-        let dataset_url = match dataset_url.scheme() {
-            "ipns" if self.ipfs_gateway.pre_resolve_dnslink => {
-                let key = match dataset_url.host() {
-                    Some(url::Host::Domain(k)) => Ok(k),
-                    _ => Err("Malformed IPNS URL").int_err(),
-                }?;
-
-                if !key.contains('.') {
-                    dataset_url
-                } else {
-                    info!(ipns_url = %dataset_url, "Resolving DNSLink name");
-                    let cid = self.resolve_ipns_dnslink(key).await?;
-                    let mut ipfs_url =
-                        Url::parse(&format!("ipfs://{}{}", cid, dataset_url.path())).unwrap();
-                    ipfs_url.ensure_trailing_slash();
-                    info!(ipns_url = %dataset_url, %ipfs_url, "Resolved DNSLink name");
-                    ipfs_url
-                }
-            }
-            _ => dataset_url,
-        };
-
-        // Re-map IPFS/IPNS urls to HTTP gateway URLs
-        // Note: This is for read path only, write path is handled separately
-        let dataset_url = match dataset_url.scheme() {
-            "ipfs" | "ipns" => {
-                let cid = match dataset_url.host() {
-                    Some(url::Host::Domain(cid)) => Ok(cid),
-                    _ => Err("Malformed IPFS URL").int_err(),
-                }?;
-
-                let gw_url = self
-                    .ipfs_gateway
-                    .url
-                    .join(&format!(
-                        "{}/{}{}",
-                        dataset_url.scheme(),
-                        cid,
-                        dataset_url.path()
-                    ))
-                    .unwrap();
-
-                info!(url = %dataset_url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
-                gw_url
-            }
-            _ => dataset_url,
-        };
-
-        Ok(dataset_url)
-    }
-
-    async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, SyncError> {
-        let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
-        let query = format!("_dnslink.{}", domain);
-        let result = r.txt_lookup(&query).await.int_err()?;
-
-        let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
-
-        for record in result {
-            let data = record.to_string();
-            debug!(%data, "Observed TXT record");
-
-            if let Some(c) = dnslink_re.captures(&data) {
-                return Ok(c.get(1).unwrap().as_str().to_owned());
+                Ok(dataset_url)
             }
         }
-        Err(DnsLinkResolutionError { record: query }.int_err().into())
     }
 
     async fn get_dataset_reader(
@@ -757,12 +668,4 @@ impl UrlExt for Url {
             self.set_path(&format!("{}/", self.path()));
         }
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("Failed to resolve DNSLink record: {record}")]
-struct DnsLinkResolutionError {
-    pub record: String,
 }

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.118.0] - 2023-04-06
+### Fixed
+- Updated IPFS gateway status code handling after upstream fixes to correctly report "not found" status (#108)
+
 ## [0.117.0] - 2023-04-03
 ### Changed
 - Revised workspace dependencies management:

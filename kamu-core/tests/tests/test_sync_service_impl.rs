@@ -82,13 +82,14 @@ async fn do_test_sync(
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_name_2 = DatasetName::new_unchecked("bar");
 
+    let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
+
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
     let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new());
-    let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
 
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
@@ -96,7 +97,6 @@ async fn do_test_sync(
         dataset_factory,
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(ipfs_client),
-        ipfs_gateway,
     );
 
     // Dataset does not exist locally / remotely //////////////////////////////

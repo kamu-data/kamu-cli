@@ -17,7 +17,9 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFactoryImpl {}
+pub struct DatasetFactoryImpl {
+    ipfs_gateway: IpfsGateway,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,8 +39,8 @@ type DatasetImplLocalFS = DatasetImpl<
 
 #[component(pub)]
 impl DatasetFactoryImpl {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(ipfs_gateway: IpfsGateway) -> Self {
+        Self { ipfs_gateway }
     }
 
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
@@ -112,10 +114,97 @@ impl DatasetFactoryImpl {
             )),
         ))
     }
+
+    async fn get_ipfs_http(&self, base_url: Url) -> Result<impl Dataset, InternalError> {
+        // Resolve IPNS DNSLink names if configured
+        let dataset_url = match base_url.scheme() {
+            "ipns" if self.ipfs_gateway.pre_resolve_dnslink => {
+                let key = match base_url.host() {
+                    Some(url::Host::Domain(k)) => Ok(k),
+                    _ => Err("Malformed IPNS URL").int_err(),
+                }?;
+
+                if !key.contains('.') {
+                    base_url
+                } else {
+                    tracing::info!(ipns_url = %base_url, "Resolving DNSLink name");
+                    let cid = self.resolve_ipns_dnslink(key).await?;
+
+                    let mut ipfs_url =
+                        Url::parse(&format!("ipfs://{}{}", cid, base_url.path())).unwrap();
+
+                    if !ipfs_url.path().ends_with('/') {
+                        ipfs_url.set_path(&format!("{}/", ipfs_url.path()));
+                    }
+
+                    tracing::info!(ipns_url = %base_url, %ipfs_url, "Resolved DNSLink name");
+                    ipfs_url
+                }
+            }
+            _ => base_url,
+        };
+
+        // Re-map IPFS/IPNS urls to HTTP gateway URLs
+        // Note: This is for read path only, write path is handled separately
+        let dataset_url = {
+            let cid = match dataset_url.host() {
+                Some(url::Host::Domain(cid)) => Ok(cid),
+                _ => Err("Malformed IPFS URL").int_err(),
+            }?;
+
+            let gw_url = self
+                .ipfs_gateway
+                .url
+                .join(&format!(
+                    "{}/{}{}",
+                    dataset_url.scheme(),
+                    cid,
+                    dataset_url.path()
+                ))
+                .unwrap();
+
+            tracing::info!(url = %dataset_url, gateway_url = %gw_url, "Mapping IPFS URL to the configured HTTP gateway");
+            gw_url
+        };
+
+        let client = reqwest::Client::new();
+        Ok(DatasetImpl::new(
+            MetadataChainImpl::new(
+                ObjectRepositoryHttp::new(client.clone(), dataset_url.join("blocks/").unwrap()),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
+                    client.clone(),
+                    dataset_url.join("refs/").unwrap(),
+                )),
+            ),
+            ObjectRepositoryHttp::new(client.clone(), dataset_url.join("data/").unwrap()),
+            ObjectRepositoryHttp::new(client.clone(), dataset_url.join("checkpoints/").unwrap()),
+            NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("cache/").unwrap()),
+            NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("info/").unwrap()),
+        ))
+    }
+
+    async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
+        let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
+        let query = format!("_dnslink.{}", domain);
+        let result = r.txt_lookup(&query).await.int_err()?;
+
+        let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
+
+        for record in result {
+            let data = record.to_string();
+            tracing::debug!(%data, "Observed TXT record");
+
+            if let Some(c) = dnslink_re.captures(&data) {
+                return Ok(c.get(1).unwrap().as_str().to_owned());
+            }
+        }
+        Err(DnsLinkResolutionError { record: query }.int_err())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Refactor to multiple factory providers that get dispatched based on URL schema
 #[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
     async fn get_dataset(
@@ -141,11 +230,15 @@ impl DatasetFactory for DatasetFactoryImpl {
             }
             "http" | "https" | "odf+http" | "odf+https" => {
                 let ds = Self::get_http(url.clone())?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+                Ok(Arc::new(ds))
+            }
+            "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {
+                let ds = self.get_ipfs_http(url.clone()).await?;
+                Ok(Arc::new(ds))
             }
             "s3" | "s3+http" | "s3+https" => {
                 let ds = Self::get_s3(url.clone()).await?;
-                Ok(Arc::new(ds) as Arc<dyn Dataset>)
+                Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {
                 message: None,
@@ -154,4 +247,29 @@ impl DatasetFactory for DatasetFactoryImpl {
             .into()),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct IpfsGateway {
+    pub url: Url,
+    pub pre_resolve_dnslink: bool,
+}
+
+impl Default for IpfsGateway {
+    fn default() -> Self {
+        Self {
+            url: Url::parse("http://localhost:8080").unwrap(),
+            pre_resolve_dnslink: true,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Failed to resolve DNSLink record: {record}")]
+struct DnsLinkResolutionError {
+    pub record: String,
 }

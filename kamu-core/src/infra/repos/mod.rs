@@ -25,6 +25,9 @@ pub use named_object_repository_local_fs::*;
 mod named_object_repository_http;
 pub use named_object_repository_http::*;
 
+mod named_object_repository_ipfs_http;
+pub use named_object_repository_ipfs_http::*;
+
 mod named_object_repository_s3;
 pub use named_object_repository_s3::*;
 
