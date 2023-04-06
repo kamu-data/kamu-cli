@@ -120,17 +120,15 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Sending pull request: {:?}", pull_request_message);
 
-        let write_result = write_payload(socket, pull_request_message).await;
-        if let Err(e) = write_result {
-            return Err(SmartProtocolPullClientError::PullRequestWriteFailed(e));
-        }
+        write_payload(socket, pull_request_message)
+            .await
+            .map_err(|e| SmartProtocolPullClientError::PullRequestWriteFailed(e))?;
 
         tracing::debug!("Reading pull request response");
 
-        let dataset_pull_response = match read_payload::<DatasetPullResponse>(socket).await {
-            Ok(dataset_pull_response) => dataset_pull_response,
-            Err(e) => return Err(SmartProtocolPullClientError::PullResponseReadFailed(e)),
-        };
+        let dataset_pull_response = read_payload::<DatasetPullResponse>(socket)
+            .await
+            .map_err(|e| SmartProtocolPullClientError::PullResponseReadFailed(e))?;
 
         match dataset_pull_response {
             Ok(success) => {
@@ -164,20 +162,15 @@ impl WsSmartTransferProtocolClient {
         let pull_metadata_request = DatasetPullMetadataRequest {};
         tracing::debug!("Sending pull metadata request");
 
-        let write_result_metadata = write_payload(socket, pull_metadata_request).await;
-        if let Err(e) = write_result_metadata {
-            return Err(SmartProtocolPullClientError::PullMetadataRequestWriteFailed(e));
-        }
+        write_payload(socket, pull_metadata_request)
+            .await
+            .map_err(|e| SmartProtocolPullClientError::PullMetadataRequestWriteFailed(e))?;
 
         tracing::debug!("Reading pull metadata request response");
 
-        let dataset_metadata_pull_response =
-            match read_payload::<DatasetMetadataPullResponse>(socket).await {
-                Ok(dataset_metadata_pull_response) => dataset_metadata_pull_response,
-                Err(e) => {
-                    return Err(SmartProtocolPullClientError::PullMetadataResponseReadFailed(e));
-                }
-            };
+        let dataset_metadata_pull_response = read_payload::<DatasetMetadataPullResponse>(socket)
+            .await
+            .map_err(|e| SmartProtocolPullClientError::PullMetadataResponseReadFailed(e))?;
 
         tracing::debug!(
             "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
@@ -202,24 +195,16 @@ impl WsSmartTransferProtocolClient {
             pull_objects_request.object_files.len()
         );
 
-        let write_result_objects = write_payload(socket, pull_objects_request).await;
-        if let Err(e) = write_result_objects {
-            return Err(SmartProtocolPullClientError::PullObjectRequestWriteFailed(
-                e,
-            ));
-        }
+        write_payload(socket, pull_objects_request)
+            .await
+            .map_err(|e| SmartProtocolPullClientError::PullObjectRequestWriteFailed(e))?;
 
         tracing::debug!("Reading pull objects request response");
 
         let dataset_objects_pull_response =
-            match read_payload::<DatasetPullObjectsTransferResponse>(socket).await {
-                Ok(dataset_objects_pull_response) => dataset_objects_pull_response,
-                Err(e) => {
-                    return Err(SmartProtocolPullClientError::PullObjectResponseReadFailed(
-                        e,
-                    ));
-                }
-            };
+            read_payload::<DatasetPullObjectsTransferResponse>(socket)
+                .await
+                .map_err(|e| SmartProtocolPullClientError::PullObjectResponseReadFailed(e))?;
 
         tracing::debug!(
             "Obtained transfer strategies for {} objects",
@@ -257,17 +242,15 @@ impl WsSmartTransferProtocolClient {
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
 
-        let write_result = write_payload(socket, push_request_message).await;
-        if let Err(e) = write_result {
-            return Err(SmartProtocolPushClientError::PushRequestWriteFailed(e));
-        }
+        write_payload(socket, push_request_message)
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushRequestWriteFailed(e))?;
 
         tracing::debug!("Reading push request response");
 
-        let dataset_push_response = match read_payload::<DatasetPushResponse>(socket).await {
-            Ok(dataset_push_response) => dataset_push_response,
-            Err(e) => return Err(SmartProtocolPushClientError::PushResponseReadFailed(e)),
-        };
+        let dataset_push_response = read_payload::<DatasetPushResponse>(socket)
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushResponseReadFailed(e))?;
 
         match dataset_push_response {
             Ok(success) => {
@@ -300,16 +283,10 @@ impl WsSmartTransferProtocolClient {
     ) -> Result<DatasetPushMetadataAccepted, SmartProtocolPushClientError> {
         tracing::debug!("Sending push metadata request");
 
-        let metadata_batch = match prepare_dataset_metadata_batch(
-            src_dataset.as_metadata_chain(),
-            src_head,
-            dst_head,
-        )
-        .await
-        {
-            Ok(metadata_batch) => metadata_batch,
-            Err(e) => return Err(SmartProtocolPushClientError::Internal(e)),
-        };
+        let metadata_batch =
+            prepare_dataset_metadata_batch(src_dataset.as_metadata_chain(), src_head, dst_head)
+                .await
+                .map_err(|e| SmartProtocolPushClientError::Internal(e))?;
 
         tracing::debug!(
             "Metadata batch of {} blocks formed, payload size {} bytes",
@@ -317,26 +294,20 @@ impl WsSmartTransferProtocolClient {
             metadata_batch.payload.len()
         );
 
-        let write_result_metadata = write_payload(
+        write_payload(
             socket,
             DatasetPushMetadataRequest {
                 new_blocks: metadata_batch,
             },
         )
-        .await;
-        if let Err(e) = write_result_metadata {
-            return Err(SmartProtocolPushClientError::PushMetadataRequestWriteFailed(e));
-        }
+        .await
+        .map_err(|e| SmartProtocolPushClientError::PushMetadataRequestWriteFailed(e))?;
 
         tracing::debug!("Reading push metadata response");
 
-        let dataset_metadata_push_response =
-            match read_payload::<DatasetPushMetadataAccepted>(socket).await {
-                Ok(dataset_metadata_push_response) => dataset_metadata_push_response,
-                Err(e) => {
-                    return Err(SmartProtocolPushClientError::PushMetadataResponseReadFailed(e));
-                }
-            };
+        let dataset_metadata_push_response = read_payload::<DatasetPushMetadataAccepted>(socket)
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushMetadataResponseReadFailed(e))?;
 
         Ok(dataset_metadata_push_response)
     }
@@ -355,24 +326,16 @@ impl WsSmartTransferProtocolClient {
             push_objects_request.object_files.len()
         );
 
-        let write_result_objects = write_payload(socket, push_objects_request).await;
-        if let Err(e) = write_result_objects {
-            return Err(SmartProtocolPushClientError::PushObjectRequestWriteFailed(
-                e,
-            ));
-        }
+        write_payload(socket, push_objects_request)
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushObjectRequestWriteFailed(e))?;
 
         tracing::debug!("Reading push objects request response");
 
         let dataset_objects_push_response =
-            match read_payload::<DatasetPushObjectsTransferResponse>(socket).await {
-                Ok(dataset_objects_push_response) => dataset_objects_push_response,
-                Err(e) => {
-                    return Err(SmartProtocolPushClientError::PushObjectResponseReadFailed(
-                        e,
-                    ));
-                }
-            };
+            read_payload::<DatasetPushObjectsTransferResponse>(socket)
+                .await
+                .map_err(|e| SmartProtocolPushClientError::PushObjectResponseReadFailed(e))?;
 
         tracing::debug!(
             "Obtained transfer strategies for {} objects",
@@ -411,17 +374,15 @@ impl WsSmartTransferProtocolClient {
     ) -> Result<DatasetPushCompleteConfirmed, SmartProtocolPushClientError> {
         tracing::debug!("Sending push complete request");
 
-        let write_result = write_payload(socket, DatasetPushComplete {}).await;
-        if let Err(e) = write_result {
-            return Err(SmartProtocolPushClientError::PushCompleteRequestWriteFailed(e));
-        }
+        write_payload(socket, DatasetPushComplete {})
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushCompleteRequestWriteFailed(e))?;
 
         tracing::debug!("Reading push complete response");
 
-        match read_payload::<DatasetPushCompleteConfirmed>(socket).await {
-            Ok(complete_response) => Ok(complete_response),
-            Err(e) => Err(SmartProtocolPushClientError::PushCompleteResponseReadFailed(e)),
-        }
+        read_payload::<DatasetPushCompleteConfirmed>(socket)
+            .await
+            .map_err(|e| SmartProtocolPushClientError::PushCompleteResponseReadFailed(e))
     }
 }
 
@@ -561,12 +522,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .int_err()?;
 
         let size_estimate =
-            match prepare_dataset_transfer_estimate(src.as_metadata_chain(), &src_head, dst_head)
+            prepare_dataset_transfer_estimate(src.as_metadata_chain(), &src_head, dst_head)
                 .await
-            {
-                Ok(size_estimate) => size_estimate,
-                Err(e) => return Err(SyncError::Internal(e.int_err())),
-            };
+                .map_err(|e| SyncError::Internal(e.int_err()))?;
 
         let num_blocks = size_estimate.num_blocks;
         if num_blocks == 0 {

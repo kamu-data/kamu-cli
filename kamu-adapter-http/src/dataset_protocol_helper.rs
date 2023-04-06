@@ -471,10 +471,10 @@ pub async fn prepare_push_object_transfer_strategy(
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
 
-    let contains = match object_repo.contains(&object_file_ref.physical_hash).await {
-        Ok(contains) => contains,
-        Err(e) => return Err(e.int_err()),
-    };
+    let contains = object_repo
+        .contains(&object_file_ref.physical_hash)
+        .await
+        .map_err(|e| e.int_err())?;
 
     if contains {
         Ok(PushObjectTransferStrategy {
@@ -528,14 +528,11 @@ pub async fn dataset_import_object_file(
 
     let client = reqwest::Client::new();
 
-    let response = match client
+    let response = client
         .get(object_transfer_strategy.download_from.url.clone())
         .send()
         .await
-    {
-        Ok(response) => response,
-        Err(e) => return Err(SyncError::Internal(e.int_err())),
-    };
+        .map_err(|e| e.int_err())?;
 
     let stream = response.bytes_stream();
 
@@ -603,20 +600,17 @@ pub async fn dataset_export_object_file(
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
 
-    let stream = match source_object_repository
+    let stream = source_object_repository
         .get_stream(&object_file_reference.physical_hash)
         .await
-    {
-        Ok(stream) => stream,
-        Err(e) => return Err(SyncError::Internal(e.int_err())),
-    };
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
 
     use tokio_util::io::ReaderStream;
     let reader_stream = ReaderStream::new(stream);
 
     let client = reqwest::Client::new();
 
-    match client
+    client
         .put(
             object_transfer_strategy
                 .upload_to
@@ -629,10 +623,7 @@ pub async fn dataset_export_object_file(
         .body(hyper::Body::wrap_stream(reader_stream))
         .send()
         .await
-    {
-        Ok(response) => response,
-        Err(e) => return Err(SyncError::Internal(e.int_err())),
-    };
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
 
     Ok(())
 }

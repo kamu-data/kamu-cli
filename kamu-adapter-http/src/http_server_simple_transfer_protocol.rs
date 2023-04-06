@@ -13,7 +13,7 @@ use kamu::domain::*;
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
-    Multihash,
+    DatasetRefLocal, Multihash,
 };
 use std::{str::FromStr, sync::Arc};
 use url::Url;
@@ -147,16 +147,30 @@ pub async fn dataset_checkpoints_handler(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    dataset_builder: Extension<Arc<Box<dyn DatasetBuilder>>>,
+    dataset_ref: Extension<DatasetRefLocal>,
+    catalog: Extension<dill::Catalog>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
 ) -> axum::response::Response {
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
+    let dataset_builder = match dataset_repo.get_or_create_dataset(&dataset_ref).await {
+        Ok(dsb) => Arc::new(dsb),
+        Err(err) => {
+            tracing::error!("Could not get dataset builder: {:?}", err);
+            return axum::response::Response::builder()
+                .status(axum::http::status::StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Default::default())
+                .unwrap();
+        }
+    };
+
     ws.on_upgrade(|socket| {
         ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(
             socket,
-            dataset_builder.0,
+            dataset_builder,
             dataset_url,
         )
     })

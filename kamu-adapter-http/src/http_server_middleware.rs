@@ -10,11 +10,10 @@
 use axum::extract::FromRequestParts;
 use axum::RequestExt;
 use axum::{body::Body, http::Request, http::StatusCode, response::Response};
-use kamu::domain::{DatasetRepository, DatasetRepositoryExt, GetDatasetError};
+use kamu::domain::{DatasetRepository, GetDatasetError};
 use opendatafabric::DatasetRefLocal;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::Arc;
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -75,7 +74,7 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 }
 
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
-    fn is_allowed_to_create_dataset(request: &Request<Body>) -> bool {
+    fn is_dataset_optional(request: &Request<Body>) -> bool {
         "/push" == request.uri().path()
     }
 }
@@ -131,28 +130,16 @@ where
             };
 
             let dataset_ref = (layer.identity_extractor)(param1);
-
-            let catalog = request
-                .extensions()
-                .get::<dill::Catalog>()
-                .expect("Catalog not found in http server extensions");
-
-            let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-            if Self::is_allowed_to_create_dataset(&request) {
-                let dataset_builder = match dataset_repo.get_or_create_dataset(&dataset_ref).await {
-                    Ok(dsb) => Arc::new(dsb),
-                    Err(err) => {
-                        tracing::error!("Could not get dataset builder: {:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Default::default())
-                            .unwrap());
-                    }
-                };
-
-                request.extensions_mut().insert(dataset_builder);
+            if Self::is_dataset_optional(&request) {
+                request.extensions_mut().insert(dataset_ref);
             } else {
+                let catalog = request
+                    .extensions()
+                    .get::<dill::Catalog>()
+                    .expect("Catalog not found in http server extensions");
+
+                let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
                 let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
                     Ok(ds) => ds,
                     Err(GetDatasetError::NotFound(err)) => {
