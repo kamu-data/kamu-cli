@@ -502,14 +502,14 @@ async fn discard_dataset_building_on_error(
 
 pub async fn dataset_push_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
-    dataset_builder: Arc<Box<dyn DatasetBuilder>>,
+    dataset_builder: Box<dyn DatasetBuilder>,
     dataset_url: Url,
 ) {
     let dataset = dataset_builder.as_dataset();
     let push_request = match handle_push_request_initiation(&mut socket, dataset).await {
         Ok(push_request) => push_request,
         Err(e) => {
-            discard_dataset_building_on_error(dataset_builder.as_ref().as_ref(), e).await;
+            discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
             return;
         }
     };
@@ -518,7 +518,7 @@ pub async fn dataset_push_ws_handler(
         match try_handle_push_metadata_request(&mut socket, dataset, push_request).await {
             Ok(received) => received,
             Err(e) => {
-                discard_dataset_building_on_error(dataset_builder.as_ref().as_ref(), e).await;
+                discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
                 return;
             }
         };
@@ -528,7 +528,7 @@ pub async fn dataset_push_ws_handler(
             match try_handle_push_objects_request(&mut socket, dataset, &dataset_url).await {
                 Ok(should_continue) => should_continue,
                 Err(e) => {
-                    discard_dataset_building_on_error(dataset_builder.as_ref().as_ref(), e).await;
+                    discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
                     return;
                 }
             };
@@ -537,8 +537,8 @@ pub async fn dataset_push_ws_handler(
         }
     }
 
-    if let Err(e) = try_handle_push_complete(&mut socket, dataset_builder.as_ref().as_ref()).await {
-        discard_dataset_building_on_error(dataset_builder.as_ref().as_ref(), e).await;
+    if let Err(e) = try_handle_push_complete(&mut socket, dataset_builder.as_ref()).await {
+        discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
         return;
     }
 

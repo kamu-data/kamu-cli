@@ -157,7 +157,7 @@ pub async fn dataset_push_ws_upgrade_handler(
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     let dataset_builder = match dataset_repo.get_or_create_dataset(&dataset_ref).await {
-        Ok(dsb) => Arc::new(dsb),
+        Ok(dsb) => dsb,
         Err(err) => {
             tracing::error!("Could not get dataset builder: {:?}", err);
             return axum::response::Response::builder()
