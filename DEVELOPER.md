@@ -7,6 +7,7 @@
   - [Building with Web UI (Optional)](#building-with-web-ui-optional)
   - [Code Generation](#code-generation)
 - [Release Procedure](#release-procedure)
+- [IDE Tips](#ide-tips)
 
 
 ## Building Locally
@@ -55,6 +56,8 @@ When needing to test against a specific official release you can install it unde
 ```shell
 curl -s "https://get.kamu.dev" | KAMU_ALIAS=kamu-release sh
 ```
+
+New to Rust? Check out these [IDE configuration tip](#ide-tips).
 
 
 ### Run Tests with Podman (Recommended)
@@ -150,3 +153,12 @@ Make sure you have all related dependencies installed (see above) and that ODF r
 6. Tag the latest commit with a new version: `git tag vX.Y.Z`
 7. Push the tag to repo: `git push origin tag vX.Y.Z`
 8. Github Actions will pick up the new tag and create a new GitHub release from it
+
+
+## IDE Tips
+When using VSCode we recommend following extensions:
+- `rust-analyzer` - Rust language server
+- `Error Lens` - to display errors inline with code
+- `Even Better TOML` - for editing TOML files
+- `crates` - displays dependency version status in `Cargo.toml`
+  - Note: It's better to use `cargo upgrade --dry-run` when upgrading to bump deps across entire workspace
