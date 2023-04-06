@@ -152,7 +152,7 @@ async fn handle_pull_request_initiation(
                 Err(e) => return Err(SmartProtocolPullServerError::Internal(e.int_err())),
             };
 
-            let size_estimation_result = prepare_dataset_transfer_estimaton(
+            let size_estimate_result = prepare_dataset_transfer_estimate(
                 dataset.as_metadata_chain(),
                 pull_request.stop_at.as_ref().or(Some(&head)).unwrap(),
                 pull_request.begin_after.as_ref(),
@@ -161,19 +161,19 @@ async fn handle_pull_request_initiation(
 
             let response_result = write_payload::<DatasetPullResponse>(
                 socket,
-                match size_estimation_result {
-                    Ok(size_estimation) => {
-                        tracing::debug!("Sending size estimation: {:?}", size_estimation);
-                        DatasetPullResponse::Ok(DatasetPullSuccessResponse { size_estimation })
+                match size_estimate_result {
+                    Ok(size_estimate) => {
+                        tracing::debug!("Sending size estimate: {:?}", size_estimate);
+                        DatasetPullResponse::Ok(DatasetPullSuccessResponse { size_estimate })
                     }
-                    Err(PrepareDatasetTransferEstimationError::InvalidInterval(e)) => {
+                    Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                         tracing::debug!("Sending invalid interval error: {:?}", e);
                         DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval {
                             head: e.head.clone(),
                             tail: e.tail.clone(),
                         })
                     }
-                    Err(PrepareDatasetTransferEstimationError::Internal(e)) => {
+                    Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                         tracing::debug!("Sending internal error: {:?}", e);
                         DatasetPullResponse::Err(DatasetPullRequestError::Internal(
                             DatasetInternalError {
@@ -359,16 +359,16 @@ async fn handle_push_request_initiation(
     match maybe_push_request {
         Ok(push_request) => {
             tracing::debug!(
-                "Push client sent a push request: currentHead={:?} sizeEstimation={:?}",
+                "Push client sent a push request: currentHead={:?} sizeEstimate={:?}",
                 push_request
                     .current_head
                     .as_ref()
                     .map(|ba| ba.to_string())
                     .ok_or("None"),
-                push_request.size_estimation
+                push_request.size_estimate
             );
 
-            // TODO: consider size estimation and maybe cancel too large pushes
+            // TODO: consider size estimate and maybe cancel too large pushes
 
             let metadata_chain = dataset.as_metadata_chain();
             let actual_head = match metadata_chain.get_ref(&BlockRef::Head).await {
@@ -417,9 +417,9 @@ async fn try_handle_push_metadata_request(
                 push_metadata_request.new_blocks.payload.len()
             );
 
-            assert!(
-                push_request.size_estimation.num_blocks
-                    == push_metadata_request.new_blocks.objects_count
+            assert_eq!(
+                push_request.size_estimate.num_blocks,
+                push_metadata_request.new_blocks.objects_count
             );
 
             let new_blocks =

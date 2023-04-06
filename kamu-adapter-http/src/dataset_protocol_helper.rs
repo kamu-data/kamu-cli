@@ -27,7 +27,7 @@ const ENCODING_RAW: &str = "raw";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum PrepareDatasetTransferEstimationError {
+pub enum PrepareDatasetTransferEstimateError {
     #[error(transparent)]
     InvalidInterval(
         #[from]
@@ -42,7 +42,7 @@ pub enum PrepareDatasetTransferEstimationError {
     ),
 }
 
-impl From<IterBlocksError> for PrepareDatasetTransferEstimationError {
+impl From<IterBlocksError> for PrepareDatasetTransferEstimateError {
     fn from(v: IterBlocksError) -> Self {
         match v {
             IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
@@ -51,11 +51,11 @@ impl From<IterBlocksError> for PrepareDatasetTransferEstimationError {
     }
 }
 
-pub async fn prepare_dataset_transfer_estimaton(
+pub async fn prepare_dataset_transfer_estimate(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-) -> Result<TransferSizeEstimation, PrepareDatasetTransferEstimationError> {
+) -> Result<TransferSizeEstimate, PrepareDatasetTransferEstimateError> {
     let mut block_stream = metadata_chain.iter_blocks_interval(stop_at, begin_after, false);
 
     let mut blocks_count: u32 = 0;
@@ -95,11 +95,18 @@ pub async fn prepare_dataset_transfer_estimaton(
                     bytes_in_checkpoint_objects += execute_query.output_checkpoint.unwrap().size;
                 }
             }
-            _ => (),
+            MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetWatermark(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_) => (),
         }
     }
 
-    Ok(TransferSizeEstimation {
+    Ok(TransferSizeEstimate {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         bytes_in_raw_blocks: bytes_in_blocks,
@@ -366,7 +373,15 @@ async fn collect_missing_object_references_from_block(
                 }
             }
         }
-        _ => (),
+
+        MetadataEvent::Seed(_)
+        | MetadataEvent::SetPollingSource(_)
+        | MetadataEvent::SetTransform(_)
+        | MetadataEvent::SetVocab(_)
+        | MetadataEvent::SetWatermark(_)
+        | MetadataEvent::SetAttachments(_)
+        | MetadataEvent::SetInfo(_)
+        | MetadataEvent::SetLicense(_) => (),
     }
 }
 
@@ -406,7 +421,7 @@ pub async fn prepare_pull_object_transfer_strategy(
         }),
         Err(error) => match error {
             GetTransferUrlError::NotSupported => Ok(TransferUrl {
-                url: get_simple_transfer_protocool_url(object_file_ref, dataset_url),
+                url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
             GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
@@ -426,7 +441,7 @@ pub async fn prepare_pull_object_transfer_strategy(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_simple_transfer_protocool_url(
+fn get_simple_transfer_protocol_url(
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
 ) -> Url {
@@ -478,7 +493,7 @@ pub async fn prepare_push_object_transfer_strategy(
             }),
             Err(error) => match error {
                 GetTransferUrlError::NotSupported => Ok(TransferUrl {
-                    url: get_simple_transfer_protocool_url(object_file_ref, dataset_url),
+                    url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                     expires_at: None,
                 }),
                 GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError

@@ -11,7 +11,6 @@ use dill::component;
 use futures::SinkExt;
 use opendatafabric::Multihash;
 use serde::{de::DeserializeOwned, Serialize};
-use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 use thiserror::Error;
@@ -137,10 +136,10 @@ impl WsSmartTransferProtocolClient {
             Ok(success) => {
                 tracing::debug!(
                     "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
-                    success.size_estimation.num_blocks,
-                    success.size_estimation.bytes_in_raw_blocks,
-                    success.size_estimation.num_objects,
-                    success.size_estimation.bytes_in_raw_objects,
+                    success.size_estimate.num_blocks,
+                    success.size_estimate.bytes_in_raw_blocks,
+                    success.size_estimate.num_objects,
+                    success.size_estimate.bytes_in_raw_objects,
                 );
                 Ok(success)
             }
@@ -248,12 +247,12 @@ impl WsSmartTransferProtocolClient {
     async fn push_send_request(
         &self,
         socket: &mut TungsteniteStream,
-        size_estimation: TransferSizeEstimation,
+        size_estimate: TransferSizeEstimate,
         dst_head: Option<&Multihash>,
     ) -> Result<DatasetPushRequestAccepted, SmartProtocolPushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
-            size_estimation,
+            size_estimate,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -471,7 +470,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let sync_result = if dataset_pull_result.size_estimation.num_blocks > 0 {
+        let sync_result = if dataset_pull_result.size_estimate.num_blocks > 0 {
             let dataset_pull_metadata_response =
                 match self.pull_send_metadata_request(&mut ws_stream).await {
                     Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
@@ -528,7 +527,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             SyncResult::Updated {
                 old_head: dst_head,
                 new_head: new_dst_head,
-                num_blocks: dataset_pull_result.size_estimation.num_blocks as usize,
+                num_blocks: dataset_pull_result.size_estimate.num_blocks as usize,
             }
         } else {
             SyncResult::UpToDate
@@ -538,7 +537,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
-                reason: Cow::Borrowed("Client pull flow succeeded"),
+                reason: "Client pull flow succeeded".into(),
             }))
             .await
             .int_err()?;
@@ -561,15 +560,15 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        let size_estimation =
-            match prepare_dataset_transfer_estimaton(src.as_metadata_chain(), &src_head, dst_head)
+        let size_estimate =
+            match prepare_dataset_transfer_estimate(src.as_metadata_chain(), &src_head, dst_head)
                 .await
             {
-                Ok(size_estimation) => size_estimation,
+                Ok(size_estimate) => size_estimate,
                 Err(e) => return Err(SyncError::Internal(e.int_err())),
             };
 
-        let num_blocks = size_estimation.num_blocks;
+        let num_blocks = size_estimate.num_blocks;
         if num_blocks == 0 {
             return Ok(SyncResult::UpToDate);
         }
@@ -589,7 +588,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_request(&mut ws_stream, size_estimation, dst_head)
+            .push_send_request(&mut ws_stream, size_estimate, dst_head)
             .await
         {
             Ok(_) => {}
@@ -651,7 +650,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
-                reason: Cow::Borrowed("Client push flow succeeded"),
+                reason: "Client push flow succeeded".into(),
             }))
             .await
             .int_err()?;
