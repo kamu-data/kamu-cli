@@ -461,45 +461,40 @@ pub async fn dataset_push_ws_handler(
     dataset_builder: Box<dyn DatasetBuilder>,
     dataset_url: Url,
 ) {
-    let dataset = dataset_builder.as_dataset();
-    let push_request = match handle_push_request_initiation(&mut socket, dataset).await {
-        Ok(push_request) => push_request,
+    match dataset_push_ws_main_flow(&mut socket, dataset_builder.as_ref(), dataset_url).await {
+        Ok(_) => {
+            tracing::debug!("Push process success");
+        }
         Err(e) => {
             discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
-            return;
         }
-    };
+    }
+}
 
-    let _new_blocks =
-        match try_handle_push_metadata_request(&mut socket, dataset, push_request).await {
-            Ok(received) => received,
-            Err(e) => {
-                discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
-                return;
-            }
-        };
+/////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_push_ws_main_flow(
+    socket: &mut axum::extract::ws::WebSocket,
+    dataset_builder: &dyn DatasetBuilder,
+    dataset_url: Url,
+) -> Result<(), PushServerError> {
+    let dataset = dataset_builder.as_dataset();
+    let push_request = handle_push_request_initiation(socket, dataset).await?;
+
+    let _new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
 
     loop {
         let should_continue =
-            match try_handle_push_objects_request(&mut socket, dataset, &dataset_url).await {
-                Ok(should_continue) => should_continue,
-                Err(e) => {
-                    discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
-                    return;
-                }
-            };
+            try_handle_push_objects_request(socket, dataset, &dataset_url).await?;
+
         if !should_continue {
             break;
         }
     }
 
-    if let Err(e) = try_handle_push_complete(&mut socket, dataset_builder.as_ref()).await {
-        discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
-        return;
-    }
+    try_handle_push_complete(socket, dataset_builder).await?;
 
-    // Success
-    tracing::debug!("Push process success");
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////
