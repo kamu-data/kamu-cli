@@ -11,6 +11,7 @@ use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::utils::ipfs_wrapper::*;
 use crate::infra::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use crate::infra::utils::smart_transfer_protocol::ObjectTransferOptions;
 use opendatafabric::*;
 
 use dill::*;
@@ -196,7 +197,12 @@ impl SyncServiceImpl {
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
         let sync_result = self
             .smart_transfer_protocol
-            .pull_protocol_client_flow(&http_src_url, dst_dataset, listener)
+            .pull_protocol_client_flow(
+                &http_src_url,
+                dst_dataset,
+                listener,
+                ObjectTransferOptions::default(),
+            )
             .await;
 
         SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_ref()).await
@@ -255,6 +261,7 @@ impl SyncServiceImpl {
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 listener,
+                ObjectTransferOptions::default(),
             )
             .await
     }

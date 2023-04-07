@@ -17,8 +17,8 @@ use url::Url;
 
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use kamu::domain::*;
 use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::{domain::*, infra::utils::smart_transfer_protocol::ObjectTransferOptions};
 
 use crate::{
     smart_protocol::{dataset_helper::*, errors::*, messages::*, phases::*},
@@ -344,6 +344,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         http_src_url: &Url,
         dst: &dyn Dataset,
         listener: Arc<dyn SyncListener>,
+        transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
@@ -422,7 +423,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
                     .map(Ok)
                     .try_for_each_concurrent(
-                        /* limit */ 4, // TODO: external configuration?
+                        /* limit */ transfer_options.max_parallel_transfers,
                         |s| async move { dataset_import_object_file(dst, &s).await },
                     )
                     .await?;
@@ -461,6 +462,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         http_dst_url: &Url,
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
+        transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
@@ -540,7 +542,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         futures::stream::iter(push_objects_response.object_transfer_strategies)
             .map(Ok)
             .try_for_each_concurrent(
-                /* limit */ 4, // TODO: external configuration?
+                /* limit */ transfer_options.max_parallel_transfers,
                 |s| async move { dataset_export_object_file(src, &s).await },
             )
             .await?;
