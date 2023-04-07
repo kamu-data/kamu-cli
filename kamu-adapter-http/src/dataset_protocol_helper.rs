@@ -9,7 +9,7 @@
 
 use std::io::Read;
 
-use crate::messages::*;
+use crate::smart_protocol::messages::*;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -432,7 +432,7 @@ pub async fn prepare_pull_object_transfer_strategy(
     match transfer_url_result {
         Ok(transfer_url) => Ok(PullObjectTransferStrategy {
             object_file: object_file_ref.clone(),
-            pull_strategy: crate::messages::ObjectPullStrategy::HttpDownload,
+            pull_strategy: ObjectPullStrategy::HttpDownload,
             download_from: transfer_url,
         }),
         Err(e) => Err(e),

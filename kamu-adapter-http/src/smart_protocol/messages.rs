@@ -12,6 +12,8 @@ use opendatafabric::Multihash;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 /// Initial dataset pull request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {
@@ -188,3 +190,5 @@ pub struct TransferUrl {
 pub struct DatasetInternalError {
     pub error_message: String,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -12,12 +12,11 @@ use std::sync::Arc;
 use axum::extract::ws::Message;
 use opendatafabric::MetadataBlock;
 use serde::{de::DeserializeOwned, Serialize};
-use thiserror::Error;
 use url::Url;
 
 use crate::{
     dataset_protocol_helper::*,
-    messages::*,
+    smart_protocol::{errors::*, messages::*, phases::*},
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
 use kamu::domain::*;
@@ -58,79 +57,15 @@ async fn write_payload<TMessagePayload: Serialize>(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
-enum SmartProtocolPullServerError {
-    #[error(transparent)]
-    PullRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PullResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    PullMetadataRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PullMetadataResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    PullObjectRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PullObjectResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-enum SmartProtocolPushServerError {
-    #[error(transparent)]
-    PushRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PushResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    PushMetadataRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PushMetadataResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    PushObjectRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PushObjectResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    PushCompleteRequestReadFailed(ReadMessageError),
-
-    #[error(transparent)]
-    PushCompleteResponseWriteFailed(WriteMessageError),
-
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
 async fn handle_pull_request_initiation(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
-) -> Result<DatasetPullRequest, SmartProtocolPullServerError> {
+) -> Result<DatasetPullRequest, PullServerError> {
     let pull_request = read_payload::<DatasetPullRequest>(socket)
         .await
-        .map_err(|e| SmartProtocolPullServerError::PullRequestReadFailed(e))?;
+        .map_err(|e| {
+            PullServerError::ReadFailed(PullReadError::new(e, PullPhase::InitialRequest))
+        })?;
 
     tracing::debug!(
         "Pull client sent a pull request: beginAfter={:?} stopAt={:?}",
@@ -150,7 +85,7 @@ async fn handle_pull_request_initiation(
     let head = metadata_chain
         .get_ref(&BlockRef::Head)
         .await
-        .map_err(|e| SmartProtocolPullServerError::Internal(e.int_err()))?;
+        .map_err(|e| PullServerError::Internal(e.int_err()))?;
 
     let size_estimate_result = prepare_dataset_transfer_estimate(
         dataset.as_metadata_chain(),
@@ -182,7 +117,7 @@ async fn handle_pull_request_initiation(
         },
     )
     .await
-    .map_err(|e| SmartProtocolPullServerError::PullResponseWriteFailed(e))?;
+    .map_err(|e| PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::InitialRequest)))?;
 
     Ok(pull_request)
 }
@@ -193,7 +128,7 @@ async fn try_handle_pull_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     pull_request: DatasetPullRequest,
-) -> Result<bool, SmartProtocolPullServerError> {
+) -> Result<bool, PullServerError> {
     let maybe_pull_metadata_request = read_payload::<DatasetPullMetadataRequest>(socket).await;
 
     match maybe_pull_metadata_request {
@@ -204,7 +139,7 @@ async fn try_handle_pull_metadata_request(
             let head = metadata_chain
                 .get_ref(&BlockRef::Head)
                 .await
-                .map_err(|e| SmartProtocolPullServerError::Internal(e.int_err()))?;
+                .map_err(|e| PullServerError::Internal(e.int_err()))?;
 
             let metadata_batch = prepare_dataset_metadata_batch(
                 dataset.as_metadata_chain(),
@@ -227,14 +162,17 @@ async fn try_handle_pull_metadata_request(
                 },
             )
             .await
-            .map_err(|e| SmartProtocolPullServerError::PullMetadataResponseWriteFailed(e))?;
+            .map_err(|e| {
+                PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::MetadataRequest))
+            })?;
 
             Ok(true)
         }
         Err(ReadMessageError::Closed) => Ok(false),
-        Err(e) => Err(SmartProtocolPullServerError::PullMetadataRequestReadFailed(
+        Err(e) => Err(PullServerError::ReadFailed(PullReadError::new(
             e,
-        )),
+            PullPhase::MetadataRequest,
+        ))),
     }
 }
 
@@ -244,7 +182,7 @@ async fn try_handle_pull_objects_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     dataset_url: &Url,
-) -> Result<bool, SmartProtocolPullServerError> {
+) -> Result<bool, PullServerError> {
     let maybe_pull_objects_transfer_request =
         read_payload::<DatasetPullObjectsTransferRequest>(socket).await;
 
@@ -274,12 +212,17 @@ async fn try_handle_pull_objects_request(
                 },
             )
             .await
-            .map_err(|e| SmartProtocolPullServerError::PullObjectResponseWriteFailed(e))?;
+            .map_err(|e| {
+                PullServerError::WriteFailed(PullWriteError::new(e, PullPhase::ObjectsRequest))
+            })?;
 
             Ok(true)
         }
         Err(ReadMessageError::Closed) => Ok(false),
-        Err(e) => Err(SmartProtocolPullServerError::PullObjectRequestReadFailed(e)),
+        Err(e) => Err(PullServerError::ReadFailed(PullReadError::new(
+            e,
+            PullPhase::ObjectsRequest,
+        ))),
     }
 }
 
@@ -334,10 +277,12 @@ pub async fn dataset_pull_ws_handler(
 async fn handle_push_request_initiation(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
-) -> Result<DatasetPushRequest, SmartProtocolPushServerError> {
+) -> Result<DatasetPushRequest, PushServerError> {
     let push_request = read_payload::<DatasetPushRequest>(socket)
         .await
-        .map_err(|e| SmartProtocolPushServerError::PushRequestReadFailed(e))?;
+        .map_err(|e| {
+            PushServerError::ReadFailed(PushReadError::new(e, PushPhase::InitialRequest))
+        })?;
 
     tracing::debug!(
         "Push client sent a push request: currentHead={:?} sizeEstimate={:?}",
@@ -355,7 +300,7 @@ async fn handle_push_request_initiation(
     let actual_head = match metadata_chain.get_ref(&BlockRef::Head).await {
         Ok(head) => Some(head),
         Err(kamu::domain::GetRefError::NotFound(_)) => None,
-        Err(e) => return Err(SmartProtocolPushServerError::Internal(e.int_err())),
+        Err(e) => return Err(PushServerError::Internal(e.int_err())),
     };
 
     let response = if push_request.current_head == actual_head {
@@ -369,7 +314,9 @@ async fn handle_push_request_initiation(
 
     write_payload::<DatasetPushResponse>(socket, response)
         .await
-        .map_err(|e| SmartProtocolPushServerError::PushResponseWriteFailed(e))?;
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::InitialRequest))
+        })?;
 
     Ok(push_request)
 }
@@ -380,7 +327,7 @@ async fn try_handle_push_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     push_request: DatasetPushRequest,
-) -> Result<Vec<MetadataBlock>, SmartProtocolPushServerError> {
+) -> Result<Vec<MetadataBlock>, PushServerError> {
     let maybe_push_metadata_request = read_payload::<DatasetPushMetadataRequest>(socket).await;
 
     match maybe_push_metadata_request {
@@ -404,14 +351,17 @@ async fn try_handle_push_metadata_request(
 
             write_payload::<DatasetPushMetadataAccepted>(socket, DatasetPushMetadataAccepted {})
                 .await
-                .map_err(|e| SmartProtocolPushServerError::PushMetadataResponseWriteFailed(e))?;
+                .map_err(|e| {
+                    PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::MetadataRequest))
+                })?;
 
             Ok(new_blocks)
         }
         Err(ReadMessageError::Closed) => Ok(vec![]),
-        Err(e) => Err(SmartProtocolPushServerError::PushMetadataRequestReadFailed(
+        Err(e) => Err(PushServerError::ReadFailed(PushReadError::new(
             e,
-        )),
+            PushPhase::MetadataRequest,
+        ))),
     }
 }
 
@@ -421,10 +371,12 @@ async fn try_handle_push_objects_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     dataset_url: &Url,
-) -> Result<bool, SmartProtocolPushServerError> {
+) -> Result<bool, PushServerError> {
     let request = read_payload::<DatasetPushObjectsTransferRequest>(socket)
         .await
-        .map_err(|e| SmartProtocolPushServerError::PushObjectRequestReadFailed(e))?;
+        .map_err(|e| {
+            PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
+        })?;
 
     tracing::debug!(
         "Push client sent a push objects request for {} objects",
@@ -435,7 +387,7 @@ async fn try_handle_push_objects_request(
     for r in request.object_files {
         let transfer_strategy = prepare_push_object_transfer_strategy(dataset, &r, &dataset_url)
             .await
-            .map_err(|e| SmartProtocolPushServerError::Internal(e))?;
+            .map_err(|e| PushServerError::Internal(e))?;
 
         object_transfer_strategies.push(transfer_strategy);
     }
@@ -449,7 +401,7 @@ async fn try_handle_push_objects_request(
         },
     )
     .await
-    .map_err(|e| SmartProtocolPushServerError::PushObjectResponseWriteFailed(e))?;
+    .map_err(|e| PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest)))?;
 
     Ok(request.is_truncated)
 }
@@ -459,10 +411,12 @@ async fn try_handle_push_objects_request(
 async fn try_handle_push_complete(
     socket: &mut axum::extract::ws::WebSocket,
     dataset_builder: &dyn DatasetBuilder,
-) -> Result<(), SmartProtocolPushServerError> {
+) -> Result<(), PushServerError> {
     read_payload::<DatasetPushComplete>(socket)
         .await
-        .map_err(|e| SmartProtocolPushServerError::PushCompleteRequestReadFailed(e))?;
+        .map_err(|e| {
+            PushServerError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
+        })?;
 
     tracing::debug!("Push client sent a complete request. Commiting the dataset");
 
@@ -470,7 +424,7 @@ async fn try_handle_push_complete(
         Ok(_) => {}
         Err(e) => {
             tracing::debug!("Committing dataset failed with error: {}", e);
-            return Err(SmartProtocolPushServerError::Internal(e.int_err()));
+            return Err(PushServerError::Internal(e.int_err()));
         }
     }
 
@@ -478,7 +432,9 @@ async fn try_handle_push_complete(
 
     write_payload::<DatasetPushCompleteConfirmed>(socket, DatasetPushCompleteConfirmed {})
         .await
-        .map_err(|e| SmartProtocolPushServerError::PushCompleteResponseWriteFailed(e))?;
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::CompleteRequest))
+        })?;
 
     Ok(())
 }
@@ -487,7 +443,7 @@ async fn try_handle_push_complete(
 
 async fn discard_dataset_building_on_error(
     dataset_builder: &dyn DatasetBuilder,
-    e: SmartProtocolPushServerError,
+    e: PushServerError,
 ) {
     tracing::debug!("Push process aborted with error: {}", e);
     match dataset_builder.discard().await {
