@@ -212,7 +212,7 @@ async fn try_handle_pull_metadata_request(
                 pull_request.begin_after.as_ref(),
             )
             .await
-            .map_err(|e| SmartProtocolPullServerError::Internal(e))?;
+            .int_err()?;
 
             tracing::debug!(
                 "Metadata batch of {} blocks formed, payload size {} bytes",
@@ -260,7 +260,7 @@ async fn try_handle_pull_objects_request(
                 let transfer_strategy =
                     prepare_pull_object_transfer_strategy(dataset, &r, dataset_url)
                         .await
-                        .map_err(|e| SmartProtocolPullServerError::Internal(e))?;
+                        .int_err()?;
 
                 object_transfer_strategies.push(transfer_strategy);
             }

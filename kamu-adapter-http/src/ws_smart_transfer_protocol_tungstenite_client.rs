@@ -286,7 +286,7 @@ impl WsSmartTransferProtocolClient {
         let metadata_batch =
             prepare_dataset_metadata_batch(src_dataset.as_metadata_chain(), src_head, dst_head)
                 .await
-                .map_err(|e| SmartProtocolPushClientError::Internal(e))?;
+                .int_err()?;
 
         tracing::debug!(
             "Metadata batch of {} blocks formed, payload size {} bytes",
