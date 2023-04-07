@@ -140,8 +140,8 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<EngineProvisionerLocal>();
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
-    b.add::<kamu_adapter_http::WsSmartTransferProtocolClient>();
-    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::WsSmartTransferProtocolClient>();
+    b.add::<kamu_adapter_http::SmartTransferProtocolClientImpl>();
+    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::SmartTransferProtocolClientImpl>();
 
     b
 }

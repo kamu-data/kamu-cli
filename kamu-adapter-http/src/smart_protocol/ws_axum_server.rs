@@ -15,8 +15,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use url::Url;
 
 use crate::{
-    dataset_protocol_helper::*,
-    smart_protocol::{errors::*, messages::*, phases::*},
+    smart_protocol::{dataset_helper::*, errors::*, messages::*, phases::*},
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
 use kamu::domain::*;

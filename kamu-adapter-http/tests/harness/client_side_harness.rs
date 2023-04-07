@@ -14,7 +14,7 @@ use kamu::{
     domain::*,
     infra::{utils::smart_transfer_protocol::SmartTransferProtocolClient, *},
 };
-use kamu_adapter_http::WsSmartTransferProtocolClient;
+use kamu_adapter_http::SmartTransferProtocolClientImpl;
 use opendatafabric::{DatasetRefAny, DatasetRefLocal, DatasetRefRemote};
 use tempfile::TempDir;
 
@@ -53,8 +53,8 @@ impl ClientSideHarness {
         b.add::<DatasetFactoryImpl>()
             .bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
-        b.add::<WsSmartTransferProtocolClient>()
-            .bind::<dyn SmartTransferProtocolClient, WsSmartTransferProtocolClient>();
+        b.add::<SmartTransferProtocolClientImpl>()
+            .bind::<dyn SmartTransferProtocolClient, SmartTransferProtocolClientImpl>();
 
         b.add::<SyncServiceImpl>()
             .bind::<dyn SyncService, SyncServiceImpl>();

@@ -16,14 +16,9 @@ pub use http_server_dataset_router::*;
 mod http_server_middleware;
 pub use http_server_middleware::*;
 
-mod ws_smart_transfer_protocol_axum_server;
-
-mod ws_smart_transfer_protocol_tungstenite_client;
-pub use ws_smart_transfer_protocol_tungstenite_client::*;
-
-mod http_server_simple_transfer_protocol;
-pub use http_server_simple_transfer_protocol::*;
-
-mod dataset_protocol_helper;
+mod simple_protocol;
 mod smart_protocol;
 mod ws_common;
+
+pub type SmartTransferProtocolClientImpl =
+    smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;

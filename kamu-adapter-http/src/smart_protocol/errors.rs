@@ -12,7 +12,7 @@ use std::fmt::{self, Display};
 use kamu::domain::{InternalError, InvalidHeadError, InvalidIntervalError};
 use thiserror::Error;
 
-use super::{PullPhase, PushPhase};
+use super::phases::*;
 use crate::ws_common::{ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////////////

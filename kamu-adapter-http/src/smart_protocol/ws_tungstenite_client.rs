@@ -21,8 +21,7 @@ use kamu::domain::*;
 use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 
 use crate::{
-    dataset_protocol_helper::*,
-    smart_protocol::{errors::*, messages::*, phases::*},
+    smart_protocol::{dataset_helper::*, errors::*, messages::*, phases::*},
     ws_common::{self, ReadMessageError, WriteMessageError},
 };
 

@@ -7,7 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ws_smart_transfer_protocol_axum_server;
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use crate::smart_protocol::ws_axum_server;
 use axum::extract::Extension;
 use kamu::domain::*;
 
@@ -168,11 +177,7 @@ pub async fn dataset_push_ws_upgrade_handler(
     };
 
     ws.on_upgrade(|socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_push_ws_handler(
-            socket,
-            dataset_builder,
-            dataset_url,
-        )
+        ws_axum_server::dataset_push_ws_handler(socket, dataset_builder, dataset_url)
     })
 }
 
@@ -187,11 +192,7 @@ pub async fn dataset_pull_ws_upgrade_handler(
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
     ws.on_upgrade(move |socket| {
-        ws_smart_transfer_protocol_axum_server::dataset_pull_ws_handler(
-            socket,
-            dataset.0,
-            dataset_url,
-        )
+        ws_axum_server::dataset_pull_ws_handler(socket, dataset.0, dataset_url)
     })
 }
 
