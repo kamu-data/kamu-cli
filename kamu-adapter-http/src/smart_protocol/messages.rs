@@ -34,7 +34,14 @@ pub struct DatasetPullSuccessResponse {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
     Internal(DatasetInternalError),
-    InvalidInterval { head: Multihash, tail: Multihash },
+    InvalidInterval(DatasetPullInvalidIntervalError),
+}
+
+// Error: pulling a range that is not a valid chain interval
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPullInvalidIntervalError {
+    pub head: Multihash,
+    pub tail: Multihash,
 }
 
 /// Pull stage 1: request metadata update
@@ -91,10 +98,14 @@ pub struct DatasetPushRequestAccepted {}
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushRequestError {
     Internal(DatasetInternalError),
-    InvalidHead {
-        suggested_head: Option<Multihash>,
-        actual_head: Option<Multihash>,
-    },
+    InvalidHead(DatasetPushInvalidHeadError),
+}
+
+// Wrong head suggested during push. Client's data on what the head is got out of date.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushInvalidHeadError {
+    pub actual_head: Option<Multihash>,
+    pub expected_head: Option<Multihash>,
 }
 
 /// Push phase 1: push metadata request

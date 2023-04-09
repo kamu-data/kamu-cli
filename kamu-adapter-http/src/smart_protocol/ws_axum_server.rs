@@ -102,10 +102,12 @@ async fn handle_pull_request_initiation(
             }
             Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                 tracing::debug!("Sending invalid interval error: {:?}", e);
-                DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval {
-                    head: e.head.clone(),
-                    tail: e.tail.clone(),
-                })
+                DatasetPullResponse::Err(DatasetPullRequestError::InvalidInterval(
+                    DatasetPullInvalidIntervalError {
+                        head: e.head.clone(),
+                        tail: e.tail.clone(),
+                    },
+                ))
             }
             Err(PrepareDatasetTransferEstimateError::Internal(e)) => {
                 tracing::debug!("Sending internal error: {:?}", e);
@@ -305,10 +307,12 @@ async fn handle_push_request_initiation(
     let response = if push_request.current_head == actual_head {
         DatasetPushResponse::Ok(DatasetPushRequestAccepted {})
     } else {
-        DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead {
-            suggested_head: push_request.current_head.clone(),
-            actual_head,
-        })
+        DatasetPushResponse::Err(DatasetPushRequestError::InvalidHead(
+            DatasetPushInvalidHeadError {
+                actual_head: push_request.current_head.clone(),
+                expected_head: actual_head,
+            },
+        ))
     };
 
     write_payload::<DatasetPushResponse>(socket, response)

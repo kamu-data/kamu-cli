@@ -74,12 +74,13 @@ impl WsSmartTransferProtocolClient {
             Err(DatasetPullRequestError::Internal(e)) => Err(PullClientError::Internal(
                 InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
             )),
-            Err(DatasetPullRequestError::InvalidInterval { head, tail }) => {
-                Err(PullClientError::InvalidInterval(InvalidIntervalError {
-                    head: head.clone(),
-                    tail: tail.clone(),
-                }))
-            }
+            Err(DatasetPullRequestError::InvalidInterval(DatasetPullInvalidIntervalError {
+                head,
+                tail,
+            })) => Err(PullClientError::InvalidInterval(InvalidIntervalError {
+                head: head.clone(),
+                tail: tail.clone(),
+            })),
         }
     }
 
@@ -201,13 +202,13 @@ impl WsSmartTransferProtocolClient {
             Err(DatasetPushRequestError::Internal(e)) => Err(PushClientError::Internal(
                 InternalError::new(Box::new(ClientInternalError::new(e.error_message.as_str()))),
             )),
-            Err(DatasetPushRequestError::InvalidHead {
-                suggested_head,
-                actual_head,
-            }) => Err(PushClientError::InvalidHead(InvalidHeadError {
-                suggested_head: suggested_head.clone(),
-                actual_head: actual_head.clone(),
-            })),
+            Err(DatasetPushRequestError::InvalidHead(e)) => {
+                Err(PushClientError::InvalidHead(RefCASError {
+                    actual: e.actual_head.clone(),
+                    expected: e.expected_head.clone(),
+                    reference: BlockRef::Head,
+                }))
+            }
         }
     }
 

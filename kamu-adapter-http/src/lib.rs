@@ -20,5 +20,5 @@ mod simple_protocol;
 mod smart_protocol;
 mod ws_common;
 
-pub type SmartTransferProtocolClientImpl =
+pub type SmartTransferProtocolClientWs =
     smart_protocol::ws_tungstenite_client::WsSmartTransferProtocolClient;
