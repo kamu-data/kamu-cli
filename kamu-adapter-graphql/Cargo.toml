@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.118.0"
+version = "0.119.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 publish = false
