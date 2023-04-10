@@ -12,6 +12,8 @@ use opendatafabric::Multihash;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 /// Initial dataset pull request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullRequest {
@@ -25,14 +27,21 @@ pub type DatasetPullResponse = Result<DatasetPullSuccessResponse, DatasetPullReq
 /// Succesful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullSuccessResponse {
-    pub size_estimation: TransferSizeEstimation,
+    pub size_estimate: TransferSizeEstimate,
 }
 
 // Unsuccesful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
     Internal(DatasetInternalError),
-    InvalidInterval { head: Multihash, tail: Multihash },
+    InvalidInterval(DatasetPullInvalidIntervalError),
+}
+
+// Error: pulling a range that is not a valid chain interval
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPullInvalidIntervalError {
+    pub head: Multihash,
+    pub tail: Multihash,
 }
 
 /// Pull stage 1: request metadata update
@@ -74,17 +83,34 @@ pub enum ObjectPullStrategy {
 /// Initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequest {
-    pub current_head: Multihash,
-    pub size_estimation: TransferSizeEstimation,
+    pub current_head: Option<Multihash>,
+    pub size_estimate: TransferSizeEstimate,
 }
 
-/// Response to initial dataset push request
+/// Response to initial dataset push request message
+pub type DatasetPushResponse = Result<DatasetPushRequestAccepted, DatasetPushRequestError>;
+
+/// Succes response to initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequestAccepted {}
 
+// Unsuccesful response to initial dataset push request
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum DatasetPushRequestError {
+    Internal(DatasetInternalError),
+    InvalidHead(DatasetPushInvalidHeadError),
+}
+
+// Wrong head suggested during push. Client's data on what the head is got out of date.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushInvalidHeadError {
+    pub actual_head: Option<Multihash>,
+    pub expected_head: Option<Multihash>,
+}
+
 /// Push phase 1: push metadata request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushMetadata {
+pub struct DatasetPushMetadataRequest {
     pub new_blocks: ObjectsBatch,
 }
 
@@ -96,6 +122,7 @@ pub struct DatasetPushMetadataAccepted {}
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushObjectsTransferRequest {
     pub object_files: Vec<ObjectFileReference>,
+    pub is_truncated: bool,
 }
 
 /// Push phase 2: object transfer response
@@ -137,9 +164,9 @@ pub struct ObjectsBatch {
     pub payload: Vec<u8>,
 }
 
-/// Transfer size estimation
+/// Transfer size estimate
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct TransferSizeEstimation {
+pub struct TransferSizeEstimate {
     pub num_blocks: u32,
     pub num_objects: u32,
     pub bytes_in_raw_blocks: u64,
@@ -174,3 +201,5 @@ pub struct TransferUrl {
 pub struct DatasetInternalError {
     pub error_message: String,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

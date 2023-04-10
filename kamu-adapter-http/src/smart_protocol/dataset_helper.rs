@@ -9,7 +9,7 @@
 
 use std::io::Read;
 
-use crate::messages::*;
+use crate::smart_protocol::messages::*;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -27,7 +27,7 @@ const ENCODING_RAW: &str = "raw";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum PrepareDatasetTransferEstimationError {
+pub enum PrepareDatasetTransferEstimateError {
     #[error(transparent)]
     InvalidInterval(
         #[from]
@@ -42,7 +42,7 @@ pub enum PrepareDatasetTransferEstimationError {
     ),
 }
 
-impl From<IterBlocksError> for PrepareDatasetTransferEstimationError {
+impl From<IterBlocksError> for PrepareDatasetTransferEstimateError {
     fn from(v: IterBlocksError) -> Self {
         match v {
             IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
@@ -51,13 +51,12 @@ impl From<IterBlocksError> for PrepareDatasetTransferEstimationError {
     }
 }
 
-pub async fn prepare_dataset_transfer_estimaton(
+pub async fn prepare_dataset_transfer_estimate(
     metadata_chain: &dyn MetadataChain,
-    stop_at: Multihash,
-    begin_after: Option<Multihash>,
-) -> Result<TransferSizeEstimation, PrepareDatasetTransferEstimationError> {
-    let mut block_stream =
-        metadata_chain.iter_blocks_interval(&stop_at, begin_after.as_ref(), false);
+    stop_at: &Multihash,
+    begin_after: Option<&Multihash>,
+) -> Result<TransferSizeEstimate, PrepareDatasetTransferEstimateError> {
+    let mut block_stream = metadata_chain.iter_blocks_interval(stop_at, begin_after, false);
 
     let mut blocks_count: u32 = 0;
     let mut bytes_in_blocks: u64 = 0;
@@ -96,11 +95,18 @@ pub async fn prepare_dataset_transfer_estimaton(
                     bytes_in_checkpoint_objects += execute_query.output_checkpoint.unwrap().size;
                 }
             }
-            _ => (),
+            MetadataEvent::Seed(_)
+            | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::SetTransform(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetWatermark(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_) => (),
         }
     }
 
-    Ok(TransferSizeEstimation {
+    Ok(TransferSizeEstimate {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         bytes_in_raw_blocks: bytes_in_blocks,
@@ -112,15 +118,15 @@ pub async fn prepare_dataset_transfer_estimaton(
 
 pub async fn prepare_dataset_metadata_batch(
     metadata_chain: &dyn MetadataChain,
-    stop_at: Multihash,
-    begin_after: Option<Multihash>,
+    stop_at: &Multihash,
+    begin_after: Option<&Multihash>,
 ) -> Result<ObjectsBatch, InternalError> {
     let mut blocks_count: u32 = 0;
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
     let blocks_for_transfer: Vec<(Multihash, MetadataBlock)> = metadata_chain
-        .iter_blocks_interval(&stop_at, begin_after.as_ref(), false)
+        .iter_blocks_interval(stop_at, begin_after, false)
         .try_collect()
         .await
         .int_err()?;
@@ -157,23 +163,35 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_import_pulled_metadata(
+pub async fn dataset_load_metadata(
     dataset: &dyn Dataset,
     objects_batch: ObjectsBatch,
-) -> Vec<Vec<ObjectFileReference>> {
+) -> Vec<(Multihash, MetadataBlock)> {
     let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
+    load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
+}
 
-    let loaded_blocks = load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await;
+/////////////////////////////////////////////////////////////////////////////////////////
 
-    let object_files =
-        collect_missing_object_references_from_metadata(dataset, loaded_blocks).await;
-
-    // TODO: analyze sizes and split on stages
-    if object_files.is_empty() {
-        vec![]
-    } else {
-        vec![object_files]
+pub async fn dataset_append_metadata(
+    dataset: &dyn Dataset,
+    metadata: Vec<(Multihash, MetadataBlock)>,
+) -> Result<(), AppendError> {
+    let metadata_chain = dataset.as_metadata_chain();
+    for (hash, block) in metadata {
+        tracing::debug!("Appending block #{} {}", block.sequence_number, hash);
+        metadata_chain
+            .append(
+                block,
+                AppendOpts {
+                    expected_hash: Some(&hash),
+                    ..AppendOpts::default()
+                },
+            )
+            .await?;
     }
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -217,22 +235,15 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
 async fn load_dataset_blocks(
     metadata_chain: &dyn MetadataChain,
     blocks_data: Vec<(Multihash, Vec<u8>)>,
-) -> Vec<MetadataBlock> {
+) -> Vec<(Multihash, MetadataBlock)> {
     stream::iter(blocks_data)
         .then(|(hash, block_buf)| async move {
             tracing::debug!("> {} - {} bytes", hash, block_buf.len());
             let block = metadata_chain
-                .append_block_from_bytes(
-                    &hash,
-                    block_buf.as_slice(),
-                    AppendOpts {
-                        expected_hash: Some(&hash),
-                        ..AppendOpts::default()
-                    },
-                )
+                .get_block_from_bytes(&hash, block_buf.as_slice())
                 .await
                 .unwrap();
-            block
+            (hash, block)
         })
         .collect()
         .await
@@ -240,76 +251,138 @@ async fn load_dataset_blocks(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn collect_missing_object_references_from_metadata(
-    dataset: &dyn Dataset,
-    blocks: Vec<MetadataBlock>,
-) -> Vec<ObjectFileReference> {
-    let data_repo = dataset.as_data_repo();
-    let checkpoint_repo = dataset.as_checkpoint_repo();
+#[derive(Error, Debug)]
+pub enum CollectMissingObjectReferencesFromIntervalError {
+    #[error(transparent)]
+    InvalidInterval(
+        #[from]
+        #[backtrace]
+        InvalidIntervalError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
-    let mut object_files: Vec<ObjectFileReference> = Vec::new();
-    for block in blocks {
-        match block.event {
-            MetadataEvent::AddData(e) => {
-                if !data_repo
-                    .contains(&e.output_data.physical_hash)
-                    .await
-                    .unwrap()
-                {
-                    object_files.push(ObjectFileReference {
-                        object_type: ObjectType::DataSlice,
-                        physical_hash: e.output_data.physical_hash.clone(),
-                        size: e.output_data.size,
-                    });
-                }
-                if let Some(checkpoint) = e.output_checkpoint {
-                    if !checkpoint_repo
-                        .contains(&checkpoint.physical_hash)
-                        .await
-                        .unwrap()
-                    {
-                        object_files.push(ObjectFileReference {
-                            object_type: ObjectType::Checkpoint,
-                            physical_hash: checkpoint.physical_hash.clone(),
-                            size: checkpoint.size,
-                        });
-                    }
-                }
-            }
-            MetadataEvent::ExecuteQuery(e) => {
-                if let Some(data_slice) = e.output_data {
-                    if !data_repo.contains(&data_slice.physical_hash).await.unwrap() {
-                        object_files.push(ObjectFileReference {
-                            object_type: ObjectType::DataSlice,
-                            physical_hash: data_slice.physical_hash.clone(),
-                            size: data_slice.size,
-                        });
-                    }
-                }
-                if let Some(checkpoint) = e.output_checkpoint {
-                    if !checkpoint_repo
-                        .contains(&checkpoint.physical_hash)
-                        .await
-                        .unwrap()
-                    {
-                        object_files.push(ObjectFileReference {
-                            object_type: ObjectType::Checkpoint,
-                            physical_hash: checkpoint.physical_hash.clone(),
-                            size: checkpoint.size,
-                        });
-                    }
-                }
-            }
-            _ => (),
+impl From<IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::InvalidInterval(e) => Self::InvalidInterval(e),
+            _ => Self::Internal(v.int_err()),
         }
     }
+}
 
-    object_files
+pub async fn collect_missing_object_references_from_interval(
+    dataset: &dyn Dataset,
+    head: &Multihash,
+    tail: Option<&Multihash>,
+) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
+    let mut res_references: Vec<ObjectFileReference> = Vec::new();
+
+    let mut block_stream = dataset
+        .as_metadata_chain()
+        .iter_blocks_interval(head, tail, false);
+    while let Some((_, block)) = block_stream.try_next().await? {
+        collect_missing_object_references_from_block(dataset, &block, &mut res_references).await;
+    }
+
+    Ok(res_references)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn prepare_object_transfer_strategy(
+pub async fn collect_missing_object_references_from_metadata(
+    dataset: &dyn Dataset,
+    blocks: &Vec<(Multihash, MetadataBlock)>,
+) -> Vec<ObjectFileReference> {
+    let mut res_references: Vec<ObjectFileReference> = Vec::new();
+    for (_, block) in blocks {
+        collect_missing_object_references_from_block(dataset, &block, &mut res_references).await
+    }
+
+    res_references
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn collect_missing_object_references_from_block(
+    dataset: &dyn Dataset,
+    block: &MetadataBlock,
+    target_references: &mut Vec<ObjectFileReference>,
+) {
+    let data_repo = dataset.as_data_repo();
+    let checkpoint_repo = dataset.as_checkpoint_repo();
+
+    match &block.event {
+        MetadataEvent::AddData(e) => {
+            if !data_repo
+                .contains(&e.output_data.physical_hash)
+                .await
+                .unwrap()
+            {
+                target_references.push(ObjectFileReference {
+                    object_type: ObjectType::DataSlice,
+                    physical_hash: e.output_data.physical_hash.clone(),
+                    size: e.output_data.size,
+                });
+            }
+            if let Some(checkpoint) = e.output_checkpoint.as_ref() {
+                if !checkpoint_repo
+                    .contains(&checkpoint.physical_hash)
+                    .await
+                    .unwrap()
+                {
+                    target_references.push(ObjectFileReference {
+                        object_type: ObjectType::Checkpoint,
+                        physical_hash: checkpoint.physical_hash.clone(),
+                        size: checkpoint.size,
+                    });
+                }
+            }
+        }
+        MetadataEvent::ExecuteQuery(e) => {
+            if let Some(data_slice) = e.output_data.as_ref() {
+                if !data_repo.contains(&data_slice.physical_hash).await.unwrap() {
+                    target_references.push(ObjectFileReference {
+                        object_type: ObjectType::DataSlice,
+                        physical_hash: data_slice.physical_hash.clone(),
+                        size: data_slice.size,
+                    });
+                }
+            }
+            if let Some(checkpoint) = e.output_checkpoint.as_ref() {
+                if !checkpoint_repo
+                    .contains(&checkpoint.physical_hash)
+                    .await
+                    .unwrap()
+                {
+                    target_references.push(ObjectFileReference {
+                        object_type: ObjectType::Checkpoint,
+                        physical_hash: checkpoint.physical_hash.clone(),
+                        size: checkpoint.size,
+                    });
+                }
+            }
+        }
+
+        MetadataEvent::Seed(_)
+        | MetadataEvent::SetPollingSource(_)
+        | MetadataEvent::SetTransform(_)
+        | MetadataEvent::SetVocab(_)
+        | MetadataEvent::SetWatermark(_)
+        | MetadataEvent::SetAttachments(_)
+        | MetadataEvent::SetInfo(_)
+        | MetadataEvent::SetLicense(_) => (),
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
@@ -319,19 +392,19 @@ pub async fn prepare_object_transfer_strategy(
             dataset
                 .as_metadata_chain()
                 .as_object_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
         ObjectType::DataSlice => {
             dataset
                 .as_data_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
         ObjectType::Checkpoint => {
             dataset
                 .as_checkpoint_repo()
-                .get_download_url(&object_file_ref.physical_hash, DownloadOpts::default())
+                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
                 .await
         }
     };
@@ -342,18 +415,19 @@ pub async fn prepare_object_transfer_strategy(
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
-            GetDownloadUrlError::NotSupported => Ok(TransferUrl {
-                url: get_simple_transfer_protocool_download_url(object_file_ref, dataset_url),
+            GetTransferUrlError::NotSupported => Ok(TransferUrl {
+                url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
-            GetDownloadUrlError::Internal(e) => Err(e),
+            GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
+            GetTransferUrlError::Internal(e) => Err(e),
         },
     };
 
     match transfer_url_result {
         Ok(transfer_url) => Ok(PullObjectTransferStrategy {
             object_file: object_file_ref.clone(),
-            pull_strategy: crate::messages::ObjectPullStrategy::HttpDownload,
+            pull_strategy: ObjectPullStrategy::HttpDownload,
             download_from: transfer_url,
         }),
         Err(e) => Err(e),
@@ -362,7 +436,7 @@ pub async fn prepare_object_transfer_strategy(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_simple_transfer_protocool_download_url(
+fn get_simple_transfer_protocol_url(
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
 ) -> Url {
@@ -377,6 +451,59 @@ fn get_simple_transfer_protocool_download_url(
         .unwrap()
         .join(object_file_ref.physical_hash.to_multibase_string().as_str())
         .unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn prepare_push_object_transfer_strategy(
+    dataset: &dyn Dataset,
+    object_file_ref: &ObjectFileReference,
+    dataset_url: &Url,
+) -> Result<PushObjectTransferStrategy, InternalError> {
+    let object_repo = match object_file_ref.object_type {
+        ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
+        ObjectType::DataSlice => dataset.as_data_repo(),
+        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
+    };
+
+    let contains = object_repo
+        .contains(&object_file_ref.physical_hash)
+        .await
+        .map_err(|e| e.int_err())?;
+
+    if contains {
+        Ok(PushObjectTransferStrategy {
+            object_file: object_file_ref.clone(),
+            push_strategy: ObjectPushStrategy::SkipUpload,
+            upload_to: None,
+        })
+    } else {
+        let get_upload_url_result = object_repo
+            .get_upload_url(&object_file_ref.physical_hash, TransferOpts::default())
+            .await;
+        let transfer_url_result = match get_upload_url_result {
+            Ok(result) => Ok(TransferUrl {
+                url: result.url,
+                expires_at: result.expires_at,
+            }),
+            Err(error) => match error {
+                GetTransferUrlError::NotSupported => Ok(TransferUrl {
+                    url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
+                    expires_at: None,
+                }),
+                GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
+                GetTransferUrlError::Internal(e) => Err(e),
+            },
+        };
+        match transfer_url_result {
+            Ok(transfer_url) => Ok(PushObjectTransferStrategy {
+                object_file: object_file_ref.clone(),
+                push_strategy: ObjectPushStrategy::HttpUpload,
+                upload_to: Some(transfer_url),
+            }),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -396,14 +523,11 @@ pub async fn dataset_import_object_file(
 
     let client = reqwest::Client::new();
 
-    let response = match client
+    let response = client
         .get(object_transfer_strategy.download_from.url.clone())
         .send()
         .await
-    {
-        Ok(response) => response,
-        Err(e) => return Err(SyncError::Internal(e.int_err())),
-    };
+        .map_err(|e| e.int_err())?;
 
     let stream = response.bytes_stream();
 
@@ -445,6 +569,58 @@ pub async fn dataset_import_object_file(
         Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
         Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_export_object_file(
+    dataset: &dyn Dataset,
+    object_transfer_strategy: &PushObjectTransferStrategy,
+) -> Result<(), SyncError> {
+    if object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload {
+        panic!(
+            "Unsupported push strategy {:?}",
+            object_transfer_strategy.push_strategy
+        );
+    }
+    if object_transfer_strategy.upload_to.is_none() {
+        panic!("Expected URL for upload strategy")
+    }
+
+    let object_file_reference = &object_transfer_strategy.object_file;
+
+    let source_object_repository = match object_file_reference.object_type {
+        ObjectType::MetadataBlock => panic!("Metadata block unexpected at objects export stage"),
+        ObjectType::DataSlice => dataset.as_data_repo(),
+        ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
+    };
+
+    let stream = source_object_repository
+        .get_stream(&object_file_reference.physical_hash)
+        .await
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
+
+    use tokio_util::io::ReaderStream;
+    let reader_stream = ReaderStream::new(stream);
+
+    let client = reqwest::Client::new();
+
+    client
+        .put(
+            object_transfer_strategy
+                .upload_to
+                .as_ref()
+                .unwrap()
+                .url
+                .clone(),
+        )
+        .header("content-type", "application/octet-stream")
+        .body(hyper::Body::wrap_stream(reader_stream))
+        .send()
+        .await
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

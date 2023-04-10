@@ -73,6 +73,12 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
     layer: DatasetResolverLayer<IdExt, Extractor>,
 }
 
+impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
+    fn is_dataset_optional(request: &Request<Body>) -> bool {
+        "/push" == request.uri().path()
+    }
+}
+
 impl<Svc, IdExt, Extractor> Clone for DatasetResolverMiddleware<Svc, IdExt, Extractor>
 where
     Svc: Clone,
@@ -124,33 +130,37 @@ where
             };
 
             let dataset_ref = (layer.identity_extractor)(param1);
+            if Self::is_dataset_optional(&request) {
+                request.extensions_mut().insert(dataset_ref);
+            } else {
+                let catalog = request
+                    .extensions()
+                    .get::<dill::Catalog>()
+                    .expect("Catalog not found in http server extensions");
 
-            let catalog = request
-                .extensions()
-                .get::<dill::Catalog>()
-                .expect("Catalog not found in http server extensions");
+                let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-            let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+                let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
+                    Ok(ds) => ds,
+                    Err(GetDatasetError::NotFound(err)) => {
+                        tracing::warn!("Dataset not found: {:?}", err);
+                        return Ok(Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .body(Default::default())
+                            .unwrap());
+                    }
+                    Err(err) => {
+                        tracing::error!("Could not get dataset: {:?}", err);
+                        return Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Default::default())
+                            .unwrap());
+                    }
+                };
 
-            let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
-                Ok(ds) => ds,
-                Err(GetDatasetError::NotFound(err)) => {
-                    tracing::warn!("Dataset not found: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::NOT_FOUND)
-                        .body(Default::default())
-                        .unwrap());
-                }
-                Err(err) => {
-                    tracing::error!("Could not get dataset: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Default::default())
-                        .unwrap());
-                }
-            };
+                request.extensions_mut().insert(dataset);
+            }
 
-            request.extensions_mut().insert(dataset);
             inner.call(request).await
         })
     }

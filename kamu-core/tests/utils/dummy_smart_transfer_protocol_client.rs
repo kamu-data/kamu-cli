@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use opendatafabric::Multihash;
 use std::sync::Arc;
 use url::Url;
 
 use kamu::{
     domain::{Dataset, SyncError, SyncListener, SyncResult},
-    infra::utils::smart_transfer_protocol::SmartTransferProtocolClient,
+    infra::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient},
 };
 
 pub struct DummySmartTransferProtocolClient {}
@@ -27,9 +28,10 @@ impl DummySmartTransferProtocolClient {
 impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
-        _src_url: &Url,
+        _http_src_url: &Url,
         _dst: &dyn Dataset,
         _listener: Arc<dyn SyncListener>,
+        _transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!("Not supported yet")
     }
@@ -37,8 +39,10 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn push_protocol_client_flow(
         &self,
         _src: &dyn Dataset,
-        _dst_url: &Url,
+        _http_dst_url: &Url,
+        _dst_head: Option<&Multihash>,
         _listener: Arc<dyn SyncListener>,
+        _transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
         unimplemented!("Not supported yet")
     }

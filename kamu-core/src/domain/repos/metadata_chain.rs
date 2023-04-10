@@ -27,6 +27,13 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    /// Loads the block from bytes without touching the chain
+    async fn get_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: &[u8],
+    ) -> Result<MetadataBlock, GetBlockError>;
+
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
@@ -59,14 +66,6 @@ pub trait MetadataChain: Send + Sync {
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
-
-    /// Loads the block from bytes and appends it to the chain
-    async fn append_block_from_bytes<'a>(
-        &'a self,
-        hash: &Multihash,
-        block_bytes: &[u8],
-        opts: AppendOpts<'a>,
-    ) -> Result<MetadataBlock, AppendFromBytesError>;
 
     fn as_object_repo(&self) -> &dyn ObjectRepository;
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
@@ -342,17 +341,6 @@ impl From<super::reference_repository::SetRefError> for AppendError {
             super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
         }
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum AppendFromBytesError {
-    #[error(transparent)]
-    Append(#[from] AppendError),
-
-    #[error(transparent)]
-    BlockVersion(#[from] BlockVersionError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

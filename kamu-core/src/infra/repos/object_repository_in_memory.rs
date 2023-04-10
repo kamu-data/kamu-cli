@@ -73,9 +73,17 @@ impl ObjectRepository for ObjectRepositoryInMemory {
     async fn get_download_url(
         &self,
         _hash: &Multihash,
-        _opts: DownloadOpts,
-    ) -> Result<GetDownloadUrlResult, GetDownloadUrlError> {
-        Err(GetDownloadUrlError::NotSupported)
+        _opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        Err(GetTransferUrlError::NotSupported)
+    }
+
+    async fn get_upload_url(
+        &self,
+        _hash: &Multihash,
+        _opts: TransferOpts,
+    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        Err(GetTransferUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

@@ -14,8 +14,8 @@ use kamu::{
     domain::*,
     infra::{utils::smart_transfer_protocol::SmartTransferProtocolClient, *},
 };
-use kamu_adapter_http::WsSmartTransferProtocolClient;
-use opendatafabric::DatasetRefAny;
+use kamu_adapter_http::SmartTransferProtocolClientWs;
+use opendatafabric::{DatasetRefAny, DatasetRefLocal, DatasetRefRemote};
 use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -25,6 +25,7 @@ pub struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
     pull_service: Arc<dyn PullService>,
+    push_service: Arc<dyn PushService>,
 }
 
 impl ClientSideHarness {
@@ -52,8 +53,8 @@ impl ClientSideHarness {
         b.add::<DatasetFactoryImpl>()
             .bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
-        b.add::<WsSmartTransferProtocolClient>()
-            .bind::<dyn SmartTransferProtocolClient, WsSmartTransferProtocolClient>();
+        b.add::<SmartTransferProtocolClientWs>()
+            .bind::<dyn SmartTransferProtocolClient, SmartTransferProtocolClientWs>();
 
         b.add::<SyncServiceImpl>()
             .bind::<dyn SyncService, SyncServiceImpl>();
@@ -64,6 +65,9 @@ impl ClientSideHarness {
         b.add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>();
 
+        b.add::<PushServiceImpl>()
+            .bind::<dyn PushService, PushServiceImpl>();
+
         b.add_value(workspace_layout.clone())
             .add_value(ContainerRuntime::default())
             .add_value(utils::ipfs_wrapper::IpfsClient::default())
@@ -72,11 +76,13 @@ impl ClientSideHarness {
         let catalog = b.build();
 
         let pull_service = catalog.get_one::<dyn PullService>().unwrap();
+        let push_service = catalog.get_one::<dyn PushService>().unwrap();
 
         Self {
             tempdir,
             catalog,
             pull_service,
+            push_service,
         }
     }
 
@@ -120,6 +126,48 @@ impl ClientSideHarness {
             .as_ref()
             .unwrap()
             .clone()
+    }
+
+    pub async fn push_dataset(
+        &self,
+        dataset_local_ref: DatasetRefLocal,
+        dataset_remote_ref: DatasetRefRemote,
+    ) -> Vec<PushResponse> {
+        self.push_service
+            .push_multi_ext(
+                &mut vec![PushRequest {
+                    local_ref: Some(dataset_local_ref),
+                    remote_ref: Some(dataset_remote_ref),
+                }]
+                .into_iter(),
+                PushOptions {
+                    sync_options: SyncOptions {
+                        create_if_not_exists: true,
+                        ..SyncOptions::default()
+                    },
+                    ..PushOptions::default()
+                },
+                None,
+            )
+            .await
+    }
+
+    pub async fn push_dataset_result(
+        &self,
+        dataset_local_ref: DatasetRefLocal,
+        dataset_remote_ref: DatasetRefRemote,
+    ) -> SyncResult {
+        let results = self
+            .push_dataset(dataset_local_ref, dataset_remote_ref)
+            .await;
+
+        match &(results.get(0).unwrap().result) {
+            Ok(sync_result) => sync_result.clone(),
+            Err(e) => {
+                println!("Error: {}", e);
+                panic!("Failure")
+            }
+        }
     }
 
     pub fn internal_datasets_folder_path(&self) -> PathBuf {

@@ -216,6 +216,22 @@ where
         }
     }
 
+    async fn get_block_from_bytes(
+        &self,
+        hash: &Multihash,
+        block_bytes: &[u8],
+    ) -> Result<MetadataBlock, GetBlockError> {
+        match self.construct_block_from_bytes(hash, block_bytes).await {
+            Ok(block) => Ok(block),
+            Err(e) => match e {
+                ConstructBlockFromBytesError::BlockVersion(e) => {
+                    Err(GetBlockError::BlockVersion(e))
+                }
+                ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
+            },
+        }
+    }
+
     fn iter_blocks_interval<'a>(
         &'a self,
         head_hash: &'a Multihash,
@@ -380,27 +396,6 @@ where
         }
 
         Ok(res.hash)
-    }
-
-    async fn append_block_from_bytes<'a>(
-        &'a self,
-        hash: &Multihash,
-        block_bytes: &[u8],
-        opts: AppendOpts<'a>,
-    ) -> Result<MetadataBlock, AppendFromBytesError> {
-        let block = match self.construct_block_from_bytes(hash, block_bytes).await {
-            Ok(block) => Ok(block),
-            Err(e) => Err(match e {
-                ConstructBlockFromBytesError::BlockVersion(e) => {
-                    AppendFromBytesError::BlockVersion(e)
-                }
-                ConstructBlockFromBytesError::Internal(e) => {
-                    AppendFromBytesError::Append(AppendError::Internal(e))
-                }
-            }),
-        }?;
-        self.append(block.clone(), opts).await?;
-        Ok(block)
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {
