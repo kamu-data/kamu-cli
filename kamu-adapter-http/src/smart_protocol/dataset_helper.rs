@@ -163,33 +163,35 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_import_pulled_metadata(
+pub async fn dataset_load_metadata(
     dataset: &dyn Dataset,
     objects_batch: ObjectsBatch,
-) -> Vec<Vec<ObjectFileReference>> {
+) -> Vec<(Multihash, MetadataBlock)> {
     let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
-
-    let loaded_blocks = load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await;
-
-    let object_files =
-        collect_missing_object_references_from_metadata(dataset, loaded_blocks).await;
-
-    // TODO: analyze sizes and split on stages
-    if object_files.is_empty() {
-        vec![]
-    } else {
-        vec![object_files]
-    }
+    load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_import_pushed_metadata(
+pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
-    objects_batch: ObjectsBatch,
-) -> Vec<MetadataBlock> {
-    let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
-    load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
+    metadata: Vec<(Multihash, MetadataBlock)>,
+) -> Result<(), AppendError> {
+    let metadata_chain = dataset.as_metadata_chain();
+    for (hash, block) in metadata {
+        tracing::debug!("Appending block #{} {}", block.sequence_number, hash);
+        metadata_chain
+            .append(
+                block,
+                AppendOpts {
+                    expected_hash: Some(&hash),
+                    ..AppendOpts::default()
+                },
+            )
+            .await?;
+    }
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -233,22 +235,15 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
 async fn load_dataset_blocks(
     metadata_chain: &dyn MetadataChain,
     blocks_data: Vec<(Multihash, Vec<u8>)>,
-) -> Vec<MetadataBlock> {
+) -> Vec<(Multihash, MetadataBlock)> {
     stream::iter(blocks_data)
         .then(|(hash, block_buf)| async move {
             tracing::debug!("> {} - {} bytes", hash, block_buf.len());
             let block = metadata_chain
-                .append_block_from_bytes(
-                    &hash,
-                    block_buf.as_slice(),
-                    AppendOpts {
-                        expected_hash: Some(&hash),
-                        ..AppendOpts::default()
-                    },
-                )
+                .get_block_from_bytes(&hash, block_buf.as_slice())
                 .await
                 .unwrap();
-            block
+            (hash, block)
         })
         .collect()
         .await
@@ -300,12 +295,12 @@ pub async fn collect_missing_object_references_from_interval(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn collect_missing_object_references_from_metadata(
+pub async fn collect_missing_object_references_from_metadata(
     dataset: &dyn Dataset,
-    blocks: Vec<MetadataBlock>,
+    blocks: &Vec<(Multihash, MetadataBlock)>,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
-    for block in blocks {
+    for (_, block) in blocks {
         collect_missing_object_references_from_block(dataset, &block, &mut res_references).await
     }
 

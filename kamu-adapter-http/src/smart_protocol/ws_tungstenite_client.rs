@@ -392,8 +392,18 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
-            let object_files_transfer_plan =
-                dataset_import_pulled_metadata(dst, dataset_pull_metadata_response.blocks).await;
+            let new_blocks =
+                dataset_load_metadata(dst, dataset_pull_metadata_response.blocks).await;
+
+            let object_files =
+                collect_missing_object_references_from_metadata(dst, &new_blocks).await;
+
+            // TODO: analyze sizes and split on stages
+            let object_files_transfer_plan = if object_files.is_empty() {
+                vec![]
+            } else {
+                vec![object_files]
+            };
 
             tracing::debug!(
                 "Object files transfer plan consist of {} stages",
@@ -429,6 +439,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     )
                     .await?;
             }
+
+            dataset_append_metadata(dst, new_blocks)
+                .await
+                .map_err(|e| {
+                    tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                    SyncError::Internal(e.int_err())
+                })?;
 
             let new_dst_head = dst
                 .as_metadata_chain()

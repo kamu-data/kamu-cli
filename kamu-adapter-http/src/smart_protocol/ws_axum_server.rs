@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use axum::extract::ws::Message;
-use opendatafabric::MetadataBlock;
+use opendatafabric::{MetadataBlock, Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use url::Url;
 
@@ -330,7 +330,7 @@ async fn try_handle_push_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     push_request: DatasetPushRequest,
-) -> Result<Vec<MetadataBlock>, PushServerError> {
+) -> Result<Vec<(Multihash, MetadataBlock)>, PushServerError> {
     let maybe_push_metadata_request = read_payload::<DatasetPushMetadataRequest>(socket).await;
 
     match maybe_push_metadata_request {
@@ -349,8 +349,7 @@ async fn try_handle_push_metadata_request(
                 push_metadata_request.new_blocks.objects_count
             );
 
-            let new_blocks =
-                dataset_import_pushed_metadata(dataset, push_metadata_request.new_blocks).await;
+            let new_blocks = dataset_load_metadata(dataset, push_metadata_request.new_blocks).await;
 
             write_payload::<DatasetPushMetadataAccepted>(socket, DatasetPushMetadataAccepted {})
                 .await
@@ -414,6 +413,7 @@ async fn try_handle_push_objects_request(
 async fn try_handle_push_complete(
     socket: &mut axum::extract::ws::WebSocket,
     dataset_builder: &dyn DatasetBuilder,
+    new_blocks: Vec<(Multihash, MetadataBlock)>,
 ) -> Result<(), PushServerError> {
     read_payload::<DatasetPushComplete>(socket)
         .await
@@ -423,13 +423,17 @@ async fn try_handle_push_complete(
 
     tracing::debug!("Push client sent a complete request. Commiting the dataset");
 
-    match dataset_builder.finish().await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::debug!("Committing dataset failed with error: {}", e);
-            return Err(PushServerError::Internal(e.int_err()));
-        }
-    }
+    dataset_append_metadata(dataset_builder.as_dataset(), new_blocks)
+        .await
+        .map_err(|e| {
+            tracing::debug!("Appending dataset metadata failed with error: {}", e);
+            PushServerError::Internal(e.int_err())
+        })?;
+
+    dataset_builder.finish().await.map_err(|e| {
+        tracing::debug!("Committing dataset failed with error: {}", e);
+        PushServerError::Internal(e.int_err())
+    })?;
 
     tracing::debug!("Sending complete confirmation");
 
@@ -484,7 +488,7 @@ pub async fn dataset_push_ws_main_flow(
     let dataset = dataset_builder.as_dataset();
     let push_request = handle_push_request_initiation(socket, dataset).await?;
 
-    let _new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
+    let new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
 
     loop {
         let should_continue =
@@ -495,7 +499,7 @@ pub async fn dataset_push_ws_main_flow(
         }
     }
 
-    try_handle_push_complete(socket, dataset_builder).await?;
+    try_handle_push_complete(socket, dataset_builder, new_blocks).await?;
 
     Ok(())
 }
