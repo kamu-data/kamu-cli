@@ -20,11 +20,12 @@ pub fn smart_transfer_protocol_routes() -> axum::Router {
         )
         .route(
             "/data/:physical_hash",
-            axum::routing::get(dataset_data_handler),
+            axum::routing::get(dataset_data_get_handler).put(dataset_data_put_handler),
         )
         .route(
             "/checkpoints/:physical_hash",
-            axum::routing::get(dataset_checkpoints_handler),
+            axum::routing::get(dataset_checkpoints_get_handler)
+                .put(dataset_checkpoints_put_handler),
         )
         .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))
         .route("/push", axum::routing::get(dataset_push_ws_upgrade_handler))

@@ -9,7 +9,7 @@
 
 use std::io::Read;
 
-use crate::smart_protocol::messages::*;
+use crate::smart_protocol::{errors::ObjectUploadError, messages::*};
 use bytes::Bytes;
 use flate2::Compression;
 use futures::{stream, StreamExt, TryStreamExt};
@@ -276,10 +276,11 @@ impl From<IterBlocksError> for CollectMissingObjectReferencesFromIntervalError {
     }
 }
 
-pub async fn collect_missing_object_references_from_interval(
+pub async fn collect_object_references_from_interval(
     dataset: &dyn Dataset,
     head: &Multihash,
     tail: Option<&Multihash>,
+    missing_files_only: bool,
 ) -> Result<Vec<ObjectFileReference>, CollectMissingObjectReferencesFromIntervalError> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
 
@@ -287,7 +288,13 @@ pub async fn collect_missing_object_references_from_interval(
         .as_metadata_chain()
         .iter_blocks_interval(head, tail, false);
     while let Some((_, block)) = block_stream.try_next().await? {
-        collect_missing_object_references_from_block(dataset, &block, &mut res_references).await;
+        collect_object_references_from_block(
+            dataset,
+            &block,
+            &mut res_references,
+            missing_files_only,
+        )
+        .await;
     }
 
     Ok(res_references)
@@ -295,13 +302,20 @@ pub async fn collect_missing_object_references_from_interval(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn collect_missing_object_references_from_metadata(
+pub async fn collect_object_references_from_metadata(
     dataset: &dyn Dataset,
     blocks: &Vec<(Multihash, MetadataBlock)>,
+    missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
     for (_, block) in blocks {
-        collect_missing_object_references_from_block(dataset, &block, &mut res_references).await
+        collect_object_references_from_block(
+            dataset,
+            &block,
+            &mut res_references,
+            missing_files_only,
+        )
+        .await
     }
 
     res_references
@@ -309,20 +323,22 @@ pub async fn collect_missing_object_references_from_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn collect_missing_object_references_from_block(
+async fn collect_object_references_from_block(
     dataset: &dyn Dataset,
     block: &MetadataBlock,
     target_references: &mut Vec<ObjectFileReference>,
+    missing_files_only: bool,
 ) {
     let data_repo = dataset.as_data_repo();
     let checkpoint_repo = dataset.as_checkpoint_repo();
 
     match &block.event {
         MetadataEvent::AddData(e) => {
-            if !data_repo
-                .contains(&e.output_data.physical_hash)
-                .await
-                .unwrap()
+            if !missing_files_only
+                || !data_repo
+                    .contains(&e.output_data.physical_hash)
+                    .await
+                    .unwrap()
             {
                 target_references.push(ObjectFileReference {
                     object_type: ObjectType::DataSlice,
@@ -331,10 +347,11 @@ async fn collect_missing_object_references_from_block(
                 });
             }
             if let Some(checkpoint) = e.output_checkpoint.as_ref() {
-                if !checkpoint_repo
-                    .contains(&checkpoint.physical_hash)
-                    .await
-                    .unwrap()
+                if !missing_files_only
+                    || !checkpoint_repo
+                        .contains(&checkpoint.physical_hash)
+                        .await
+                        .unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::Checkpoint,
@@ -346,7 +363,9 @@ async fn collect_missing_object_references_from_block(
         }
         MetadataEvent::ExecuteQuery(e) => {
             if let Some(data_slice) = e.output_data.as_ref() {
-                if !data_repo.contains(&data_slice.physical_hash).await.unwrap() {
+                if !missing_files_only
+                    || !data_repo.contains(&data_slice.physical_hash).await.unwrap()
+                {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::DataSlice,
                         physical_hash: data_slice.physical_hash.clone(),
@@ -355,10 +374,11 @@ async fn collect_missing_object_references_from_block(
                 }
             }
             if let Some(checkpoint) = e.output_checkpoint.as_ref() {
-                if !checkpoint_repo
-                    .contains(&checkpoint.physical_hash)
-                    .await
-                    .unwrap()
+                if !missing_files_only
+                    || !checkpoint_repo
+                        .contains(&checkpoint.physical_hash)
+                        .await
+                        .unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::Checkpoint,
@@ -595,6 +615,11 @@ pub async fn dataset_export_object_file(
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
 
+    let size = source_object_repository
+        .get_size(&object_file_reference.physical_hash)
+        .await
+        .map_err(|e| SyncError::Internal(e.int_err()))?;
+
     let stream = source_object_repository
         .get_stream(&object_file_reference.physical_hash)
         .await
@@ -605,7 +630,7 @@ pub async fn dataset_export_object_file(
 
     let client = reqwest::Client::new();
 
-    client
+    let response = client
         .put(
             object_transfer_strategy
                 .upload_to
@@ -615,12 +640,24 @@ pub async fn dataset_export_object_file(
                 .clone(),
         )
         .header("content-type", "application/octet-stream")
+        .header("content-length", size)
         .body(hyper::Body::wrap_stream(reader_stream))
         .send()
         .await
         .map_err(|e| SyncError::Internal(e.int_err()))?;
 
-    Ok(())
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        tracing::error!(
+            "File transfer to {} failed, result is {:?}",
+            object_transfer_strategy.upload_to.as_ref().unwrap().url,
+            response
+        );
+        Err(SyncError::Internal(
+            (ObjectUploadError { response }).int_err(),
+        ))
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

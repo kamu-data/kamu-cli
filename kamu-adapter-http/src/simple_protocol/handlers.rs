@@ -104,7 +104,7 @@ pub async fn dataset_blocks_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_data_handler(
+pub async fn dataset_data_get_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
@@ -129,7 +129,17 @@ pub async fn dataset_data_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_checkpoints_handler(
+pub async fn dataset_data_put_handler(
+    _dataset_ref: Extension<DatasetRefLocal>,
+    _catalog: Extension<dill::Catalog>,
+    axum::extract::Path(_hash_param): axum::extract::Path<PhysicalHashFromPath>,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    unimplemented!("dataset_data_put_handler")
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_checkpoints_get_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
@@ -150,6 +160,16 @@ pub async fn dataset_checkpoints_handler(
     Ok(axum::response::Response::builder()
         .body(axum::body::boxed(body))
         .unwrap())
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_checkpoints_put_handler(
+    _dataset_ref: Extension<DatasetRefLocal>,
+    _catalog: Extension<dill::Catalog>,
+    axum::extract::Path(_hash_param): axum::extract::Path<PhysicalHashFromPath>,
+) -> Result<axum::response::Response, axum::http::StatusCode> {
+    unimplemented!("dataset_checkpoints_put_handler")
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -210,8 +230,8 @@ fn get_base_dataset_url(
     for _ in 0..depth {
         path.pop();
     }
-
-    url.join(&path.join("/")).unwrap()
+    let path_string = format!("{}/", path.join("/"));
+    url.join(path_string.as_str()).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

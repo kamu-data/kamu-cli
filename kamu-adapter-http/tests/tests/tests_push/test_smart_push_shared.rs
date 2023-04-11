@@ -16,7 +16,8 @@ use kamu::{
 use opendatafabric::{DatasetKind, DatasetRefLocal, DatasetRefRemote, MetadataEvent};
 
 use crate::harness::{
-    await_client_server_flow, copy_folder_recursively, ClientSideHarness, ServerSideHarness,
+    await_client_server_flow, copy_folder_recursively, create_random_data, ClientSideHarness,
+    ServerSideHarness,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -28,7 +29,7 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    client_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -40,6 +41,17 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
         .unwrap();
 
     let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
+
+    let commit_result = client_repo
+        .get_dataset(&local_dataset_ref)
+        .await
+        .unwrap()
+        .commit_event(
+            MetadataEvent::AddData(create_random_data(&client_dataset_layout).await.build()),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -53,8 +65,8 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
         assert_eq!(
             SyncResult::Updated {
                 old_head: None,
-                new_head: create_result.head,
-                num_blocks: 2
+                new_head: commit_result.new_head,
+                num_blocks: 3
             },
             push_result
         );

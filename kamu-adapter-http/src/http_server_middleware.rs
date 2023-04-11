@@ -75,7 +75,13 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
     fn is_dataset_optional(request: &Request<Body>) -> bool {
-        "/push" == request.uri().path()
+        let path = request.uri().path();
+        if "/push" == path {
+            return true;
+        }
+
+        let method = request.method().as_str();
+        method == "PUT" && (path.starts_with("/data/") || path.starts_with("/checkpoint/"))
     }
 }
 
