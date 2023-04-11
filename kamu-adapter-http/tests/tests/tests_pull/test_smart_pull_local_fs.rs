@@ -12,7 +12,6 @@ use crate::{harness::ServerSideLocalFsHarness, tests::tests_pull::test_smart_pul
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_local_fs_new_dataset() {
     let server_harness = ServerSideLocalFsHarness::new().await;
     test_smart_pull_shared::test_smart_pull_new_dataset(server_harness).await;
@@ -21,7 +20,6 @@ async fn test_smart_pull_local_fs_new_dataset() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_local_fs_existing_up_to_date_dataset() {
     let server_harness = ServerSideLocalFsHarness::new().await;
     test_smart_pull_shared::test_smart_pull_existing_up_to_date_dataset(server_harness).await;
@@ -30,7 +28,6 @@ async fn test_smart_pull_local_fs_existing_up_to_date_dataset() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_local_fs_existing_evolved_dataset() {
     let server_harness = ServerSideLocalFsHarness::new().await;
     test_smart_pull_shared::test_smart_pull_existing_evolved_dataset(server_harness).await;
@@ -39,7 +36,6 @@ async fn test_smart_pull_local_fs_existing_evolved_dataset() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_smart_pull_local_fs_existing_advanced_dataset_fails() {
     let server_harness = ServerSideLocalFsHarness::new().await;
     test_smart_pull_shared::test_smart_pull_existing_advanced_dataset_fails(server_harness).await;
