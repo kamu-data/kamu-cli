@@ -12,45 +12,49 @@ repository = "https://github.com/kamu-data/kamu-cli"
 keywords = ["cli", "data", "collaboration", "pipeline", "management", "provenance"]
 categories = ["command-line-utilities"]
 
+
 [lib]
 doctest = false
+
 
 [features]
 default = []
 web-ui = []
 skip_docker_tests = []
 
+
 [dependencies]
-dill = { workspace = true }
-opendatafabric = { path = "../opendatafabric" }
-kamu = { path = "../kamu-core" }
-kamu-adapter-graphql = { path = "../kamu-adapter-graphql" }
-kamu-adapter-http = { path = "../kamu-adapter-http" }
-container-runtime = { path = "../utils/container-runtime" }
+# Kamu
+dill = "0.5.0"
+opendatafabric = { version = "0.119.0", path = "../opendatafabric" }
+kamu = { version = "0.119.0", path = "../kamu-core" }
+kamu-adapter-graphql = { version = "0.119.0", path = "../kamu-adapter-graphql" }
+kamu-adapter-http = { version = "0.119.0", path = "../kamu-adapter-http" }
+container-runtime = { version = "0.119.0", path = "../utils/container-runtime" }
 
 # CLI
-read_input = "0.8"  # Basic user input
 chrono-humanize = "0.2"  # Human readable durations
-clap = { workspace = true }
-clap_complete = "4.2"
+clap = "4"
+clap_complete = "4"
 console = "0.15"  # Terminal colors
 humansize = "2"  # Human readable data sizes
 indicatif = "0.17"  # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"  # Human-readable number formatting
 prettytable-rs = "0.10"  # ASCII table formatting
+read_input = "0.8"  # Basic user input
 webbrowser = "0.8"  # For opening URLs in default system browser
 
 # API / GraphQL
-http = { workspace = true }
-hyper = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true, features = ["trace", "cors"] }
-axum = { workspace = true, features = ["ws"] }
-axum-extra = { workspace = true, features = ["async-read-body"] }
-async-graphql = { workspace = true, features = ["chrono", "url", "apollo_tracing"] }
-async-graphql-axum = { workspace = true }
-serde_json = { workspace = true }
+http = "0.2"
+hyper = "0.14"
+tower = "0.4"
+tower-http = { version = "0.4", features = ["trace", "cors"] }
+axum = { version = "0.6", features = ["ws"] }
+axum-extra = { version = "0.7", features = ["async-read-body"] }
+async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
+async-graphql-axum = "5"
+serde_json = "1"
 
 # Web UI
 rust-embed = { version = "6", features = ["interpolate-folder-path", "compression"] }
@@ -58,37 +62,37 @@ mime = "0.3"
 mime_guess = "2"
 
 # Config
-merge = "0.1"
-serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
-serde_yaml = { workspace = true }
 duration-string = { version = "0.3", features = ["serde"] }
+merge = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_with = "2"
+serde_yaml = "0.9"
 
 # Tracing / logging / telemetry
-tracing = { workspace = true }
-tracing-appender = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
-tracing-log = { workspace = true }
-tracing-bunyan-formatter = { workspace = true }
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-log = "0.1"
+tracing-bunyan-formatter = "0.3"
 
 # Utils
-async-trait = { workspace = true }
-chrono = { workspace = true }
+async-trait = "0.1"
+chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
-glob = "0.3"  # Used for path completions
-datafusion = { workspace = true }
+datafusion = "22"
 dirs = "5"
-futures = { workspace = true }
-indoc = { workspace = true }
-itertools = { workspace = true }
+futures = "0.3"
+glob = "0.3"  # Used for path completions
+indoc = "2"
+itertools = "0.10"
 libc = "0.2"  # Signal names
-regex = { workspace = true }
+regex = "1"
 shlex = "1"  # Parsing partial input for custom completions
 signal-hook = "0.3"  # Signal handling
-tokio = { workspace = true, features = [] }
-tempfile = { workspace = true }
-thiserror = { workspace = true }
-url = { workspace = true }
+tokio = { version = "1", default-features = false, features = [] }
+tempfile = "3"
+thiserror = "1"
+url = "2"
 urlencoding = "2"
 
 
@@ -97,7 +101,6 @@ users = "0.11"  # For getting uid:gid
 
 
 [dev-dependencies]
+env_logger = "0.10"
 rand = "0.8"
-indoc = { workspace = true }
-env_logger = { workspace = true }
-test-log = { workspace = true, features = ["trace"] }
+test-log = { version = "0.2", features = ["trace"] }

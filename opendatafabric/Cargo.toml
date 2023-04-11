@@ -5,36 +5,35 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
 
+
 [lib]
 doctest = false
 
+
 [dependencies]
-# Domain
-chrono = { workspace = true, features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+indoc = "2"
+thiserror = "1"
 
 # Multiformats
 bs58 = "0.4"  # base58 codec
-digest = { workspace = true }
-sha3 = { workspace = true }
+digest = "0.10"
+sha3 = "0.10"
 unsigned-varint = "0.7"
-url = { workspace = true }
+url = "2"
 
 # Crypto
-rand = "0.7"  # TODO: Pinned for ed25519-dalek compatibility
 ed25519-dalek = "1"
+rand = "0.7"  # TODO: Pinned for ed25519-dalek compatibility
 
 # Serialization
 byteorder = "1"
-flatbuffers = { workspace = true }
+flatbuffers = "23"
 hex = "0.4"
-serde = { workspace = true, features = ["derive"] }
-serde_with = { workspace = true }
-serde_yaml = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_with = "2"
+serde_yaml = "0.9"
 
 # gRPC
-tonic = "0.9"
 prost = "0.11"
-
-# Utils
-indoc = { workspace = true }
-thiserror = { workspace = true }
+tonic = "0.9"

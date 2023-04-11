@@ -9,7 +9,7 @@
 
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::arrow::ArrowWriter;
-use datafusion::parquet::basic::Compression;
+use datafusion::parquet::basic::{Compression, GzipLevel};
 use datafusion::parquet::record::RowAccessor;
 use datafusion::{
     arrow::{
@@ -117,7 +117,7 @@ async fn test_ingest_parquet_with_engine() {
     .unwrap();
 
     let arrow_writer_props = WriterProperties::builder()
-        .set_compression(Compression::GZIP)
+        .set_compression(Compression::GZIP(GzipLevel::default()))
         .build();
 
     let mut arrow_writer = ArrowWriter::try_new(
