@@ -21,11 +21,7 @@ use crate::harness::{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-async fn test_smart_pull_new_dataset() {
-    let server_harness = ServerSideHarness::new().await;
-
+pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
         .create_dataset_from_snapshot(
@@ -69,11 +65,7 @@ async fn test_smart_pull_new_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-async fn test_smart_pull_existing_up_to_date_dataset() {
-    let server_harness = ServerSideHarness::new().await;
-
+pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
@@ -117,11 +109,7 @@ async fn test_smart_pull_existing_up_to_date_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-async fn test_smart_pull_existing_evolved_dataset() {
-    let server_harness = ServerSideHarness::new().await;
-
+pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
         .create_dataset_from_snapshot(
@@ -188,11 +176,9 @@ async fn test_smart_pull_existing_evolved_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
-async fn test_smart_pull_existing_advanced_dataset_fails() {
-    let server_harness = ServerSideHarness::new().await;
-
+pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarness>(
+    server_harness: T,
+) {
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
