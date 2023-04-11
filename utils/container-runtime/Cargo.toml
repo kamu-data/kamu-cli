@@ -5,12 +5,15 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
 
+[lib]
+doctest = false
+
 [features]
 skip_docker_tests = []
 
 [dependencies]
-dill = { workspace = true }
-regex = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
-url = { workspace = true }
+dill = "0.5"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+url = "2"
