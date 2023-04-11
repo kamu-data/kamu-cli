@@ -162,6 +162,8 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
+            submatches.get_one("address").map(|a| *a),
+            submatches.get_one("http-port").map(|p| *p),
             submatches
                 .get_many("env")
                 .unwrap_or_default() // optional

@@ -16,6 +16,7 @@ use container_runtime::ContainerRuntime;
 use kamu::infra::*;
 
 use console::style as s;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,6 +25,8 @@ pub struct NotebookCommand {
     jupyter_config: Arc<JupyterConfig>,
     output_config: Arc<OutputConfig>,
     container_runtime: Arc<ContainerRuntime>,
+    address: Option<IpAddr>,
+    port: Option<u16>,
     env_vars: Vec<(String, Option<String>)>,
 }
 
@@ -33,6 +36,8 @@ impl NotebookCommand {
         jupyter_config: Arc<JupyterConfig>,
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
+        address: Option<IpAddr>,
+        port: Option<u16>,
         env_vars: Iter,
     ) -> Self
     where
@@ -44,6 +49,8 @@ impl NotebookCommand {
             jupyter_config,
             output_config,
             container_runtime,
+            address,
+            port,
             env_vars: env_vars
                 .into_iter()
                 .map(|elem| {
@@ -99,6 +106,8 @@ impl Command for NotebookCommand {
 
         notebook_server.run(
             &self.workspace_layout,
+            self.address.clone(),
+            self.port,
             environment_vars,
             self.output_config.verbosity_level > 0,
             move |url| {

@@ -13,6 +13,7 @@ use container_runtime::{
     ContainerHandle, ContainerRuntime, ContainerRuntimeType, PullImageListener, RunArgs,
 };
 use std::fs::File;
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -49,6 +50,8 @@ impl NotebookServerImpl {
     pub fn run<StartedClb, ShutdownClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
+        address: Option<IpAddr>,
+        port: Option<u16>,
         environment_vars: Vec<(String, String)>,
         inherit_stdio: bool,
         on_started: StartedClb,
@@ -58,6 +61,10 @@ impl NotebookServerImpl {
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
     {
+        if address.is_some() {
+            panic!("Exposing Notebook server on a host network interface is not yet supported");
+        }
+
         let network_name = "kamu";
 
         // Delete network if exists from previous run
@@ -117,6 +124,17 @@ impl NotebookServerImpl {
             expose_ports: vec![80],
             volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
             environment_vars: environment_vars,
+            args: vec![
+                "jupyter".to_owned(),
+                "notebook".to_owned(),
+                "--allow-root".to_owned(),
+                "--ip".to_owned(),
+                address
+                    .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
+                    .to_string(),
+                "--port".to_owned(),
+                port.unwrap_or(80).to_string(),
+            ],
             ..RunArgs::default()
         });
 

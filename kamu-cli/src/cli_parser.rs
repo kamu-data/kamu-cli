@@ -13,7 +13,7 @@ use clap::{value_parser, Arg, ArgAction, Command};
 use opendatafabric::*;
 
 fn tabular_output_params<'a>(app: Command) -> Command {
-    app.args(&[
+    app.args([
         Arg::new("output-format")
             .long("output-format")
             .short('o')
@@ -79,7 +79,7 @@ pub fn cli() -> Command {
         .subcommand_required(true)
         .arg_required_else_help(true)
         .version(crate::VERSION)
-        .args(&[
+        .args([
             Arg::new("verbose")
                 .short('v')
                 .action(ArgAction::Count)
@@ -101,7 +101,7 @@ pub fn cli() -> Command {
             [
                 Command::new("add")
                     .about("Add a new dataset or modify an existing one")
-                    .args(&[
+                    .args([
                         Arg::new("recursive")
                             .short('r')
                             .long("recursive")
@@ -216,7 +216,7 @@ pub fn cli() -> Command {
                     .subcommands([
                         Command::new("list")
                             .about("Display current configuration combined from all config files")
-                            .args(&[
+                            .args([
                                 Arg::new("user")
                                     .long("user")
                                     .action(ArgAction::SetTrue)
@@ -228,7 +228,7 @@ pub fn cli() -> Command {
                             ]),
                         Command::new("get")
                             .about("Get current configuration value")
-                            .args(&[
+                            .args([
                                 Arg::new("user")
                                     .long("user")
                                     .action(ArgAction::SetTrue)
@@ -246,7 +246,7 @@ pub fn cli() -> Command {
                             ]),
                         Command::new("set")
                             .about("Set or unset configuration value")
-                            .args(&[
+                            .args([
                                 Arg::new("user")
                                     .long("user")
                                     .action(ArgAction::SetTrue)
@@ -293,7 +293,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("delete")
                     .about("Delete a dataset")
-                    .args(&[
+                    .args([
                         Arg::new("all")
                             .short('a')
                             .long("all")
@@ -336,7 +336,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("init")
                     .about("Initialize an empty workspace in the current directory")
-                    .args(&[
+                    .args([
                         Arg::new("pull-images")
                             .long("pull-images")
                             .action(ArgAction::SetTrue)
@@ -371,7 +371,7 @@ pub fn cli() -> Command {
                     .subcommands([
                         Command::new("lineage")
                             .about("Shows the dependency tree of a dataset")
-                            .args(&[
+                            .args([
                                 Arg::new("output-format")
                                     .long("output-format")
                                     .short('o')
@@ -412,7 +412,7 @@ pub fn cli() -> Command {
                             )),
                         Command::new("query")
                             .about("Shows the transformations used by a derivative dataset")
-                            .args(&[Arg::new("dataset")
+                            .args([Arg::new("dataset")
                                 .required(true)
                                 .index(1)
                                 .value_parser(value_parse_dataset_ref_local)
@@ -427,7 +427,7 @@ pub fn cli() -> Command {
                             )),
                         Command::new("schema")
                             .about("Shows the dataset schema")
-                            .args(&[
+                            .args([
                                 Arg::new("dataset")
                                     .required(true)
                                     .index(1)
@@ -460,7 +460,7 @@ pub fn cli() -> Command {
                 tabular_output_params(
                     Command::new("list")
                         .about("List all datasets in the workspace")
-                        .args(&[Arg::new("wide")
+                        .args([Arg::new("wide")
                             .long("wide")
                             .short('w')
                             .action(ArgAction::Count)
@@ -485,7 +485,7 @@ pub fn cli() -> Command {
                 ),
                 Command::new("log")
                     .about("Shows dataset metadata history")
-                    .args(&[
+                    .args([
                         Arg::new("dataset")
                             .required(true)
                             .index(1)
@@ -538,7 +538,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")
-                    .args(&[
+                    .args([
                         Arg::new("root")
                             .long("root")
                             .action(ArgAction::SetTrue)
@@ -578,20 +578,28 @@ pub fn cli() -> Command {
                     https://github.com/kamu-data/kamu-cli
                     "
                     ))
-                    .arg(
+                    .args([
+                        Arg::new("address")
+                            .long("address")
+                            .value_parser(value_parser!(std::net::IpAddr))
+                            .help("Expose HTTP server on specific network interface"),
+                        Arg::new("http-port")
+                            .long("http-port")
+                            .value_parser(value_parser!(u16))
+                            .help("Expose HTTP server on specific port"),
                         Arg::new("env")
                             .short('e')
                             .long("env")
                             .value_name("VAR")
                             .action(ArgAction::Append)
                             .help(concat!(
-                                "Pass specified environment variable into the notebook ",
+                                "Propagate or set an environment variable in the notebook ",
                                 "(e.g. `-e VAR` or `-e VAR=foo`)"
                             )),
-                    ),
+                    ]),
                 Command::new("pull")
                     .about("Pull new data into the datasets")
-                    .args(&[
+                    .args([
                         Arg::new("all")
                             .short('a')
                             .long("all")
@@ -689,7 +697,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("push")
                     .about("Push local data into a repository")
-                    .args(&[
+                    .args([
                         Arg::new("all")
                             .short('a')
                             .long("all")
@@ -758,7 +766,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("rename")
                     .about("Rename a dataset")
-                    .args(&[
+                    .args([
                         Arg::new("dataset")
                             .required(true)
                             .index(1)
@@ -784,7 +792,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("reset")
                     .about("Revert the dataset back to the specified state")
-                    .args(&[
+                    .args([
                         Arg::new("dataset")
                             .required(true)
                             .index(1)
@@ -831,7 +839,7 @@ pub fn cli() -> Command {
                                 s3+https://my-minio-server:9000/bucket
                         "
                             ))
-                            .args(&[
+                            .args([
                                 Arg::new("name")
                                     .required(true)
                                     .index(1)
@@ -844,7 +852,7 @@ pub fn cli() -> Command {
                             ]),
                         Command::new("delete")
                             .about("Deletes a reference to repository")
-                            .args(&[
+                            .args([
                                 Arg::new("all")
                                     .short('a')
                                     .long("all")
@@ -870,7 +878,7 @@ pub fn cli() -> Command {
                             .arg_required_else_help(true)
                             .subcommands([
                                 tabular_output_params(
-                                    Command::new("list").about("Lists remote aliases").args(&[
+                                    Command::new("list").about("Lists remote aliases").args([
                                         Arg::new("dataset")
                                             .index(1)
                                             .value_parser(value_parse_dataset_ref_local)
@@ -879,7 +887,7 @@ pub fn cli() -> Command {
                                 ),
                                 Command::new("add")
                                     .about("Adds a remote alias to a dataset")
-                                    .args(&[
+                                    .args([
                                         Arg::new("dataset")
                                             .required(true)
                                             .index(1)
@@ -901,7 +909,7 @@ pub fn cli() -> Command {
                                     ]),
                                 Command::new("delete")
                                     .about("Deletes a remote alias associated with a dataset")
-                                    .args(&[
+                                    .args([
                                         Arg::new("all")
                                             .short('a')
                                             .long("all")
@@ -973,7 +981,7 @@ pub fn cli() -> Command {
                 tabular_output_params(
                     Command::new("search")
                         .about("Searches for datasets in the registered repositories")
-                        .args(&[
+                        .args([
                             Arg::new("query")
                                 .index(1)
                                 .value_name("QUERY")
@@ -1008,7 +1016,7 @@ pub fn cli() -> Command {
                     Command::new("sql")
                         .about("Executes an SQL query or drops you into an SQL shell")
                         .subcommand(
-                            Command::new("server").about("Run JDBC server only").args(&[
+                            Command::new("server").about("Run JDBC server only").args([
                                 Arg::new("address")
                                     .long("address")
                                     .value_parser(value_parser!(IpAddr))
@@ -1026,7 +1034,7 @@ pub fn cli() -> Command {
                                     .hide(true),
                             ]),
                         )
-                        .args(&[
+                        .args([
                             Arg::new("url").long("url").value_name("URL").help(
                                 "URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)",
                             ),
@@ -1192,7 +1200,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("verify")
                     .about("Verifies the validity of a dataset")
-                    .args(&[
+                    .args([
                         Arg::new("recursive")
                             .short('r')
                             .long("recursive")
