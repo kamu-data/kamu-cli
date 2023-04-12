@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
+use crate::{domain::*, infra::get_staging_name};
 use opendatafabric::{Multicodec, Multihash};
 
 use async_trait::async_trait;
@@ -62,20 +62,12 @@ where
     }
 
     // TODO: Cleanup procedure for orphaned staging files?
-    fn get_staging_path(&self) -> PathBuf {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
+    fn get_staging_path(&self) -> Result<PathBuf, std::io::Error> {
+        if !self.root.exists() {
+            std::fs::create_dir_all(&self.root)?;
+        }
 
-        let mut filename = String::with_capacity(16);
-        filename.push_str(".pending-");
-        filename.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        self.root.join(filename)
+        Ok(self.root.join(get_staging_name()))
     }
 
     async fn write_stream_with_digest<'a>(
@@ -215,7 +207,7 @@ where
             return Ok(InsertResult { hash });
         }
 
-        let staging_path = self.get_staging_path();
+        let staging_path = self.get_staging_path().int_err()?;
 
         // Write to staging file
         tokio::fs::write(&staging_path, data).await.int_err()?;
@@ -231,7 +223,7 @@ where
         src: Box<AsyncReadObj>,
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let staging_path = self.get_staging_path();
+        let staging_path = self.get_staging_path().int_err()?;
 
         let actual_hash = self
             .write_stream_with_digest(&staging_path, src)

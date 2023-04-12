@@ -630,7 +630,7 @@ impl DatasetBuilder for NullDatasetBuilder {
     }
 
     fn get_staging_name(&self) -> &str {
-        "<staging_name>"
+        self.hdl.name.as_str()
     }
 
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {

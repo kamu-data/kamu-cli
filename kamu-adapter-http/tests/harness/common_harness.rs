@@ -10,11 +10,13 @@
 use std::{fs, io, path::Path};
 
 use kamu::{
-    domain::{InsertOpts, ObjectRepository},
+    domain::{
+        CommitOpts, CommitResult, DatasetExt, DatasetRepository, InsertOpts, ObjectRepository,
+    },
     infra::{DatasetLayout, ObjectRepositoryLocalFS},
     testing::{AddDataBuilder, MetadataFactory},
 };
-use opendatafabric::Multihash;
+use opendatafabric::{DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,6 +57,25 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
         .hash;
 
     (hash, data.len())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn commit_add_data_event(
+    dataset_repo: &dyn DatasetRepository,
+    dataset_ref: &DatasetRef,
+    dataset_layout: &DatasetLayout,
+) -> CommitResult {
+    dataset_repo
+        .get_dataset(&dataset_ref)
+        .await
+        .unwrap()
+        .commit_event(
+            MetadataEvent::AddData(create_random_data(dataset_layout).await.build()),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

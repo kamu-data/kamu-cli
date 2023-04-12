@@ -19,7 +19,10 @@
 use crate::smart_protocol::ws_axum_server;
 use axum::extract::Extension;
 use bytes::Bytes;
-use kamu::{domain::*, infra::WorkspaceLayout};
+use kamu::{
+    domain::*,
+    infra::{get_staging_name, WorkspaceLayout},
+};
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
@@ -207,14 +210,27 @@ async fn dataset_put_object_common(
         .get_one::<WorkspaceLayout>()
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let data_folder_suffix = format!(
+    let temp_data_folder_suffix = format!(
+        "{}/{}/{}",
+        staging_name,
+        internal_folder_name,
+        get_staging_name()
+    );
+
+    let temp_upload_path = workspace_layout.datasets_dir.join(temp_data_folder_suffix);
+
+    tokio::fs::write(&temp_upload_path, body)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let final_data_folder_suffix = format!(
         "{}/{}/{}",
         staging_name, internal_folder_name, physical_hash
     );
 
-    let upload_path = workspace_layout.datasets_dir.join(data_folder_suffix);
+    let final_upload_path = workspace_layout.datasets_dir.join(final_data_folder_suffix);
 
-    tokio::fs::write(&upload_path, body)
+    tokio::fs::rename(temp_upload_path, final_upload_path)
         .await
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 

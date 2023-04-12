@@ -13,10 +13,10 @@ use kamu::{
     domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, SyncResult},
     testing::{DatasetTestHelper, MetadataFactory},
 };
-use opendatafabric::{DatasetKind, DatasetRefLocal, DatasetRefRemote, MetadataEvent};
+use opendatafabric::{DatasetKind, DatasetRef, DatasetRefRemote, MetadataEvent};
 
 use crate::harness::{
-    await_client_server_flow, copy_folder_recursively, create_random_data, ClientSideHarness,
+    await_client_server_flow, commit_add_data_event, copy_folder_recursively, ClientSideHarness,
     ServerSideHarness,
 };
 
@@ -40,18 +40,10 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
         .await
         .unwrap();
 
-    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
-    let commit_result = client_repo
-        .get_dataset(&local_dataset_ref)
-        .await
-        .unwrap()
-        .commit_event(
-            MetadataEvent::AddData(create_random_data(&client_dataset_layout).await.build()),
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap();
+    let commit_result =
+        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -59,7 +51,7 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(local_dataset_ref, foo_dataset_ref)
+            .push_dataset_result(dataset_ref, foo_dataset_ref)
             .await;
 
         assert_eq!(
@@ -97,6 +89,10 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
         .await
         .unwrap();
 
+    let dataset_ref: DatasetRef = DatasetRef::from_str("foo").unwrap();
+
+    commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+
     // Hard folder synchronization
     copy_folder_recursively(
         &client_dataset_layout.root_dir,
@@ -104,15 +100,13 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
     )
     .unwrap();
 
-    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
-
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(local_dataset_ref, foo_dataset_ref)
+            .push_dataset_result(dataset_ref, foo_dataset_ref)
             .await;
 
         assert_eq!(SyncResult::UpToDate {}, push_result);
@@ -151,9 +145,9 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
     .unwrap();
 
     // Extend client-side dataset with new node
-    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
-    let commit_result = client_repo
-        .get_dataset(&local_dataset_ref)
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    client_repo
+        .get_dataset(&dataset_ref)
         .await
         .unwrap()
         .commit_event(
@@ -167,20 +161,23 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
         .await
         .unwrap();
 
+    let commit_result =
+        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(local_dataset_ref, foo_dataset_ref)
+            .push_dataset_result(dataset_ref, foo_dataset_ref)
             .await;
 
         assert_eq!(
             SyncResult::Updated {
                 old_head: Some(create_result.head),
                 new_head: commit_result.new_head,
-                num_blocks: 1
+                num_blocks: 2
             },
             push_result
         );
@@ -221,11 +218,11 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
     )
     .unwrap();
 
-    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
     // Extend server-side dataset with new node
     server_repo
-        .get_dataset(&local_dataset_ref)
+        .get_dataset(&dataset_ref)
         .await
         .unwrap()
         .commit_event(
@@ -245,7 +242,7 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_responses = client_harness
-            .push_dataset(local_dataset_ref, foo_dataset_ref)
+            .push_dataset(dataset_ref, foo_dataset_ref)
             .await;
 
         // TODO: try expecting better error message

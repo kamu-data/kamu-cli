@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use kamu::{
     domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult},
     testing::{DatasetTestHelper, MetadataFactory},
@@ -16,14 +18,15 @@ use opendatafabric::{
 };
 
 use crate::harness::{
-    await_client_server_flow, copy_folder_recursively, ClientSideHarness, ServerSideHarness,
+    await_client_server_flow, commit_add_data_event, copy_folder_recursively, ClientSideHarness,
+    ServerSideHarness,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
+    server_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name("foo")
@@ -35,6 +38,11 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
         .unwrap();
 
     let server_dataset_layout = server_harness.dataset_layout("foo");
+
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+
+    let commit_result =
+        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
@@ -51,8 +59,8 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
         assert_eq!(
             PullResult::Updated {
                 old_head: None,
-                new_head: create_result.head,
-                num_blocks: 2
+                new_head: commit_result.new_head,
+                num_blocks: 3
             },
             pull_result
         );
@@ -79,6 +87,10 @@ pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(s
         .unwrap();
 
     let server_dataset_layout = server_harness.dataset_layout("foo");
+
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+
+    commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
@@ -134,9 +146,12 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
     )
     .unwrap();
 
-    // Extend server-side dataset with new node
-    let commit_result = server_repo
-        .get_dataset(&DatasetRef::from(DatasetName::try_from("foo").unwrap()))
+    // Extend server-side dataset with new nodes
+
+    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+
+    server_repo
+        .get_dataset(&dataset_ref)
         .await
         .unwrap()
         .commit_event(
@@ -149,6 +164,9 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
         )
         .await
         .unwrap();
+
+    let commit_result =
+        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -163,7 +181,7 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
             PullResult::Updated {
                 old_head: Some(create_result.head),
                 new_head: commit_result.new_head,
-                num_blocks: 1
+                num_blocks: 2
             },
             pull_result
         );
