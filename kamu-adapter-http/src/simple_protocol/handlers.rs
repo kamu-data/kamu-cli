@@ -18,7 +18,8 @@
 
 use crate::smart_protocol::ws_axum_server;
 use axum::extract::Extension;
-use kamu::domain::*;
+use bytes::Bytes;
+use kamu::{domain::*, infra::WorkspaceLayout};
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
@@ -42,6 +43,11 @@ pub struct BlockHashFromPath {
 #[derive(serde::Deserialize)]
 pub struct PhysicalHashFromPath {
     physical_hash: Multihash,
+}
+
+#[derive(serde::Deserialize)]
+pub struct StagingNameFromQuery {
+    staging_name: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -129,16 +135,6 @@ pub async fn dataset_data_get_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_data_put_handler(
-    _dataset_ref: Extension<DatasetRefLocal>,
-    _catalog: Extension<dill::Catalog>,
-    axum::extract::Path(_hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> Result<axum::response::Response, axum::http::StatusCode> {
-    unimplemented!("dataset_data_put_handler")
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
 pub async fn dataset_checkpoints_get_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
@@ -164,12 +160,65 @@ pub async fn dataset_checkpoints_get_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+pub async fn dataset_data_put_handler(
+    catalog: Extension<dill::Catalog>,
+    axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
+    axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
+    body: Bytes,
+) -> Result<(), axum::http::StatusCode> {
+    dataset_put_object_common(
+        catalog,
+        hash_param.physical_hash,
+        staging_name_param.staging_name.as_str(),
+        "data",
+        body,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
 pub async fn dataset_checkpoints_put_handler(
-    _dataset_ref: Extension<DatasetRefLocal>,
-    _catalog: Extension<dill::Catalog>,
-    axum::extract::Path(_hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> Result<axum::response::Response, axum::http::StatusCode> {
-    unimplemented!("dataset_checkpoints_put_handler")
+    catalog: Extension<dill::Catalog>,
+    axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
+    axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
+    body: Bytes,
+) -> Result<(), axum::http::StatusCode> {
+    dataset_put_object_common(
+        catalog,
+        hash_param.physical_hash,
+        staging_name_param.staging_name.as_str(),
+        "checkpoints",
+        body,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn dataset_put_object_common(
+    catalog: Extension<dill::Catalog>,
+    physical_hash: Multihash,
+    staging_name: &str,
+    internal_folder_name: &str,
+    body: Bytes,
+) -> Result<(), axum::http::StatusCode> {
+    let workspace_layout = catalog
+        .get_one::<WorkspaceLayout>()
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let data_folder_suffix = format!(
+        "{}/{}/{}",
+        staging_name, internal_folder_name, physical_hash
+    );
+
+    let upload_path = workspace_layout.datasets_dir.join(data_folder_suffix);
+
+    tokio::fs::write(&upload_path, body)
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -223,15 +272,21 @@ fn get_base_dataset_url(
     uri: axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
-    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
-    let url = Url::parse(&format!("{}://{}", scheme, host.0)).unwrap();
+    let api_server_url = get_api_server_url(host);
 
     let mut path: Vec<_> = uri.0.path().split('/').collect();
     for _ in 0..depth {
         path.pop();
     }
     let path_string = format!("{}/", path.join("/"));
-    url.join(path_string.as_str()).unwrap()
+    api_server_url.join(path_string.as_str()).unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+fn get_api_server_url(host: axum::extract::Host) -> Url {
+    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+    Url::parse(&format!("{}://{}", scheme, host.0)).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

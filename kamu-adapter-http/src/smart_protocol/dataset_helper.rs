@@ -477,8 +477,9 @@ fn get_simple_transfer_protocol_url(
 
 pub async fn prepare_push_object_transfer_strategy(
     dataset: &dyn Dataset,
-    object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
+    dataset_staging_name: &str,
+    object_file_ref: &ObjectFileReference,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {
         ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
@@ -507,10 +508,17 @@ pub async fn prepare_push_object_transfer_strategy(
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
-                GetTransferUrlError::NotSupported => Ok(TransferUrl {
-                    url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
-                    expires_at: None,
-                }),
+                GetTransferUrlError::NotSupported => {
+                    let mut simple_transfer_protocl_url =
+                        get_simple_transfer_protocol_url(object_file_ref, dataset_url);
+                    let staging_name_query_part = format!("staging_name={}", dataset_staging_name);
+                    simple_transfer_protocl_url.set_query(Some(staging_name_query_part.as_str()));
+
+                    Ok(TransferUrl {
+                        url: simple_transfer_protocl_url,
+                        expires_at: None,
+                    })
+                }
                 GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
                 GetTransferUrlError::Internal(e) => Err(e),
             },

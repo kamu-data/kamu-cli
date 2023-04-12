@@ -373,6 +373,7 @@ async fn try_handle_push_objects_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     dataset_url: &Url,
+    dataset_staging_name: &str,
 ) -> Result<bool, PushServerError> {
     let request = read_payload::<DatasetPushObjectsTransferRequest>(socket)
         .await
@@ -387,9 +388,10 @@ async fn try_handle_push_objects_request(
 
     let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
     for r in request.object_files {
-        let transfer_strategy = prepare_push_object_transfer_strategy(dataset, &r, &dataset_url)
-            .await
-            .map_err(|e| PushServerError::Internal(e))?;
+        let transfer_strategy =
+            prepare_push_object_transfer_strategy(dataset, &dataset_url, dataset_staging_name, &r)
+                .await
+                .map_err(|e| PushServerError::Internal(e))?;
 
         object_transfer_strategies.push(transfer_strategy);
     }
@@ -468,7 +470,14 @@ pub async fn dataset_push_ws_handler(
     dataset_builder: Box<dyn DatasetBuilder>,
     dataset_url: Url,
 ) {
-    match dataset_push_ws_main_flow(&mut socket, dataset_builder.as_ref(), dataset_url).await {
+    match dataset_push_ws_main_flow(
+        &mut socket,
+        dataset_builder.as_ref(),
+        dataset_url,
+        dataset_builder.get_staging_name(),
+    )
+    .await
+    {
         Ok(_) => {
             tracing::debug!("Push process success");
         }
@@ -484,6 +493,7 @@ pub async fn dataset_push_ws_main_flow(
     socket: &mut axum::extract::ws::WebSocket,
     dataset_builder: &dyn DatasetBuilder,
     dataset_url: Url,
+    dataset_staging_name: &str,
 ) -> Result<(), PushServerError> {
     let dataset = dataset_builder.as_dataset();
     let push_request = handle_push_request_initiation(socket, dataset).await?;
@@ -492,7 +502,8 @@ pub async fn dataset_push_ws_main_flow(
 
     loop {
         let should_continue =
-            try_handle_push_objects_request(socket, dataset, &dataset_url).await?;
+            try_handle_push_objects_request(socket, dataset, &dataset_url, dataset_staging_name)
+                .await?;
 
         if !should_continue {
             break;

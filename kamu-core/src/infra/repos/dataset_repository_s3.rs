@@ -327,6 +327,10 @@ impl DatasetBuilder for DatasetBuilderS3 {
         self.dataset.as_ref()
     }
 
+    fn get_staging_name(&self) -> &str {
+        self.staging_name.as_str()
+    }
+
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
         match self
             .dataset

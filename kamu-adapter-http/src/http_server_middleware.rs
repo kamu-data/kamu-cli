@@ -81,7 +81,7 @@ impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
         }
 
         let method = request.method().as_str();
-        method == "PUT" && (path.starts_with("/data/") || path.starts_with("/checkpoint/"))
+        method == "PUT" && (path.starts_with("/data/") || path.starts_with("/checkpoints/"))
     }
 }
 

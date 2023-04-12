@@ -405,6 +405,10 @@ where
         &self.dataset
     }
 
+    fn get_staging_name(&self) -> &str {
+        self.staging_path.file_name().unwrap().to_str().unwrap()
+    }
+
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
         match self
             .dataset

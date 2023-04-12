@@ -82,6 +82,7 @@ pub type DatasetHandleStream<'a> =
 #[async_trait]
 pub trait DatasetBuilder: Send + Sync {
     fn as_dataset(&self) -> &dyn Dataset;
+    fn get_staging_name(&self) -> &str;
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError>;
     async fn discard(&self) -> Result<(), InternalError>;
 }
@@ -626,6 +627,10 @@ impl NullDatasetBuilder {
 impl DatasetBuilder for NullDatasetBuilder {
     fn as_dataset(&self) -> &dyn Dataset {
         self.dataset.as_ref()
+    }
+
+    fn get_staging_name(&self) -> &str {
+        "<staging_name>"
     }
 
     async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
