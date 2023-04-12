@@ -35,7 +35,7 @@ async fn test_smart_pull_local_fs_existing_evolved_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_log::test(tokio::test)] 
+#[test_log::test(tokio::test)]
 async fn test_smart_pull_local_fs_existing_advanced_dataset_fails() {
     let server_harness = ServerSideLocalFsHarness::new().await;
     test_smart_pull_shared::test_smart_pull_existing_advanced_dataset_fails(server_harness).await;
