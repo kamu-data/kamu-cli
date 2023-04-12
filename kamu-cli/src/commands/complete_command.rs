@@ -77,8 +77,8 @@ impl CompleteCommand {
         if let Some(repo) = self.local_repo.as_ref() {
             let mut datasets = repo.get_all_datasets();
             while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
-                if dataset_handle.name.starts_with(prefix) {
-                    writeln!(output, "{}", dataset_handle.name).unwrap();
+                if dataset_handle.alias.dataset_name.starts_with(prefix) {
+                    writeln!(output, "{}", dataset_handle.alias).unwrap();
                 }
             }
         }

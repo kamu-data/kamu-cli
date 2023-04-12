@@ -19,11 +19,11 @@ use std::sync::Arc;
 
 pub struct SystemIpfsAddCommand {
     sync_svc: Arc<dyn SyncService>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
 }
 
 impl SystemIpfsAddCommand {
-    pub fn new(sync_svc: Arc<dyn SyncService>, dataset_ref: DatasetRefLocal) -> Self {
+    pub fn new(sync_svc: Arc<dyn SyncService>, dataset_ref: DatasetRef) -> Self {
         Self {
             sync_svc,
             dataset_ref,

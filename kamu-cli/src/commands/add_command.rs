@@ -177,7 +177,7 @@ impl Command for AddCommand {
                     console::style("You are about to replace following dataset(s)").yellow(),
                     already_exist
                         .iter()
-                        .map(|h| h.name.as_str())
+                        .map(|h| h.alias.to_string())
                         .collect::<Vec<_>>()
                         .join(", "),
                     console::style("This operation is irreversible!").yellow(),

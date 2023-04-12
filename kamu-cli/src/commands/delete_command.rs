@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 pub struct DeleteCommand {
     local_repo: Arc<dyn DatasetRepository>,
-    dataset_refs: Vec<DatasetRefLocal>,
+    dataset_refs: Vec<DatasetRef>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
@@ -31,7 +31,7 @@ impl DeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefLocal>,
+        I: IntoIterator<Item = DatasetRef>,
     {
         Self {
             local_repo,

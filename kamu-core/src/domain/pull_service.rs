@@ -41,7 +41,7 @@ pub trait PullService: Send + Sync {
 
     async fn set_watermark(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError>;
 }
@@ -50,7 +50,7 @@ pub trait PullService: Send + Sync {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PullRequest {
-    pub local_ref: Option<DatasetRefLocal>,
+    pub local_ref: Option<DatasetRef>,
     pub remote_ref: Option<DatasetRefRemote>,
     /// Allows to override the fetch source on root datasets (e.g. to pull data from a specific file)
     pub ingest_from: Option<FetchStep>,
@@ -61,7 +61,7 @@ pub struct PullResponse {
     /// Parameters passed into the call. Empty for datasets that were pulled as recursive dependencies.
     pub original_request: Option<PullRequest>,
     /// Local dataset handle, if resolved
-    pub local_ref: Option<DatasetRefLocal>,
+    pub local_ref: Option<DatasetRef>,
     /// Destination reference, if resolved
     pub remote_ref: Option<DatasetRefRemote>,
     /// Result of the push operation

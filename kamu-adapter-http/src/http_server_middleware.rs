@@ -11,7 +11,7 @@ use axum::extract::FromRequestParts;
 use axum::RequestExt;
 use axum::{body::Body, http::Request, http::StatusCode, response::Response};
 use kamu::domain::{DatasetRepository, GetDatasetError};
-use opendatafabric::DatasetRefLocal;
+use opendatafabric::DatasetRef;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::{
@@ -42,7 +42,7 @@ where
 
 impl<IdExt, Extractor> DatasetResolverLayer<IdExt, Extractor>
 where
-    IdExt: Fn(Extractor) -> DatasetRefLocal,
+    IdExt: Fn(Extractor) -> DatasetRef,
 {
     pub fn new(identity_extractor: IdExt) -> Self {
         Self {
@@ -96,7 +96,7 @@ impl<Svc, IdExt, Extractor> Service<Request<Body>>
     for DatasetResolverMiddleware<Svc, IdExt, Extractor>
 where
     IdExt: Send + Clone + 'static,
-    IdExt: Fn(Extractor) -> DatasetRefLocal,
+    IdExt: Fn(Extractor) -> DatasetRef,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
     Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,

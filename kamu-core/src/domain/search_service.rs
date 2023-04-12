@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::domain::*;
-use opendatafabric::{RemoteDatasetName, RepositoryName};
+use opendatafabric::{DatasetAliasRemote, RepoName};
 
 use thiserror::Error;
 
@@ -27,13 +27,12 @@ pub trait SearchService: Send + Sync {
 
 #[derive(Debug, Clone, Default)]
 pub struct SearchOptions {
-    pub repository_names: Vec<RepositoryName>,
+    pub repository_names: Vec<RepoName>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchResult {
-    // TODO: REMORE ID: Should be RemoteDatasetHandle
-    pub datasets: Vec<RemoteDatasetName>,
+    pub datasets: Vec<DatasetAliasRemote>,
 }
 
 impl SearchResult {

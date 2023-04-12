@@ -22,14 +22,14 @@ use thiserror::Error;
 pub trait IngestService: Send + Sync {
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
     async fn ingest_from(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         fetch: FetchStep,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
@@ -37,22 +37,22 @@ pub trait IngestService: Send + Sync {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)>;
+    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
 
     async fn ingest_multi_ext(
         &self,
         requests: &mut dyn Iterator<Item = IngestRequest>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)>;
+    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
 }
 
 #[derive(Clone, Debug)]
 pub struct IngestRequest {
-    pub dataset_ref: DatasetRefLocal,
+    pub dataset_ref: DatasetRef,
     pub fetch_override: Option<FetchStep>,
 }
 

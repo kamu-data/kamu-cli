@@ -42,7 +42,7 @@ async fn test_smart_push_new_dataset() {
         .await
         .unwrap();
 
-    let local_dataset_ref = DatasetRefLocal::from_str("foo").unwrap();
+    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -98,7 +98,7 @@ async fn test_smart_push_existing_up_to_date_dataset() {
     )
     .unwrap();
 
-    let local_dataset_ref = DatasetRefLocal::from_str("foo").unwrap();
+    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -148,7 +148,7 @@ async fn test_smart_push_existing_evolved_dataset() {
     .unwrap();
 
     // Extend client-side dataset with new node
-    let local_dataset_ref = DatasetRefLocal::from_str("foo").unwrap();
+    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
     let commit_result = client_repo
         .get_dataset(&local_dataset_ref)
         .await
@@ -219,7 +219,7 @@ async fn test_smart_push_existing_dataset_fails_as_server_advanced() {
     )
     .unwrap();
 
-    let local_dataset_ref = DatasetRefLocal::from_str("foo").unwrap();
+    let local_dataset_ref = DatasetRef::from_str("foo").unwrap();
 
     // Extend server-side dataset with new node
     server_repo

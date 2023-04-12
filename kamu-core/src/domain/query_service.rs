@@ -12,7 +12,7 @@ use crate::domain::*;
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
-use opendatafabric::DatasetRefLocal;
+use opendatafabric::DatasetRef;
 use thiserror::Error;
 
 #[async_trait::async_trait]
@@ -21,7 +21,7 @@ pub trait QueryService: Send + Sync {
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`
     async fn tail(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         num_records: u64,
     ) -> Result<DataFrame, QueryError>;
 
@@ -32,7 +32,7 @@ pub trait QueryService: Send + Sync {
     ) -> Result<DataFrame, QueryError>;
 
     /// Returns the schema of the given dataset, if it is already defined by this moment, None otherwise
-    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Option<Type>, QueryError>;
+    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ pub struct QueryOptions {
 
 #[derive(Debug, Clone)]
 pub struct DatasetQueryOptions {
-    pub dataset_ref: DatasetRefLocal,
+    pub dataset_ref: DatasetRef,
     /// Number of records that output requires (starting from latest entries)
     /// Setting this value allows to limit the number of part files examined.
     pub limit: Option<u64>,
@@ -87,7 +87,7 @@ pub enum QueryError {
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset schema is not yet available: {dataset_ref}")]
 pub struct DatasetSchemaNotAvailableError {
-    pub dataset_ref: DatasetRefLocal,
+    pub dataset_ref: DatasetRef,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

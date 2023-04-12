@@ -25,9 +25,9 @@ use super::test_pull_service_impl::TestTransformService;
 async fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let dataset_name = DatasetName::new_unchecked("bar");
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
+    let dataset_layout = workspace_layout.dataset_layout(&dataset_alias);
 
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
 
@@ -51,7 +51,7 @@ async fn test_verify_data_consistency() {
     let create_result = local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
-                .name(&dataset_name)
+                .name(&dataset_alias.dataset_name)
                 .kind(DatasetKind::Derivative)
                 .push_event(MetadataFactory::set_transform(["foo"]).build())
                 .build(),
@@ -62,7 +62,7 @@ async fn test_verify_data_consistency() {
     assert_matches!(
         verification_svc
             .verify(
-                &dataset_name.as_local_ref(),
+                &dataset_alias.as_local_ref(),
                 (None, None),
                 VerificationOptions {
                     check_integrity: true,
@@ -92,7 +92,7 @@ async fn test_verify_data_consistency() {
 
     // "Commit" data
     let dataset = local_repo
-        .get_dataset(&dataset_name.as_local_ref())
+        .get_dataset(&dataset_alias.as_local_ref())
         .await
         .unwrap();
 
@@ -127,7 +127,7 @@ async fn test_verify_data_consistency() {
     assert_matches!(
         verification_svc
             .verify(
-                &dataset_name.as_local_ref(),
+                &dataset_alias.as_local_ref(),
                 (None, None),
                 VerificationOptions {
                     check_integrity: true,
@@ -154,7 +154,7 @@ async fn test_verify_data_consistency() {
 
     assert_matches!(
         verification_svc.verify(
-            &dataset_name.as_local_ref(),
+            &dataset_alias.as_local_ref(),
             (None, None),
             VerificationOptions {check_integrity: true, replay_transformations: false},
             None,

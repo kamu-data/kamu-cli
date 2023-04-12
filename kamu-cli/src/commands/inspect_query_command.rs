@@ -20,14 +20,14 @@ use std::{io::Write, sync::Arc};
 
 pub struct InspectQueryCommand {
     local_repo: Arc<dyn DatasetRepository>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
@@ -143,7 +143,7 @@ impl InspectQueryCommand {
                         let alias = query
                             .alias
                             .clone()
-                            .unwrap_or_else(|| dataset_handle.name.to_string());
+                            .unwrap_or_else(|| dataset_handle.alias.to_string());
                         writeln!(output, "{} {}", style("Query:").dim(), style(alias).bold(),)?;
                         for line in query.query.trim_end().split('\n') {
                             writeln!(output, "  {}", line)?;
@@ -156,7 +156,7 @@ impl InspectQueryCommand {
                         output,
                         "{} {}",
                         style("Query:").dim(),
-                        style(&dataset_handle.name).bold(),
+                        style(&dataset_handle.alias).bold(),
                     )?;
                     for line in query.trim_end().split('\n') {
                         writeln!(output, "  {}", line)?;
@@ -182,7 +182,7 @@ impl Command for InspectQueryCommand {
             pager
                 .set_exit_strategy(minus::ExitStrategy::PagerQuit)
                 .unwrap();
-            pager.set_prompt(&dataset_handle.name).unwrap();
+            pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
             self.render(&mut WritePager(&mut pager), &dataset_handle)
                 .await?;

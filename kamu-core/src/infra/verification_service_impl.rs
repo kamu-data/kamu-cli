@@ -67,7 +67,7 @@ impl VerificationServiceImpl {
             .try_collect()
             .await?;
 
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
         let num_blocks = plan.len();
 
         listener.begin_phase(VerificationPhase::DataIntegrity);
@@ -251,7 +251,7 @@ impl VerificationServiceImpl {
 impl VerificationService for VerificationServiceImpl {
     async fn verify(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,

@@ -16,7 +16,7 @@ use std::sync::Arc;
 pub struct ResetCommand {
     local_repo: Arc<dyn DatasetRepository>,
     reset_svc: Arc<dyn ResetService>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     block_hash: Multihash,
     no_confirmation: bool,
 }
@@ -25,7 +25,7 @@ impl ResetCommand {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
         reset_svc: Arc<dyn ResetService>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         block_hash: Multihash,
         no_confirmation: bool,
     ) -> Self {

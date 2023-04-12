@@ -55,7 +55,7 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         num_records: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
@@ -118,7 +118,7 @@ impl QueryService for QueryServiceImpl {
         let query = format!(
             r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
             fields = fields.join(", "),
-            dataset = dataset_handle.name,
+            dataset = dataset_handle.alias,
             offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
             num_records = num_records
         );
@@ -161,7 +161,7 @@ impl QueryService for QueryServiceImpl {
         Ok(ctx.sql(statement).await?)
     }
 
-    async fn get_schema(&self, dataset_ref: &DatasetRefLocal) -> Result<Option<Type>, QueryError> {
+    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
             .local_repo
@@ -169,7 +169,7 @@ impl QueryService for QueryServiceImpl {
             .await?;
 
         // TODO: This service shouldn't know the specifics of dataset layouts
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         let last_data_file_opt = dataset
             .as_metadata_chain()
@@ -274,7 +274,7 @@ impl KamuSchema {
         dataset_handle: &DatasetHandle,
         limit: Option<u64>,
     ) -> Result<Vec<PathBuf>, InternalError> {
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         if let Ok(dataset) = self
             .local_repo
@@ -307,9 +307,9 @@ impl KamuSchema {
     fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
         for opt in &self.options.datasets {
             let same = match &opt.dataset_ref {
-                DatasetRefLocal::ID(id) => *id == dataset_handle.id,
-                DatasetRefLocal::Name(name) => *name == dataset_handle.name,
-                DatasetRefLocal::Handle(h) => h.id == dataset_handle.id,
+                DatasetRef::ID(id) => *id == dataset_handle.id,
+                DatasetRef::Alias(alias) => *alias == dataset_handle.alias,
+                DatasetRef::Handle(h) => h.id == dataset_handle.id,
             };
             if same {
                 return Some(opt);
@@ -325,7 +325,7 @@ impl KamuSchema {
 
             while let Some(hdl) = dataset_handles.try_next().await.unwrap() {
                 if self.has_data(&hdl).await.unwrap() {
-                    res.push(hdl.name.to_string())
+                    res.push(hdl.alias.to_string())
                 }
             }
 

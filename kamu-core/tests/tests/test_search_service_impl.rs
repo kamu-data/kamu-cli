@@ -20,9 +20,9 @@ use url::Url;
 
 // Create repo/bar dataset in a repo and check it appears in searches
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
-    let dataset_local_name = DatasetName::new_unchecked("foo");
-    let repo_name = RepositoryName::new_unchecked("repo");
-    let dataset_remote_name = RemoteDatasetName::try_from("repo/bar").unwrap();
+    let dataset_local_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let repo_name = RepoName::new_unchecked("repo");
+    let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
@@ -46,7 +46,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
-                .name(&dataset_local_name)
+                .name(&dataset_local_alias.dataset_name)
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .build(),
@@ -56,8 +56,8 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     sync_svc
         .sync(
-            &dataset_local_name.as_any_ref(),
-            &dataset_remote_name.as_any_ref(),
+            &dataset_local_alias.as_any_ref(),
+            &dataset_remote_alias.as_any_ref(),
             SyncOptions::default(),
             None,
         )
@@ -67,11 +67,11 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     // Search!
     assert_matches!(
         search_svc.search(None, SearchOptions::default()).await,
-        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
+        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_alias.clone()]
     );
     assert_matches!(
         search_svc.search(Some("bar"), SearchOptions::default()).await,
-        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_name.clone()]
+        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_alias.clone()]
     );
     assert_matches!(
         search_svc.search(Some("foo"), SearchOptions::default()).await,
@@ -79,7 +79,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_search_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
     let tmp_repo_dir = tempfile::tempdir().unwrap();
@@ -88,7 +88,7 @@ async fn test_search_local_fs() {
     do_test_search(tmp_workspace_dir.path(), repo_url).await;
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_search_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";

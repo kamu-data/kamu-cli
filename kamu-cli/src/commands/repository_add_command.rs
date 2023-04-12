@@ -9,21 +9,21 @@
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use opendatafabric::RepositoryName;
+use opendatafabric::RepoName;
 
 use std::sync::Arc;
 use url::Url;
 
 pub struct RepositoryAddCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    name: RepositoryName,
+    name: RepoName,
     url: String,
 }
 
 impl RepositoryAddCommand {
     pub fn new<S>(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        name: RepositoryName,
+        name: RepoName,
         url: S,
     ) -> Self
     where

@@ -23,7 +23,7 @@ use thiserror::Error;
 pub trait VerificationService: Send + Sync {
     async fn verify(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationListener>>,
@@ -43,7 +43,7 @@ pub trait VerificationService: Send + Sync {
 
 #[derive(Debug)]
 pub struct VerificationRequest {
-    pub dataset_ref: DatasetRefLocal,
+    pub dataset_ref: DatasetRef,
     pub block_range: (Option<Multihash>, Option<Multihash>),
 }
 

@@ -58,12 +58,20 @@ impl PushCommand {
         }
     }
 
-    async fn do_push(&self, listener: Option<Arc<dyn SyncMultiListener>>) -> Vec<PushResponse> {
+    async fn do_push(
+        &self,
+        listener: Option<Arc<dyn SyncMultiListener>>,
+    ) -> Result<Vec<PushResponse>, CLIError> {
         if let Some(remote_ref) = &self.to {
-            self.push_svc
+            let local_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
+                CLIError::usage_error("When using --to reference should point to a local dataset")
+            })?;
+
+            Ok(self
+                .push_svc
                 .push_multi_ext(
                     &mut vec![PushRequest {
-                        local_ref: self.refs[0].as_local_ref(),
+                        local_ref: Some(local_ref),
                         remote_ref: Some(remote_ref.clone()),
                     }]
                     .into_iter(),
@@ -75,9 +83,10 @@ impl PushCommand {
                     },
                     listener,
                 )
-                .await
+                .await)
         } else {
-            self.push_svc
+            Ok(self
+                .push_svc
                 .push_multi(
                     &mut self.refs.iter().cloned(),
                     PushOptions {
@@ -88,7 +97,7 @@ impl PushCommand {
                     },
                     listener,
                 )
-                .await
+                .await)
         }
     }
 
@@ -99,7 +108,7 @@ impl PushCommand {
         }
     }
 
-    async fn push_with_progress(&self) -> Vec<PushResponse> {
+    async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
         let progress = PrettyPushProgress::new();
         let listener = Arc::new(progress.clone());
 
@@ -136,7 +145,7 @@ impl Command for PushCommand {
             self.push_with_progress().await
         } else {
             self.do_push(None).await
-        };
+        }?;
 
         let mut updated = 0;
         let mut up_to_date = 0;
@@ -225,8 +234,8 @@ impl SyncMultiListener for PrettyPushProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            src.as_local_ref().unwrap(),
-            dst.as_remote_ref().unwrap(),
+            src.as_local_ref(|_| true).expect("Expected local ref"),
+            dst.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))
     }
@@ -235,7 +244,7 @@ impl SyncMultiListener for PrettyPushProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_ref: DatasetRefLocal,
+    local_ref: DatasetRef,
     remote_ref: DatasetRefRemote,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PrettySyncProgressState>,
@@ -248,7 +257,7 @@ struct PrettySyncProgressState {
 
 impl PrettySyncProgress {
     fn new(
-        local_ref: DatasetRefLocal,
+        local_ref: DatasetRef,
         remote_ref: DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
@@ -264,7 +273,7 @@ impl PrettySyncProgress {
     }
 
     fn new_spinner(
-        local_ref: &DatasetRefLocal,
+        local_ref: &DatasetRef,
         remote_ref: &DatasetRefRemote,
     ) -> indicatif::ProgressBar {
         let spinner = indicatif::ProgressBar::hidden();

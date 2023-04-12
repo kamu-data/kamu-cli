@@ -16,7 +16,7 @@ use std::sync::Arc;
 pub struct AliasAddCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    dataset: DatasetRefLocal,
+    dataset: DatasetRef,
     alias: DatasetRefRemote,
     pull: bool,
     push: bool,
@@ -26,7 +26,7 @@ impl AliasAddCommand {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        dataset: DatasetRefLocal,
+        dataset: DatasetRef,
         alias: DatasetRefRemote,
         pull: bool,
         push: bool,
@@ -51,9 +51,9 @@ impl Command for AliasAddCommand {
             ));
         }
 
-        if let DatasetRefRemote::RemoteName(name) = &self.alias {
+        if let DatasetRefRemote::Alias(alias) = &self.alias {
             self.remote_repo_reg
-                .get_repository(name.repository())
+                .get_repository(&alias.repo_name)
                 .map_err(CLIError::failure)?;
         }
 

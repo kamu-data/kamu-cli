@@ -25,7 +25,7 @@ pub struct LineageCommand {
     local_repo: Arc<dyn DatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
-    dataset_refs: Vec<DatasetRefLocal>,
+    dataset_refs: Vec<DatasetRef>,
     browse: bool,
     output_format: Option<String>,
     output_config: Arc<OutputConfig>,
@@ -42,7 +42,7 @@ impl LineageCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefLocal>,
+        I: IntoIterator<Item = DatasetRef>,
     {
         Self {
             local_repo,
@@ -98,7 +98,7 @@ impl Command for LineageCommand {
                 .map_err(|e| CLIError::failure(e))?
         };
 
-        dataset_handles.sort_by(|a, b| a.name.cmp(&b.name));
+        dataset_handles.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         let mut visitor = self.get_visitor();
         visitor.begin();

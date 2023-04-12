@@ -36,7 +36,7 @@ pub trait SyncService: Send + Sync {
 
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
-    async fn ipfs_add(&self, src: &DatasetRefLocal) -> Result<String, SyncError>;
+    async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError>;
 }
 
 #[derive(Debug, Clone)]

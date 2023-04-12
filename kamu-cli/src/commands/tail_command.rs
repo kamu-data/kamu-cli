@@ -17,7 +17,7 @@ use opendatafabric::*;
 
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     num_records: u64,
     output_cfg: Arc<OutputConfig>,
 }
@@ -25,7 +25,7 @@ pub struct TailCommand {
 impl TailCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         num_records: u64,
         output_cfg: Arc<OutputConfig>,
     ) -> Self {

@@ -17,28 +17,49 @@ use url::Url;
 fn test_dataset_refs() {
     assert_eq!(
         DatasetRefAny::from_str("dataset").unwrap(),
-        DatasetRefAny::Name(DatasetName::new_unchecked("dataset"))
+        DatasetRefAny::Alias(None, None, DatasetName::new_unchecked("dataset"))
     );
     assert_eq!(
-        DatasetRefAny::from_str("repo/dataset").unwrap(),
-        DatasetRefAny::RemoteName(RemoteDatasetName::new(
-            RepositoryName::new_unchecked("repo"),
+        DatasetRefAny::from_str("repo/dataset")
+            .unwrap()
+            .into_remote_ref(|_| true),
+        Ok(DatasetRefRemote::Alias(DatasetAliasRemote::new(
+            RepoName::new_unchecked("repo"),
             None,
             DatasetName::new_unchecked("dataset")
-        ))
+        )))
     );
     assert_eq!(
-        DatasetRefAny::from_str("repo/account/dataset").unwrap(),
-        DatasetRefAny::RemoteName(RemoteDatasetName::new(
-            RepositoryName::new_unchecked("repo"),
+        DatasetRefAny::from_str("acc/dataset")
+            .unwrap()
+            .into_local_ref(|_| false),
+        Ok(DatasetRef::Alias(DatasetAlias::new(
+            Some(AccountName::new_unchecked("acc")),
+            DatasetName::new_unchecked("dataset")
+        )))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("repo/account/dataset")
+            .unwrap()
+            .into_remote_ref(|_| true),
+        Ok(DatasetRefRemote::Alias(DatasetAliasRemote::new(
+            RepoName::new_unchecked("repo"),
             Some(AccountName::new_unchecked("account")),
             DatasetName::new_unchecked("dataset")
-        ))
+        )))
     );
     assert_eq!(
         DatasetRefAny::from_str("did:odf:z4k88e8eonGq3xrTzEVyvb4s7Fy3orT7npgW4w3juneJLohqCRs")
             .unwrap(),
-        DatasetRefAny::ID(DatasetID::from_pub_key_ed25519(b"key"))
+        DatasetRefAny::ID(None, DatasetID::from_pub_key_ed25519(b"key"))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("repo/did:odf:z4k88e8eonGq3xrTzEVyvb4s7Fy3orT7npgW4w3juneJLohqCRs")
+            .unwrap(),
+        DatasetRefAny::ID(
+            Some(RepoName::new_unchecked("repo")),
+            DatasetID::from_pub_key_ed25519(b"key")
+        )
     );
     assert_eq!(
         DatasetRefAny::from_str("https://opendata.ca/odf/census-2016-population/").unwrap(),
@@ -103,79 +124,76 @@ fn test_dataset_name_validation() {
 }
 
 #[test]
-fn test_remote_dataset_name_validation() {
+fn test_remote_alias_validation() {
     assert_matches!(
-        RemoteDatasetName::try_from("repo.name/local.id")
+        DatasetAliasRemote::try_from("repo.name/local.id")
             .unwrap()
             .to_string()
             .as_ref(),
         "repo.name/local.id"
     );
 
-    let dr = RemoteDatasetName::try_from("repo.name/local.id").unwrap();
-    assert_eq!(dr.dataset(), "local.id");
-    assert_eq!(dr.account(), None);
-    assert_eq!(dr.repository(), "repo.name");
+    let dr = DatasetAliasRemote::try_from("repo.name/local.id").unwrap();
+    assert_eq!(dr.dataset_name, "local.id");
+    assert_eq!(dr.account_name, None);
+    assert_eq!(dr.repo_name, "repo.name");
 
-    assert_matches!(RemoteDatasetName::try_from("repo.name/.invalid"), Err(_));
-    assert_matches!(RemoteDatasetName::try_from(".invalid/local.id"), Err(_));
+    assert_matches!(DatasetAliasRemote::try_from("repo.name/.invalid"), Err(_));
+    assert_matches!(DatasetAliasRemote::try_from(".invalid/local.id"), Err(_));
 
     assert_matches!(
-        RemoteDatasetName::try_from("repo.name/user-name/local.id")
+        DatasetAliasRemote::try_from("repo.name/user-name/local.id")
             .unwrap()
             .to_string()
             .as_ref(),
         "repo.name/user-name/local.id"
     );
 
-    let dr = RemoteDatasetName::try_from("repo.name/user-name/local.id").unwrap();
-    assert_eq!(dr.dataset(), "local.id");
-    assert_matches!(dr.account(), Some(id) if id == "user-name");
-    assert_eq!(dr.repository(), "repo.name");
+    let dr = DatasetAliasRemote::try_from("repo.name/user-name/local.id").unwrap();
+    assert_eq!(dr.dataset_name, "local.id");
+    assert_matches!(dr.account_name, Some(id) if id == "user-name");
+    assert_eq!(dr.repo_name, "repo.name");
 
     assert_matches!(
-        RemoteDatasetName::try_from("repo.name/user-name/.invalid"),
+        DatasetAliasRemote::try_from("repo.name/user-name/.invalid"),
         Err(_)
     );
     assert_matches!(
-        RemoteDatasetName::try_from("repo.name/user.name/local.id"),
+        DatasetAliasRemote::try_from("repo.name/.invalid/local.id"),
         Err(_)
     );
     assert_matches!(
-        RemoteDatasetName::try_from(".invalid/user-name/local.id"),
+        DatasetAliasRemote::try_from(".invalid/user-name/local.id"),
         Err(_)
     );
 }
 
 #[test]
-fn test_dataset_name_with_owner_validation() {
+fn test_local_alias_validation() {
     assert_matches!(
-        DatasetNameWithOwner::try_from("local.id")
+        DatasetAlias::try_from("local.id")
             .unwrap()
             .to_string()
             .as_ref(),
         "local.id"
     );
 
-    let dr = DatasetNameWithOwner::try_from("local.id").unwrap();
-    assert_eq!(dr.dataset(), "local.id");
-    assert_eq!(dr.account(), None);
+    let dr = DatasetAlias::try_from("local.id").unwrap();
+    assert_eq!(dr.dataset_name, "local.id");
+    assert_eq!(dr.account_name, None);
 
-    let dr = DatasetNameWithOwner::try_from("user-name/local.id").unwrap();
-    assert_eq!(dr.dataset(), "local.id");
-    assert_matches!(dr.account(), Some(id) if id == "user-name");
+    let dr = DatasetAlias::try_from("user-name/local.id").unwrap();
+    assert_eq!(dr.dataset_name, "local.id");
+    assert_matches!(dr.account_name, Some(id) if id == "user-name");
 
-    assert_matches!(
-        DatasetNameWithOwner::try_from("repo.name/user-name/blah"),
-        Err(_)
-    );
-    assert_matches!(DatasetNameWithOwner::try_from("user-name/.invalid"), Err(_));
-    assert_matches!(DatasetNameWithOwner::try_from("user.name/local.id"), Err(_));
+    assert_matches!(DatasetAlias::try_from("repo.name/user-name/blah"), Err(_));
+    assert_matches!(DatasetAlias::try_from("user-name/.invalid"), Err(_));
+    assert_matches!(DatasetAlias::try_from(".invalid/local.id"), Err(_));
 }
 
 #[test]
 fn test_dataset_refs_conversions() {
-    fn takes_ref_local<R: Into<DatasetRefLocal>>(_: R) {}
+    fn takes_ref_local<R: Into<DatasetRef>>(_: R) {}
     fn takes_ref_remote<R: Into<DatasetRefRemote>>(_: R) {}
     fn takes_ref_any<R: Into<DatasetRefAny>>(_: R) {}
 
@@ -185,30 +203,30 @@ fn test_dataset_refs_conversions() {
     takes_ref_local(&DatasetName::new_unchecked("baz"));
     takes_ref_local(DatasetHandle {
         id: DatasetID::from_pub_key_ed25519(b"key"),
-        name: DatasetName::new_unchecked("bar"),
+        alias: DatasetAlias::try_from("bar").unwrap(),
     });
     takes_ref_local(&DatasetHandle {
         id: DatasetID::from_pub_key_ed25519(b"key"),
-        name: DatasetName::new_unchecked("bar"),
+        alias: DatasetAlias::try_from("bar").unwrap(),
     });
 
     takes_ref_remote(DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_remote(&DatasetID::from_pub_key_ed25519(b"key"));
-    takes_ref_remote(RemoteDatasetName::try_from("foo/bar").unwrap());
-    takes_ref_remote(&RemoteDatasetName::try_from("foo/bar").unwrap());
+    takes_ref_remote(DatasetAliasRemote::try_from("foo/bar").unwrap());
+    takes_ref_remote(&DatasetAliasRemote::try_from("foo/bar").unwrap());
 
     takes_ref_any(DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_any(&DatasetID::from_pub_key_ed25519(b"key"));
     takes_ref_any(DatasetName::new_unchecked("bar"));
     takes_ref_any(&DatasetName::new_unchecked("baz"));
-    takes_ref_any(RemoteDatasetName::try_from("foo/bar").unwrap());
-    takes_ref_any(&RemoteDatasetName::try_from("foo/bar").unwrap());
+    takes_ref_any(DatasetAliasRemote::try_from("foo/bar").unwrap());
+    takes_ref_any(&DatasetAliasRemote::try_from("foo/bar").unwrap());
     takes_ref_any(DatasetHandle {
         id: DatasetID::from_pub_key_ed25519(b"key"),
-        name: DatasetName::new_unchecked("bar"),
+        alias: DatasetAlias::try_from("bar").unwrap(),
     });
     takes_ref_any(&DatasetHandle {
         id: DatasetID::from_pub_key_ed25519(b"key"),
-        name: DatasetName::new_unchecked("bar"),
+        alias: DatasetAlias::try_from("bar").unwrap(),
     });
 }

@@ -18,10 +18,7 @@ use url::Url;
 
 #[async_trait]
 pub trait DatasetRegistry: Send + Sync {
-    async fn get_dataset_url(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-    ) -> Result<Url, GetDatasetUrlError>;
+    async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

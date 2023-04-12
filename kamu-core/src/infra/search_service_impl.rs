@@ -31,7 +31,7 @@ impl SearchServiceImpl {
         &self,
         url: &Url,
         query: Option<&str>,
-    ) -> Result<Vec<DatasetNameWithOwner>, SearchError> {
+    ) -> Result<Vec<DatasetAlias>, SearchError> {
         let mut datasets = Vec::new();
 
         match url.scheme() {
@@ -44,9 +44,9 @@ impl SearchServiceImpl {
                 for entry in std::fs::read_dir(&path).int_err()? {
                     if let Some(file_name) = entry.int_err()?.file_name().to_str() {
                         if query.is_empty() || file_name.contains(query) {
-                            datasets.push(DatasetNameWithOwner::new(
+                            datasets.push(DatasetAlias::new(
                                 None,
-                                DatasetName::try_from(file_name).unwrap(),
+                                DatasetName::try_from(file_name).int_err()?,
                             ));
                         }
                     }
@@ -67,7 +67,7 @@ impl SearchServiceImpl {
                     let name = DatasetName::try_from(prefix).int_err()?;
 
                     if query.is_empty() || name.contains(query) {
-                        datasets.push(DatasetNameWithOwner::new(None, name));
+                        datasets.push(DatasetAlias::new(None, name));
                     }
                 }
             }
@@ -86,7 +86,7 @@ impl SearchServiceImpl {
     async fn search_in_repo(
         &self,
         query: Option<&str>,
-        repo_name: &RepositoryName,
+        repo_name: &RepoName,
     ) -> Result<SearchResult, SearchError> {
         let repo = self.remote_repo_reg.get_repository(&repo_name)?;
 
@@ -97,7 +97,7 @@ impl SearchServiceImpl {
         Ok(SearchResult {
             datasets: datasets
                 .into_iter()
-                .map(|name| name.as_remote_name(repo_name))
+                .map(|alias| alias.as_remote_alias(repo_name))
                 .collect(),
         })
     }

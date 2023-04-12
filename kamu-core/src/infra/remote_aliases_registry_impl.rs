@@ -38,8 +38,9 @@ impl RemoteAliasesRegistryImpl {
         }
     }
 
-    fn get_dataset_metadata_dir(&self, name: &DatasetName) -> PathBuf {
-        self.workspace_layout.datasets_dir.join(name)
+    fn get_dataset_metadata_dir(&self, alias: &DatasetAlias) -> PathBuf {
+        assert!(!alias.is_multitenant(), "Multitenancy is not supported");
+        self.workspace_layout.datasets_dir.join(&alias.dataset_name)
     }
 
     fn read_config(&self, path: &Path) -> Result<DatasetConfig, InternalError> {
@@ -62,8 +63,8 @@ impl RemoteAliasesRegistryImpl {
         Ok(())
     }
 
-    fn get_config(&self, dataset_name: &DatasetName) -> Result<DatasetConfig, InternalError> {
-        let path = self.get_dataset_metadata_dir(dataset_name).join("config");
+    fn get_config(&self, dataset_alias: &DatasetAlias) -> Result<DatasetConfig, InternalError> {
+        let path = self.get_dataset_metadata_dir(dataset_alias).join("config");
 
         if path.exists() {
             self.read_config(&path)
@@ -74,10 +75,10 @@ impl RemoteAliasesRegistryImpl {
 
     fn set_config(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
         config: DatasetConfig,
     ) -> Result<(), InternalError> {
-        let path = self.get_dataset_metadata_dir(dataset_name).join("config");
+        let path = self.get_dataset_metadata_dir(dataset_alias).join("config");
         self.write_config(&path, config)
     }
 }
@@ -88,10 +89,10 @@ impl RemoteAliasesRegistryImpl {
 impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
         let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
-        let config = self.get_config(&hdl.name)?;
+        let config = self.get_config(&hdl.alias)?;
         Ok(Box::new(RemoteAliasesImpl::new(self.clone(), hdl, config)))
     }
 }
@@ -167,7 +168,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         if !aliases.contains(&remote_ref) {
             aliases.push(remote_ref);
             self.alias_registry
-                .set_config(&self.dataset_handle.name, self.config.clone())?;
+                .set_config(&self.dataset_handle.alias, self.config.clone())?;
             Ok(true)
         } else {
             Ok(false)
@@ -187,7 +188,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         if let Some(i) = aliases.iter().position(|r| *r == *remote_ref) {
             aliases.remove(i);
             self.alias_registry
-                .set_config(&self.dataset_handle.name, self.config.clone())?;
+                .set_config(&self.dataset_handle.alias, self.config.clone())?;
             Ok(true)
         } else {
             Ok(false)
@@ -203,7 +204,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         if !aliases.is_empty() {
             aliases.clear();
             self.alias_registry
-                .set_config(&self.dataset_handle.name, self.config.clone())?;
+                .set_config(&self.dataset_handle.alias, self.config.clone())?;
         }
         Ok(len)
     }
@@ -219,7 +220,7 @@ pub struct RemoteAliasesRegistryNull;
 impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
         Err(DatasetNotFoundError {
             dataset_ref: dataset_ref.clone(),

@@ -22,7 +22,7 @@ use std::sync::Arc;
 
 async fn block_count(
     local_repo: &dyn DatasetRepository,
-    dataset_ref: impl Into<DatasetRefLocal>,
+    dataset_ref: impl Into<DatasetRef>,
 ) -> usize {
     let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
     let blocks: Vec<_> = ds
@@ -36,7 +36,7 @@ async fn block_count(
 
 async fn get_data_of_block(
     local_repo: &dyn DatasetRepository,
-    dataset_ref: impl Into<DatasetRefLocal>,
+    dataset_ref: impl Into<DatasetRef>,
     dataset_layout: &DatasetLayout,
     block_hash: &Multihash,
 ) -> ParquetReaderHelper {
@@ -122,7 +122,7 @@ async fn test_transform_with_engine_spark() {
         )
         .build();
 
-    let root_name = root_snapshot.name.clone();
+    let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
 
     local_repo
         .create_dataset_from_snapshot(root_snapshot)
@@ -130,7 +130,7 @@ async fn test_transform_with_engine_spark() {
         .unwrap();
 
     ingest_svc
-        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
         .await
         .unwrap();
 
@@ -142,7 +142,7 @@ async fn test_transform_with_engine_spark() {
         .name("deriv")
         .kind(DatasetKind::Derivative)
         .push_event(
-            MetadataFactory::set_transform([&root_name])
+            MetadataFactory::set_transform([&root_alias.dataset_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("spark")
@@ -155,7 +155,7 @@ async fn test_transform_with_engine_spark() {
         )
         .build();
 
-    let deriv_name = deriv_snapshot.name.clone();
+    let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
 
     local_repo
         .create_dataset_from_snapshot(deriv_snapshot)
@@ -163,7 +163,7 @@ async fn test_transform_with_engine_spark() {
         .unwrap();
 
     let block_hash = match transform_svc
-        .transform(&deriv_name.as_local_ref(), None)
+        .transform(&deriv_alias.as_local_ref(), None)
         .await
         .unwrap()
     {
@@ -171,13 +171,13 @@ async fn test_transform_with_engine_spark() {
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let dataset_layout = workspace_layout.dataset_layout(&deriv_name);
+    let dataset_layout = workspace_layout.dataset_layout(&deriv_alias);
     assert!(dataset_layout.data_dir.exists());
-    assert_eq!(block_count(local_repo.as_ref(), &deriv_name).await, 3);
+    assert_eq!(block_count(local_repo.as_ref(), &deriv_alias).await, 3);
 
     let parquet_reader = get_data_of_block(
         local_repo.as_ref(),
-        &deriv_name,
+        &deriv_alias,
         &dataset_layout,
         &block_hash,
     )
@@ -230,12 +230,12 @@ async fn test_transform_with_engine_spark() {
     .unwrap();
 
     ingest_svc
-        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
         .await
         .unwrap();
 
     let block_hash = match transform_svc
-        .transform(&deriv_name.as_local_ref(), None)
+        .transform(&deriv_alias.as_local_ref(), None)
         .await
         .unwrap()
     {
@@ -245,7 +245,7 @@ async fn test_transform_with_engine_spark() {
 
     let parquet_reader = get_data_of_block(
         local_repo.as_ref(),
-        &deriv_name,
+        &deriv_alias,
         &dataset_layout,
         &block_hash,
     )
@@ -272,7 +272,7 @@ async fn test_transform_with_engine_spark() {
 
     let verify_result = transform_svc
         .verify_transform(
-            &deriv_name.as_local_ref(),
+            &deriv_alias.as_local_ref(),
             (None, None),
             VerificationOptions::default(),
             None,
@@ -347,7 +347,7 @@ async fn test_transform_with_engine_flink() {
         )
         .build();
 
-    let root_name = root_snapshot.name.clone();
+    let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
 
     local_repo
         .create_dataset_from_snapshot(root_snapshot)
@@ -355,7 +355,7 @@ async fn test_transform_with_engine_flink() {
         .unwrap();
 
     ingest_svc
-        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
         .await
         .unwrap();
 
@@ -367,7 +367,7 @@ async fn test_transform_with_engine_flink() {
         .name("deriv")
         .kind(DatasetKind::Derivative)
         .push_event(
-            MetadataFactory::set_transform([&root_name])
+            MetadataFactory::set_transform([&root_alias.dataset_name])
                 .transform(
                     MetadataFactory::transform()
                         .engine("flink")
@@ -380,7 +380,7 @@ async fn test_transform_with_engine_flink() {
         )
         .build();
 
-    let deriv_name = deriv_snapshot.name.clone();
+    let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
 
     local_repo
         .create_dataset_from_snapshot(deriv_snapshot)
@@ -388,7 +388,7 @@ async fn test_transform_with_engine_flink() {
         .unwrap();
 
     let block_hash = match transform_svc
-        .transform(&deriv_name.as_local_ref(), None)
+        .transform(&deriv_alias.as_local_ref(), None)
         .await
         .unwrap()
     {
@@ -396,13 +396,13 @@ async fn test_transform_with_engine_flink() {
         v @ _ => panic!("Unexpected result: {:?}", v),
     };
 
-    let dataset_layout = workspace_layout.dataset_layout(&deriv_name);
+    let dataset_layout = workspace_layout.dataset_layout(&deriv_alias);
     assert!(dataset_layout.data_dir.exists());
-    assert_eq!(block_count(local_repo.as_ref(), &deriv_name).await, 3);
+    assert_eq!(block_count(local_repo.as_ref(), &deriv_alias).await, 3);
 
     let parquet_reader = get_data_of_block(
         local_repo.as_ref(),
-        &deriv_name,
+        &deriv_alias,
         &dataset_layout,
         &block_hash,
     )
@@ -455,12 +455,12 @@ async fn test_transform_with_engine_flink() {
     .unwrap();
 
     ingest_svc
-        .ingest(&root_name.as_local_ref(), IngestOptions::default(), None)
+        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
         .await
         .unwrap();
 
     let block_hash = match transform_svc
-        .transform(&deriv_name.as_local_ref(), None)
+        .transform(&deriv_alias.as_local_ref(), None)
         .await
         .unwrap()
     {
@@ -470,7 +470,7 @@ async fn test_transform_with_engine_flink() {
 
     let parquet_reader = get_data_of_block(
         local_repo.as_ref(),
-        &deriv_name,
+        &deriv_alias,
         &dataset_layout,
         &block_hash,
     )
@@ -497,7 +497,7 @@ async fn test_transform_with_engine_flink() {
 
     let verify_result = transform_svc
         .verify_transform(
-            &deriv_name.as_local_ref(),
+            &deriv_alias.as_local_ref(),
             (None, None),
             VerificationOptions::default(),
             None,

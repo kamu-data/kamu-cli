@@ -52,8 +52,11 @@ impl DatasetRepositoryLocalFs {
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
-    fn get_dataset_impl(&self, dataset_name: &DatasetName) -> Result<impl Dataset, InternalError> {
-        let layout = DatasetLayout::new(self.root.join(&dataset_name));
+    fn get_dataset_impl(
+        &self,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<impl Dataset, InternalError> {
+        let layout = DatasetLayout::new(self.root.join(&dataset_alias.dataset_name));
         Ok(DatasetFactoryImpl::get_local_fs(layout))
     }
 
@@ -103,7 +106,7 @@ impl DatasetRepositoryLocalFs {
         &self,
         dataset: &dyn Dataset,
         staging_path: &Path,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, CreateDatasetError> {
         let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
             Ok(s) => Ok(s),
@@ -112,21 +115,21 @@ impl DatasetRepositoryLocalFs {
             Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
         }?;
 
-        let handle = DatasetHandle::new(summary.id, dataset_name.clone());
+        let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
 
         // Check for late name collision
         if let Some(existing_dataset) = self
-            .try_resolve_dataset_ref(&dataset_name.as_local_ref())
+            .try_resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await?
         {
             return Err(NameCollisionError {
-                name: existing_dataset.name,
+                alias: existing_dataset.alias,
             }
             .into());
         }
 
         // Atomic move
-        let target_path = self.root.join(dataset_name);
+        let target_path = self.root.join(&dataset_alias.dataset_name);
         assert!(
             !target_path.exists(),
             "Target dir exists: {:?}",
@@ -153,12 +156,9 @@ impl DatasetRepositoryLocalFs {
 
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryLocalFs {
-    async fn get_dataset_url(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-    ) -> Result<Url, GetDatasetUrlError> {
+    async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        Ok(Url::from_directory_path(self.root.join(handle.name)).unwrap())
+        Ok(Url::from_directory_path(self.root.join(handle.alias.dataset_name)).unwrap())
     }
 }
 
@@ -175,27 +175,32 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     // Note that this lock does not prevent concurrent updates to summaries, only reduces the chances of it.
     async fn resolve_dataset_ref(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError> {
         match dataset_ref {
-            DatasetRefLocal::Handle(h) => Ok(h.clone()),
-            DatasetRefLocal::Name(name) => {
-                let path = self.root.join(&name);
+            DatasetRef::Handle(h) => Ok(h.clone()),
+            DatasetRef::Alias(alias) => {
+                assert!(
+                    !alias.is_multitenant(),
+                    "Multitenancy is not supported by LocalFs repository"
+                );
+
+                let path = self.root.join(&alias.dataset_name);
                 if !path.exists() {
                     return Err(GetDatasetError::NotFound(DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
                     }));
                 }
 
-                let dataset = self.get_dataset_impl(name)?;
+                let dataset = self.get_dataset_impl(&alias)?;
                 let summary = dataset
                     .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
 
-                Ok(DatasetHandle::new(summary.id, name.clone()))
+                Ok(DatasetHandle::new(summary.id, alias.clone()))
             }
-            DatasetRefLocal::ID(id) => {
+            DatasetRef::ID(id) => {
                 // Anti-thrashing lock (see comment above)
                 let _lock_guard = self.thrash_lock.lock().await;
 
@@ -209,15 +214,20 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                         }
                     }
 
-                    let name = DatasetName::try_from(&entry.file_name()).int_err()?;
+                    let alias = DatasetAlias::new(
+                        None,
+                        DatasetName::try_from(&entry.file_name()).int_err()?,
+                    );
+
                     let summary = self
-                        .get_dataset_impl(&name)
+                        .get_dataset_impl(&alias)
                         .int_err()?
                         .get_summary(GetSummaryOpts::default())
                         .await
                         .int_err()?;
+
                     if summary.id == *id {
-                        return Ok(DatasetHandle::new(summary.id, name));
+                        return Ok(DatasetHandle::new(summary.id, alias));
                     }
                 }
 
@@ -250,16 +260,16 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
     async fn get_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.name)?;
+        let dataset = self.get_dataset_impl(&handle.alias)?;
         Ok(Arc::new(dataset))
     }
 
     async fn create_dataset(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
         let staging_path = self.root.join(get_staging_name());
 
@@ -270,23 +280,23 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             self.clone(),
             dataset,
             staging_path,
-            dataset_name.clone(),
+            dataset_alias.clone(),
         )))
     }
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
-        new_name: &DatasetName,
+        dataset_ref: &DatasetRef,
+        new_alias: &DatasetAlias,
     ) -> Result<(), RenameDatasetError> {
-        let old_name = self.resolve_dataset_ref(dataset_ref).await?.name;
+        let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
 
-        let old_dataset_path = self.root.join(&old_name);
-        let new_dataset_path = self.root.join(&new_name);
+        let old_dataset_path = self.root.join(&old_alias.dataset_name);
+        let new_dataset_path = self.root.join(&new_alias.dataset_name);
 
         if new_dataset_path.exists() {
             Err(NameCollisionError {
-                name: new_name.clone(),
+                alias: new_alias.clone(),
             }
             .into())
         } else {
@@ -297,10 +307,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Need fast inverse dependency lookup
-    async fn delete_dataset(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-    ) -> Result<(), DeleteDatasetError> {
+    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
@@ -330,14 +337,14 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
-        let dataset_dir = self.root.join(&dataset_handle.name);
+        let dataset_dir = self.root.join(&dataset_handle.alias.dataset_name);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
         Ok(())
     }
 
     fn get_downstream_dependencies<'s>(
         &'s self,
-        dataset_ref: &'s DatasetRefLocal,
+        dataset_ref: &'s DatasetRef,
     ) -> DatasetHandleStream<'s> {
         Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
@@ -351,7 +358,7 @@ struct DatasetBuilderLocalFs<D> {
     repo: DatasetRepositoryLocalFs,
     dataset: D,
     staging_path: PathBuf,
-    dataset_name: DatasetName,
+    dataset_alias: DatasetAlias,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -361,13 +368,13 @@ impl<D> DatasetBuilderLocalFs<D> {
         repo: DatasetRepositoryLocalFs,
         dataset: D,
         staging_path: PathBuf,
-        dataset_name: DatasetName,
+        dataset_alias: DatasetAlias,
     ) -> Self {
         Self {
             repo,
             dataset,
             staging_path,
-            dataset_name,
+            dataset_alias,
         }
     }
 
@@ -415,7 +422,7 @@ where
         }?;
 
         self.repo
-            .finish_create_dataset(&self.dataset, &self.staging_path, &self.dataset_name)
+            .finish_create_dataset(&self.dataset, &self.staging_path, &self.dataset_alias)
             .await
     }
 

@@ -44,9 +44,13 @@ impl Datasets {
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
         let account = Account::mock();
+
+        // Not multitenant yet
+        let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
+
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = local_repo
-            .try_resolve_dataset_ref(&dataset_name.as_local_ref())
+            .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
         Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
@@ -67,7 +71,7 @@ impl Datasets {
 
         let mut all_datasets: Vec<_> = local_repo.get_all_datasets().try_collect().await?;
         let total_count = all_datasets.len();
-        all_datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         let nodes = all_datasets
             .into_iter()
@@ -191,7 +195,8 @@ impl Datasets {
             }
             Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
-                    dataset_name: e.name.into(),
+                    // TODO: Multitenancy
+                    dataset_name: e.alias.dataset_name.into(),
                 })
             }
             Err(domain::CreateDatasetFromSnapshotError::InvalidSnapshot(e)) => {

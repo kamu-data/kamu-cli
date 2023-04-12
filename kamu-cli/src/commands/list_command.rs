@@ -174,14 +174,14 @@ impl Command for ListCommand {
         let mut watermark: Vec<Option<i64>> = Vec::new();
 
         let mut datasets: Vec<_> = self.local_repo.get_all_datasets().try_collect().await?;
-        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         for hdl in datasets.iter() {
             let dataset = self.local_repo.get_dataset(&hdl.as_local_ref()).await?;
             let current_head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
             let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
 
-            name.push(hdl.name.to_string());
+            name.push(hdl.alias.to_string());
             kind.push(self.get_kind(hdl, &summary).await?);
             pulled.push(summary.last_pulled.map(|t| t.timestamp_micros()));
             records.push(summary.num_records);

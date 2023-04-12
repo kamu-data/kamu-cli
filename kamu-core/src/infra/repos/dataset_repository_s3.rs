@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{str::FromStr, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
-use opendatafabric::{DatasetHandle, DatasetName, DatasetRefLocal};
+use opendatafabric::{DatasetAlias, DatasetHandle, DatasetName, DatasetRef};
 use thiserror::Error;
 use url::Url;
 
@@ -38,37 +38,50 @@ impl DatasetRepositoryS3 {
         }
     }
 
-    fn get_s3_bucket_path(&self, dataset_name: &str) -> Url {
+    fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
+        assert!(
+            !dataset_alias.is_multitenant(),
+            "Multitenancy is not yet supported by S3 repo"
+        );
+
         let dataset_url_string = format!(
             "s3+{}/{}/{}/",
             self.endpoint,
             self.s3_context.bucket,
-            self.s3_context.get_key(dataset_name)
+            self.s3_context.get_key(&dataset_alias.dataset_name)
         );
         Url::parse(dataset_url_string.as_str()).unwrap()
     }
 
     async fn get_dataset_impl(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<impl Dataset, InternalError> {
-        let dataset_url = self.get_s3_bucket_path(dataset_name.as_str());
+        assert!(
+            !dataset_alias.is_multitenant(),
+            "Multitenancy is not yet supported by S3 repo"
+        );
+        let dataset_url = self.get_s3_bucket_path(dataset_alias);
         DatasetFactoryImpl::get_s3(dataset_url).await
     }
 
     async fn delete_dataset_s3_objects(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<(), InternalError> {
-        let dataset_key_prefix = self.s3_context.get_key(dataset_name.as_str());
+        assert!(
+            !dataset_alias.is_multitenant(),
+            "Multitenancy is not yet supported by S3 repo"
+        );
+        let dataset_key_prefix = self.s3_context.get_key(&dataset_alias.dataset_name);
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
-        staging_name: &str,
-        dataset_name: &DatasetName,
+        staging_alias: &DatasetAlias,
+        dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, CreateDatasetError> {
         let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
             Ok(s) => Ok(s),
@@ -77,10 +90,10 @@ impl DatasetRepositoryS3 {
             Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
         }?;
 
-        let handle = DatasetHandle::new(summary.id, dataset_name.clone());
+        let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
 
         match self
-            .move_bucket_items_on_dataset_rename(staging_name, dataset_name.as_str())
+            .move_bucket_items_on_dataset_rename(staging_alias, dataset_alias)
             .await
         {
             Ok(_) => Ok(handle),
@@ -93,10 +106,15 @@ impl DatasetRepositoryS3 {
 
     async fn move_bucket_items_on_dataset_rename(
         &self,
-        old_dataset_name: &str,
-        new_dataset_name: &str,
+        old_alias: &DatasetAlias,
+        new_alias: &DatasetAlias,
     ) -> Result<(), MoveBucketItemsOnRenameError> {
-        let new_key_prefix = self.s3_context.get_key(new_dataset_name);
+        assert!(
+            !new_alias.is_multitenant(),
+            "Multitenancy is not yet supported by S3 repo"
+        );
+
+        let new_key_prefix = self.s3_context.get_key(&new_alias.dataset_name);
         if self
             .s3_context
             .bucket_path_exists(new_key_prefix.as_str())
@@ -104,12 +122,12 @@ impl DatasetRepositoryS3 {
         {
             return Err(MoveBucketItemsOnRenameError::NameCollision(
                 NameCollisionError {
-                    name: DatasetName::from_str(new_dataset_name).unwrap(),
+                    alias: new_alias.clone(),
                 },
             ));
         }
 
-        let old_key_prefix = self.s3_context.get_key(old_dataset_name);
+        let old_key_prefix = self.s3_context.get_key(&old_alias.dataset_name);
         self.s3_context
             .recursive_move(old_key_prefix, new_key_prefix)
             .await?;
@@ -133,10 +151,7 @@ impl Clone for DatasetRepositoryS3 {
 
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryS3 {
-    async fn get_dataset_url(
-        &self,
-        _dataset_ref: &DatasetRefLocal,
-    ) -> Result<Url, GetDatasetUrlError> {
+    async fn get_dataset_url(&self, _dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
         unimplemented!("get_dataset_url not supported by S3 repository")
     }
 }
@@ -147,26 +162,35 @@ impl DatasetRegistry for DatasetRepositoryS3 {
 impl DatasetRepository for DatasetRepositoryS3 {
     async fn resolve_dataset_ref(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError> {
         match dataset_ref {
-            DatasetRefLocal::Handle(h) => Ok(h.clone()),
-            DatasetRefLocal::Name(name) => {
-                if self.s3_context.bucket_path_exists(name.as_str()).await? {
-                    let dataset = self.get_dataset_impl(name).await?;
+            DatasetRef::Handle(h) => Ok(h.clone()),
+            DatasetRef::Alias(alias) => {
+                assert!(
+                    !alias.is_multitenant(),
+                    "Multitenancy is not yet supported by S3 repo"
+                );
+
+                if self
+                    .s3_context
+                    .bucket_path_exists(&alias.dataset_name)
+                    .await?
+                {
+                    let dataset = self.get_dataset_impl(alias).await?;
                     let summary = dataset
                         .get_summary(GetSummaryOpts::default())
                         .await
                         .int_err()?;
 
-                    Ok(DatasetHandle::new(summary.id, name.clone()))
+                    Ok(DatasetHandle::new(summary.id, alias.clone()))
                 } else {
                     Err(GetDatasetError::NotFound(DatasetNotFoundError {
                         dataset_ref: dataset_ref.clone(),
                     }))
                 }
             }
-            DatasetRefLocal::ID(_idd) => {
+            DatasetRef::ID(_) => {
                 unimplemented!("Querying S3 bucket not supported yet");
             }
         }
@@ -181,7 +205,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     prefix.pop();
                 }
 
-                let name = DatasetName::try_from(prefix).int_err()?;
+                let name = DatasetAlias::new(None, DatasetName::try_from(prefix).int_err()?);
                 let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
                 yield hdl;
             }
@@ -190,26 +214,27 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     async fn get_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.name).await?;
+        let dataset = self.get_dataset_impl(&handle.alias).await?;
         Ok(Arc::new(dataset))
     }
 
     async fn create_dataset(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_name = get_staging_name();
-        let dataset_url = self.get_s3_bucket_path(staging_name.as_str());
+        let staging_alias =
+            DatasetAlias::new(None, DatasetName::new_unchecked(&get_staging_name()));
+        let dataset_url = self.get_s3_bucket_path(&staging_alias);
         let dataset_result = DatasetFactoryImpl::get_s3(dataset_url).await;
         match dataset_result {
-            Ok(dataset) => Ok(Box::new(DatasetBuildS3::new(
+            Ok(dataset) => Ok(Box::new(DatasetBuilderS3::new(
                 self.clone(),
                 Arc::new(dataset),
-                staging_name,
-                dataset_name.clone(),
+                staging_alias,
+                dataset_alias.clone(),
             ))),
             Err(e) => Err(BeginCreateDatasetError::Internal(e)),
         }
@@ -217,12 +242,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
-        new_name: &DatasetName,
+        dataset_ref: &DatasetRef,
+        new_alias: &DatasetAlias,
     ) -> Result<(), RenameDatasetError> {
-        let old_name = self.resolve_dataset_ref(dataset_ref).await?.name;
+        let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
+
         match self
-            .move_bucket_items_on_dataset_rename(old_name.as_str(), new_name.as_str())
+            .move_bucket_items_on_dataset_rename(&old_alias, new_alias)
             .await
         {
             Ok(_) => Ok(()),
@@ -233,10 +259,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
     }
 
-    async fn delete_dataset(
-        &self,
-        dataset_ref: &DatasetRefLocal,
-    ) -> Result<(), DeleteDatasetError> {
+    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(dataset_handle) => dataset_handle,
             Err(GetDatasetError::NotFound(e)) => return Err(DeleteDatasetError::NotFound(e)),
@@ -255,7 +278,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .into());
         }
 
-        match self.delete_dataset_s3_objects(&dataset_handle.name).await {
+        match self.delete_dataset_s3_objects(&dataset_handle.alias).await {
             Ok(_) => Ok(()),
             Err(e) => Err(DeleteDatasetError::Internal(e)),
         }
@@ -263,7 +286,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     fn get_downstream_dependencies<'s>(
         &'s self,
-        dataset_ref: &'s DatasetRefLocal,
+        dataset_ref: &'s DatasetRef,
     ) -> DatasetHandleStream<'s> {
         Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
@@ -273,33 +296,33 @@ impl DatasetRepository for DatasetRepositoryS3 {
 // DatasetS3BuilderImpl
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct DatasetBuildS3 {
+struct DatasetBuilderS3 {
     repo: DatasetRepositoryS3,
     dataset: Arc<dyn Dataset>,
-    staging_name: String,
-    dataset_name: DatasetName,
+    staging_alias: DatasetAlias,
+    dataset_alias: DatasetAlias,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetBuildS3 {
+impl DatasetBuilderS3 {
     fn new(
         repo: DatasetRepositoryS3,
         dataset: Arc<dyn Dataset>,
-        staging_name: String,
-        dataset_name: DatasetName,
+        staging_alias: DatasetAlias,
+        dataset_alias: DatasetAlias,
     ) -> Self {
         Self {
             repo,
             dataset,
-            staging_name,
-            dataset_name,
+            staging_alias,
+            dataset_alias,
         }
     }
 }
 
 #[async_trait]
-impl DatasetBuilder for DatasetBuildS3 {
+impl DatasetBuilder for DatasetBuilderS3 {
     fn as_dataset(&self) -> &dyn Dataset {
         self.dataset.as_ref()
     }
@@ -323,15 +346,15 @@ impl DatasetBuilder for DatasetBuildS3 {
         self.repo
             .finish_create_dataset(
                 self.dataset.as_ref(),
-                self.staging_name.as_str(),
-                &self.dataset_name,
+                &self.staging_alias,
+                &self.dataset_alias,
             )
             .await
     }
 
     async fn discard(&self) -> Result<(), InternalError> {
         self.repo
-            .delete_dataset_s3_objects(&self.dataset_name)
+            .delete_dataset_s3_objects(&self.dataset_alias)
             .await
     }
 }

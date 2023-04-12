@@ -61,9 +61,14 @@ impl ProvenanceServiceImpl {
                 })
             }
 
+            assert!(
+                !dataset_handle.alias.is_multitenant(),
+                "Multitenancy is not supported yet"
+            );
+
             let dataset_info = NodeInfo::Local {
                 id: summary.id.clone(),
-                name: dataset_handle.name.clone(),
+                name: dataset_handle.alias.dataset_name.clone(),
                 kind: summary.kind,
                 dependencies: &resolved_inputs,
             };
@@ -80,7 +85,7 @@ impl ProvenanceServiceImpl {
             // Remote dataset
             let dataset_info = NodeInfo::Remote {
                 id: dataset_handle.id.clone(),
-                name: dataset_handle.name.clone(),
+                name: dataset_handle.alias.dataset_name.clone(),
             };
 
             visitor.enter(&dataset_info);
@@ -94,7 +99,7 @@ impl ProvenanceServiceImpl {
 impl ProvenanceService for ProvenanceServiceImpl {
     async fn get_dataset_lineage(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), GetLineageError> {
@@ -167,7 +172,7 @@ impl<W: Write, S: DotStyle> LineageVisitor for DotVisitor<W, S> {
                 writeln!(
                     self.writer,
                     "\"{}\" -> \"{}\";",
-                    dep.handle.name,
+                    dep.handle.alias,
                     dataset.name()
                 )
                 .unwrap();

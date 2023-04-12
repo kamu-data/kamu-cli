@@ -62,20 +62,17 @@ impl PullService for TestPullService {
         transform_listener: Option<Arc<dyn TransformMultiListener>>,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let mut requests = dataset_refs.map(|r| {
-            if let Some(local_ref) = r.as_local_ref() {
-                PullRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: None,
-                    ingest_from: None,
-                }
-            } else {
-                PullRequest {
-                    local_ref: None,
-                    remote_ref: Some(r.as_remote_ref().unwrap()),
-                    ingest_from: None,
-                }
-            }
+        let mut requests = dataset_refs.map(|r| match r.as_local_single_tenant_ref() {
+            Ok(local_ref) => PullRequest {
+                local_ref: Some(local_ref),
+                remote_ref: None,
+                ingest_from: None,
+            },
+            Err(remote_ref) => PullRequest {
+                local_ref: None,
+                remote_ref: Some(remote_ref),
+                ingest_from: None,
+            },
         });
 
         self.pull_multi_ext(
@@ -162,7 +159,7 @@ impl PullService for TestPullService {
 
     async fn set_watermark(
         &self,
-        _dataset_ref: &DatasetRefLocal,
+        _dataset_ref: &DatasetRef,
         _watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError> {
         unimplemented!()

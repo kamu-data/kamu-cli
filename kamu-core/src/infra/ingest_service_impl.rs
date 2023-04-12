@@ -92,7 +92,7 @@ impl IngestServiceImpl {
 
     async fn do_ingest(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         options: IngestOptions,
         fetch_override: Option<FetchStep>,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
@@ -101,7 +101,7 @@ impl IngestServiceImpl {
 
         // TODO: This service should not know the dataset layout specifics
         // Consider getting layout from DatasetRepository
-        let layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         let dataset = self
             .local_repo
@@ -160,7 +160,7 @@ impl IngestServiceImpl {
 impl IngestService for IngestServiceImpl {
     async fn ingest(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
@@ -171,7 +171,7 @@ impl IngestService for IngestServiceImpl {
 
     async fn ingest_from(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         fetch: FetchStep,
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
@@ -183,10 +183,10 @@ impl IngestService for IngestServiceImpl {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
+    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
         self.ingest_multi_ext(
             &mut dataset_refs.map(|r| IngestRequest {
                 dataset_ref: r,
@@ -203,7 +203,7 @@ impl IngestService for IngestServiceImpl {
         requests: &mut dyn Iterator<Item = IngestRequest>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRefLocal, Result<IngestResult, IngestError>)> {
+    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
 

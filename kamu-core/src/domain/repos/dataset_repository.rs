@@ -43,33 +43,32 @@ impl CreateDatasetResult {
 pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn resolve_dataset_ref(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
 
     async fn get_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError>;
 
     async fn create_dataset(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError>;
 
     async fn rename_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
-        new_name: &DatasetName,
+        dataset_ref: &DatasetRef,
+        new_alias: &DatasetAlias,
     ) -> Result<(), RenameDatasetError>;
 
-    async fn delete_dataset(&self, dataset_ref: &DatasetRefLocal)
-        -> Result<(), DeleteDatasetError>;
+    async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
 
     fn get_downstream_dependencies<'s>(
         &'s self,
-        dataset_ref: &'s DatasetRefLocal,
+        dataset_ref: &'s DatasetRef,
     ) -> DatasetHandleStream<'s>;
 }
 
@@ -95,22 +94,22 @@ pub trait DatasetBuilder: Send + Sync {
 pub trait DatasetRepositoryExt: DatasetRepository {
     async fn try_resolve_dataset_ref(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Option<DatasetHandle>, InternalError>;
 
     async fn try_get_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
 
     async fn get_or_create_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn DatasetBuilder>, GetDatasetError>;
 
     async fn create_dataset_from_blocks<IT>(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
         blocks: IT,
     ) -> Result<CreateDatasetResult, CreateDatasetError>
     where
@@ -141,7 +140,7 @@ where
 {
     async fn try_resolve_dataset_ref(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Option<DatasetHandle>, InternalError> {
         match self.resolve_dataset_ref(dataset_ref).await {
             Ok(hdl) => Ok(Some(hdl)),
@@ -152,7 +151,7 @@ where
 
     async fn try_get_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError> {
         match self.get_dataset(dataset_ref).await {
             Ok(ds) => Ok(Some(ds)),
@@ -163,16 +162,16 @@ where
 
     async fn get_or_create_dataset(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn DatasetBuilder>, GetDatasetError> {
         match self.resolve_dataset_ref(dataset_ref).await {
             Ok(hdl) => {
                 let ds = self.get_dataset(&hdl.as_local_ref()).await?;
                 Ok(Box::new(NullDatasetBuilder::new(hdl, ds)))
             }
-            Err(e @ GetDatasetError::NotFound(_)) => match dataset_ref.name() {
+            Err(e @ GetDatasetError::NotFound(_)) => match dataset_ref.alias() {
                 None => Err(e),
-                Some(name) => match self.create_dataset(name).await {
+                Some(alias) => match self.create_dataset(alias).await {
                     Ok(b) => Ok(b),
                     Err(BeginCreateDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
                 },
@@ -183,14 +182,14 @@ where
 
     async fn create_dataset_from_blocks<IT>(
         &self,
-        dataset_name: &DatasetName,
+        dataset_alias: &DatasetAlias,
         blocks: IT,
     ) -> Result<CreateDatasetResult, CreateDatasetError>
     where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
     {
-        let ds = self.create_dataset(dataset_name).await?;
+        let ds = self.create_dataset(dataset_alias).await?;
         let mut hash = None;
         let mut sequence_number = -1;
         for mut block in blocks {
@@ -263,7 +262,8 @@ where
 
         let system_time = Utc::now();
 
-        let builder = self.create_dataset(&snapshot.name).await?;
+        let alias = DatasetAlias::new(None, snapshot.name);
+        let builder = self.create_dataset(&alias).await?;
         let chain = builder.as_dataset().as_metadata_chain();
 
         // We are generating a key pair and deriving a dataset ID from it.
@@ -353,13 +353,16 @@ where
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?;
         } else {
+            // TODO: Input should be a multitenant alias
+            let input_alias = DatasetAlias::new(None, input.name.clone());
+
             // When ID is not specified we try resolving it by name
-            let hdl = match repo.resolve_dataset_ref(&input.name.as_local_ref()).await {
+            let hdl = match repo.resolve_dataset_ref(&input_alias.as_local_ref()).await {
                 Ok(hdl) => Ok(hdl),
                 Err(GetDatasetError::NotFound(_)) => Err(
                     CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
                         dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input.name.as_local_ref()],
+                        missing_inputs: vec![input_alias.into_local_ref()],
                     }),
                 ),
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
@@ -416,15 +419,15 @@ fn sort_snapshots_in_dependency_order(
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
-    pub dataset_ref: DatasetRefLocal,
+    pub dataset_ref: DatasetRef,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 pub struct MissingInputsError {
-    pub dataset_ref: DatasetRefLocal,
-    pub missing_inputs: Vec<DatasetRefLocal>,
+    pub dataset_ref: DatasetRef,
+    pub missing_inputs: Vec<DatasetRef>,
 }
 
 impl std::fmt::Display for MissingInputsError {
@@ -468,9 +471,9 @@ impl std::fmt::Display for DanglingReferenceError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Dataset with name {name} already exists")]
+#[error("Dataset with name {alias} already exists")]
 pub struct NameCollisionError {
-    pub name: DatasetName,
+    pub alias: DatasetAlias,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

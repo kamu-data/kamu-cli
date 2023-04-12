@@ -12,7 +12,7 @@ use kamu::{
     testing::{DatasetTestHelper, MetadataFactory},
 };
 use opendatafabric::{
-    DatasetKind, DatasetName, DatasetRefAny, DatasetRefLocal, DatasetRefRemote, MetadataEvent,
+    DatasetKind, DatasetName, DatasetRef, DatasetRefAny, DatasetRefRemote, MetadataEvent,
 };
 
 use crate::harness::{
@@ -148,9 +148,7 @@ async fn test_smart_pull_existing_evolved_dataset() {
 
     // Extend server-side dataset with new node
     let commit_result = server_repo
-        .get_dataset(&DatasetRefLocal::from(
-            DatasetName::try_from("foo").unwrap(),
-        ))
+        .get_dataset(&DatasetRef::from(DatasetName::try_from("foo").unwrap()))
         .await
         .unwrap()
         .commit_event(
@@ -222,9 +220,7 @@ async fn test_smart_pull_existing_advanced_dataset_fails() {
     // Extend client-side dataset with new node
     let client_repo = client_harness.dataset_repository();
     client_repo
-        .get_dataset(&DatasetRefLocal::from(
-            DatasetName::try_from("foo").unwrap(),
-        ))
+        .get_dataset(&DatasetRef::from(DatasetName::try_from("foo").unwrap()))
         .await
         .unwrap()
         .commit_event(

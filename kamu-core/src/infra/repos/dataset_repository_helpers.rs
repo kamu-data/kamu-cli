@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use futures::Stream;
-use opendatafabric::{DatasetHandle, DatasetRefLocal};
+use opendatafabric::{DatasetHandle, DatasetRef};
 use tokio_stream::StreamExt;
 
 use crate::domain::{DatasetRepository, GetSummaryOpts, InternalError, ResultIntoInternal};
@@ -36,7 +36,7 @@ pub fn get_staging_name() -> String {
 
 pub fn get_downstream_dependencies_impl<'s>(
     repo: &'s dyn DatasetRepository,
-    dataset_ref: &'s DatasetRefLocal,
+    dataset_ref: &'s DatasetRef,
 ) -> impl Stream<Item = Result<DatasetHandle, InternalError>> + 's {
     async_stream::try_stream! {
         let dataset_handle = repo.resolve_dataset_ref(dataset_ref).await.int_err()?;

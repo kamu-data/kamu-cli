@@ -78,7 +78,7 @@ impl PullCommand {
         listener: Option<Arc<PrettyPullProgress>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let local_name = self.as_name.as_ref().unwrap();
-        let remote_ref = self.refs[0].as_remote_ref().ok_or_else(|| {
+        let remote_ref = self.refs[0].as_remote_ref(|_| true).map_err(|_| {
             CLIError::usage_error("When using --as reference should point to a remote dataset")
         })?;
 
@@ -106,7 +106,7 @@ impl PullCommand {
         &self,
         listener: Option<Arc<PrettyPullProgress>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_ref = self.refs[0].as_local_ref().ok_or_else(|| {
+        let dataset_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
             CLIError::usage_error("When using --fetch reference should point to a local dataset")
         })?;
 
@@ -407,8 +407,8 @@ impl SyncMultiListener for PrettyPullProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            dst.as_local_ref().unwrap(),
-            src.as_remote_ref().unwrap(),
+            dst.as_local_ref(|_| true).expect("Expected local ref"),
+            src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))
     }
@@ -481,7 +481,7 @@ impl PrettyIngestProgress {
         msg: T,
     ) -> String {
         let step_str = format!("[{}/7]", step + 1);
-        let dataset = format!("({})", dataset_handle.name);
+        let dataset = format!("({})", dataset_handle.alias);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),
@@ -526,7 +526,7 @@ impl IngestListener for PrettyIngestProgress {
                     .multi_progress
                     .add(Self::new_spinner(&self.message_for_stage(stage))),
                 ProgressStyle::Bar => self.multi_progress.add(Self::new_progress_bar(
-                    &self.dataset_handle.name,
+                    &self.dataset_handle.alias.to_string(),
                     n,
                     out_of,
                 )),
@@ -701,7 +701,7 @@ impl PrettyTransformProgress {
         msg: T,
     ) -> String {
         let step_str = format!("[{}/1]", step + 1);
-        let dataset = format!("({})", dataset_handle.name);
+        let dataset = format!("({})", dataset_handle.alias);
         format!(
             "{} {} {}",
             console::style(step_str).bold().dim(),
@@ -801,7 +801,7 @@ impl PullImageListener for PrettyTransformProgress {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct PrettySyncProgress {
-    local_ref: DatasetRefLocal,
+    local_ref: DatasetRef,
     remote_ref: DatasetRefRemote,
     multi_progress: Arc<indicatif::MultiProgress>,
     state: Mutex<PrettySyncProgressState>,
@@ -814,7 +814,7 @@ struct PrettySyncProgressState {
 
 impl PrettySyncProgress {
     fn new(
-        local_ref: DatasetRefLocal,
+        local_ref: DatasetRef,
         remote_ref: DatasetRefRemote,
         multi_progress: Arc<indicatif::MultiProgress>,
     ) -> Self {
@@ -830,7 +830,7 @@ impl PrettySyncProgress {
     }
 
     fn new_spinner(
-        local_ref: &DatasetRefLocal,
+        local_ref: &DatasetRef,
         remote_ref: &DatasetRefRemote,
     ) -> indicatif::ProgressBar {
         let spinner = indicatif::ProgressBar::hidden();

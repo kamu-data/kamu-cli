@@ -16,16 +16,13 @@ use url::Url;
 
 #[async_trait]
 pub trait RemoteRepositoryRegistry: Send + Sync {
-    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's>;
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's>;
 
-    fn get_repository(
-        &self,
-        repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, GetRepoError>;
+    fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError>;
 
-    fn add_repository(&self, repo_name: &RepositoryName, url: Url) -> Result<(), AddRepoError>;
+    fn add_repository(&self, repo_name: &RepoName, url: Url) -> Result<(), AddRepoError>;
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError>;
+    fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +90,7 @@ pub enum DeleteRepoError {
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error("Repository {repo_name} does not exist")]
 pub struct RepositoryNotFoundError {
-    pub repo_name: RepositoryName,
+    pub repo_name: RepoName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -101,5 +98,5 @@ pub struct RepositoryNotFoundError {
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
 #[error("Repository {repo_name} already exists")]
 pub struct RepositoryAlreadyExistsError {
-    pub repo_name: RepositoryName,
+    pub repo_name: RepoName,
 }

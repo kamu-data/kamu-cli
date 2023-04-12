@@ -843,7 +843,7 @@ pub fn cli() -> Command {
                                 Arg::new("name")
                                     .required(true)
                                     .index(1)
-                                    .value_parser(value_parse_repository_name)
+                                    .value_parser(value_parse_repo_name)
                                     .help("Local alias of the repository"),
                                 Arg::new("url")
                                     .required(true)
@@ -861,7 +861,7 @@ pub fn cli() -> Command {
                                 Arg::new("repository")
                                     .action(ArgAction::Append)
                                     .index(1)
-                                    .value_parser(value_parse_repository_name)
+                                    .value_parser(value_parse_repo_name)
                                     .help("Repository name(s)"),
                                 Arg::new("yes")
                                     .short('y')
@@ -990,7 +990,7 @@ pub fn cli() -> Command {
                                 .long("repo")
                                 .action(ArgAction::Append)
                                 .value_name("REPO")
-                                .value_parser(value_parse_repository_name)
+                                .value_parser(value_parse_repo_name)
                                 .help("Repository name(s) to search in"),
                         ])
                         .after_help(indoc::indoc!(
@@ -1281,19 +1281,8 @@ fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     }
 }
 
-#[allow(dead_code)]
-fn value_parse_dataset_remote_name(s: &str) -> Result<RemoteDatasetName, String> {
-    match RemoteDatasetName::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "Remote dataset name should be in form: \
-            `repository/dataset-id` or `repository/account/dataset-id`",
-        )),
-    }
-}
-
-fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRefLocal, String> {
-    match DatasetRefLocal::try_from(s) {
+fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
+    match DatasetRef::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
@@ -1322,8 +1311,8 @@ fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     }
 }
 
-fn value_parse_repository_name(s: &str) -> Result<RepositoryName, String> {
-    match RepositoryName::try_from(s) {
+fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
+    match RepoName::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(format!(
             "RepositoryID can only contain alphanumerics, dashes, and dots",

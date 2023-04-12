@@ -219,13 +219,20 @@ impl IngestTestHarness {
 
         let res = self
             .ingest_svc
-            .ingest(&dataset_name.as_local_ref(), IngestOptions::default(), None)
+            .ingest(
+                &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
+                IngestOptions::default(),
+                None,
+            )
             .await;
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
     fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_name);
+        let dataset_layout = self
+            .workspace_layout
+            .dataset_layout(&DatasetAlias::new(None, dataset_name.clone()));
+
         assert!(dataset_layout.data_dir.exists());
 
         let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {

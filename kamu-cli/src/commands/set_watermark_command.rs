@@ -68,8 +68,8 @@ impl Command for SetWatermarkCommand {
         })?;
 
         let dataset_ref = self.refs[0]
-            .as_local_ref()
-            .ok_or_else(|| CLIError::usage_error("Expected a local dataset reference"))?;
+            .as_local_ref(|_| true)
+            .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
         let aliases = self
             .remote_alias_reg

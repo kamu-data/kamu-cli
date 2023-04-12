@@ -69,7 +69,7 @@ fn setup_server<IdExt, Extractor>(
     identity_extractor: IdExt,
 ) -> axum::Server<AddrIncoming, IntoMakeService<Router>>
 where
-    IdExt: Fn(Extractor) -> DatasetRefLocal,
+    IdExt: Fn(Extractor) -> DatasetRef,
     IdExt: Clone + Send + 'static,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
@@ -175,13 +175,13 @@ async fn test_routing_dataset_name() {
     let server = setup_server(
         repo.catalog,
         "/:dataset_name",
-        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).into_local_ref(),
     );
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/{}/",
         server.local_addr(),
-        repo.created_dataset.dataset_handle.name
+        repo.created_dataset.dataset_handle.alias
     ))
     .unwrap();
 
@@ -208,7 +208,7 @@ async fn test_routing_dataset_account_and_name() {
         "/:account_name/:dataset_name",
         |Path(p): Path<DatasetByAccountAndName>| {
             // TODO: Ignoring account name until DatasetRepository supports multi-tenancy
-            p.dataset_name.as_local_ref()
+            DatasetAlias::new(None, p.dataset_name).into_local_ref()
         },
     );
 
@@ -217,7 +217,7 @@ async fn test_routing_dataset_account_and_name() {
     let dataset_url = url::Url::parse(&format!(
         "http://{}/kamu/{}/",
         server.local_addr(),
-        repo.created_dataset.dataset_handle.name
+        repo.created_dataset.dataset_handle.alias
     ))
     .unwrap();
 
@@ -235,7 +235,7 @@ async fn test_routing_err_invalid_identity_format() {
     let server = setup_server(
         repo.catalog,
         "/:dataset_id",
-        |Path(p): Path<DatasetByID>| p.dataset_id.as_local_ref(),
+        |Path(p): Path<DatasetByID>| p.dataset_id.into_local_ref(),
     );
 
     let dataset_url = format!("http://{}/this-is-no-a-did/", server.local_addr());
@@ -257,7 +257,7 @@ async fn test_routing_err_dataset_not_found() {
     let server = setup_server(
         repo.catalog,
         "/:dataset_name",
-        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+        |Path(p): Path<DatasetByName>| DatasetAlias::new(None, p.dataset_name).as_local_ref(),
     );
 
     let dataset_url = format!("http://{}/non.existing.dataset/", server.local_addr());

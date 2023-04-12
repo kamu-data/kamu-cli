@@ -37,7 +37,7 @@ pub trait PushService: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct PushRequest {
-    pub local_ref: Option<DatasetRefLocal>,
+    pub local_ref: Option<DatasetRef>,
     pub remote_ref: Option<DatasetRefRemote>,
 }
 

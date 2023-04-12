@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::infra::DatasetLayout;
-use opendatafabric::DatasetName;
+use opendatafabric::DatasetAlias;
 
 use std::path::PathBuf;
 
@@ -47,7 +47,8 @@ impl WorkspaceLayout {
         Ok(ws)
     }
 
-    pub fn dataset_layout(&self, name: &DatasetName) -> DatasetLayout {
-        DatasetLayout::new(self.datasets_dir.join(name))
+    pub fn dataset_layout(&self, alias: &DatasetAlias) -> DatasetLayout {
+        assert!(!alias.is_multitenant(), "Multitenancy is not yet supported");
+        DatasetLayout::new(self.datasets_dir.join(&alias.dataset_name))
     }
 }

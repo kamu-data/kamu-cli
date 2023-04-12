@@ -96,14 +96,6 @@ impl Grammar {
         Some((scheme, s))
     }
 
-    #[allow(dead_code)]
-    // DatasetID = "did:odf:" Multibase
-    pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
-        let (h, t) = Self::match_str(s, "did:odf:")?;
-        let (hh, tt) = Self::match_multibase(t)?;
-        Some((&s[..h.len() + hh.len()], tt))
-    }
-
     // Subdomain = [a-zA-Z0-9]+ ("-" [a-zA-Z0-9]+)*
     fn match_subdomain(s: &str) -> Option<(&str, &str)> {
         let (h, t) = Self::match_alphanums(s)?;
@@ -130,23 +122,47 @@ impl Grammar {
         Some((&s[0..h.len() + hh.len()], tt))
     }
 
+    // DatasetID = "did:odf:" Multibase
+    pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
+        let (h, t) = Self::match_str(s, "did:odf:")?;
+        let (hh, tt) = Self::match_multibase(t)?;
+        Some((&s[..h.len() + hh.len()], tt))
+    }
+
     // DatasetName = Hostname
     pub fn match_dataset_name(s: &str) -> Option<(&str, &str)> {
         Self::match_hostname(s)
     }
 
-    // AccountName = Subdomain
+    // AccountName = Hostname
     pub fn match_account_name(s: &str) -> Option<(&str, &str)> {
-        Self::match_subdomain(s)
-    }
-
-    // RepositoryName = Hostname
-    pub fn match_repository_name(s: &str) -> Option<(&str, &str)> {
         Self::match_hostname(s)
     }
 
-    // TenantDatasetName = (AccountName "/")? DatasetName
-    pub fn match_dataset_name_with_owner(s: &str) -> Option<(Option<&str>, &str, &str)> {
+    // RepoName = Hostname
+    pub fn match_repo_name(s: &str) -> Option<(&str, &str)> {
+        Self::match_hostname(s)
+    }
+
+    // (RepoName "/")? DatasetID
+    pub fn match_remote_dataset_id(s: &str) -> Option<(Option<&str>, &str, &str)> {
+        match s.split_once('/') {
+            None => {
+                let (id, tail) = Self::match_dataset_id(s)?;
+                Some((None, id, tail))
+            }
+            Some((head, tail)) => match Self::match_repo_name(head) {
+                Some((repo, "")) => {
+                    let (id, tail) = Self::match_dataset_id(tail)?;
+                    Some((Some(repo), id, tail))
+                }
+                _ => None,
+            },
+        }
+    }
+
+    // DatasetAlias = (AccountName "/")? DatasetName
+    pub fn match_dataset_alias(s: &str) -> Option<(Option<&str>, &str, &str)> {
         match s.split_once('/') {
             None => {
                 let (ds, tail) = Self::match_dataset_name(s)?;
@@ -162,11 +178,11 @@ impl Grammar {
         }
     }
 
-    // RemoteDatasetName = RepositoryName "/" (AccountName "/")? DatasetName
-    pub fn match_remote_dataset_name(s: &str) -> Option<(&str, Option<&str>, &str, &str)> {
+    // DatasetAliasRemote = RepoName "/" (AccountName "/")? DatasetName
+    pub fn match_dataset_alias_remote(s: &str) -> Option<(&str, Option<&str>, &str, &str)> {
         match s.split_once('/') {
             None => None,
-            Some((repo, rest)) => match Self::match_repository_name(repo) {
+            Some((repo, rest)) => match Self::match_repo_name(repo) {
                 Some((repo, "")) => match rest.split_once('/') {
                     Some((acc, rest)) => match Self::match_account_name(acc) {
                         Some((acc, "")) => {

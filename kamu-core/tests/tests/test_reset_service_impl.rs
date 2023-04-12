@@ -138,7 +138,10 @@ impl ResetTestHarness {
     }
 
     async fn a_dataset_builder(&self, dataset_name: &DatasetName) -> Box<dyn DatasetBuilder> {
-        self.local_repo.create_dataset(&dataset_name).await.unwrap()
+        self.local_repo
+            .create_dataset(&DatasetAlias::new(None, dataset_name.clone()))
+            .await
+            .unwrap()
     }
 
     async fn a_seed_block(

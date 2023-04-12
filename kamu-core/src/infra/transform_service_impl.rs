@@ -369,7 +369,7 @@ impl TransformServiceImpl {
 
         // TODO: This service shouldn't know specifics of dataset layouts
         // perhaps it should only receive a staging file to write into from Dataset interface
-        let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
         // TODO: Avoid giving engines write access directly to data and checkpoint dirs
         // to prevent accidents and creation of garbage files like .crc
         let out_data_path = output_layout.data_dir.join(".pending");
@@ -386,13 +386,18 @@ impl TransformServiceImpl {
             std::fs::remove_file(&new_checkpoint_path).int_err()?;
         }
 
+        assert!(
+            !dataset_handle.alias.is_multitenant(),
+            "Multitenancy is not supported yet"
+        );
+
         Ok(Some(TransformOperation {
             dataset_handle: dataset_handle.clone(),
             input_slices,
             input_checkpoint: prev_checkpoint.map(|cp| cp.physical_hash),
             request: ExecuteQueryRequest {
                 dataset_id: dataset_handle.id.clone(),
-                dataset_name: dataset_handle.name.clone(),
+                dataset_name: dataset_handle.alias.dataset_name.clone(),
                 system_time,
                 offset: data_offset_end.map(|e| e + 1).unwrap_or(0),
                 vocab,
@@ -405,7 +410,7 @@ impl TransformServiceImpl {
         }))
     }
 
-    async fn is_never_pulled(&self, dataset_ref: &DatasetRefLocal) -> Result<bool, InternalError> {
+    async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
         let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
         Ok(dataset
             .as_metadata_chain()
@@ -525,7 +530,7 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
         let input_chain = input_dataset.as_metadata_chain();
-        let input_layout = self.workspace_layout.dataset_layout(&input_handle.name);
+        let input_layout = self.workspace_layout.dataset_layout(&input_handle.alias);
 
         // List of part files and watermarks that will be used by the engine
         // Note: Engine will still filter the records by the offset interval
@@ -608,7 +613,7 @@ impl TransformServiceImpl {
     // TODO: Avoid iterating through output chain multiple times
     async fn get_vocab(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
         let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
         Ok(dataset
@@ -703,7 +708,7 @@ impl TransformServiceImpl {
         let source = source.ok_or(
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.name);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
@@ -745,6 +750,11 @@ impl TransformServiceImpl {
                 .try_collect()
                 .await?;
 
+            assert!(
+                !dataset_handle.alias.is_multitenant(),
+                "Multitenancy is not supported yet"
+            );
+
             let step = VerificationStep {
                 operation: TransformOperation {
                     dataset_handle: dataset_handle.clone(),
@@ -752,7 +762,7 @@ impl TransformServiceImpl {
                     input_checkpoint: block_t.event.input_checkpoint.clone(),
                     request: ExecuteQueryRequest {
                         dataset_id: dataset_handle.id.clone(),
-                        dataset_name: dataset_handle.name.clone(),
+                        dataset_name: dataset_handle.alias.dataset_name.clone(),
                         system_time: block.system_time,
                         offset: block_t
                             .event
@@ -784,7 +794,7 @@ impl TransformServiceImpl {
 
     async fn transform_impl(
         &self,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
@@ -835,7 +845,7 @@ impl TransformServiceImpl {
 impl TransformService for TransformServiceImpl {
     async fn transform(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         info!(
@@ -849,9 +859,9 @@ impl TransformService for TransformServiceImpl {
 
     async fn transform_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefLocal>,
+        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
         maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
-    ) -> Vec<(DatasetRefLocal, Result<TransformResult, TransformError>)> {
+    ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
@@ -878,7 +888,7 @@ impl TransformService for TransformServiceImpl {
 
     async fn verify_transform(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
         _options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,

@@ -21,13 +21,8 @@ use opendatafabric::*;
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
 
-type GenericVerificationResult = Result<
-    Vec<(
-        DatasetRefLocal,
-        Result<VerificationResult, VerificationError>,
-    )>,
-    CLIError,
->;
+type GenericVerificationResult =
+    Result<Vec<(DatasetRef, Result<VerificationResult, VerificationError>)>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -37,7 +32,7 @@ pub struct VerifyCommand {
     local_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRefLocal>,
+    refs: Vec<DatasetRef>,
     recursive: bool,
     integrity: bool,
 }
@@ -52,7 +47,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefLocal>,
+        I: Iterator<Item = DatasetRef>,
     {
         Self {
             local_repo,
@@ -277,9 +272,9 @@ impl VerificationProgress {
         };
 
         let dataset = if let Some(block) = block {
-            format!("({} @ {})", self.dataset_handle.name, block.short())
+            format!("({} @ {})", self.dataset_handle.alias, block.short())
         } else {
-            format!("({})", self.dataset_handle.name)
+            format!("({})", self.dataset_handle.alias)
         };
 
         format!(

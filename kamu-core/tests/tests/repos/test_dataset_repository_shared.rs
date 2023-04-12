@@ -10,22 +10,22 @@
 use std::assert_matches::assert_matches;
 
 use kamu::{domain::*, testing::MetadataFactory};
-use opendatafabric::{DatasetKind, DatasetName};
+use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
-    let dataset_name = DatasetName::new_unchecked("foo");
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
+        repo.get_dataset(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
         GetDatasetError::NotFound(_)
     );
 
-    let builder = repo.create_dataset(&dataset_name).await.unwrap();
+    let builder = repo.create_dataset(&dataset_alias).await.unwrap();
     let chain = builder.as_dataset().as_metadata_chain();
 
     chain
@@ -39,7 +39,7 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
 
     // Not finalized yet
     assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
+        repo.get_dataset(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -47,18 +47,21 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
     );
 
     let hdl = builder.finish().await.unwrap();
-    assert_eq!(hdl.name, dataset_name);
+    assert_eq!(hdl.alias, dataset_alias);
 
-    assert!(repo.get_dataset(&dataset_name.as_local_ref()).await.is_ok());
+    assert!(repo
+        .get_dataset(&dataset_alias.as_local_ref())
+        .await
+        .is_ok());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
-    let dataset_name = DatasetName::new_unchecked("foo");
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
 
     assert_matches!(
-        repo.get_dataset(&dataset_name.as_local_ref())
+        repo.get_dataset(&dataset_alias.as_local_ref())
             .await
             .err()
             .unwrap(),
@@ -90,9 +93,9 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
-    let name_foo = DatasetName::new_unchecked("foo");
-    let name_bar = DatasetName::new_unchecked("bar");
-    let name_baz = DatasetName::new_unchecked("baz");
+    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -110,22 +113,22 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
     repo.create_datasets_from_snapshots(snapshots).await;
 
     assert_matches!(
-        repo.rename_dataset(&name_baz.as_local_ref(), &name_foo)
+        repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo)
             .await,
         Err(RenameDatasetError::NotFound(_))
     );
 
     assert_matches!(
-        repo.rename_dataset(&name_foo.as_local_ref(), &name_bar)
+        repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar)
             .await,
         Err(RenameDatasetError::NameCollision(_))
     );
 
-    repo.rename_dataset(&name_foo.as_local_ref(), &name_baz)
+    repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz)
         .await
         .unwrap();
 
-    let baz = repo.get_dataset(&name_baz.as_local_ref()).await.unwrap();
+    let baz = repo.get_dataset(&alias_baz.as_local_ref()).await.unwrap();
 
     use futures::StreamExt;
     assert_eq!(baz.as_metadata_chain().iter_blocks().count().await, 2);
@@ -134,8 +137,8 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_dataset(repo: &dyn DatasetRepository) {
-    let name_foo = DatasetName::new_unchecked("foo");
-    let name_bar = DatasetName::new_unchecked("bar");
+    let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -158,18 +161,22 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository) {
         .collect();
 
     assert_matches!(
-        repo.delete_dataset(&name_foo.as_local_ref()).await,
+        repo.delete_dataset(&alias_foo.as_local_ref()).await,
         Err(DeleteDatasetError::DanglingReference(e)) if e.children == vec![handles[1].clone()]
     );
 
-    assert!(repo.get_dataset(&name_foo.as_local_ref()).await.is_ok());
-    assert!(repo.get_dataset(&name_bar.as_local_ref()).await.is_ok());
+    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
+    assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_ok());
 
-    repo.delete_dataset(&name_bar.as_local_ref()).await.unwrap();
-    repo.delete_dataset(&name_foo.as_local_ref()).await.unwrap();
+    repo.delete_dataset(&alias_bar.as_local_ref())
+        .await
+        .unwrap();
+    repo.delete_dataset(&alias_foo.as_local_ref())
+        .await
+        .unwrap();
 
     assert_matches!(
-        repo.get_dataset(&name_foo.as_local_ref())
+        repo.get_dataset(&alias_foo.as_local_ref())
             .await
             .err()
             .unwrap(),

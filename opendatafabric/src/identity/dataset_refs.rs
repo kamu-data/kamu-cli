@@ -18,150 +18,174 @@ use crate::formats::InvalidValue;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// References local dataset by ID or by name
+/// References local dataset by ID or alias
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DatasetRefLocal {
+pub enum DatasetRef {
     ID(DatasetID),
-    Name(DatasetName),
+    Alias(DatasetAlias),
     Handle(DatasetHandle),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// References remote dataset by ID or by qualified name
+/// References remote dataset by ID, URL, or alias
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRefRemote {
-    ID(DatasetID),
-    RemoteName(RemoteDatasetName),
-    RemoteHandle(RemoteDatasetHandle),
+    ID(Option<RepoName>, DatasetID),
+    Alias(DatasetAliasRemote),
     Url(Arc<Url>),
+    Handle(DatasetHandleRemote),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// References any dataset, local or remote
+/// References any dataset, local or remote.
+///
+/// Note that when interpreting reference such as `"foo/bar"` there is an
+/// ambiguity between treating it as `<account>/<dataset>` or `<repo>/<dataset>`.
+/// That's why this reference needs to be disambiguated before accessing those parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRefAny {
-    ID(DatasetID),
-    Name(DatasetName),
-    Handle(DatasetHandle),
-    RemoteName(RemoteDatasetName),
-    RemoteHandle(RemoteDatasetHandle),
+    ID(Option<RepoName>, DatasetID),
+    Alias(Option<Arc<str>>, Option<Arc<str>>, DatasetName),
     Url(Arc<Url>),
+    LocalHandle(DatasetHandle),
+    RemoteHandle(DatasetHandleRemote),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-
-/// References a dataset located inside a repository
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RepoDatasetRef {
-    ID(DatasetID),
-    Name(DatasetNameWithOwner),
-    Url(Arc<Url>),
-    Handle(RepoDatasetHandle),
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DatasetRefLocal
+// DatasetRef
 ////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetRefLocal {
+impl DatasetRef {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
-            DatasetRefLocal::ID(id) => Some(id),
-            DatasetRefLocal::Name(_) => None,
-            DatasetRefLocal::Handle(DatasetHandle { id, .. }) => Some(id),
+            Self::ID(id) => Some(id),
+            Self::Alias(_) => None,
+            Self::Handle(DatasetHandle { id, .. }) => Some(id),
         }
     }
 
-    pub fn name(&self) -> Option<&DatasetName> {
+    pub fn alias(&self) -> Option<&DatasetAlias> {
         match self {
-            DatasetRefLocal::ID(_) => None,
-            DatasetRefLocal::Name(name) => Some(name),
-            DatasetRefLocal::Handle(DatasetHandle { name, .. }) => Some(name),
+            Self::ID(_) => None,
+            Self::Alias(alias) => Some(alias),
+            Self::Handle(DatasetHandle { alias, .. }) => Some(alias),
+        }
+    }
+
+    pub fn account_name(&self) -> Option<&AccountName> {
+        match self {
+            Self::ID(_) => None,
+            Self::Alias(alias) => alias.account_name.as_ref(),
+            Self::Handle(DatasetHandle { alias, .. }) => alias.account_name.as_ref(),
+        }
+    }
+
+    pub fn dataset_name(&self) -> Option<&DatasetName> {
+        match self {
+            Self::ID(_) => None,
+            Self::Alias(alias) => Some(&alias.dataset_name),
+            Self::Handle(DatasetHandle { alias, .. }) => Some(&alias.dataset_name),
         }
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
         DatasetRefAny::from(self)
     }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
+    }
 }
 
-impl std::str::FromStr for DatasetRefLocal {
-    type Err = InvalidValue<DatasetRefLocal>;
+impl std::str::FromStr for DatasetRef {
+    type Err = InvalidValue<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match DatasetID::from_str(s) {
-            Ok(id) => Ok(id.into()),
-            Err(_) => match DatasetName::from_str(s) {
-                Ok(name) => Ok(name.into()),
+            Ok(id) => Ok(Self::ID(id)),
+            Err(_) => match DatasetAlias::from_str(s) {
+                Ok(alias) => Ok(Self::Alias(alias)),
                 Err(_) => Err(Self::Err::new(s)),
             },
         }
     }
 }
 
-super::dataset_identity::impl_try_from_str!(DatasetRefLocal);
+super::dataset_identity::impl_try_from_str!(DatasetRef);
 
-crate::formats::impl_invalid_value!(DatasetRefLocal);
+crate::formats::impl_invalid_value!(DatasetRef);
 
-impl fmt::Display for DatasetRefLocal {
+impl fmt::Display for DatasetRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DatasetRefLocal::ID(v) => write!(f, "{}", v),
-            DatasetRefLocal::Name(v) => write!(f, "{}", v),
-            DatasetRefLocal::Handle(v) => write!(f, "{}", v),
+            Self::ID(v) => write!(f, "{}", v),
+            Self::Alias(v) => write!(f, "{}", v),
+            Self::Handle(v) => write!(f, "{}", v),
         }
     }
 }
 
-impl_serde!(DatasetRefLocal, DatasetRefLocalSerdeVisitor);
+impl_serde!(DatasetRef, DatasetRefSerdeVisitor);
 
-impl From<DatasetID> for DatasetRefLocal {
+impl From<DatasetID> for DatasetRef {
     fn from(v: DatasetID) -> Self {
         Self::ID(v.clone())
     }
 }
 
-impl From<&DatasetID> for DatasetRefLocal {
+impl From<&DatasetID> for DatasetRef {
     fn from(v: &DatasetID) -> Self {
         Self::ID(v.clone())
     }
 }
 
-impl From<DatasetName> for DatasetRefLocal {
+impl From<DatasetName> for DatasetRef {
     fn from(v: DatasetName) -> Self {
-        Self::Name(v)
+        Self::Alias(DatasetAlias::new(None, v))
     }
 }
 
-impl From<&DatasetName> for DatasetRefLocal {
+impl From<&DatasetName> for DatasetRef {
     fn from(v: &DatasetName) -> Self {
-        Self::Name(v.clone())
+        Self::Alias(DatasetAlias::new(None, v.clone()))
     }
 }
 
-impl From<DatasetHandle> for DatasetRefLocal {
+impl From<DatasetAlias> for DatasetRef {
+    fn from(v: DatasetAlias) -> Self {
+        Self::Alias(v)
+    }
+}
+
+impl From<&DatasetAlias> for DatasetRef {
+    fn from(v: &DatasetAlias) -> Self {
+        Self::Alias(v.clone())
+    }
+}
+
+impl From<DatasetHandle> for DatasetRef {
     fn from(v: DatasetHandle) -> Self {
         Self::Handle(v)
     }
 }
 
-impl From<&DatasetHandle> for DatasetRefLocal {
+impl From<&DatasetHandle> for DatasetRef {
     fn from(v: &DatasetHandle) -> Self {
         Self::Handle(v.clone())
     }
 }
 
-impl std::cmp::Ord for DatasetRefLocal {
+impl std::cmp::Ord for DatasetRef {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let l = (self.name(), self.id());
-        let r = (other.name(), other.id());
+        let l = (self.account_name(), self.dataset_name(), self.id());
+        let r = (self.account_name(), self.dataset_name(), other.id());
         l.cmp(&r)
     }
 }
 
-impl std::cmp::PartialOrd for DatasetRefLocal {
+impl std::cmp::PartialOrd for DatasetRef {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
@@ -174,23 +198,63 @@ impl std::cmp::PartialOrd for DatasetRefLocal {
 impl DatasetRefRemote {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
-            DatasetRefRemote::ID(id) => Some(id),
-            DatasetRefRemote::RemoteName(_) => None,
-            DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { id, .. }) => Some(id),
-            DatasetRefRemote::Url(_) => None,
+            Self::ID(_, id) => Some(id),
+            Self::Alias(_) => None,
+            Self::Url(_) => None,
+            Self::Handle(hdl) => Some(&hdl.id),
         }
     }
 
-    pub fn name(&self) -> Option<&RemoteDatasetName> {
+    pub fn alias(&self) -> Option<&DatasetAliasRemote> {
         match self {
-            DatasetRefRemote::ID(_) => None,
-            DatasetRefRemote::RemoteName(name) => Some(name),
-            DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }) => Some(name),
-            DatasetRefRemote::Url(_) => None,
+            Self::ID(_, _) => None,
+            Self::Alias(alias) => Some(alias),
+            Self::Url(_) => None,
+            Self::Handle(hdl) => Some(&hdl.alias),
+        }
+    }
+
+    pub fn url(&self) -> Option<&Url> {
+        match self {
+            Self::ID(_, _) => None,
+            Self::Alias(_) => None,
+            Self::Url(url) => Some(url.as_ref()),
+            Self::Handle(_) => None,
+        }
+    }
+
+    pub fn dataset_name(&self) -> Option<&DatasetName> {
+        match self {
+            Self::ID(_, _) => None,
+            Self::Alias(alias) => Some(&alias.dataset_name),
+            Self::Url(_) => None,
+            Self::Handle(hdl) => Some(&hdl.alias.dataset_name),
+        }
+    }
+
+    pub fn account_name(&self) -> Option<&AccountName> {
+        match self {
+            Self::ID(_, _) => None,
+            Self::Alias(alias) => alias.account_name.as_ref(),
+            Self::Url(_) => None,
+            Self::Handle(hdl) => hdl.alias.account_name.as_ref(),
+        }
+    }
+
+    pub fn repo_name(&self) -> Option<&RepoName> {
+        match self {
+            Self::ID(repo_name, _) => repo_name.as_ref(),
+            Self::Alias(alias) => Some(&alias.repo_name),
+            Self::Url(_) => None,
+            Self::Handle(hdl) => Some(&hdl.alias.repo_name),
         }
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
+    }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
         DatasetRefAny::from(self)
     }
 }
@@ -199,13 +263,16 @@ impl std::str::FromStr for DatasetRefRemote {
     type Err = InvalidValue<DatasetRefRemote>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetID::from_str(s) {
-            Ok(id) => Ok(id.into()),
-            Err(_) => match RemoteDatasetName::from_str(s) {
-                Ok(name) => Ok(name.into()),
+        match Grammar::match_remote_dataset_id(s) {
+            Some((repo, id, "")) => match DatasetID::from_str(id) {
+                Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
+                Err(_) => Err(Self::Err::new(s)),
+            },
+            _ => match DatasetAliasRemote::from_str(s) {
+                Ok(alias) => Ok(Self::Alias(alias)),
                 Err(_) => match Grammar::match_url(s) {
                     Some(_) => match Url::from_str(s) {
-                        Ok(url) => Ok(url.into()),
+                        Ok(url) => Ok(Self::Url(Arc::new(url))),
                         Err(_) => Err(Self::Err::new(s)),
                     },
                     None => Err(Self::Err::new(s)),
@@ -222,10 +289,11 @@ crate::formats::impl_invalid_value!(DatasetRefRemote);
 impl fmt::Display for DatasetRefRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DatasetRefRemote::ID(v) => write!(f, "{}", v),
-            DatasetRefRemote::RemoteName(v) => write!(f, "{}", v),
-            DatasetRefRemote::RemoteHandle(v) => write!(f, "{}", v),
+            DatasetRefRemote::ID(None, id) => write!(f, "{}", id),
+            DatasetRefRemote::ID(Some(repo), id) => write!(f, "{}/{}", repo, id),
+            DatasetRefRemote::Alias(v) => write!(f, "{}", v),
             DatasetRefRemote::Url(v) => write!(f, "{}", v),
+            DatasetRefRemote::Handle(v) => write!(f, "{}", v),
         }
     }
 }
@@ -234,37 +302,37 @@ impl_serde!(DatasetRefRemote, DatasetRefRemoteSerdeVisitor);
 
 impl From<DatasetID> for DatasetRefRemote {
     fn from(v: DatasetID) -> Self {
-        Self::ID(v)
+        Self::ID(None, v)
     }
 }
 
 impl From<&DatasetID> for DatasetRefRemote {
     fn from(v: &DatasetID) -> Self {
-        Self::ID(v.clone())
+        Self::ID(None, v.clone())
     }
 }
 
-impl From<RemoteDatasetName> for DatasetRefRemote {
-    fn from(v: RemoteDatasetName) -> Self {
-        Self::RemoteName(v)
+impl From<DatasetAliasRemote> for DatasetRefRemote {
+    fn from(v: DatasetAliasRemote) -> Self {
+        Self::Alias(v)
     }
 }
 
-impl From<&RemoteDatasetName> for DatasetRefRemote {
-    fn from(v: &RemoteDatasetName) -> Self {
-        Self::RemoteName(v.clone())
+impl From<&DatasetAliasRemote> for DatasetRefRemote {
+    fn from(v: &DatasetAliasRemote) -> Self {
+        Self::Alias(v.clone())
     }
 }
 
-impl From<RemoteDatasetHandle> for DatasetRefRemote {
-    fn from(v: RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v)
+impl From<DatasetHandleRemote> for DatasetRefRemote {
+    fn from(v: DatasetHandleRemote) -> Self {
+        Self::Handle(v)
     }
 }
 
-impl From<&RemoteDatasetHandle> for DatasetRefRemote {
-    fn from(v: &RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v.clone())
+impl From<&DatasetHandleRemote> for DatasetRefRemote {
+    fn from(v: &DatasetHandleRemote) -> Self {
+        Self::Handle(v.clone())
     }
 }
 
@@ -282,8 +350,8 @@ impl From<Url> for DatasetRefRemote {
 
 impl std::cmp::Ord for DatasetRefRemote {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let l = (self.name(), self.id());
-        let r = (other.name(), other.id());
+        let l = (self.url(), self.alias(), self.repo_name(), self.id());
+        let r = (self.url(), other.alias(), self.repo_name(), other.id());
         l.cmp(&r)
     }
 }
@@ -301,42 +369,129 @@ impl std::cmp::PartialOrd for DatasetRefRemote {
 impl DatasetRefAny {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
-            DatasetRefAny::ID(id) => Some(id),
-            DatasetRefAny::Name(_) => None,
-            DatasetRefAny::Handle(DatasetHandle { id, .. }) => Some(id),
-            DatasetRefAny::RemoteName(_) => None,
-            DatasetRefAny::RemoteHandle(RemoteDatasetHandle { id, .. }) => Some(id),
-            DatasetRefAny::Url(_) => None,
+            Self::ID(_, id) => Some(id),
+            _ => None,
         }
     }
 
-    pub fn as_local_ref(&self) -> Option<DatasetRefLocal> {
+    pub fn as_local_ref(
+        &self,
+        is_repo: impl Fn(&RepoName) -> bool,
+    ) -> Result<DatasetRef, DatasetRefRemote> {
+        self.clone().into_local_ref(is_repo)
+    }
+
+    pub fn as_local_single_tenant_ref(&self) -> Result<DatasetRef, DatasetRefRemote> {
+        self.as_local_ref(|_| true)
+    }
+
+    pub fn into_local_single_tenant_ref(self) -> Result<DatasetRef, DatasetRefRemote> {
+        self.into_local_ref(|_| true)
+    }
+
+    pub fn into_local_ref(
+        self,
+        is_repo: impl Fn(&RepoName) -> bool,
+    ) -> Result<DatasetRef, DatasetRefRemote> {
         match self {
-            DatasetRefAny::ID(v) => Some(DatasetRefLocal::ID(v.clone())),
-            DatasetRefAny::Name(v) => Some(DatasetRefLocal::Name(v.clone())),
-            DatasetRefAny::Handle(v) => Some(DatasetRefLocal::Handle(v.clone())),
-            DatasetRefAny::RemoteName(_) => None,
-            DatasetRefAny::RemoteHandle(_) => None,
-            DatasetRefAny::Url(_) => None,
+            Self::ID(None, id) => Ok(DatasetRef::ID(id)),
+            Self::ID(Some(repo), id) => Err(DatasetRefRemote::ID(Some(repo), id)),
+            Self::Alias(None, None, dataset_name) => {
+                Ok(DatasetRef::Alias(DatasetAlias::new(None, dataset_name)))
+            }
+            Self::Alias(Some(repo_name), Some(account_name), dataset_name) => {
+                Err(DatasetRefRemote::Alias(DatasetAliasRemote {
+                    repo_name: RepoName::from_inner_unchecked(repo_name),
+                    account_name: Some(AccountName::from_inner_unchecked(account_name)),
+                    dataset_name,
+                }))
+            }
+            Self::Alias(Some(prefix), None, dataset_name) => {
+                let repo_name = RepoName::from_inner_unchecked(prefix);
+                if is_repo(&repo_name) {
+                    Err(DatasetRefRemote::Alias(DatasetAliasRemote {
+                        repo_name,
+                        account_name: None,
+                        dataset_name,
+                    }))
+                } else {
+                    Ok(DatasetRef::Alias(DatasetAlias {
+                        account_name: Some(AccountName::from_inner_unchecked(
+                            repo_name.into_inner(),
+                        )),
+                        dataset_name,
+                    }))
+                }
+            }
+            Self::Alias(None, Some(_), _) => unreachable!(),
+            Self::Url(url) => Err(DatasetRefRemote::Url(url)),
+            Self::LocalHandle(hdl) => Ok(DatasetRef::Handle(hdl)),
+            Self::RemoteHandle(hdl) => Err(DatasetRefRemote::Handle(hdl)),
         }
     }
 
-    pub fn as_remote_ref(&self) -> Option<DatasetRefRemote> {
+    pub fn as_remote_ref(
+        &self,
+        is_repo: impl Fn(&RepoName) -> bool,
+    ) -> Result<DatasetRefRemote, DatasetRef> {
+        self.clone().into_remote_ref(is_repo)
+    }
+
+    pub fn into_remote_ref(
+        self,
+        is_repo: impl Fn(&RepoName) -> bool,
+    ) -> Result<DatasetRefRemote, DatasetRef> {
         match self {
-            DatasetRefAny::ID(v) => Some(DatasetRefRemote::ID(v.clone())),
-            DatasetRefAny::Name(_) => None,
-            DatasetRefAny::Handle(_) => None,
-            DatasetRefAny::RemoteName(v) => Some(DatasetRefRemote::RemoteName(v.clone())),
-            DatasetRefAny::RemoteHandle(v) => Some(DatasetRefRemote::RemoteHandle(v.clone())),
-            DatasetRefAny::Url(v) => Some(DatasetRefRemote::Url(v.clone())),
+            Self::ID(repo, id) => Ok(DatasetRefRemote::ID(repo, id)),
+            Self::Alias(None, None, dataset_name) => {
+                Err(DatasetRef::Alias(DatasetAlias::new(None, dataset_name)))
+            }
+            Self::Alias(Some(repo_name), Some(account_name), dataset_name) => {
+                Ok(DatasetRefRemote::Alias(DatasetAliasRemote {
+                    repo_name: RepoName::from_inner_unchecked(repo_name),
+                    account_name: Some(AccountName::from_inner_unchecked(account_name)),
+                    dataset_name,
+                }))
+            }
+            Self::Alias(Some(prefix), None, dataset_name) => {
+                let repo_name = RepoName::from_inner_unchecked(prefix);
+                if is_repo(&repo_name) {
+                    Ok(DatasetRefRemote::Alias(DatasetAliasRemote {
+                        repo_name,
+                        account_name: None,
+                        dataset_name,
+                    }))
+                } else {
+                    Err(DatasetRef::Alias(DatasetAlias {
+                        account_name: Some(AccountName::from_inner_unchecked(
+                            repo_name.into_inner(),
+                        )),
+                        dataset_name,
+                    }))
+                }
+            }
+            Self::Alias(None, Some(_), _) => unreachable!(),
+            Self::Url(url) => Ok(DatasetRefRemote::Url(url)),
+            Self::LocalHandle(hdl) => Err(DatasetRef::Handle(hdl)),
+            Self::RemoteHandle(hdl) => Ok(DatasetRefRemote::Handle(hdl)),
         }
     }
+}
 
-    pub fn is_odf_remote_ref(&self) -> bool {
-        if let DatasetRefAny::Url(v) = self {
-            v.as_str().starts_with("odf+")
-        } else {
-            false
+impl fmt::Display for DatasetRefAny {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ID(None, id) => write!(f, "{}", id),
+            Self::ID(Some(repo), id) => write!(f, "{}/{}", repo, id),
+            Self::Alias(None, None, name) => write!(f, "{}", name),
+            Self::Alias(None, Some(account), name) => write!(f, "{}/{}", account, name),
+            Self::Alias(Some(repo), None, name) => write!(f, "{}/{}", repo, name),
+            Self::Alias(Some(repo), Some(account), name) => {
+                write!(f, "{}/{}/{}", repo, account, name)
+            }
+            Self::Url(v) => write!(f, "{}", v),
+            Self::LocalHandle(v) => write!(f, "{}", v),
+            Self::RemoteHandle(v) => write!(f, "{}", v),
         }
     }
 }
@@ -345,15 +500,22 @@ impl std::str::FromStr for DatasetRefAny {
     type Err = InvalidValue<DatasetRefAny>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetID::from_str(s) {
-            Ok(id) => Ok(id.into()),
-            Err(_) => match DatasetName::from_str(s) {
-                Ok(name) => Ok(name.into()),
-                Err(_) => match RemoteDatasetName::from_str(s) {
-                    Ok(name) => Ok(name.into()),
+        match Grammar::match_remote_dataset_id(s) {
+            Some((repo, id, "")) => match DatasetID::from_str(id) {
+                Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
+                Err(_) => Err(Self::Err::new(s)),
+            },
+            _ => match DatasetName::from_str(s) {
+                Ok(dataset_name) => Ok(Self::Alias(None, None, dataset_name)),
+                Err(_) => match DatasetAliasRemote::from_str(s) {
+                    Ok(alias) => Ok(Self::Alias(
+                        Some(alias.repo_name.into_inner()),
+                        alias.account_name.map(|v| v.into_inner()),
+                        alias.dataset_name,
+                    )),
                     Err(_) => match Grammar::match_url(s) {
                         Some(_) => match Url::from_str(s) {
-                            Ok(url) => Ok(url.into()),
+                            Ok(url) => Ok(Self::Url(Arc::new(url))),
                             Err(_) => Err(Self::Err::new(s)),
                         },
                         None => Err(Self::Err::new(s)),
@@ -368,120 +530,63 @@ super::dataset_identity::impl_try_from_str!(DatasetRefAny);
 
 crate::formats::impl_invalid_value!(DatasetRefAny);
 
-impl fmt::Display for DatasetRefAny {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DatasetRefAny::ID(v) => write!(f, "{}", v),
-            DatasetRefAny::Name(v) => write!(f, "{}", v),
-            DatasetRefAny::Handle(v) => write!(f, "{}", v),
-            DatasetRefAny::RemoteName(v) => write!(f, "{}", v),
-            DatasetRefAny::RemoteHandle(v) => write!(f, "{}", v),
-            DatasetRefAny::Url(v) => write!(f, "{}", v),
-        }
-    }
-}
-
-impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
-
 impl From<DatasetID> for DatasetRefAny {
     fn from(v: DatasetID) -> Self {
-        Self::ID(v)
+        Self::ID(None, v)
     }
 }
 
 impl From<&DatasetID> for DatasetRefAny {
     fn from(v: &DatasetID) -> Self {
-        Self::ID(v.clone())
+        Self::ID(None, v.clone())
     }
 }
 
 impl From<DatasetName> for DatasetRefAny {
     fn from(v: DatasetName) -> Self {
-        Self::Name(v)
+        Self::Alias(None, None, v)
     }
 }
 
 impl From<&DatasetName> for DatasetRefAny {
     fn from(v: &DatasetName) -> Self {
-        Self::Name(v.clone())
+        Self::Alias(None, None, v.clone())
     }
 }
 
-impl From<DatasetHandle> for DatasetRefAny {
-    fn from(v: DatasetHandle) -> Self {
-        Self::Handle(v)
+impl From<DatasetAlias> for DatasetRefAny {
+    fn from(v: DatasetAlias) -> Self {
+        Self::Alias(None, v.account_name.map(|v| v.into_inner()), v.dataset_name)
     }
 }
 
-impl From<&DatasetHandle> for DatasetRefAny {
-    fn from(v: &DatasetHandle) -> Self {
-        Self::Handle(v.clone())
+impl From<&DatasetAlias> for DatasetRefAny {
+    fn from(v: &DatasetAlias) -> Self {
+        Self::Alias(
+            None,
+            v.account_name.clone().map(|v| v.into_inner()),
+            v.dataset_name.clone(),
+        )
     }
 }
 
-impl From<RemoteDatasetName> for DatasetRefAny {
-    fn from(v: RemoteDatasetName) -> Self {
-        Self::RemoteName(v)
+impl From<DatasetAliasRemote> for DatasetRefAny {
+    fn from(v: DatasetAliasRemote) -> Self {
+        Self::Alias(
+            Some(v.repo_name.into_inner()),
+            v.account_name.map(|v| v.into_inner()),
+            v.dataset_name,
+        )
     }
 }
 
-impl From<&RemoteDatasetName> for DatasetRefAny {
-    fn from(v: &RemoteDatasetName) -> Self {
-        Self::RemoteName(v.clone())
-    }
-}
-
-impl From<RemoteDatasetHandle> for DatasetRefAny {
-    fn from(v: RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v)
-    }
-}
-
-impl From<&RemoteDatasetHandle> for DatasetRefAny {
-    fn from(v: &RemoteDatasetHandle) -> Self {
-        Self::RemoteHandle(v.clone())
-    }
-}
-
-impl From<DatasetRefLocal> for DatasetRefAny {
-    fn from(v: DatasetRefLocal) -> Self {
-        match v {
-            DatasetRefLocal::ID(v) => DatasetRefAny::ID(v),
-            DatasetRefLocal::Name(v) => DatasetRefAny::Name(v),
-            DatasetRefLocal::Handle(v) => DatasetRefAny::Handle(v),
-        }
-    }
-}
-
-impl From<&DatasetRefLocal> for DatasetRefAny {
-    fn from(v: &DatasetRefLocal) -> Self {
-        match v {
-            DatasetRefLocal::ID(v) => DatasetRefAny::ID(v.clone()),
-            DatasetRefLocal::Name(v) => DatasetRefAny::Name(v.clone()),
-            DatasetRefLocal::Handle(v) => DatasetRefAny::Handle(v.clone()),
-        }
-    }
-}
-
-impl From<DatasetRefRemote> for DatasetRefAny {
-    fn from(v: DatasetRefRemote) -> Self {
-        match v {
-            DatasetRefRemote::ID(v) => DatasetRefAny::ID(v),
-            DatasetRefRemote::RemoteName(v) => DatasetRefAny::RemoteName(v),
-            DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v),
-            DatasetRefRemote::Url(v) => DatasetRefAny::Url(v),
-        }
-    }
-}
-
-impl From<&DatasetRefRemote> for DatasetRefAny {
-    fn from(v: &DatasetRefRemote) -> Self {
-        match v {
-            DatasetRefRemote::ID(v) => DatasetRefAny::ID(v.clone()),
-            DatasetRefRemote::RemoteName(v) => DatasetRefAny::RemoteName(v.clone()),
-            DatasetRefRemote::RemoteHandle(v) => DatasetRefAny::RemoteHandle(v.clone()),
-            DatasetRefRemote::Url(v) => DatasetRefAny::Url(v.clone()),
-        }
+impl From<&DatasetAliasRemote> for DatasetRefAny {
+    fn from(v: &DatasetAliasRemote) -> Self {
+        Self::Alias(
+            Some(v.repo_name.clone().into_inner()),
+            v.account_name.clone().map(|v| v.into_inner()),
+            v.dataset_name.clone(),
+        )
     }
 }
 
@@ -497,10 +602,127 @@ impl From<Url> for DatasetRefAny {
     }
 }
 
+impl From<DatasetRef> for DatasetRefAny {
+    fn from(v: DatasetRef) -> Self {
+        match v {
+            DatasetRef::ID(v) => Self::ID(None, v),
+            DatasetRef::Alias(v) => {
+                Self::Alias(None, v.account_name.map(|v| v.into_inner()), v.dataset_name)
+            }
+            DatasetRef::Handle(v) => Self::LocalHandle(v),
+        }
+    }
+}
+
+impl From<&DatasetRef> for DatasetRefAny {
+    fn from(v: &DatasetRef) -> Self {
+        match v {
+            DatasetRef::ID(v) => Self::ID(None, v.clone()),
+            DatasetRef::Alias(v) => Self::Alias(
+                None,
+                v.account_name.clone().map(|v| v.into_inner()),
+                v.dataset_name.clone(),
+            ),
+            DatasetRef::Handle(v) => Self::LocalHandle(v.clone()),
+        }
+    }
+}
+
+impl From<DatasetRefRemote> for DatasetRefAny {
+    fn from(v: DatasetRefRemote) -> Self {
+        match v {
+            DatasetRefRemote::ID(repo, id) => Self::ID(repo, id),
+            DatasetRefRemote::Alias(v) => Self::Alias(
+                Some(v.repo_name.into_inner()),
+                v.account_name.map(|v| v.into_inner()),
+                v.dataset_name,
+            ),
+            DatasetRefRemote::Url(v) => Self::Url(v),
+            DatasetRefRemote::Handle(v) => Self::RemoteHandle(v),
+        }
+    }
+}
+
+impl From<&DatasetRefRemote> for DatasetRefAny {
+    fn from(v: &DatasetRefRemote) -> Self {
+        match v {
+            DatasetRefRemote::ID(repo, id) => Self::ID(repo.clone(), id.clone()),
+            DatasetRefRemote::Alias(v) => Self::Alias(
+                Some(v.repo_name.clone().into_inner()),
+                v.account_name.clone().map(|v| v.into_inner()),
+                v.dataset_name.clone(),
+            ),
+            DatasetRefRemote::Url(v) => Self::Url(v.clone()),
+            DatasetRefRemote::Handle(v) => Self::RemoteHandle(v.clone()),
+        }
+    }
+}
+
+impl From<DatasetHandle> for DatasetRefAny {
+    fn from(v: DatasetHandle) -> Self {
+        Self::LocalHandle(v)
+    }
+}
+
+impl From<&DatasetHandle> for DatasetRefAny {
+    fn from(v: &DatasetHandle) -> Self {
+        Self::LocalHandle(v.clone())
+    }
+}
+
+impl From<DatasetHandleRemote> for DatasetRefAny {
+    fn from(v: DatasetHandleRemote) -> Self {
+        Self::RemoteHandle(v)
+    }
+}
+
+impl From<&DatasetHandleRemote> for DatasetRefAny {
+    fn from(v: &DatasetHandleRemote) -> Self {
+        Self::RemoteHandle(v.clone())
+    }
+}
+
 impl std::cmp::Ord for DatasetRefAny {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let l = (self.as_remote_ref(), self.as_local_ref());
-        let r = (other.as_remote_ref(), other.as_local_ref());
+        fn tuplify<'a>(
+            v: &DatasetRefAny,
+        ) -> (
+            Option<&str>,
+            Option<&str>,
+            Option<&DatasetName>,
+            Option<&DatasetID>,
+            Option<&Url>,
+        ) {
+            match v {
+                DatasetRefAny::ID(r, id) => {
+                    (r.as_ref().map(|v| v.as_str()), None, None, Some(&id), None)
+                }
+                DatasetRefAny::Alias(r, a, n) => (
+                    r.as_ref().map(|v| v.as_ref()),
+                    a.as_ref().map(|v| v.as_ref()),
+                    Some(n),
+                    None,
+                    None,
+                ),
+                DatasetRefAny::Url(url) => (None, None, None, None, Some(url.as_ref())),
+                DatasetRefAny::LocalHandle(hdl) => (
+                    None,
+                    hdl.alias.account_name.as_ref().map(|v| v.as_str()),
+                    Some(&hdl.alias.dataset_name),
+                    Some(&hdl.id),
+                    None,
+                ),
+                DatasetRefAny::RemoteHandle(hdl) => (
+                    Some(hdl.alias.repo_name.as_str()),
+                    hdl.alias.account_name.as_ref().map(|v| v.as_str()),
+                    Some(&hdl.alias.dataset_name),
+                    Some(&hdl.id),
+                    None,
+                ),
+            }
+        }
+        let l = tuplify(self);
+        let r = tuplify(other);
         l.cmp(&r)
     }
 }
@@ -508,106 +730,5 @@ impl std::cmp::Ord for DatasetRefAny {
 impl std::cmp::PartialOrd for DatasetRefAny {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// RepoDatasetRef
-////////////////////////////////////////////////////////////////////////////////
-
-impl RepoDatasetRef {
-    pub fn id(&self) -> Option<&DatasetID> {
-        match self {
-            RepoDatasetRef::ID(id) => Some(id),
-            RepoDatasetRef::Name(_) => None,
-            RepoDatasetRef::Handle(RepoDatasetHandle { id, .. }) => Some(id),
-            RepoDatasetRef::Url(_) => None,
-        }
-    }
-
-    pub fn name(&self) -> Option<&DatasetNameWithOwner> {
-        match self {
-            RepoDatasetRef::ID(_) => None,
-            RepoDatasetRef::Name(name) => Some(name),
-            RepoDatasetRef::Handle(RepoDatasetHandle { name, .. }) => Some(name),
-            RepoDatasetRef::Url(_) => None,
-        }
-    }
-}
-
-impl std::str::FromStr for RepoDatasetRef {
-    type Err = InvalidValue<RepoDatasetRef>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetID::from_str(s) {
-            Ok(id) => Ok(id.into()),
-            Err(_) => match DatasetNameWithOwner::from_str(s) {
-                Ok(name) => Ok(name.into()),
-                Err(_) => match Grammar::match_url(s) {
-                    Some(_) => match Url::from_str(s) {
-                        Ok(url) => Ok(url.into()),
-                        Err(_) => Err(Self::Err::new(s)),
-                    },
-                    None => Err(Self::Err::new(s)),
-                },
-            },
-        }
-    }
-}
-
-super::dataset_identity::impl_try_from_str!(RepoDatasetRef);
-
-crate::formats::impl_invalid_value!(RepoDatasetRef);
-
-impl fmt::Display for RepoDatasetRef {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            RepoDatasetRef::ID(v) => write!(f, "{}", v),
-            RepoDatasetRef::Name(v) => write!(f, "{}", v),
-            RepoDatasetRef::Handle(v) => write!(f, "{}", v),
-            RepoDatasetRef::Url(v) => write!(f, "{}", v),
-        }
-    }
-}
-
-impl From<DatasetID> for RepoDatasetRef {
-    fn from(v: DatasetID) -> Self {
-        Self::ID(v)
-    }
-}
-
-impl From<&DatasetID> for RepoDatasetRef {
-    fn from(v: &DatasetID) -> Self {
-        Self::ID(v.clone())
-    }
-}
-
-impl From<DatasetNameWithOwner> for RepoDatasetRef {
-    fn from(v: DatasetNameWithOwner) -> Self {
-        Self::Name(v)
-    }
-}
-
-impl From<&DatasetNameWithOwner> for RepoDatasetRef {
-    fn from(v: &DatasetNameWithOwner) -> Self {
-        Self::Name(v.clone())
-    }
-}
-
-impl From<RepoDatasetHandle> for RepoDatasetRef {
-    fn from(v: RepoDatasetHandle) -> Self {
-        Self::Handle(v)
-    }
-}
-
-impl From<&RepoDatasetHandle> for RepoDatasetRef {
-    fn from(v: &RepoDatasetHandle) -> Self {
-        Self::Handle(v.clone())
-    }
-}
-
-impl From<Url> for RepoDatasetRef {
-    fn from(v: Url) -> Self {
-        Self::Url(Arc::new(v))
     }
 }

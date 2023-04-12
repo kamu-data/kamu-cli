@@ -9,13 +9,13 @@
 
 use super::{CLIError, Command};
 use kamu::domain::*;
-use opendatafabric::RepositoryName;
+use opendatafabric::RepoName;
 
 use std::sync::Arc;
 
 pub struct RepositoryDeleteCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    names: Vec<RepositoryName>,
+    names: Vec<RepoName>,
     all: bool,
     no_confirmation: bool,
 }
@@ -28,7 +28,7 @@ impl RepositoryDeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: Iterator<Item = RepositoryName>,
+        I: Iterator<Item = RepoName>,
     {
         Self {
             remote_repo_reg,

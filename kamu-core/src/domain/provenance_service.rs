@@ -20,7 +20,7 @@ pub trait ProvenanceService: Sync + Send {
     /// Some predefined visitors are available.
     async fn get_dataset_lineage(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         visitor: &mut dyn LineageVisitor,
         options: LineageOptions,
     ) -> Result<(), GetLineageError>;

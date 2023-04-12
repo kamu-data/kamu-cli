@@ -78,7 +78,7 @@ async fn test_add_recursive() {
 
     let mut datasets: Vec<_> = local_repo
         .get_all_datasets()
-        .map_ok(|h| h.name)
+        .map_ok(|h| h.alias.to_string())
         .try_collect()
         .await
         .unwrap();

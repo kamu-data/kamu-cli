@@ -17,7 +17,7 @@ use thiserror::Error;
 pub trait RemoteAliasesRegistry: Send + Sync {
     async fn get_remote_aliases(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError>;
 }
 

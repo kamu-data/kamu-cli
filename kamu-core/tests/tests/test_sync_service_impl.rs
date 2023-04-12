@@ -23,7 +23,7 @@ use url::Url;
 
 async fn append_block(
     local_repo: &dyn DatasetRepository,
-    dataset_ref: impl Into<DatasetRefLocal>,
+    dataset_ref: impl Into<DatasetRef>,
     block: MetadataBlock,
 ) -> Multihash {
     let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
@@ -35,11 +35,11 @@ async fn append_block(
 
 fn assert_in_sync(
     workspace_layout: &WorkspaceLayout,
-    dataset_name_1: &DatasetName,
-    dataset_name_2: &DatasetName,
+    dataset_alias_1: &DatasetAlias,
+    dataset_alias_2: &DatasetAlias,
 ) {
-    let dataset_1_layout = workspace_layout.dataset_layout(dataset_name_1);
-    let dataset_2_layout = workspace_layout.dataset_layout(dataset_name_2);
+    let dataset_1_layout = workspace_layout.dataset_layout(dataset_alias_1);
+    let dataset_2_layout = workspace_layout.dataset_layout(dataset_alias_2);
 
     DatasetTestHelper::assert_datasets_in_sync(&dataset_1_layout, &dataset_2_layout);
 }
@@ -79,14 +79,14 @@ async fn do_test_sync(
     ipfs: Option<(IpfsGateway, IpfsClient)>,
 ) {
     // Tests sync between "foo" -> remote -> "bar"
-    let dataset_name = DatasetName::new_unchecked("foo");
-    let dataset_name_2 = DatasetName::new_unchecked("bar");
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let dataset_alias_2 = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let dataset_layout = workspace_layout.dataset_layout(&dataset_name);
-    let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_name_2);
+    let dataset_layout = workspace_layout.dataset_layout(&dataset_alias);
+    let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_alias_2);
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
@@ -103,20 +103,20 @@ async fn do_test_sync(
     assert_matches!(
         sync_svc
             .sync(
-                &dataset_name.as_any_ref(),
+                &dataset_alias.as_any_ref(),
                 &push_ref.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
             .await,
-        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_name.as_any_ref()
+        Err(SyncError::DatasetNotFound(e)) if e.dataset_ref == dataset_alias.as_any_ref()
     );
 
     assert_matches!(
         sync_svc
             .sync(
                 &pull_ref.as_any_ref(),
-                &dataset_name_2.as_any_ref(),
+                &dataset_alias_2.as_any_ref(),
                 SyncOptions::default(),
                 None,
             )
@@ -126,7 +126,7 @@ async fn do_test_sync(
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
-        .name(&dataset_name)
+        .name(&dataset_alias.dataset_name)
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
@@ -141,7 +141,7 @@ async fn do_test_sync(
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc.sync(
-            &dataset_name.as_any_ref(),
+            &dataset_alias.as_any_ref(),
             &push_ref.as_any_ref(),
             SyncOptions { create_if_not_exists: false, ..Default::default() },
             None
@@ -150,7 +150,7 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(),  SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(),  SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -159,7 +159,7 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head: None,
             new_head,
@@ -167,12 +167,12 @@ async fn do_test_sync(
         }) if new_head == b1
     );
 
-    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
+    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let b2 = append_block(
         local_repo.as_ref(),
-        &dataset_name,
+        &dataset_alias,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
             .prev(&b1, b1_sequence_number)
             .build(),
@@ -181,7 +181,7 @@ async fn do_test_sync(
 
     let b3 = append_block(
         local_repo.as_ref(),
-        &dataset_name,
+        &dataset_alias,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
             .prev(&b2, b1_sequence_number + 1)
             .build(),
@@ -189,13 +189,13 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DestinationAhead(DestinationAheadError {src_head, dst_head, dst_ahead_size: 2 }))
         if src_head == b1 && dst_head == b3
     );
 
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -204,7 +204,7 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias_2.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -212,13 +212,13 @@ async fn do_test_sync(
         }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
+    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
 
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc
             .sync(
-                &dataset_name.as_any_ref(),
+                &dataset_alias.as_any_ref(),
                 &push_ref.as_any_ref(),
                 SyncOptions::default(),
                 None
@@ -231,7 +231,7 @@ async fn do_test_sync(
         sync_svc
             .sync(
                 &pull_ref.as_any_ref(),
-                &dataset_name_2.as_any_ref(),
+                &dataset_alias_2.as_any_ref(),
                 SyncOptions::default(),
                 None
             )
@@ -239,14 +239,14 @@ async fn do_test_sync(
         Ok(SyncResult::UpToDate)
     );
 
-    assert_in_sync(&workspace_layout, &dataset_name, &dataset_name_2);
+    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
     let exta_head = append_block(
         local_repo.as_ref(),
-        &dataset_name_2,
+        &dataset_alias_2,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
             .prev(&b3, b1_sequence_number + 2)
             .build(),
@@ -254,7 +254,7 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc.sync(&dataset_name_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -264,7 +264,7 @@ async fn do_test_sync(
 
     // Try push from dataset_1
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1 }))
         if src_head == b3 && dst_head == exta_head
     );
@@ -273,7 +273,7 @@ async fn do_test_sync(
     assert_matches!(
         sync_svc
             .sync(
-                &dataset_name.as_any_ref(),
+                &dataset_alias.as_any_ref(),
                 &push_ref.as_any_ref(),
                 SyncOptions {
                     force: true,
@@ -291,7 +291,7 @@ async fn do_test_sync(
 
     // Try pulling dataset_2: should fail, destination is ahead
     assert_matches!(
-        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_name_2.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias_2.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DestinationAhead(DestinationAheadError { src_head, dst_head, dst_ahead_size: 1}))
         if src_head == b3 && dst_head == exta_head
     );
@@ -301,7 +301,7 @@ async fn do_test_sync(
         sync_svc
             .sync(
                 &pull_ref.as_any_ref(),
-                &dataset_name_2.as_any_ref(),
+                &dataset_alias_2.as_any_ref(),
                 SyncOptions {
                     force: true,
                     .. SyncOptions::default()
@@ -320,7 +320,7 @@ async fn do_test_sync(
 
     let b4 = append_block(
         local_repo.as_ref(),
-        &dataset_name,
+        &dataset_alias,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
             .prev(&b3, b1_sequence_number + 2)
             .build(),
@@ -329,7 +329,7 @@ async fn do_test_sync(
 
     let b5 = append_block(
         local_repo.as_ref(),
-        &dataset_name,
+        &dataset_alias,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
             .prev(&b4, b1_sequence_number + 3)
             .build(),
@@ -338,7 +338,7 @@ async fn do_test_sync(
 
     let b4_alt = append_block(
         local_repo.as_ref(),
-        &dataset_name_2,
+        &dataset_alias_2,
         MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
             .prev(&b3, b1_sequence_number + 2)
             .build(),
@@ -346,7 +346,7 @@ async fn do_test_sync(
     .await;
 
     assert_matches!(
-        sync_svc.sync(&dataset_name.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Ok(SyncResult::Updated {
             old_head,
             new_head,
@@ -355,7 +355,7 @@ async fn do_test_sync(
     );
 
     assert_matches!(
-        sync_svc.sync(&dataset_name_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
+        sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head, uncommon_blocks_in_src, uncommon_blocks_in_dst }))
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src == 1 && uncommon_blocks_in_dst == 2
     );

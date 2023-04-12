@@ -35,10 +35,7 @@ impl Dataset {
     }
 
     #[graphql(skip)]
-    pub async fn from_ref(
-        ctx: &Context<'_>,
-        dataset_ref: &odf::DatasetRefLocal,
-    ) -> Result<Dataset> {
+    pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail later?
@@ -63,7 +60,7 @@ impl Dataset {
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use `id()`.
     async fn name(&self) -> DatasetName {
-        self.dataset_handle.name.clone().into()
+        self.dataset_handle.alias.dataset_name.clone().into()
     }
 
     /// Returns the user or organization that owns this dataset

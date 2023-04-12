@@ -31,10 +31,11 @@ async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHand
 async fn new_deriv(
     local_repo: &dyn DatasetRepository,
     name: &str,
-    inputs: &[DatasetName],
+    inputs: &[DatasetAlias],
 ) -> (DatasetHandle, SetTransform) {
     let name = DatasetName::try_from(name).unwrap();
-    let transform = MetadataFactory::set_transform(inputs).build();
+    let transform =
+        MetadataFactory::set_transform(inputs.iter().map(|d| d.dataset_name.clone())).build();
     let snap = MetadataFactory::dataset_snapshot()
         .name(name)
         .kind(DatasetKind::Derivative)
@@ -47,7 +48,7 @@ async fn new_deriv(
 
 async fn append_block(
     local_repo: &dyn DatasetRepository,
-    dataset_ref: impl Into<DatasetRefLocal>,
+    dataset_ref: impl Into<DatasetRef>,
     block: MetadataBlock,
 ) -> Multihash {
     let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
@@ -59,10 +60,10 @@ async fn append_block(
 
 async fn append_data_block(
     local_repo: &dyn DatasetRepository,
-    name: &DatasetName,
+    alias: &DatasetAlias,
     records: i64,
 ) -> (Multihash, MetadataBlockTyped<AddData>) {
-    let ds = local_repo.get_dataset(&name.as_local_ref()).await.unwrap();
+    let ds = local_repo.get_dataset(&alias.as_local_ref()).await.unwrap();
     let chain = ds.as_metadata_chain();
     let offset = chain
         .iter_blocks()
@@ -104,9 +105,9 @@ async fn test_get_next_operation() {
     );
 
     let foo = new_root(local_repo.as_ref(), "foo").await;
-    let foo_layout = workspace_layout.dataset_layout(&foo.name);
+    let foo_layout = workspace_layout.dataset_layout(&foo.alias);
 
-    let (bar, bar_source) = new_deriv(local_repo.as_ref(), "bar", &[foo.name.clone()]).await;
+    let (bar, bar_source) = new_deriv(local_repo.as_ref(), "bar", &[foo.alias.clone()]).await;
 
     // No data - no work
     assert_eq!(
@@ -117,7 +118,7 @@ async fn test_get_next_operation() {
         None
     );
 
-    let (_, foo_block) = append_data_block(local_repo.as_ref(), &foo.name, 10).await;
+    let (_, foo_block) = append_data_block(local_repo.as_ref(), &foo.alias, 10).await;
     let data_path = foo_layout.data_slice_path(&foo_block.event.output_data);
 
     assert!(matches!(
@@ -126,7 +127,7 @@ async fn test_get_next_operation() {
         if transform == bar_source.transform &&
         inputs == vec![ExecuteQueryInput {
             dataset_id: foo.id.clone(),
-            dataset_name: foo.name.clone(),
+            dataset_name: foo.alias.dataset_name.clone(),
             vocab: DatasetVocabulary::default(),
             data_interval: Some(OffsetInterval {start: 0, end: 9}),
             data_paths: vec![data_path.clone()],
@@ -152,15 +153,15 @@ async fn test_get_verification_plan_one_to_one() {
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
-    let root_name = DatasetName::new_unchecked("foo");
-    let root_layout = workspace_layout.dataset_layout(&root_name);
+    let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
+    let root_layout = workspace_layout.dataset_layout(&root_alias);
     let root_create_result = local_repo
         .create_dataset_from_blocks(
-            &root_name,
+            &root_alias,
             [
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(DatasetKind::Root)
-                        .id_from(root_name.as_str())
+                        .id_from(root_alias.dataset_name.as_str())
                         .build(),
                 )
                 .system_time(t0)
@@ -178,20 +179,20 @@ async fn test_get_verification_plan_one_to_one() {
     let root_initial_sequence_number = root_create_result.head_sequence_number;
 
     // Create derivative
-    let deriv_name = DatasetName::new_unchecked("bar");
+    let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let deriv_create_result = local_repo
         .create_dataset_from_blocks(
-            &deriv_name,
+            &deriv_alias,
             [
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(DatasetKind::Derivative)
-                        .id_from(deriv_name.as_str())
+                        .id_from(deriv_alias.dataset_name.as_str())
                         .build(),
                 )
                 .system_time(t0)
                 .build(),
                 MetadataFactory::metadata_block(
-                    MetadataFactory::set_transform([&root_name])
+                    MetadataFactory::set_transform([&root_alias.dataset_name])
                         .input_ids_from_names()
                         .build(),
                 )

@@ -16,14 +16,14 @@ use std::sync::Arc;
 
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     output_format: Option<String>,
 }
 
 impl InspectSchemaCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         output_format: Option<&str>,
     ) -> Self {
         Self {
@@ -109,7 +109,7 @@ impl InspectSchemaCommand {
         eprintln!(
             "{}: Dataset schema is not yet available: {}",
             console::style("Warning").yellow(),
-            self.dataset_ref.name().unwrap(),
+            self.dataset_ref.alias().unwrap(),
         );
     }
 }

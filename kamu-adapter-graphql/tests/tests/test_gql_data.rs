@@ -35,7 +35,7 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
     let dataset_builder = local_repo
-        .create_dataset(&DatasetName::new_unchecked("foo"))
+        .create_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
         .await
         .unwrap();
 

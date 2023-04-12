@@ -15,14 +15,14 @@ use std::sync::Arc;
 
 pub struct RenameCommand {
     local_repo: Arc<dyn DatasetRepository>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     new_name: DatasetName,
 }
 
 impl RenameCommand {
     pub fn new<N>(
         local_repo: Arc<dyn DatasetRepository>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         new_name: N,
     ) -> Self
     where
@@ -42,7 +42,10 @@ impl Command for RenameCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self
             .local_repo
-            .rename_dataset(&self.dataset_ref, &self.new_name)
+            .rename_dataset(
+                &self.dataset_ref,
+                &DatasetAlias::new(None, self.new_name.clone()),
+            )
             .await
         {
             Ok(_) => Ok(()),

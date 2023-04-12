@@ -141,10 +141,12 @@ impl PushServiceImpl {
         remote_ref: &DatasetRefRemote,
     ) -> Result<DatasetHandle, PushError> {
         // Do a quick check when remote and local names match
-        if let Some(remote_name) = remote_ref.name() {
+        if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
                 .local_repo
-                .try_resolve_dataset_ref(&remote_name.dataset().as_local_ref())
+                .try_resolve_dataset_ref(
+                    &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
+                )
                 .await?
             {
                 if self
@@ -188,16 +190,16 @@ impl PushService for PushServiceImpl {
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse> {
         let mut requests = dataset_refs.map(|r| {
-            if let Some(local_ref) = r.as_local_ref() {
-                PushRequest {
+            // TODO: Support local multi-tenancy
+            match r.as_local_single_tenant_ref() {
+                Ok(local_ref) => PushRequest {
                     local_ref: Some(local_ref),
                     remote_ref: None,
-                }
-            } else {
-                PushRequest {
+                },
+                Err(remote_ref) => PushRequest {
                     local_ref: None,
-                    remote_ref: Some(r.as_remote_ref().unwrap()),
-                }
+                    remote_ref: Some(remote_ref),
+                },
             }
         });
 

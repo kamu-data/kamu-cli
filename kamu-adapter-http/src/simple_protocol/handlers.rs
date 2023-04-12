@@ -22,7 +22,7 @@ use kamu::domain::*;
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
-    DatasetRefLocal, Multihash,
+    DatasetRef, Multihash,
 };
 use std::{str::FromStr, sync::Arc};
 use url::Url;
@@ -156,7 +156,7 @@ pub async fn dataset_checkpoints_handler(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    dataset_ref: Extension<DatasetRefLocal>,
+    dataset_ref: Extension<DatasetRef>,
     catalog: Extension<dill::Catalog>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,

@@ -63,7 +63,8 @@ impl Kamu {
     }
 
     pub fn dataset_layout(&self, dataset_name: &DatasetName) -> DatasetLayout {
-        self.workspace_layout.dataset_layout(dataset_name)
+        self.workspace_layout
+            .dataset_layout(&DatasetAlias::new(None, dataset_name.clone()))
     }
 
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {

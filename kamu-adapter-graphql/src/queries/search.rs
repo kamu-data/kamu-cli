@@ -41,11 +41,11 @@ impl Search {
 
         let mut datasets: Vec<_> = local_repo
             .get_all_datasets()
-            .filter_ok(|hdl| hdl.name.contains(&query))
+            .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect()
             .await?;
 
-        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
         let total_count = datasets.len();
 
         let nodes: Vec<_> = datasets

@@ -19,7 +19,7 @@ pub struct AliasListCommand {
     local_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
-    dataset_ref: Option<DatasetRefLocal>,
+    dataset_ref: Option<DatasetRef>,
 }
 
 impl AliasListCommand {
@@ -27,7 +27,7 @@ impl AliasListCommand {
         local_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
-        dataset_ref: Option<DatasetRefLocal>,
+        dataset_ref: Option<DatasetRef>,
     ) -> Self {
         Self {
             local_repo,
@@ -51,10 +51,10 @@ impl AliasListCommand {
                 .await?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                write!(out, "{},{},{}\n", &ds.name, "pull", &alias)?;
+                write!(out, "{},{},{}\n", &ds.alias, "pull", &alias)?;
             }
             for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                write!(out, "{},{},{}\n", &ds.name, "push", &alias)?;
+                write!(out, "{},{},{}\n", &ds.alias, "push", &alias)?;
             }
         }
 
@@ -89,7 +89,7 @@ impl AliasListCommand {
             for alias in pull_aliases {
                 items += 1;
                 table.add_row(Row::new(vec![
-                    Cell::new(&ds.name),
+                    Cell::new(&ds.alias.to_string()),
                     Cell::new("Pull"),
                     Cell::new(&alias),
                 ]));
@@ -98,7 +98,7 @@ impl AliasListCommand {
             for alias in push_aliases {
                 items += 1;
                 table.add_row(Row::new(vec![
-                    Cell::new(&ds.name),
+                    Cell::new(&ds.alias.to_string()),
                     Cell::new("Push"),
                     Cell::new(&alias),
                 ]));
@@ -125,7 +125,7 @@ impl Command for AliasListCommand {
             self.local_repo.get_all_datasets().try_collect().await?
         };
 
-        datasets.sort_by(|a, b| a.name.cmp(&b.name));
+        datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         // TODO: replace with formatters
         match self.output_config.format {

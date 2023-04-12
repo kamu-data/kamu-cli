@@ -36,7 +36,7 @@ impl RemoteRepositoryRegistryImpl {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
-    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's> {
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
         let read_dir = std::fs::read_dir(&self.workspace_layout.repos_dir).unwrap();
         Box::new(read_dir.map(|i| {
             i.unwrap()
@@ -48,10 +48,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         }))
     }
 
-    fn get_repository(
-        &self,
-        repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, GetRepoError> {
+    fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if !file_path.exists() {
@@ -67,7 +64,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         Ok(manifest.content)
     }
 
-    fn add_repository(&self, repo_name: &RepositoryName, mut url: Url) -> Result<(), AddRepoError> {
+    fn add_repository(&self, repo_name: &RepoName, mut url: Url) -> Result<(), AddRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if file_path.exists() {
@@ -93,7 +90,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         Ok(())
     }
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError> {
+    fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError> {
         let file_path = self.workspace_layout.repos_dir.join(repo_name);
 
         if !file_path.exists() {
@@ -115,25 +112,22 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
 pub struct RemoteRepositoryRegistryNull;
 
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
-    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepositoryName> + 's> {
+    fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
         Box::new(std::iter::empty())
     }
 
-    fn get_repository(
-        &self,
-        repo_name: &RepositoryName,
-    ) -> Result<RepositoryAccessInfo, GetRepoError> {
+    fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
         Err(RepositoryNotFoundError {
             repo_name: repo_name.clone(),
         }
         .into())
     }
 
-    fn add_repository(&self, _repo_name: &RepositoryName, _url: Url) -> Result<(), AddRepoError> {
+    fn add_repository(&self, _repo_name: &RepoName, _url: Url) -> Result<(), AddRepoError> {
         Err("null registry".int_err().into())
     }
 
-    fn delete_repository(&self, repo_name: &RepositoryName) -> Result<(), DeleteRepoError> {
+    fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError> {
         Err(RepositoryNotFoundError {
             repo_name: repo_name.clone(),
         }

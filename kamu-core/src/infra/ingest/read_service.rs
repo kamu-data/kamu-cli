@@ -81,7 +81,7 @@ impl ReadService {
 
         let request = IngestRequest {
             dataset_id: dataset_handle.id.clone(),
-            dataset_name: dataset_handle.name.clone(),
+            dataset_name: dataset_handle.alias.dataset_name.clone(),
             ingest_path: src_path.to_owned(),
             system_time,
             event_time: source_event_time,

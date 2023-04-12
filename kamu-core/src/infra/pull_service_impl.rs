@@ -82,7 +82,7 @@ impl PullServiceImpl {
         request: &PullRequest,
         referenced_explicitly: bool,
         options: &PullOptions,
-        visited: &mut HashMap<DatasetName, PullItem>,
+        visited: &mut HashMap<DatasetAlias, PullItem>,
     ) -> Result<i32, PullError> {
         debug!(?request, "Entering node");
 
@@ -105,33 +105,35 @@ impl PullServiceImpl {
 
         // Resolve the name of a local dataset if it exists
         // or a name to create dataset with if syncing from remote and creation is allowed
-        let local_name = if let Some(hdl) = &local_handle {
+        let local_alias = if let Some(hdl) = &local_handle {
             // Target exists
-            Ok(hdl.name.clone())
+            hdl.alias.clone()
         } else if let Some(local_ref) = &request.local_ref {
             // Target does not exist but was provided
-            if let Some(name) = local_ref.name() {
-                Ok(name.clone())
+            if let Some(alias) = local_ref.alias() {
+                alias.clone()
             } else {
-                Err(PullError::NotFound(DatasetNotFoundError {
+                return Err(PullError::NotFound(DatasetNotFoundError {
                     dataset_ref: local_ref.clone(),
-                }))
+                }));
             }
         } else {
             // Infer target name from remote reference
             // TODO: Inferred name can already exist, should we care?
             match &request.remote_ref {
-                Some(DatasetRefRemote::ID(_)) => {
+                Some(DatasetRefRemote::ID(_, _)) => {
                     unimplemented!("Pulling from remote by ID is not supported")
                 }
                 Some(
-                    DatasetRefRemote::RemoteName(name)
-                    | DatasetRefRemote::RemoteHandle(RemoteDatasetHandle { name, .. }),
-                ) => Ok(name.dataset().clone()),
-                Some(DatasetRefRemote::Url(url)) => self.infer_local_name_from_url(url),
+                    DatasetRefRemote::Alias(alias)
+                    | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
+                ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
+                Some(DatasetRefRemote::Url(url)) => {
+                    DatasetAlias::new(None, self.infer_local_name_from_url(url)?)
+                }
                 None => unreachable!(),
             }
-        }?;
+        };
 
         if local_handle.is_none() && !options.sync_options.create_if_not_exists {
             return Err(PullError::InvalidOperation(
@@ -140,7 +142,7 @@ impl PullServiceImpl {
         }
 
         // Already visited?
-        if let Some(pi) = visited.get_mut(&local_name) {
+        if let Some(pi) = visited.get_mut(&local_alias) {
             debug!("Already visited - continuing");
             if referenced_explicitly {
                 pi.original_request = Some(request.clone())
@@ -164,7 +166,7 @@ impl PullServiceImpl {
                 depth: 0,
                 local_ref: local_handle
                     .map(|h| h.into())
-                    .unwrap_or(local_name.clone().into()),
+                    .unwrap_or(local_alias.clone().into()),
                 remote_ref,
             }
         } else {
@@ -223,7 +225,7 @@ impl PullServiceImpl {
         debug!(?pull_item, "Resolved node");
 
         let depth = pull_item.depth;
-        visited.insert(local_name.clone(), pull_item);
+        visited.insert(local_alias.clone(), pull_item);
         Ok(depth)
     }
 
@@ -233,10 +235,12 @@ impl PullServiceImpl {
         remote_ref: &DatasetRefRemote,
     ) -> Result<Option<DatasetHandle>, InternalError> {
         // Do a quick check when remote and local names match
-        if let Some(remote_name) = remote_ref.name() {
+        if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
                 .local_repo
-                .try_resolve_dataset_ref(&remote_name.dataset().as_local_ref())
+                .try_resolve_dataset_ref(
+                    &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
+                )
                 .await?
             {
                 if self
@@ -272,7 +276,7 @@ impl PullServiceImpl {
 
     async fn resolve_pull_alias(
         &self,
-        local_ref: &DatasetRefLocal,
+        local_ref: &DatasetRef,
     ) -> Result<Option<DatasetRefRemote>, PullError> {
         let remote_aliases = match self.remote_alias_reg.get_remote_aliases(local_ref).await {
             Ok(v) => Ok(v),
@@ -434,18 +438,18 @@ impl PullService for PullServiceImpl {
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let mut requests = dataset_refs.map(|r| {
-            if let Some(local_ref) = r.as_local_ref() {
-                PullRequest {
+            // TODO: Support local multi-tenancy
+            match r.as_local_single_tenant_ref() {
+                Ok(local_ref) => PullRequest {
                     local_ref: Some(local_ref),
                     remote_ref: None,
                     ingest_from: None,
-                }
-            } else {
-                PullRequest {
+                },
+                Err(remote_ref) => PullRequest {
                     local_ref: None,
-                    remote_ref: Some(r.as_remote_ref().unwrap()),
+                    remote_ref: Some(remote_ref),
                     ingest_from: None,
-                }
+                },
             }
         });
 
@@ -537,7 +541,7 @@ impl PullService for PullServiceImpl {
 
     async fn set_watermark(
         &self,
-        dataset_ref: &DatasetRefLocal,
+        dataset_ref: &DatasetRef,
         watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError> {
         let aliases = match self.remote_alias_reg.get_remote_aliases(dataset_ref).await {
@@ -589,7 +593,7 @@ impl PullService for PullServiceImpl {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PullItem {
     depth: i32,
-    local_ref: DatasetRefLocal,
+    local_ref: DatasetRef,
     remote_ref: Option<DatasetRefRemote>,
     original_request: Option<PullRequest>,
 }
@@ -597,7 +601,7 @@ struct PullItem {
 impl PullItem {
     fn into_response_ingest(
         self,
-        r: (DatasetRefLocal, Result<IngestResult, IngestError>),
+        r: (DatasetRef, Result<IngestResult, IngestError>),
     ) -> PullResponse {
         PullResponse {
             original_request: self.original_request,
@@ -611,10 +615,11 @@ impl PullItem {
     }
 
     fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
+        // TODO: Support local multi-tenancy
         PullResponse {
             original_request: self.original_request,
-            local_ref: r.dst.as_local_ref(),
-            remote_ref: r.src.as_remote_ref(),
+            local_ref: r.dst.as_local_ref(|_| true).ok(),
+            remote_ref: r.src.as_remote_ref(|_| true).ok(),
             result: match r.result {
                 Ok(r) => Ok(r.into()),
                 Err(e) => Err(e.into()),
@@ -624,7 +629,7 @@ impl PullItem {
 
     fn into_response_transform(
         self,
-        r: (DatasetRefLocal, Result<TransformResult, TransformError>),
+        r: (DatasetRef, Result<TransformResult, TransformError>),
     ) -> PullResponse {
         PullResponse {
             original_request: self.original_request,
@@ -659,7 +664,7 @@ impl Ord for PullItem {
             };
         }
 
-        match (self.local_ref.name(), other.local_ref.name()) {
+        match (self.local_ref.alias(), other.local_ref.alias()) {
             (Some(lhs), Some(rhs)) => lhs.cmp(rhs),
             (Some(_), None) => Ordering::Greater,
             (None, Some(_)) => Ordering::Less,

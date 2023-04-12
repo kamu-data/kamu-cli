@@ -15,7 +15,7 @@ use kamu::{
     infra::{utils::smart_transfer_protocol::SmartTransferProtocolClient, *},
 };
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use opendatafabric::{DatasetRefAny, DatasetRefLocal, DatasetRefRemote};
+use opendatafabric::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -130,7 +130,7 @@ impl ClientSideHarness {
 
     pub async fn push_dataset(
         &self,
-        dataset_local_ref: DatasetRefLocal,
+        dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
     ) -> Vec<PushResponse> {
         self.push_service
@@ -154,7 +154,7 @@ impl ClientSideHarness {
 
     pub async fn push_dataset_result(
         &self,
-        dataset_local_ref: DatasetRefLocal,
+        dataset_local_ref: DatasetRef,
         dataset_remote_ref: DatasetRefRemote,
     ) -> SyncResult {
         let results = self

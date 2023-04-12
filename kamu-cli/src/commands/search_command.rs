@@ -18,7 +18,7 @@ pub struct SearchCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     query: Option<String>,
-    repository_names: Vec<RepositoryName>,
+    repository_names: Vec<RepoName>,
 }
 
 impl SearchCommand {
@@ -30,7 +30,7 @@ impl SearchCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: IntoIterator<Item = RepositoryName>,
+        I: IntoIterator<Item = RepoName>,
     {
         Self {
             search_svc,

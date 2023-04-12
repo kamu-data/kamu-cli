@@ -16,7 +16,7 @@ use std::sync::Arc;
 use ed25519_dalek::Keypair;
 
 use super::grammar::Grammar;
-use super::{DatasetRefAny, DatasetRefLocal, DatasetRefRemote};
+use super::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use crate::formats::*;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -108,6 +108,14 @@ macro_rules! newtype_str {
 
             pub fn as_str(&self) -> &str {
                 self.0.as_ref()
+            }
+
+            pub fn into_inner(self) -> Arc<str> {
+                self.0
+            }
+
+            pub fn from_inner_unchecked(s: Arc<str>) -> Self {
+                Self(s)
             }
         }
 
@@ -243,16 +251,28 @@ impl DatasetID {
             .map_err(|_| InvalidValue::new(s))
     }
 
-    pub fn as_local_ref(&self) -> DatasetRefLocal {
-        DatasetRefLocal::ID(self.clone())
+    pub fn as_local_ref(&self) -> DatasetRef {
+        DatasetRef::ID(self.clone())
+    }
+
+    pub fn into_local_ref(self) -> DatasetRef {
+        DatasetRef::ID(self)
     }
 
     pub fn as_remote_ref(&self) -> DatasetRefRemote {
-        DatasetRefRemote::ID(self.clone())
+        DatasetRefRemote::from(self)
+    }
+
+    pub fn into_remote_ref(self) -> DatasetRefRemote {
+        DatasetRefRemote::from(self)
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::ID(self.clone())
+        DatasetRefAny::from(self)
+    }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
     }
 }
 
@@ -293,12 +313,12 @@ newtype_str!(
 );
 
 impl DatasetName {
-    pub fn as_local_ref(&self) -> DatasetRefLocal {
-        DatasetRefLocal::Name(self.clone())
+    pub fn as_local_ref(&self) -> DatasetRef {
+        DatasetRef::Alias(DatasetAlias::new(None, self.clone()))
     }
 
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::Name(self.clone())
+    pub fn into_local_ref(self) -> DatasetRef {
+        DatasetRef::Alias(DatasetAlias::new(None, self))
     }
 }
 
@@ -312,21 +332,17 @@ newtype_str!(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
-    RepositoryName,
-    Grammar::match_repository_name,
-    RepositoryNameSerdeVisitor
-);
+newtype_str!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DatasetNameWithOwner {
-    account_name: Option<AccountName>,
-    dataset_name: DatasetName,
+pub struct DatasetAlias {
+    pub account_name: Option<AccountName>,
+    pub dataset_name: DatasetName,
 }
 
-impl DatasetNameWithOwner {
+impl DatasetAlias {
     pub fn new(account_name: Option<AccountName>, dataset_name: DatasetName) -> Self {
         Self {
             account_name,
@@ -338,27 +354,39 @@ impl DatasetNameWithOwner {
         self.account_name.is_some()
     }
 
-    pub fn dataset(&self) -> &DatasetName {
-        &self.dataset_name
+    pub fn as_local_ref(&self) -> DatasetRef {
+        DatasetRef::Alias(self.clone())
     }
 
-    pub fn account(&self) -> Option<&AccountName> {
-        self.account_name.as_ref()
+    pub fn into_local_ref(self) -> DatasetRef {
+        DatasetRef::Alias(self)
     }
 
-    pub fn as_remote_name(&self, repository_name: &RepositoryName) -> RemoteDatasetName {
-        RemoteDatasetName::new(
-            repository_name.clone(),
+    pub fn as_remote_alias(&self, repo_name: impl Into<RepoName>) -> DatasetAliasRemote {
+        DatasetAliasRemote::new(
+            repo_name.into(),
             self.account_name.clone(),
             self.dataset_name.clone(),
         )
     }
+
+    pub fn into_remote_alias(self, repo_name: impl Into<RepoName>) -> DatasetAliasRemote {
+        DatasetAliasRemote::new(repo_name.into(), self.account_name, self.dataset_name)
+    }
+
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
+    }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
+    }
 }
 
-impl std::str::FromStr for DatasetNameWithOwner {
-    type Err = InvalidValue<DatasetNameWithOwner>;
+impl std::str::FromStr for DatasetAlias {
+    type Err = InvalidValue<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_dataset_name_with_owner(s) {
+        match Grammar::match_dataset_alias(s) {
             Some((acc, ds, "")) => Ok(Self::new(
                 acc.map(|s| AccountName::new_unchecked(s)),
                 DatasetName::new_unchecked(ds),
@@ -368,7 +396,7 @@ impl std::str::FromStr for DatasetNameWithOwner {
     }
 }
 
-impl fmt::Display for DatasetNameWithOwner {
+impl fmt::Display for DatasetAlias {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(acc) = &self.account_name {
             write!(f, "{}/", acc)?;
@@ -377,29 +405,29 @@ impl fmt::Display for DatasetNameWithOwner {
     }
 }
 
-impl_try_from_str!(DatasetNameWithOwner);
+impl_try_from_str!(DatasetAlias);
 
-impl_invalid_value!(DatasetNameWithOwner);
+impl_invalid_value!(DatasetAlias);
 
-impl_serde!(DatasetNameWithOwner, DatasetNameWithOwnerSerdeVisitor);
+impl_serde!(DatasetAlias, DatasetAliasSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct RemoteDatasetName {
-    repository_name: RepositoryName,
-    account_name: Option<AccountName>,
-    dataset_name: DatasetName,
+pub struct DatasetAliasRemote {
+    pub repo_name: RepoName,
+    pub account_name: Option<AccountName>,
+    pub dataset_name: DatasetName,
 }
 
-impl RemoteDatasetName {
+impl DatasetAliasRemote {
     pub fn new(
-        repository_name: RepositoryName,
+        repo_name: RepoName,
         account_name: Option<AccountName>,
         dataset_name: DatasetName,
     ) -> Self {
         Self {
-            repository_name,
+            repo_name,
             account_name,
             dataset_name,
         }
@@ -409,40 +437,41 @@ impl RemoteDatasetName {
         self.account_name.is_some()
     }
 
-    pub fn dataset(&self) -> &DatasetName {
-        &self.dataset_name
+    pub fn local_alias(&self) -> DatasetAlias {
+        DatasetAlias::new(self.account_name.clone(), self.dataset_name.clone())
     }
 
-    pub fn account(&self) -> Option<&AccountName> {
-        self.account_name.as_ref()
+    pub fn as_remote_ref(&self) -> DatasetRefRemote {
+        DatasetRefRemote::Alias(self.clone())
     }
 
-    pub fn repository(&self) -> &RepositoryName {
-        &self.repository_name
+    pub fn into_remote_ref(self) -> DatasetRefRemote {
+        DatasetRefRemote::Alias(self)
     }
 
-    pub fn as_name_with_owner(&self) -> DatasetNameWithOwner {
-        DatasetNameWithOwner::new(
-            self.account_name.as_ref().map(|a| a.clone()),
+    pub fn as_any_ref(&self) -> DatasetRefAny {
+        DatasetRefAny::Alias(
+            Some(self.repo_name.clone().into_inner()),
+            self.account_name.clone().map(|v| v.into_inner()),
             self.dataset_name.clone(),
         )
     }
 
-    pub fn as_remote_ref(&self) -> DatasetRefRemote {
-        DatasetRefRemote::RemoteName(self.clone())
-    }
-
-    pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::RemoteName(self.clone())
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::Alias(
+            Some(self.repo_name.into_inner()),
+            self.account_name.map(|v| v.into_inner()),
+            self.dataset_name,
+        )
     }
 }
 
-impl std::str::FromStr for RemoteDatasetName {
-    type Err = InvalidValue<RemoteDatasetName>;
+impl std::str::FromStr for DatasetAliasRemote {
+    type Err = InvalidValue<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_remote_dataset_name(s) {
+        match Grammar::match_dataset_alias_remote(s) {
             Some((repo, acc, ds, "")) => Ok(Self::new(
-                RepositoryName::new_unchecked(repo),
+                RepoName::new_unchecked(repo),
                 acc.map(|s| AccountName::new_unchecked(s)),
                 DatasetName::new_unchecked(ds),
             )),
@@ -451,9 +480,9 @@ impl std::str::FromStr for RemoteDatasetName {
     }
 }
 
-impl fmt::Display for RemoteDatasetName {
+impl fmt::Display for DatasetAliasRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}/", self.repository_name)?;
+        write!(f, "{}/", self.repo_name)?;
         if let Some(acc) = &self.account_name {
             write!(f, "{}/", acc)?;
         }
@@ -461,8 +490,8 @@ impl fmt::Display for RemoteDatasetName {
     }
 }
 
-impl_try_from_str!(RemoteDatasetName);
+impl_try_from_str!(DatasetAliasRemote);
 
-impl_invalid_value!(RemoteDatasetName);
+impl_invalid_value!(DatasetAliasRemote);
 
-impl_serde!(RemoteDatasetName, RemoteDatasetNameSerdeVisitor);
+impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);

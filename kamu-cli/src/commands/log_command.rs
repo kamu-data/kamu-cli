@@ -26,7 +26,7 @@ use std::sync::Arc;
 
 pub struct LogCommand {
     local_repo: Arc<dyn DatasetRepository>,
-    dataset_ref: DatasetRefLocal,
+    dataset_ref: DatasetRef,
     outout_format: Option<String>,
     filter: Option<String>,
     limit: usize,
@@ -36,7 +36,7 @@ pub struct LogCommand {
 impl LogCommand {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
-        dataset_ref: DatasetRefLocal,
+        dataset_ref: DatasetRef,
         outout_format: Option<&str>,
         filter: Option<&str>,
         limit: usize,
@@ -79,10 +79,10 @@ impl LogCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let id_to_name_lookup: BTreeMap<_, _> = self
+        let id_to_alias_lookup: BTreeMap<_, _> = self
             .local_repo
             .get_all_datasets()
-            .map_ok(|h| (h.id, h.name))
+            .map_ok(|h| (h.id, h.alias))
             .try_collect()
             .await?;
 
@@ -90,8 +90,8 @@ impl Command for LogCommand {
             self.outout_format.as_ref().map(|s| s.as_str()),
             self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
-            (None, true) => Box::new(PagedAsciiRenderer::new(id_to_name_lookup, self.limit)),
-            (None, false) => Box::new(AsciiRenderer::new(id_to_name_lookup, self.limit)),
+            (None, true) => Box::new(PagedAsciiRenderer::new(id_to_alias_lookup, self.limit)),
+            (None, false) => Box::new(AsciiRenderer::new(id_to_alias_lookup, self.limit)),
             (Some("yaml"), true) => Box::new(PagedYamlRenderer::new(self.limit)),
             (Some("yaml"), false) => Box::new(YamlRenderer::new(self.limit)),
             _ => panic!("Unexpected output format combination"),
@@ -134,12 +134,12 @@ trait MetadataRenderer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct AsciiRenderer {
-    id_to_name_lookup: BTreeMap<DatasetID, DatasetName>,
+    id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>,
     limit: usize,
 }
 
 impl AsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>, limit: usize) -> Self {
+    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>, limit: usize) -> Self {
         Self {
             id_to_name_lookup,
             limit,
@@ -434,12 +434,12 @@ impl MetadataRenderer for AsciiRenderer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct PagedAsciiRenderer {
-    id_to_name_lookup: BTreeMap<DatasetID, DatasetName>,
+    id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>,
     limit: usize,
 }
 
 impl PagedAsciiRenderer {
-    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetName>, limit: usize) -> Self {
+    fn new(id_to_name_lookup: BTreeMap<DatasetID, DatasetAlias>, limit: usize) -> Self {
         Self {
             id_to_name_lookup,
             limit,
@@ -458,7 +458,7 @@ impl MetadataRenderer for PagedAsciiRenderer {
         pager
             .set_exit_strategy(minus::ExitStrategy::PagerQuit)
             .unwrap();
-        pager.set_prompt(&dataset_handle.name).unwrap();
+        pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone(), self.limit);
         let mut write = WritePager(&mut pager);
@@ -563,7 +563,7 @@ impl MetadataRenderer for PagedYamlRenderer {
         pager
             .set_exit_strategy(minus::ExitStrategy::PagerQuit)
             .unwrap();
-        pager.set_prompt(&dataset_handle.name).unwrap();
+        pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         {
             let mut write = WritePager(&mut pager);

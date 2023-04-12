@@ -18,26 +18,34 @@ use super::dataset_refs::*;
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct DatasetHandle {
     pub id: DatasetID,
-    pub name: DatasetName,
+    pub alias: DatasetAlias,
 }
 
 impl DatasetHandle {
-    pub fn new(id: DatasetID, name: DatasetName) -> Self {
-        Self { id, name }
+    pub fn new(id: DatasetID, alias: DatasetAlias) -> Self {
+        Self { id, alias }
     }
 
-    pub fn as_local_ref(&self) -> DatasetRefLocal {
-        DatasetRefLocal::Handle(self.clone())
+    pub fn as_local_ref(&self) -> DatasetRef {
+        DatasetRef::from(self)
+    }
+
+    pub fn into_local_ref(self) -> DatasetRef {
+        DatasetRef::from(self)
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::Handle(self.clone())
+        DatasetRefAny::from(self)
+    }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
     }
 }
 
 impl fmt::Display for DatasetHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
+        write!(f, "{}", &self.alias)
     }
 }
 
@@ -45,7 +53,7 @@ impl fmt::Debug for DatasetHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("DatasetHandle")
             .field(&self.id)
-            .field(&self.name)
+            .field(&self.alias)
             .finish()
     }
 }
@@ -54,66 +62,44 @@ impl fmt::Debug for DatasetHandle {
 
 /// A resolved handle to the remote dataset
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RemoteDatasetHandle {
+pub struct DatasetHandleRemote {
     pub id: DatasetID,
-    pub name: RemoteDatasetName,
+    pub alias: DatasetAliasRemote,
 }
 
-impl RemoteDatasetHandle {
-    pub fn new(id: DatasetID, name: RemoteDatasetName) -> Self {
-        Self { id, name }
+impl DatasetHandleRemote {
+    pub fn new(id: DatasetID, alias: DatasetAliasRemote) -> Self {
+        Self { id, alias }
     }
 
     pub fn as_remote_ref(&self) -> DatasetRefRemote {
-        DatasetRefRemote::RemoteHandle(self.clone())
+        DatasetRefRemote::from(self)
+    }
+
+    pub fn into_remote_ref(self) -> DatasetRefRemote {
+        DatasetRefRemote::from(self)
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::RemoteHandle(self.clone())
+        DatasetRefAny::from(self)
+    }
+
+    pub fn into_any_ref(self) -> DatasetRefAny {
+        DatasetRefAny::from(self)
     }
 }
 
-impl fmt::Display for RemoteDatasetHandle {
+impl fmt::Display for DatasetHandleRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
+        write!(f, "{}", &self.alias)
     }
 }
 
-impl fmt::Debug for RemoteDatasetHandle {
+impl fmt::Debug for DatasetHandleRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("RemoteDatasetHandle")
             .field(&self.id)
-            .field(&self.name)
-            .finish()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-/// A resolved handle to the dataset inside a repository
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct RepoDatasetHandle {
-    pub id: DatasetID,
-    pub name: DatasetNameWithOwner,
-}
-
-impl RepoDatasetHandle {
-    pub fn new(id: DatasetID, name: DatasetNameWithOwner) -> Self {
-        Self { id, name }
-    }
-}
-
-impl fmt::Display for RepoDatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.name)
-    }
-}
-
-impl fmt::Debug for RepoDatasetHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("RepoDatasetHandle")
-            .field(&self.id)
-            .field(&self.name)
+            .field(&self.alias)
             .finish()
     }
 }
