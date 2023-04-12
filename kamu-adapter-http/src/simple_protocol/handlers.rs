@@ -18,7 +18,6 @@
 
 use crate::smart_protocol::ws_axum_server;
 use axum::extract::Extension;
-use bytes::Bytes;
 use kamu::{
     domain::*,
     infra::{get_staging_name, WorkspaceLayout},
@@ -30,6 +29,8 @@ use opendatafabric::{
 };
 use std::{str::FromStr, sync::Arc};
 use url::Url;
+
+use super::file_uploader::upload_file_from_axum_to_disk;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -167,14 +168,14 @@ pub async fn dataset_data_put_handler(
     catalog: Extension<dill::Catalog>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
-    body: Bytes,
+    mut body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
     dataset_put_object_common(
         catalog,
         hash_param.physical_hash,
         staging_name_param.staging_name.as_str(),
         "data",
-        body,
+        &mut body_stream,
     )
     .await
 }
@@ -185,14 +186,14 @@ pub async fn dataset_checkpoints_put_handler(
     catalog: Extension<dill::Catalog>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
-    body: Bytes,
+    mut body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
     dataset_put_object_common(
         catalog,
         hash_param.physical_hash,
         staging_name_param.staging_name.as_str(),
         "checkpoints",
-        body,
+        &mut body_stream,
     )
     .await
 }
@@ -204,7 +205,7 @@ async fn dataset_put_object_common(
     physical_hash: Multihash,
     staging_name: &str,
     internal_folder_name: &str,
-    body: Bytes,
+    body_stream: &mut axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
     let workspace_layout = catalog
         .get_one::<WorkspaceLayout>()
@@ -218,8 +219,7 @@ async fn dataset_put_object_common(
     );
 
     let temp_upload_path = workspace_layout.datasets_dir.join(temp_data_folder_suffix);
-
-    tokio::fs::write(&temp_upload_path, body)
+    upload_file_from_axum_to_disk(&temp_upload_path, body_stream)
         .await
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 
