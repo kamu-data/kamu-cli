@@ -47,9 +47,9 @@ digest = "0.10"
 sha3 = "0.10"
 
 # Repositories
-aws-config = { version = "0.55.0" }
+aws-config = { version = "0.55.1" }
 aws-sdk-s3 = { version = "0.25" }
-aws-smithy-http = { version = "0.55.0", features = ["rt-tokio"] }
+aws-smithy-http = { version = "0.55.1", features = ["rt-tokio"] }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
 # Utils
