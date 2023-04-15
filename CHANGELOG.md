@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Upgraded to latest `datafusion` and `arrow`
+- Updated to multi-tenant references and aliases in accordance with ODF spec
 
 ## [0.119.0] - 2023-04-10
 ### Added
