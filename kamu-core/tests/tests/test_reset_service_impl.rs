@@ -123,7 +123,7 @@ impl ResetTestHarness {
 
     async fn a_chain_with_2_blocks(&self) -> ChainWith2BlocksTestCase {
         let dataset_name = DatasetName::try_from("foo").unwrap();
-        let dataset_builder = self.a_dataset_builder(&dataset_name).await;
+        let mut dataset_builder = self.a_dataset_builder(&dataset_name).await;
 
         let chain = dataset_builder.as_dataset().as_metadata_chain();
         let (hash_seed_block, seed_block_sequence_number) =

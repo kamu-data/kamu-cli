@@ -25,7 +25,7 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
         GetDatasetError::NotFound(_)
     );
 
-    let builder = repo.create_dataset(&dataset_alias).await.unwrap();
+    let mut builder = repo.create_dataset(&dataset_alias).await.unwrap();
     let chain = builder.as_dataset().as_metadata_chain();
 
     chain
@@ -37,14 +37,11 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
         .await
         .unwrap();
 
-    // Not finalized yet
-    assert_matches!(
-        repo.get_dataset(&dataset_alias.as_local_ref())
-            .await
-            .err()
-            .unwrap(),
-        GetDatasetError::NotFound(_)
-    );
+    // Not finalized yet, but we should already see the dataset
+    assert!(repo
+        .get_dataset(&dataset_alias.as_local_ref())
+        .await
+        .is_ok());
 
     let hdl = builder.finish().await.unwrap();
     assert_eq!(hdl.alias, dataset_alias);

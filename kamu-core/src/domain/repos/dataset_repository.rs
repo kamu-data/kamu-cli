@@ -82,8 +82,7 @@ pub type DatasetHandleStream<'a> =
 #[async_trait]
 pub trait DatasetBuilder: Send + Sync {
     fn as_dataset(&self) -> &dyn Dataset;
-    fn get_staging_name(&self) -> &str;
-    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError>;
+    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError>;
     async fn discard(&self) -> Result<(), InternalError>;
 }
 
@@ -190,7 +189,7 @@ where
         IT: IntoIterator<Item = MetadataBlock> + Send,
         IT::IntoIter: Send,
     {
-        let ds = self.create_dataset(dataset_alias).await?;
+        let mut ds = self.create_dataset(dataset_alias).await?;
         let mut hash = None;
         let mut sequence_number = -1;
         for mut block in blocks {
@@ -264,7 +263,7 @@ where
         let system_time = Utc::now();
 
         let alias = DatasetAlias::new(None, snapshot.name);
-        let builder = self.create_dataset(&alias).await?;
+        let mut builder = self.create_dataset(&alias).await?;
         let chain = builder.as_dataset().as_metadata_chain();
 
         // We are generating a key pair and deriving a dataset ID from it.
@@ -629,11 +628,7 @@ impl DatasetBuilder for NullDatasetBuilder {
         self.dataset.as_ref()
     }
 
-    fn get_staging_name(&self) -> &str {
-        self.hdl.name.as_str()
-    }
-
-    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
+    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
         Ok(self.hdl.clone())
     }
 

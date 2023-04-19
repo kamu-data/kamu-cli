@@ -17,11 +17,9 @@
 // by the Apache License, Version 2.0.
 
 use crate::smart_protocol::ws_axum_server;
-use axum::extract::Extension;
-use kamu::{
-    domain::*,
-    infra::{get_staging_name, WorkspaceLayout},
-};
+use axum::{extract::Extension, headers::ContentLength, TypedHeader};
+use futures::TryStreamExt;
+use kamu::domain::*;
 
 use opendatafabric::{
     serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
@@ -29,8 +27,6 @@ use opendatafabric::{
 };
 use std::{str::FromStr, sync::Arc};
 use url::Url;
-
-use super::file_uploader::upload_file_from_axum_to_disk;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -47,11 +43,6 @@ pub struct BlockHashFromPath {
 #[derive(serde::Deserialize)]
 pub struct PhysicalHashFromPath {
     physical_hash: Multihash,
-}
-
-#[derive(serde::Deserialize)]
-pub struct StagingNameFromQuery {
-    staging_name: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -165,17 +156,16 @@ pub async fn dataset_checkpoints_get_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_data_put_handler(
-    catalog: Extension<dill::Catalog>,
+    dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
-    mut body_stream: axum::extract::BodyStream,
+    TypedHeader(content_length): TypedHeader<ContentLength>,
+    body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
     dataset_put_object_common(
-        catalog,
+        dataset.as_data_repo(),
         hash_param.physical_hash,
-        staging_name_param.staging_name.as_str(),
-        "data",
-        &mut body_stream,
+        content_length.0 as usize,
+        body_stream,
     )
     .await
 }
@@ -183,17 +173,16 @@ pub async fn dataset_data_put_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_checkpoints_put_handler(
-    catalog: Extension<dill::Catalog>,
+    dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    axum::extract::Query(staging_name_param): axum::extract::Query<StagingNameFromQuery>,
-    mut body_stream: axum::extract::BodyStream,
+    TypedHeader(content_length): TypedHeader<ContentLength>,
+    body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
     dataset_put_object_common(
-        catalog,
+        dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
-        staging_name_param.staging_name.as_str(),
-        "checkpoints",
-        &mut body_stream,
+        content_length.0 as usize,
+        body_stream,
     )
     .await
 }
@@ -201,36 +190,26 @@ pub async fn dataset_checkpoints_put_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 async fn dataset_put_object_common(
-    catalog: Extension<dill::Catalog>,
+    object_repository: &dyn ObjectRepository,
     physical_hash: Multihash,
-    staging_name: &str,
-    internal_folder_name: &str,
-    body_stream: &mut axum::extract::BodyStream,
+    content_length: usize,
+    body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::http::StatusCode> {
-    let workspace_layout = catalog
-        .get_one::<WorkspaceLayout>()
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+    let reader = body_stream
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .into_async_read()
+        .compat();
 
-    let temp_data_folder_suffix = format!(
-        "{}/{}/{}",
-        staging_name,
-        internal_folder_name,
-        get_staging_name()
-    );
-
-    let temp_upload_path = workspace_layout.datasets_dir.join(temp_data_folder_suffix);
-    upload_file_from_axum_to_disk(&temp_upload_path, body_stream)
-        .await
-        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let final_data_folder_suffix = format!(
-        "{}/{}/{}",
-        staging_name, internal_folder_name, physical_hash
-    );
-
-    let final_upload_path = workspace_layout.datasets_dir.join(final_data_folder_suffix);
-
-    tokio::fs::rename(temp_upload_path, final_upload_path)
+    object_repository
+        .insert_stream(
+            Box::new(reader),
+            InsertOpts {
+                precomputed_hash: None,
+                expected_hash: Some(&physical_hash),
+                size_hint: Some(content_length),
+            },
+        )
         .await
         .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
 

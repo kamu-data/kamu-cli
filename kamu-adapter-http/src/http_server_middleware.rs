@@ -76,12 +76,7 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
     fn is_dataset_optional(request: &Request<Body>) -> bool {
         let path = request.uri().path();
-        if "/push" == path {
-            return true;
-        }
-
-        let method = request.method().as_str();
-        method == "PUT" && (path.starts_with("/data/") || path.starts_with("/checkpoints/"))
+        "/push" == path
     }
 }
 
@@ -134,6 +129,8 @@ where
                         .unwrap());
                 }
             };
+
+            println!("{}", request.uri());
 
             let dataset_ref = (layer.identity_extractor)(param1);
             if Self::is_dataset_optional(&request) {

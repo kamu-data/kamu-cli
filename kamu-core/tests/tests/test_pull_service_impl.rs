@@ -73,7 +73,7 @@ async fn create_graph(
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        let builder = repo.create_dataset(&dataset_alias).await.unwrap();
+        let mut builder = repo.create_dataset(&dataset_alias).await.unwrap();
         let chain = builder.as_dataset().as_metadata_chain();
 
         if deps.is_empty() {
