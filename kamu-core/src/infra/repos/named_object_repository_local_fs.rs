@@ -14,6 +14,8 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::PathBuf;
 
+use super::get_staging_name;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct NamedObjectRepositoryLocalFS {
@@ -33,19 +35,7 @@ impl NamedObjectRepositoryLocalFS {
 
     // TODO: Cleanup procedure for orphaned staging files?
     fn get_staging_path(&self) -> PathBuf {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut filename = String::with_capacity(16);
-        filename.push_str(".pending-");
-        filename.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        self.root.join(filename)
+        self.root.join(get_staging_name())
     }
 }
 

@@ -15,7 +15,6 @@ use crate::domain::{DatasetRepository, GetSummaryOpts, InternalError, ResultInto
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Cleanup procedure for orphaned staged datasets?
 pub fn get_staging_name() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;

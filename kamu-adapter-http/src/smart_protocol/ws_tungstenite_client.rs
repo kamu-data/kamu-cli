@@ -396,7 +396,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 dataset_load_metadata(dst, dataset_pull_metadata_response.blocks).await;
 
             let object_files =
-                collect_missing_object_references_from_metadata(dst, &new_blocks).await;
+                collect_object_references_from_metadata(dst, &new_blocks, true).await;
 
             // TODO: analyze sizes and split on stages
             let object_files_transfer_plan = if object_files.is_empty() {
@@ -537,7 +537,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let missing_objects =
-            match collect_missing_object_references_from_interval(src, &src_head, dst_head).await {
+            match collect_object_references_from_interval(src, &src_head, dst_head, false).await {
                 Ok(object_references) => object_references,
                 Err(e) => {
                     tracing::debug!("Push process aborted with error: {}", e);

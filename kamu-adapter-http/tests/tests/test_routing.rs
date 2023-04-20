@@ -238,7 +238,7 @@ async fn test_routing_err_invalid_identity_format() {
         |Path(p): Path<DatasetByID>| p.dataset_id.into_local_ref(),
     );
 
-    let dataset_url = format!("http://{}/this-is-no-a-did/", server.local_addr());
+    let dataset_url = format!("http://{}/this-is-no-a-did/refs/head", server.local_addr());
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();

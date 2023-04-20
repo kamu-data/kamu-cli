@@ -18,7 +18,7 @@ use url::Url;
 
 use crate::{domain::*, infra::utils::s3_context::S3Context};
 
-use super::{get_downstream_dependencies_impl, get_staging_name, DatasetFactoryImpl};
+use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -80,7 +80,6 @@ impl DatasetRepositoryS3 {
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
-        staging_alias: &DatasetAlias,
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, CreateDatasetError> {
         let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
@@ -92,16 +91,7 @@ impl DatasetRepositoryS3 {
 
         let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
 
-        match self
-            .move_bucket_items_on_dataset_rename(staging_alias, dataset_alias)
-            .await
-        {
-            Ok(_) => Ok(handle),
-            Err(MoveBucketItemsOnRenameError::NameCollision(e)) => {
-                Err(CreateDatasetError::NameCollision(e))
-            }
-            Err(MoveBucketItemsOnRenameError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
-        }
+        Ok(handle)
     }
 
     async fn move_bucket_items_on_dataset_rename(
@@ -225,15 +215,12 @@ impl DatasetRepository for DatasetRepositoryS3 {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_alias =
-            DatasetAlias::new(None, DatasetName::new_unchecked(&get_staging_name()));
-        let dataset_url = self.get_s3_bucket_path(&staging_alias);
+        let dataset_url = self.get_s3_bucket_path(dataset_alias);
         let dataset_result = DatasetFactoryImpl::get_s3(dataset_url).await;
         match dataset_result {
             Ok(dataset) => Ok(Box::new(DatasetBuilderS3::new(
                 self.clone(),
                 Arc::new(dataset),
-                staging_alias,
                 dataset_alias.clone(),
             ))),
             Err(e) => Err(BeginCreateDatasetError::Internal(e)),
@@ -299,7 +286,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
 struct DatasetBuilderS3 {
     repo: DatasetRepositoryS3,
     dataset: Arc<dyn Dataset>,
-    staging_alias: DatasetAlias,
     dataset_alias: DatasetAlias,
 }
 
@@ -309,13 +295,11 @@ impl DatasetBuilderS3 {
     fn new(
         repo: DatasetRepositoryS3,
         dataset: Arc<dyn Dataset>,
-        staging_alias: DatasetAlias,
         dataset_alias: DatasetAlias,
     ) -> Self {
         Self {
             repo,
             dataset,
-            staging_alias,
             dataset_alias,
         }
     }
@@ -327,7 +311,7 @@ impl DatasetBuilder for DatasetBuilderS3 {
         self.dataset.as_ref()
     }
 
-    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
+    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
         match self
             .dataset
             .as_metadata_chain()
@@ -344,11 +328,7 @@ impl DatasetBuilder for DatasetBuilderS3 {
         }?;
 
         self.repo
-            .finish_create_dataset(
-                self.dataset.as_ref(),
-                &self.staging_alias,
-                &self.dataset_alias,
-            )
+            .finish_create_dataset(self.dataset.as_ref(), &self.dataset_alias)
             .await
     }
 

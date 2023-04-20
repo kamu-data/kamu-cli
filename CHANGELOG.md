@@ -4,10 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.120.0] - 2023-04-20
+### Added
+- Smart Transfer Protocol now supports pushing into local filesystem workspace repository.
+  It can be activated via:
+   `kamu push <dataset_name> --to odf+http://<server-address>:<port>/<dataset_name>`.
+  I.e., run API server in one Kamu workspace directory, where you intend to push `my-dataset`to:
+   `kamu system api-server --http-port=35433`
+  and push from the Kamu workspace directory, where `my-dataset` is stored:
+   `kamu push my-dataset --to odf+http://localhost::35433/my-dataset`  
 ### Changed
 - Upgraded to latest `datafusion` and `arrow`
 - Updated to multi-tenant references and aliases in accordance with ODF spec
+- New datasets no longer use staging area before `DatasetBuilder` finishes them
 
 ## [0.119.0] - 2023-04-10
 ### Added

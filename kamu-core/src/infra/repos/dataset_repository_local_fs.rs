@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::dataset_repository_helpers::get_staging_name;
 use crate::domain::*;
 use crate::infra::*;
 use futures::TryStreamExt;
@@ -15,7 +14,7 @@ use opendatafabric::*;
 
 use async_trait::async_trait;
 use dill::*;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use url::Url;
 
@@ -105,7 +104,6 @@ impl DatasetRepositoryLocalFs {
     async fn finish_create_dataset(
         &self,
         dataset: &dyn Dataset,
-        staging_path: &Path,
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, CreateDatasetError> {
         let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
@@ -116,26 +114,6 @@ impl DatasetRepositoryLocalFs {
         }?;
 
         let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
-
-        // Check for late name collision
-        if let Some(existing_dataset) = self
-            .try_resolve_dataset_ref(&dataset_alias.as_local_ref())
-            .await?
-        {
-            return Err(NameCollisionError {
-                alias: existing_dataset.alias,
-            }
-            .into());
-        }
-
-        // Atomic move
-        let target_path = self.root.join(&dataset_alias.dataset_name);
-        assert!(
-            !target_path.exists(),
-            "Target dir exists: {:?}",
-            target_path
-        );
-        std::fs::rename(staging_path, target_path).int_err()?;
 
         // // Add new entry
         // repo_info.datasets.push(DatasetEntry {
@@ -271,16 +249,29 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let staging_path = self.root.join(get_staging_name());
+        let dataset_path = if dataset_alias.is_multitenant() {
+            self.root
+                .join(dataset_alias.account_name.as_ref().unwrap())
+                .join(dataset_alias.dataset_name.as_str())
+        } else {
+            self.root.join(dataset_alias.dataset_name.as_str())
+        };
 
-        let layout = DatasetLayout::create(&staging_path).int_err()?;
+        let folder_state = if dataset_path.exists() {
+            DatasetBuilderFolderState::ExistingDataset
+        } else {
+            DatasetBuilderFolderState::UnfinishedNewDataset
+        };
+
+        let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
         Ok(Box::new(DatasetBuilderLocalFs::new(
             self.clone(),
             dataset,
-            staging_path,
+            dataset_path,
             dataset_alias.clone(),
+            folder_state,
         )))
     }
 
@@ -357,8 +348,16 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 struct DatasetBuilderLocalFs<D> {
     repo: DatasetRepositoryLocalFs,
     dataset: D,
-    staging_path: PathBuf,
+    dataset_path: PathBuf,
     dataset_alias: DatasetAlias,
+    folder_state: DatasetBuilderFolderState,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+enum DatasetBuilderFolderState {
+    UnfinishedNewDataset,
+    FinishedNewDataset,
+    ExistingDataset,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -367,20 +366,24 @@ impl<D> DatasetBuilderLocalFs<D> {
     fn new(
         repo: DatasetRepositoryLocalFs,
         dataset: D,
-        staging_path: PathBuf,
+        dataset_path: PathBuf,
         dataset_alias: DatasetAlias,
+        folder_state: DatasetBuilderFolderState,
     ) -> Self {
         Self {
             repo,
             dataset,
-            staging_path,
+            dataset_path,
             dataset_alias,
+            folder_state,
         }
     }
 
     fn discard_impl(&self) -> Result<(), InternalError> {
-        if self.staging_path.exists() {
-            std::fs::remove_dir_all(&self.staging_path).int_err()?;
+        if self.folder_state == DatasetBuilderFolderState::UnfinishedNewDataset
+            && self.dataset_path.exists()
+        {
+            std::fs::remove_dir_all(&self.dataset_path).int_err()?;
         }
         Ok(())
     }
@@ -405,7 +408,7 @@ where
         &self.dataset
     }
 
-    async fn finish(&self) -> Result<DatasetHandle, CreateDatasetError> {
+    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
         match self
             .dataset
             .as_metadata_chain()
@@ -422,8 +425,14 @@ where
         }?;
 
         self.repo
-            .finish_create_dataset(&self.dataset, &self.staging_path, &self.dataset_alias)
+            .finish_create_dataset(&self.dataset, &self.dataset_alias)
             .await
+            .map(|handle| {
+                if self.folder_state == DatasetBuilderFolderState::UnfinishedNewDataset {
+                    self.folder_state = DatasetBuilderFolderState::FinishedNewDataset;
+                }
+                handle
+            })
     }
 
     async fn discard(&self) -> Result<(), InternalError> {

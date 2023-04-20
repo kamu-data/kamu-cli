@@ -152,7 +152,7 @@ impl SyncServiceImpl {
         let src_is_local = src.as_local_single_tenant_ref().is_ok();
 
         let src_dataset = self.get_dataset_reader(src).await?;
-        let dst_dataset_builder = self
+        let mut dst_dataset_builder = self
             .get_dataset_writer(dst, opts.create_if_not_exists)
             .await?;
 
@@ -177,7 +177,7 @@ impl SyncServiceImpl {
             )
             .await;
 
-        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_ref()).await
+        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_mut()).await
     }
 
     async fn sync_smart_pull_transfer_protocol(
@@ -190,7 +190,7 @@ impl SyncServiceImpl {
         let odf_src_url = self.resolve_remote_dataset_url(&odf_src).await?;
         let http_src_url = Url::parse(&(odf_src_url.as_str())["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
 
-        let dst_dataset_builder = self
+        let mut dst_dataset_builder = self
             .get_dataset_writer(dst, opts.create_if_not_exists)
             .await?;
 
@@ -207,12 +207,12 @@ impl SyncServiceImpl {
             )
             .await;
 
-        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_ref()).await
+        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_mut()).await
     }
 
     async fn finish_building_dataset(
         sync_result: Result<SyncResult, SyncError>,
-        dataset_builder: &dyn DatasetBuilder,
+        dataset_builder: &mut dyn DatasetBuilder,
     ) -> Result<SyncResult, SyncError> {
         match sync_result {
             Ok(result) => {
@@ -644,7 +644,7 @@ impl SyncService for SyncServiceImpl {
 #[async_trait::async_trait]
 trait DatasetBuilder {
     fn as_dataset(&self) -> &dyn Dataset;
-    async fn finish(&self) -> Result<(), CreateDatasetError>;
+    async fn finish(&mut self) -> Result<(), CreateDatasetError>;
     async fn discard(&self) -> Result<(), InternalError>;
 }
 
@@ -664,7 +664,7 @@ impl DatasetBuilder for NullDatasetBuilder {
         self.dataset.as_ref()
     }
 
-    async fn finish(&self) -> Result<(), CreateDatasetError> {
+    async fn finish(&mut self) -> Result<(), CreateDatasetError> {
         Ok(())
     }
 
@@ -689,7 +689,7 @@ impl DatasetBuilder for WrapperDatasetBuilder {
         self.builder.as_dataset()
     }
 
-    async fn finish(&self) -> Result<(), CreateDatasetError> {
+    async fn finish(&mut self) -> Result<(), CreateDatasetError> {
         self.builder.finish().await?;
         Ok(())
     }

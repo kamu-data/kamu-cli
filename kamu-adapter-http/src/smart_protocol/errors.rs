@@ -229,3 +229,16 @@ impl std::error::Error for ClientInternalError {
 }
 
 /////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub struct ObjectUploadError {
+    pub response: reqwest::Response,
+}
+
+impl fmt::Display for ObjectUploadError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ObjectUploadError: status={}", self.response.status())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////

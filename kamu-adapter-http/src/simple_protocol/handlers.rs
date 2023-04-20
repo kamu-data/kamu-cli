@@ -17,7 +17,8 @@
 // by the Apache License, Version 2.0.
 
 use crate::smart_protocol::ws_axum_server;
-use axum::extract::Extension;
+use axum::{extract::Extension, headers::ContentLength, TypedHeader};
+use futures::TryStreamExt;
 use kamu::domain::*;
 
 use opendatafabric::{
@@ -104,7 +105,7 @@ pub async fn dataset_blocks_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_data_handler(
+pub async fn dataset_data_get_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
@@ -129,7 +130,7 @@ pub async fn dataset_data_handler(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_checkpoints_handler(
+pub async fn dataset_checkpoints_get_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> Result<axum::response::Response, axum::http::StatusCode> {
@@ -150,6 +151,69 @@ pub async fn dataset_checkpoints_handler(
     Ok(axum::response::Response::builder()
         .body(axum::body::boxed(body))
         .unwrap())
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_data_put_handler(
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
+    TypedHeader(content_length): TypedHeader<ContentLength>,
+    body_stream: axum::extract::BodyStream,
+) -> Result<(), axum::http::StatusCode> {
+    dataset_put_object_common(
+        dataset.as_data_repo(),
+        hash_param.physical_hash,
+        content_length.0 as usize,
+        body_stream,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub async fn dataset_checkpoints_put_handler(
+    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
+    TypedHeader(content_length): TypedHeader<ContentLength>,
+    body_stream: axum::extract::BodyStream,
+) -> Result<(), axum::http::StatusCode> {
+    dataset_put_object_common(
+        dataset.as_checkpoint_repo(),
+        hash_param.physical_hash,
+        content_length.0 as usize,
+        body_stream,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn dataset_put_object_common(
+    object_repository: &dyn ObjectRepository,
+    physical_hash: Multihash,
+    content_length: usize,
+    body_stream: axum::extract::BodyStream,
+) -> Result<(), axum::http::StatusCode> {
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+    let reader = body_stream
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .into_async_read()
+        .compat();
+
+    object_repository
+        .insert_stream(
+            Box::new(reader),
+            InsertOpts {
+                precomputed_hash: None,
+                expected_hash: Some(&physical_hash),
+                size_hint: Some(content_length),
+            },
+        )
+        .await
+        .map_err(|_| axum::http::StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -203,15 +267,21 @@ fn get_base_dataset_url(
     uri: axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
-    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
-    let url = Url::parse(&format!("{}://{}", scheme, host.0)).unwrap();
+    let api_server_url = get_api_server_url(host);
 
     let mut path: Vec<_> = uri.0.path().split('/').collect();
     for _ in 0..depth {
         path.pop();
     }
+    let path_string = format!("{}/", path.join("/"));
+    api_server_url.join(path_string.as_str()).unwrap()
+}
 
-    url.join(&path.join("/")).unwrap()
+/////////////////////////////////////////////////////////////////////////////////
+
+fn get_api_server_url(host: axum::extract::Host) -> Url {
+    let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
+    Url::parse(&format!("{}://{}", scheme, host.0)).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -75,7 +75,8 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
     fn is_dataset_optional(request: &Request<Body>) -> bool {
-        "/push" == request.uri().path()
+        let path = request.uri().path();
+        "/push" == path
     }
 }
 
