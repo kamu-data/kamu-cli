@@ -215,7 +215,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let dataset_url = self.get_s3_bucket_path(dataset_alias.as_str());
+        let dataset_url = self.get_s3_bucket_path(dataset_alias);
         let dataset_result = DatasetFactoryImpl::get_s3(dataset_url).await;
         match dataset_result {
             Ok(dataset) => Ok(Box::new(DatasetBuilderS3::new(

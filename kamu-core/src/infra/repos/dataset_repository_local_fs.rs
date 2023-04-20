@@ -249,7 +249,13 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
-        let dataset_path = self.root.join(dataset_name.as_str());
+        let dataset_path = if dataset_alias.is_multitenant() {
+            self.root
+                .join(dataset_alias.account_name.as_ref().unwrap())
+                .join(dataset_alias.dataset_name.as_str())
+        } else {
+            self.root.join(dataset_alias.dataset_name.as_str())
+        };
 
         let folder_state = if dataset_path.exists() {
             DatasetBuilderFolderState::ExistingDataset
