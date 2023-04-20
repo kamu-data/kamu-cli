@@ -11,7 +11,6 @@ use crate::{harness::ServerSideLocalFsHarness, tests::tests_push::test_smart_pus
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[ignore]
 #[test_log::test(tokio::test)]
 async fn test_smart_push_local_fs_new_dataset() {
     let server_harness = ServerSideLocalFsHarness::new().await;

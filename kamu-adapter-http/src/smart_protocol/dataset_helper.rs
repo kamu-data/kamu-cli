@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::io::Read;
+use std::{collections::VecDeque, io::Read};
 
 use crate::smart_protocol::{errors::ObjectUploadError, messages::*};
 use bytes::Bytes;
@@ -166,7 +166,7 @@ pub async fn prepare_dataset_metadata_batch(
 pub async fn dataset_load_metadata(
     dataset: &dyn Dataset,
     objects_batch: ObjectsBatch,
-) -> Vec<(Multihash, MetadataBlock)> {
+) -> VecDeque<(Multihash, MetadataBlock)> {
     let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
     load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
 }
@@ -175,7 +175,7 @@ pub async fn dataset_load_metadata(
 
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
-    metadata: Vec<(Multihash, MetadataBlock)>,
+    metadata: VecDeque<(Multihash, MetadataBlock)>,
 ) -> Result<(), AppendError> {
     let metadata_chain = dataset.as_metadata_chain();
     for (hash, block) in metadata {
@@ -235,7 +235,7 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
 async fn load_dataset_blocks(
     metadata_chain: &dyn MetadataChain,
     blocks_data: Vec<(Multihash, Vec<u8>)>,
-) -> Vec<(Multihash, MetadataBlock)> {
+) -> VecDeque<(Multihash, MetadataBlock)> {
     stream::iter(blocks_data)
         .then(|(hash, block_buf)| async move {
             tracing::debug!("> {} - {} bytes", hash, block_buf.len());
@@ -304,7 +304,7 @@ pub async fn collect_object_references_from_interval(
 
 pub async fn collect_object_references_from_metadata(
     dataset: &dyn Dataset,
-    blocks: &Vec<(Multihash, MetadataBlock)>,
+    blocks: &VecDeque<(Multihash, MetadataBlock)>,
     missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();

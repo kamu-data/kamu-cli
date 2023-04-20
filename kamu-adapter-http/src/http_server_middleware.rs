@@ -130,8 +130,6 @@ where
                 }
             };
 
-            println!("{}", request.uri());
-
             let dataset_ref = (layer.identity_extractor)(param1);
             if Self::is_dataset_optional(&request) {
                 request.extensions_mut().insert(dataset_ref);

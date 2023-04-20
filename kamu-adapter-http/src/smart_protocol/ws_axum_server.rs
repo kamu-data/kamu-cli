@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use axum::extract::ws::Message;
 use opendatafabric::{MetadataBlock, Multihash};
@@ -330,7 +330,7 @@ async fn try_handle_push_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
     dataset: &dyn Dataset,
     push_request: DatasetPushRequest,
-) -> Result<Vec<(Multihash, MetadataBlock)>, PushServerError> {
+) -> Result<VecDeque<(Multihash, MetadataBlock)>, PushServerError> {
     let maybe_push_metadata_request = read_payload::<DatasetPushMetadataRequest>(socket).await;
 
     match maybe_push_metadata_request {
@@ -359,11 +359,50 @@ async fn try_handle_push_metadata_request(
 
             Ok(new_blocks)
         }
-        Err(ReadMessageError::Closed) => Ok(vec![]),
+        Err(ReadMessageError::Closed) => Ok(VecDeque::new()),
         Err(e) => Err(PushServerError::ReadFailed(PushReadError::new(
             e,
             PushPhase::MetadataRequest,
         ))),
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn ensure_at_least_seed_exists_on_chain(
+    dataset: &dyn Dataset,
+    new_blocks: &mut VecDeque<(Multihash, MetadataBlock)>,
+) -> Result<(), InternalError> {
+    match dataset.get_summary(GetSummaryOpts::default()).await {
+        Ok(_) => {
+            tracing::debug!("Dataset summary exists, skipping seed import");
+            Ok(())
+        }
+        Err(GetSummaryError::EmptyDataset) => {
+            tracing::info!("Dataset summary missing, trying to import Seed event");
+            let (first_hash, first_block) = new_blocks.pop_front().unwrap();
+            dataset
+                .as_metadata_chain()
+                .append(
+                    first_block,
+                    AppendOpts {
+                        expected_hash: Some(&first_hash),
+                        ..AppendOpts::default()
+                    },
+                )
+                .await
+                .map_err(|e| e.int_err())?;
+            tracing::info!("Seed event imported");
+            Ok(())
+        }
+        Err(GetSummaryError::Access(e)) => {
+            tracing::error!("Get summary failed: {:#?}", e);
+            Err(e.int_err().into())
+        }
+        Err(GetSummaryError::Internal(e)) => {
+            tracing::error!("Get summary failed: {:#?}", e);
+            Err(e)
+        }
     }
 }
 
@@ -413,7 +452,7 @@ async fn try_handle_push_objects_request(
 async fn try_handle_push_complete(
     socket: &mut axum::extract::ws::WebSocket,
     dataset_builder: &mut dyn DatasetBuilder,
-    new_blocks: Vec<(Multihash, MetadataBlock)>,
+    new_blocks: VecDeque<(Multihash, MetadataBlock)>,
 ) -> Result<(), PushServerError> {
     read_payload::<DatasetPushComplete>(socket)
         .await
@@ -488,14 +527,16 @@ pub async fn dataset_push_ws_main_flow(
     let dataset = dataset_builder.as_dataset();
     let push_request = handle_push_request_initiation(socket, dataset).await?;
 
-    let new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
+    let mut new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
+    if new_blocks.len() > 0 {
+        ensure_at_least_seed_exists_on_chain(dataset, &mut new_blocks).await?;
+        loop {
+            let should_continue =
+                try_handle_push_objects_request(socket, dataset, &dataset_url).await?;
 
-    loop {
-        let should_continue =
-            try_handle_push_objects_request(socket, dataset, &dataset_url).await?;
-
-        if !should_continue {
-            break;
+            if !should_continue {
+                break;
+            }
         }
     }
 
