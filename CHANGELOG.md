@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded to latest `datafusion` and `arrow`
 - Updated to multi-tenant references and aliases in accordance with ODF spec
+- New datasets no longer use staging area before `DatasetBuilder` finishes them
 
 ## [0.119.0] - 2023-04-10
 ### Added
