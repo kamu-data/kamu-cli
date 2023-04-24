@@ -106,9 +106,7 @@ pub trait IntoDataStreamBlock {
 impl IntoDataStreamBlock for MetadataBlock {
     fn into_data_stream_block(self) -> Option<MetadataBlockDataStream> {
         let (output_data, output_checkpoint, output_watermark) = match self.event {
-            MetadataEvent::AddData(e) => {
-                (Some(e.output_data), e.output_checkpoint, e.output_watermark)
-            }
+            MetadataEvent::AddData(e) => (e.output_data, e.output_checkpoint, e.output_watermark),
             MetadataEvent::ExecuteQuery(e) => {
                 (e.output_data, e.output_checkpoint, e.output_watermark)
             }
@@ -135,7 +133,7 @@ impl IntoDataStreamBlock for MetadataBlock {
     fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>> {
         let (output_data, output_checkpoint, output_watermark) = match &self.event {
             MetadataEvent::AddData(e) => (
-                Some(&e.output_data),
+                e.output_data.as_ref(),
                 e.output_checkpoint.as_ref(),
                 e.output_watermark.as_ref(),
             ),

@@ -27,11 +27,11 @@ use std::path::PathBuf;
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
     pub input_checkpoint: Option<Multihash>,
-    /// Describes output data written during this transaction.
-    pub output_data: DataSlice,
+    /// Describes output data written during this transaction, if any.
+    pub output_data: Option<DataSlice>,
     /// Describes checkpoint written during this transaction, if any.
     pub output_checkpoint: Option<Checkpoint>,
-    /// Last watermark of the output data stream.
+    /// Last watermark of the output data stream, if changed.
     pub output_watermark: Option<DateTime<Utc>>,
 }
 

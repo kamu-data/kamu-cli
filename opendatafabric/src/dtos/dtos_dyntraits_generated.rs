@@ -26,7 +26,7 @@ use std::path::Path;
 
 pub trait AddData {
     fn input_checkpoint(&self) -> Option<&Multihash>;
-    fn output_data(&self) -> &dyn DataSlice;
+    fn output_data(&self) -> Option<&dyn DataSlice>;
     fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
 }
@@ -35,8 +35,8 @@ impl AddData for dtos::AddData {
     fn input_checkpoint(&self) -> Option<&Multihash> {
         self.input_checkpoint.as_ref().map(|v| -> &Multihash { v })
     }
-    fn output_data(&self) -> &dyn DataSlice {
-        &self.output_data
+    fn output_data(&self) -> Option<&dyn DataSlice> {
+        self.output_data.as_ref().map(|v| -> &dyn DataSlice { v })
     }
     fn output_checkpoint(&self) -> Option<&dyn Checkpoint> {
         self.output_checkpoint
@@ -54,7 +54,7 @@ impl Into<dtos::AddData> for &dyn AddData {
     fn into(self) -> dtos::AddData {
         dtos::AddData {
             input_checkpoint: self.input_checkpoint().map(|v| v.clone()),
-            output_data: self.output_data().into(),
+            output_data: self.output_data().map(|v| v.into()),
             output_checkpoint: self.output_checkpoint().map(|v| v.into()),
             output_watermark: self.output_watermark().map(|v| v),
         }

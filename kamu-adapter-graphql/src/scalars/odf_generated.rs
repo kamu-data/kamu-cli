@@ -27,7 +27,7 @@ use opendatafabric as odf;
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
     pub input_checkpoint: Option<Multihash>,
-    pub output_data: DataSlice,
+    pub output_data: Option<DataSlice>,
     pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
 }
@@ -36,7 +36,7 @@ impl From<odf::AddData> for AddData {
     fn from(v: odf::AddData) -> Self {
         Self {
             input_checkpoint: v.input_checkpoint.map(Into::into),
-            output_data: v.output_data.into(),
+            output_data: v.output_data.map(Into::into),
             output_checkpoint: v.output_checkpoint.map(Into::into),
             output_watermark: v.output_watermark.map(Into::into),
         }

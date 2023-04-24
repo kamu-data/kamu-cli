@@ -56,8 +56,9 @@ macro_rules! implement_serde_as {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddDataDef {
     pub input_checkpoint: Option<Multihash>,
-    #[serde_as(as = "DataSliceDef")]
-    pub output_data: DataSlice,
+    #[serde_as(as = "Option<DataSliceDef>")]
+    #[serde(default)]
+    pub output_data: Option<DataSlice>,
     #[serde_as(as = "Option<CheckpointDef>")]
     #[serde(default)]
     pub output_checkpoint: Option<Checkpoint>,
