@@ -12,7 +12,7 @@ all-examples:
 jupyter: all-examples
 	docker build \
 		-f Dockerfile.jupyter \
-		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
+		--build-arg DEMO_VERSION=$(DEMO_VERSION) \
 		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)-odds \
 		.
 
