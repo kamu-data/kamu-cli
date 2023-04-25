@@ -157,6 +157,63 @@ where
         Ok(())
     }
 
+    async fn validate_append_event_structure(
+        &self,
+        new_block: &MetadataBlock,
+        _block_cache: &mut Vec<MetadataBlock>,
+    ) -> Result<(), AppendError> {
+        match &new_block.event {
+            MetadataEvent::AddData(e) => {
+                if e.output_data.is_none()
+                    && e.output_checkpoint.is_none()
+                    && e.output_watermark.is_none()
+                {
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        "AddData has empty data, checkpoint, and watermark",
+                    ))
+                    .into());
+                }
+
+                Ok(())
+            }
+            MetadataEvent::ExecuteQuery(_) => Ok(()),
+            MetadataEvent::Seed(_) => Ok(()),
+            MetadataEvent::SetPollingSource(_) => Ok(()),
+            MetadataEvent::SetTransform(_) => Ok(()),
+            MetadataEvent::SetVocab(_) => Ok(()),
+            MetadataEvent::SetWatermark(_) => Ok(()),
+            MetadataEvent::SetAttachments(_) => Ok(()),
+            MetadataEvent::SetInfo(_) => Ok(()),
+            MetadataEvent::SetLicense(_) => Ok(()),
+        }
+    }
+
+    async fn validate_append_watermark_is_monotonic(
+        &self,
+        new_block: &MetadataBlock,
+        _block_cache: &mut Vec<MetadataBlock>,
+    ) -> Result<(), AppendError> {
+        if let Some(new_block) = new_block.as_data_stream_block() {
+            if let Some(new_wm) = new_block.event.output_watermark {
+                // TODO: PERF: Use block cache
+                let prev_wm = self
+                    .iter_blocks()
+                    .filter_data_stream_blocks()
+                    .filter_map_ok(|(_, b)| b.event.output_watermark)
+                    .try_first()
+                    .await
+                    .int_err()?;
+
+                if let Some(prev_wm) = prev_wm {
+                    if prev_wm >= *new_wm {
+                        return Err(AppendValidationError::WatermarkIsNotMonotonic.into());
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     async fn construct_block_from_bytes(
         &self,
         hash: &Multihash,
@@ -340,9 +397,13 @@ where
                 .await?;
             self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
+            self.validate_append_event_structure(&block, &mut block_cache)
+                .await?;
             self.validate_append_seed_block_order(&block, &mut block_cache)
                 .await?;
             self.validate_append_system_time_is_monotonic(&block, &mut block_cache)
+                .await?;
+            self.validate_append_watermark_is_monotonic(&block, &mut block_cache)
                 .await?;
         }
 

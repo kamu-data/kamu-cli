@@ -155,10 +155,12 @@ where
                 MetadataEvent::AddData(add_data) => {
                     increment.seen_last_pulled.get_or_insert(block.system_time);
 
-                    let iv = add_data.output_data.interval;
-                    increment.seen_num_records += (iv.end - iv.start + 1) as u64;
+                    if let Some(output_data) = add_data.output_data {
+                        let iv = output_data.interval;
+                        increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
-                    increment.seen_data_size += add_data.output_data.size as u64;
+                        increment.seen_data_size += output_data.size as u64;
+                    }
 
                     if let Some(checkpoint) = add_data.output_checkpoint {
                         increment.seen_checkpoints_size += checkpoint.size as u64;

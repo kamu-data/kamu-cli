@@ -180,7 +180,6 @@ impl MetadataChain {
                 })
             }
             Err(e @ domain::CommitError::Internal(_)) => return Err(e.into()),
-            Err(e @ domain::CommitError::EmptyCommit) => return Err(e.into()),
         };
 
         Ok(result)

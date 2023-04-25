@@ -395,17 +395,37 @@ pub struct RefCASError {
 #[derive(Error, Debug)]
 pub enum AppendValidationError {
     #[error(transparent)]
-    HashMismatch(HashMismatchError),
+    InvalidEvent(#[from] InvalidEventError),
+    #[error(transparent)]
+    HashMismatch(#[from] HashMismatchError),
     #[error("First block has to be a seed, perhaps new block does not link to the previous")]
     FirstBlockMustBeSeed,
     #[error("Attempt to append seed block to a non-empty chain")]
     AppendingSeedBlockToNonEmptyChain,
     #[error("Invalid previous block")]
-    PrevBlockNotFound(BlockNotFoundError),
+    PrevBlockNotFound(#[from] BlockNotFoundError),
     #[error(transparent)]
-    SequenceIntegrity(SequenceIntegrityError),
+    SequenceIntegrity(#[from] SequenceIntegrityError),
     #[error("System time has to be monotonically non-decreasing")]
     SystemTimeIsNotMonotonic,
+    #[error("Watermark has to be monotonically increasing")]
+    WatermarkIsNotMonotonic,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, PartialEq, Eq, Debug)]
+#[error("Invalid event: {message}")]
+pub struct InvalidEventError {
+    message: String,
+}
+
+impl InvalidEventError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

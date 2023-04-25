@@ -54,7 +54,7 @@ impl IngestTask {
         let mut source = None;
         let mut prev_checkpoint = None;
         let mut vocab = None;
-        let mut next_offset = 0;
+        let mut next_offset = -1;
 
         {
             use futures::stream::TryStreamExt;
@@ -62,8 +62,10 @@ impl IngestTask {
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 match block.event {
                     MetadataEvent::AddData(add_data) => {
-                        if next_offset == 0 {
-                            next_offset = add_data.output_data.interval.end + 1;
+                        if next_offset < 0 {
+                            if let Some(output_data) = &add_data.output_data {
+                                next_offset = output_data.interval.end + 1;
+                            }
                         }
                         // TODO: Keep track of other types of blocks that may produce checkpoints
                         if prev_checkpoint.is_none() {
@@ -78,16 +80,24 @@ impl IngestTask {
                     MetadataEvent::SetVocab(set_vocab) => {
                         vocab = Some(set_vocab.into());
                     }
+                    MetadataEvent::Seed(_) => {
+                        if next_offset < 0 {
+                            next_offset = 0;
+                        }
+                    }
                     MetadataEvent::ExecuteQuery(_) => unreachable!(),
-                    MetadataEvent::Seed(_)
-                    | MetadataEvent::SetAttachments(_)
+                    MetadataEvent::SetAttachments(_)
                     | MetadataEvent::SetInfo(_)
                     | MetadataEvent::SetLicense(_)
                     | MetadataEvent::SetTransform(_)
                     | MetadataEvent::SetWatermark(_) => (),
                 }
 
-                if source.is_some() && vocab.is_some() && prev_checkpoint.is_some() {
+                if next_offset >= 0
+                    && source.is_some()
+                    && vocab.is_some()
+                    && prev_checkpoint.is_some()
+                {
                     break;
                 }
             }
@@ -460,17 +470,7 @@ impl IngestTask {
                                 },
                             })
                         }
-                        Err(CommitError::EmptyCommit) => {
-                            Ok(ExecutionResult {
-                                was_up_to_date: false, // The checkpoint is not up-to-date but dataset is
-                                checkpoint: CommitCheckpoint {
-                                    last_committed: Utc::now(),
-                                    for_read_at: read_result.checkpoint.last_read,
-                                    for_fetched_at: fetch_result.checkpoint.last_fetched,
-                                    last_hash: None,
-                                },
-                            })
-                        }
+                        // TODO: Err(CommitError::EmptyCommit) => { The checkpoint is not up-to-date but dataset is }
                         Err(e) => Err(e.int_err().into()),
                     }
                 },

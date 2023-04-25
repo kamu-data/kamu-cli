@@ -119,58 +119,65 @@ pub trait DatasetExt: Dataset {
         data_interval: Option<OffsetInterval>,
         movable_data_file: Option<P>,
         movable_checkpoint_file: Option<P>,
-        watermark: Option<DateTime<Utc>>,
+        output_watermark: Option<DateTime<Utc>>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
-        // New block might not contain anything new, so we check for data
-        // and watermark differences to see if commit should be skipped
-        let metadata_event = if let Some(data_interval) = data_interval {
-            let span = info_span!("Computing data hashes");
-            let _span_guard = span.enter();
+        // Commit data
+        let output_data = match data_interval {
+            None => None,
+            Some(data_interval) => {
+                let span = info_span!("Computing data hashes");
+                let _span_guard = span.enter();
 
-            let from_data_path = movable_data_file.unwrap();
+                let from_data_path = movable_data_file.unwrap();
 
-            let output_data = DataSlice {
-                logical_hash: crate::infra::utils::data_utils::get_parquet_logical_hash(
-                    from_data_path.as_ref(),
-                )
-                .int_err()?,
-                physical_hash: crate::infra::utils::data_utils::get_file_physical_hash(
-                    from_data_path.as_ref(),
-                )
-                .int_err()?,
-                interval: data_interval,
-                size: std::fs::metadata(&from_data_path).int_err()?.len() as i64,
-            };
+                let output_data = DataSlice {
+                    logical_hash: crate::infra::utils::data_utils::get_parquet_logical_hash(
+                        from_data_path.as_ref(),
+                    )
+                    .int_err()?,
+                    physical_hash: crate::infra::utils::data_utils::get_file_physical_hash(
+                        from_data_path.as_ref(),
+                    )
+                    .int_err()?,
+                    interval: data_interval,
+                    size: std::fs::metadata(&from_data_path).int_err()?.len() as i64,
+                };
 
-            // Commit data
-            self.as_data_repo()
-                .insert_file_move(
-                    from_data_path.as_ref(),
-                    InsertOpts {
-                        precomputed_hash: Some(&output_data.physical_hash),
-                        expected_hash: None,
-                        size_hint: Some(output_data.size as usize),
-                    },
-                )
-                .await
-                .int_err()?;
+                // Move data to repo
+                self.as_data_repo()
+                    .insert_file_move(
+                        from_data_path.as_ref(),
+                        InsertOpts {
+                            precomputed_hash: Some(&output_data.physical_hash),
+                            expected_hash: None,
+                            size_hint: Some(output_data.size as usize),
+                        },
+                    )
+                    .await
+                    .int_err()?;
 
-            // Commit checkpoint
-            //
-            // TODO: Should checkpoint be committed even when there is no data?
-            // Postpone changes until we revisit ingest checkpoints
-            let output_checkpoint = if let Some(from_checkpoint_path) = movable_checkpoint_file {
+                Some(output_data)
+            }
+        };
+
+        // Commit checkpoint
+        let output_checkpoint = match movable_checkpoint_file {
+            None => None,
+            Some(checkpoint_file) => {
+                let span = info_span!("Computing checkpoint hash");
+                let _span_guard = span.enter();
+
                 let physical_hash = crate::infra::utils::data_utils::get_file_physical_hash(
-                    from_checkpoint_path.as_ref(),
+                    checkpoint_file.as_ref(),
                 )
                 .int_err()?;
 
-                let size = std::fs::metadata(&from_checkpoint_path).int_err()?.len() as i64;
+                let size = std::fs::metadata(&checkpoint_file).int_err()?.len() as i64;
 
                 self.as_checkpoint_repo()
                     .insert_file_move(
-                        from_checkpoint_path.as_ref(),
+                        checkpoint_file.as_ref(),
                         InsertOpts {
                             precomputed_hash: Some(&physical_hash),
                             expected_hash: None,
@@ -184,39 +191,23 @@ pub trait DatasetExt: Dataset {
                     physical_hash,
                     size,
                 })
-            } else {
-                None
-            };
-
-            MetadataEvent::AddData(AddData {
-                input_checkpoint,
-                output_data,
-                output_checkpoint,
-                output_watermark: watermark,
-            })
-        } else {
-            let prev_watermark = self
-                .as_metadata_chain()
-                .iter_blocks()
-                .filter_data_stream_blocks()
-                .filter_map_ok(|(_, b)| b.event.output_watermark)
-                .try_first()
-                .await
-                .int_err()?;
-
-            if watermark.is_none() || watermark == prev_watermark {
-                info!(concat!(
-                    "Skipping commit of new block as ",
-                    "it neither has new data nor an updated watermark"
-                ));
-                return Err(CommitError::EmptyCommit);
             }
-
-            // TODO: Should this be here?
-            MetadataEvent::SetWatermark(SetWatermark {
-                output_watermark: watermark.unwrap(),
-            })
         };
+
+        let metadata_event =
+            if output_data.is_none() && output_checkpoint.is_none() && output_watermark.is_some() {
+                // TODO: Should this be here?
+                MetadataEvent::SetWatermark(SetWatermark {
+                    output_watermark: output_watermark.unwrap(),
+                })
+            } else {
+                MetadataEvent::AddData(AddData {
+                    input_checkpoint,
+                    output_data,
+                    output_checkpoint,
+                    output_watermark,
+                })
+            };
 
         self.commit_event(metadata_event, opts).await
     }
@@ -289,8 +280,6 @@ pub enum GetSummaryError {
 
 #[derive(Error, Debug)]
 pub enum CommitError {
-    #[error("Empty commit")]
-    EmptyCommit,
     #[error(transparent)]
     MetadataAppendError(#[from] AppendError),
     #[error(transparent)]

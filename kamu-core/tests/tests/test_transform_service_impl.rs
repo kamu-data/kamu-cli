@@ -68,7 +68,7 @@ async fn append_data_block(
     let offset = chain
         .iter_blocks()
         .filter_map_ok(|(_, b)| b.event.into_variant::<AddData>())
-        .map_ok(|e| e.output_data.interval.end + 1)
+        .map_ok(|e| e.output_data.unwrap().interval.end + 1)
         .try_first()
         .await
         .unwrap()
@@ -119,7 +119,7 @@ async fn test_get_next_operation() {
     );
 
     let (_, foo_block) = append_data_block(local_repo.as_ref(), &foo.alias, 10).await;
-    let data_path = foo_layout.data_slice_path(&foo_block.event.output_data);
+    let data_path = foo_layout.data_slice_path(foo_block.event.output_data.as_ref().unwrap());
 
     assert!(matches!(
         transform_svc.get_next_operation(&bar, Utc::now()).await.unwrap(),
@@ -214,12 +214,12 @@ async fn test_get_verification_plan_one_to_one() {
         &root_hdl,
         MetadataFactory::metadata_block(AddData {
             input_checkpoint: None,
-            output_data: DataSlice {
+            output_data: Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                 interval: OffsetInterval { start: 0, end: 99 },
                 size: 10,
-            },
+            }),
             output_checkpoint: None,
             output_watermark: Some(t0),
         })
@@ -276,7 +276,7 @@ async fn test_get_verification_plan_one_to_one() {
         &root_hdl,
         MetadataFactory::metadata_block(AddData {
             input_checkpoint: None,
-            output_data: DataSlice {
+            output_data: Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
                 interval: OffsetInterval {
@@ -284,7 +284,7 @@ async fn test_get_verification_plan_one_to_one() {
                     end: 109,
                 },
                 size: 10,
-            },
+            }),
             output_checkpoint: None,
             output_watermark: Some(t2),
         })

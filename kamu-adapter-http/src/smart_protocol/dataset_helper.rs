@@ -77,22 +77,23 @@ pub async fn prepare_dataset_transfer_estimate(
 
         match block.event {
             MetadataEvent::AddData(add_data) => {
-                data_objects_count += 1;
-                bytes_in_data_objects += add_data.output_data.size;
-
-                if add_data.output_checkpoint.is_some() {
+                if let Some(output_data) = &add_data.output_data {
+                    data_objects_count += 1;
+                    bytes_in_data_objects += output_data.size;
+                }
+                if let Some(output_checkpoint) = &add_data.output_checkpoint {
                     checkpoint_objects_count += 1;
-                    bytes_in_checkpoint_objects += add_data.output_checkpoint.unwrap().size;
+                    bytes_in_checkpoint_objects += output_checkpoint.size;
                 }
             }
             MetadataEvent::ExecuteQuery(execute_query) => {
-                if execute_query.output_data.is_some() {
+                if let Some(output_data) = &execute_query.output_data {
                     data_objects_count += 1;
-                    bytes_in_data_objects += execute_query.output_data.unwrap().size;
+                    bytes_in_data_objects += output_data.size;
                 }
-                if execute_query.output_checkpoint.is_some() {
+                if let Some(output_checkpoint) = &execute_query.output_checkpoint {
                     checkpoint_objects_count += 1;
-                    bytes_in_checkpoint_objects += execute_query.output_checkpoint.unwrap().size;
+                    bytes_in_checkpoint_objects += output_checkpoint.size;
                 }
             }
             MetadataEvent::Seed(_)
@@ -334,19 +335,21 @@ async fn collect_object_references_from_block(
 
     match &block.event {
         MetadataEvent::AddData(e) => {
-            if !missing_files_only
-                || !data_repo
-                    .contains(&e.output_data.physical_hash)
-                    .await
-                    .unwrap()
-            {
-                target_references.push(ObjectFileReference {
-                    object_type: ObjectType::DataSlice,
-                    physical_hash: e.output_data.physical_hash.clone(),
-                    size: e.output_data.size,
-                });
+            if let Some(output_data) = &e.output_data {
+                if !missing_files_only
+                    || !data_repo
+                        .contains(&output_data.physical_hash)
+                        .await
+                        .unwrap()
+                {
+                    target_references.push(ObjectFileReference {
+                        object_type: ObjectType::DataSlice,
+                        physical_hash: output_data.physical_hash.clone(),
+                        size: output_data.size,
+                    });
+                }
             }
-            if let Some(checkpoint) = e.output_checkpoint.as_ref() {
+            if let Some(checkpoint) = &e.output_checkpoint {
                 if !missing_files_only
                     || !checkpoint_repo
                         .contains(&checkpoint.physical_hash)
@@ -362,7 +365,7 @@ async fn collect_object_references_from_block(
             }
         }
         MetadataEvent::ExecuteQuery(e) => {
-            if let Some(data_slice) = e.output_data.as_ref() {
+            if let Some(data_slice) = &e.output_data {
                 if !missing_files_only
                     || !data_repo.contains(&data_slice.physical_hash).await.unwrap()
                 {
@@ -373,7 +376,7 @@ async fn collect_object_references_from_block(
                     });
                 }
             }
-            if let Some(checkpoint) = e.output_checkpoint.as_ref() {
+            if let Some(checkpoint) = &e.output_checkpoint {
                 if !missing_files_only
                     || !checkpoint_repo
                         .contains(&checkpoint.physical_hash)

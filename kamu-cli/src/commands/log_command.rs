@@ -196,12 +196,14 @@ impl AsciiRenderer {
                     self.render_property(output, 0, "InputCheckpoint", &icp)?;
                 }
 
-                self.render_section(output, 0, "Data")?;
-                self.render_data_slice(output, 1, &output_data)?;
+                if let Some(slice) = output_data {
+                    self.render_section(output, 0, "Data")?;
+                    self.render_data_slice(output, 1, slice)?;
+                }
 
                 if let Some(ocp) = output_checkpoint {
                     self.render_section(output, 0, "OutputCheckpoint")?;
-                    self.render_checkpoint(output, 1, &ocp)?;
+                    self.render_checkpoint(output, 1, ocp)?;
                 }
 
                 if let Some(wm) = output_watermark {

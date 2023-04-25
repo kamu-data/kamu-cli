@@ -331,6 +331,7 @@ impl SimpleTransferProtocol {
         // Commit blocks
         for (hash, block) in blocks.into_iter().rev() {
             debug!(?hash, "Appending block");
+            let sequence_number = block.sequence_number;
 
             match dst
                 .as_metadata_chain()
@@ -353,18 +354,23 @@ impl SimpleTransferProtocol {
                 Ok(_) => Ok(()),
                 Err(AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))) => {
                     Err(CorruptedSourceError {
-                        message: concat!(
-                            "Block hash declared by the source didn't match ",
-                            "the computed - this may be an indication of hashing ",
-                            "algorithm mismatch or an attempted tampering",
-                        )
-                        .to_owned(),
+                        message: format!(
+                            concat!(
+                                "Block hash declared by the source {} didn't match ",
+                                "the computed {} at block {} - this may be an indication ",
+                                "of hashing algorithm mismatch or an attempt to tamper data",
+                            ),
+                            e.actual, e.expected, sequence_number
+                        ),
                         source: Some(e.into()),
                     }
                     .into())
                 }
                 Err(AppendError::InvalidBlock(e)) => Err(CorruptedSourceError {
-                    message: "Source metadata chain is logically inconsistent".to_owned(),
+                    message: format!(
+                        "Source metadata chain is logically inconsistent at block {}[{}]",
+                        hash, sequence_number
+                    ),
                     source: Some(e.into()),
                 }
                 .into()),

@@ -34,7 +34,7 @@ type Accounts {
 
 type AddData {
 	inputCheckpoint: Multihash
-	outputData: DataSlice!
+	outputData: DataSlice
 	outputCheckpoint: Checkpoint
 	outputWatermark: DateTime
 }

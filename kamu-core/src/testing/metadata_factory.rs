@@ -279,51 +279,68 @@ impl AddDataBuilder {
         Self {
             v: AddData {
                 input_checkpoint: None,
-                output_data: DataSlice {
-                    logical_hash: Multihash::from_digest_sha3_256(b"foo"),
-                    physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval { start: 0, end: 9 },
-                    size: 0,
-                },
+                output_data: None,
                 output_checkpoint: None,
-                output_watermark: Some(Utc::now()),
+                output_watermark: None,
             },
         }
+        .some_output_data()
+    }
+
+    pub fn some_output_data(mut self) -> Self {
+        if self.v.output_data.is_none() {
+            self.v.output_data = Some(DataSlice {
+                logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                interval: OffsetInterval { start: 0, end: 9 },
+                size: 0,
+            });
+        }
+        self
+    }
+
+    pub fn some_output_checkpoint(mut self) -> Self {
+        if self.v.output_checkpoint.is_none() {
+            self.v.output_checkpoint = Some(Checkpoint {
+                physical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                size: 1,
+            });
+        }
+        self
     }
 
     pub fn data_physical_hash(mut self, hash: Multihash) -> Self {
-        self.v.output_data.physical_hash = hash;
-        self
-    }
-
-    pub fn data_size(mut self, size: i64) -> Self {
-        self.v.output_data.size = size;
-        self
-    }
-
-    pub fn checkpoint_physical_hash(mut self, hash: Multihash) -> Self {
-        self.v.output_checkpoint = Some(Checkpoint {
-            physical_hash: hash,
-            size: 1,
-        });
-        self
-    }
-
-    pub fn checkpoint_size(mut self, size: i64) -> Self {
-        if self.v.output_checkpoint.is_none() {
-            self = self.checkpoint_physical_hash(Multihash::from_digest_sha3_256(b"foo"));
-        }
-        self.v.output_checkpoint.as_mut().unwrap().size = size;
+        self = self.some_output_data();
+        self.v.output_data.as_mut().unwrap().physical_hash = hash;
         self
     }
 
     pub fn interval(mut self, start: i64, end: i64) -> Self {
-        self.v.output_data.interval = OffsetInterval { start, end };
+        self = self.some_output_data();
+        self.v.output_data.as_mut().unwrap().interval = OffsetInterval { start, end };
         self
     }
 
-    pub fn watermark(mut self, wm: DateTime<Utc>) -> Self {
-        self.v.output_watermark = Some(wm);
+    pub fn data_size(mut self, size: i64) -> Self {
+        self = self.some_output_data();
+        self.v.output_data.as_mut().unwrap().size = size;
+        self
+    }
+
+    pub fn checkpoint_physical_hash(mut self, hash: Multihash) -> Self {
+        self = self.some_output_checkpoint();
+        self.v.output_checkpoint.as_mut().unwrap().physical_hash = hash;
+        self
+    }
+
+    pub fn checkpoint_size(mut self, size: i64) -> Self {
+        self = self.some_output_checkpoint();
+        self.v.output_checkpoint.as_mut().unwrap().size = size;
+        self
+    }
+
+    pub fn watermark(mut self, output_watermark: DateTime<Utc>) -> Self {
+        self.v.output_watermark = Some(output_watermark);
         self
     }
 

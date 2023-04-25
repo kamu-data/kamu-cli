@@ -48,7 +48,7 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    let create_result = local_repo
+    local_repo
         .create_dataset_from_snapshot(
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_alias.dataset_name)
@@ -86,44 +86,43 @@ async fn test_verify_data_consistency() {
     let data_path = tempdir.path().join("data");
 
     ParquetWriterHelper::from_record_batch(&data_path, &record_batch).unwrap();
-    let size = std::fs::metadata(&data_path).unwrap().len();
     let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
     let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
 
-    // "Commit" data
+    // Commit data
     let dataset = local_repo
         .get_dataset(&dataset_alias.as_local_ref())
         .await
         .unwrap();
 
     let head = dataset
-        .as_metadata_chain()
-        .append(
-            MetadataFactory::metadata_block(AddData {
-                input_checkpoint: None,
-                output_data: DataSlice {
-                    logical_hash: data_logical_hash.clone(),
-                    physical_hash: data_physical_hash.clone(),
-                    interval: OffsetInterval { start: 0, end: 0 },
-                    size: size as i64,
-                },
-                output_checkpoint: None,
-                output_watermark: None,
-            })
-            .prev(&create_result.head, create_result.head_sequence_number)
-            .build(),
-            AppendOpts::default(),
+        .commit_add_data(
+            None,
+            Some(OffsetInterval { start: 0, end: 0 }),
+            Some(data_path),
+            None,
+            None,
+            CommitOpts::default(),
         )
         .await
-        .unwrap();
-    std::fs::rename(
-        data_path,
-        dataset_layout
-            .data_dir
-            .join(data_physical_hash.to_multibase_string()),
-    )
-    .unwrap();
+        .unwrap()
+        .new_head;
 
+    assert_matches!(
+        dataset.as_metadata_chain().get_block(&head).await.unwrap(), 
+        MetadataBlock {
+            event: MetadataEvent::AddData(AddData {
+                output_data: Some(DataSlice {
+                    logical_hash,
+                    physical_hash,
+                    ..
+                }),
+                ..
+            }),
+        ..
+    } if logical_hash == data_logical_hash && physical_hash == data_physical_hash);
+
+    // Check verification succeeds
     assert_matches!(
         verification_svc
             .verify(
@@ -152,6 +151,7 @@ async fn test_verify_data_consistency() {
     )
     .unwrap();
 
+    // Check verification fails
     assert_matches!(
         verification_svc.verify(
             &dataset_alias.as_local_ref(),
