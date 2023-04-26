@@ -116,6 +116,9 @@ pub use system_ipfs_add_command::*;
 mod ui_command;
 pub use ui_command::*;
 
+mod upgrade_workspace_command;
+pub use upgrade_workspace_command::*;
+
 mod verify_command;
 pub use verify_command::*;
 

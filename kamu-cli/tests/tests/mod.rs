@@ -11,3 +11,4 @@ mod test_add_command;
 mod test_complete_command;
 mod test_new_dataset_command;
 mod test_pull_command;
+mod test_workspace_svc;

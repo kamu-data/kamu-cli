@@ -7,14 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
-
 use arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::{Array, Int32Array, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::parquet::errors::ParquetError;
+use std::path::Path;
+use std::sync::Arc;
 
 pub struct ParquetWriterHelper;
 
 impl ParquetWriterHelper {
+    pub fn from_sample_data(path: &Path) -> Result<(), ParquetError> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("a", DataType::Int32, false),
+            Field::new("b", DataType::Utf8, false),
+        ]));
+
+        let a: Arc<dyn Array> = Arc::new(Int32Array::from(vec![1, 2, 3, 4, 5]));
+        let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c", "d", "e"]));
+
+        let record_batch =
+            RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)])
+                .unwrap();
+
+        Self::from_record_batch(path, &record_batch)
+    }
+
     pub fn from_record_batch(path: &Path, record_batch: &RecordBatch) -> Result<(), ParquetError> {
         use datafusion::parquet::arrow::ArrowWriter;
 

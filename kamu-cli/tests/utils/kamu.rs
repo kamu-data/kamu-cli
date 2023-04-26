@@ -164,6 +164,6 @@ impl Kamu {
 #[derive(Debug, Error)]
 #[error("Command {cmd:?} failed: {error}")]
 pub struct CommandError {
-    cmd: Vec<OsString>,
-    error: CLIError,
+    pub cmd: Vec<OsString>,
+    pub error: CLIError,
 }

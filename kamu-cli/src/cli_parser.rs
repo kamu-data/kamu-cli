@@ -1092,6 +1092,8 @@ pub fn cli() -> Command {
                     .subcommand_required(true)
                     .arg_required_else_help(true)
                     .subcommands([
+                        Command::new("upgrade-workspace")
+                            .about("Upgrade the layout of a local workspace to the latest version"),
                         Command::new("api-server")
                             .about("Run HTTP + GraphQL server")
                             .subcommands([

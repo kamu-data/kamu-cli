@@ -26,11 +26,11 @@ pub use commands::*;
 
 pub mod explore;
 
-pub mod config;
-pub use config::*;
-
 pub mod error;
 pub use error::*;
 
 pub mod output;
 pub use output::*;
+
+pub mod services;
+pub use services::*;

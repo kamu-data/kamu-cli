@@ -12,6 +12,7 @@ use opendatafabric::DatasetAlias;
 
 use std::path::PathBuf;
 
+// TODO: Consider extracting to kamu-cli layer
 /// Describes the layout of the workspace on disk
 #[derive(Debug, Clone)]
 pub struct WorkspaceLayout {
@@ -23,6 +24,8 @@ pub struct WorkspaceLayout {
     pub repos_dir: PathBuf,
     /// Directory for storing per-run diagnostics information and logs
     pub run_info_dir: PathBuf,
+    /// Version file path
+    pub version_path: PathBuf,
 }
 
 impl WorkspaceLayout {
@@ -32,6 +35,7 @@ impl WorkspaceLayout {
             datasets_dir: root_dir.join("datasets"),
             repos_dir: root_dir.join("repos"),
             run_info_dir: root_dir.join("run"),
+            version_path: root_dir.join("version"),
             root_dir,
         }
     }

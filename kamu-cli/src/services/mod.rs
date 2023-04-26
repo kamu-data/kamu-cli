@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(exit_status_error)]
-#![feature(assert_matches)]
-
-mod tests;
-mod utils;
+mod config_service;
+mod workspace_service;
+pub use config_service::*;
+pub use workspace_service::*;

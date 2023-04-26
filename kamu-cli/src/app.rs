@@ -20,9 +20,9 @@ use tracing::info;
 
 use crate::cli_commands;
 use crate::commands::Command;
-use crate::config::*;
 use crate::error::*;
 use crate::output::*;
+use crate::services::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,6 +38,10 @@ pub async fn run(
     workspace_layout: WorkspaceLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
+    let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
+    let in_workspace = workspace_svc.is_in_workspace();
+    let workspace_version = workspace_svc.workspace_version()?;
+
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
@@ -52,6 +56,8 @@ pub async fn run(
         info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
+            %in_workspace,
+            %workspace_version,
             workspace_root = ?workspace_layout.root_dir,
             "Initializing kamu-cli"
         );
@@ -63,8 +69,10 @@ pub async fn run(
 
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
 
-    let result = if command.needs_workspace() && !in_workspace(catalog.get_one().unwrap()) {
+    let result = if command.needs_workspace() && !in_workspace {
         Err(CLIError::usage_error_from(NotInWorkspace))
+    } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+        Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
     } else {
         command.run().await
     };
@@ -89,6 +97,7 @@ pub async fn run(
 pub fn configure_catalog() -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
+    b.add::<WorkspaceService>();
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
 
@@ -211,34 +220,6 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::infra::utils::ipfs_wrapper::IpfsClient::default());
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// Workspace
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn find_workspace() -> WorkspaceLayout {
-    let cwd = Path::new(".").canonicalize().unwrap();
-    if let Some(ws) = find_workspace_rec(&cwd) {
-        ws
-    } else {
-        WorkspaceLayout::new(cwd.join(".kamu"))
-    }
-}
-
-fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
-    let root_dir = p.join(".kamu");
-    if root_dir.exists() {
-        Some(WorkspaceLayout::new(root_dir))
-    } else if let Some(parent) = p.parent() {
-        find_workspace_rec(parent)
-    } else {
-        None
-    }
-}
-
-pub(crate) fn in_workspace(workspace_layout: Arc<WorkspaceLayout>) -> bool {
-    workspace_layout.root_dir.is_dir()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

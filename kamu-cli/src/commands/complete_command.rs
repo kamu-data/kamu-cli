@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::config::ConfigService;
+use crate::services::ConfigService;
 
 use super::{CLIError, Command};
 use kamu::domain::*;

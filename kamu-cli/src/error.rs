@@ -185,6 +185,7 @@ impl std::error::Error for BatchError {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Error, Debug)]
 pub enum CLIError {
     #[error("{0}")]
@@ -349,6 +350,8 @@ impl Display for UsageError {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Error)]
 #[error("Directory is already a kamu workspace")]
 pub struct AlreadyInWorkspace;
@@ -360,3 +363,9 @@ pub struct NotInWorkspace;
 #[derive(Debug, Error)]
 #[error("Command interpretation failed")]
 pub struct CommandInterpretationFailed;
+
+#[derive(Debug, Error)]
+#[error(
+    "Workspace needs to be upgraded before continuing - please run `kamu system upgrade-workspace`"
+)]
+pub struct WorkspaceUpgradeRequired;

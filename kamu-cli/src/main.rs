@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 fn main() {
-    let workspace_layout = kamu_cli::find_workspace();
+    let workspace_layout = kamu_cli::WorkspaceService::find_workspace();
     let matches = kamu_cli::cli().get_matches();
 
     let runtime = tokio::runtime::Runtime::new().unwrap();

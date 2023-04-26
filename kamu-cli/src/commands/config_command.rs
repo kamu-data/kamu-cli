@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use super::{CLIError, Command};
-use crate::config::{ConfigScope, ConfigService};
+use crate::services::{ConfigScope, ConfigService};
 
 use std::sync::Arc;
 

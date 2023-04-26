@@ -7,15 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetName;
-use opendatafabric::DatasetRef;
-use opendatafabric::DatasetRefAny;
-use opendatafabric::DatasetRefRemote;
-use opendatafabric::Multihash;
-use opendatafabric::RepoName;
+use opendatafabric::*;
 
-use crate::app::in_workspace;
 use crate::commands::*;
+use crate::services::WorkspaceService;
 use crate::CommandInterpretationFailed;
 
 pub fn get_command(
@@ -34,30 +29,36 @@ pub fn get_command(
             submatches.get_flag("replace"),
             submatches.get_flag("stdin"),
         )),
-        Some(("complete", submatches)) => Box::new(CompleteCommand::new(
-            if in_workspace(catalog.get_one()?) {
-                Some(catalog.get_one()?)
-            } else {
-                None
-            },
-            if in_workspace(catalog.get_one()?) {
-                Some(catalog.get_one()?)
-            } else {
-                None
-            },
-            if in_workspace(catalog.get_one()?) {
-                Some(catalog.get_one()?)
-            } else {
-                None
-            },
-            catalog.get_one()?,
-            crate::cli_parser::cli(),
-            submatches
-                .get_one::<String>("input")
-                .map(|s| s.to_string())
-                .unwrap(),
-            *(submatches.get_one("current").unwrap()),
-        )),
+        Some(("complete", submatches)) => {
+            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+            let in_workspace =
+                workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()?;
+
+            Box::new(CompleteCommand::new(
+                if in_workspace {
+                    Some(catalog.get_one()?)
+                } else {
+                    None
+                },
+                if in_workspace {
+                    Some(catalog.get_one()?)
+                } else {
+                    None
+                },
+                if in_workspace {
+                    Some(catalog.get_one()?)
+                } else {
+                    None
+                },
+                catalog.get_one()?,
+                crate::cli_parser::cli(),
+                submatches
+                    .get_one::<String>("input")
+                    .map(|s| s.to_string())
+                    .unwrap(),
+                *(submatches.get_one("current").unwrap()),
+            ))
+        }
         Some(("completions", submatches)) => Box::new(CompletionsCommand::new(
             crate::cli_parser::cli(),
             *submatches.get_one("shell").unwrap(),
@@ -334,6 +335,9 @@ pub fn get_command(
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("system", submatches)) => match submatches.subcommand() {
+            Some(("upgrade-workspace", _)) => {
+                Box::new(UpgradeWorkspaceCommand::new(catalog.get_one()?))
+            }
             Some(("api-server", server_matches)) => match server_matches.subcommand() {
                 None => Box::new(APIServerRunCommand::new(
                     catalog.clone(), // TODO: Currently very expensive!
