@@ -404,27 +404,6 @@ impl SimpleTransferProtocol {
             Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
 
-        // Download kamu-specific cache files (if exist)
-        // TODO: This is not part of the ODF spec and should be revisited.
-        // See also: IPFS sync procedure.
-        // Ticket: https://www.notion.so/Where-to-store-ingest-checkpoints-4d48e8db656042168f94a8ab2793daef
-        let cache_files = ["fetch.yaml", "prep.yaml", "read.yaml", "commit.yaml"];
-        for name in &cache_files {
-            use crate::domain::repos::named_object_repository::GetError;
-
-            match src.as_cache_repo().get(name).await {
-                Ok(data) => {
-                    dst.as_cache_repo()
-                        .set(name, data.as_ref())
-                        .await
-                        .int_err()?;
-                    Ok(())
-                }
-                Err(GetError::NotFound(_)) => Ok(()),
-                Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-                Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
-            }?;
-        }
         Ok(())
     }
 }

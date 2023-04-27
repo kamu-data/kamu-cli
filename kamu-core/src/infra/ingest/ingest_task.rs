@@ -155,7 +155,8 @@ impl IngestTask {
     }
 
     pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
-        if self.source.is_none() {
+        panic!();
+        /*if self.source.is_none() {
             return Ok(IngestResult::UpToDate {
                 no_polling_source: true,
                 uncacheable: false,
@@ -211,10 +212,10 @@ impl IngestTask {
             }
         };
 
-        Ok(res)
+        Ok(res)*/
     }
 
-    async fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    /*async fn maybe_fetch(&mut self) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
         let checkpoint_path = self.layout.cache_dir.join("fetch.yaml");
 
         let commit_checkpoint_path = self.layout.cache_dir.join("commit.yaml");
@@ -477,7 +478,7 @@ impl IngestTask {
             )
             .await
             .int_err()?
-    }
+    }*/
 }
 
 struct FetchProgressListenerBridge {

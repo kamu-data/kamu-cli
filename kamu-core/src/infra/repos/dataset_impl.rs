@@ -18,37 +18,33 @@ use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo> {
+pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
     metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
-    cache_repo: CacheRepo,
     info_repo: InfoRepo,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo>
-    DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo>
+impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
+    DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
     MetaChain: MetadataChain + Sync + Send,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
-    CacheRepo: NamedObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     pub fn new(
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
-        cache_repo: CacheRepo,
         info_repo: InfoRepo,
     ) -> Self {
         Self {
             metadata_chain,
             data_repo,
             checkpoint_repo,
-            cache_repo,
             info_repo,
         }
     }
@@ -243,13 +239,12 @@ impl UpdateSummaryIncrement {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo> Dataset
-    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, CacheRepo, InfoRepo>
+impl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> Dataset
+    for DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo>
 where
     MetaChain: MetadataChain + Sync + Send,
     DataRepo: ObjectRepository + Sync + Send,
     CheckpointRepo: ObjectRepository + Sync + Send,
-    CacheRepo: NamedObjectRepository + Sync + Send,
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
@@ -274,9 +269,5 @@ where
 
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository {
         &self.checkpoint_repo
-    }
-
-    fn as_cache_repo(&self) -> &dyn NamedObjectRepository {
-        &self.cache_repo
     }
 }

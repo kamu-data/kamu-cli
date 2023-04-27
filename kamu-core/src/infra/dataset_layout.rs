@@ -25,8 +25,6 @@ pub struct DatasetLayout {
     pub checkpoints_dir: PathBuf,
     /// Directory containing auxiliary information (e.g. summary, lookup tables etc.)
     pub info_dir: PathBuf,
-    /// Directory containing data that is not essential but can improve performance of operations like data polling
-    pub cache_dir: PathBuf,
 }
 
 impl DatasetLayout {
@@ -38,7 +36,6 @@ impl DatasetLayout {
             data_dir: root_dir.join("data"),
             checkpoints_dir: root_dir.join("checkpoints"),
             info_dir: root_dir.join("info"),
-            cache_dir: root_dir.join("cache"),
             root_dir,
         }
     }
@@ -51,7 +48,6 @@ impl DatasetLayout {
         std::fs::create_dir_all(&dl.data_dir)?;
         std::fs::create_dir_all(&dl.checkpoints_dir)?;
         std::fs::create_dir_all(&dl.info_dir)?;
-        std::fs::create_dir_all(&dl.cache_dir)?;
         Ok(dl)
     }
 

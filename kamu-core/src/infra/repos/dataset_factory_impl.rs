@@ -32,7 +32,6 @@ type DatasetImplLocalFS = DatasetImpl<
     ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
     ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
     NamedObjectRepositoryLocalFS,
-    NamedObjectRepositoryLocalFS,
 >;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +50,6 @@ impl DatasetFactoryImpl {
             ),
             ObjectRepositoryLocalFS::new(layout.data_dir),
             ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
-            NamedObjectRepositoryLocalFS::new(layout.cache_dir),
             NamedObjectRepositoryLocalFS::new(layout.info_dir),
         )
     }
@@ -68,7 +66,6 @@ impl DatasetFactoryImpl {
             ),
             ObjectRepositoryHttp::new(client.clone(), base_url.join("data/").unwrap()),
             ObjectRepositoryHttp::new(client.clone(), base_url.join("checkpoints/").unwrap()),
-            NamedObjectRepositoryHttp::new(client.clone(), base_url.join("cache/").unwrap()),
             NamedObjectRepositoryHttp::new(client.clone(), base_url.join("info/").unwrap()),
         ))
     }
@@ -101,11 +98,6 @@ impl DatasetFactoryImpl {
                 client.clone(),
                 bucket.clone(),
                 format!("{}checkpoints/", key_prefix),
-            )),
-            NamedObjectRepositoryS3::new(S3Context::new(
-                client.clone(),
-                bucket.clone(),
-                format!("{}cache/", key_prefix),
             )),
             NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
@@ -178,7 +170,6 @@ impl DatasetFactoryImpl {
             ),
             ObjectRepositoryHttp::new(client.clone(), dataset_url.join("data/").unwrap()),
             ObjectRepositoryHttp::new(client.clone(), dataset_url.join("checkpoints/").unwrap()),
-            NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("cache/").unwrap()),
             NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("info/").unwrap()),
         ))
     }
