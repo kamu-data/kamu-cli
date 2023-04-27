@@ -22,8 +22,6 @@ pub struct WorkspaceService {
 
 #[dill::component(pub)]
 impl WorkspaceService {
-    pub const LATEST_SUPPORTED_VERSION: usize = 1;
-
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
         Self { workspace_layout }
     }
@@ -55,33 +53,38 @@ impl WorkspaceService {
 
     /// Whether workspace requires and upgrade
     pub fn is_upgrade_needed(&self) -> Result<bool, InternalError> {
-        Ok(self.workspace_version()? != Self::LATEST_SUPPORTED_VERSION)
+        Ok(self.workspace_version()? != Some(WorkspaceLayout::VERSION))
     }
 
     /// Returns the version of the current workspace
-    pub fn workspace_version(&self) -> Result<usize, InternalError> {
-        assert!(self.is_in_workspace());
-
-        if !self.workspace_layout.version_path.is_file() {
-            Ok(0)
+    pub fn workspace_version(&self) -> Result<Option<usize>, InternalError> {
+        if !self.is_in_workspace() {
+            Ok(None)
         } else {
-            let version_str =
-                std::fs::read_to_string(&self.workspace_layout.version_path).int_err()?;
+            if !self.workspace_layout.version_path.is_file() {
+                Ok(Some(0))
+            } else {
+                let version_str =
+                    std::fs::read_to_string(&self.workspace_layout.version_path).int_err()?;
 
-            version_str.trim().parse().int_err()
+                Ok(Some(version_str.trim().parse().int_err()?))
+            }
         }
     }
 
     /// Returns the version that code expects to function correctly
     pub fn latest_supported_version(&self) -> usize {
-        Self::LATEST_SUPPORTED_VERSION
+        WorkspaceLayout::VERSION
     }
 
     /// Perform an upgrade of the workspace if necessary
     pub fn upgrade(&self) -> Result<WorkspaceUpgradeResult, WorkspaceUpgradeError> {
-        let prev_version = self.workspace_version()?;
+        let prev_version = self
+            .workspace_version()?
+            .expect("Upgrade called when not in workspace");
+
         let mut current_version = prev_version;
-        let new_version = Self::LATEST_SUPPORTED_VERSION;
+        let new_version = WorkspaceLayout::VERSION;
 
         if prev_version == new_version {
             return Ok(WorkspaceUpgradeResult {

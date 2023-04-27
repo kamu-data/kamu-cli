@@ -39,7 +39,6 @@ pub async fn run(
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
-    let in_workspace = workspace_svc.is_in_workspace();
     let workspace_version = workspace_svc.workspace_version()?;
 
     prepare_run_dir(&workspace_layout.run_info_dir);
@@ -56,8 +55,7 @@ pub async fn run(
         info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
-            %in_workspace,
-            %workspace_version,
+            ?workspace_version,
             workspace_root = ?workspace_layout.root_dir,
             "Initializing kamu-cli"
         );
@@ -69,7 +67,7 @@ pub async fn run(
 
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
 
-    let result = if command.needs_workspace() && !in_workspace {
+    let result = if command.needs_workspace() && !workspace_svc.is_in_workspace() {
         Err(CLIError::usage_error_from(NotInWorkspace))
     } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
         Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))

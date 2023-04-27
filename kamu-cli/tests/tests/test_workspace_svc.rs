@@ -9,7 +9,7 @@
 
 use crate::utils::{CommandError, Kamu};
 use kamu::domain::*;
-use kamu::infra::{DatasetFactoryImpl, DatasetLayout};
+use kamu::infra::{DatasetFactoryImpl, DatasetLayout, WorkspaceLayout};
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
 use opendatafabric::*;
@@ -74,14 +74,15 @@ async fn init_v0_workspace(workspace_path: &Path) {
 async fn test_workspace_upgrade() {
     let temp_dir = tempfile::tempdir().unwrap();
 
-    init_v0_workspace(temp_dir.path()).await;
-    let ingest_cache_dir = temp_dir.path().join(".kamu/datasets/foo/cache");
-    assert!(ingest_cache_dir.is_dir());
-
     let kamu = Kamu::new(temp_dir.path());
-
     let workspace_svc = kamu.catalog().get_one::<WorkspaceService>().unwrap();
-    assert_eq!(workspace_svc.workspace_version().unwrap(), 0);
+    assert_eq!(workspace_svc.workspace_version().unwrap(), None);
+
+    init_v0_workspace(temp_dir.path()).await;
+
+    assert!(!temp_dir.path().join(".kamu/version").is_file());
+    assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+    assert_eq!(workspace_svc.workspace_version().unwrap(), Some(0));
 
     assert_matches!(
         kamu.execute(["list"]).await,
@@ -95,9 +96,11 @@ async fn test_workspace_upgrade() {
 
     assert_eq!(
         workspace_svc.workspace_version().unwrap(),
-        WorkspaceService::LATEST_SUPPORTED_VERSION
+        Some(WorkspaceLayout::VERSION)
     );
 
-    assert!(!ingest_cache_dir.is_dir());
+    assert!(temp_dir.path().join(".kamu/version").is_file());
+    assert!(!temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+
     kamu.execute(["list"]).await.unwrap();
 }

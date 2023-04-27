@@ -22,6 +22,8 @@ pub struct WorkspaceLayout {
     pub datasets_dir: PathBuf,
     /// Contains repository definitions
     pub repos_dir: PathBuf,
+    /// Contains cached downloads and ingest checkpoints
+    pub cache_dir: PathBuf,
     /// Directory for storing per-run diagnostics information and logs
     pub run_info_dir: PathBuf,
     /// Version file path
@@ -29,11 +31,14 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
+    pub const VERSION: usize = 1;
+
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
         Self {
             datasets_dir: root_dir.join("datasets"),
             repos_dir: root_dir.join("repos"),
+            cache_dir: root_dir.join("cache"),
             run_info_dir: root_dir.join("run"),
             version_path: root_dir.join("version"),
             root_dir,
@@ -47,7 +52,9 @@ impl WorkspaceLayout {
         }
         std::fs::create_dir(&ws.datasets_dir)?;
         std::fs::create_dir(&ws.repos_dir)?;
+        std::fs::create_dir(&ws.cache_dir)?;
         std::fs::create_dir(&ws.run_info_dir)?;
+        std::fs::write(&ws.version_path, Self::VERSION.to_string())?;
         Ok(ws)
     }
 
