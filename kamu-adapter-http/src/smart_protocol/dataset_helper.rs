@@ -179,7 +179,7 @@ pub async fn dataset_append_metadata(
 ) -> Result<(), AppendError> {
     let metadata_chain = dataset.as_metadata_chain();
     for (hash, block) in metadata {
-        tracing::debug!("Appending block #{} {}", block.sequence_number, hash);
+        tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
         metadata_chain
             .append(
                 block,
@@ -597,6 +597,14 @@ pub async fn dataset_export_object_file(
     dataset: &dyn Dataset,
     object_transfer_strategy: &PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
+    if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {
+        tracing::debug!(
+            object_type = ?object_transfer_strategy.object_file.object_type,
+            physical_hash = %object_transfer_strategy.object_file.physical_hash,
+            "Skipping upload",
+        );
+        return Ok(());
+    }
     if object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload {
         panic!(
             "Unsupported push strategy {:?}",

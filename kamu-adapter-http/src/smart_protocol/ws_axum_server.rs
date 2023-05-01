@@ -151,9 +151,9 @@ async fn try_handle_pull_metadata_request(
             .int_err()?;
 
             tracing::debug!(
-                "Metadata batch of {} blocks formed, payload size {} bytes",
-                metadata_batch.objects_count,
-                metadata_batch.payload.len()
+                num_blocks = % metadata_batch.objects_count,
+                payload_size = % metadata_batch.payload.len(),
+                "Metadata batch of blocks formed",
             );
 
             write_payload::<DatasetMetadataPullResponse>(
@@ -190,8 +190,8 @@ async fn try_handle_pull_objects_request(
     match maybe_pull_objects_transfer_request {
         Ok(request) => {
             tracing::debug!(
-                "Pull client sent a pull objects request for {} objects",
-                request.object_files.len(),
+                objects_count = %request.object_files.len(),
+                "Pull client sent a pull objects request"
             );
 
             let mut object_transfer_strategies: Vec<PullObjectTransferStrategy> = Vec::new();
@@ -336,12 +336,12 @@ async fn try_handle_push_metadata_request(
     match maybe_push_metadata_request {
         Ok(push_metadata_request) => {
             tracing::debug!(
-                "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
-                push_metadata_request.new_blocks.objects_count,
-                push_metadata_request.new_blocks.object_type,
-                push_metadata_request.new_blocks.media_type,
-                push_metadata_request.new_blocks.encoding,
-                push_metadata_request.new_blocks.payload.len()
+                objects_count = % push_metadata_request.new_blocks.objects_count,
+                object_type = ? push_metadata_request.new_blocks.object_type,
+                media_type = % push_metadata_request.new_blocks.media_type,
+                encoding = % push_metadata_request.new_blocks.encoding,
+                payload_length = % push_metadata_request.new_blocks.payload.len(),
+                "Obtained compressed object batch",
             );
 
             assert_eq!(
@@ -420,8 +420,8 @@ async fn try_handle_push_objects_request(
         })?;
 
     tracing::debug!(
-        "Push client sent a push objects request for {} objects",
-        request.object_files.len(),
+        objects_count = % request.object_files.len(),
+        "Push client sent a push objects request",
     );
 
     let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();

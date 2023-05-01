@@ -171,7 +171,15 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     let summary = dataset
                         .get_summary(GetSummaryOpts::default())
                         .await
-                        .int_err()?;
+                        .map_err(|e| {
+                            if let GetSummaryError::EmptyDataset = e {
+                                GetDatasetError::NotFound(DatasetNotFoundError {
+                                    dataset_ref: dataset_ref.clone(),
+                                })
+                            } else {
+                                GetDatasetError::Internal(e.int_err())
+                            }
+                        })?;
 
                     Ok(DatasetHandle::new(summary.id, alias.clone()))
                 } else {
