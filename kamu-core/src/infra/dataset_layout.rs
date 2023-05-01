@@ -45,15 +45,13 @@ impl DatasetLayout {
 
     pub fn create(root: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
         let dl = Self::new(root);
-        if !dl.root_dir.exists() || dl.root_dir.read_dir()?.next().is_some() {
-            std::fs::create_dir(&dl.root_dir)?;
-        }
-        std::fs::create_dir(&dl.blocks_dir)?;
-        std::fs::create_dir(&dl.refs_dir)?;
-        std::fs::create_dir(&dl.data_dir)?;
-        std::fs::create_dir(&dl.checkpoints_dir)?;
-        std::fs::create_dir(&dl.info_dir)?;
-        std::fs::create_dir(&dl.cache_dir)?;
+        // Use `create_dir_all`, as it ignores if the directories already exist
+        std::fs::create_dir_all(&dl.blocks_dir)?;
+        std::fs::create_dir_all(&dl.refs_dir)?;
+        std::fs::create_dir_all(&dl.data_dir)?;
+        std::fs::create_dir_all(&dl.checkpoints_dir)?;
+        std::fs::create_dir_all(&dl.info_dir)?;
+        std::fs::create_dir_all(&dl.cache_dir)?;
         Ok(dl)
     }
 

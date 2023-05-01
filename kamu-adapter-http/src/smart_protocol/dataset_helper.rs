@@ -597,6 +597,14 @@ pub async fn dataset_export_object_file(
     dataset: &dyn Dataset,
     object_transfer_strategy: &PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
+    if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {
+        tracing::debug!(
+            "Skipping upload of {:?} '{}'",
+            object_transfer_strategy.object_file.object_type,
+            object_transfer_strategy.object_file.physical_hash
+        );
+        return Ok(());
+    }
     if object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload {
         panic!(
             "Unsupported push strategy {:?}",

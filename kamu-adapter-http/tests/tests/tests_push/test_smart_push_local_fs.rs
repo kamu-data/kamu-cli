@@ -45,3 +45,12 @@ async fn test_smart_push_local_fs_existing_dataset_fails_as_server_advanced() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_push_local_fs_aborted_write_of_new_rewrite_succeeds() {
+    let server_harness = ServerSideLocalFsHarness::new().await;
+    test_smart_push_shared::test_smart_push_aborted_write_of_new_rewrite_succeeds(server_harness)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
