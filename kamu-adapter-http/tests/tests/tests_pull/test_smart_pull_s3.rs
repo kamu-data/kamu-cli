@@ -46,3 +46,23 @@ async fn test_smart_pull_s3_existing_advanced_dataset_fails() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_smart_pull_s3_aborted_read_of_new_reread_succeeds() {
+    let server_harness = ServerSideS3Harness::new().await;
+    test_smart_pull_shared::test_smart_pull_aborted_read_of_new_reread_succeeds(server_harness)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_smart_pull_s3_aborted_read_of_existing_evolved_dataset_reread_succeeds() {
+    let server_harness = ServerSideS3Harness::new().await;
+    test_smart_pull_shared::test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds(server_harness)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

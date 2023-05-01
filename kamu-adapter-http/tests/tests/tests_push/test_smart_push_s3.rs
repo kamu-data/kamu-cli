@@ -59,3 +59,15 @@ async fn test_smart_push_s3_aborted_write_of_new_rewrite_succeeds() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_smart_push_s3_aborted_write_of_updated_rewrite_succeeds() {
+    let server_harness = ServerSideS3Harness::new().await;
+    test_smart_push_shared::test_smart_push_aborted_write_of_updated_rewrite_succeeds(
+        server_harness,
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -238,8 +238,11 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                     }
                 }
                 let name = DatasetName::try_from(&entry.file_name()).int_err()?;
-                let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
-                yield hdl;
+                match self.resolve_dataset_ref(&name.into()).await {
+                    Ok(hdl) => { yield hdl; Ok(()) }
+                    Err(GetDatasetError::NotFound(_)) => Ok(()),
+                    Err(e) => Err(e.int_err())
+                }?;
             }
         })
     }

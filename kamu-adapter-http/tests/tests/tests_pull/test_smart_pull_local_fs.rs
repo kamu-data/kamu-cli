@@ -42,3 +42,21 @@ async fn test_smart_pull_local_fs_existing_advanced_dataset_fails() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_local_fs_aborted_read_of_new_reread_succeeds() {
+    let server_harness = ServerSideLocalFsHarness::new().await;
+    test_smart_pull_shared::test_smart_pull_aborted_read_of_new_reread_succeeds(server_harness)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_smart_pull_local_fs_aborted_read_of_existing_evolved_dataset_reread_succeeds() {
+    let server_harness = ServerSideLocalFsHarness::new().await;
+    test_smart_pull_shared::test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds(server_harness)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
