@@ -63,8 +63,8 @@ pub async fn dataset_refs_handler(
         Err(GetRefError::NotFound(_)) => Err(axum::http::StatusCode::NOT_FOUND),
         Err(_) => {
             tracing::debug!(
-                "Internal error while resolving reference '{}'",
-                ref_param.reference
+                reference = %ref_param.reference,
+                "Internal error while resolving reference"
             );
             return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         }
@@ -85,7 +85,7 @@ pub async fn dataset_blocks_handler(
         Ok(block) => block,
         Err(GetBlockError::NotFound(_)) => return Err(axum::http::StatusCode::NOT_FOUND),
         Err(e) => {
-            tracing::debug!("GetBlockError: {}, {}", hash_param.block_hash, e);
+            tracing::debug!(block_hash = %hash_param.block_hash, "GetBlockError: {}", e);
             return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
@@ -93,11 +93,7 @@ pub async fn dataset_blocks_handler(
     match FlatbuffersMetadataBlockSerializer.write_manifest(&block) {
         Ok(block_bytes) => Ok(block_bytes.collapse_vec()),
         Err(e) => {
-            tracing::debug!(
-                "Block serialization failed: {}, {}",
-                hash_param.block_hash,
-                e
-            );
+            tracing::debug!(block_hash = %hash_param.block_hash, "Block serialization failed: {}", e);
             Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
@@ -117,7 +113,7 @@ pub async fn dataset_data_get_handler(
         Ok(stream) => stream,
         Err(GetError::NotFound(_)) => return Err(axum::http::StatusCode::NOT_FOUND),
         Err(e) => {
-            tracing::debug!("Data GetError: {}, {}", hash_param.physical_hash, e);
+            tracing::debug!(physical_hash = %hash_param.physical_hash, "Data GetError: {}", e);
             return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
@@ -142,7 +138,7 @@ pub async fn dataset_checkpoints_get_handler(
         Ok(stream) => stream,
         Err(GetError::NotFound(_)) => return Err(axum::http::StatusCode::NOT_FOUND),
         Err(e) => {
-            tracing::debug!("Checkpoint GetError: {}, {}", hash_param.physical_hash, e);
+            tracing::debug!(physical_hash = %hash_param.physical_hash, "Checkpoint GetError: {}", e);
             return Err(axum::http::StatusCode::INTERNAL_SERVER_ERROR);
         }
     };

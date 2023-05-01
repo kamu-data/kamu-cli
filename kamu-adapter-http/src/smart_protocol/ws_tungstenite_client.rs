@@ -63,11 +63,11 @@ impl WsSmartTransferProtocolClient {
         match dataset_pull_response {
             Ok(success) => {
                 tracing::debug!(
-                    "Pull response estimate: {} blocks to synchronize of {} total bytes, {} data objects of {} total bytes", 
-                    success.size_estimate.num_blocks,
-                    success.size_estimate.bytes_in_raw_blocks,
-                    success.size_estimate.num_objects,
-                    success.size_estimate.bytes_in_raw_objects,
+                    num_blocks = % success.size_estimate.num_blocks,
+                    bytes_in_raw_locks = % success.size_estimate.bytes_in_raw_blocks,
+                    num_objects = % success.size_estimate.num_objects,
+                    bytes_in_raw_objecs = % success.size_estimate.bytes_in_raw_objects,
+                    "Pull response estimate",
                 );
                 Ok(success)
             }
@@ -106,12 +106,12 @@ impl WsSmartTransferProtocolClient {
             })?;
 
         tracing::debug!(
-            "Obtained object batch with {} objects of type {:?}, media type {:?}, encoding {:?}, bytes in compressed blocks {}",
-            dataset_metadata_pull_response.blocks.objects_count,
-            dataset_metadata_pull_response.blocks.object_type,
-            dataset_metadata_pull_response.blocks.media_type,
-            dataset_metadata_pull_response.blocks.encoding,
-            dataset_metadata_pull_response.blocks.payload.len()
+            objects_count = % dataset_metadata_pull_response.blocks.objects_count,
+            object_type = ? dataset_metadata_pull_response.blocks.object_type,
+            media_type = % dataset_metadata_pull_response.blocks.media_type,
+            encoding = % dataset_metadata_pull_response.blocks.encoding,
+            payload_length = % dataset_metadata_pull_response.blocks.payload.len(),
+            "Obtained compressed objects batch",
         );
 
         Ok(dataset_metadata_pull_response)
@@ -124,8 +124,8 @@ impl WsSmartTransferProtocolClient {
     ) -> Result<DatasetPullObjectsTransferResponse, PullClientError> {
         let pull_objects_request = DatasetPullObjectsTransferRequest { object_files };
         tracing::debug!(
-            "Sending pull objects request for {} objects",
-            pull_objects_request.object_files.len()
+            num_objects = % pull_objects_request.object_files.len(),
+            "Sending pull objects request",
         );
 
         write_payload(socket, pull_objects_request)
@@ -144,10 +144,10 @@ impl WsSmartTransferProtocolClient {
                 })?;
 
         tracing::debug!(
-            "Obtained transfer strategies for {} objects",
-            dataset_objects_pull_response
+            num_objects = % dataset_objects_pull_response
                 .object_transfer_strategies
-                .len()
+                .len(),
+            "Obtained transfer strategies",
         );
 
         dataset_objects_pull_response
@@ -155,11 +155,11 @@ impl WsSmartTransferProtocolClient {
             .iter()
             .for_each(|s| {
                 tracing::debug!(
-                    "Object file {} needs to download from {} via {:?} method, expires at {:?}",
-                    s.object_file.physical_hash.to_string(),
-                    s.download_from.url,
-                    s.pull_strategy,
-                    s.download_from.expires_at
+                    physical_hash = % s.object_file.physical_hash,
+                    download_from_url = % s.download_from.url,
+                    pull_strategy = ? s.pull_strategy,
+                    expires_at = ? s.download_from.expires_at,
+                    "Detailed file download strategy",
                 )
             });
 
@@ -227,9 +227,9 @@ impl WsSmartTransferProtocolClient {
                 .int_err()?;
 
         tracing::debug!(
-            "Metadata batch of {} blocks formed, payload size {} bytes",
-            metadata_batch.objects_count,
-            metadata_batch.payload.len()
+            objects_count = % metadata_batch.objects_count,
+            payload_len = metadata_batch.payload.len(),
+            "Metadata batch of blocks formed",
         );
 
         write_payload(
@@ -264,8 +264,8 @@ impl WsSmartTransferProtocolClient {
             is_truncated: false, // TODO: split on pages to avoid links expiry
         };
         tracing::debug!(
-            "Sending push objects request for {} objects",
-            push_objects_request.object_files.len()
+            objects_count = % push_objects_request.object_files.len(),
+            "Sending push objects request"
         );
 
         write_payload(socket, push_objects_request)
@@ -284,10 +284,10 @@ impl WsSmartTransferProtocolClient {
                 })?;
 
         tracing::debug!(
-            "Obtained transfer strategies for {} objects",
-            dataset_objects_push_response
+            objects_count = % dataset_objects_push_response
                 .object_transfer_strategies
-                .len()
+                .len(),
+            "Obtained transfer strategies",
         );
 
         dataset_objects_push_response
@@ -296,17 +296,17 @@ impl WsSmartTransferProtocolClient {
             .for_each(|s| match s.upload_to.as_ref() {
                 Some(transfer_url) => {
                     tracing::debug!(
-                        "Object file {} needs to upload to {} via {:?} method, expires at {:?}",
-                        s.object_file.physical_hash.to_string(),
-                        transfer_url.url,
-                        s.push_strategy,
-                        transfer_url.expires_at
+                        physical_hash = % s.object_file.physical_hash,
+                        transfer_url = % transfer_url.url,
+                        push_strategy = ? s.push_strategy,
+                        expires_at = ? transfer_url.expires_at,
+                        "Object file upload strategy details"
                     );
                 }
                 None => {
                     tracing::debug!(
-                        "Object file {} does not need an upload",
-                        s.object_file.physical_hash.to_string(),
+                        physical_hash = % s.object_file.physical_hash,
+                        "Skipping object file upload"
                     );
                 }
             });
