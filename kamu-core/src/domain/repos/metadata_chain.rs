@@ -11,7 +11,7 @@ use std::fmt::Display;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::domain::*;
-use opendatafabric::{MetadataBlock, Multihash};
+use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 
 use async_trait::async_trait;
 use strum_macros::EnumString;
@@ -415,14 +415,16 @@ pub enum AppendValidationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("Invalid event: {message}")]
+#[error("Invalid event: {message}: {event:?}")]
 pub struct InvalidEventError {
+    event: MetadataEvent,
     message: String,
 }
 
 impl InvalidEventError {
-    pub fn new(message: impl Into<String>) -> Self {
+    pub fn new(event: MetadataEvent, message: impl Into<String>) -> Self {
         Self {
+            event,
             message: message.into(),
         }
     }

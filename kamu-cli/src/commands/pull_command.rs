@@ -548,7 +548,6 @@ impl IngestListener for PrettyIngestProgress {
             IngestResult::UpToDate {
                 no_polling_source,
                 uncacheable,
-                has_more,
             } => {
                 state
                     .curr_progress
@@ -564,10 +563,8 @@ impl IngestListener for PrettyIngestProgress {
                                     .to_owned(),
                             )
                             .yellow()
-                        } else if !has_more {
-                            console::style("Dataset is up-to-date".to_owned()).yellow()
                         } else {
-                            console::style("No new data ingested".to_owned()).yellow()
+                            console::style("Dataset is up-to-date".to_owned()).yellow()
                         },
                     ));
             }

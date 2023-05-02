@@ -119,6 +119,7 @@ pub trait DatasetExt: Dataset {
         movable_data_file: Option<P>,
         movable_checkpoint_file: Option<P>,
         output_watermark: Option<DateTime<Utc>>,
+        source_state: Option<SourceState>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         // Commit data
@@ -193,20 +194,24 @@ pub trait DatasetExt: Dataset {
             }
         };
 
-        let metadata_event =
-            if output_data.is_none() && output_checkpoint.is_none() && output_watermark.is_some() {
-                // TODO: Should this be here?
-                MetadataEvent::SetWatermark(SetWatermark {
-                    output_watermark: output_watermark.unwrap(),
-                })
-            } else {
-                MetadataEvent::AddData(AddData {
-                    input_checkpoint,
-                    output_data,
-                    output_checkpoint,
-                    output_watermark,
-                })
-            };
+        let metadata_event = if output_data.is_none()
+            && output_checkpoint.is_none()
+            && source_state.is_none()
+            && output_watermark.is_some()
+        {
+            // TODO: Should this be here?
+            MetadataEvent::SetWatermark(SetWatermark {
+                output_watermark: output_watermark.unwrap(),
+            })
+        } else {
+            MetadataEvent::AddData(AddData {
+                input_checkpoint,
+                output_data,
+                output_checkpoint,
+                output_watermark,
+                source_state,
+            })
+        };
 
         self.commit_event(metadata_event, opts).await
     }

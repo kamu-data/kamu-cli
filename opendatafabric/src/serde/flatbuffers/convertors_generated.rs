@@ -58,12 +58,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
             .map(|v| fb.create_vector(&v.to_bytes()));
         let output_data_offset = self.output_data.as_ref().map(|v| v.serialize(fb));
         let output_checkpoint_offset = self.output_checkpoint.as_ref().map(|v| v.serialize(fb));
+        let source_state_offset = self.source_state.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::AddDataBuilder::new(fb);
         input_checkpoint_offset.map(|off| builder.add_input_checkpoint(off));
         output_data_offset.map(|off| builder.add_output_data(off));
         output_checkpoint_offset.map(|off| builder.add_output_checkpoint(off));
         self.output_watermark
             .map(|v| builder.add_output_watermark(&datetime_to_fb(&v)));
+        source_state_offset.map(|off| builder.add_source_state(off));
         builder.finish()
     }
 }
@@ -79,6 +81,9 @@ impl<'fb> FlatbuffersDeserializable<fb::AddData<'fb>> for odf::AddData {
                 .output_checkpoint()
                 .map(|v| odf::Checkpoint::deserialize(v)),
             output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)),
+            source_state: proxy
+                .source_state()
+                .map(|v| odf::SourceState::deserialize(v)),
         }
     }
 }
@@ -1987,6 +1992,36 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::SourceCaching> for odf::SourceC
         match t {
             fb::SourceCaching::SourceCachingForever => odf::SourceCaching::Forever,
             _ => panic!("Invalid enum value: {}", t.0),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceState
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
+////////////////////////////////////////////////////////////////////////////////
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::SourceState {
+    type OffsetT = WIPOffset<fb::SourceState<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let kind_offset = { fb.create_string(&self.kind) };
+        let source_offset = { fb.create_string(&self.source) };
+        let value_offset = { fb.create_string(&self.value) };
+        let mut builder = fb::SourceStateBuilder::new(fb);
+        builder.add_kind(kind_offset);
+        builder.add_source(source_offset);
+        builder.add_value(value_offset);
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::SourceState<'fb>> for odf::SourceState {
+    fn deserialize(proxy: fb::SourceState<'fb>) -> Self {
+        odf::SourceState {
+            kind: proxy.kind().map(|v| v.to_owned()).unwrap(),
+            source: proxy.source().map(|v| v.to_owned()).unwrap(),
+            value: proxy.value().map(|v| v.to_owned()).unwrap(),
         }
     }
 }

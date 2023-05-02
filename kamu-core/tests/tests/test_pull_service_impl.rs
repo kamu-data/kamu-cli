@@ -922,7 +922,6 @@ impl IngestService for TestIngestService {
                     Ok(IngestResult::UpToDate {
                         no_polling_source: false,
                         uncacheable: false,
-                        has_more: false,
                     }),
                 )
             })

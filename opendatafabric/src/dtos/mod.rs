@@ -17,3 +17,6 @@ pub mod dynamic {
 
 mod dtos_trait_impls;
 pub use dtos_trait_impls::*;
+
+mod constants;
+pub use constants::*;

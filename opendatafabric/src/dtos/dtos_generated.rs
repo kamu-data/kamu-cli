@@ -33,6 +33,8 @@ pub struct AddData {
     pub output_checkpoint: Option<Checkpoint>,
     /// Last watermark of the output data stream, if changed.
     pub output_watermark: Option<DateTime<Utc>>,
+    /// The state of the source the data was added from to allow fast resuming.
+    pub source_state: Option<SourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -772,6 +774,22 @@ pub struct SetWatermark {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceCaching {
     Forever,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceState
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// The state of the source the data was added from to allow fast resuming.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SourceState {
+    /// Identifies the type of the state. Standard types include: `odf/etag`, `odf/last-modified`.
+    pub kind: String,
+    /// Identifies the source data was ingested from. Standard sources include: `odf/poll`
+    pub source: String,
+    /// Opaque value representing the state.
+    pub value: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

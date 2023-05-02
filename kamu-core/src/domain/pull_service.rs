@@ -112,7 +112,6 @@ impl From<IngestResult> for PullResult {
             IngestResult::UpToDate {
                 no_polling_source: _,
                 uncacheable: _,
-                has_more: _,
             } => PullResult::UpToDate,
             IngestResult::Updated {
                 old_head,

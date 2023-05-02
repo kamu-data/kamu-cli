@@ -16,7 +16,7 @@ use std::convert::TryFrom;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn get_test_events() -> [(MetadataEvent, &'static str); 5] {
+fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
     [
         (
             MetadataEvent::SetPollingSource(SetPollingSource {
@@ -52,6 +52,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 5] {
                 output_data: None,
                 output_checkpoint: None,
                 output_watermark: None,
+                source_state: None,
             }),
             "eb745e4f975c66d8794afce2f5792a888ecf3cb367e2c90bf108753a34a0690e",
         ),
@@ -66,8 +67,28 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 5] {
                 }),
                 output_checkpoint: None,
                 output_watermark: None,
+                source_state: None,
             }),
             "5f5736202e41d0da69ec9835bb0d15efc23e844dd98243da585135c9f772812d",
+        ),
+        (
+            MetadataEvent::AddData(AddData {
+                input_checkpoint: None,
+                output_data: Some(DataSlice {
+                    logical_hash: Multihash::from_digest_sha3_256(b"logical"),
+                    physical_hash: Multihash::from_digest_sha3_256(b"physical"),
+                    interval: OffsetInterval { start: 0, end: 100 },
+                    size: 100,
+                }),
+                output_checkpoint: None,
+                output_watermark: None,
+                source_state: Some(SourceState {
+                    kind: "odf/etag".to_owned(),
+                    source: "odf/polling-source".to_owned(),
+                    value: "SOME_ETAG".to_owned(),
+                }),
+            }),
+            "bb459566b5913507f6627a07e13ab60bbd16948ee4d8fb640e77fc4c3df57998",
         ),
         (
             MetadataEvent::SetTransform(SetTransform {

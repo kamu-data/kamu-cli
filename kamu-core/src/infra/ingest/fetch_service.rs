@@ -9,7 +9,6 @@
 
 use super::*;
 use crate::domain::*;
-use crate::infra::WorkspaceLayout;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
@@ -17,6 +16,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
+use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
@@ -25,45 +25,50 @@ use std::time::Duration;
 use tracing::{debug, error, info, info_span};
 use url::Url;
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub struct FetchService {
     container_runtime: Arc<ContainerRuntime>,
-    workspace_layout: Arc<WorkspaceLayout>,
+    container_log_dir: PathBuf,
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Reimplement with async libraries
 impl FetchService {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        container_log_dir: impl Into<PathBuf>,
     ) -> Self {
         Self {
             container_runtime,
-            workspace_layout,
+            container_log_dir: container_log_dir.into(),
         }
     }
 
     pub async fn fetch(
         &self,
         fetch_step: &FetchStep,
-        old_checkpoint: Option<FetchCheckpoint>,
-        target: &Path,
+        prev_source_state: Option<&PollingSourceState>,
+        target_path: &Path,
         maybe_listener: Option<Arc<dyn FetchProgressListener>>,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
         let fetch_step = fetch_step.clone();
-        let target = target.to_owned();
+        let prev_source_state = prev_source_state.cloned();
+        let target_path = target_path.to_owned();
         let container_runtime = self.container_runtime.clone();
-        let workspace_layout = self.workspace_layout.clone();
+        let container_log_dir = self.container_log_dir.clone();
 
         tokio::task::spawn_blocking(move || {
             Self::fetch_impl(
                 &fetch_step,
-                old_checkpoint,
-                &target,
+                prev_source_state.as_ref(),
+                &target_path,
                 listener,
                 container_runtime,
-                workspace_layout,
+                container_log_dir,
             )
         })
         .await
@@ -72,12 +77,12 @@ impl FetchService {
 
     fn fetch_impl(
         fetch_step: &FetchStep,
-        old_checkpoint: Option<FetchCheckpoint>,
-        target: &Path,
+        prev_source_state: Option<&PollingSourceState>,
+        target_path: &Path,
         listener: Arc<dyn FetchProgressListener>,
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: Arc<WorkspaceLayout>,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+        container_log_dir: PathBuf,
+    ) -> Result<FetchResult, IngestError> {
         match &fetch_step {
             FetchStep::Url(furl) => {
                 let url = Self::template_url(&furl.url)?;
@@ -88,37 +93,37 @@ impl FetchService {
                         &url.to_file_path()
                             .map_err(|_| format!("Invalid url: {}", url).int_err())?,
                         furl.event_time.as_ref(),
-                        old_checkpoint,
-                        target,
+                        prev_source_state,
+                        target_path,
                         listener.as_ref(),
                     ),
                     "http" | "https" => Self::fetch_http(
                         &url,
                         &headers,
                         furl.event_time.as_ref(),
-                        old_checkpoint,
-                        target,
+                        prev_source_state,
+                        target_path,
                         listener.as_ref(),
                     ),
                     "ftp" => Self::fetch_ftp(
                         &url,
                         furl.event_time.as_ref(),
-                        old_checkpoint,
-                        target,
+                        prev_source_state,
+                        target_path,
                         listener.as_ref(),
                     ),
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
             FetchStep::FilesGlob(fglob) => {
-                Self::fetch_files_glob(fglob, old_checkpoint, target, listener.as_ref())
+                Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
             }
             FetchStep::Container(fetch) => Self::fetch_container(
                 container_runtime,
-                workspace_layout,
+                container_log_dir,
                 fetch,
-                old_checkpoint,
-                target,
+                prev_source_state,
+                target_path,
                 listener,
             ),
         }
@@ -185,12 +190,12 @@ impl FetchService {
     // TODO: Allow containers to output watermarks
     fn fetch_container(
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        container_log_dir: PathBuf,
         fetch: &FetchStepContainer,
-        old_checkpoint: Option<FetchCheckpoint>,
+        prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: Arc<dyn FetchProgressListener>,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
         use rand::Rng;
         use std::process::Stdio;
 
@@ -232,15 +237,11 @@ impl FetchService {
             .map(char::from)
             .collect();
 
-        let out_dir = workspace_layout
-            .run_info_dir
-            .join(format!("fetch-{}", &run_id));
+        let out_dir = container_log_dir.join(format!("fetch-{}", &run_id));
 
         std::fs::create_dir_all(&out_dir).int_err()?;
 
-        let stderr_path = workspace_layout
-            .run_info_dir
-            .join(format!("fetch-{}.err.txt", run_id));
+        let stderr_path = container_log_dir.join(format!("fetch-{}.err.txt", run_id));
 
         let stdout_file = std::fs::File::create(target_path).int_err()?;
         let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
@@ -248,22 +249,18 @@ impl FetchService {
         let new_etag_path = out_dir.join("new-etag");
         let new_last_modified_path = out_dir.join("new-last-modified");
 
+        let (prev_etag, prev_last_modified) = match prev_source_state {
+            None => (String::new(), String::new()),
+            Some(PollingSourceState::ETag(etag)) => (etag.clone(), String::new()),
+            Some(PollingSourceState::LastModified(last_modified)) => (
+                String::new(),
+                last_modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true),
+            ),
+        };
+
         let mut environment_vars = vec![
-            (
-                "ODF_LAST_MODIFIED".to_owned(),
-                old_checkpoint
-                    .as_ref()
-                    .and_then(|c| c.last_modified)
-                    .map(|d| d.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true))
-                    .unwrap_or_default(),
-            ),
-            (
-                "ODF_ETAG".to_owned(),
-                old_checkpoint
-                    .as_ref()
-                    .and_then(|c| c.etag.clone())
-                    .unwrap_or_default(),
-            ),
+            ("ODF_ETAG".to_owned(), prev_etag),
+            ("ODF_LAST_MODIFIED".to_owned(), prev_last_modified),
             (
                 "ODF_NEW_ETAG_PATH".to_owned(),
                 "/opt/odf/out/new-etag".to_owned(),
@@ -333,57 +330,37 @@ impl FetchService {
             return Err(ProcessError::new(status.code(), vec![stderr_path]).into());
         }
 
-        let old_checkpoint = old_checkpoint.unwrap_or(FetchCheckpoint {
-            last_fetched: Utc::now(),
-            last_modified: None,
-            etag: None,
-            source_event_time: None,
-            last_filename: None,
-            has_more: false,
-        });
-
-        let etag = if new_etag_path.exists() {
-            Some(std::fs::read_to_string(new_etag_path).int_err()?)
-        } else {
-            old_checkpoint.etag.clone()
-        };
-
-        let last_modified = if new_last_modified_path.exists() {
+        let source_state = if new_etag_path.exists() {
+            let s = std::fs::read_to_string(new_etag_path).int_err()?;
+            Some(PollingSourceState::ETag(s))
+        } else if new_last_modified_path.exists() {
             let s = std::fs::read_to_string(new_last_modified_path).int_err()?;
-            Some(chrono::DateTime::parse_from_rfc3339(&s).int_err()?.into())
+            Some(PollingSourceState::LastModified(
+                chrono::DateTime::parse_from_rfc3339(&s).int_err()?.into(),
+            ))
         } else {
-            old_checkpoint.last_modified.clone()
+            None
         };
 
         if target_path.metadata().int_err()?.len() == 0
-            && etag == old_checkpoint.etag
-            && last_modified == old_checkpoint.last_modified
+            && prev_source_state == source_state.as_ref()
         {
-            Ok(ExecutionResult {
-                was_up_to_date: true,
-                checkpoint: old_checkpoint,
-            })
+            Ok(FetchResult::UpToDate)
         } else {
-            Ok(ExecutionResult {
-                was_up_to_date: false,
-                checkpoint: FetchCheckpoint {
-                    last_fetched: Utc::now(),
-                    last_modified,
-                    etag,
-                    source_event_time: None,
-                    last_filename: None,
-                    has_more: false,
-                },
-            })
+            Ok(FetchResult::Updated(FetchResultUpdated {
+                source_state,
+                source_event_time: None,
+                has_more: false,
+            }))
         }
     }
 
     fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
-        old_checkpoint: Option<FetchCheckpoint>,
-        target: &Path,
+        prev_source_state: Option<&PollingSourceState>,
+        target_path: &Path,
         listener: &dyn FetchProgressListener,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
         match &fglob.order {
             None => (),
             Some(SourceOrdering::ByName) => (),
@@ -396,17 +373,17 @@ impl FetchService {
         let event_time_source = match &fglob.event_time {
             None => None,
             Some(EventTimeSource::FromPath(fp)) => Some(fp),
-            Some(src) => panic!(
+            Some(src) => {
+                return Err(EventTimeSourceError::incompatible(format!(
                 "Files glob source only supports deriving event time from file path, found: {:?}",
                 src
-            ),
+            ))
+                .into())
+            }
         };
 
-        let last_filename = match old_checkpoint {
-            Some(FetchCheckpoint {
-                last_filename: Some(ref name),
-                ..
-            }) => Some(name.clone()),
+        let last_filename = match prev_source_state {
+            Some(PollingSourceState::ETag(etag)) => Some(etag),
             _ => None,
         };
 
@@ -420,7 +397,7 @@ impl FetchService {
             .filter(|p| p.is_file())
             .map(|p| (p.file_name().unwrap().to_str().unwrap().to_owned(), p))
             .filter(|(name, _)| {
-                if let Some(ref lfn) = last_filename {
+                if let Some(lfn) = last_filename {
                     name > lfn
                 } else {
                     true
@@ -433,58 +410,55 @@ impl FetchService {
         info!(pattern = fglob.path.as_str(), last_filename = ?last_filename, matches = ?matched_files, "Matched the glob pattern");
 
         if matched_files.is_empty() {
-            return if let Some(cp) = old_checkpoint {
-                Ok(ExecutionResult {
-                    was_up_to_date: true,
-                    checkpoint: cp,
-                })
+            return if prev_source_state.is_some() {
+                Ok(FetchResult::UpToDate)
             } else {
                 Err(IngestError::not_found(&fglob.path, None))
             };
         }
 
         let (first_filename, first_path) = matched_files.pop().unwrap();
-        let res = Self::fetch_file(
-            &first_path,
-            fglob.event_time.as_ref(),
-            None,
-            target,
-            listener,
-        );
+        let fetch_res = Self::fetch_file(&first_path, None, None, target_path, listener)?;
+        assert_matches!(fetch_res, FetchResult::Updated(_));
 
-        let event_time = match event_time_source {
+        let source_event_time = match event_time_source {
             None => None,
             Some(src) => Some(Self::extract_event_time(&first_filename, &src)?),
         };
 
-        match res {
-            Ok(exec_res) => Ok(ExecutionResult {
-                was_up_to_date: exec_res.was_up_to_date,
-                checkpoint: FetchCheckpoint {
-                    last_fetched: exec_res.checkpoint.last_fetched,
-                    source_event_time: event_time,
-                    last_filename: Some(first_filename),
-                    has_more: !matched_files.is_empty(),
-                    etag: None,
-                    last_modified: None,
-                },
-            }),
-            Err(e) => Err(e),
-        }
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: Some(PollingSourceState::ETag(first_filename)),
+            source_event_time,
+            has_more: !matched_files.is_empty(),
+        }))
     }
 
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
     fn fetch_file(
         path: &Path,
-        _event_time_source: Option<&EventTimeSource>,
-        old_checkpoint: Option<FetchCheckpoint>,
+        event_time_source: Option<&EventTimeSource>,
+        prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
         use fs_extra::file::*;
 
         info!(path = ?path, "Ingesting file");
+
+        match event_time_source {
+            None | Some(EventTimeSource::FromMetadata) => (),
+            Some(src) => {
+                return Err(EventTimeSourceError::incompatible(format!(
+                    concat!(
+                        "File source only supports deriving event time from metadata ",
+                        "(file modification time), found: {:?}"
+                    ),
+                    src
+                ))
+                .into())
+            }
+        };
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => {
@@ -499,23 +473,11 @@ impl FetchService {
             .expect("File modification time is not available on this platform")
             .round_subsecs(3);
 
-        if let Some(cp) = old_checkpoint {
-            if cp.last_modified == Some(mod_time) {
-                return Ok(ExecutionResult {
-                    was_up_to_date: true,
-                    checkpoint: cp,
-                });
+        if let Some(PollingSourceState::LastModified(last_modified)) = prev_source_state {
+            if *last_modified == mod_time {
+                return Ok(FetchResult::UpToDate);
             }
         }
-
-        let new_checkpoint = FetchCheckpoint {
-            last_fetched: Utc::now(),
-            last_modified: Some(mod_time),
-            etag: None,
-            source_event_time: Some(mod_time),
-            last_filename: None,
-            has_more: false,
-        };
 
         let mut options = CopyOptions::new();
         options.overwrite = true;
@@ -529,24 +491,39 @@ impl FetchService {
             listener.on_progress(&progress);
         };
 
-        // TODO: Use symlinks
-        // TODO: Support compression
+        // TODO: PERF: Use symlinks
+        // TODO: PERF: Support compression
         fs_extra::file::copy_with_progress(path, target_path, &options, handle).int_err()?;
 
-        Ok(ExecutionResult {
-            was_up_to_date: false,
-            checkpoint: new_checkpoint,
-        })
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: Some(PollingSourceState::LastModified(mod_time)),
+            source_event_time: Some(mod_time),
+            has_more: false,
+        }))
     }
 
     fn fetch_http(
         url: &Url,
         headers: &Vec<RequestHeader>,
-        _event_time_source: Option<&EventTimeSource>,
-        old_checkpoint: Option<FetchCheckpoint>,
+        event_time_source: Option<&EventTimeSource>,
+        prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
+        match event_time_source {
+            None | Some(EventTimeSource::FromMetadata) => (),
+            Some(src) => {
+                return Err(EventTimeSourceError::incompatible(format!(
+                    concat!(
+                        "Url source only supports deriving event time from metadata ",
+                        "(last modified time), found: {:?}",
+                    ),
+                    src
+                ))
+                .into())
+            }
+        };
+
         let target_path_tmp = target_path.with_extension("tmp");
 
         let mut h = curl::easy::Easy::new();
@@ -560,16 +537,17 @@ impl FetchService {
         for hdr in headers {
             header_list.append(&format!("{}: {}", hdr.name, hdr.value))?;
         }
-        if let Some(ref cp) = old_checkpoint {
-            if let Some(ref etag) = cp.etag {
-                header_list.append(&format!("If-None-Match: {}", etag))?;
-            } else if let Some(ref last_modified) = cp.last_modified {
-                header_list.append(&format!(
-                    "If-Modified-Since: {}",
-                    last_modified.to_rfc2822()
-                ))?;
+
+        match prev_source_state {
+            None => (),
+            Some(PollingSourceState::ETag(etag)) => {
+                header_list.append(&format!("If-None-Match: {}", etag))?
             }
+            Some(PollingSourceState::LastModified(last_modified)) => header_list.append(
+                &format!("If-Modified-Since: {}", last_modified.to_rfc2822()),
+            )?,
         }
+
         h.http_headers(header_list)?;
 
         let mut last_modified: Option<DateTime<Utc>> = None;
@@ -626,27 +604,26 @@ impl FetchService {
             })?;
         }
 
+        let source_state = if let Some(etag) = etag {
+            Some(PollingSourceState::ETag(etag))
+        } else if let Some(last_modified) = &last_modified {
+            Some(PollingSourceState::LastModified(last_modified.clone()))
+        } else {
+            None
+        };
+
         match h.response_code()? {
             200 => {
                 std::fs::rename(target_path_tmp, target_path).unwrap();
-                Ok(ExecutionResult {
-                    was_up_to_date: false,
-                    checkpoint: FetchCheckpoint {
-                        last_fetched: Utc::now(),
-                        last_modified: last_modified,
-                        etag: etag,
-                        source_event_time: last_modified,
-                        last_filename: None,
-                        has_more: false,
-                    },
-                })
+                Ok(FetchResult::Updated(FetchResultUpdated {
+                    source_state,
+                    source_event_time: last_modified,
+                    has_more: false,
+                }))
             }
             304 => {
                 std::fs::remove_file(&target_path_tmp).unwrap();
-                Ok(ExecutionResult {
-                    was_up_to_date: true,
-                    checkpoint: old_checkpoint.unwrap(),
-                })
+                Ok(FetchResult::UpToDate)
             }
             404 => {
                 std::fs::remove_file(&target_path_tmp).unwrap();
@@ -667,10 +644,10 @@ impl FetchService {
     fn fetch_ftp(
         url: &Url,
         _event_time_source: Option<&EventTimeSource>,
-        _old_checkpoint: Option<FetchCheckpoint>,
+        _prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
-    ) -> Result<ExecutionResult<FetchCheckpoint>, IngestError> {
+    ) -> Result<FetchResult, IngestError> {
         let target_path_tmp = target_path.with_extension("tmp");
 
         let mut h = curl::easy::Easy::new();
@@ -715,17 +692,12 @@ impl FetchService {
         }
 
         std::fs::rename(target_path_tmp, target_path).unwrap();
-        Ok(ExecutionResult {
-            was_up_to_date: false,
-            checkpoint: FetchCheckpoint {
-                last_fetched: Utc::now(),
-                last_modified: None,
-                etag: None,
-                source_event_time: None,
-                last_filename: None,
-                has_more: false,
-            },
-        })
+
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: None,
+            source_event_time: None,
+            has_more: false,
+        }))
     }
 
     fn split_header<'a>(h: &'a str) -> Option<(&'a str, &'a str)> {
@@ -783,26 +755,27 @@ impl FetchService {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+pub enum FetchResult {
+    UpToDate,
+    Updated(FetchResultUpdated),
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct FetchCheckpoint {
-    #[serde(with = "datetime_rfc3339")]
-    pub last_fetched: DateTime<Utc>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
-    pub last_modified: Option<DateTime<Utc>>,
-    pub etag: Option<String>,
+pub struct FetchResultUpdated {
+    #[serde(default, with = "PollingSourceState")]
+    pub source_state: Option<PollingSourceState>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub source_event_time: Option<DateTime<Utc>>,
-    pub last_filename: Option<String>,
     pub has_more: bool,
 }
 
-impl FetchCheckpoint {
-    pub fn is_cacheable(&self) -> bool {
-        self.last_modified.is_some() || self.etag.is_some() || self.last_filename.is_some()
-    }
-}
+////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FetchProgress {
@@ -847,34 +820,46 @@ impl std::convert::From<curl::Error> for IngestError {
 
 #[derive(Error, Debug)]
 enum EventTimeSourceError {
-    #[error("Bad event time pattern: {0}")]
+    #[error(transparent)]
+    Incompatible(#[from] EventTimeSourceIncompatibleError),
+    #[error(transparent)]
     BadPattern(#[from] EventTimeSourcePatternError),
-    #[error("Error when extracting event time: {0}")]
+    #[error(transparent)]
     Extract(#[from] EventTimeSourceExtractError),
 }
 
 impl EventTimeSourceError {
+    fn incompatible(message: String) -> EventTimeSourceError {
+        EventTimeSourceError::Incompatible(EventTimeSourceIncompatibleError { message })
+    }
+
     fn bad_pattern(pattern: &str, error: chrono::ParseError) -> EventTimeSourceError {
         EventTimeSourceError::BadPattern(EventTimeSourcePatternError {
             pattern: pattern.to_owned(),
-            error: error,
+            error,
         })
     }
 
     fn failed_extract(message: String) -> EventTimeSourceError {
-        EventTimeSourceError::Extract(EventTimeSourceExtractError { message: message })
+        EventTimeSourceError::Extract(EventTimeSourceExtractError { message })
     }
 }
 
 #[derive(Error, Debug)]
-#[error("{error} in pattern {pattern}")]
+#[error("{message}")]
+struct EventTimeSourceIncompatibleError {
+    pub message: String,
+}
+
+#[derive(Error, Debug)]
+#[error("Bad event time pattern: {error} in pattern {pattern}")]
 struct EventTimeSourcePatternError {
     pub pattern: String,
     pub error: chrono::ParseError,
 }
 
 #[derive(Error, Debug)]
-#[error("{message}")]
+#[error("Error when extracting event time: {message}")]
 struct EventTimeSourceExtractError {
     pub message: String,
 }

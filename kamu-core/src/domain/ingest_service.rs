@@ -79,7 +79,6 @@ pub enum IngestResult {
     UpToDate {
         no_polling_source: bool,
         uncacheable: bool,
-        has_more: bool,
     },
     Updated {
         old_head: Multihash,

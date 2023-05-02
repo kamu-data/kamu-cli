@@ -169,7 +169,8 @@ where
                     && e.output_watermark.is_none()
                 {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
-                        "AddData has empty data, checkpoint, and watermark",
+                        MetadataEvent::AddData(e.clone()),
+                        "Event is empty",
                     ))
                     .into());
                 }

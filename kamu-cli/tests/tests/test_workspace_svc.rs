@@ -51,6 +51,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
             Some(data_path),
             Some(checkpoint_path),
             None,
+            None,
             CommitOpts::default(),
         )
         .await

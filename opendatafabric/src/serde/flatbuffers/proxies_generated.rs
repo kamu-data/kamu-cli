@@ -1978,6 +1978,159 @@ impl core::fmt::Debug for Checkpoint<'_> {
         ds.finish()
     }
 }
+pub enum SourceStateOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+pub struct SourceState<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for SourceState<'a> {
+    type Inner = SourceState<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> SourceState<'a> {
+    pub const VT_KIND: flatbuffers::VOffsetT = 4;
+    pub const VT_SOURCE: flatbuffers::VOffsetT = 6;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        SourceState { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args SourceStateArgs<'args>,
+    ) -> flatbuffers::WIPOffset<SourceState<'bldr>> {
+        let mut builder = SourceStateBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        if let Some(x) = args.source {
+            builder.add_source(x);
+        }
+        if let Some(x) = args.kind {
+            builder.add_kind(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn kind(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(SourceState::VT_KIND, None)
+        }
+    }
+    #[inline]
+    pub fn source(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(SourceState::VT_SOURCE, None)
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(SourceState::VT_VALUE, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for SourceState<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("kind", Self::VT_KIND, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("source", Self::VT_SOURCE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("value", Self::VT_VALUE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct SourceStateArgs<'a> {
+    pub kind: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub source: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub value: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for SourceStateArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        SourceStateArgs {
+            kind: None,
+            source: None,
+            value: None,
+        }
+    }
+}
+
+pub struct SourceStateBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> SourceStateBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_kind(&mut self, kind: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SourceState::VT_KIND, kind);
+    }
+    #[inline]
+    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SourceState::VT_SOURCE, source);
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(SourceState::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SourceStateBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        SourceStateBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<SourceState<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for SourceState<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("SourceState");
+        ds.field("kind", &self.kind());
+        ds.field("source", &self.source());
+        ds.field("value", &self.value());
+        ds.finish()
+    }
+}
 pub enum AddDataOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -2002,6 +2155,7 @@ impl<'a> AddData<'a> {
     pub const VT_OUTPUT_DATA: flatbuffers::VOffsetT = 6;
     pub const VT_OUTPUT_CHECKPOINT: flatbuffers::VOffsetT = 8;
     pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 10;
+    pub const VT_SOURCE_STATE: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -2013,6 +2167,9 @@ impl<'a> AddData<'a> {
         args: &'args AddDataArgs<'args>,
     ) -> flatbuffers::WIPOffset<AddData<'bldr>> {
         let mut builder = AddDataBuilder::new(_fbb);
+        if let Some(x) = args.source_state {
+            builder.add_source_state(x);
+        }
         if let Some(x) = args.output_watermark {
             builder.add_output_watermark(x);
         }
@@ -2073,6 +2230,16 @@ impl<'a> AddData<'a> {
                 .get::<Timestamp>(AddData::VT_OUTPUT_WATERMARK, None)
         }
     }
+    #[inline]
+    pub fn source_state(&self) -> Option<SourceState<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<SourceState>>(AddData::VT_SOURCE_STATE, None)
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for AddData<'_> {
@@ -2099,6 +2266,11 @@ impl flatbuffers::Verifiable for AddData<'_> {
                 false,
             )?
             .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<SourceState>>(
+                "source_state",
+                Self::VT_SOURCE_STATE,
+                false,
+            )?
             .finish();
         Ok(())
     }
@@ -2108,6 +2280,7 @@ pub struct AddDataArgs<'a> {
     pub output_data: Option<flatbuffers::WIPOffset<DataSlice<'a>>>,
     pub output_checkpoint: Option<flatbuffers::WIPOffset<Checkpoint<'a>>>,
     pub output_watermark: Option<&'a Timestamp>,
+    pub source_state: Option<flatbuffers::WIPOffset<SourceState<'a>>>,
 }
 impl<'a> Default for AddDataArgs<'a> {
     #[inline]
@@ -2117,6 +2290,7 @@ impl<'a> Default for AddDataArgs<'a> {
             output_data: None,
             output_checkpoint: None,
             output_watermark: None,
+            source_state: None,
         }
     }
 }
@@ -2161,6 +2335,14 @@ impl<'a: 'b, 'b> AddDataBuilder<'a, 'b> {
             .push_slot_always::<&Timestamp>(AddData::VT_OUTPUT_WATERMARK, output_watermark);
     }
     #[inline]
+    pub fn add_source_state(&mut self, source_state: flatbuffers::WIPOffset<SourceState<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<SourceState>>(
+                AddData::VT_SOURCE_STATE,
+                source_state,
+            );
+    }
+    #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> AddDataBuilder<'a, 'b> {
         let start = _fbb.start_table();
         AddDataBuilder {
@@ -2182,6 +2364,7 @@ impl core::fmt::Debug for AddData<'_> {
         ds.field("output_data", &self.output_data());
         ds.field("output_checkpoint", &self.output_checkpoint());
         ds.field("output_watermark", &self.output_watermark());
+        ds.field("source_state", &self.source_state());
         ds.finish()
     }
 }

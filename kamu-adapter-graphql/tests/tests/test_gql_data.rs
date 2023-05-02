@@ -65,6 +65,7 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
         Some(tmp_data_path),
         None,
         None,
+        None,
         CommitOpts::default(),
     )
     .await

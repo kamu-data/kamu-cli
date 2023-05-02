@@ -2746,6 +2746,7 @@ dependencies = [
  "dill",
  "env_logger",
  "filetime",
+ "flatbuffers",
  "flate2",
  "fs_extra",
  "futures",

@@ -64,6 +64,9 @@ pub struct AddDataDef {
     pub output_checkpoint: Option<Checkpoint>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub output_watermark: Option<DateTime<Utc>>,
+    #[serde_as(as = "Option<SourceStateDef>")]
+    #[serde(default)]
+    pub source_state: Option<SourceState>,
 }
 
 implement_serde_as!(AddData, AddDataDef, "AddDataDef");
@@ -1037,6 +1040,24 @@ pub enum SourceCachingDef {
 }
 
 implement_serde_as!(SourceCaching, SourceCachingDef, "SourceCachingDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceState
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SourceState")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SourceStateDef {
+    pub kind: String,
+    pub source: String,
+    pub value: String,
+}
+
+implement_serde_as!(SourceState, SourceStateDef, "SourceStateDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // SqlQueryStep

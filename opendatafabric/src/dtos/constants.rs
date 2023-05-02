@@ -7,17 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ingest_task;
-pub use ingest_task::*;
+use super::SourceState;
 
-mod fetch_service;
-pub use fetch_service::*;
-
-mod prep_service;
-pub use prep_service::*;
-
-mod read_service;
-pub use read_service::*;
-
-mod polling_source_state;
-pub use polling_source_state::*;
+impl SourceState {
+    pub const KIND_ETAG: &str = "odf/etag";
+    pub const KIND_LAST_MODIFIED: &str = "odf/last-modified";
+    pub const SOURCE_POLLING: &str = "odf/polling";
+}

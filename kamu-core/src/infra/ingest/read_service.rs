@@ -7,15 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
 use crate::domain::engine::IngestRequest;
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use ::serde::{Deserialize, Serialize};
-use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use std::path::Path;
 use std::sync::Arc;
@@ -35,6 +31,7 @@ impl ReadService {
         dataset_handle: &'b DatasetHandle,
         dataset_layout: &'b DatasetLayout,
         source: &'b SetPollingSource,
+        src_data_path: &'b Path,
         prev_checkpoint: Option<Multihash>,
         vocab: &'b DatasetVocabulary,
         system_time: DateTime<Utc>,
@@ -42,27 +39,17 @@ impl ReadService {
         offset: i64,
         out_data_path: &'b Path,
         out_checkpoint_path: &'b Path,
-        for_prepared_at: DateTime<Utc>,
-        _old_checkpoint: Option<ReadCheckpoint>,
-        src_path: &'b Path,
         listener: Arc<dyn IngestListener>,
-    ) -> Result<ExecutionResult<ReadCheckpoint>, IngestError>
+    ) -> Result<ExecuteQueryResponseSuccess, IngestError>
     where
         'a: 'b,
     {
         // Terminate early for zero-sized files
-        if src_path.metadata().int_err()?.len() == 0 {
-            return Ok(ExecutionResult {
-                was_up_to_date: false,
-                checkpoint: ReadCheckpoint {
-                    last_read: Utc::now(),
-                    for_prepared_at: for_prepared_at,
-                    system_time,
-                    engine_response: ExecuteQueryResponseSuccess {
-                        data_interval: None,
-                        output_watermark: None,
-                    },
-                },
+        // TODO: Should we still call an engine if only to propagate source_event_time to it?
+        if src_data_path.metadata().int_err()?.len() == 0 {
+            return Ok(ExecuteQueryResponseSuccess {
+                data_interval: None,
+                output_watermark: None,
             });
         }
 
@@ -71,18 +58,10 @@ impl ReadService {
             .provision_ingest_engine(listener.get_engine_provisioning_listener())
             .await?;
 
-        // Clean up previous state leftovers
-        if out_data_path.exists() {
-            std::fs::remove_file(&out_data_path).int_err()?;
-        }
-        if out_checkpoint_path.exists() {
-            std::fs::remove_file(&out_checkpoint_path).int_err()?;
-        }
-
         let request = IngestRequest {
             dataset_id: dataset_handle.id.clone(),
             dataset_name: dataset_handle.alias.dataset_name.clone(),
-            ingest_path: src_path.to_owned(),
+            ingest_path: src_data_path.to_owned(),
             system_time,
             event_time: source_event_time,
             offset,
@@ -113,28 +92,6 @@ impl ReadService {
             }
         }
 
-        Ok(ExecutionResult {
-            was_up_to_date: false,
-            checkpoint: ReadCheckpoint {
-                last_read: Utc::now(),
-                for_prepared_at: for_prepared_at,
-                system_time,
-                engine_response: response,
-            },
-        })
+        Ok(response)
     }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ReadCheckpoint {
-    #[serde(with = "datetime_rfc3339")]
-    pub last_read: DateTime<Utc>,
-    #[serde(with = "datetime_rfc3339")]
-    pub for_prepared_at: DateTime<Utc>,
-    #[serde(with = "datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-    #[serde(with = "ExecuteQueryResponseSuccessDef")]
-    pub engine_response: ExecuteQueryResponseSuccess,
 }

@@ -189,6 +189,7 @@ impl AsciiRenderer {
                 output_data,
                 output_checkpoint,
                 output_watermark,
+                source_state,
             }) => {
                 self.render_property(output, 0, "Kind", "AddData")?;
 
@@ -204,6 +205,13 @@ impl AsciiRenderer {
                 if let Some(ocp) = output_checkpoint {
                     self.render_section(output, 0, "OutputCheckpoint")?;
                     self.render_checkpoint(output, 1, ocp)?;
+                }
+
+                if let Some(ss) = source_state {
+                    self.render_section(output, 0, "SourceState")?;
+                    self.render_property(output, 1, "Kind", &ss.kind)?;
+                    self.render_property(output, 1, "Source", &ss.source)?;
+                    self.render_property(output, 1, "Value", &ss.value)?;
                 }
 
                 if let Some(wm) = output_watermark {

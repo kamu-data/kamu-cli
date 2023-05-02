@@ -222,6 +222,7 @@ async fn test_get_verification_plan_one_to_one() {
             }),
             output_checkpoint: None,
             output_watermark: Some(t0),
+            source_state: None,
         })
         .system_time(t1)
         .prev(&root_head_src, root_initial_sequence_number)
@@ -287,6 +288,7 @@ async fn test_get_verification_plan_one_to_one() {
             }),
             output_checkpoint: None,
             output_watermark: Some(t2),
+            source_state: None,
         })
         .system_time(t3)
         .prev(&root_head_t1, root_initial_sequence_number + 1)

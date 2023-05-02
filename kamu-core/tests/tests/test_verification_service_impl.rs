@@ -102,6 +102,7 @@ async fn test_verify_data_consistency() {
             Some(data_path),
             None,
             None,
+            None,
             CommitOpts::default(),
         )
         .await

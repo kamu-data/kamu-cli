@@ -12,7 +12,6 @@ use kamu::domain::IngestError;
 use kamu::infra::ingest::*;
 use opendatafabric::*;
 
-use chrono::Utc;
 use std::assert_matches::assert_matches;
 use std::io::prelude::*;
 
@@ -52,12 +51,11 @@ fn test_prep_pipe() {
     )
     .unwrap();
 
-    let res = prep_svc
-        .prepare(&prep_steps, Utc::now(), None, &src_path, &target_path)
+    prep_svc
+        .prepare(&prep_steps, &src_path, &target_path)
         .unwrap();
-    assert_eq!(res.was_up_to_date, false);
-    assert!(target_path.exists());
 
+    assert!(target_path.exists());
     assert_eq!(
         std::fs::read_to_string(&target_path).unwrap().replace("\r", ""),
         "{\"city\":\"A\",\"population\":100}\n{\"city\":\"B\",\"population\":200}\n{\"city\":\"A\",\"population\":110}\n"
@@ -98,12 +96,11 @@ fn test_prep_decompress_zip_single_file() {
 
     let prep_svc = PrepService::new();
 
-    let res = prep_svc
-        .prepare(&prep_steps, Utc::now(), None, &src_path, &target_path)
+    prep_svc
+        .prepare(&prep_steps, &src_path, &target_path)
         .unwrap();
-    assert_eq!(res.was_up_to_date, false);
-    assert!(target_path.exists());
 
+    assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }
 
@@ -123,7 +120,7 @@ fn test_prep_decompress_zip_bad_file() {
 
     let prep_svc = PrepService::new();
 
-    let res = prep_svc.prepare(&prep_steps, Utc::now(), None, &src_path, &target_path);
+    let res = prep_svc.prepare(&prep_steps, &src_path, &target_path);
     assert_matches!(res, Err(IngestError::Internal(_)));
 }
 
@@ -161,11 +158,10 @@ fn test_prep_decompress_gzip() {
 
     let prep_svc = PrepService::new();
 
-    let res = prep_svc
-        .prepare(&prep_steps, Utc::now(), None, &src_path, &target_path)
+    prep_svc
+        .prepare(&prep_steps, &src_path, &target_path)
         .unwrap();
-    assert_eq!(res.was_up_to_date, false);
-    assert!(target_path.exists());
 
+    assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }

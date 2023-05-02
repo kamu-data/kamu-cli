@@ -57,14 +57,13 @@ impl IngestServiceImpl {
                 }),
                 IngestResult::UpToDate {
                     no_polling_source: _,
-                    has_more,
                     uncacheable,
                 },
             ) => IngestResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
-                has_more,
+                has_more: false,
                 uncacheable,
             },
             (
@@ -140,7 +139,7 @@ impl IngestServiceImpl {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
                     let has_more = match combined_result {
-                        Some(IngestResult::UpToDate { has_more, .. }) => has_more,
+                        Some(IngestResult::UpToDate { .. }) => false,
                         Some(IngestResult::Updated { has_more, .. }) => has_more,
                         None => unreachable!(),
                     };

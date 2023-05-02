@@ -7,14 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
 use crate::domain::*;
-use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use ::serde::{Deserialize, Serialize};
-use ::serde_with::skip_serializing_none;
-use chrono::{DateTime, Utc};
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;
@@ -35,11 +30,9 @@ impl PrepService {
     pub fn prepare(
         &self,
         prep_steps: &Vec<PrepStep>,
-        for_fetched_at: DateTime<Utc>,
-        _old_checkpoint: Option<PrepCheckpoint>,
         src_path: &Path,
         target_path: &Path,
-    ) -> Result<ExecutionResult<PrepCheckpoint>, IngestError> {
+    ) -> Result<(), IngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
 
         for step in prep_steps.iter() {
@@ -59,24 +52,8 @@ impl PrepService {
 
         sink.join()?;
 
-        Ok(ExecutionResult {
-            was_up_to_date: false,
-            checkpoint: PrepCheckpoint {
-                last_prepared: Utc::now(),
-                for_fetched_at: for_fetched_at,
-            },
-        })
+        Ok(())
     }
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct PrepCheckpoint {
-    #[serde(with = "datetime_rfc3339")]
-    pub last_prepared: DateTime<Utc>,
-    #[serde(with = "datetime_rfc3339")]
-    pub for_fetched_at: DateTime<Utc>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

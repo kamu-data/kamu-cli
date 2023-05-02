@@ -30,6 +30,7 @@ pub struct AddData {
     pub output_data: Option<DataSlice>,
     pub output_checkpoint: Option<Checkpoint>,
     pub output_watermark: Option<DateTime<Utc>>,
+    pub source_state: Option<SourceState>,
 }
 
 impl From<odf::AddData> for AddData {
@@ -39,6 +40,7 @@ impl From<odf::AddData> for AddData {
             output_data: v.output_data.map(Into::into),
             output_checkpoint: v.output_checkpoint.map(Into::into),
             output_watermark: v.output_watermark.map(Into::into),
+            source_state: v.source_state.map(Into::into),
         }
     }
 }
@@ -1149,6 +1151,28 @@ impl From<odf::SourceCaching> for SourceCaching {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceCachingForever {
     pub _dummy: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceState
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct SourceState {
+    pub kind: String,
+    pub source: String,
+    pub value: String,
+}
+
+impl From<odf::SourceState> for SourceState {
+    fn from(v: odf::SourceState) -> Self {
+        Self {
+            kind: v.kind.into(),
+            source: v.source.into(),
+            value: v.value.into(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

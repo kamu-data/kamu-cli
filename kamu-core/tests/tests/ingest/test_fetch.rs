@@ -42,7 +42,10 @@ async fn test_fetch_url_file() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
 
     // No file to fetch
     assert_matches!(
@@ -69,23 +72,38 @@ async fn test_fetch_url_file() {
         .fetch(&fetch_step, None, &target_path, None)
         .await
         .unwrap();
-    assert_eq!(res.was_up_to_date, false);
+    assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
+
+    let update = match res {
+        FetchResult::Updated(upd) => upd,
+        _ => unreachable!(),
+    };
 
     // No modifications
     let res2 = fetch_svc
-        .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res2.was_up_to_date, true);
+    assert_matches!(res2, FetchResult::UpToDate);
 
     // Fetches again if mtime changed
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
-        .fetch(&fetch_step, Some(res2.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res3.was_up_to_date, false);
+    assert_matches!(res3, FetchResult::Updated(_));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -105,7 +123,10 @@ async fn test_fetch_url_http_unreachable() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
@@ -130,7 +151,10 @@ async fn test_fetch_url_http_not_found() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
 
     assert_matches!(
         fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
@@ -169,7 +193,10 @@ async fn test_fetch_url_http_ok() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
@@ -177,7 +204,13 @@ async fn test_fetch_url_http_ok() {
         .await
         .unwrap();
 
-    assert!(!res.was_up_to_date);
+    assert_matches!(res, FetchResult::Updated(_));
+    let update = match res {
+        FetchResult::Updated(upd) => upd,
+        _ => unreachable!(),
+    };
+    assert_matches!(&update.source_state, Some(PollingSourceState::ETag(_)));
+    assert!(!update.has_more);
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
     assert_eq!(
@@ -188,43 +221,42 @@ async fn test_fetch_url_http_ok() {
         })
     );
 
-    let cp_last_mod = FetchCheckpoint {
-        etag: None,
-        ..res.checkpoint.clone()
-    };
-    let res_repeat_last_mod = fetch_svc
-        .fetch(&fetch_step, Some(cp_last_mod), &target_path, None)
+    let res_repeat = fetch_svc
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
 
-    assert!(res_repeat_last_mod.was_up_to_date);
-    assert!(target_path.exists());
-
-    let cp_etag = FetchCheckpoint {
-        last_modified: None,
-        ..res.checkpoint.clone()
-    };
-    let res_repeat_etag = fetch_svc
-        .fetch(&fetch_step, Some(cp_etag), &target_path, None)
-        .await
-        .unwrap();
-
-    assert!(res_repeat_etag.was_up_to_date);
+    assert_matches!(res_repeat, FetchResult::UpToDate);
     assert!(target_path.exists());
 
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res_touch = fetch_svc
-        .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
 
-    assert!(!res_touch.was_up_to_date);
+    assert_matches!(res_touch, FetchResult::Updated(_));
     assert!(target_path.exists());
 
     std::fs::remove_file(&src_path).unwrap();
     assert_matches!(
         fetch_svc
-            .fetch(&fetch_step, Some(res_touch.checkpoint), &target_path, None)
+            .fetch(
+                &fetch_step,
+                update.source_state.as_ref(),
+                &target_path,
+                None
+            )
             .await,
         Err(IngestError::NotFound { .. })
     );
@@ -265,7 +297,10 @@ async fn test_fetch_url_http_env_interpolation() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
     let listener = Arc::new(TestListener::new());
 
     assert_matches!(
@@ -282,7 +317,7 @@ async fn test_fetch_url_http_env_interpolation() {
         .await
         .unwrap();
 
-    assert!(!res.was_up_to_date);
+    assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
     assert_eq!(
@@ -328,7 +363,10 @@ async fn test_fetch_url_ftp_ok() {
         headers: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
@@ -336,7 +374,7 @@ async fn test_fetch_url_ftp_ok() {
         .await
         .unwrap();
 
-    assert!(!res.was_up_to_date);
+    assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
     assert_eq!(
@@ -375,7 +413,10 @@ async fn test_fetch_files_glob() {
         order: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
 
     // No file to fetch
     assert_matches!(
@@ -402,31 +443,45 @@ async fn test_fetch_files_glob() {
         .fetch(&fetch_step, None, &target_path, None)
         .await
         .unwrap();
-    assert_eq!(res.was_up_to_date, false);
+    assert_matches!(res, FetchResult::Updated(_));
+    let update = match res {
+        FetchResult::Updated(upd) => upd,
+        _ => unreachable!(),
+    };
     assert!(target_path.exists());
-    assert_eq!(
-        res.checkpoint.last_filename,
-        Some("data-2020-10-01.csv".to_owned())
+    assert_matches!(
+        &update.source_state,
+        Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-01.csv"
     );
     assert_eq!(
-        res.checkpoint.source_event_time,
+        update.source_event_time,
         Some(Utc.with_ymd_and_hms(2020, 10, 1, 0, 0, 0).unwrap())
     );
 
     // No modifications
     let res2 = fetch_svc
-        .fetch(&fetch_step, Some(res.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res2.was_up_to_date, true);
+    assert_matches!(res2, FetchResult::UpToDate);
 
     // Doesn't fetch again if mtime changed
     filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
-        .fetch(&fetch_step, Some(res2.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res3.was_up_to_date, true);
+    assert_matches!(res3, FetchResult::UpToDate);
 
     // Doesn't consider files with names lexicographically "smaller" than last fetched
     let src_path_0 = tempdir.path().join("data-2020-01-01.csv");
@@ -444,14 +499,15 @@ async fn test_fetch_files_glob() {
     .unwrap();
 
     let res4 = fetch_svc
-        .fetch(&fetch_step, Some(res3.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res4.was_up_to_date, true);
-    assert_eq!(
-        res4.checkpoint.last_filename,
-        Some("data-2020-10-01.csv".to_owned())
-    );
+    assert_matches!(res4, FetchResult::UpToDate);
 
     // Multiple available
     let src_path_2 = tempdir.path().join("data-2020-10-05.csv");
@@ -479,34 +535,54 @@ async fn test_fetch_files_glob() {
     .unwrap();
 
     let res5 = fetch_svc
-        .fetch(&fetch_step, Some(res4.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res5.was_up_to_date, false);
+    assert_matches!(res5, FetchResult::Updated(_));
+    let update5 = match res5 {
+        FetchResult::Updated(upd) => upd,
+        _ => unreachable!(),
+    };
     assert!(target_path.exists());
-    assert_eq!(
-        res5.checkpoint.last_filename,
-        Some("data-2020-10-05.csv".to_owned())
+    assert_matches!(
+        &update5.source_state,
+        Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-05.csv"
     );
     assert_eq!(
-        res5.checkpoint.source_event_time,
+        update5.source_event_time,
         Some(Utc.with_ymd_and_hms(2020, 10, 5, 0, 0, 0).unwrap())
     );
+    assert!(update5.has_more);
 
     let res6 = fetch_svc
-        .fetch(&fetch_step, Some(res5.checkpoint), &target_path, None)
+        .fetch(
+            &fetch_step,
+            update5.source_state.as_ref(),
+            &target_path,
+            None,
+        )
         .await
         .unwrap();
-    assert_eq!(res6.was_up_to_date, false);
+    assert_matches!(res6, FetchResult::Updated(_));
+    let update6 = match res6 {
+        FetchResult::Updated(upd) => upd,
+        _ => unreachable!(),
+    };
     assert!(target_path.exists());
-    assert_eq!(
-        res6.checkpoint.last_filename,
-        Some("data-2020-10-10.csv".to_owned())
+    assert_matches!(
+        update6.source_state,
+        Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-10.csv"
     );
     assert_eq!(
-        res6.checkpoint.source_event_time,
+        update6.source_event_time,
         Some(Utc.with_ymd_and_hms(2020, 10, 10, 0, 0, 0).unwrap())
     );
+    assert!(!update6.has_more);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -540,7 +616,10 @@ async fn test_fetch_container_ok() {
         env: None,
     });
 
-    let fetch_svc = FetchService::new(Arc::new(ContainerRuntime::default()), workspace_layout);
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        &workspace_layout.run_info_dir,
+    );
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
@@ -548,7 +627,7 @@ async fn test_fetch_container_ok() {
         .await
         .unwrap();
 
-    assert!(!res.was_up_to_date);
+    assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
 }

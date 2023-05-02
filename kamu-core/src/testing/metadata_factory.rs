@@ -282,6 +282,7 @@ impl AddDataBuilder {
                 output_data: None,
                 output_checkpoint: None,
                 output_watermark: None,
+                source_state: None,
             },
         }
         .some_output_data()

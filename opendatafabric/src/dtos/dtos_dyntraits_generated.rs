@@ -29,6 +29,7 @@ pub trait AddData {
     fn output_data(&self) -> Option<&dyn DataSlice>;
     fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
     fn output_watermark(&self) -> Option<DateTime<Utc>>;
+    fn source_state(&self) -> Option<&dyn SourceState>;
 }
 
 impl AddData for dtos::AddData {
@@ -48,6 +49,11 @@ impl AddData for dtos::AddData {
             .as_ref()
             .map(|v| -> DateTime<Utc> { *v })
     }
+    fn source_state(&self) -> Option<&dyn SourceState> {
+        self.source_state
+            .as_ref()
+            .map(|v| -> &dyn SourceState { v })
+    }
 }
 
 impl Into<dtos::AddData> for &dyn AddData {
@@ -57,6 +63,7 @@ impl Into<dtos::AddData> for &dyn AddData {
             output_data: self.output_data().map(|v| v.into()),
             output_checkpoint: self.output_checkpoint().map(|v| v.into()),
             output_watermark: self.output_watermark().map(|v| v),
+            source_state: self.source_state().map(|v| v.into()),
         }
     }
 }
@@ -1720,6 +1727,39 @@ impl Into<dtos::SourceCaching> for SourceCaching<'_> {
         match self {
             SourceCaching::Forever => dtos::SourceCaching::Forever,
             SourceCaching::_Phantom(_) => unreachable!(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SourceState
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SourceState {
+    fn kind(&self) -> &str;
+    fn source(&self) -> &str;
+    fn value(&self) -> &str;
+}
+
+impl SourceState for dtos::SourceState {
+    fn kind(&self) -> &str {
+        self.kind.as_ref()
+    }
+    fn source(&self) -> &str {
+        self.source.as_ref()
+    }
+    fn value(&self) -> &str {
+        self.value.as_ref()
+    }
+}
+
+impl Into<dtos::SourceState> for &dyn SourceState {
+    fn into(self) -> dtos::SourceState {
+        dtos::SourceState {
+            kind: self.kind().to_owned(),
+            source: self.source().to_owned(),
+            value: self.value().to_owned(),
         }
     }
 }
