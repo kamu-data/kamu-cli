@@ -65,7 +65,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     // Ingest cache directory
     let ingest_cache_dir = dataset_dir.join("cache");
-    //std::fs::create_dir(&ingest_cache_dir).unwrap();
+    std::fs::create_dir(&ingest_cache_dir).unwrap();
 
     std::fs::write(ingest_cache_dir.join("fetch.yaml"), b"<fetch.yaml>").unwrap();
     std::fs::write(ingest_cache_dir.join("commit.yaml"), b"<commit.yaml>").unwrap();

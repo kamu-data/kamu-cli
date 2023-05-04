@@ -158,7 +158,13 @@ impl IngestTask {
     pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         let span = info_span!("Ingesting data", dataset_handle = %self.dataset_handle);
         let _span_guard = span.enter();
-        info!(source = ?self.source, prev_checkpoint = ?self.prev_checkpoint, vocab = ?self.vocab, "Ingest details");
+        info!(
+            source = ?self.source,
+            fetch_override = ?self.fetch_override,
+            prev_checkpoint = ?self.prev_checkpoint,
+            vocab = ?self.vocab,
+            "Ingest details",
+        );
 
         self.listener.begin();
 
@@ -374,7 +380,7 @@ impl IngestTask {
             let fetch_result = self
                 .fetch_service
                 .fetch(
-                    &self.source.as_ref().unwrap().fetch,
+                    fetch_step,
                     prev_source_state,
                     &target_path,
                     Some(Arc::new(FetchProgressListenerBridge {
