@@ -35,6 +35,9 @@ pub use config_command::*;
 mod delete_command;
 pub use delete_command::*;
 
+mod gc_command;
+pub use gc_command::*;
+
 mod init_command;
 pub use init_command::*;
 

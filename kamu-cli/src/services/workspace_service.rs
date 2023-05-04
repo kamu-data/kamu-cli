@@ -130,6 +130,7 @@ impl WorkspaceService {
                 std::fs::remove_dir_all(cache_dir).int_err()?;
             }
         }
+        let _ = std::fs::create_dir(&self.workspace_layout.cache_dir);
         Ok(())
     }
 }

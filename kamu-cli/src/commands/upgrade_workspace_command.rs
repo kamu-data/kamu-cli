@@ -35,13 +35,13 @@ impl Command for UpgradeWorkspaceCommand {
             match self.workspace_svc.upgrade() {
                 Ok(res) => {
                     eprintln!(
-                        "{}",
-                        console::style(format!(
-                            "Successfully upgraded workspace from version {} to {}",
-                            res.prev_version, res.new_version
-                        ))
-                        .green()
-                        .bold()
+                        "{} {} {} {}",
+                        console::style("Successfully upgraded workspace from version")
+                            .green()
+                            .bold(),
+                        res.prev_version,
+                        console::style("to").green().bold(),
+                        res.new_version,
                     );
                     Ok(())
                 }

@@ -335,6 +335,7 @@ pub fn get_command(
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("system", submatches)) => match submatches.subcommand() {
+            Some(("clean", _)) => Box::new(GcCommand::new(catalog.get_one()?)),
             Some(("upgrade-workspace", _)) => {
                 Box::new(UpgradeWorkspaceCommand::new(catalog.get_one()?))
             }
