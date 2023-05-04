@@ -217,7 +217,7 @@ impl PullCommand {
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
-        let pull_progress = PrettyPullProgress::new();
+        let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable);
         let listener = Arc::new(pull_progress.clone());
 
         let draw_thread = std::thread::spawn(move || {
@@ -353,14 +353,16 @@ impl Command for PullCommand {
 
 #[derive(Clone)]
 struct PrettyPullProgress {
-    pub multi_progress: Arc<indicatif::MultiProgress>,
-    pub finished: Arc<AtomicBool>,
+    multi_progress: Arc<indicatif::MultiProgress>,
+    fetch_uncacheable: bool,
+    finished: Arc<AtomicBool>,
 }
 
 impl PrettyPullProgress {
-    fn new() -> Self {
+    fn new(fetch_uncacheable: bool) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
+            fetch_uncacheable,
             finished: Arc::new(AtomicBool::new(false)),
         }
     }
@@ -384,6 +386,7 @@ impl IngestMultiListener for PrettyPullProgress {
         Some(Arc::new(PrettyIngestProgress::new(
             dataset_handle,
             self.multi_progress.clone(),
+            self.fetch_uncacheable,
         )))
     }
 }
@@ -425,6 +428,7 @@ enum ProgressStyle {
 struct PrettyIngestProgress {
     dataset_handle: DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
+    fetch_uncacheable: bool,
     state: Mutex<PrettyIngestProgressState>,
 }
 
@@ -435,7 +439,11 @@ struct PrettyIngestProgressState {
 }
 
 impl PrettyIngestProgress {
-    fn new(dataset_handle: &DatasetHandle, multi_progress: Arc<indicatif::MultiProgress>) -> Self {
+    fn new(
+        dataset_handle: &DatasetHandle,
+        multi_progress: Arc<indicatif::MultiProgress>,
+        fetch_uncacheable: bool,
+    ) -> Self {
         Self {
             dataset_handle: dataset_handle.clone(),
             state: Mutex::new(PrettyIngestProgressState {
@@ -447,7 +455,8 @@ impl PrettyIngestProgress {
                     "Checking for updates",
                 ))),
             }),
-            multi_progress: multi_progress,
+            multi_progress,
+            fetch_uncacheable,
         }
     }
 
@@ -557,7 +566,7 @@ impl IngestListener for PrettyIngestProgress {
                         if *no_polling_source {
                             console::style("Dataset does not specify a polling source".to_owned())
                                 .yellow()
-                        } else if *uncacheable {
+                        } else if *uncacheable && !self.fetch_uncacheable {
                             console::style(
                                 "Dataset is uncachable (use --fetch-uncacheable to update)"
                                     .to_owned(),
