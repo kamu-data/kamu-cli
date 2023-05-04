@@ -395,8 +395,6 @@ pub struct RefCASError {
 #[derive(Error, Debug)]
 pub enum AppendValidationError {
     #[error(transparent)]
-    InvalidEvent(#[from] InvalidEventError),
-    #[error(transparent)]
     HashMismatch(#[from] HashMismatchError),
     #[error("First block has to be a seed, perhaps new block does not link to the previous")]
     FirstBlockMustBeSeed,
@@ -410,6 +408,12 @@ pub enum AppendValidationError {
     SystemTimeIsNotMonotonic,
     #[error("Watermark has to be monotonically increasing")]
     WatermarkIsNotMonotonic,
+    #[error("Data offsets have to be sequential")]
+    OffsetsAreNotSequential,
+    #[error(transparent)]
+    InvalidEvent(#[from] InvalidEventError),
+    #[error(transparent)]
+    NoOpEvent(#[from] NoOpEventError),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -422,9 +426,27 @@ pub struct InvalidEventError {
 }
 
 impl InvalidEventError {
-    pub fn new(event: MetadataEvent, message: impl Into<String>) -> Self {
+    pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self {
-            event,
+            event: event.into(),
+            message: message.into(),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, PartialEq, Eq, Debug)]
+#[error("No-op event: {message}: {event:?}")]
+pub struct NoOpEventError {
+    event: MetadataEvent,
+    message: String,
+}
+
+impl NoOpEventError {
+    pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
+        Self {
+            event: event.into(),
             message: message.into(),
         }
     }

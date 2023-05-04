@@ -37,6 +37,10 @@ impl MetadataFactory {
         AddDataBuilder::new()
     }
 
+    pub fn execute_query() -> ExecuteQueryBuilder {
+        ExecuteQueryBuilder::new()
+    }
+
     pub fn set_transform<S, I>(inputs: I) -> SetTransformBuilder
     where
         I: IntoIterator<Item = S>,
@@ -275,7 +279,7 @@ pub struct AddDataBuilder {
 }
 
 impl AddDataBuilder {
-    fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
             v: AddData {
                 input_checkpoint: None,
@@ -285,7 +289,22 @@ impl AddDataBuilder {
                 source_state: None,
             },
         }
-        .some_output_data()
+    }
+
+    pub fn new() -> Self {
+        Self::empty().some_output_data()
+    }
+
+    pub fn some_input_checkpoint(mut self) -> Self {
+        if self.v.input_checkpoint.is_none() {
+            self.v.input_checkpoint = Some(Multihash::from_digest_sha3_256(b"foo"));
+        }
+        self
+    }
+
+    pub fn input_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
+        self.v.input_checkpoint = checkpoint;
+        self
     }
 
     pub fn some_output_data(mut self) -> Self {
@@ -307,6 +326,39 @@ impl AddDataBuilder {
                 size: 1,
             });
         }
+        self
+    }
+
+    pub fn output_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
+        self.v.output_checkpoint = checkpoint;
+        self
+    }
+
+    pub fn some_output_watermark(mut self) -> Self {
+        if self.v.output_watermark.is_none() {
+            self.v.output_watermark = Some(Utc::now());
+        }
+        self
+    }
+
+    pub fn output_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
+        self.v.output_watermark = watermark;
+        self
+    }
+
+    pub fn some_source_state(mut self) -> Self {
+        if self.v.source_state.is_none() {
+            self.v.source_state = Some(SourceState {
+                kind: SourceState::KIND_ETAG.to_owned(),
+                source: SourceState::SOURCE_POLLING.to_owned(),
+                value: "<etag>".to_owned(),
+            });
+        }
+        self
+    }
+
+    pub fn source_state(mut self, source_state: Option<SourceState>) -> Self {
+        self.v.source_state = source_state;
         self
     }
 
@@ -346,6 +398,74 @@ impl AddDataBuilder {
     }
 
     pub fn build(self) -> AddData {
+        self.v
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryBuilder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct ExecuteQueryBuilder {
+    v: ExecuteQuery,
+}
+
+impl ExecuteQueryBuilder {
+    pub fn new() -> Self {
+        Self {
+            v: ExecuteQuery {
+                input_slices: Vec::new(),
+                input_checkpoint: None,
+                output_data: None,
+                output_checkpoint: None,
+                output_watermark: None,
+            },
+        }
+    }
+
+    pub fn some_output_data(mut self) -> Self {
+        if self.v.output_data.is_none() {
+            self.v.output_data = Some(DataSlice {
+                logical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                interval: OffsetInterval { start: 0, end: 9 },
+                size: 0,
+            });
+        }
+        self
+    }
+
+    pub fn output_data(mut self, data_slice: Option<DataSlice>) -> Self {
+        self.v.output_data = data_slice;
+        self
+    }
+
+    pub fn some_output_checkpoint(mut self) -> Self {
+        if self.v.output_checkpoint.is_none() {
+            self.v.output_checkpoint = Some(Checkpoint {
+                physical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                size: 1,
+            });
+        }
+        self
+    }
+
+    pub fn output_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
+        self.v.output_checkpoint = checkpoint;
+        self
+    }
+
+    pub fn some_output_watermark(mut self) -> Self {
+        self.v.output_watermark = Some(Utc::now());
+        self
+    }
+
+    pub fn output_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
+        self.v.output_watermark = watermark;
+        self
+    }
+
+    pub fn build(self) -> ExecuteQuery {
         self.v
     }
 }

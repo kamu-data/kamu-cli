@@ -221,7 +221,7 @@ impl SyncServiceImpl {
                 Ok(result)
             }
             Err(error) => {
-                info!(?error, "Sync failed");
+                warn!(?error, "Sync failed");
                 dataset_builder.discard().await?;
                 Err(error)
             }

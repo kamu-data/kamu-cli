@@ -77,8 +77,8 @@ impl SparkEngine {
         }
     }
 
-    fn volume_dir_in_container(&self) -> PathBuf {
-        PathBuf::from("/opt/engine/volume")
+    fn workspace_dir_in_container(&self) -> PathBuf {
+        PathBuf::from("/opt/engine/workspace")
     }
 
     fn in_out_dir_in_container(&self) -> PathBuf {
@@ -87,11 +87,9 @@ impl SparkEngine {
 
     fn to_container_path(&self, path: &Path) -> PathBuf {
         assert!(path.is_absolute());
-        assert!(self.workspace_layout.datasets_dir.is_absolute());
-        let rel = path
-            .strip_prefix(&self.workspace_layout.datasets_dir)
-            .unwrap();
-        let joined = self.volume_dir_in_container().join(rel);
+        assert!(self.workspace_layout.root_dir.is_absolute());
+        let rel = path.strip_prefix(&self.workspace_layout.root_dir).unwrap();
+        let joined = self.workspace_dir_in_container().join(rel);
         let unix_path = joined.to_str().unwrap().replace("\\", "/");
         PathBuf::from(unix_path)
     }
@@ -114,8 +112,8 @@ impl SparkEngine {
         let volume_map = vec![
             (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
             (
-                self.workspace_layout.datasets_dir.clone(),
-                self.volume_dir_in_container(),
+                self.workspace_layout.root_dir.clone(),
+                self.workspace_dir_in_container(),
             ),
         ];
 
@@ -130,7 +128,7 @@ impl SparkEngine {
                         "; chown -R {}:{} {} {}",
                         users::get_current_uid(),
                         users::get_current_gid(),
-                        self.volume_dir_in_container().display(),
+                        self.workspace_dir_in_container().display(),
                         self.in_out_dir_in_container().display()
                     )
                 } else {
@@ -203,33 +201,6 @@ impl SparkEngine {
             ))
         }
     }
-
-    fn unpack_checkpoint(
-        prev_checkpoint_path: &Path,
-        target_dir: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        info!(
-            ?prev_checkpoint_path,
-            ?target_dir,
-            "Unpacking previous checkpoint"
-        );
-        std::fs::create_dir(target_dir)?;
-        let mut archive = tar::Archive::new(std::fs::File::open(prev_checkpoint_path)?);
-        archive.unpack(target_dir)?;
-        Ok(())
-    }
-
-    fn pack_checkpoint(
-        source_dir: &Path,
-        new_checkpoint_path: &Path,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        info!(?source_dir, ?new_checkpoint_path, "Packing new checkpoint");
-        let mut ar = tar::Builder::new(std::fs::File::create(new_checkpoint_path)?);
-        ar.follow_symlinks(false);
-        ar.append_dir_all(".", source_dir)?;
-        ar.finish()?;
-        Ok(())
-    }
 }
 
 #[async_trait::async_trait]
@@ -239,26 +210,15 @@ impl IngestEngine for SparkEngine {
         request: IngestRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "ingest");
+        let prev_watermark = request.prev_watermark.clone();
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
 
-        // Checkpoints are required to be files but for now Spark engine uses directories
-        // So we untar old checkpoints before processing and pack new ones after
-        let new_checkpoint_path_unpacked = run_info.in_out_dir.join("new-checkpoint");
-        let prev_checkpoint_path_unpacked = if let Some(p) = &request.prev_checkpoint_path {
-            let target_dir = run_info.in_out_dir.join("prev-checkpoint");
-            Self::unpack_checkpoint(p, &target_dir).expect("Failed to untar previous checkpoint");
-            Some(target_dir)
-        } else {
-            None
-        };
-
         let request_adj = IngestRequest {
             ingest_path: self.to_container_path(&request.ingest_path),
-            prev_checkpoint_path: prev_checkpoint_path_unpacked
-                .as_ref()
-                .map(|_| self.in_out_dir_in_container().join("prev-checkpoint")),
+            // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them
+            prev_checkpoint_path: None,
             new_checkpoint_path: self.in_out_dir_in_container().join("new-checkpoint"),
             data_dir: self.to_container_path(&request.data_dir),
             out_data_path: self.to_container_path(&request.out_data_path),
@@ -277,26 +237,24 @@ impl IngestEngine for SparkEngine {
             ..request
         };
 
-        let response = self.ingest_impl(run_info, request_adj).await;
+        match self.ingest_impl(run_info, request_adj).await {
+            Ok(mut resp) => {
+                // TODO: Spark ingest currently derives watermark as `max(event_time_col)`.
+                // If there is no output data - watermark will be empty, so we have to fill it with a previous value.
+                // If data is out of order - we need to make sure watermark remains monotonically increasing.
+                resp.output_watermark = if resp.data_interval.is_none() {
+                    prev_watermark
+                } else {
+                    match (prev_watermark, resp.output_watermark) {
+                        (None, Some(new)) => Some(new),
+                        (Some(prev), Some(new)) => Some(std::cmp::max(prev, new)),
+                        (_, None) => panic!("Spark ingest didn't produce watermark"),
+                    }
+                };
 
-        if response.is_ok() {
-            // Pack checkpoints and clean up
-            if new_checkpoint_path_unpacked.exists()
-                && new_checkpoint_path_unpacked
-                    .read_dir()
-                    .unwrap()
-                    .next()
-                    .is_some()
-            {
-                Self::pack_checkpoint(&new_checkpoint_path_unpacked, &request.new_checkpoint_path)
-                    .expect("Failed to tar new checkpoint");
-                std::fs::remove_dir_all(new_checkpoint_path_unpacked)?;
+                Ok(resp)
             }
-            if let Some(prev) = prev_checkpoint_path_unpacked {
-                std::fs::remove_dir_all(prev)?;
-            }
+            Err(err) => Err(err),
         }
-
-        response
     }
 }

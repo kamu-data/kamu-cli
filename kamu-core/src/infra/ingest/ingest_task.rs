@@ -33,6 +33,7 @@ pub struct IngestTask {
     source: Option<SetPollingSource>,
     prev_source_state: Option<PollingSourceState>,
     prev_checkpoint: Option<Multihash>,
+    prev_watermark: Option<DateTime<Utc>>,
     vocab: DatasetVocabulary,
 
     fetch_service: FetchService,
@@ -57,6 +58,7 @@ impl IngestTask {
         let mut source = None;
         let mut prev_source_state = None;
         let mut prev_checkpoint = None;
+        let mut prev_watermark = None;
         let mut vocab = None;
         let mut next_offset = None;
 
@@ -75,11 +77,19 @@ impl IngestTask {
                             prev_checkpoint =
                                 Some(add_data.output_checkpoint.map(|cp| cp.physical_hash));
                         }
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(add_data.output_watermark);
+                        }
                         if prev_source_state.is_none() {
                             if let Some(source_state) = add_data.source_state {
                                 prev_source_state =
                                     PollingSourceState::from_source_state(&source_state)?;
                             }
+                        }
+                    }
+                    MetadataEvent::SetWatermark(set_wm) => {
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(Some(set_wm.output_watermark));
                         }
                     }
                     MetadataEvent::SetPollingSource(src) => {
@@ -99,14 +109,14 @@ impl IngestTask {
                     MetadataEvent::SetAttachments(_)
                     | MetadataEvent::SetInfo(_)
                     | MetadataEvent::SetLicense(_)
-                    | MetadataEvent::SetTransform(_)
-                    | MetadataEvent::SetWatermark(_) => (),
+                    | MetadataEvent::SetTransform(_) => (),
                 }
 
                 if next_offset.is_some()
                     && source.is_some()
                     && vocab.is_some()
                     && prev_checkpoint.is_some()
+                    && prev_watermark.is_some()
                 {
                     break;
                 }
@@ -136,6 +146,7 @@ impl IngestTask {
             source,
             prev_source_state,
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),
+            prev_watermark: prev_watermark.unwrap_or_default(),
             vocab: vocab.unwrap_or_default(),
             fetch_service: FetchService::new(container_runtime, &workspace_layout.run_info_dir),
             prep_service: PrepService::new(),
@@ -185,7 +196,7 @@ impl IngestTask {
 
         let first_ingest = self.next_offset == 0;
         let uncacheable =
-            self.fetch_override.is_some() || (first_ingest && self.prev_source_state.is_none());
+            !first_ingest && self.prev_source_state.is_none() && self.fetch_override.is_none();
 
         if uncacheable && !self.options.fetch_uncacheable {
             info!("Skipping fetch of uncacheable source");
@@ -214,14 +225,9 @@ impl IngestTask {
                 self.listener.on_stage_progress(IngestStage::Merge, 0, 1);
                 self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
 
-                let commit_result = self
-                    .commit(savepoint.source_state.as_ref(), &read_result, &prev_head)
+                let commit_res = self
+                    .maybe_commit(savepoint.source_state.as_ref(), &read_result, &prev_head)
                     .await?;
-
-                // Advance offset for the next run
-                if let Some(data_interval) = read_result.engine_response.data_interval {
-                    self.next_offset = data_interval.end + 1;
-                }
 
                 // Clean up intermediate files
                 // Note that we are leaving the fetch data and savepoint intact
@@ -231,13 +237,30 @@ impl IngestTask {
                         .int_err()?;
                 }
 
-                Ok(IngestResult::Updated {
-                    old_head: prev_head,
-                    new_head: commit_result.new_head,
-                    num_blocks: 1,
-                    has_more: savepoint.has_more,
-                    uncacheable,
-                })
+                match commit_res {
+                    CommitStepResult::UpToDate => Ok(IngestResult::UpToDate {
+                        no_polling_source: false,
+                        uncacheable,
+                    }),
+                    CommitStepResult::Updated(commit) => {
+                        // Advance the task state for the next run
+                        self.prev_checkpoint =
+                            commit.new_event.output_checkpoint.map(|c| c.physical_hash);
+                        self.prev_watermark = commit.new_event.output_watermark;
+                        if let Some(output_data) = commit.new_event.output_data {
+                            self.next_offset = output_data.interval.end + 1;
+                        }
+                        self.prev_source_state = savepoint.source_state;
+
+                        Ok(IngestResult::Updated {
+                            old_head: prev_head,
+                            new_head: commit.new_head,
+                            num_blocks: 1,
+                            has_more: savepoint.has_more,
+                            uncacheable,
+                        })
+                    }
+                }
             }
         }
     }
@@ -340,6 +363,11 @@ impl IngestTask {
             let span = info_span!("Fetching the data");
             let _span_guard = span.enter();
 
+            // Just in case user deleted it manually
+            if !self.cache_dir.exists() {
+                std::fs::create_dir(&self.cache_dir).int_err()?;
+            }
+
             let data_cache_key = self.get_random_cache_key("fetch-");
             let target_path = self.cache_dir.join(&data_cache_key);
 
@@ -435,6 +463,7 @@ impl IngestTask {
                 &self.layout,
                 self.source.as_ref().unwrap(),
                 &src_data_path,
+                self.prev_watermark.clone(),
                 self.prev_checkpoint.clone(),
                 &self.vocab,
                 system_time.clone(),
@@ -454,12 +483,12 @@ impl IngestTask {
         })
     }
 
-    async fn commit(
+    async fn maybe_commit(
         &mut self,
         source_state: Option<&PollingSourceState>,
         read_result: &ReadStepResult,
         prev_hash: &Multihash,
-    ) -> Result<CommitResult, IngestError> {
+    ) -> Result<CommitStepResult, IngestError> {
         let data_interval = read_result.engine_response.data_interval.clone();
         let output_watermark = read_result.engine_response.output_watermark;
         let new_data_path = if data_interval.is_some() {
@@ -475,7 +504,7 @@ impl IngestTask {
         };
         let source_state = source_state.map(|v| v.to_source_state());
 
-        let commit_result = self
+        match self
             .dataset
             .commit_add_data(
                 self.prev_checkpoint.clone(),
@@ -491,9 +520,28 @@ impl IngestTask {
                 },
             )
             .await
-            .int_err()?;
+        {
+            Ok(commit) => {
+                let new_block = self
+                    .dataset
+                    .as_metadata_chain()
+                    .get_block(&commit.new_head)
+                    .await
+                    .int_err()?;
 
-        Ok(commit_result)
+                Ok(CommitStepResult::Updated(CommitStepResultUpdated {
+                    new_head: commit.new_head,
+                    new_event: match new_block.event {
+                        MetadataEvent::AddData(v) => v,
+                        _ => unreachable!(),
+                    },
+                }))
+            }
+            Err(CommitError::MetadataAppendError(AppendError::InvalidBlock(
+                AppendValidationError::NoOpEvent(_),
+            ))) => Ok(CommitStepResult::UpToDate),
+            Err(err) => Err(err.int_err().into()),
+        }
     }
 }
 
@@ -513,6 +561,16 @@ struct ReadStepResult {
     engine_response: ExecuteQueryResponseSuccess,
     out_checkpoint_cache_key: String,
     out_data_cache_key: String,
+}
+
+enum CommitStepResult {
+    UpToDate,
+    Updated(CommitStepResultUpdated),
+}
+
+struct CommitStepResultUpdated {
+    new_head: Multihash,
+    new_event: AddData,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

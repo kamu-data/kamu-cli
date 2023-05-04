@@ -12,6 +12,7 @@ use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -157,31 +158,152 @@ where
         Ok(())
     }
 
-    async fn validate_append_event_structure(
+    async fn validate_append_event_logical_structure(
         &self,
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
         match &new_block.event {
+            // TODO: ensure only used on Root datasets
             MetadataEvent::AddData(e) => {
+                // Validate event is not empty
                 if e.output_data.is_none()
                     && e.output_checkpoint.is_none()
                     && e.output_watermark.is_none()
+                    && e.source_state.is_none()
+                {
+                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                        e.clone(),
+                        "Event is empty",
+                    ))
+                    .into());
+                }
+
+                let mut prev_checkpoint = None;
+                let mut prev_watermark = None;
+                let mut prev_source_state = None;
+
+                // TODO: Generalize this logic
+                // TODO: PERF: Use block cache
+                let mut blocks = self.iter_blocks_interval(
+                    new_block.prev_block_hash.as_ref().unwrap(),
+                    None,
+                    false,
+                );
+                while let Some((_, block)) = blocks.try_next().await.int_err()? {
+                    match block.event {
+                        MetadataEvent::AddData(e) => {
+                            prev_checkpoint = Some(e.output_checkpoint);
+                            prev_source_state = Some(e.source_state);
+                            if prev_watermark.is_none() {
+                                prev_watermark = Some(e.output_watermark);
+                            }
+                        }
+                        MetadataEvent::SetWatermark(e) => {
+                            prev_watermark = Some(Some(e.output_watermark));
+                        }
+                        _ => (),
+                    }
+                    if prev_checkpoint.is_some()
+                        && prev_watermark.is_some()
+                        && prev_source_state.is_some()
+                    {
+                        break;
+                    }
+                }
+
+                let prev_checkpoint = prev_checkpoint.unwrap_or_default();
+                let prev_watermark = prev_watermark.unwrap_or_default();
+                let prev_source_state = prev_source_state.unwrap_or_default();
+
+                // Validate input/output checkpoint sequencing
+                if e.input_checkpoint.as_ref() != prev_checkpoint.as_ref().map(|c| &c.physical_hash)
                 {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
-                        MetadataEvent::AddData(e.clone()),
-                        "Event is empty",
+                        e.clone(),
+                        "Input checkpoint does not correspond to the previous checkpoint in the chain",
+                    ))
+                    .into());
+                }
+
+                // Validate event advances some state
+                if e.output_data.is_none()
+                    && e.output_checkpoint.as_ref().map(|v| &v.physical_hash)
+                        == prev_checkpoint.as_ref().map(|v| &v.physical_hash)
+                    && e.output_watermark == prev_watermark
+                    && e.source_state == prev_source_state
+                {
+                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                        e.clone(),
+                        "Event neither has data nor it advances checkpoint, watermark, or source state",
                     ))
                     .into());
                 }
 
                 Ok(())
             }
-            MetadataEvent::ExecuteQuery(_) => Ok(()),
+            // TODO: ensure only used on Derivative datasets
+            MetadataEvent::ExecuteQuery(e) => {
+                // Validate event is not empty
+                if e.output_data.is_none()
+                    && e.output_checkpoint.is_none()
+                    && e.output_watermark.is_none()
+                {
+                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                        e.clone(),
+                        "Event is empty",
+                    ))
+                    .into());
+                }
+
+                // TODO: PERF: Use block cache
+                let prev_query = self
+                    .iter_blocks_interval(new_block.prev_block_hash.as_ref().unwrap(), None, false)
+                    .filter_map_ok(|(_, b)| match b.event {
+                        MetadataEvent::ExecuteQuery(e) => Some(e),
+                        _ => None,
+                    })
+                    .try_first()
+                    .await
+                    .int_err()?;
+
+                let prev_checkpoint = prev_query
+                    .as_ref()
+                    .and_then(|e| e.output_checkpoint.as_ref())
+                    .map(|c| &c.physical_hash);
+
+                let prev_watermark = prev_query
+                    .as_ref()
+                    .and_then(|e| e.output_watermark.as_ref());
+
+                // Validate input/output checkpoint sequencing
+                if e.input_checkpoint.as_ref() != prev_checkpoint {
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        e.clone(),
+                        "Input checkpoint does not correspond to the previous checkpoint in the chain",
+                    ))
+                    .into());
+                }
+
+                // Validate event advances some state
+                if e.output_data.is_none()
+                    && e.output_checkpoint.as_ref().map(|v| &v.physical_hash) == prev_checkpoint
+                    && e.output_watermark.as_ref() == prev_watermark
+                {
+                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                        e.clone(),
+                        "Event neither has data nor it advances checkpoint or watermark",
+                    ))
+                    .into());
+                }
+
+                Ok(())
+            }
             MetadataEvent::Seed(_) => Ok(()),
             MetadataEvent::SetPollingSource(_) => Ok(()),
             MetadataEvent::SetTransform(_) => Ok(()),
             MetadataEvent::SetVocab(_) => Ok(()),
+            // TODO: Ensure is not called on Derivative datasets (in a performant way)
             MetadataEvent::SetWatermark(_) => Ok(()),
             MetadataEvent::SetAttachments(_) => Ok(()),
             MetadataEvent::SetInfo(_) => Ok(()),
@@ -195,20 +317,55 @@ where
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
         if let Some(new_block) = new_block.as_data_stream_block() {
-            if let Some(new_wm) = new_block.event.output_watermark {
+            // TODO: PERF: Use block cache
+            let prev_wm = self
+                .iter_blocks_interval(new_block.prev_block_hash.unwrap(), None, false)
+                .filter_data_stream_blocks()
+                .map_ok(|(_, b)| b.event.output_watermark)
+                .try_first()
+                .await
+                .int_err()?;
+
+            if let Some(prev_wm) = &prev_wm {
+                match (prev_wm, new_block.event.output_watermark) {
+                    (Some(_), None) => {
+                        return Err(AppendValidationError::WatermarkIsNotMonotonic.into())
+                    }
+                    (Some(prev_wm), Some(new_wm)) if prev_wm > new_wm => {
+                        return Err(AppendValidationError::WatermarkIsNotMonotonic.into())
+                    }
+                    _ => (),
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn validate_append_offsets_are_sequential(
+        &self,
+        new_block: &MetadataBlock,
+        _block_cache: &mut Vec<MetadataBlock>,
+    ) -> Result<(), AppendError> {
+        if let Some(new_block) = new_block.as_data_stream_block() {
+            if let Some(new_data) = new_block.event.output_data {
                 // TODO: PERF: Use block cache
-                let prev_wm = self
-                    .iter_blocks()
+                let prev_data = self
+                    .iter_blocks_interval(new_block.prev_block_hash.unwrap(), None, false)
                     .filter_data_stream_blocks()
-                    .filter_map_ok(|(_, b)| b.event.output_watermark)
+                    .filter_map_ok(|(_, b)| b.event.output_data)
                     .try_first()
                     .await
                     .int_err()?;
 
-                if let Some(prev_wm) = prev_wm {
-                    if prev_wm >= *new_wm {
-                        return Err(AppendValidationError::WatermarkIsNotMonotonic.into());
-                    }
+                let last_offset = prev_data.map(|v| v.interval.end).unwrap_or(-1);
+
+                if new_data.interval.start != last_offset + 1 {
+                    tracing::debug!(
+                        "Expected offset {} but got {}",
+                        last_offset + 1,
+                        new_data.interval.start
+                    );
+                    return Err(AppendValidationError::OffsetsAreNotSequential.into());
                 }
             }
         }
@@ -398,13 +555,15 @@ where
                 .await?;
             self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
-            self.validate_append_event_structure(&block, &mut block_cache)
-                .await?;
             self.validate_append_seed_block_order(&block, &mut block_cache)
                 .await?;
             self.validate_append_system_time_is_monotonic(&block, &mut block_cache)
                 .await?;
             self.validate_append_watermark_is_monotonic(&block, &mut block_cache)
+                .await?;
+            self.validate_append_offsets_are_sequential(&block, &mut block_cache)
+                .await?;
+            self.validate_append_event_logical_structure(&block, &mut block_cache)
                 .await?;
         }
 

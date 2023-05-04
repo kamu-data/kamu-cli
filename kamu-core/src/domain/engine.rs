@@ -59,6 +59,8 @@ pub struct IngestRequest {
     pub source: SetPollingSource,
     #[serde(with = "DatasetVocabularyDef")]
     pub dataset_vocab: DatasetVocabulary,
+    #[serde(skip)]
+    pub prev_watermark: Option<DateTime<Utc>>,
     pub prev_checkpoint_path: Option<PathBuf>,
     pub new_checkpoint_path: PathBuf,
     pub data_dir: PathBuf,

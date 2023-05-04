@@ -31,6 +31,10 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 pub trait MetadataStream<'a>:
     Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>
 {
+    // TODO: Reconsider this method as it may result in incorrect logic of checkpoint propagation.
+    // In cases when AddData is followed by SetWatermark the client may incorrectly assume that
+    // the checkpoint is missing when inspecting SetWatermark event, while in fact they should've
+    // scanned the chain further.
     fn filter_data_stream_blocks(
         self: Pin<Box<Self>>,
     ) -> Pin<

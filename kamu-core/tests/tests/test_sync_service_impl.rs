@@ -21,16 +21,57 @@ use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 
-async fn append_block(
+async fn append_random_data(
     local_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRef>,
-    block: MetadataBlock,
 ) -> Multihash {
+    let tmp_dir = tempfile::tempdir().unwrap();
+
     let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
-    ds.as_metadata_chain()
-        .append(block, AppendOpts::default())
+
+    let prev_data = ds
+        .as_metadata_chain()
+        .iter_blocks()
+        .filter_map_ok(|(_, b)| match b.event {
+            MetadataEvent::AddData(e) => Some(e),
+            _ => None,
+        })
+        .try_first()
         .await
-        .unwrap()
+        .unwrap();
+
+    let data_path = tmp_dir.path().join("data");
+    let checkpoint_path = tmp_dir.path().join("checkpoint");
+    ParquetWriterHelper::from_sample_data(&data_path).unwrap();
+    create_random_file(&checkpoint_path).await;
+
+    let input_checkpoint = prev_data
+        .as_ref()
+        .and_then(|e| e.output_checkpoint.as_ref())
+        .map(|c| c.physical_hash.clone());
+
+    let prev_offset = prev_data
+        .as_ref()
+        .and_then(|e| e.output_data.as_ref())
+        .map(|d| d.interval.end)
+        .unwrap_or(-1);
+    let data_interval = OffsetInterval {
+        start: prev_offset + 1,
+        end: prev_offset + 10,
+    };
+
+    ds.commit_add_data(
+        input_checkpoint,
+        Some(data_interval),
+        Some(data_path),
+        Some(checkpoint_path),
+        None,
+        None,
+        CommitOpts::default(),
+    )
+    .await
+    .unwrap()
+    .new_head
 }
 
 fn assert_in_sync(
@@ -44,32 +85,14 @@ fn assert_in_sync(
     DatasetTestHelper::assert_datasets_in_sync(&dataset_1_layout, &dataset_2_layout);
 }
 
-async fn create_random_file(root: &Path) -> (Multihash, usize) {
+async fn create_random_file(path: &Path) -> usize {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
     rand::thread_rng().fill_bytes(&mut data);
 
-    std::fs::create_dir_all(root).unwrap();
-
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(root);
-    let hash = repo
-        .insert_bytes(&data, InsertOpts::default())
-        .await
-        .unwrap()
-        .hash;
-
-    (hash, data.len())
-}
-
-async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
-    let (d_hash, d_size) = create_random_file(&dataset_layout.data_dir).await;
-    let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
-    MetadataFactory::add_data()
-        .data_physical_hash(d_hash)
-        .data_size(d_size as i64)
-        .checkpoint_physical_hash(c_hash)
-        .checkpoint_size(c_size as i64)
+    std::fs::write(path, data).unwrap();
+    data.len()
 }
 
 async fn do_test_sync(
@@ -85,8 +108,6 @@ async fn do_test_sync(
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let dataset_layout = workspace_layout.dataset_layout(&dataset_alias);
-    let dataset_layout_2 = workspace_layout.dataset_layout(&dataset_alias_2);
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
@@ -131,12 +152,11 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = local_repo
+    let b1 = local_repo
         .create_dataset_from_snapshot(snapshot)
         .await
-        .unwrap();
-    let b1 = create_result.head;
-    let b1_sequence_number = create_result.head_sequence_number;
+        .unwrap()
+        .head;
 
     // Initial sync ///////////////////////////////////////////////////////////
     assert_matches!(
@@ -170,23 +190,9 @@ async fn do_test_sync(
     assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let b2 = append_block(
-        local_repo.as_ref(),
-        &dataset_alias,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b1, b1_sequence_number)
-            .build(),
-    )
-    .await;
+    let _b2 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
 
-    let b3 = append_block(
-        local_repo.as_ref(),
-        &dataset_alias,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b2, b1_sequence_number + 1)
-            .build(),
-    )
-    .await;
+    let b3 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
@@ -244,14 +250,7 @@ async fn do_test_sync(
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let exta_head = append_block(
-        local_repo.as_ref(),
-        &dataset_alias_2,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
-            .prev(&b3, b1_sequence_number + 2)
-            .build(),
-    )
-    .await;
+    let exta_head = append_random_data(local_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -318,32 +317,11 @@ async fn do_test_sync(
 
     // Datasets complex divergence //////////////////////////////////////////////
 
-    let b4 = append_block(
-        local_repo.as_ref(),
-        &dataset_alias,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b3, b1_sequence_number + 2)
-            .build(),
-    )
-    .await;
+    let _b4 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
 
-    let b5 = append_block(
-        local_repo.as_ref(),
-        &dataset_alias,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout).await.build())
-            .prev(&b4, b1_sequence_number + 3)
-            .build(),
-    )
-    .await;
+    let b5 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
 
-    let b4_alt = append_block(
-        local_repo.as_ref(),
-        &dataset_alias_2,
-        MetadataFactory::metadata_block(create_random_data(&dataset_layout_2).await.build())
-            .prev(&b3, b1_sequence_number + 2)
-            .build(),
-    )
-    .await;
+    let b4_alt = append_random_data(local_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,

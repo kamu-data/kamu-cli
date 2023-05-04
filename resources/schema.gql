@@ -37,6 +37,7 @@ type AddData {
 	outputData: DataSlice
 	outputCheckpoint: Checkpoint
 	outputWatermark: DateTime
+	sourceState: SourceState
 }
 
 type AttachmentEmbedded {
@@ -692,6 +693,12 @@ type SourceCachingForever {
 enum SourceOrdering {
 	BY_EVENT_TIME
 	BY_NAME
+}
+
+type SourceState {
+	kind: String!
+	source: String!
+	value: String!
 }
 
 type SqlQueryStep {

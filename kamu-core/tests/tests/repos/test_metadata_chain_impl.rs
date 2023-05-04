@@ -194,15 +194,17 @@ async fn test_append_prev_block_sequence_integrity_broken() {
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, 0)
-        .build();
+    let block_2 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
+            .prev(&hash_1, 0)
+            .build();
 
     let hash_2 = chain.append(block_2, AppendOpts::default()).await.unwrap();
 
-    let block_too_low = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2, 0 /* should be 1 */)
-        .build();
+    let block_too_low =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+            .prev(&hash_2, 0 /* should be 1 */)
+            .build();
 
     assert_matches!(
         chain.append(block_too_low, AppendOpts::default()).await,
@@ -216,9 +218,10 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 1
     );
 
-    let block_too_high = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2, 2 /* should be 1 */)
-        .build();
+    let block_too_high =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+            .prev(&hash_2, 2 /* should be 1 */)
+            .build();
 
     assert_matches!(
         chain.append(block_too_high, AppendOpts::default()).await,
@@ -232,9 +235,10 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 3
     );
 
-    let block_just_right = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2, 1)
-        .build();
+    let block_just_right =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+            .prev(&hash_2, 1)
+            .build();
 
     let hash_just_right = chain
         .append(block_just_right, AppendOpts::default())
@@ -344,6 +348,169 @@ async fn test_append_system_time_non_monotonic() {
 }
 
 #[tokio::test]
+async fn test_append_watermark_non_monotonic() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    // output_watermart = None
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .some_output_data()
+            .interval(0, 9)
+            .build(),
+    )
+    .prev(&hash, 0)
+    .build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    // output_watermart = Some(2000-01-01)
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .some_output_data()
+            .interval(10, 19)
+            .watermark(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
+            .build(),
+    )
+    .prev(&hash, 1)
+    .build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    // output_watermart = None
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .some_output_data()
+            .interval(20, 29)
+            .build(),
+    )
+    .prev(&hash, 2)
+    .build();
+
+    assert_matches!(
+        chain.append(block, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::WatermarkIsNotMonotonic
+        ))
+    );
+
+    // output_watermart = Some(1988-01-01)
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .some_output_data()
+            .interval(20, 29)
+            .watermark(Utc.with_ymd_and_hms(1988, 1, 1, 12, 0, 0).unwrap())
+            .build(),
+    )
+    .prev(&hash, 2)
+    .build();
+
+    assert_matches!(
+        chain.append(block, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::WatermarkIsNotMonotonic
+        ))
+    );
+
+    // output_watermart = Some(2020-01-01)
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .some_output_data()
+            .interval(20, 29)
+            .watermark(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap())
+            .build(),
+    )
+    .prev(&hash, 2)
+    .build();
+
+    chain.append(block, AppendOpts::default()).await.unwrap();
+}
+
+#[tokio::test]
+async fn test_append_add_data_empty_commit() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    let add_data = AddDataBuilder::empty()
+        .some_output_data()
+        .some_output_checkpoint()
+        .some_output_watermark()
+        .build();
+    let block = MetadataFactory::metadata_block(add_data.clone())
+        .prev(&hash, 0)
+        .build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    // No data, same checkpoint, watermark, and source state
+    let block = MetadataFactory::metadata_block(
+        AddDataBuilder::empty()
+            .output_checkpoint(add_data.output_checkpoint)
+            .output_watermark(add_data.output_watermark)
+            .source_state(add_data.source_state)
+            .build(),
+    )
+    .prev(&hash, 1)
+    .build();
+
+    assert_matches!(
+        chain.append(block, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
+}
+
+#[tokio::test]
+async fn test_append_execute_query_empty_commit() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let block =
+        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    let execute_query = MetadataFactory::execute_query()
+        .some_output_data()
+        .some_output_checkpoint()
+        .some_output_watermark()
+        .build();
+    let block = MetadataFactory::metadata_block(execute_query.clone())
+        .prev(&hash, 0)
+        .build();
+
+    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+
+    // No data, same checkpoint and watermark
+    let block = MetadataFactory::metadata_block(
+        MetadataFactory::execute_query()
+            .output_checkpoint(execute_query.output_checkpoint)
+            .output_watermark(execute_query.output_watermark)
+            .build(),
+    )
+    .prev(&hash, 1)
+    .build();
+
+    assert_matches!(
+        chain.append(block, AppendOpts::default()).await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
+}
+
+#[tokio::test]
 async fn test_iter_blocks() {
     use tokio_stream::StreamExt;
 
@@ -357,17 +524,19 @@ async fn test_iter_blocks() {
         .await
         .unwrap();
 
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, block_1.sequence_number)
-        .build();
+    let block_2 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
+            .prev(&hash_1, block_1.sequence_number)
+            .build();
     let hash_2 = chain
         .append(block_2.clone(), AppendOpts::default())
         .await
         .unwrap();
 
-    let block_3 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_2, block_2.sequence_number)
-        .build();
+    let block_3 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+            .prev(&hash_2, block_2.sequence_number)
+            .build();
     let hash_3 = chain
         .append(block_3.clone(), AppendOpts::default())
         .await
