@@ -31,7 +31,7 @@ byteorder = "1"
 flatbuffers = "23"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
-serde_with = "2"
+serde_with = "3"
 serde_yaml = "0.9"
 
 # gRPC

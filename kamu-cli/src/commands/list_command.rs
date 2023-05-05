@@ -129,13 +129,14 @@ impl Command for ListCommand {
 
         let mut writer = self.output_config.get_records_writer(records_format);
 
+        let tz = Some(Arc::from("+00:00"));
         let schema = Arc::new(Schema::new(if self.detail_level == 0 {
             vec![
                 Field::new("Name", DataType::Utf8, false),
                 Field::new("Kind", DataType::Utf8, false),
                 Field::new(
                     "Pulled",
-                    DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".to_string())),
+                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
                     true,
                 ),
                 Field::new("Records", DataType::UInt64, false),
@@ -149,7 +150,7 @@ impl Command for ListCommand {
                 Field::new("Head", DataType::Utf8, false),
                 Field::new(
                     "Pulled",
-                    DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".to_string())),
+                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
                     true,
                 ),
                 Field::new("Records", DataType::UInt64, false),
@@ -157,7 +158,7 @@ impl Command for ListCommand {
                 Field::new("Size", DataType::UInt64, false),
                 Field::new(
                     "Watermark",
-                    DataType::Timestamp(TimeUnit::Microsecond, Some("+00:00".to_string())),
+                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
                     true,
                 ),
             ]

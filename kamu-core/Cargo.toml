@@ -26,7 +26,7 @@ flatbuffers = "23"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_with = "2"
+serde_with = "3"
 serde_yaml = "0.9"
 
 # Ingest
@@ -40,17 +40,17 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-arrow = { version = "36", features = ["chrono-tz"] }
-arrow-digest = "36"
-datafusion = "22"
+arrow = { version = "37", features = ["chrono-tz"] }
+arrow-digest = "37"
+datafusion = "23"
 object_store = "0.5"
 digest = "0.10"
 sha3 = "0.10"
 
 # Repositories
-aws-config = { version = "0.55.1" }
-aws-sdk-s3 = { version = "0.25" }
-aws-smithy-http = { version = "0.55.1", features = ["rt-tokio"] }
+aws-config = { version = "0.55" }
+aws-sdk-s3 = { version = "0.27" }
+aws-smithy-http = { version = "0.55", features = ["rt-tokio"] }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
 # Utils

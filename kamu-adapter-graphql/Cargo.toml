@@ -17,7 +17,7 @@ kamu = { version = "0.120.1", path = "../kamu-core" }
 
 async-graphql = { version = "*", features = ["chrono", "url", "apollo_tracing"] }
 chrono = "0.4"
-datafusion = "22"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = "23"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 futures = "0.3"
 indoc = "2"
 reqwest = { version = "0.11", features = ["json"] }  # TODO: Remove from this crate (needed by GitHub auth)
