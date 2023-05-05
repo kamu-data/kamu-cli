@@ -334,7 +334,7 @@ async fn test_fetch_url_http_env_interpolation() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
+#[cfg_attr(any(feature = "skip_docker_tests", not(feature = "test_ftp")), ignore)]
 async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));

@@ -13,7 +13,9 @@ doctest = false
 
 [features]
 skip_docker_tests = []
-
+# FTP protocol relies on fixed range of ports that might conflict
+# with other applications, thus we only enable FTP tests conditionally in CI
+test_ftp = []
 
 [dependencies]
 # Kamu
