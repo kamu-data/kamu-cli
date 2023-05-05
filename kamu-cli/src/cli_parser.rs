@@ -1092,7 +1092,7 @@ pub fn cli() -> Command {
                     .subcommand_required(true)
                     .arg_required_else_help(true)
                     .subcommands([
-                        Command::new("clean")
+                        Command::new("gc")
                             .about("Runs garbage collection to clean up cached and unreachable objects in the workspace"),
                         Command::new("upgrade-workspace")
                             .about("Upgrade the layout of a local workspace to the latest version"),

@@ -2872,6 +2872,7 @@ dependencies = [
  "dirs 5.0.1",
  "duration-string",
  "env_logger",
+ "fs_extra",
  "futures",
  "glob",
  "http",

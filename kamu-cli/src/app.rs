@@ -65,6 +65,11 @@ pub async fn run(
         (_log_thread, catalog_builder.build())
     };
 
+    // Evict cache
+    if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
+        catalog.get_one::<GcService>()?.evict_cache()?;
+    }
+
     let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
 
     let result = if command.needs_workspace() && !workspace_svc.is_in_workspace() {
@@ -95,9 +100,10 @@ pub async fn run(
 pub fn configure_catalog() -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
-    b.add::<WorkspaceService>();
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
+    b.add::<GcService>();
+    b.add::<WorkspaceService>();
 
     b.add::<DatasetRepositoryLocalFs>();
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
