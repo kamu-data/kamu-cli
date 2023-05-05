@@ -210,18 +210,17 @@ impl IngestEngine for SparkEngine {
         request: IngestRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.workspace_layout, "ingest");
-        let prev_watermark = request.prev_watermark.clone();
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
 
         let request_adj = IngestRequest {
-            ingest_path: self.to_container_path(&request.ingest_path),
+            input_data_path: self.to_container_path(&request.input_data_path),
             // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them
             prev_checkpoint_path: None,
             new_checkpoint_path: self.in_out_dir_in_container().join("new-checkpoint"),
             data_dir: self.to_container_path(&request.data_dir),
-            out_data_path: self.to_container_path(&request.out_data_path),
+            output_data_path: self.to_container_path(&request.output_data_path),
             // TODO: We are stripping out the "fetch step because URL can contain templating
             // that will fail to parse in the engine.
             // In future engine should only receive the query part of the request.
@@ -237,24 +236,6 @@ impl IngestEngine for SparkEngine {
             ..request
         };
 
-        match self.ingest_impl(run_info, request_adj).await {
-            Ok(mut resp) => {
-                // TODO: Spark ingest currently derives watermark as `max(event_time_col)`.
-                // If there is no output data - watermark will be empty, so we have to fill it with a previous value.
-                // If data is out of order - we need to make sure watermark remains monotonically increasing.
-                resp.output_watermark = if resp.data_interval.is_none() {
-                    prev_watermark
-                } else {
-                    match (prev_watermark, resp.output_watermark) {
-                        (None, Some(new)) => Some(new),
-                        (Some(prev), Some(new)) => Some(std::cmp::max(prev, new)),
-                        (_, None) => panic!("Spark ingest didn't produce watermark"),
-                    }
-                };
-
-                Ok(resp)
-            }
-            Err(err) => Err(err),
-        }
+        self.ingest_impl(run_info, request_adj).await
     }
 }

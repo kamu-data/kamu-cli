@@ -49,7 +49,8 @@ pub struct IngestRequest {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
     pub dataset_name: DatasetName,
-    pub ingest_path: PathBuf,
+    pub input_data_path: PathBuf,
+    pub output_data_path: PathBuf,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     #[serde(default, with = "datetime_rfc3339_opt")]
@@ -59,12 +60,11 @@ pub struct IngestRequest {
     pub source: SetPollingSource,
     #[serde(with = "DatasetVocabularyDef")]
     pub dataset_vocab: DatasetVocabulary,
-    #[serde(skip)]
-    pub prev_watermark: Option<DateTime<Utc>>,
     pub prev_checkpoint_path: Option<PathBuf>,
     pub new_checkpoint_path: PathBuf,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub prev_watermark: Option<DateTime<Utc>>,
     pub data_dir: PathBuf,
-    pub out_data_path: PathBuf,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

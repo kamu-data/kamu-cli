@@ -62,7 +62,7 @@ impl ReadService {
         let request = IngestRequest {
             dataset_id: dataset_handle.id.clone(),
             dataset_name: dataset_handle.alias.dataset_name.clone(),
-            ingest_path: src_data_path.to_owned(),
+            input_data_path: src_data_path.to_owned(),
             system_time,
             event_time: source_event_time,
             offset,
@@ -71,7 +71,7 @@ impl ReadService {
             prev_watermark,
             prev_checkpoint_path: prev_checkpoint.map(|cp| dataset_layout.checkpoint_path(&cp)),
             data_dir: dataset_layout.data_dir.clone(),
-            out_data_path: out_data_path.to_owned(),
+            output_data_path: out_data_path.to_owned(),
             new_checkpoint_path: out_checkpoint_path.to_owned(),
         };
 
