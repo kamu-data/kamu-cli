@@ -50,7 +50,7 @@ impl ReadService {
         if src_data_path.metadata().int_err()?.len() == 0 {
             return Ok(ExecuteQueryResponseSuccess {
                 data_interval: None,
-                output_watermark: None,
+                output_watermark: prev_watermark,
             });
         }
 
