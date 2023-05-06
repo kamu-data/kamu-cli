@@ -9,7 +9,7 @@
 
 use crate::utils::{CommandError, Kamu};
 use kamu::domain::*;
-use kamu::infra::{DatasetFactoryImpl, DatasetLayout, WorkspaceLayout};
+use kamu::infra::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
 use opendatafabric::*;
@@ -83,7 +83,10 @@ async fn test_workspace_upgrade() {
 
     assert!(!temp_dir.path().join(".kamu/version").is_file());
     assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
-    assert_eq!(workspace_svc.workspace_version().unwrap(), Some(0));
+    assert_eq!(
+        workspace_svc.workspace_version().unwrap(),
+        Some(WorkspaceVersion::V0_Initial)
+    );
 
     assert_matches!(
         kamu.execute(["list"]).await,

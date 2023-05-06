@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::*;
-use kamu::infra::WorkspaceLayout;
+use kamu::infra::{WorkspaceLayout, WorkspaceVersion};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -57,23 +57,24 @@ impl WorkspaceService {
     }
 
     /// Returns the version of the current workspace
-    pub fn workspace_version(&self) -> Result<Option<usize>, InternalError> {
+    pub fn workspace_version(&self) -> Result<Option<WorkspaceVersion>, InternalError> {
         if !self.is_in_workspace() {
             Ok(None)
         } else {
             if !self.workspace_layout.version_path.is_file() {
-                Ok(Some(0))
+                Ok(Some(WorkspaceVersion::V0_Initial))
             } else {
                 let version_str =
                     std::fs::read_to_string(&self.workspace_layout.version_path).int_err()?;
 
-                Ok(Some(version_str.trim().parse().int_err()?))
+                let version: u32 = version_str.trim().parse().int_err()?;
+                Ok(Some(version.into()))
             }
         }
     }
 
     /// Returns the version that code expects to function correctly
-    pub fn latest_supported_version(&self) -> usize {
+    pub fn latest_supported_version(&self) -> WorkspaceVersion {
         WorkspaceLayout::VERSION
     }
 
@@ -86,7 +87,7 @@ impl WorkspaceService {
         let mut current_version = prev_version;
         let new_version = WorkspaceLayout::VERSION;
 
-        if prev_version == new_version {
+        if current_version == new_version {
             return Ok(WorkspaceUpgradeResult {
                 prev_version,
                 new_version,
@@ -103,11 +104,11 @@ impl WorkspaceService {
             );
 
             match current_version {
-                0 => self.upgrade_0_to_1()?,
+                WorkspaceVersion::V0_Initial => self.upgrade_0_to_1()?,
                 _ => unreachable!(),
             }
 
-            current_version += 1;
+            current_version = current_version.next();
             std::fs::write(
                 &self.workspace_layout.version_path,
                 current_version.to_string(),
@@ -139,8 +140,8 @@ impl WorkspaceService {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct WorkspaceUpgradeResult {
-    pub prev_version: usize,
-    pub new_version: usize,
+    pub prev_version: WorkspaceVersion,
+    pub new_version: WorkspaceVersion,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -160,6 +161,6 @@ pub enum WorkspaceUpgradeError {
 #[derive(thiserror::Error, Debug)]
 #[error("Workspace version {workspace_version} is newer than supported version {latest_supported_version} - upgrade to latest software version")]
 pub struct WorkspaceFutureVersionError {
-    pub workspace_version: usize,
-    pub latest_supported_version: usize,
+    pub workspace_version: WorkspaceVersion,
+    pub latest_supported_version: WorkspaceVersion,
 }

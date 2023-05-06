@@ -12,6 +12,8 @@ use opendatafabric::DatasetAlias;
 
 use std::path::PathBuf;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Consider extracting to kamu-cli layer
 /// Describes the layout of the workspace on disk
 #[derive(Debug, Clone)]
@@ -31,7 +33,7 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: usize = 1;
+    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V1_WorkspaceCacheDir;
 
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
@@ -61,5 +63,51 @@ impl WorkspaceLayout {
     pub fn dataset_layout(&self, alias: &DatasetAlias) -> DatasetLayout {
         assert!(!alias.is_multitenant(), "Multitenancy is not yet supported");
         DatasetLayout::new(self.datasets_dir.join(&alias.dataset_name))
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Generalize this enum pattern
+#[allow(non_camel_case_types)]
+#[repr(u32)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum WorkspaceVersion {
+    V0_Initial,
+    V1_WorkspaceCacheDir,
+    Unknown(u32),
+}
+
+impl WorkspaceVersion {
+    pub fn next(&self) -> Self {
+        let v: u32 = (*self).into();
+        (v + 1).into()
+    }
+}
+
+impl From<u32> for WorkspaceVersion {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => WorkspaceVersion::V0_Initial,
+            1 => WorkspaceVersion::V1_WorkspaceCacheDir,
+            _ => WorkspaceVersion::Unknown(value),
+        }
+    }
+}
+
+impl Into<u32> for WorkspaceVersion {
+    fn into(self) -> u32 {
+        match self {
+            Self::V0_Initial => 0,
+            Self::V1_WorkspaceCacheDir => 1,
+            Self::Unknown(value) => value,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkspaceVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value: u32 = (*self).into();
+        write!(f, "{}", value)
     }
 }
