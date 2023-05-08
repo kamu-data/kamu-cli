@@ -159,13 +159,14 @@ impl BatchError {
     pub fn new<S, I, C, E>(summary: S, errors_with_context: I) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = (E, C)>,
+        I: IntoIterator<Item = (E, C)>,
         C: Into<String>,
         E: Into<BoxedError>,
     {
         Self {
             summary: summary.into(),
             errors_with_context: errors_with_context
+                .into_iter()
                 .map(|(e, c)| (e.into(), c.into()))
                 .collect(),
         }
