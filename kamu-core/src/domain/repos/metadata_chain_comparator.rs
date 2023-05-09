@@ -312,6 +312,10 @@ impl From<GetBlockError> for CompareChainsError {
                 message: "Metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }),
+            GetBlockError::BlockMalformed(e) => Self::Corrupted(CorruptedSourceError {
+                message: "Metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
         }
@@ -330,6 +334,13 @@ impl From<IterBlocksError> for CompareChainsError {
                 .into(),
             ),
             IterBlocksError::BlockVersion(e) => CompareChainsError::Corrupted(
+                CorruptedSourceError {
+                    message: "Metadata chain is broken".to_owned(),
+                    source: Some(e.into()),
+                }
+                .into(),
+            ),
+            IterBlocksError::BlockMalformed(e) => CompareChainsError::Corrupted(
                 CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
@@ -378,14 +389,6 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         (self.on_read)(1);
         self.chain.get_block(hash).await
-    }
-
-    async fn get_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: &[u8],
-    ) -> Result<MetadataBlock, GetBlockError> {
-        self.chain.get_block_from_bytes(hash, block_bytes).await
     }
 
     fn iter_blocks_interval<'b>(

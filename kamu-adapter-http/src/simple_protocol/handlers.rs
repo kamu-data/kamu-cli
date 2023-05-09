@@ -216,7 +216,7 @@ async fn dataset_put_object_common(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    dataset_ref: Extension<DatasetRef>,
+    Extension(dataset_ref): Extension<DatasetRef>,
     catalog: Extension<dill::Catalog>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
@@ -225,10 +225,11 @@ pub async fn dataset_push_ws_upgrade_handler(
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-    let dataset_builder = match dataset_repo.get_or_create_dataset(&dataset_ref).await {
-        Ok(dsb) => dsb,
+    let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
+        Ok(ds) => Some(ds),
+        Err(GetDatasetError::NotFound(_)) => None,
         Err(err) => {
-            tracing::error!("Could not get dataset builder: {:?}", err);
+            tracing::error!("Could not get dataset: {:?}", err);
             return axum::response::Response::builder()
                 .status(axum::http::status::StatusCode::INTERNAL_SERVER_ERROR)
                 .body(Default::default())
@@ -237,7 +238,13 @@ pub async fn dataset_push_ws_upgrade_handler(
     };
 
     ws.on_upgrade(|socket| {
-        ws_axum_server::dataset_push_ws_handler(socket, dataset_builder, dataset_url)
+        ws_axum_server::dataset_push_ws_handler(
+            socket,
+            dataset_ref,
+            dataset,
+            dataset_repo,
+            dataset_url,
+        )
     })
 }
 

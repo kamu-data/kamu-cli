@@ -13,21 +13,6 @@ use opendatafabric::*;
 
 use async_trait::async_trait;
 use futures::TryStreamExt;
-use thiserror::Error;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-enum ConstructBlockFromBytesError {
-    #[error(transparent)]
-    BlockVersion(BlockVersionError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,6 +77,7 @@ where
                     AppendValidationError::PrevBlockNotFound(e),
                 )),
                 Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
+                Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
                 Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }?;
@@ -143,6 +129,7 @@ where
                     AppendValidationError::PrevBlockNotFound(e),
                 )),
                 Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
+                Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
                 Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }
@@ -372,27 +359,23 @@ where
         Ok(())
     }
 
-    async fn construct_block_from_bytes(
-        &self,
+    fn deserialize_block(
         hash: &Multihash,
         block_bytes: &[u8],
-    ) -> Result<MetadataBlock, ConstructBlockFromBytesError> {
+    ) -> Result<MetadataBlock, GetBlockError> {
         match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
             Ok(block) => Ok(block),
             Err(e) => match e {
-                Error::UnsupportedVersion { .. } => Err(
-                    ConstructBlockFromBytesError::BlockVersion(BlockVersionError {
+                Error::UnsupportedVersion { .. } => {
+                    Err(GetBlockError::BlockVersion(BlockVersionError {
                         hash: hash.clone(),
                         source: e.into(),
-                    }),
-                ),
-                _ => Err(ConstructBlockFromBytesError::Internal(
-                    BlockMalformedError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }
-                    .int_err(),
-                )),
+                    }))
+                }
+                _ => Err(GetBlockError::BlockMalformed(BlockMalformedError {
+                    hash: hash.clone(),
+                    source: e.into(),
+                })),
             },
         }
     }
@@ -420,31 +403,7 @@ where
             Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
         }?;
 
-        match self.construct_block_from_bytes(hash, &data).await {
-            Ok(block) => Ok(block),
-            Err(e) => match e {
-                ConstructBlockFromBytesError::BlockVersion(e) => {
-                    Err(GetBlockError::BlockVersion(e))
-                }
-                ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
-            },
-        }
-    }
-
-    async fn get_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: &[u8],
-    ) -> Result<MetadataBlock, GetBlockError> {
-        match self.construct_block_from_bytes(hash, block_bytes).await {
-            Ok(block) => Ok(block),
-            Err(e) => match e {
-                ConstructBlockFromBytesError::BlockVersion(e) => {
-                    Err(GetBlockError::BlockVersion(e))
-                }
-                ConstructBlockFromBytesError::Internal(e) => Err(GetBlockError::Internal(e)),
-            },
-        }
+        Self::deserialize_block(hash, &data)
     }
 
     fn iter_blocks_interval<'a>(

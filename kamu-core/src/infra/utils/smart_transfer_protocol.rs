@@ -11,6 +11,7 @@ use opendatafabric::Multihash;
 use std::sync::Arc;
 use url::Url;
 
+pub use super::simple_transfer_protocol::DatasetFactoryFn;
 use crate::domain::{Dataset, SyncError, SyncListener, SyncResult};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -41,14 +42,15 @@ pub trait SmartTransferProtocolClient: Sync + Send {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: &dyn Dataset,
+        dst: Option<Arc<dyn Dataset>>,
+        dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
         transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError>;
 
     async fn push_protocol_client_flow(
         &self,
-        src: &dyn Dataset,
+        src: Arc<dyn Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,

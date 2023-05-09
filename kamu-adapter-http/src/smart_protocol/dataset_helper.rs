@@ -12,7 +12,7 @@ use std::{collections::VecDeque, io::Read};
 use crate::smart_protocol::{errors::ObjectUploadError, messages::*};
 use bytes::Bytes;
 use flate2::Compression;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use kamu::domain::*;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
@@ -164,12 +164,40 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dataset_load_metadata(
-    dataset: &dyn Dataset,
+pub async fn decode_metadata_batch(
     objects_batch: ObjectsBatch,
-) -> VecDeque<(Multihash, MetadataBlock)> {
+) -> Result<VecDeque<(Multihash, MetadataBlock)>, GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
-    load_dataset_blocks(dataset.as_metadata_chain(), blocks_data).await
+    blocks_data
+        .into_iter()
+        .map(|(hash, bytes)| match deserialize_block(&hash, &bytes) {
+            Ok(block) => Ok((hash, block)),
+            Err(err) => Err(err),
+        })
+        .collect::<Result<VecDeque<_>, _>>()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn deserialize_block(hash: &Multihash, block_bytes: &[u8]) -> Result<MetadataBlock, GetBlockError> {
+    use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
+    use opendatafabric::serde::{Error, MetadataBlockDeserializer};
+
+    match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
+        Ok(block) => Ok(block),
+        Err(e @ Error::UnsupportedVersion { .. }) => {
+            Err(GetBlockError::BlockVersion(BlockVersionError {
+                hash: hash.clone(),
+                source: e.into(),
+            }))
+        }
+        Err(e @ Error::IoError { .. } | e @ Error::SerdeError { .. }) => {
+            Err(GetBlockError::BlockMalformed(BlockMalformedError {
+                hash: hash.clone(),
+                source: e.into(),
+            }))
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -178,6 +206,9 @@ pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
     metadata: VecDeque<(Multihash, MetadataBlock)>,
 ) -> Result<(), AppendError> {
+    let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
+    let new_head = metadata.back().unwrap().0.clone();
+
     let metadata_chain = dataset.as_metadata_chain();
     for (hash, block) in metadata {
         tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
@@ -185,12 +216,24 @@ pub async fn dataset_append_metadata(
             .append(
                 block,
                 AppendOpts {
+                    update_ref: None,
                     expected_hash: Some(&hash),
                     ..AppendOpts::default()
                 },
             )
             .await?;
     }
+
+    metadata_chain
+        .set_ref(
+            &BlockRef::Head,
+            &new_head,
+            SetRefOpts {
+                validate_block_present: false,
+                check_ref_is: Some(old_head.as_ref()),
+            },
+        )
+        .await?;
 
     Ok(())
 }
@@ -229,25 +272,6 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
         .collect();
 
     blocks_data
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn load_dataset_blocks(
-    metadata_chain: &dyn MetadataChain,
-    blocks_data: Vec<(Multihash, Vec<u8>)>,
-) -> VecDeque<(Multihash, MetadataBlock)> {
-    stream::iter(blocks_data)
-        .then(|(hash, block_buf)| async move {
-            tracing::debug!("> {} - {} bytes", hash, block_buf.len());
-            let block = metadata_chain
-                .get_block_from_bytes(&hash, block_buf.as_slice())
-                .await
-                .unwrap();
-            (hash, block)
-        })
-        .collect()
-        .await
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

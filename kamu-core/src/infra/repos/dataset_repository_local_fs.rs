@@ -58,76 +58,6 @@ impl DatasetRepositoryLocalFs {
         let layout = DatasetLayout::new(self.root.join(&dataset_alias.dataset_name));
         Ok(DatasetFactoryImpl::get_local_fs(layout))
     }
-
-    /*async fn read_repo_info(&self) -> Result<DatasetRepositoryInfo, InternalError> {
-        use crate::domain::repos::named_object_repository::GetError;
-
-        let data = match self.info_repo.get("info").await {
-            Ok(data) => data,
-            Err(GetError::NotFound(_)) => {
-                return Ok(DatasetRepositoryInfo {
-                    datasets: Vec::new(),
-                })
-            }
-            Err(GetError::Internal(e)) => return Err(e),
-        };
-
-        let manifest: Manifest<DatasetRepositoryInfo> =
-            serde_yaml::from_slice(&data[..]).int_err()?;
-
-        if manifest.kind != "DatasetRepositoryInfo" {
-            return Err(InvalidObjectKind {
-                expected: "DatasetRepositoryInfo".to_owned(),
-                actual: manifest.kind,
-            }
-            .int_err()
-            .into());
-        }
-
-        Ok(manifest.content)
-    }
-
-    async fn write_repo_info(&self, info: DatasetRepositoryInfo) -> Result<(), InternalError> {
-        let manifest = Manifest {
-            kind: "DatasetRepositoryInfo".to_owned(),
-            version: 1,
-            content: info,
-        };
-
-        let data = serde_yaml::to_vec(&manifest).int_err()?;
-
-        self.info_repo.set("info", &data).await?;
-
-        Ok(())
-    }*/
-
-    async fn finish_create_dataset(
-        &self,
-        dataset: &dyn Dataset,
-        dataset_alias: &DatasetAlias,
-    ) -> Result<DatasetHandle, CreateDatasetError> {
-        let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
-            Ok(s) => Ok(s),
-            Err(GetSummaryError::EmptyDataset) => unreachable!(),
-            Err(GetSummaryError::Access(e)) => Err(e.int_err().into()),
-            Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
-        }?;
-
-        let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
-
-        // // Add new entry
-        // repo_info.datasets.push(DatasetEntry {
-        //     id: handle.id.clone(),
-        //     name: handle.name.clone(),
-        // });
-
-        // self.repo
-        //     .write_repo_info(repo_info)
-        //     .await
-        //     .map_err(|e| CreateDatasetError::Internal(e.into()))?;
-
-        Ok(handle)
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +189,16 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-    ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
+        seed_block: MetadataBlock,
+    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        let dataset_id = match &seed_block {
+            MetadataBlock {
+                event: MetadataEvent::Seed(seed),
+                ..
+            } => Ok(seed.dataset_id.clone()),
+            _ => Err(format!("Expected a seed block, but got {:?}", seed_block).int_err()),
+        }?;
+
         let dataset_path = if dataset_alias.is_multitenant() {
             self.root
                 .join(dataset_alias.account_name.as_ref().unwrap())
@@ -268,22 +207,40 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             self.root.join(dataset_alias.dataset_name.as_str())
         };
 
-        let folder_state = if dataset_path.exists() {
-            DatasetBuilderFolderState::ExistingDataset
-        } else {
-            DatasetBuilderFolderState::UnfinishedNewDataset
-        };
-
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
-        Ok(Box::new(DatasetBuilderLocalFs::new(
-            self.clone(),
-            dataset,
-            dataset_path,
-            dataset_alias.clone(),
-            folder_state,
-        )))
+        // There are three possiblities at this point:
+        // - Dataset did not exist before - continue normally
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name collision
+        let head = match dataset
+            .as_metadata_chain()
+            .append(
+                seed_block,
+                AppendOpts {
+                    // We are using head ref CAS to detect previous existence of a dataset
+                    // as atomically as possible
+                    check_ref_is: Some(None),
+                    ..AppendOpts::default()
+                },
+            )
+            .await
+        {
+            Ok(head) => Ok(head),
+            Err(AppendError::RefCASFailed(_)) => {
+                Err(CreateDatasetError::NameCollision(NameCollisionError {
+                    alias: dataset_alias.clone(),
+                }))
+            }
+            Err(err) => Err(err.int_err().into()),
+        }?;
+
+        Ok(CreateDatasetResult {
+            dataset_handle: DatasetHandle::new(dataset_id, dataset_alias.clone()),
+            dataset: Arc::new(dataset),
+            head,
+        })
     }
 
     async fn rename_dataset(
@@ -349,127 +306,5 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         dataset_ref: &'s DatasetRef,
     ) -> DatasetHandleStream<'s> {
         Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// DatasetBuilderImpl
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct DatasetBuilderLocalFs<D> {
-    repo: DatasetRepositoryLocalFs,
-    dataset: D,
-    dataset_path: PathBuf,
-    dataset_alias: DatasetAlias,
-    folder_state: DatasetBuilderFolderState,
-}
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-enum DatasetBuilderFolderState {
-    UnfinishedNewDataset,
-    FinishedNewDataset,
-    ExistingDataset,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl<D> DatasetBuilderLocalFs<D> {
-    fn new(
-        repo: DatasetRepositoryLocalFs,
-        dataset: D,
-        dataset_path: PathBuf,
-        dataset_alias: DatasetAlias,
-        folder_state: DatasetBuilderFolderState,
-    ) -> Self {
-        Self {
-            repo,
-            dataset,
-            dataset_path,
-            dataset_alias,
-            folder_state,
-        }
-    }
-
-    fn discard_impl(&self) -> Result<(), InternalError> {
-        if self.folder_state == DatasetBuilderFolderState::UnfinishedNewDataset
-            && self.dataset_path.exists()
-        {
-            std::fs::remove_dir_all(&self.dataset_path).int_err()?;
-        }
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl<D> Drop for DatasetBuilderLocalFs<D> {
-    fn drop(&mut self) {
-        let _ = self.discard_impl();
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<D> DatasetBuilder for DatasetBuilderLocalFs<D>
-where
-    D: Dataset,
-{
-    fn as_dataset(&self) -> &dyn Dataset {
-        &self.dataset
-    }
-
-    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
-        match self
-            .dataset
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(GetRefError::NotFound(_)) => {
-                self.discard_impl()?;
-                Err(CreateDatasetError::EmptyDataset)
-            }
-            Err(GetRefError::Access(e)) => Err(e.int_err().into()),
-            Err(GetRefError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
-        }?;
-
-        self.repo
-            .finish_create_dataset(&self.dataset, &self.dataset_alias)
-            .await
-            .map(|handle| {
-                if self.folder_state == DatasetBuilderFolderState::UnfinishedNewDataset {
-                    self.folder_state = DatasetBuilderFolderState::FinishedNewDataset;
-                }
-                handle
-            })
-    }
-
-    async fn discard(&self) -> Result<(), InternalError> {
-        self.discard_impl()?;
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<D> Dataset for DatasetBuilderLocalFs<D>
-where
-    D: Dataset,
-{
-    async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
-        self.dataset.get_summary(opts).await
-    }
-
-    fn as_metadata_chain(&self) -> &dyn MetadataChain {
-        self.dataset.as_metadata_chain()
-    }
-    fn as_data_repo(&self) -> &dyn ObjectRepository {
-        self.dataset.as_data_repo()
-    }
-    fn as_checkpoint_repo(&self) -> &dyn ObjectRepository {
-        self.dataset.as_checkpoint_repo()
     }
 }

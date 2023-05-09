@@ -25,31 +25,36 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
         GetDatasetError::NotFound(_)
     );
 
-    let mut builder = repo.create_dataset(&dataset_alias).await.unwrap();
-    let chain = builder.as_dataset().as_metadata_chain();
-
-    chain
-        .append(
+    let create_result = repo
+        .create_dataset(
+            &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build(),
-            AppendOpts::default(),
         )
         .await
         .unwrap();
 
-    // Not finalized yet, but we should already see the dataset
+    assert_eq!(create_result.dataset_handle.alias, dataset_alias);
+
+    // We should see the dataset
     assert!(repo
         .get_dataset(&dataset_alias.as_local_ref())
         .await
         .is_ok());
 
-    let hdl = builder.finish().await.unwrap();
-    assert_eq!(hdl.alias, dataset_alias);
+    // Now test name collision
+    let create_result = repo
+        .create_dataset(
+            &dataset_alias,
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+        )
+        .await;
 
-    assert!(repo
-        .get_dataset(&dataset_alias.as_local_ref())
-        .await
-        .is_ok());
+    assert_matches!(
+        create_result.err(),
+        Some(CreateDatasetError::NameCollision(_))
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +76,10 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = repo.create_dataset_from_snapshot(snapshot).await.unwrap();
+    let create_result = repo
+        .create_dataset_from_snapshot(snapshot.clone())
+        .await
+        .unwrap();
 
     let dataset = repo
         .get_dataset(&create_result.dataset_handle.into())
@@ -85,6 +93,11 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
         .unwrap();
 
     assert_eq!(actual_head, create_result.head);
+
+    assert_matches!(
+        repo.create_dataset_from_snapshot(snapshot).await.err(),
+        Some(CreateDatasetFromSnapshotError::NameCollision(_))
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

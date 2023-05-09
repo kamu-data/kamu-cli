@@ -35,18 +35,17 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
 
-    let mut dataset_builder = local_repo
-        .create_dataset(&DatasetAlias::new(None, DatasetName::new_unchecked("foo")))
+    let dataset = local_repo
+        .create_dataset(
+            &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            MetadataFactory::metadata_block(MetadataEvent::Seed(
+                MetadataFactory::seed(DatasetKind::Root).build(),
+            ))
+            .build(),
+        )
         .await
-        .unwrap();
-
-    let ds = dataset_builder.as_dataset();
-    ds.commit_event(
-        MetadataEvent::Seed(MetadataFactory::seed(DatasetKind::Root).build()),
-        CommitOpts::default(),
-    )
-    .await
-    .unwrap();
+        .unwrap()
+        .dataset;
 
     let tmp_data_path = tempdir.join("data");
     let schema = Arc::new(Schema::new(vec![
@@ -59,19 +58,18 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
     ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
-    ds.commit_add_data(
-        None,
-        Some(OffsetInterval { start: 0, end: 3 }),
-        Some(tmp_data_path),
-        None,
-        None,
-        None,
-        CommitOpts::default(),
-    )
-    .await
-    .unwrap();
-
-    dataset_builder.finish().await.unwrap();
+    dataset
+        .commit_add_data(
+            None,
+            Some(OffsetInterval { start: 0, end: 3 }),
+            Some(tmp_data_path),
+            None,
+            None,
+            None,
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
 
     cat
 }

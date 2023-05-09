@@ -20,19 +20,18 @@ use tokio_stream::Stream;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
 pub struct CreateDatasetResult {
     pub dataset_handle: DatasetHandle,
+    pub dataset: Arc<dyn Dataset>,
     pub head: Multihash,
-    pub head_sequence_number: i32,
 }
 
 impl CreateDatasetResult {
-    pub fn new(dataset_handle: DatasetHandle, head: Multihash, head_sequence_number: i32) -> Self {
+    pub fn new(dataset_handle: DatasetHandle, dataset: Arc<dyn Dataset>, head: Multihash) -> Self {
         Self {
             dataset_handle,
+            dataset,
             head,
-            head_sequence_number,
         }
     }
 }
@@ -56,7 +55,8 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-    ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError>;
+        seed_block: MetadataBlock,
+    ) -> Result<CreateDatasetResult, CreateDatasetError>;
 
     async fn rename_dataset(
         &self,
@@ -78,15 +78,6 @@ pub type DatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-pub trait DatasetBuilder: Send + Sync {
-    fn as_dataset(&self) -> &dyn Dataset;
-    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError>;
-    async fn discard(&self) -> Result<(), InternalError>;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 // Extensions
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -101,20 +92,6 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
-
-    async fn get_or_create_dataset(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Box<dyn DatasetBuilder>, GetDatasetError>;
-
-    async fn create_dataset_from_blocks<IT>(
-        &self,
-        dataset_alias: &DatasetAlias,
-        blocks: IT,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>
-    where
-        IT: IntoIterator<Item = MetadataBlock> + Send,
-        IT::IntoIter: Send;
 
     async fn create_dataset_from_snapshot(
         &self,
@@ -158,58 +135,6 @@ where
             Err(GetDatasetError::NotFound(_)) => Ok(None),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
-    }
-
-    async fn get_or_create_dataset(
-        &self,
-        dataset_ref: &DatasetRef,
-    ) -> Result<Box<dyn DatasetBuilder>, GetDatasetError> {
-        match self.resolve_dataset_ref(dataset_ref).await {
-            Ok(hdl) => {
-                let ds = self.get_dataset(&hdl.as_local_ref()).await?;
-                Ok(Box::new(NullDatasetBuilder::new(hdl, ds)))
-            }
-            Err(e @ GetDatasetError::NotFound(_)) => match dataset_ref.alias() {
-                None => Err(e),
-                Some(alias) => match self.create_dataset(alias).await {
-                    Ok(b) => Ok(b),
-                    Err(BeginCreateDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
-                },
-            },
-            Err(GetDatasetError::Internal(e)) => Err(GetDatasetError::Internal(e)),
-        }
-    }
-
-    async fn create_dataset_from_blocks<IT>(
-        &self,
-        dataset_alias: &DatasetAlias,
-        blocks: IT,
-    ) -> Result<CreateDatasetResult, CreateDatasetError>
-    where
-        IT: IntoIterator<Item = MetadataBlock> + Send,
-        IT::IntoIter: Send,
-    {
-        let mut ds = self.create_dataset(dataset_alias).await?;
-        let mut hash = None;
-        let mut sequence_number = -1;
-        for mut block in blocks {
-            sequence_number += 1;
-            block.prev_block_hash = hash.clone();
-            block.sequence_number = sequence_number;
-            hash = Some(
-                ds.as_dataset()
-                    .as_metadata_chain()
-                    .append(block, AppendOpts::default())
-                    .await
-                    .int_err()?,
-            );
-        }
-        let hdl = ds.finish().await?;
-        Ok(CreateDatasetResult::new(
-            hdl,
-            hash.unwrap(),
-            sequence_number,
-        ))
     }
 
     async fn create_dataset_from_snapshot(
@@ -260,21 +185,16 @@ where
             }?;
         }
 
-        let system_time = Utc::now();
-
-        let alias = DatasetAlias::new(None, snapshot.name);
-        let mut builder = self.create_dataset(&alias).await?;
-        let chain = builder.as_dataset().as_metadata_chain();
-
         // We are generating a key pair and deriving a dataset ID from it.
         // The key pair is discarded for now, but in future can be used for
         // proof of control over dataset and metadata signing.
         let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
 
-        let mut sequence_number = 0;
+        let system_time = Utc::now();
 
-        let mut head = chain
-            .append(
+        let create_result = self
+            .create_dataset(
+                &DatasetAlias::new(None, snapshot.name),
                 MetadataBlock {
                     system_time,
                     prev_block_hash: None,
@@ -282,31 +202,51 @@ where
                         dataset_id,
                         dataset_kind: snapshot.kind,
                     }),
-                    sequence_number: sequence_number,
+                    sequence_number: 0,
                 },
-                AppendOpts::default(),
             )
-            .await
-            .int_err()?;
+            .await?;
+
+        let chain = create_result.dataset.as_metadata_chain();
+        let mut head = create_result.head.clone();
+        let mut sequence_number = 1;
 
         for event in snapshot.metadata {
-            sequence_number += 1;
             head = chain
                 .append(
                     MetadataBlock {
                         system_time,
                         prev_block_hash: Some(head),
                         event,
-                        sequence_number: sequence_number,
+                        sequence_number,
                     },
-                    AppendOpts::default(),
+                    AppendOpts {
+                        update_ref: None,
+                        ..AppendOpts::default()
+                    },
                 )
                 .await
                 .int_err()?;
+
+            sequence_number += 1;
         }
 
-        let hdl = builder.finish().await?;
-        Ok(CreateDatasetResult::new(hdl, head, sequence_number))
+        chain
+            .set_ref(
+                &BlockRef::Head,
+                &head,
+                SetRefOpts {
+                    validate_block_present: false,
+                    check_ref_is: Some(Some(&create_result.head)),
+                },
+            )
+            .await
+            .int_err()?;
+
+        Ok(CreateDatasetResult {
+            head,
+            ..create_result
+        })
     }
 
     async fn create_datasets_from_snapshots(
@@ -501,16 +441,6 @@ pub enum GetDatasetError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum BeginCreateDatasetError {
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-#[derive(Error, Debug)]
 pub enum CreateDatasetError {
     #[error("Dataset is empty")]
     EmptyDataset,
@@ -538,14 +468,6 @@ pub enum CreateDatasetFromSnapshotError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<BeginCreateDatasetError> for CreateDatasetError {
-    fn from(v: BeginCreateDatasetError) -> Self {
-        match v {
-            BeginCreateDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -591,14 +513,6 @@ pub enum DeleteDatasetError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<BeginCreateDatasetError> for CreateDatasetFromSnapshotError {
-    fn from(v: BeginCreateDatasetError) -> Self {
-        match v {
-            BeginCreateDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
 impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     fn from(v: CreateDatasetError) -> Self {
         match v {
@@ -606,33 +520,5 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
             CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
             CreateDatasetError::Internal(e) => Self::Internal(e),
         }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct NullDatasetBuilder {
-    hdl: DatasetHandle,
-    dataset: Arc<dyn Dataset>,
-}
-
-impl NullDatasetBuilder {
-    pub fn new(hdl: DatasetHandle, dataset: Arc<dyn Dataset>) -> Self {
-        Self { hdl, dataset }
-    }
-}
-
-#[async_trait]
-impl DatasetBuilder for NullDatasetBuilder {
-    fn as_dataset(&self) -> &dyn Dataset {
-        self.dataset.as_ref()
-    }
-
-    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
-        Ok(self.hdl.clone())
-    }
-
-    async fn discard(&self) -> Result<(), InternalError> {
-        Ok(())
     }
 }
