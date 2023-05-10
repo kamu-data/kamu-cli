@@ -347,10 +347,18 @@ where
                 let last_offset = prev_data.map(|v| v.interval.end).unwrap_or(-1);
 
                 if new_data.interval.start != last_offset + 1 {
-                    tracing::debug!(
-                        "Expected offset {} but got {}",
+                    tracing::warn!(
+                        "Expected offset interval to start at {} but got {:?}",
                         last_offset + 1,
-                        new_data.interval.start
+                        new_data.interval
+                    );
+                    return Err(AppendValidationError::OffsetsAreNotSequential.into());
+                }
+
+                if new_data.interval.end < new_data.interval.start {
+                    tracing::debug!(
+                        "Expected valid offset interval but got {:?}",
+                        new_data.interval
                     );
                     return Err(AppendValidationError::OffsetsAreNotSequential.into());
                 }

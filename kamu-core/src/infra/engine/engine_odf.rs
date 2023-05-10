@@ -21,7 +21,6 @@ use odf::{
 };
 use opendatafabric as odf;
 use rand::Rng;
-use tracing::{info, info_span, warn};
 
 use super::ODFEngineConfig;
 use crate::domain::*;
@@ -51,6 +50,7 @@ impl ODFEngine {
         }
     }
 
+    #[tracing::instrument(level = "info", name = "execute_query", skip_all)]
     async fn transform_impl(
         &self,
         run_info: RunInfo,
@@ -69,18 +69,16 @@ impl ODFEngine {
 
         let mut client = engine_container.connect_client(&run_info).await?;
 
-        let span = info_span!(
-            "Performing engine operation",
+        tracing::info!(
             id = engine_container.container_name.as_str(),
             image = self.image.as_str(),
-            operation = "execute_query",
-            request = ?request,
+            ?request,
+            "Performing engine operation",
         );
-        let _span_guard = span.enter();
 
         let response = client.execute_query(request).await;
 
-        info!(?response, "Operation response");
+        tracing::info!(?response, "Operation response");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
@@ -283,7 +281,7 @@ impl EngineContainer {
             ..RunArgs::default()
         });
 
-        info!(command = ?cmd, image = image, id = container_name.as_str(), "Starting engine");
+        tracing::info!(command = ?cmd, image, id = container_name.as_str(), "Starting engine");
 
         let engine_process = KillOnDrop::new(
             cmd.stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
@@ -300,7 +298,7 @@ impl EngineContainer {
             .wait_for_socket(adapter_host_port, config.start_timeout)
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-        info!(id = container_name.as_str(), "Engine running");
+        tracing::info!(id = container_name.as_str(), "Engine running");
 
         Ok(Self {
             container_runtime,
@@ -338,7 +336,7 @@ impl Drop for EngineContainer {
             return;
         }
 
-        info!(id = self.container_name.as_str(), "Shutting down engine");
+        tracing::info!(id = self.container_name.as_str(), "Shutting down engine");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
@@ -354,7 +352,7 @@ impl Drop for EngineContainer {
                     std::thread::sleep(Duration::from_millis(100));
                 }
 
-                warn!(id = self.container_name.as_str(), "Engine did not shutdown gracefully, killing");
+                tracing::warn!(id = self.container_name.as_str(), "Engine did not shutdown gracefully, killing");
             }
         }
 

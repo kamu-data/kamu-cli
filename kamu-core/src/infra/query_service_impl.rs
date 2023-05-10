@@ -27,7 +27,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tracing::info_span;
 
 use crate::domain::*;
 use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
@@ -135,14 +134,12 @@ impl QueryService for QueryServiceImpl {
         .await
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(statement))]
     async fn sql_statement(
         &self,
         statement: &str,
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError> {
-        let span = info_span!("Executing SQL query", statement);
-        let _span_guard = span.enter();
-
         let cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");

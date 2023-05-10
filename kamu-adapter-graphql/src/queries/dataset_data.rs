@@ -15,7 +15,6 @@ use kamu::domain;
 use kamu::domain::GetSummaryOpts;
 use kamu::domain::QueryError;
 use opendatafabric as odf;
-use tracing::debug;
 
 pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
@@ -74,7 +73,7 @@ impl DatasetData {
                 if let QueryError::DatasetSchemaNotAvailable(_) = err {
                     return Ok(DataQueryResult::no_schema_yet(data_format, limit));
                 } else {
-                    debug!(?err, "Query error");
+                    tracing::debug!(?err, "Query error");
                     return Ok(err.into());
                 }
             }

@@ -16,7 +16,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::Client;
 use tokio::io::AsyncRead;
-use tracing::debug;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +50,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
-        debug!(%url, "Checking for object");
+        tracing::debug!(%url, "Checking for object");
 
         let response = self.client.head(url).send().await.int_err()?;
 
@@ -75,7 +74,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
-        debug!(%url, "Reading object");
+        tracing::debug!(%url, "Reading object");
 
         let response = self.client.get(url).send().await.int_err()?;
 
@@ -103,7 +102,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 
-        debug!(%url, "Reading object stream");
+        tracing::debug!(%url, "Reading object stream");
 
         let response = self.client.get(url).send().await.int_err()?;
 

@@ -17,7 +17,6 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::io::{AsyncRead, AsyncWriteExt};
-use tracing::debug;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -113,7 +112,7 @@ where
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let path = self.get_path(hash);
 
-        debug!(?path, "Checking for object");
+        tracing::debug!(?path, "Checking for object");
 
         Ok(path.exists())
     }
@@ -121,7 +120,7 @@ where
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let path = self.get_path(hash);
 
-        debug!(?path, "Reading object size");
+        tracing::debug!(?path, "Reading object size");
 
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
@@ -135,7 +134,7 @@ where
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         let path = self.get_path(hash);
 
-        debug!(?path, "Reading object");
+        tracing::debug!(?path, "Reading object");
 
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
@@ -150,7 +149,7 @@ where
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let path = self.get_path(&hash);
 
-        debug!(?path, "Reading object stream");
+        tracing::debug!(?path, "Reading object stream");
 
         if !path.exists() {
             return Err(GetError::NotFound(ObjectNotFoundError {
@@ -201,7 +200,7 @@ where
 
         let path = self.get_path_write(&hash).int_err()?;
 
-        debug!(?path, "Inserting object");
+        tracing::debug!(?path, "Inserting object");
 
         if path.exists() {
             return Ok(InsertResult { hash });
@@ -249,7 +248,7 @@ where
 
         let path = self.get_path_write(&hash).int_err()?;
 
-        debug!(?path, "Inserting object stream");
+        tracing::debug!(?path, "Inserting object stream");
 
         if path.exists() {
             tokio::fs::remove_file(&staging_path).await.int_err()?;
@@ -285,8 +284,8 @@ where
 
         let path = self.get_path_write(&hash).int_err()?;
 
-        debug!(?src, ?path, "Inserting object from file");
-        debug!("{} {}", path.parent().unwrap().exists(), src.exists());
+        tracing::debug!(?src, ?path, "Inserting object from file");
+        tracing::debug!("{} {}", path.parent().unwrap().exists(), src.exists());
 
         if path.exists() {
             return Ok(InsertResult { hash });
@@ -301,7 +300,7 @@ where
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let path = self.get_path(hash);
 
-        debug!(?path, "Deleting object");
+        tracing::debug!(?path, "Deleting object");
 
         if path.exists() {
             tokio::fs::remove_file(&path).await.int_err()?;

@@ -9,7 +9,6 @@
 
 use dill::*;
 use opendatafabric::*;
-use tracing::info;
 
 use crate::{domain::*, infra::utils::s3_context::S3Context};
 
@@ -90,7 +89,7 @@ impl SearchServiceImpl {
     ) -> Result<SearchResult, SearchError> {
         let repo = self.remote_repo_reg.get_repository(&repo_name)?;
 
-        info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
+        tracing::info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 
         let datasets = self.search_in_resource(&repo.url, query).await?;
 

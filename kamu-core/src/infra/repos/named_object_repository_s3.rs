@@ -14,7 +14,6 @@ use crate::infra::utils::s3_context::S3Context;
 use async_trait::async_trait;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
-use tracing::debug;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,7 +40,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
     async fn get(&self, name: &str) -> Result<Bytes, GetError> {
         let key = self.get_key(name);
 
-        debug!(?key, "Reading object stream");
+        tracing::debug!(?key, "Reading object stream");
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
@@ -66,7 +65,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
         let key = self.get_key(name);
 
-        debug!(?key, "Inserting object");
+        tracing::debug!(?key, "Inserting object");
 
         match self.s3_context.put_object(key, data).await {
             Ok(_) => {}
@@ -82,7 +81,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
     async fn delete(&self, name: &str) -> Result<(), DeleteError> {
         let key = self.get_key(name);
 
-        debug!(?key, "Deleting object");
+        tracing::debug!(?key, "Deleting object");
 
         match self.s3_context.delete_object(key).await {
             Ok(_) => {}

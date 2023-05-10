@@ -15,7 +15,6 @@ use opendatafabric::*;
 use container_runtime::ContainerRuntime;
 use dill::*;
 use std::sync::Arc;
-use tracing::info;
 
 pub struct IngestServiceImpl {
     workspace_layout: Arc<WorkspaceLayout>,
@@ -163,7 +162,7 @@ impl IngestService for IngestServiceImpl {
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        info!(%dataset_ref, "Ingesting single dataset");
+        tracing::info!(%dataset_ref, "Ingesting single dataset");
         self.do_ingest(dataset_ref, options, None, |_| maybe_listener)
             .await
     }
@@ -175,7 +174,7 @@ impl IngestService for IngestServiceImpl {
         options: IngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
+        tracing::info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
         self.do_ingest(dataset_ref, options, Some(fetch), |_| maybe_listener)
             .await
     }
@@ -207,7 +206,7 @@ impl IngestService for IngestServiceImpl {
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
 
         let requests: Vec<_> = requests.collect();
-        info!(?requests, "Ingesting multiple datasets");
+        tracing::info!(?requests, "Ingesting multiple datasets");
 
         let futures: Vec<_> = requests
             .iter()

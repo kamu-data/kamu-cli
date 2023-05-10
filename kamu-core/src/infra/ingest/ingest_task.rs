@@ -19,7 +19,6 @@ use container_runtime::ContainerRuntime;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{error, info, info_span};
 
 pub struct IngestTask {
     dataset_handle: DatasetHandle,
@@ -155,10 +154,13 @@ impl IngestTask {
         })
     }
 
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(dataset_handle = %self.dataset_handle),
+    )]
     pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
-        let span = info_span!("Ingesting data", dataset_handle = %self.dataset_handle);
-        let _span_guard = span.enter();
-        info!(
+        tracing::info!(
             source = ?self.source,
             fetch_override = ?self.fetch_override,
             prev_checkpoint = ?self.prev_checkpoint,
@@ -170,12 +172,12 @@ impl IngestTask {
 
         match self.ingest_inner().await {
             Ok(res) => {
-                info!(result = ?res, "Ingest successful");
+                tracing::info!(result = ?res, "Ingest successful");
                 self.listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
-                error!(error = ?err, "Ingest failed");
+                tracing::error!(error = ?err, "Ingest failed");
                 self.listener.error(&err);
                 Err(err)
             }
@@ -205,7 +207,7 @@ impl IngestTask {
             !first_ingest && self.prev_source_state.is_none() && self.fetch_override.is_none();
 
         if uncacheable && !self.options.fetch_uncacheable {
-            info!("Skipping fetch of uncacheable source");
+            tracing::info!("Skipping fetch of uncacheable source");
             return Ok(IngestResult::UpToDate {
                 no_polling_source: false,
                 uncacheable,
@@ -348,6 +350,7 @@ impl IngestTask {
         Ok(())
     }
 
+    #[tracing::instrument(level = "info", name = "fetch", skip(self))]
     async fn maybe_fetch(&mut self) -> Result<FetchStepResult, IngestError> {
         // Ignore source state for overridden fetch step
         let (fetch_step, prev_source_state) = if let Some(fetch_override) = &self.fetch_override {
@@ -363,12 +366,9 @@ impl IngestTask {
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
 
         if let Some(savepoint) = savepoint {
-            info!(?savepoint_path, "Resuming from savepoint");
+            tracing::info!(?savepoint_path, "Resuming from savepoint");
             Ok(FetchStepResult::Updated(savepoint))
         } else {
-            let span = info_span!("Fetching the data");
-            let _span_guard = span.enter();
-
             // Just in case user deleted it manually
             if !self.cache_dir.exists() {
                 std::fs::create_dir(&self.cache_dir).int_err()?;
@@ -411,6 +411,7 @@ impl IngestTask {
         }
     }
 
+    #[tracing::instrument(level = "info", skip(self))]
     async fn prepare(
         &mut self,
         fetch_result: &FetchSavepoint,
@@ -430,9 +431,6 @@ impl IngestTask {
                 data_cache_key: fetch_result.data_cache_key.clone(),
             })
         } else {
-            let span = info_span!("Preparing the data");
-            let _span_guard = span.enter();
-
             let src_path = self.cache_dir.join(&fetch_result.data_cache_key);
             let data_cache_key = self.get_random_cache_key("prepare-");
             let target_path = self.cache_dir.join(&data_cache_key);
@@ -444,6 +442,7 @@ impl IngestTask {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn read(
         &mut self,
         prep_result: &PrepStepResult,
@@ -458,9 +457,6 @@ impl IngestTask {
 
         let out_checkpoint_cache_key = self.get_random_cache_key("read-cpt-");
         let out_checkpoint_path = self.cache_dir.join(&out_checkpoint_cache_key);
-
-        let span = info_span!("Reading the data");
-        let _span_guard = span.enter();
 
         let engine_response = self
             .read_service
@@ -489,6 +485,7 @@ impl IngestTask {
         })
     }
 
+    #[tracing::instrument(level = "info", name = "commit", skip_all)]
     async fn maybe_commit(
         &mut self,
         source_state: Option<&PollingSourceState>,

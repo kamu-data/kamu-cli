@@ -16,7 +16,6 @@ use opendatafabric::*;
 
 use dill::*;
 use std::sync::Arc;
-use tracing::*;
 use url::Url;
 
 use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
@@ -167,7 +166,7 @@ impl SyncServiceImpl {
 
         let trust_source_hashes = opts.trust_source.unwrap_or(src_is_local);
 
-        info!("Starting sync using Simple Transfer Protocol");
+        tracing::info!("Starting sync using Simple Transfer Protocol");
         SimpleTransferProtocol
             .sync(
                 src_ref,
@@ -197,7 +196,7 @@ impl SyncServiceImpl {
             .get_dataset_writer(dst_ref, opts.create_if_not_exists)
             .await?;
 
-        info!("Starting sync using Smart Transfer Protocol (Pull flow)");
+        tracing::info!("Starting sync using Smart Transfer Protocol (Pull flow)");
 
         self.smart_transfer_protocol
             .pull_protocol_client_flow(
@@ -237,7 +236,7 @@ impl SyncServiceImpl {
             Err(e) => Err(e),
         }?;
 
-        info!("Starting sync using Smart Transfer Protocol (Push flow)");
+        tracing::info!("Starting sync using Smart Transfer Protocol (Push flow)");
         self.smart_transfer_protocol
             .push_protocol_client_flow(
                 src_dataset,
@@ -269,7 +268,7 @@ impl SyncServiceImpl {
             Err(format!("IPFS does not have a key with ID {}", key_id).int_err())
         }?;
 
-        info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
+        tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
         // Resolve and compare heads
         let src_dataset = self.local_repo.get_dataset(src).await?;
@@ -287,11 +286,11 @@ impl SyncServiceImpl {
         let (old_cid, dst_head, chains_comparison) =
             match self.ipfs_client.name_resolve_local(&key.id).await? {
                 None => {
-                    info!("Key does not resolve locally - asumming it's unpublished");
+                    tracing::info!("Key does not resolve locally - asumming it's unpublished");
                     Ok((None, None, None))
                 }
                 Some(old_cid) => {
-                    info!(%old_cid, "Attempting to read remote head");
+                    tracing::info!(%old_cid, "Attempting to read remote head");
                     let dst_http_url = self
                         .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
                         .await?;
@@ -323,7 +322,7 @@ impl SyncServiceImpl {
                 }
             }?;
 
-        info!(?src_head, ?dst_head, "Resolved heads");
+        tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
         if !opts.create_if_not_exists && dst_head.is_none() {
             return Err(DatasetNotFoundError::new(dst_url).into());
@@ -334,7 +333,7 @@ impl SyncServiceImpl {
                 // IPNS entries have a limited lifetime
                 // so even if data is up-to-date we re-publish to keep the entry alive.
                 let cid = old_cid.unwrap();
-                info!(%cid, "Refreshing IPNS entry");
+                tracing::info!(%cid, "Refreshing IPNS entry");
                 let _id = self
                     .ipfs_client
                     .name_publish(
@@ -410,11 +409,11 @@ impl SyncServiceImpl {
         };
 
         // Add files to IPFS
-        info!("Adding files to IPFS");
+        tracing::info!("Adding files to IPFS");
         let cid = self.add_to_ipfs(src).await?;
 
         // Publish to IPNS
-        info!(%cid, "Publishing to IPNS");
+        tracing::info!(%cid, "Publishing to IPNS");
         let _id = self
             .ipfs_client
             .name_publish(
@@ -451,6 +450,7 @@ impl SyncServiceImpl {
         Ok(cid)
     }
 
+    #[tracing::instrument(level = "info", name = "sync", skip_all, fields(%src, %dst))]
     async fn sync_impl(
         &self,
         src: &DatasetRefAny,
@@ -458,9 +458,6 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let span = info_span!("Dataset sync", %src, %dst);
-        let _span_guard = span.enter();
-
         match (src, dst) {
             (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipfs" => {
                 Err(UnsupportedProtocolError {

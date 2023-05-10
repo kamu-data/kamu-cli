@@ -20,7 +20,6 @@ use bytes::Bytes;
 
 use opendatafabric::{Multicodec, Multihash};
 use std::{marker::PhantomData, path::Path};
-use tracing::debug;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +61,7 @@ where
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let key = self.get_key(hash);
 
-        debug!(?key, "Checking for object");
+        tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
             Ok(_) => Ok(true),
@@ -77,7 +76,7 @@ where
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
         let key = self.get_key(hash);
 
-        debug!(?key, "Checking for object");
+        tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
             Ok(output) => {
@@ -106,7 +105,7 @@ where
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         let key = self.get_key(hash);
 
-        debug!(?key, "Reading object stream");
+        tracing::debug!(?key, "Reading object stream");
 
         let resp = match self.s3_context.get_object(key).await {
             Ok(resp) => Ok(resp),
@@ -203,7 +202,7 @@ where
 
         let key = self.get_key(&hash);
 
-        debug!(?key, "Inserting object");
+        tracing::debug!(?key, "Inserting object");
 
         match self.s3_context.put_object(key, data).await {
             Ok(_) => {}
@@ -235,7 +234,7 @@ where
 
         let key = self.get_key(&hash);
 
-        debug!(?key, size, "Inserting object stream");
+        tracing::debug!(?key, size, "Inserting object stream");
 
         use tokio_util::io::ReaderStream;
         let stream = ReaderStream::new(src);
@@ -266,7 +265,7 @@ where
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
         let key = self.get_key(&hash);
 
-        debug!(?key, "Deleting object");
+        tracing::debug!(?key, "Deleting object");
 
         match self.s3_context.delete_object(key).await {
             Ok(_) => {}

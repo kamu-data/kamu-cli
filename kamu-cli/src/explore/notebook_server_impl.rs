@@ -18,7 +18,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::info;
 
 use crate::JupyterConfig;
 
@@ -99,7 +98,7 @@ impl NotebookServerImpl {
             ..RunArgs::default()
         });
 
-        info!(command = ?livy_cmd, "Starting Livy container");
+        tracing::info!(command = ?livy_cmd, "Starting Livy container");
 
         let mut livy = livy_cmd
             .stdout(if inherit_stdio {
@@ -138,7 +137,7 @@ impl NotebookServerImpl {
             ..RunArgs::default()
         });
 
-        info!(command = ?jupyter_cmd, "Starting Jupyter container");
+        tracing::info!(command = ?jupyter_cmd, "Starting Jupyter container");
 
         let mut jupyter = jupyter_cmd
             .stdout(if inherit_stdio {

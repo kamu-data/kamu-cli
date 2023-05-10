@@ -20,9 +20,9 @@ use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info, info_span};
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -178,7 +178,7 @@ impl FetchService {
                 }
             } else {
                 if let std::borrow::Cow::Owned(_) = &s {
-                    debug!(%s, "String after template substitution");
+                    tracing::debug!(%s, "String after template substitution");
                 }
                 return Ok(s);
             }
@@ -188,6 +188,7 @@ impl FetchService {
     // TODO: Progress reporting
     // TODO: Env var security
     // TODO: Allow containers to output watermarks
+    #[tracing::instrument(level = "info", name = "commit", skip_all)]
     fn fetch_container(
         container_runtime: Arc<ContainerRuntime>,
         container_log_dir: PathBuf,
@@ -197,33 +198,16 @@ impl FetchService {
         listener: Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         use rand::Rng;
-        use std::process::Stdio;
 
         if !container_runtime.has_image(&fetch.image) {
-            let span = info_span!("Pulling ingest image", image_name = %fetch.image);
-            let _span_guard = span.enter();
-
-            let image_listener = listener
-                .clone()
-                .get_pull_image_listener()
-                .unwrap_or_else(|| Arc::new(NullPullImageListener));
-            image_listener.begin(&fetch.image);
-
-            // TODO: Better error handling
-            container_runtime
-                .pull_cmd(&fetch.image)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .int_err()?
-                .exit_ok()
-                .map_err(|e| {
-                    error!(error = ?e, "Failed to pull ingest image");
-                    ImageNotFoundError::new(&fetch.image)
-                })?;
-
-            info!("Successfully pulled ingest image");
-            image_listener.success();
+            Self::pull_image(
+                container_runtime.as_ref(),
+                &fetch.image,
+                listener
+                    .clone()
+                    .get_pull_image_listener()
+                    .unwrap_or_else(|| Arc::new(NullPullImageListener)),
+            )?;
         }
 
         listener.on_progress(&FetchProgress {
@@ -355,6 +339,33 @@ impl FetchService {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(image))]
+    fn pull_image(
+        container_runtime: &ContainerRuntime,
+        image: &str,
+        listener: Arc<dyn PullImageListener>,
+    ) -> Result<(), IngestError> {
+        listener.begin(image);
+
+        // TODO: Better error handling
+        container_runtime
+            .pull_cmd(image)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .int_err()?
+            .exit_ok()
+            .map_err(|error| {
+                tracing::error!(?error, "Failed to pull ingest image");
+                ImageNotFoundError::new(image)
+            })?;
+
+        tracing::info!("Successfully pulled ingest image");
+        listener.success();
+
+        Ok(())
+    }
+
     fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
@@ -407,7 +418,7 @@ impl FetchService {
 
         matched_files.sort_by(|a, b| b.0.cmp(&a.0));
 
-        info!(pattern = fglob.path.as_str(), last_filename = ?last_filename, matches = ?matched_files, "Matched the glob pattern");
+        tracing::info!(pattern = fglob.path.as_str(), last_filename = ?last_filename, matches = ?matched_files, "Matched the glob pattern");
 
         if matched_files.is_empty() {
             return if prev_source_state.is_some() {
@@ -444,7 +455,7 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         use fs_extra::file::*;
 
-        info!(path = ?path, "Ingesting file");
+        tracing::info!(path = ?path, "Ingesting file");
 
         match event_time_source {
             None | Some(EventTimeSource::FromMetadata) => (),

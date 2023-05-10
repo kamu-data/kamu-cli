@@ -9,7 +9,6 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tracing::debug;
 
 use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
@@ -105,7 +104,7 @@ where
             return Ok(prev);
         }
 
-        debug!(?current_head, ?last_seen, "Updating dataset summary");
+        tracing::debug!(?current_head, ?last_seen, "Updating dataset summary");
 
         let increment = self
             .compute_summary_increment(&current_head, last_seen)

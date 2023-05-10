@@ -15,7 +15,6 @@ use opendatafabric::*;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
-use tracing::{error, info, info_span};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -88,7 +87,7 @@ pub trait DatasetExt: Dataset {
             event,
         };
 
-        info!(?block, "Committing new block");
+        tracing::info!(?block, "Committing new block");
 
         let new_head = chain
             .append(
@@ -101,7 +100,7 @@ pub trait DatasetExt: Dataset {
             )
             .await?;
 
-        info!(%new_head, "Committed new block");
+        tracing::info!(%new_head, "Committed new block");
 
         Ok(CommitResult {
             old_head: prev_block_hash,
@@ -126,9 +125,6 @@ pub trait DatasetExt: Dataset {
         let output_data = match data_interval {
             None => None,
             Some(data_interval) => {
-                let span = info_span!("Computing data hashes");
-                let _span_guard = span.enter();
-
                 let from_data_path = movable_data_file.unwrap();
 
                 let output_data = DataSlice {
@@ -165,9 +161,6 @@ pub trait DatasetExt: Dataset {
         let output_checkpoint = match movable_checkpoint_file {
             None => None,
             Some(checkpoint_file) => {
-                let span = info_span!("Computing checkpoint hash");
-                let _span_guard = span.enter();
-
                 let physical_hash = crate::infra::utils::data_utils::get_file_physical_hash(
                     checkpoint_file.as_ref(),
                 )
