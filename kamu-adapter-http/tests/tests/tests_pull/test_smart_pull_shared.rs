@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{assert_matches::assert_matches, str::FromStr};
+use std::str::FromStr;
 
 use kamu::{
     domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult},
@@ -139,18 +139,12 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
 
-    // Initial sync
-    let foo_dataset_ref = DatasetRefRemote::from(&server_harness.dataset_url("foo"));
-    let client_handle = async {
-        let pull_responses = client_harness
-            .pull_datasets(DatasetRefAny::from(foo_dataset_ref.clone()))
-            .await;
-
-        assert_matches!(pull_responses[0].result, Ok(_));
-    };
-
-    let mut api_server_handle = server_harness.api_server_run();
-    await_client_server_flow!(&mut api_server_handle, client_handle);
+    // Hard folder synchronization
+    copy_folder_recursively(
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
+    )
+    .unwrap();
 
     // Extend server-side dataset with new nodes
 
@@ -174,6 +168,10 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
     let commit_result =
         commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
 
+    let foo_odf_url = server_harness.dataset_url("foo");
+    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
@@ -211,23 +209,21 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
         .await
         .unwrap();
 
-    // Initial sync
-    let foo_dataset_ref = DatasetRefRemote::from(&server_harness.dataset_url("foo"));
+    let server_dataset_layout = server_harness.dataset_layout("foo");
+
     let client_harness = ClientSideHarness::new();
-    let client_handle = async {
-        let pull_responses = client_harness
-            .pull_datasets(DatasetRefAny::from(foo_dataset_ref.clone()))
-            .await;
+    let client_dataset_layout = client_harness.dataset_layout("foo");
 
-        assert_matches!(pull_responses[0].result, Ok(_));
-    };
-
-    let mut api_server_handle = server_harness.api_server_run();
-    await_client_server_flow!(&mut api_server_handle, client_handle);
+    // Hard folder synchronization
+    copy_folder_recursively(
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
+    )
+    .unwrap();
 
     // Extend client-side dataset with new node
-    client_harness
-        .dataset_repository()
+    let client_repo = client_harness.dataset_repository();
+    client_repo
         .get_dataset(&DatasetRef::from(DatasetName::try_from("foo").unwrap()))
         .await
         .unwrap()
@@ -242,6 +238,10 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
         .await
         .unwrap();
 
+    let foo_odf_url = server_harness.dataset_url("foo");
+    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_responses = client_harness
             .pull_datasets(DatasetRefAny::from(foo_dataset_ref))
@@ -337,20 +337,15 @@ pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_suc
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
 
-    // Initial sync
-    let foo_dataset_ref = DatasetRefRemote::from(&server_harness.dataset_url("foo"));
-    let client_handle = async {
-        let pull_responses = client_harness
-            .pull_datasets(DatasetRefAny::from(foo_dataset_ref.clone()))
-            .await;
-
-        assert_matches!(pull_responses[0].result, Ok(_));
-    };
-
-    let mut api_server_handle = server_harness.api_server_run();
-    await_client_server_flow!(&mut api_server_handle, client_handle);
+    // Hard folder synchronization
+    copy_folder_recursively(
+        &server_dataset_layout.root_dir,
+        &client_dataset_layout.root_dir,
+    )
+    .unwrap();
 
     // Extend server-side dataset with new nodes
+
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
     server_repo
@@ -379,6 +374,10 @@ pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_suc
     )
     .unwrap();
 
+    let foo_odf_url = server_harness.dataset_url("foo");
+    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+
+    let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let pull_result = client_harness
             .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))

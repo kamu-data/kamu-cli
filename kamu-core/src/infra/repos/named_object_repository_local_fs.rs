@@ -34,8 +34,12 @@ impl NamedObjectRepositoryLocalFS {
     }
 
     // TODO: Cleanup procedure for orphaned staging files?
-    fn get_staging_path(&self) -> PathBuf {
-        self.root.join(get_staging_name())
+    fn get_staging_path(&self) -> Result<PathBuf, std::io::Error> {
+        if !self.root.exists() {
+            std::fs::create_dir_all(&self.root)?;
+        }
+
+        Ok(self.root.join(get_staging_name()))
     }
 }
 
@@ -58,7 +62,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
     }
 
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
-        let staging_path = self.get_staging_path();
+        let staging_path = self.get_staging_path().int_err()?;
         tokio::fs::write(&staging_path, data).await.int_err()?;
 
         // Atomic move/replace
