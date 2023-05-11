@@ -170,34 +170,16 @@ pub async fn decode_metadata_batch(
     let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
     blocks_data
         .into_iter()
-        .map(|(hash, bytes)| match deserialize_block(&hash, &bytes) {
-            Ok(block) => Ok((hash, block)),
-            Err(err) => Err(err),
+        .map(|(hash, bytes)| {
+            // TODO: Avoid depending on specific implementation of MetadataChain.
+            // This is currently necessary because we need to be able to deserialize blocks BEFORE
+            // an instance of MetadataChain exists. Consider injecting a configurable block deserializer.
+            match kamu::infra::MetadataChainImpl::<(), ()>::deserialize_block(&hash, &bytes) {
+                Ok(block) => Ok((hash, block)),
+                Err(err) => Err(err),
+            }
         })
         .collect::<Result<VecDeque<_>, _>>()
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-fn deserialize_block(hash: &Multihash, block_bytes: &[u8]) -> Result<MetadataBlock, GetBlockError> {
-    use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
-    use opendatafabric::serde::{Error, MetadataBlockDeserializer};
-
-    match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
-        Ok(block) => Ok(block),
-        Err(e @ Error::UnsupportedVersion { .. }) => {
-            Err(GetBlockError::BlockVersion(BlockVersionError {
-                hash: hash.clone(),
-                source: e.into(),
-            }))
-        }
-        Err(e @ Error::IoError { .. } | e @ Error::SerdeError { .. }) => {
-            Err(GetBlockError::BlockMalformed(BlockMalformedError {
-                hash: hash.clone(),
-                source: e.into(),
-            }))
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

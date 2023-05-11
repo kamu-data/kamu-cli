@@ -358,8 +358,10 @@ where
         }
         Ok(())
     }
+}
 
-    fn deserialize_block(
+impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo> {
+    pub fn deserialize_block(
         hash: &Multihash,
         block_bytes: &[u8],
     ) -> Result<MetadataBlock, GetBlockError> {
