@@ -15,22 +15,46 @@ use crate::formats::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+/// Same as [MetadataBlock] struct but holds a specific variant of the [MetadataEvent]
 pub struct MetadataBlockTyped<T> {
+    /// System time when this block was written.
     pub system_time: DateTime<Utc>,
+    /// Hash sum of the preceding block.
     pub prev_block_hash: Option<Multihash>,
+    /// Block sequence number starting from tail to head.
+    pub sequence_number: i32,
+    /// Event data.
     pub event: T,
 }
 
 pub struct MetadataBlockTypedRef<'a, T> {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<&'a Multihash>,
+    pub sequence_number: i32,
     pub event: &'a T,
 }
 
 pub struct MetadataBlockTypedRefMut<'a, T> {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<&'a Multihash>,
+    pub sequence_number: i32,
     pub event: &'a mut T,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl<T> Into<MetadataBlock> for MetadataBlockTyped<T>
+where
+    T: Into<MetadataEvent>,
+{
+    fn into(self) -> MetadataBlock {
+        MetadataBlock {
+            system_time: self.system_time,
+            prev_block_hash: self.prev_block_hash,
+            sequence_number: self.sequence_number,
+            event: self.event.into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +73,7 @@ impl AsTypedBlock for MetadataBlock {
         T::into_variant(self.event).map(|e| MetadataBlockTyped {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash,
+            sequence_number: self.sequence_number,
             event: e,
         })
     }
@@ -57,6 +82,7 @@ impl AsTypedBlock for MetadataBlock {
         T::as_variant(&self.event).map(|e| MetadataBlockTypedRef {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash.as_ref(),
+            sequence_number: self.sequence_number,
             event: e,
         })
     }
@@ -67,6 +93,7 @@ impl AsTypedBlock for MetadataBlock {
         T::as_variant_mut(&mut self.event).map(|e| MetadataBlockTypedRefMut {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash.as_ref(),
+            sequence_number: self.sequence_number,
             event: e,
         })
     }

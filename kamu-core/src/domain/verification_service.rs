@@ -173,6 +173,12 @@ pub enum VerificationError {
         BlockVersionError,
     ),
     #[error(transparent)]
+    BlockMalformed(
+        #[from]
+        #[backtrace]
+        BlockMalformedError,
+    ),
+    #[error(transparent)]
     InvalidInterval(
         #[from]
         #[backtrace]
@@ -235,6 +241,7 @@ impl From<IterBlocksError> for VerificationError {
             IterBlocksError::RefNotFound(e) => VerificationError::RefNotFound(e),
             IterBlocksError::BlockNotFound(e) => VerificationError::BlockNotFound(e),
             IterBlocksError::BlockVersion(e) => VerificationError::BlockVersion(e),
+            IterBlocksError::BlockMalformed(e) => VerificationError::BlockMalformed(e),
             IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
             IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
             IterBlocksError::Internal(e) => VerificationError::Internal(e),

@@ -27,13 +27,6 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    /// Loads the block from bytes without touching the chain
-    async fn get_block_from_bytes(
-        &self,
-        hash: &Multihash,
-        block_bytes: &[u8],
-    ) -> Result<MetadataBlock, GetBlockError>;
-
     /// Iterates the chain in reverse order starting with specified block and following the previous block links.
     /// The interval returned is `[head, tail)` - tail is exclusive.
     /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
@@ -215,9 +208,11 @@ impl Default for AppendOpts<'_> {
 #[derive(Error, Debug)]
 pub enum GetBlockError {
     #[error(transparent)]
-    NotFound(BlockNotFoundError),
+    NotFound(#[from] BlockNotFoundError),
     #[error(transparent)]
-    BlockVersion(BlockVersionError),
+    BlockVersion(#[from] BlockVersionError),
+    #[error(transparent)]
+    BlockMalformed(#[from] BlockMalformedError),
     #[error(transparent)]
     Access(
         #[from]
@@ -242,6 +237,8 @@ pub enum IterBlocksError {
     BlockNotFound(BlockNotFoundError),
     #[error(transparent)]
     BlockVersion(BlockVersionError),
+    #[error(transparent)]
+    BlockMalformed(#[from] BlockMalformedError),
     #[error(transparent)]
     InvalidInterval(InvalidIntervalError),
     #[error(transparent)]
@@ -273,6 +270,7 @@ impl From<GetBlockError> for IterBlocksError {
         match v {
             GetBlockError::NotFound(e) => Self::BlockNotFound(e),
             GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
         }
@@ -339,6 +337,17 @@ impl From<super::reference_repository::SetRefError> for AppendError {
         match v {
             super::reference_repository::SetRefError::Access(e) => Self::Access(e),
             super::reference_repository::SetRefError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<SetRefError> for AppendError {
+    fn from(v: SetRefError) -> Self {
+        match v {
+            SetRefError::BlockNotFound(e) => Self::Internal(e.int_err()),
+            SetRefError::CASFailed(e) => Self::RefCASFailed(e),
+            SetRefError::Access(e) => Self::Access(e),
+            SetRefError::Internal(e) => Self::Internal(e),
         }
     }
 }

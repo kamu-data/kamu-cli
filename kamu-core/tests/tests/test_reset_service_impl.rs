@@ -123,64 +123,33 @@ impl ResetTestHarness {
 
     async fn a_chain_with_2_blocks(&self) -> ChainWith2BlocksTestCase {
         let dataset_name = DatasetName::try_from("foo").unwrap();
-        let mut dataset_builder = self.a_dataset_builder(&dataset_name).await;
 
-        let chain = dataset_builder.as_dataset().as_metadata_chain();
-        let (hash_seed_block, seed_block_sequence_number) =
-            self.a_seed_block(chain, &dataset_name).await;
-        let hash_polling_source_block = self
-            .a_polling_source_block(chain, &hash_seed_block, seed_block_sequence_number)
-            .await;
-
-        let dataset_handle = dataset_builder.finish().await.unwrap();
-
-        ChainWith2BlocksTestCase::new(dataset_handle, hash_seed_block, hash_polling_source_block)
-    }
-
-    async fn a_dataset_builder(&self, dataset_name: &DatasetName) -> Box<dyn DatasetBuilder> {
-        self.local_repo
-            .create_dataset(&DatasetAlias::new(None, dataset_name.clone()))
-            .await
-            .unwrap()
-    }
-
-    async fn a_seed_block(
-        &self,
-        chain: &dyn MetadataChain,
-        dataset_name: &DatasetName,
-    ) -> (Multihash, i32) {
         let seed_block = MetadataFactory::metadata_block(
             MetadataFactory::seed(DatasetKind::Root)
                 .id_from(dataset_name.as_str())
                 .build(),
         )
-        .build();
-        let seed_block_sequence_number = seed_block.sequence_number;
+        .build_typed();
 
-        (
-            chain
-                .append(seed_block, AppendOpts::default())
-                .await
-                .unwrap(),
-            seed_block_sequence_number,
-        )
-    }
+        let create_result = self
+            .local_repo
+            .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
+            .await
+            .unwrap();
 
-    async fn a_polling_source_block(
-        &self,
-        chain: &dyn MetadataChain,
-        prev_block_hash: &Multihash,
-        prev_sequence_number: i32,
-    ) -> Multihash {
-        chain
-            .append(
-                MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                    .prev(prev_block_hash, prev_sequence_number)
-                    .build(),
-                AppendOpts::default(),
+        let dataset_handle = create_result.dataset_handle;
+        let hash_seed_block = create_result.head;
+        let hash_polling_source_block = create_result
+            .dataset
+            .commit_event(
+                MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
+                CommitOpts::default(),
             )
             .await
             .unwrap()
+            .new_head;
+
+        ChainWith2BlocksTestCase::new(dataset_handle, hash_seed_block, hash_polling_source_block)
     }
 
     async fn get_dataset_head(&self, dataset_handle: &DatasetHandle) -> Multihash {

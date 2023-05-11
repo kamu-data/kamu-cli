@@ -9,9 +9,9 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
+use ::serde::{de::DeserializeOwned, Serialize};
 use axum::extract::ws::Message;
-use opendatafabric::{MetadataBlock, Multihash};
-use serde::{de::DeserializeOwned, Serialize};
+use opendatafabric::*;
 use url::Url;
 
 use crate::{
@@ -277,7 +277,7 @@ pub async fn dataset_pull_ws_handler(
 
 async fn handle_push_request_initiation(
     socket: &mut axum::extract::ws::WebSocket,
-    dataset: &dyn Dataset,
+    dataset: Option<Arc<dyn Dataset>>,
 ) -> Result<DatasetPushRequest, PushServerError> {
     let push_request = read_payload::<DatasetPushRequest>(socket)
         .await
@@ -297,11 +297,14 @@ async fn handle_push_request_initiation(
 
     // TODO: consider size estimate and maybe cancel too large pushes
 
-    let metadata_chain = dataset.as_metadata_chain();
-    let actual_head = match metadata_chain.get_ref(&BlockRef::Head).await {
-        Ok(head) => Some(head),
-        Err(kamu::domain::GetRefError::NotFound(_)) => None,
-        Err(e) => return Err(PushServerError::Internal(e.int_err())),
+    let actual_head = if let Some(dataset) = dataset {
+        match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            Ok(head) => Some(head),
+            Err(kamu::domain::GetRefError::NotFound(_)) => None,
+            Err(e) => return Err(PushServerError::Internal(e.int_err())),
+        }
+    } else {
+        None
     };
 
     let response = if push_request.current_head == actual_head {
@@ -328,82 +331,41 @@ async fn handle_push_request_initiation(
 
 async fn try_handle_push_metadata_request(
     socket: &mut axum::extract::ws::WebSocket,
-    dataset: &dyn Dataset,
     push_request: DatasetPushRequest,
 ) -> Result<VecDeque<(Multihash, MetadataBlock)>, PushServerError> {
-    let maybe_push_metadata_request = read_payload::<DatasetPushMetadataRequest>(socket).await;
-
-    match maybe_push_metadata_request {
-        Ok(push_metadata_request) => {
-            tracing::debug!(
-                objects_count = % push_metadata_request.new_blocks.objects_count,
-                object_type = ? push_metadata_request.new_blocks.object_type,
-                media_type = % push_metadata_request.new_blocks.media_type,
-                encoding = % push_metadata_request.new_blocks.encoding,
-                payload_length = % push_metadata_request.new_blocks.payload.len(),
-                "Obtained compressed object batch",
-            );
-
-            assert_eq!(
-                push_request.size_estimate.num_blocks,
-                push_metadata_request.new_blocks.objects_count
-            );
-
-            let new_blocks = dataset_load_metadata(dataset, push_metadata_request.new_blocks).await;
-
-            write_payload::<DatasetPushMetadataAccepted>(socket, DatasetPushMetadataAccepted {})
-                .await
-                .map_err(|e| {
-                    PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::MetadataRequest))
-                })?;
-
-            Ok(new_blocks)
-        }
-        Err(ReadMessageError::Closed) => Ok(VecDeque::new()),
+    let push_metadata_request = match read_payload::<DatasetPushMetadataRequest>(socket).await {
+        Ok(push_metadata_request) => Ok(push_metadata_request),
         Err(e) => Err(PushServerError::ReadFailed(PushReadError::new(
             e,
             PushPhase::MetadataRequest,
         ))),
-    }
-}
+    }?;
 
-/////////////////////////////////////////////////////////////////////////////////
+    tracing::debug!(
+        objects_count = %push_metadata_request.new_blocks.objects_count,
+        object_type = ?push_metadata_request.new_blocks.object_type,
+        media_type = %push_metadata_request.new_blocks.media_type,
+        encoding = %push_metadata_request.new_blocks.encoding,
+        payload_length = %push_metadata_request.new_blocks.payload.len(),
+        "Obtained compressed object batch",
+    );
 
-async fn ensure_at_least_seed_exists_on_chain(
-    dataset: &dyn Dataset,
-    new_blocks: &mut VecDeque<(Multihash, MetadataBlock)>,
-) -> Result<(), InternalError> {
-    match dataset.get_summary(GetSummaryOpts::default()).await {
-        Ok(_) => {
-            tracing::debug!("Dataset summary exists, skipping seed import");
-            Ok(())
-        }
-        Err(GetSummaryError::EmptyDataset) => {
-            tracing::info!("Dataset summary missing, trying to import Seed event");
-            let (first_hash, first_block) = new_blocks.pop_front().unwrap();
-            dataset
-                .as_metadata_chain()
-                .append(
-                    first_block,
-                    AppendOpts {
-                        expected_hash: Some(&first_hash),
-                        ..AppendOpts::default()
-                    },
-                )
-                .await
-                .map_err(|e| e.int_err())?;
-            tracing::info!("Seed event imported");
-            Ok(())
-        }
-        Err(GetSummaryError::Access(e)) => {
-            tracing::error!("Get summary failed: {:#?}", e);
-            Err(e.int_err().into())
-        }
-        Err(GetSummaryError::Internal(e)) => {
-            tracing::error!("Get summary failed: {:#?}", e);
-            Err(e)
-        }
-    }
+    assert_eq!(
+        push_request.size_estimate.num_blocks,
+        push_metadata_request.new_blocks.objects_count
+    );
+
+    let new_blocks = decode_metadata_batch(push_metadata_request.new_blocks)
+        .await
+        .int_err()?;
+
+    write_payload::<DatasetPushMetadataAccepted>(socket, DatasetPushMetadataAccepted {})
+        .await
+        .map_err(|e| {
+            PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::MetadataRequest))
+        })?;
+
+    Ok(new_blocks)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -451,7 +413,7 @@ async fn try_handle_push_objects_request(
 
 async fn try_handle_push_complete(
     socket: &mut axum::extract::ws::WebSocket,
-    dataset_builder: &mut dyn DatasetBuilder,
+    dataset: Option<Arc<dyn Dataset>>,
     new_blocks: VecDeque<(Multihash, MetadataBlock)>,
 ) -> Result<(), PushServerError> {
     read_payload::<DatasetPushComplete>(socket)
@@ -462,19 +424,16 @@ async fn try_handle_push_complete(
 
     tracing::debug!("Push client sent a complete request. Commiting the dataset");
 
-    dataset_append_metadata(dataset_builder.as_dataset(), new_blocks)
-        .await
-        .map_err(|e| {
-            tracing::debug!("Appending dataset metadata failed with error: {}", e);
-            PushServerError::Internal(e.int_err())
-        })?;
+    if new_blocks.len() > 0 {
+        dataset_append_metadata(dataset.unwrap().as_ref(), new_blocks)
+            .await
+            .map_err(|e| {
+                tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                PushServerError::Internal(e.int_err())
+            })?;
+    }
 
-    dataset_builder.finish().await.map_err(|e| {
-        tracing::debug!("Committing dataset failed with error: {}", e);
-        PushServerError::Internal(e.int_err())
-    })?;
-
-    tracing::debug!("Sending complete confirmation");
+    tracing::debug!("Sending completion confirmation");
 
     write_payload::<DatasetPushCompleteConfirmed>(socket, DatasetPushCompleteConfirmed {})
         .await
@@ -487,32 +446,21 @@ async fn try_handle_push_complete(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-async fn discard_dataset_building_on_error(
-    dataset_builder: &dyn DatasetBuilder,
-    e: PushServerError,
-) {
-    tracing::debug!("Push process aborted with error: {}", e);
-    match dataset_builder.discard().await {
-        Ok(_) => {}
-        Err(e) => {
-            tracing::debug!("Discard dataset build error: {}", e);
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////
-
 pub async fn dataset_push_ws_handler(
     mut socket: axum::extract::ws::WebSocket,
-    mut dataset_builder: Box<dyn DatasetBuilder>,
+    dataset_ref: DatasetRef,
+    dataset: Option<Arc<dyn Dataset>>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_url: Url,
 ) {
-    match dataset_push_ws_main_flow(&mut socket, dataset_builder.as_mut(), dataset_url).await {
+    match dataset_push_ws_main_flow(&mut socket, dataset_ref, dataset, dataset_repo, dataset_url)
+        .await
+    {
         Ok(_) => {
             tracing::debug!("Push process success");
         }
         Err(e) => {
-            discard_dataset_building_on_error(dataset_builder.as_ref(), e).await;
+            tracing::debug!("Push process aborted with error: {}", e);
         }
     }
 }
@@ -521,18 +469,47 @@ pub async fn dataset_push_ws_handler(
 
 pub async fn dataset_push_ws_main_flow(
     socket: &mut axum::extract::ws::WebSocket,
-    dataset_builder: &mut dyn DatasetBuilder,
+    dataset_ref: DatasetRef,
+    mut dataset: Option<Arc<dyn Dataset>>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_url: Url,
 ) -> Result<(), PushServerError> {
-    let dataset = dataset_builder.as_dataset();
-    let push_request = handle_push_request_initiation(socket, dataset).await?;
+    let push_request = handle_push_request_initiation(socket, dataset.clone()).await?;
 
-    let mut new_blocks = try_handle_push_metadata_request(socket, dataset, push_request).await?;
+    let mut new_blocks = try_handle_push_metadata_request(socket, push_request).await?;
     if new_blocks.len() > 0 {
-        ensure_at_least_seed_exists_on_chain(dataset, &mut new_blocks).await?;
+        if dataset.is_none() {
+            tracing::info!("Dataset does not exist, trying to create from Seed block");
+
+            let dataset_alias = dataset_ref.alias().expect("Dataset ref is not an alias");
+
+            let (_, first_block) = new_blocks.pop_front().unwrap();
+            let seed_block = first_block
+                .into_typed()
+                .ok_or_else(|| {
+                    tracing::debug!("First metadata block was not a Seed");
+                    CorruptedSourceError {
+                        message: "First metadata block is not Seed".to_owned(),
+                        source: None,
+                    }
+                })
+                .int_err()?;
+
+            let create_result = dataset_repo
+                .create_dataset(dataset_alias, seed_block)
+                .await
+                .int_err()?;
+
+            dataset = Some(create_result.dataset);
+        }
+
         loop {
-            let should_continue =
-                try_handle_push_objects_request(socket, dataset, &dataset_url).await?;
+            let should_continue = try_handle_push_objects_request(
+                socket,
+                dataset.as_ref().unwrap().as_ref(),
+                &dataset_url,
+            )
+            .await?;
 
             if !should_continue {
                 break;
@@ -540,7 +517,7 @@ pub async fn dataset_push_ws_main_flow(
         }
     }
 
-    try_handle_push_complete(socket, dataset_builder, new_blocks).await?;
+    try_handle_push_complete(socket, dataset, new_blocks).await?;
 
     Ok(())
 }

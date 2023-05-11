@@ -10,7 +10,7 @@
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::utils::ipfs_wrapper::*;
-use crate::infra::utils::simple_transfer_protocol::SimpleTransferProtocol;
+use crate::infra::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
 use crate::infra::utils::smart_transfer_protocol::ObjectTransferOptions;
 use opendatafabric::*;
 
@@ -103,20 +103,23 @@ impl SyncServiceImpl {
         &self,
         dataset_ref: &DatasetRefAny,
         create_if_not_exists: bool,
-    ) -> Result<Box<dyn DatasetBuilder>, SyncError> {
+    ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
         // TODO: Support local multi-tenancy
         match dataset_ref.as_local_single_tenant_ref() {
-            Ok(local_ref) => {
-                if create_if_not_exists {
-                    Ok(Box::new(WrapperDatasetBuilder::new(
-                        self.local_repo.get_or_create_dataset(&local_ref).await?,
-                    )))
-                } else {
-                    Ok(Box::new(NullDatasetBuilder::new(
-                        self.local_repo.get_dataset(&local_ref).await?,
-                    )))
+            Ok(local_ref) => match self.local_repo.get_dataset(&local_ref).await {
+                Ok(dataset) => Ok((Some(dataset), None)),
+                Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
+                    let alias = local_ref.alias().unwrap().clone();
+                    let repo = self.local_repo.clone();
+                    Ok((
+                        None,
+                        Some(Box::new(move |seed_block| {
+                            Box::pin(async move { repo.create_dataset(&alias, seed_block).await })
+                        })),
+                    ))
                 }
-            }
+                Err(err) => Err(err.into()),
+            },
             Err(remote_ref) => {
                 let url = self.resolve_remote_dataset_url(&remote_ref).await?;
                 let dataset = self
@@ -136,24 +139,24 @@ impl SyncServiceImpl {
                     }?;
                 }
 
-                Ok(Box::new(NullDatasetBuilder::new(dataset)))
+                Ok((Some(dataset), None))
             }
         }
     }
 
     async fn sync_generic(
         &self,
-        src: &DatasetRefAny,
-        dst: &DatasetRefAny,
+        src_ref: &DatasetRefAny,
+        dst_ref: &DatasetRefAny,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         // TODO: Support local multi-tenancy
-        let src_is_local = src.as_local_single_tenant_ref().is_ok();
+        let src_is_local = src_ref.as_local_single_tenant_ref().is_ok();
 
-        let src_dataset = self.get_dataset_reader(src).await?;
-        let mut dst_dataset_builder = self
-            .get_dataset_writer(dst, opts.create_if_not_exists)
+        let src_dataset = self.get_dataset_reader(src_ref).await?;
+        let (dst_dataset, dst_factory) = self
+            .get_dataset_writer(dst_ref, opts.create_if_not_exists)
             .await?;
 
         let validation = if opts.trust_source.unwrap_or(src_is_local) {
@@ -162,70 +165,49 @@ impl SyncServiceImpl {
             AppendValidation::Full
         };
 
-        let dst_dataset = dst_dataset_builder.as_dataset();
+        let trust_source_hashes = opts.trust_source.unwrap_or(src_is_local);
 
-        let sync_result = self
-            .sync_simple_transfer_protocol(
-                src_dataset.as_ref(),
-                src,
+        info!("Starting sync using Simple Transfer Protocol");
+        SimpleTransferProtocol
+            .sync(
+                src_ref,
+                dst_ref,
+                src_dataset,
                 dst_dataset,
-                dst,
+                dst_factory,
                 validation,
-                opts.trust_source.unwrap_or(src_is_local),
+                trust_source_hashes,
                 opts.force,
                 listener,
             )
-            .await;
-
-        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_mut()).await
+            .await
     }
 
     async fn sync_smart_pull_transfer_protocol(
         &self,
-        odf_src: &DatasetRefRemote,
-        dst: &DatasetRefAny,
+        src_ref: &DatasetRefRemote,
+        dst_ref: &DatasetRefAny,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let odf_src_url = self.resolve_remote_dataset_url(&odf_src).await?;
+        let odf_src_url = self.resolve_remote_dataset_url(&src_ref).await?;
         let http_src_url = Url::parse(&(odf_src_url.as_str())["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
 
-        let mut dst_dataset_builder = self
-            .get_dataset_writer(dst, opts.create_if_not_exists)
+        let (dst_dataset, dst_factory) = self
+            .get_dataset_writer(dst_ref, opts.create_if_not_exists)
             .await?;
 
-        let dst_dataset = dst_dataset_builder.as_dataset();
-
         info!("Starting sync using Smart Transfer Protocol (Pull flow)");
-        let sync_result = self
-            .smart_transfer_protocol
+
+        self.smart_transfer_protocol
             .pull_protocol_client_flow(
                 &http_src_url,
                 dst_dataset,
+                dst_factory,
                 listener,
                 ObjectTransferOptions::default(),
             )
-            .await;
-
-        SyncServiceImpl::finish_building_dataset(sync_result, dst_dataset_builder.as_mut()).await
-    }
-
-    async fn finish_building_dataset(
-        sync_result: Result<SyncResult, SyncError>,
-        dataset_builder: &mut dyn DatasetBuilder,
-    ) -> Result<SyncResult, SyncError> {
-        match sync_result {
-            Ok(result) => {
-                info!(?result, "Sync completed");
-                dataset_builder.finish().await?;
-                Ok(result)
-            }
-            Err(error) => {
-                warn!(?error, "Sync failed");
-                dataset_builder.discard().await?;
-                Err(error)
-            }
-        }
+            .await
     }
 
     async fn sync_smart_push_transfer_protocol<'a>(
@@ -258,37 +240,11 @@ impl SyncServiceImpl {
         info!("Starting sync using Smart Transfer Protocol (Push flow)");
         self.smart_transfer_protocol
             .push_protocol_client_flow(
-                src_dataset.as_ref(),
+                src_dataset,
                 &http_dst_url,
                 maybe_dst_head.as_ref(),
                 listener,
                 ObjectTransferOptions::default(),
-            )
-            .await
-    }
-
-    async fn sync_simple_transfer_protocol<'a>(
-        &'a self,
-        src: &'a dyn Dataset,
-        src_ref: &'a DatasetRefAny,
-        dst: &'a dyn Dataset,
-        dst_ref: &'a DatasetRefAny,
-        validation: AppendValidation,
-        trust_source_hashes: bool,
-        force: bool,
-        listener: Arc<dyn SyncListener + 'static>,
-    ) -> Result<SyncResult, SyncError> {
-        info!("Starting sync using Simple Transfer Protocol");
-        SimpleTransferProtocol
-            .sync(
-                src,
-                src_ref,
-                dst,
-                dst_ref,
-                validation,
-                trust_source_hashes,
-                force,
-                listener,
             )
             .await
     }
@@ -438,6 +394,11 @@ impl SyncServiceImpl {
                 }
                 .into()),
                 Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
+                    message: "Source metadata chain is broken".to_owned(),
+                    source: Some(e.into()),
+                }
+                .into()),
+                Err(IterBlocksError::BlockMalformed(e)) => Err(CorruptedSourceError {
                     message: "Source metadata chain is broken".to_owned(),
                     source: Some(e.into()),
                 }
@@ -631,68 +592,6 @@ impl SyncService for SyncServiceImpl {
 
     async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError> {
         self.add_to_ipfs(src).await
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-/// Adapter for dataset builder that does not return a handle
-/// and treats local and remote datasets the same way.
-#[async_trait::async_trait]
-trait DatasetBuilder {
-    fn as_dataset(&self) -> &dyn Dataset;
-    async fn finish(&mut self) -> Result<(), CreateDatasetError>;
-    async fn discard(&self) -> Result<(), InternalError>;
-}
-
-struct NullDatasetBuilder {
-    dataset: Arc<dyn Dataset>,
-}
-
-impl NullDatasetBuilder {
-    pub fn new(dataset: Arc<dyn Dataset>) -> Self {
-        Self { dataset }
-    }
-}
-
-#[async_trait::async_trait]
-impl DatasetBuilder for NullDatasetBuilder {
-    fn as_dataset(&self) -> &dyn Dataset {
-        self.dataset.as_ref()
-    }
-
-    async fn finish(&mut self) -> Result<(), CreateDatasetError> {
-        Ok(())
-    }
-
-    async fn discard(&self) -> Result<(), InternalError> {
-        Ok(())
-    }
-}
-
-struct WrapperDatasetBuilder {
-    builder: Box<dyn crate::domain::DatasetBuilder>,
-}
-
-impl WrapperDatasetBuilder {
-    fn new(builder: Box<dyn crate::domain::DatasetBuilder>) -> Self {
-        Self { builder }
-    }
-}
-
-#[async_trait::async_trait]
-impl DatasetBuilder for WrapperDatasetBuilder {
-    fn as_dataset(&self) -> &dyn Dataset {
-        self.builder.as_dataset()
-    }
-
-    async fn finish(&mut self) -> Result<(), CreateDatasetError> {
-        self.builder.finish().await?;
-        Ok(())
-    }
-
-    async fn discard(&self) -> Result<(), InternalError> {
-        self.builder.discard().await
     }
 }
 

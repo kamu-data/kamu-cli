@@ -13,6 +13,7 @@ use url::Url;
 
 use kamu::{
     domain::{Dataset, SyncError, SyncListener, SyncResult},
+    infra::utils::simple_transfer_protocol::DatasetFactoryFn,
     infra::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient},
 };
 
@@ -29,7 +30,8 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         _http_src_url: &Url,
-        _dst: &dyn Dataset,
+        _dst: Option<Arc<dyn Dataset>>,
+        _dst_factory: Option<DatasetFactoryFn>,
         _listener: Arc<dyn SyncListener>,
         _transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -38,7 +40,7 @@ impl SmartTransferProtocolClient for DummySmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        _src: &dyn Dataset,
+        _src: Arc<dyn Dataset>,
         _http_dst_url: &Url,
         _dst_head: Option<&Multihash>,
         _listener: Arc<dyn SyncListener>,

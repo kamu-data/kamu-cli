@@ -200,7 +200,9 @@ impl Command for AddCommand {
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
 
-        let (mut num_added, mut num_errors) = (0, 0);
+        let mut num_added = 0;
+
+        let mut errors_with_contexts = Vec::new();
 
         for (id, res) in add_results {
             match res {
@@ -216,25 +218,26 @@ impl Command for AddCommand {
                     );
                 }
                 Err(err) => {
-                    num_errors += 1;
-                    eprintln!("{}: {}: {}", console::style("Error").red(), id, err);
+                    errors_with_contexts.push((err, format!("Failed to add dataset {}", id)));
                 }
             }
         }
 
-        eprintln!(
-            "{}",
-            console::style(format!("Added {} dataset(s)", num_added))
-                .green()
-                .bold()
-        );
+        if errors_with_contexts.len() == 0 {
+            eprintln!(
+                "{}",
+                console::style(format!("Added {} dataset(s)", num_added))
+                    .green()
+                    .bold()
+            );
 
-        if num_errors == 0 {
             Ok(())
-        } else if num_added > 0 {
-            Err(CLIError::PartialFailure)
         } else {
-            Err(CLIError::Aborted)
+            Err(BatchError::new(
+                format!("Failed to load {} manifest(s)", errors_with_contexts.len()),
+                errors_with_contexts,
+            )
+            .into())
         }
     }
 }

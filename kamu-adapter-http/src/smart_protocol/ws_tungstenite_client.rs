@@ -9,7 +9,7 @@
 
 use dill::component;
 use futures::SinkExt;
-use opendatafabric::Multihash;
+use opendatafabric::{AsTypedBlock, Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -17,7 +17,7 @@ use url::Url;
 
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::infra::utils::smart_transfer_protocol::{DatasetFactoryFn, SmartTransferProtocolClient};
 use kamu::{domain::*, infra::utils::smart_transfer_protocol::ObjectTransferOptions};
 
 use crate::{
@@ -343,7 +343,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     async fn pull_protocol_client_flow(
         &self,
         http_src_url: &Url,
-        dst: &dyn Dataset,
+        dst: Option<Arc<dyn Dataset>>,
+        dst_factory: Option<DatasetFactoryFn>,
         listener: Arc<dyn SyncListener>,
         transfer_options: ObjectTransferOptions,
     ) -> Result<SyncResult, SyncError> {
@@ -363,13 +364,16 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let dst_head_result = dst.as_metadata_chain().get_ref(&BlockRef::Head).await;
-        let dst_head = match dst_head_result {
-            Ok(head) => Ok(Some(head)),
-            Err(GetRefError::NotFound(_)) => Ok(None),
-            Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+        let dst_head = if let Some(dst) = &dst {
+            match dst.as_metadata_chain().get_ref(&BlockRef::Head).await {
+                Ok(head) => Ok(Some(head)),
+                Err(GetRefError::NotFound(_)) => Ok(None),
+                Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
+                Err(GetRefError::Internal(e)) => Err(SyncError::Internal(e)),
+            }?
+        } else {
+            None
+        };
 
         let dataset_pull_result = match self
             .pull_send_request(&mut ws_stream, dst_head.clone())
@@ -392,11 +396,28 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
-            let new_blocks =
-                dataset_load_metadata(dst, dataset_pull_metadata_response.blocks).await;
+            let mut new_blocks = decode_metadata_batch(dataset_pull_metadata_response.blocks)
+                .await
+                .int_err()?;
+
+            // Create destination dataset if not exists
+            let dst = if let Some(dst) = dst {
+                dst
+            } else {
+                let (first_hash, first_block) = new_blocks.pop_front().unwrap();
+                let seed_block = first_block
+                    .into_typed()
+                    .ok_or_else(|| CorruptedSourceError {
+                        message: "First metadata block is not Seed".to_owned(),
+                        source: None,
+                    })?;
+                let create_result = (dst_factory.unwrap())(seed_block).await.int_err()?;
+                assert_eq!(first_hash, create_result.head);
+                create_result.dataset
+            };
 
             let object_files =
-                collect_object_references_from_metadata(dst, &new_blocks, true).await;
+                collect_object_references_from_metadata(dst.as_ref(), &new_blocks, true).await;
 
             // TODO: analyze sizes and split on stages
             let object_files_transfer_plan = if object_files.is_empty() {
@@ -430,17 +451,18 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
+                let dst_ref = dst.as_ref();
                 use futures::stream::{StreamExt, TryStreamExt};
                 futures::stream::iter(dataset_objects_pull_response.object_transfer_strategies)
                     .map(Ok)
                     .try_for_each_concurrent(
                         /* limit */ transfer_options.max_parallel_transfers,
-                        |s| async move { dataset_import_object_file(dst, &s).await },
+                        |s| async move { dataset_import_object_file(dst_ref, &s).await },
                     )
                     .await?;
             }
 
-            dataset_append_metadata(dst, new_blocks)
+            dataset_append_metadata(dst.as_ref(), new_blocks)
                 .await
                 .map_err(|e| {
                     tracing::debug!("Appending dataset metadata failed with error: {}", e);
@@ -476,7 +498,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
     async fn push_protocol_client_flow(
         &self,
-        src: &dyn Dataset,
+        src: Arc<dyn Dataset>,
         http_dst_url: &Url,
         dst_head: Option<&Multihash>,
         listener: Arc<dyn SyncListener>,
@@ -526,7 +548,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_metadata_request(&mut ws_stream, src, &src_head, dst_head)
+            .push_send_metadata_request(&mut ws_stream, src.as_ref(), &src_head, dst_head)
             .await
         {
             Ok(_) => {}
@@ -537,7 +559,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let missing_objects =
-            match collect_object_references_from_interval(src, &src_head, dst_head, false).await {
+            match collect_object_references_from_interval(src.as_ref(), &src_head, dst_head, false)
+                .await
+            {
                 Ok(object_references) => object_references,
                 Err(e) => {
                     tracing::debug!("Push process aborted with error: {}", e);
@@ -556,12 +580,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
+        let src_ref = src.as_ref();
         use futures::stream::{StreamExt, TryStreamExt};
         futures::stream::iter(push_objects_response.object_transfer_strategies)
             .map(Ok)
             .try_for_each_concurrent(
                 /* limit */ transfer_options.max_parallel_transfers,
-                |s| async move { dataset_export_object_file(src, &s).await },
+                |s| async move { dataset_export_object_file(src_ref, &s).await },
             )
             .await?;
 

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
-use opendatafabric::{DatasetAlias, DatasetHandle, DatasetName, DatasetRef};
+use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
 
@@ -75,23 +75,6 @@ impl DatasetRepositoryS3 {
         );
         let dataset_key_prefix = self.s3_context.get_key(&dataset_alias.dataset_name);
         self.s3_context.recursive_delete(dataset_key_prefix).await
-    }
-
-    async fn finish_create_dataset(
-        &self,
-        dataset: &dyn Dataset,
-        dataset_alias: &DatasetAlias,
-    ) -> Result<DatasetHandle, CreateDatasetError> {
-        let summary = match dataset.get_summary(GetSummaryOpts::default()).await {
-            Ok(s) => Ok(s),
-            Err(GetSummaryError::EmptyDataset) => unreachable!(),
-            Err(GetSummaryError::Access(e)) => Err(e.int_err().into()),
-            Err(GetSummaryError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
-        }?;
-
-        let handle = DatasetHandle::new(summary.id, dataset_alias.clone());
-
-        Ok(handle)
     }
 
     async fn move_bucket_items_on_dataset_rename(
@@ -222,17 +205,37 @@ impl DatasetRepository for DatasetRepositoryS3 {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-    ) -> Result<Box<dyn DatasetBuilder>, BeginCreateDatasetError> {
+        seed_block: MetadataBlockTyped<Seed>,
+    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
-        let dataset_result = DatasetFactoryImpl::get_s3(dataset_url).await;
-        match dataset_result {
-            Ok(dataset) => Ok(Box::new(DatasetBuilderS3::new(
-                self.clone(),
-                Arc::new(dataset),
-                dataset_alias.clone(),
-            ))),
-            Err(e) => Err(BeginCreateDatasetError::Internal(e)),
-        }
+        let dataset = DatasetFactoryImpl::get_s3(dataset_url).await?;
+
+        // There are three possiblities at this point:
+        // - Dataset did not exist before - continue normally
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name collision
+        let head = match dataset
+            .as_metadata_chain()
+            .append(seed_block.into(), AppendOpts::default())
+            .await
+        {
+            Ok(hash) => Ok(hash),
+            Err(AppendError::RefCASFailed(_)) => {
+                // We are using head ref CAS to detect previous existence of a dataset
+                // as atomically as possible
+                Err(CreateDatasetError::NameCollision(NameCollisionError {
+                    alias: dataset_alias.clone(),
+                }))
+            }
+            Err(err) => Err(err.int_err().into()),
+        }?;
+
+        Ok(CreateDatasetResult {
+            dataset_handle: DatasetHandle::new(dataset_id, dataset_alias.clone()),
+            dataset: Arc::new(dataset),
+            head,
+        })
     }
 
     async fn rename_dataset(
@@ -284,66 +287,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_ref: &'s DatasetRef,
     ) -> DatasetHandleStream<'s> {
         Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// DatasetS3BuilderImpl
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct DatasetBuilderS3 {
-    repo: DatasetRepositoryS3,
-    dataset: Arc<dyn Dataset>,
-    dataset_alias: DatasetAlias,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl DatasetBuilderS3 {
-    fn new(
-        repo: DatasetRepositoryS3,
-        dataset: Arc<dyn Dataset>,
-        dataset_alias: DatasetAlias,
-    ) -> Self {
-        Self {
-            repo,
-            dataset,
-            dataset_alias,
-        }
-    }
-}
-
-#[async_trait]
-impl DatasetBuilder for DatasetBuilderS3 {
-    fn as_dataset(&self) -> &dyn Dataset {
-        self.dataset.as_ref()
-    }
-
-    async fn finish(&mut self) -> Result<DatasetHandle, CreateDatasetError> {
-        match self
-            .dataset
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(GetRefError::NotFound(_)) => {
-                self.discard().await?;
-                Err(CreateDatasetError::EmptyDataset)
-            }
-            Err(GetRefError::Access(e)) => Err(e.int_err().into()),
-            Err(GetRefError::Internal(e)) => Err(CreateDatasetError::Internal(e)),
-        }?;
-
-        self.repo
-            .finish_create_dataset(self.dataset.as_ref(), &self.dataset_alias)
-            .await
-    }
-
-    async fn discard(&self) -> Result<(), InternalError> {
-        self.repo
-            .delete_dataset_s3_objects(&self.dataset_alias)
-            .await
     }
 }
 

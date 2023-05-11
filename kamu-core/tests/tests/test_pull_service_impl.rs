@@ -73,62 +73,45 @@ async fn create_graph(
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        let mut builder = repo.create_dataset(&dataset_alias).await.unwrap();
-        let chain = builder.as_dataset().as_metadata_chain();
-
-        if deps.is_empty() {
-            let seed_block = MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root)
+        let dataset = repo
+            .create_dataset(
+                &dataset_alias,
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(if deps.is_empty() {
+                        DatasetKind::Root
+                    } else {
+                        DatasetKind::Derivative
+                    })
                     .id_from(dataset_alias.dataset_name.as_str())
                     .build(),
+                )
+                .build_typed(),
             )
-            .build();
-            let seed_block_sequence_number = seed_block.sequence_number;
+            .await
+            .unwrap()
+            .dataset;
 
-            let h = chain
-                .append(seed_block, AppendOpts::default())
-                .await
-                .unwrap();
-
-            chain
-                .append(
-                    MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                        .prev(&h, seed_block_sequence_number)
-                        .build(),
-                    AppendOpts::default(),
+        if deps.is_empty() {
+            dataset
+                .commit_event(
+                    MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
+                    CommitOpts::default(),
                 )
                 .await
                 .unwrap();
         } else {
-            let seed_block = MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Derivative)
-                    .id_from(dataset_alias.dataset_name.as_str())
-                    .build(),
-            )
-            .build();
-            let seed_block_sequence_number = seed_block.sequence_number;
-
-            let h = chain
-                .append(seed_block, AppendOpts::default())
-                .await
-                .unwrap();
-
-            chain
-                .append(
-                    MetadataFactory::metadata_block(
+            dataset
+                .commit_event(
+                    MetadataEvent::SetTransform(
                         MetadataFactory::set_transform(deps.into_iter().map(|d| d.dataset_name))
                             .input_ids_from_names()
                             .build(),
-                    )
-                    .prev(&h, seed_block_sequence_number)
-                    .build(),
-                    AppendOpts::default(),
+                    ),
+                    CommitOpts::default(),
                 )
                 .await
                 .unwrap();
         }
-
-        builder.finish().await.unwrap();
     }
 }
 

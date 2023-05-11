@@ -9,12 +9,22 @@
 
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
+use crate::infra::*;
 use opendatafabric::*;
 
 use futures::TryStreamExt;
 use opendatafabric::MetadataBlock;
 use std::sync::{Arc, Mutex};
 use tracing::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+type BoxedCreateDatasetFuture = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>> + Send>,
+>;
+
+pub type DatasetFactoryFn =
+    Box<dyn FnOnce(MetadataBlockTyped<Seed>) -> BoxedCreateDatasetFuture + Send>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,12 +35,13 @@ pub struct SimpleTransferProtocol;
 
 impl SimpleTransferProtocol {
     // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
-    pub async fn sync<'a>(
-        &'a self,
-        src: &'a dyn Dataset,
-        src_ref: &'a DatasetRefAny,
-        dst: &'a dyn Dataset,
-        _dst_ref: &'a DatasetRefAny,
+    pub async fn sync(
+        &self,
+        src_ref: &DatasetRefAny,
+        _dst_ref: &DatasetRefAny,
+        src: Arc<dyn Dataset>,
+        maybe_dst: Option<Arc<dyn Dataset>>,
+        dst_factory: Option<DatasetFactoryFn>,
         validation: AppendValidation,
         trust_source_hashes: bool,
         force: bool,
@@ -38,11 +49,21 @@ impl SimpleTransferProtocol {
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
-        let src_chain = src.as_metadata_chain();
-        let dst_chain = dst.as_metadata_chain();
+        let empty_chain = MetadataChainImpl::new(
+            ObjectRepositoryInMemory::new(),
+            ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+        );
 
+        let src_chain = src.as_metadata_chain();
         let src_head = self.get_src_head(src_ref, src_chain).await?;
-        let dst_head = self.get_dest_head(dst_chain).await?;
+
+        let (dst_chain, dst_head) = if let Some(dst) = &maybe_dst {
+            let dst_chain = dst.as_metadata_chain();
+            let dst_head = self.get_dest_head(dst_chain).await?;
+            (dst_chain, dst_head)
+        } else {
+            (&empty_chain as &dyn MetadataChain, None)
+        };
 
         info!(?src_head, ?dst_head, "Resolved heads");
 
@@ -86,7 +107,7 @@ impl SimpleTransferProtocol {
             }
         };
 
-        let blocks = match chains_comparison {
+        let mut blocks = match chains_comparison {
             CompareChainsResult::Equal => unreachable!(),
             CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
@@ -102,12 +123,28 @@ impl SimpleTransferProtocol {
             }
         };
 
+        let old_head = dst_head.clone();
         let num_blocks = blocks.len();
+
+        // Create dataset if necessary using the source Seed block
+        let (dst, dst_head) = if let Some(dst) = maybe_dst {
+            (dst, dst_head)
+        } else {
+            let (_, first_block) = blocks.pop().unwrap();
+            let seed_block = first_block
+                .into_typed()
+                .ok_or_else(|| CorruptedSourceError {
+                    message: "First metadata block is not Seed".to_owned(),
+                    source: None,
+                })?;
+            let create_result = (dst_factory.unwrap())(seed_block).await?;
+            (create_result.dataset, Some(create_result.head))
+        };
 
         self.synchronize_blocks(
             blocks,
-            src,
-            dst,
+            src.as_ref(),
+            dst.as_ref(),
             &src_head,
             dst_head.as_ref(),
             validation,
@@ -118,7 +155,7 @@ impl SimpleTransferProtocol {
         .await?;
 
         Ok(SyncResult::Updated {
-            old_head: dst_head,
+            old_head,
             new_head: src_head,
             num_blocks,
         })
@@ -161,6 +198,11 @@ impl SimpleTransferProtocol {
             }
             .into(),
             IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+                message: "Source metadata chain is broken".to_owned(),
+                source: Some(e.into()),
+            }
+            .into(),
+            IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
                 message: "Source metadata chain is broken".to_owned(),
                 source: Some(e.into()),
             }

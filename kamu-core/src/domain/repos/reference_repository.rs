@@ -34,7 +34,7 @@ pub trait ReferenceRepository {
 #[derive(Error, Debug)]
 pub enum GetRefError {
     #[error(transparent)]
-    NotFound(RefNotFoundError),
+    NotFound(#[from] RefNotFoundError),
     #[error(transparent)]
     Access(
         #[from]

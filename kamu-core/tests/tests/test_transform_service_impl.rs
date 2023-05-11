@@ -156,56 +156,70 @@ async fn test_get_verification_plan_one_to_one() {
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let root_layout = workspace_layout.dataset_layout(&root_alias);
     let root_create_result = local_repo
-        .create_dataset_from_blocks(
+        .create_dataset(
             &root_alias,
-            [
-                MetadataFactory::metadata_block(
-                    MetadataFactory::seed(DatasetKind::Root)
-                        .id_from(root_alias.dataset_name.as_str())
-                        .build(),
-                )
-                .system_time(t0)
-                .build(),
-                MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                    .system_time(t0)
+            MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Root)
+                    .id_from(root_alias.dataset_name.as_str())
                     .build(),
-            ],
+            )
+            .system_time(t0)
+            .build_typed(),
         )
         .await
         .unwrap();
 
+    let root_head_src = root_create_result
+        .dataset
+        .commit_event(
+            MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
+            CommitOpts {
+                system_time: Some(t0),
+                ..CommitOpts::default()
+            },
+        )
+        .await
+        .unwrap()
+        .new_head;
+
     let root_hdl = root_create_result.dataset_handle;
-    let root_head_src = root_create_result.head;
-    let root_initial_sequence_number = root_create_result.head_sequence_number;
+    let root_initial_sequence_number = 1;
 
     // Create derivative
     let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let deriv_create_result = local_repo
-        .create_dataset_from_blocks(
+        .create_dataset(
             &deriv_alias,
-            [
-                MetadataFactory::metadata_block(
-                    MetadataFactory::seed(DatasetKind::Derivative)
-                        .id_from(deriv_alias.dataset_name.as_str())
-                        .build(),
-                )
-                .system_time(t0)
-                .build(),
-                MetadataFactory::metadata_block(
-                    MetadataFactory::set_transform([&root_alias.dataset_name])
-                        .input_ids_from_names()
-                        .build(),
-                )
-                .system_time(t0)
-                .build(),
-            ],
+            MetadataFactory::metadata_block(
+                MetadataFactory::seed(DatasetKind::Derivative)
+                    .id_from(deriv_alias.dataset_name.as_str())
+                    .build(),
+            )
+            .system_time(t0)
+            .build_typed(),
         )
         .await
         .unwrap();
 
+    let deriv_head_src = deriv_create_result
+        .dataset
+        .commit_event(
+            MetadataEvent::SetTransform(
+                MetadataFactory::set_transform([&root_alias.dataset_name])
+                    .input_ids_from_names()
+                    .build(),
+            ),
+            CommitOpts {
+                system_time: Some(t0),
+                ..CommitOpts::default()
+            },
+        )
+        .await
+        .unwrap()
+        .new_head;
+
     let deriv_hdl = deriv_create_result.dataset_handle;
-    let deriv_head_src = deriv_create_result.head;
-    let deriv_initial_sequence_number = deriv_create_result.head_sequence_number;
+    let deriv_initial_sequence_number = 1;
 
     // T1: Root data added
     let t1 = Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap();
