@@ -9,9 +9,9 @@
 
 use std::{collections::VecDeque, sync::Arc};
 
+use ::serde::{de::DeserializeOwned, Serialize};
 use axum::extract::ws::Message;
-use opendatafabric::{DatasetRef, MetadataBlock, Multihash};
-use serde::{de::DeserializeOwned, Serialize};
+use opendatafabric::*;
 use url::Url;
 
 use crate::{
@@ -484,8 +484,19 @@ pub async fn dataset_push_ws_main_flow(
             let dataset_alias = dataset_ref.alias().expect("Dataset ref is not an alias");
 
             let (_, first_block) = new_blocks.pop_front().unwrap();
+            let seed_block = first_block
+                .into_typed()
+                .ok_or_else(|| {
+                    tracing::debug!("First metadata block was not a Seed");
+                    CorruptedSourceError {
+                        message: "First metadata block is not Seed".to_owned(),
+                        source: None,
+                    }
+                })
+                .int_err()?;
+
             let create_result = dataset_repo
-                .create_dataset(dataset_alias, first_block)
+                .create_dataset(dataset_alias, seed_block)
                 .await
                 .int_err()?;
 

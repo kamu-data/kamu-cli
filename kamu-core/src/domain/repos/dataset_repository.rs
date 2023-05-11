@@ -55,7 +55,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlock,
+        seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError>;
 
     async fn rename_dataset(
@@ -195,13 +195,13 @@ where
         let create_result = self
             .create_dataset(
                 &DatasetAlias::new(None, snapshot.name),
-                MetadataBlock {
+                MetadataBlockTyped {
                     system_time,
                     prev_block_hash: None,
-                    event: MetadataEvent::Seed(Seed {
+                    event: Seed {
                         dataset_id,
                         dataset_kind: snapshot.kind,
-                    }),
+                    },
                     sequence_number: 0,
                 },
             )

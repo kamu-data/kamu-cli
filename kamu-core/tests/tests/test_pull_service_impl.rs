@@ -85,7 +85,7 @@ async fn create_graph(
                     .id_from(dataset_alias.dataset_name.as_str())
                     .build(),
                 )
-                .build(),
+                .build_typed(),
             )
             .await
             .unwrap()

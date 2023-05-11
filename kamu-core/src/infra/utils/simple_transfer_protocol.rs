@@ -21,7 +21,7 @@ use tracing::*;
 
 pub type DatasetFactoryFn = Box<
     dyn FnOnce(
-            MetadataBlock,
+            MetadataBlockTyped<Seed>,
         ) -> std::pin::Pin<
             Box<
                 dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>>
@@ -134,10 +134,13 @@ impl SimpleTransferProtocol {
         let (dst, dst_head) = if let Some(dst) = maybe_dst {
             (dst, dst_head)
         } else {
-            let seed_block = match blocks.pop() {
-                Some((_, seed_block)) => seed_block,
-                _ => unreachable!(),
-            };
+            let (_, first_block) = blocks.pop().unwrap();
+            let seed_block = first_block
+                .into_typed()
+                .ok_or_else(|| CorruptedSourceError {
+                    message: "First metadata block is not Seed".to_owned(),
+                    source: None,
+                })?;
             let create_result = (dst_factory.unwrap())(seed_block).await?;
             (create_result.dataset, Some(create_result.head))
         };

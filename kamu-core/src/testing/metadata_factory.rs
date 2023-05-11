@@ -50,7 +50,7 @@ impl MetadataFactory {
         SetTransformBuilder::new(inputs.into_iter())
     }
 
-    pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder {
+    pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder<E> {
         MetadataBlockBuilder::new(event)
     }
 
@@ -474,20 +474,23 @@ impl ExecuteQueryBuilder {
 // MetadataBlock Builder
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataBlockBuilder {
+pub struct MetadataBlockBuilder<E> {
     prev_block_hash: Option<Multihash>,
     system_time: DateTime<Utc>,
-    event: MetadataEvent,
     sequence_number: i32,
+    event: E,
 }
 
-impl MetadataBlockBuilder {
-    fn new<E: Into<MetadataEvent>>(event: E) -> Self {
+impl<E> MetadataBlockBuilder<E>
+where
+    E: Into<MetadataEvent>,
+{
+    fn new(event: E) -> Self {
         Self {
             prev_block_hash: None,
             system_time: Utc::now(),
-            event: event.into(),
             sequence_number: 0,
+            event,
         }
     }
 
@@ -506,8 +509,17 @@ impl MetadataBlockBuilder {
         MetadataBlock {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash,
-            event: self.event,
             sequence_number: self.sequence_number,
+            event: self.event.into(),
+        }
+    }
+
+    pub fn build_typed(self) -> MetadataBlockTyped<E> {
+        MetadataBlockTyped {
+            system_time: self.system_time,
+            prev_block_hash: self.prev_block_hash,
+            sequence_number: self.sequence_number,
+            event: self.event,
         }
     }
 }

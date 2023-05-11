@@ -189,16 +189,9 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlock,
+        seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        let dataset_id = match &seed_block {
-            MetadataBlock {
-                event: MetadataEvent::Seed(seed),
-                ..
-            } => Ok(seed.dataset_id.clone()),
-            _ => Err(format!("Expected a seed block, but got {:?}", seed_block).int_err()),
-        }?;
-
+        let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_path = if dataset_alias.is_multitenant() {
             self.root
                 .join(dataset_alias.account_name.as_ref().unwrap())
@@ -217,7 +210,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         let head = match dataset
             .as_metadata_chain()
             .append(
-                seed_block,
+                seed_block.into(),
                 AppendOpts {
                     // We are using head ref CAS to detect previous existence of a dataset
                     // as atomically as possible

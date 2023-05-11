@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: There has to be a crate for this
 pub trait EnumWithVariants<E> {
     fn is_variant<V: VariantOf<E>>(&self) -> bool;
@@ -14,6 +16,18 @@ pub trait EnumWithVariants<E> {
     fn as_variant<V: VariantOf<E>>(&self) -> Option<&V>;
     fn as_variant_mut<V: VariantOf<E>>(&mut self) -> Option<&mut V>;
 }
+
+pub trait VariantOf<E>
+where
+    Self: Sized,
+{
+    fn is_variant(e: &E) -> bool;
+    fn into_variant(e: E) -> Option<Self>;
+    fn as_variant(e: &E) -> Option<&Self>;
+    fn as_variant_mut(e: &mut E) -> Option<&mut Self>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Use derive macro
 macro_rules! impl_enum_with_variants {
@@ -90,16 +104,3 @@ macro_rules! impl_enum_variant {
 
 pub(crate) use impl_enum_variant;
 pub(crate) use impl_enum_with_variants;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: There has to be a crate for this
-pub trait VariantOf<E>
-where
-    Self: Sized,
-{
-    fn is_variant(e: &E) -> bool;
-    fn into_variant(e: E) -> Option<Self>;
-    fn as_variant(e: &E) -> Option<&Self>;
-    fn as_variant_mut(e: &mut E) -> Option<&mut Self>;
-}

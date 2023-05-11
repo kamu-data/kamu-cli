@@ -38,10 +38,8 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
     let dataset = local_repo
         .create_dataset(
             &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-            MetadataFactory::metadata_block(MetadataEvent::Seed(
-                MetadataFactory::seed(DatasetKind::Root).build(),
-            ))
-            .build(),
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build_typed(),
         )
         .await
         .unwrap()

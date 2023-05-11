@@ -9,7 +9,7 @@
 
 use dill::component;
 use futures::SinkExt;
-use opendatafabric::Multihash;
+use opendatafabric::{AsTypedBlock, Multihash};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -405,7 +405,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 dst
             } else {
                 let (first_hash, first_block) = new_blocks.pop_front().unwrap();
-                let create_result = (dst_factory.unwrap())(first_block).await.int_err()?;
+                let seed_block = first_block
+                    .into_typed()
+                    .ok_or_else(|| CorruptedSourceError {
+                        message: "First metadata block is not Seed".to_owned(),
+                        source: None,
+                    })?;
+                let create_result = (dst_factory.unwrap())(seed_block).await.int_err()?;
                 assert_eq!(first_hash, create_result.head);
                 create_result.dataset
             };

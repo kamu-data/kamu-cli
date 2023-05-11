@@ -29,7 +29,7 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
         .create_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                .build(),
+                .build_typed(),
         )
         .await
         .unwrap();
@@ -47,7 +47,7 @@ pub async fn test_create_dataset(repo: &dyn DatasetRepository) {
         .create_dataset(
             &dataset_alias,
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
-                .build(),
+                .build_typed(),
         )
         .await;
 

@@ -205,16 +205,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
-        seed_block: MetadataBlock,
+        seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        let dataset_id = match &seed_block {
-            MetadataBlock {
-                event: MetadataEvent::Seed(seed),
-                ..
-            } => Ok(seed.dataset_id.clone()),
-            _ => Err(format!("Expected a seed block, but got {:?}", seed_block).int_err()),
-        }?;
-
+        let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
         let dataset = DatasetFactoryImpl::get_s3(dataset_url).await?;
 
@@ -224,7 +217,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         // - Dataset existed before (has valid head) - we should error out with name collision
         let head = match dataset
             .as_metadata_chain()
-            .append(seed_block, AppendOpts::default())
+            .append(seed_block.into(), AppendOpts::default())
             .await
         {
             Ok(hash) => Ok(hash),

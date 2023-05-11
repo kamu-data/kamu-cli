@@ -129,7 +129,7 @@ impl ResetTestHarness {
                 .id_from(dataset_name.as_str())
                 .build(),
         )
-        .build();
+        .build_typed();
 
         let create_result = self
             .local_repo

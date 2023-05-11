@@ -164,7 +164,7 @@ async fn test_get_verification_plan_one_to_one() {
                     .build(),
             )
             .system_time(t0)
-            .build(),
+            .build_typed(),
         )
         .await
         .unwrap();
@@ -196,7 +196,7 @@ async fn test_get_verification_plan_one_to_one() {
                     .build(),
             )
             .system_time(t0)
-            .build(),
+            .build_typed(),
         )
         .await
         .unwrap();
