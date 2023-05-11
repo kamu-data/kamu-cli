@@ -167,6 +167,7 @@ impl SyncServiceImpl {
         let trust_source_hashes = opts.trust_source.unwrap_or(src_is_local);
 
         tracing::info!("Starting sync using Simple Transfer Protocol");
+
         SimpleTransferProtocol
             .sync(
                 src_ref,

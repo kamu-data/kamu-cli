@@ -10,9 +10,21 @@
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::*;
+
+use opendatafabric::*;
+
 use futures::TryStreamExt;
 use opendatafabric::*;
 use std::sync::{Arc, Mutex};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+type BoxedCreateDatasetFuture = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>> + Send>,
+>;
+
+pub type DatasetFactoryFn =
+    Box<dyn FnOnce(MetadataBlockTyped<Seed>) -> BoxedCreateDatasetFuture + Send>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,6 +65,14 @@ impl SimpleTransferProtocol {
 
         let src_chain = src.as_metadata_chain();
         let src_head = self.get_src_head(src_ref, src_chain).await?;
+
+        let (dst_chain, dst_head) = if let Some(dst) = &maybe_dst {
+            let dst_chain = dst.as_metadata_chain();
+            let dst_head = self.get_dest_head(dst_chain).await?;
+            (dst_chain, dst_head)
+        } else {
+            (&empty_chain as &dyn MetadataChain, None)
+        };
 
         let (dst_chain, dst_head) = if let Some(dst) = &maybe_dst {
             let dst_chain = dst.as_metadata_chain();
