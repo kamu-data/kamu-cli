@@ -16,7 +16,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use tracing::info;
 
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -98,7 +97,7 @@ impl SqlShellImpl {
                 .container_runtime
                 .run_shell_cmd(args, &["sleep".to_owned(), "999999".to_owned()]);
 
-            info!(command = ?cmd, stdout = ?spark_stdout_path, stderr = ?spark_stderr_path, "Starting Spark container");
+            tracing::info!(command = ?cmd, stdout = ?spark_stdout_path, stderr = ?spark_stderr_path, "Starting Spark container");
 
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::from(File::create(&spark_stdout_path)?))
@@ -106,7 +105,7 @@ impl SqlShellImpl {
                 .spawn()?
         };
 
-        info!("Waiting for container");
+        tracing::info!("Waiting for container");
         self.container_runtime
             .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
             .expect("Container did not start");
@@ -124,7 +123,7 @@ impl SqlShellImpl {
                 &["sbin/start-thriftserver.sh"],
             );
 
-            info!(command = ?cmd, "Starting Thrift Server");
+            tracing::info!(command = ?cmd, "Starting Thrift Server");
 
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
@@ -160,7 +159,7 @@ impl SqlShellImpl {
         S1: AsRef<str>,
         S2: AsRef<str>,
     {
-        info!("Starting SQL shell");
+        tracing::info!("Starting SQL shell");
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
@@ -224,7 +223,7 @@ impl SqlShellImpl {
             let _drop_spark = ContainerHandle::new(self.container_runtime.clone(), "kamu-spark");
 
             started_clb();
-            info!("Starting SQL shell");
+            tracing::info!("Starting SQL shell");
 
             // Relying on shell to send signal to child processes
             let mut beeline_cmd = self.container_runtime
@@ -248,7 +247,7 @@ impl SqlShellImpl {
                     ],
                 );
 
-            info!(command = ?beeline_cmd, "Running beeline");
+            tracing::info!(command = ?beeline_cmd, "Running beeline");
             beeline_cmd.spawn()?.wait()?;
         }
 

@@ -21,9 +21,6 @@ use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::info_span;
-use tracing::warn;
-use tracing::{error, info};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,14 +79,11 @@ impl EngineProvisionerLocal {
         }
     }
 
-    async fn ensure_image<'a, 'b>(
-        &'a self,
-        image: &'b str,
+    async fn ensure_image(
+        &self,
+        image: &str,
         listener: Arc<dyn EngineProvisioningListener>,
-    ) -> Result<(), EngineProvisioningError>
-    where
-        'a: 'b,
-    {
+    ) -> Result<(), EngineProvisioningError> {
         let pull_image = {
             let mut state = self.state.lock().unwrap();
             if state.known_images.contains(image) {
@@ -103,34 +97,13 @@ impl EngineProvisionerLocal {
         };
 
         if pull_image {
-            let span = info_span!("Pulling engine image", image_name = image);
-            let _span_guard = span.enter();
-
-            let image_listener = listener
-                .get_pull_image_listener()
-                .unwrap_or_else(|| Arc::new(NullPullImageListener));
-            image_listener.begin(image);
-
-            let container_runtime = self.container_runtime.clone();
-            let image_name = image.to_owned();
-            tokio::task::spawn_blocking(move ||
-                // TODO: Return better errors
-                container_runtime
-                    .pull_cmd(&image_name)
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|e| EngineProvisioningError::internal(e))?
-                    .exit_ok()
-                    .map_err(|e| {
-                        error!(error = ?e, "Failed to pull engine image");
-                        EngineProvisioningError::image_not_found(&image_name)
-                    }))
-            .await
-            .unwrap()?;
-
-            info!("Successfully pulled engine image");
-            image_listener.success();
+            self.pull_image(
+                image,
+                listener
+                    .get_pull_image_listener()
+                    .unwrap_or_else(|| Arc::new(NullPullImageListener)),
+            )
+            .await?;
 
             {
                 let mut state = self.state.lock().unwrap();
@@ -138,6 +111,37 @@ impl EngineProvisionerLocal {
             }
         }
 
+        Ok(())
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(image))]
+    async fn pull_image(
+        &self,
+        image: &str,
+        listener: Arc<dyn PullImageListener>,
+    ) -> Result<(), EngineProvisioningError> {
+        listener.begin(image);
+
+        let container_runtime = self.container_runtime.clone();
+        let image = image.to_owned();
+        tokio::task::spawn_blocking(move ||
+            // TODO: Return better errors
+            container_runtime
+                .pull_cmd(&image)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .map_err(|e| EngineProvisioningError::internal(e))?
+                .exit_ok()
+                .map_err(|error| {
+                    tracing::error!(?error, "Failed to pull engine image");
+                    EngineProvisioningError::image_not_found(&image)
+                }))
+        .await
+        .unwrap()?;
+
+        tracing::info!("Successfully pulled engine image");
+        listener.success();
         Ok(())
     }
 
@@ -156,7 +160,7 @@ impl EngineProvisionerLocal {
                 }
 
                 if !logged {
-                    info!(
+                    tracing::info!(
                         "Reached maximum concurrency of {} - waiting for an engine to be released",
                         max_concurrency
                     );
@@ -179,7 +183,7 @@ impl EngineProvisionerLocal {
             (Some(1), _) => 1,
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
-                warn!("Ingoring specified engine max concurrency of {} since running in the Host networking mode", multi);
+                tracing::warn!("Ingoring specified engine max concurrency of {} since running in the Host networking mode", multi);
                 1
             }
         }
@@ -235,7 +239,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
     }
 
     fn release_engine(&self, engine: &dyn Engine) {
-        info!("Releasing the engine {:p}", engine);
+        tracing::info!("Releasing the engine {:p}", engine);
 
         {
             let mut state = self.state.lock().unwrap();
@@ -245,7 +249,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
     }
 
     fn release_ingest_engine(&self, engine: &dyn IngestEngine) {
-        info!("Releasing the engine {:p}", engine);
+        tracing::info!("Releasing the engine {:p}", engine);
 
         {
             let mut state = self.state.lock().unwrap();

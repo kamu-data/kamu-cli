@@ -15,8 +15,6 @@ use dill::*;
 use kamu::domain::*;
 use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::infra::*;
-use tracing::error;
-use tracing::info;
 
 use crate::cli_commands;
 use crate::commands::Command;
@@ -52,7 +50,7 @@ pub async fn run(
         catalog_builder.add_value(output_format.clone());
 
         let _log_thread = configure_logging(&output_format, &workspace_layout);
-        info!(
+        tracing::info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
             ?workspace_version,
@@ -82,11 +80,11 @@ pub async fn run(
 
     match result {
         Ok(res) => {
-            info!("Command successful");
+            tracing::info!("Command successful");
             Ok(res)
         }
         Err(e) => {
-            error!(error = ?e, "Command failed");
+            tracing::error!(error = ?e, "Command failed");
             Err(e)
         }
     }
@@ -167,7 +165,7 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
     let config_svc = ConfigService::new(workspace_layout);
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
-    info!(config = ?config, "Loaded configuration");
+    tracing::info!(config = ?config, "Loaded configuration");
 
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 

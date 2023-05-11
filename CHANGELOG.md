@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.122.0] - 2023-05-11
 ### Fixed
 - `kamu add` command no longer fails to deduplicate existing datasets
+- Tracing spans in logs no longer interfere with one another in concurrent code
 ### Changed
 - Improved dataset creation logic to make it more resilient to various failures
 - Improved `kamu add` command error handling

@@ -20,10 +20,6 @@ use opendatafabric::serde::MetadataBlockSerializer;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::debug;
-use tracing::error;
-use tracing::info;
-use tracing::info_span;
 
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -46,6 +42,7 @@ impl TransformServiceImpl {
     }
 
     // Note: Can be called from multiple threads
+    #[tracing::instrument(level = "info", skip_all)]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         operation: TransformOperation,
@@ -56,9 +53,7 @@ impl TransformServiceImpl {
         CommitFn: FnOnce(MetadataBlock, PathBuf, PathBuf) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
-        let span = info_span!("Performing transform");
-        let _span_guard = span.enter();
-        info!(?operation, "Transform request");
+        tracing::info!(?operation, "Transform request");
 
         listener.begin();
 
@@ -66,12 +61,12 @@ impl TransformServiceImpl {
             .await
         {
             Ok(res) => {
-                info!("Transform successful");
+                tracing::info!("Transform successful");
                 listener.success(&res);
                 Ok(res)
             }
             Err(err) => {
-                error!(error = ?err, "Transform failed");
+                tracing::error!(error = ?err, "Transform failed");
                 listener.error(&err);
                 Err(err)
             }
@@ -92,7 +87,6 @@ impl TransformServiceImpl {
         let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_path);
         let system_time = operation.request.system_time.clone();
         let out_data_path = PathBuf::from(&operation.request.out_data_path);
-        let offset = operation.request.offset;
 
         let engine = engine_provisioner
             .provision_engine(
@@ -106,14 +100,6 @@ impl TransformServiceImpl {
         let response = engine.transform(operation.request).await?;
 
         let output_data = if let Some(interval) = response.data_interval {
-            // TODO: Move out this to validation
-            if interval.end < interval.start || interval.start != offset {
-                return Err(EngineError::contract_error(
-                    "Engine returned an output slice with invalid offset range",
-                    Vec::new(),
-                )
-                .into());
-            }
             if !out_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
@@ -128,9 +114,6 @@ impl TransformServiceImpl {
                 )
                 .into());
             }
-
-            let span = info_span!("Computing data hashes");
-            let _span_guard = span.enter();
 
             // TODO: Move out into data commit procedure of sorts
             let logical_hash =
@@ -263,7 +246,7 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
 
-        info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
+        tracing::info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
 
         Ok(TransformResult::Updated {
             old_head: prev_block_hash,
@@ -273,14 +256,12 @@ impl TransformServiceImpl {
     }
 
     // TODO: PERF: Avoid multiple passes over metadata chain
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_next_operation(
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
     ) -> Result<Option<TransformOperation>, InternalError> {
-        let span = info_span!("Evaluating transform");
-        let _span_guard = span.enter();
-
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -312,7 +293,7 @@ impl TransformServiceImpl {
         }
 
         let source = sources.pop().unwrap();
-        debug!(?source, "Transforming using source");
+        tracing::debug!(?source, "Transforming using source");
 
         // Check if all inputs are non-empty
         if futures::stream::iter(&source.inputs)
@@ -321,7 +302,7 @@ impl TransformServiceImpl {
             .any_ok(|never_pulled| *never_pulled)
             .await?
         {
-            info!("Not processing because one of the inputs was never pulled");
+            tracing::info!("Not processing because one of the inputs was never pulled");
             return Ok(None);
         }
 
@@ -599,7 +580,7 @@ impl TransformServiceImpl {
             explicit_watermarks,
         };
 
-        info!(
+        tracing::info!(
             %input_handle,
             ?input,
             ?slice,
@@ -629,14 +610,12 @@ impl TransformServiceImpl {
 
     // TODO: Improve error handling
     // Need an inconsistent medata error?
+    #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_verification_plan(
         &self,
         dataset_handle: &DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
     ) -> Result<Vec<VerificationStep>, VerificationError> {
-        let span = info_span!("Preparing transformations replay plan");
-        let _span_guard = span.enter();
-
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -792,6 +771,7 @@ impl TransformServiceImpl {
         Ok(plan)
     }
 
+    #[tracing::instrument(level = "info", name = "transform", skip_all, fields(%dataset_ref))]
     async fn transform_impl(
         &self,
         dataset_ref: DatasetRef,
@@ -799,9 +779,6 @@ impl TransformServiceImpl {
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
         let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
-
-        let span = info_span!("Transforming dataset", %dataset_handle);
-        let _span_guard = span.enter();
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
@@ -848,10 +825,7 @@ impl TransformService for TransformServiceImpl {
         dataset_ref: &DatasetRef,
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
-        info!(
-            dataset_ref = ?dataset_ref,
-            "Transforming a single dataset"
-        );
+        tracing::info!(?dataset_ref, "Transforming a single dataset");
 
         self.transform_impl(dataset_ref.clone(), maybe_listener)
             .await
@@ -866,7 +840,7 @@ impl TransformService for TransformServiceImpl {
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
         let dataset_refs: Vec<_> = dataset_refs.collect();
-        info!(?dataset_refs, "Transforming multiple datasets");
+        tracing::info!(?dataset_refs, "Transforming multiple datasets");
 
         let mut futures = Vec::new();
 
@@ -886,6 +860,7 @@ impl TransformService for TransformServiceImpl {
         dataset_refs.into_iter().zip(results).collect()
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?block_range))]
     async fn verify_transform(
         &self,
         dataset_ref: &DatasetRef,
@@ -896,9 +871,6 @@ impl TransformService for TransformServiceImpl {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
-
-        let span = info_span!("Replaying dataset transformations", %dataset_handle, ?block_range);
-        let _span_guard = span.enter();
 
         let verification_plan = self
             .get_verification_plan(&dataset_handle, block_range)
@@ -915,7 +887,7 @@ impl TransformService for TransformServiceImpl {
             let mut actual_block = None;
             let mut actual_block_hash = None;
 
-            info!(
+            tracing::info!(
                 block_hash = %expected_block_hash,
                 "Replaying block"
             );
@@ -994,10 +966,10 @@ impl TransformService for TransformServiceImpl {
 
             let actual_block = actual_block.unwrap();
             let actual_block_hash = actual_block_hash.unwrap();
-            debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
+            tracing::debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
 
             if expected_block_hash != actual_block_hash || expected_block != actual_block {
-                info!(block_hash = %expected_block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
+                tracing::info!(block_hash = %expected_block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
                     expected_block_hash,
@@ -1009,7 +981,7 @@ impl TransformService for TransformServiceImpl {
                 return Err(err);
             }
 
-            info!(block_hash = %expected_block_hash, "Block valid");
+            tracing::info!(block_hash = %expected_block_hash, "Block valid");
             listener.end_block(
                 &expected_block_hash,
                 step_index,

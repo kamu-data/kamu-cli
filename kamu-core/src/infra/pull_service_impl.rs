@@ -15,7 +15,6 @@ use dill::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, info_span};
 use url::Url;
 
 pub struct PullServiceImpl {
@@ -84,7 +83,7 @@ impl PullServiceImpl {
         options: &PullOptions,
         visited: &mut HashMap<DatasetAlias, PullItem>,
     ) -> Result<i32, PullError> {
-        debug!(?request, "Entering node");
+        tracing::debug!(?request, "Entering node");
 
         // Resolve local dataset if it exists
         let local_handle = if let Some(local_ref) = &request.local_ref {
@@ -143,7 +142,7 @@ impl PullServiceImpl {
 
         // Already visited?
         if let Some(pi) = visited.get_mut(&local_alias) {
-            debug!("Already visited - continuing");
+            tracing::debug!("Already visited - continuing");
             if referenced_explicitly {
                 pi.original_request = Some(request.clone())
             }
@@ -193,7 +192,7 @@ impl PullServiceImpl {
 
             for dep in summary.dependencies {
                 let id = dep.id.unwrap();
-                debug!(%id, name = %dep.name, "Descending into dependency");
+                tracing::debug!(%id, name = %dep.name, "Descending into dependency");
 
                 let depth = self
                     .collect_pull_graph_depth_first(
@@ -222,7 +221,7 @@ impl PullServiceImpl {
             pull_item.original_request = Some(request.clone());
         }
 
-        debug!(?pull_item, "Resolved node");
+        tracing::debug!(?pull_item, "Resolved node");
 
         let depth = pull_item.depth;
         visited.insert(local_alias.clone(), pull_item);
@@ -463,6 +462,7 @@ impl PullService for PullServiceImpl {
         .await
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull_multi_ext(
         &self,
         requests: &mut dyn Iterator<Item = PullRequest>,
@@ -486,12 +486,10 @@ impl PullService for PullServiceImpl {
                 .await?
         };
 
-        let span = info_span!("Pull");
-        let _span_guard = span.enter();
-        info!(?requests, ?options, "Performing pull");
+        tracing::info!(?requests, ?options, "Performing pull");
 
         let (mut plan, errors) = self.collect_pull_graph(&requests, &options).await;
-        info!(
+        tracing::info!(
             num_items = plan.len(),
             num_errors = errors.len(),
             ?plan,
@@ -506,7 +504,7 @@ impl PullService for PullServiceImpl {
             plan.retain(|pi| pi.original_request.is_some());
         }
 
-        info!(num_items = plan.len(), "Retained pull plan");
+        tracing::info!(num_items = plan.len(), "Retained pull plan");
 
         let mut results = Vec::with_capacity(plan.len());
 
@@ -516,15 +514,15 @@ impl PullService for PullServiceImpl {
             rest = tail;
 
             let results_level: Vec<_> = if depth == 0 && !is_remote {
-                info!(%depth, ?batch, "Running ingest batch");
+                tracing::info!(%depth, ?batch, "Running ingest batch");
                 self.ingest_multi(batch, &options, ingest_listener.clone())
                     .await?
             } else if depth == 0 && is_remote {
-                info!(%depth, ?batch, "Running sync batch");
+                tracing::info!(%depth, ?batch, "Running sync batch");
                 self.sync_multi(batch, &options, sync_listener.clone())
                     .await?
             } else {
-                info!(%depth, ?batch, "Running transform batch");
+                tracing::info!(%depth, ?batch, "Running transform batch");
                 self.transform_multi(batch, &options, transform_listener.clone())
                     .await?
             };

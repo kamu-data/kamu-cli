@@ -16,7 +16,6 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
 
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -66,7 +65,7 @@ impl LivyServerImpl {
             ..RunArgs::default()
         });
 
-        info!(command = ?livy_cmd, "Starting Livy container");
+        tracing::info!(command = ?livy_cmd, "Starting Livy container");
 
         let mut livy = livy_cmd
             .stdout(if inherit_stdio {

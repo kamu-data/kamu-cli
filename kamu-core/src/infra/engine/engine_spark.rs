@@ -20,7 +20,6 @@ use rand::Rng;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::info;
 
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
@@ -103,7 +102,7 @@ impl SparkEngine {
         let response_path = run_info.in_out_dir.join("response.yaml");
 
         {
-            info!(request = ?request, path = ?request_path, "Writing request");
+            tracing::info!(request = ?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request)
                 .map_err(|e| EngineError::internal(e, Vec::new()))?;
@@ -159,7 +158,7 @@ impl SparkEngine {
             ],
         );
 
-        info!(command = ?cmd, "Running Spark job");
+        tracing::info!(command = ?cmd, "Running Spark job");
 
         let status = tokio::task::spawn_blocking(move || {
             cmd.stdout(std::process::Stdio::from(stdout_file))
@@ -176,7 +175,7 @@ impl SparkEngine {
                 .read_execute_query_response(data.as_bytes())
                 .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-            info!(response = ?response, "Read response");
+            tracing::info!(response = ?response, "Read response");
 
             match response {
                 ExecuteQueryResponse::Progress => unreachable!(),

@@ -14,7 +14,6 @@ use opendatafabric::*;
 use dill::*;
 use futures::TryStreamExt;
 use std::sync::Arc;
-use tracing::info_span;
 
 pub struct VerificationServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -36,6 +35,7 @@ impl VerificationServiceImpl {
         }
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn check_data_integrity<'a>(
         &'a self,
         dataset_handle: &'a DatasetHandle,
@@ -43,9 +43,6 @@ impl VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying data integrity");
-        let _span_guard = span.enter();
-
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -187,15 +184,13 @@ impl VerificationServiceImpl {
         Ok(VerificationResult::Valid)
     }
 
-    async fn check_sequence_integrity<'a>(
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn check_metadata_integrity<'a>(
         &'a self,
         dataset_handle: &'a DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
-        let span = info_span!("Verifying metadata integrity");
-        let _span_guard = span.enter();
-
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -249,6 +244,7 @@ impl VerificationServiceImpl {
 
 #[async_trait::async_trait(?Send)]
 impl VerificationService for VerificationServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?block_range))]
     async fn verify(
         &self,
         dataset_ref: &DatasetRef,
@@ -262,9 +258,6 @@ impl VerificationService for VerificationServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let span = info_span!("Verifying dataset", %dataset_handle, ?block_range);
-        let _span_guard = span.enter();
-
         let dataset_kind = dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -276,7 +269,7 @@ impl VerificationService for VerificationServiceImpl {
 
         let res = try {
             if options.check_integrity {
-                self.check_sequence_integrity(
+                self.check_metadata_integrity(
                     &dataset_handle,
                     block_range.clone(),
                     listener.clone(),

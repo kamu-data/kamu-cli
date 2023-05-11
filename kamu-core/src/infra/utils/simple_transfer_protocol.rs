@@ -10,12 +10,10 @@
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::*;
 
 use futures::TryStreamExt;
-use opendatafabric::MetadataBlock;
+use opendatafabric::*;
 use std::sync::{Arc, Mutex};
-use tracing::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,7 +63,7 @@ impl SimpleTransferProtocol {
             (&empty_chain as &dyn MetadataChain, None)
         };
 
-        info!(?src_head, ?dst_head, "Resolved heads");
+        tracing::info!(?src_head, ?dst_head, "Resolved heads");
 
         let listener_adapter = CompareChainsListenerAdapter::new(listener.clone());
 
@@ -242,7 +240,7 @@ impl SimpleTransferProtocol {
             }
         }
 
-        info!(?stats, "Considering {} new blocks", blocks.len());
+        tracing::info!(?stats, "Considering {} new blocks", blocks.len());
         listener.on_status(SyncStage::TransferData, &stats);
 
         // Download data and checkpoints
@@ -253,7 +251,7 @@ impl SimpleTransferProtocol {
         {
             // Data
             if let Some(data_slice) = block.event.output_data {
-                info!(hash = ?data_slice.physical_hash, "Transfering data file");
+                tracing::info!(hash = ?data_slice.physical_hash, "Transfering data file");
 
                 let stream = match src
                     .as_data_repo()
@@ -311,7 +309,7 @@ impl SimpleTransferProtocol {
 
             // Checkpoint
             if let Some(checkpoint) = block.event.output_checkpoint {
-                info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
+                tracing::info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
 
                 let stream = match src
                     .as_checkpoint_repo()
@@ -372,7 +370,7 @@ impl SimpleTransferProtocol {
 
         // Commit blocks
         for (hash, block) in blocks.into_iter().rev() {
-            debug!(?hash, "Appending block");
+            tracing::debug!(?hash, "Appending block");
             let sequence_number = block.sequence_number;
 
             match dst

@@ -10,7 +10,6 @@
 use crate::domain::*;
 
 use std::path::{Path, PathBuf};
-use tracing::{info, warn};
 
 pub struct IpfsClient {
     ipfs_path: Option<PathBuf>,
@@ -46,7 +45,7 @@ impl IpfsClient {
         let mut cmd = self.ipfs_cmd();
         cmd.args(["key", "list", "-l"]);
 
-        info!(?cmd, "Running process");
+        tracing::info!(?cmd, "Running process");
 
         let output = cmd.output().await.int_err()?;
 
@@ -54,7 +53,7 @@ impl IpfsClient {
         let stderr = std::str::from_utf8(&output.stderr[..]).int_err()?;
 
         if !output.status.success() {
-            warn!(%stdout, %stderr, "Process exited with non-zero code");
+            tracing::warn!(%stdout, %stderr, "Process exited with non-zero code");
             output.status.exit_ok().int_err()?;
         }
 
@@ -78,13 +77,13 @@ impl IpfsClient {
         cmd.args(["key", "gen"]);
         cmd.arg(name.as_ref());
 
-        info!(?cmd, "Running process");
+        tracing::info!(?cmd, "Running process");
         let output = cmd.output().await.int_err()?;
         let stdout = std::str::from_utf8(&output.stdout[..]).int_err()?;
         let stderr = std::str::from_utf8(&output.stderr[..]).int_err()?;
 
         if !output.status.success() {
-            warn!(%stdout, %stderr, "Process exited with non-zero code");
+            tracing::warn!(%stdout, %stderr, "Process exited with non-zero code");
             output.status.exit_ok().int_err()?;
         }
 
@@ -105,13 +104,13 @@ impl IpfsClient {
         }
         cmd.arg(path.as_ref());
 
-        info!(?cmd, "Running process");
+        tracing::info!(?cmd, "Running process");
         let output = cmd.output().await.int_err()?;
         let stdout = std::str::from_utf8(&output.stdout[..]).int_err()?;
         let stderr = std::str::from_utf8(&output.stderr[..]).int_err()?;
 
         if !output.status.success() {
-            warn!(%stdout, %stderr, "Process exited with non-zero code");
+            tracing::warn!(%stdout, %stderr, "Process exited with non-zero code");
             output.status.exit_ok().int_err()?;
         }
 
@@ -131,7 +130,7 @@ impl IpfsClient {
 
         cmd.arg(format!("/ipns/{}", key));
 
-        info!(?cmd, "Running process");
+        tracing::info!(?cmd, "Running process");
 
         let output = cmd.output().await.int_err()?;
         let stdout = std::str::from_utf8(&output.stdout[..]).int_err()?;
@@ -173,14 +172,14 @@ impl IpfsClient {
         }
         cmd.arg(format!("/ipfs/{}", cid));
 
-        info!(?cmd, "Running process");
+        tracing::info!(?cmd, "Running process");
 
         let output = cmd.output().await.int_err()?;
         let stdout = std::str::from_utf8(&output.stdout[..]).int_err()?;
         let stderr = std::str::from_utf8(&output.stderr[..]).int_err()?;
 
         if !output.status.success() {
-            warn!(%stdout, %stderr, "Process exited with non-zero code");
+            tracing::warn!(%stdout, %stderr, "Process exited with non-zero code");
             output.status.exit_ok().int_err()?;
         }
 
