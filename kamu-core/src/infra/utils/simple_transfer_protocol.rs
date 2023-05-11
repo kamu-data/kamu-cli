@@ -19,16 +19,12 @@ use tracing::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetFactoryFn = Box<
-    dyn FnOnce(
-            MetadataBlockTyped<Seed>,
-        ) -> std::pin::Pin<
-            Box<
-                dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>>
-                    + Send,
-            >,
-        > + Send,
+type BoxedCreateDatasetFuture = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<CreateDatasetResult, CreateDatasetError>> + Send>,
 >;
+
+pub type DatasetFactoryFn =
+    Box<dyn FnOnce(MetadataBlockTyped<Seed>) -> BoxedCreateDatasetFuture + Send>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
