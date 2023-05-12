@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.123.0"
+version = "0.123.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license-file = "../LICENSE.txt"
@@ -20,8 +20,8 @@ test_ftp = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.123.0", path = "../opendatafabric" }
-container-runtime = { version = "0.123.0", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.123.1", path = "../opendatafabric" }
+container-runtime = { version = "0.123.1", path = "../utils/container-runtime" }
 
 # Serialization
 flatbuffers = "23"
@@ -32,11 +32,13 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # Ingest
-curl = { version = "0.4", features = ["http2", "protocol-ftp", "static-curl", "static-ssl"] }  # TODO: reconsider static linking
+# TODO: Using curl brings a lot of overhead including compiling and linking openssl
+# We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
+curl = { version = "0.4", features = ["http2", "protocol-ftp", "static-curl", "static-ssl"] }
 curl-sys = "0.4"
 flate2 = "1"  # GZip decoder
 fs_extra = "1.3"  # Copy files with progress, get directory sizes
-reqwest = { version = "0.11", features = ["rustls-tls", "gzip", "deflate", "stream"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }
 ringbuf = "0.3"
 tar = "0.4"  # Checkpoint archival
 zip = "0.6"
