@@ -15,8 +15,6 @@ use opendatafabric::*;
 
 use dill::*;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -50,7 +48,7 @@ impl TransformServiceImpl {
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(MetadataBlock, PathBuf, PathBuf) -> Fut,
+        CommitFn: FnOnce(DateTime<Utc>, ExecuteQuery, PathBuf, PathBuf) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
         tracing::info!(?operation, "Transform request");
@@ -81,7 +79,7 @@ impl TransformServiceImpl {
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(MetadataBlock, PathBuf, PathBuf) -> Fut,
+        CommitFn: FnOnce(DateTime<Utc>, ExecuteQuery, PathBuf, PathBuf) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
         let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_path);
@@ -165,21 +163,17 @@ impl TransformServiceImpl {
             None
         };
 
-        let metadata_block = MetadataBlock {
-            system_time,
-            prev_block_hash: None, // Filled out at commit
-            event: MetadataEvent::ExecuteQuery(ExecuteQuery {
-                input_slices: operation.input_slices,
-                input_checkpoint: operation.input_checkpoint,
-                output_data,
-                output_checkpoint,
-                output_watermark: response.output_watermark,
-            }),
-            sequence_number: 0, // Filled out at commit
+        let new_event = ExecuteQuery {
+            input_slices: operation.input_slices,
+            input_checkpoint: operation.input_checkpoint,
+            output_data,
+            output_checkpoint,
+            output_watermark: response.output_watermark,
         };
 
         let result = commit_fn(
-            metadata_block,
+            system_time,
+            new_event,
             out_data_path.clone(),
             new_checkpoint_path.clone(),
         )
@@ -195,21 +189,15 @@ impl TransformServiceImpl {
     async fn commit_transform(
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
+        system_time: DateTime<Utc>,
         prev_block_hash: Multihash,
         prev_sequence_number: i32,
-        new_block: MetadataBlock,
+        new_event: ExecuteQuery,
         new_data_path: PathBuf,
         new_checkpoint_path: PathBuf,
     ) -> Result<TransformResult, TransformError> {
-        let new_block = MetadataBlock {
-            prev_block_hash: Some(prev_block_hash.clone()),
-            sequence_number: prev_sequence_number + 1,
-            ..new_block
-        };
-        let new_block_t = new_block.as_typed::<ExecuteQuery>().unwrap();
-
         // Commit data
-        if let Some(data_slice) = &new_block_t.event.output_data {
+        if let Some(data_slice) = &new_event.output_data {
             dataset
                 .as_data_repo()
                 .insert_file_move(
@@ -225,7 +213,7 @@ impl TransformServiceImpl {
         }
 
         // Commit checkpoint
-        if let Some(checkpoint) = &new_block_t.event.output_checkpoint {
+        if let Some(checkpoint) = &new_event.output_checkpoint {
             dataset
                 .as_checkpoint_repo()
                 .insert_file_move(
@@ -239,6 +227,13 @@ impl TransformServiceImpl {
                 .await
                 .int_err()?;
         }
+
+        let new_block = MetadataBlock {
+            prev_block_hash: Some(prev_block_hash.clone()),
+            system_time,
+            sequence_number: prev_sequence_number + 1,
+            event: new_event.into(),
+        };
 
         let new_block_hash = dataset
             .as_metadata_chain()
@@ -796,13 +791,14 @@ impl TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                move |new_block, new_data_path, new_checkpoint_path| {
+                move |system_time, new_event, new_data_path, new_checkpoint_path| {
                     Self::commit_transform(
                         dataset_handle,
                         dataset,
+                        system_time,
                         head,
                         head_block.sequence_number,
-                        new_block,
+                        new_event,
                         new_data_path,
                         new_checkpoint_path,
                     )
@@ -865,7 +861,6 @@ impl TransformService for TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
-        _options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
@@ -880,20 +875,20 @@ impl TransformService for TransformServiceImpl {
 
         for (step_index, step) in verification_plan.into_iter().enumerate() {
             let operation = step.operation;
-            let expected_block_hash = step.expected_hash;
+            let block_hash = step.expected_hash;
             let expected_block = step.expected_block;
+            let expected_event = expected_block.event.into_variant::<ExecuteQuery>().unwrap();
 
             // Will be set during "commit" step
-            let mut actual_block = None;
-            let mut actual_block_hash = None;
+            let mut actual_event = None;
 
             tracing::info!(
-                block_hash = %expected_block_hash,
+                %block_hash,
                 "Replaying block"
             );
 
             listener.begin_block(
-                &expected_block_hash,
+                &block_hash,
                 step_index,
                 num_steps,
                 VerificationPhase::ReplayTransform,
@@ -907,56 +902,21 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                |mut new_block: MetadataBlock, new_data_path, new_checkpoint_path| async {
-                    let new_block_t = new_block.as_typed_mut::<ExecuteQuery>().unwrap();
-                    let expected_block_t = expected_block.as_typed::<ExecuteQuery>().unwrap();
-
+                |_system_time, new_event, new_data_path, new_checkpoint_path| async {
                     // Cleanup not needed outputs
-                    if new_block_t.event.output_data.is_some() {
+                    if new_event.output_data.is_some() {
                         std::fs::remove_file(new_data_path).int_err()?;
                     }
-                    if new_block_t.event.output_checkpoint.is_some() {
+                    if new_event.output_checkpoint.is_some() {
                         std::fs::remove_file(new_checkpoint_path).int_err()?;
                     }
 
-                    // We overwrite the physical hash with the expected one because Parquet format is non-reproducible
-                    // We rely only on logical hash for equivalence test
-                    if let Some(slice) = &mut new_block_t.event.output_data {
-                        if let Some(expected_physical_hash) = expected_block_t
-                            .event
-                            .output_data
-                            .as_ref()
-                            .map(|s| &s.physical_hash)
-                        {
-                            slice.physical_hash = expected_physical_hash.clone();
-                        }
-                    }
+                    actual_event = Some(new_event);
 
-                    // We're not considering checkpoints in equivalence checks.
-                    if let Some(actual_checkpoint) = &mut new_block_t.event.output_checkpoint {
-                        if let Some(expected_checkpoint) = &expected_block_t.event.output_checkpoint
-                        {
-                            actual_checkpoint.physical_hash =
-                                expected_checkpoint.physical_hash.clone();
-                        }
-                    }
-
-                    // Link new block
-                    new_block.prev_block_hash = expected_block.prev_block_hash.clone();
-                    new_block.sequence_number = expected_block.sequence_number;
-
-                    // All we care about is the new block and its hash
-                    actual_block_hash = Some(Multihash::from_digest_sha3_256(
-                        &FlatbuffersMetadataBlockSerializer
-                            .write_manifest(&new_block)
-                            .int_err()?,
-                    ));
-
-                    actual_block = Some(new_block);
-
+                    // This result is ignored
                     Ok(TransformResult::Updated {
                         old_head: expected_block.prev_block_hash.clone().unwrap(),
-                        new_head: actual_block_hash.clone().unwrap(),
+                        new_head: block_hash.clone(),
                         num_blocks: 1,
                     })
                 },
@@ -964,26 +924,39 @@ impl TransformService for TransformServiceImpl {
             )
             .await?;
 
-            let actual_block = actual_block.unwrap();
-            let actual_block_hash = actual_block_hash.unwrap();
-            tracing::debug!(expected = ?expected_block, actual = ?actual_block, "Comparing results");
+            let actual_event = actual_event.unwrap();
 
-            if expected_block_hash != actual_block_hash || expected_block != actual_block {
-                tracing::info!(block_hash = %expected_block_hash, expected = ?expected_block, actual = ?actual_block, "Block invalid");
+            tracing::debug!(%block_hash, ?expected_event, ?actual_event, "Comparing expected and replayed events");
+
+            let mut cmp_actual_event = actual_event.clone();
+
+            // Parquet format is non-reproducible, so we rely only on logical hash for equivalence test
+            // and overwrite the physical hash and size with the expected values for comparison
+            if let Some(actual_slice) = &mut cmp_actual_event.output_data {
+                if let Some(expected_slice) = &expected_event.output_data {
+                    actual_slice.physical_hash = expected_slice.physical_hash.clone();
+                    actual_slice.size = expected_slice.size;
+                }
+            }
+
+            // Currently we're considering checkpoints non-reproducible and thus exclude them from equivalence test
+            cmp_actual_event.output_checkpoint = expected_event.output_checkpoint.clone();
+
+            if expected_event != cmp_actual_event {
+                tracing::warn!(%block_hash, ?expected_event, ?actual_event, "Data is not reproducible");
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
-                    expected_block_hash,
-                    expected_block,
-                    actual_block_hash,
-                    actual_block,
+                    block_hash,
+                    expected_event: expected_event.into(),
+                    actual_event: actual_event.into(),
                 });
                 listener.error(&err);
                 return Err(err);
             }
 
-            tracing::info!(block_hash = %expected_block_hash, "Block valid");
+            tracing::info!(%block_hash, "Block is valid");
             listener.end_block(
-                &expected_block_hash,
+                &block_hash,
                 step_index,
                 num_steps,
                 VerificationPhase::ReplayTransform,
@@ -997,7 +970,6 @@ impl TransformService for TransformServiceImpl {
     async fn verify_transform_multi(
         &self,
         _datasets: &mut dyn Iterator<Item = VerificationRequest>,
-        _options: VerificationOptions,
         _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         unimplemented!()

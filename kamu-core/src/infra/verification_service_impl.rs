@@ -290,7 +290,6 @@ impl VerificationService for VerificationServiceImpl {
                     .verify_transform(
                         &dataset_handle.as_local_ref(),
                         block_range.clone(),
-                        options,
                         Some(listener.clone()),
                     )
                     .await?;

@@ -299,21 +299,17 @@ impl Display for DataDoesNotMatchMetadata {
 
 #[derive(Error, Debug)]
 pub struct DataNotReproducible {
-    pub expected_block_hash: Multihash,
-    pub expected_block: MetadataBlock,
-    pub actual_block_hash: Multihash,
-    pub actual_block: MetadataBlock,
+    pub block_hash: Multihash,
+    pub expected_event: MetadataEvent,
+    pub actual_event: MetadataEvent,
 }
 
 impl Display for DataNotReproducible {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Expected block {:?} ({:?}) but got non-equivalent block {:?} ({:?})",
-            self.expected_block,
-            self.expected_block_hash,
-            self.actual_block,
-            self.actual_block_hash
+            "At block {:?} expected event {:?} but got non-equivalent event {:?}",
+            self.block_hash, self.expected_event, self.actual_event
         )
     }
 }

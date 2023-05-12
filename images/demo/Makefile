@@ -1,6 +1,6 @@
 IMAGE_REPO = ghcr.io/kamu-data
-KAMU_VERSION = 0.122.0
-DEMO_VERSION = 0.7.0
+KAMU_VERSION = 0.123.0
+DEMO_VERSION = 0.7.1
 
 #########################################################################################
 

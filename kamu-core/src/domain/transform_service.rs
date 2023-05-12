@@ -36,14 +36,12 @@ pub trait TransformService: Send + Sync {
         &self,
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 
     async fn verify_transform_multi(
         &self,
         datasets: &mut dyn Iterator<Item = VerificationRequest>,
-        options: VerificationOptions,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 }
