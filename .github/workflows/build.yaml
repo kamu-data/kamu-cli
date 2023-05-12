@@ -79,6 +79,9 @@ jobs:
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
+    # Disabling until we investigate the cause of linker OOM crash
+    # Issue: https://www.notion.so/CI-Windows-build-is-failing-with-linker-OOM-d6d2fc0cb71543d79ff79539f539c603?pvs=4
+    if: false
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
