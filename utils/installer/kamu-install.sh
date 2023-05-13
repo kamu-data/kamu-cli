@@ -216,13 +216,12 @@ main() {
 
 print_header() {
     logoclr="${cyanbr}"
-    printf "
-${logoclr}    ◢◣◥◣         ${red}${bold}           KAMU${reset}
-${logoclr}   ◢◤◥◣◥◣        ${magenta}${bold}Planet-scale data pipeline${reset}
-${logoclr}  ◢◤◢🭬◥◣◥◣       ${reset}
-${logoclr} ◢◤◢◤  🭭 ◥◣      ${magenta}    https://kamu.dev${reset}
-${logoclr}🭮◤◢◤🬯🬰🬰🬰🬰🬰🬒${reset}
-
+    printf \
+"${logoclr}${green}${bold}Kamu: Planet-scale data pipeline${reset}
+${logoclr}${reset}
+${logoclr}${magenta}Website: https://kamu.dev${reset}
+${logoclr}${magenta}Docs: https://docs.kamu.dev/cli/${reset}
+${logoclr}${magenta}Discord: https://discord.gg/nU6TXRQNXC${reset}
 
 " 1>&2
 }
