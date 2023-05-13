@@ -13,3 +13,12 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
+
+
+# Emit the line info tables for our crates to produce useful crash reports and backtraces.
+# We don't emit info for dependencies as this significantly increases binary size.
+# See: https://doc.rust-lang.org/cargo/reference/profiles.html#debug
+[profile.release.package]
+opendatafabric = { debug = 1 }
+kamu = { debug = 1 }
+kamu-cli = { debug = 1 }

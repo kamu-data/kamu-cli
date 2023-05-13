@@ -54,6 +54,7 @@ jobs:
       #     key: ${{ runner.os }}-cargo
       - run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
+      - run: cargo build --features test_ftp
       - run: cargo test --verbose --features test_ftp
       - run: git diff
       - run: git diff-index --quiet HEAD # Ensure all generated files are up-to-date
@@ -73,6 +74,7 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
+      - run: cargo build --features skip_docker_tests
       - run: cargo test --verbose --features skip_docker_tests
 
   test_windows:
@@ -93,4 +95,5 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
+      - run: cargo build --features skip_docker_tests
       - run: cargo test --verbose --features skip_docker_tests
