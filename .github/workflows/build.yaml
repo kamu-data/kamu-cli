@@ -54,10 +54,14 @@ jobs:
       #     key: ${{ runner.os }}-cargo
       - run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
-      - run: cargo build --features test_ftp
-      - run: cargo test --verbose --features test_ftp
-      - run: git diff
-      - run: git diff-index --quiet HEAD # Ensure all generated files are up-to-date
+      - name: build
+        run: cargo test --features test_ftp --no-run
+      - name: pull test images
+        run: cargo test test_setup_pull_images --features test_ftp
+      - name: run tests
+        run: cargo test --verbose --features test_ftp
+      - name: check git diff 
+        run: git diff && git diff-index --quiet HEAD # Ensure all generated files are up-to-date
 
   test_macos:
     name: Test / MacOS
@@ -74,15 +78,14 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
-      - run: cargo build --features skip_docker_tests
-      - run: cargo test --verbose --features skip_docker_tests
+      - name: build
+        run: cargo test --features skip_docker_tests --no-run
+      - name: run tests
+        run: cargo test --verbose --features skip_docker_tests
 
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
-    # Disabling until we investigate the cause of linker OOM crash
-    # Issue: https://www.notion.so/CI-Windows-build-is-failing-with-linker-OOM-d6d2fc0cb71543d79ff79539f539c603?pvs=4
-    if: false
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -95,5 +98,7 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
-      - run: cargo build --features skip_docker_tests
-      - run: cargo test --verbose --features skip_docker_tests
+      - name: build
+        run: cargo test --features skip_docker_tests --no-run
+      - name: run tests
+        run: cargo test --verbose --features skip_docker_tests

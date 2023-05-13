@@ -16,6 +16,7 @@ mod test_resource_loader_impl;
 mod test_schema_utils;
 mod test_search_service_impl;
 mod test_serde_yaml;
+mod test_setup;
 mod test_sync_service_impl;
 mod test_transform_service_impl;
 mod test_verification_service_impl;
