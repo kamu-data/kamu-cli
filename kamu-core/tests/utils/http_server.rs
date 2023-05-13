@@ -29,6 +29,7 @@ impl HttpServer {
         use rand::Rng;
 
         let container_runtime = ContainerRuntime::default();
+        container_runtime.ensure_image(Self::IMAGE, None);
 
         let mut server_name = "kamu-test-http-".to_owned();
         server_name.extend(
@@ -42,12 +43,6 @@ impl HttpServer {
         if !server_dir.exists() {
             std::fs::create_dir(&server_dir).unwrap();
         }
-
-        assert!(
-            container_runtime.has_image(Self::IMAGE),
-            "Please pull {} image before running this test",
-            Self::IMAGE
-        );
 
         let process = container_runtime
             .run_cmd(RunArgs {

@@ -341,11 +341,6 @@ pub fn cli() -> Command {
                             .long("pull-images")
                             .action(ArgAction::SetTrue)
                             .help("Only pull container images and exit"),
-                        Arg::new("pull-test-images")
-                            .long("pull-test-images")
-                            .action(ArgAction::SetTrue)
-                            .hide(true)
-                            .help("Only pull test-related container images and exit"),
                         Arg::new("list-only")
                             .long("list-only")
                             .action(ArgAction::SetTrue)

@@ -94,10 +94,11 @@ pub fn get_command(
             submatches.get_flag("yes"),
         )),
         Some(("init", submatches)) => {
-            if submatches.get_flag("pull-images") || submatches.get_flag("pull-test-images") {
+            if submatches.get_flag("pull-images") {
                 Box::new(PullImagesCommand::new(
                     catalog.get_one()?,
-                    submatches.get_flag("pull-test-images"),
+                    catalog.get_one()?,
+                    catalog.get_one()?,
                     submatches.get_flag("list-only"),
                 ))
             } else {

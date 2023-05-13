@@ -140,6 +140,11 @@ pub struct ContainerRuntime {
     pub config: ContainerRuntimeConfig,
 }
 
+// TODO: This is a hack primarily for tests that use containers not to
+// spam docker/podman with many pull requests at a time. While docker's daemon architecture
+// handles concurrent pulls well, podman seem to sometimes does not deduplicate pulls well.
+static PULL_IMAGE_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[component(pub)]
 impl ContainerRuntime {
     pub fn new(config: ContainerRuntimeConfig) -> Self {
@@ -180,15 +185,19 @@ impl ContainerRuntime {
         if !self.has_image(image) {
             listener.begin(image);
 
-            // TODO: Handle pull errors gracefully
-            self.pull_cmd(image)
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .expect("Failed to start pull process")
-                .exit_ok()
-                .expect("Failed to pull image");
+            {
+                let _lock = PULL_IMAGE_MUTEX.lock().unwrap();
+
+                // TODO: Handle pull errors gracefully
+                self.pull_cmd(image)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .status()
+                    .expect("Failed to start pull process")
+                    .exit_ok()
+                    .expect("Failed to pull image");
+            }
 
             listener.success();
         }

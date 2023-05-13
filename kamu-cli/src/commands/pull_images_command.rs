@@ -7,29 +7,30 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use crate::JupyterConfig;
-
 use super::{CLIError, Command};
+use crate::JupyterConfig;
 use container_runtime::ContainerRuntime;
-use kamu::infra::utils::docker_images;
+use kamu::infra::EngineProvisionerLocalConfig;
+use std::sync::Arc;
 
 pub struct PullImagesCommand {
     container_runtime: Arc<ContainerRuntime>,
-    pull_test_deps: bool,
+    engine_config: Arc<EngineProvisionerLocalConfig>,
+    jupyter_config: Arc<JupyterConfig>,
     list_only: bool,
 }
 
 impl PullImagesCommand {
     pub fn new<'a>(
         container_runtime: Arc<ContainerRuntime>,
-        pull_test_deps: bool,
+        engine_config: Arc<EngineProvisionerLocalConfig>,
+        jupyter_config: Arc<JupyterConfig>,
         list_only: bool,
     ) -> Self {
         Self {
             container_runtime,
-            pull_test_deps,
+            engine_config,
+            jupyter_config,
             list_only,
         }
     }
@@ -43,18 +44,14 @@ impl Command for PullImagesCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         let mut images = vec![
-            docker_images::SPARK,
-            docker_images::FLINK,
-            JupyterConfig::IMAGE,
+            self.engine_config.spark_image.as_str(),
+            self.engine_config.flink_image.as_str(),
+            self.jupyter_config.image.as_ref().unwrap().as_str(),
+            self.jupyter_config.livy_image.as_ref().unwrap().as_str(),
         ];
 
-        if self.pull_test_deps {
-            images.extend(vec![
-                docker_images::HTTPD,
-                docker_images::FTP,
-                docker_images::MINIO,
-            ])
-        }
+        images.sort();
+        images.dedup();
 
         if self.list_only {
             for img in images {
@@ -64,7 +61,7 @@ impl Command for PullImagesCommand {
             for img in images {
                 eprintln!("{}: {}", console::style("Pulling image").bold(), img);
                 self.container_runtime
-                    .pull_cmd(img)
+                    .pull_cmd(&img)
                     .status()?
                     .exit_ok()
                     .map_err(|e| CLIError::failure(e))?;

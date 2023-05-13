@@ -62,13 +62,12 @@ New to Rust? Check out these [IDE configuration tip](#ide-tips).
 
 ### Run Tests with Podman (Recommended)
 
-Prepare test containers once before running tests:
+Set podman as preferred runtime for your user:
 ```shell
 cargo run --bin kamu-cli -- config set --user engine.runtime podman
-kamu init --pull-test-images
 ```
 
-Then run tests:
+Run tests (note: upon first run the tests will need to pull extra images and will run longer):
 ```shell
 cargo test
 ```
@@ -76,12 +75,7 @@ cargo test
 
 ### Run Tests with Docker (Alternative)
 
-Prepare test containers once before running tests:
-```shell
-kamu init --pull-test-images
-```
-
-Then run tests:
+Run tests (note: upon first run the tests will need to pull extra images and will run longer):
 ```shell
 KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test
 

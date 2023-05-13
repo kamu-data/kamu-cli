@@ -52,9 +52,8 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
-      - run: cargo build
-      - run: cargo run --bin kamu-cli -- config set --user engine.runtime podman # Podman is default for tests but not for runtime yet
-      - run: cargo run --bin kamu-cli -- init --pull-test-images
+      - run: |
+          echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
       - run: cargo test --verbose --features test_ftp
       - run: git diff
       - run: git diff-index --quiet HEAD # Ensure all generated files are up-to-date
