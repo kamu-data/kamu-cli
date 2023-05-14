@@ -675,6 +675,9 @@ impl FetchService {
             });
         }
 
+        // Important: Ensures file is closed immediately when dropped
+        file.flush().await.int_err()?;
+
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state,
             source_event_time,
