@@ -38,7 +38,7 @@ jobs:
     name: Test / Linux
     runs-on: ubuntu-latest
     env:
-      KAMU_FEATURES: ftp
+      CARGO_FLAGS: --profile ci --features ftp
     steps:
       - uses: ibnesayeed/setup-ipfs@master
         with:
@@ -52,11 +52,11 @@ jobs:
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
       - name: build
-        run: cargo test --features $KAMU_FEATURES --no-run
+        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: pull test images
-        run: cargo test --features $KAMU_FEATURES test_setup_pull_images
+        run: cargo test ${{ env.CARGO_FLAGS }} test_setup_pull_images
       - name: run tests
-        run: cargo test --features $KAMU_FEATURES
+        run: cargo test ${{ env.CARGO_FLAGS }}
       - name: check git diff 
         run: git diff && git diff-index --quiet HEAD # Ensure all generated files are up-to-date
 
@@ -64,7 +64,7 @@ jobs:
     name: Test / MacOS
     runs-on: macos-latest
     env:
-      KAMU_FEATURES: skip_docker_tests
+      CARGO_FLAGS: --profile ci --features skip_docker_tests
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -72,15 +72,15 @@ jobs:
         with:
           cache-on-failure: true
       - name: build
-        run: cargo test --features $KAMU_FEATURES --no-run
+        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: run tests
-        run: cargo test --features $KAMU_FEATURES
+        run: cargo test ${{ env.CARGO_FLAGS }}
 
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
     env:
-      KAMU_FEATURES: skip_docker_tests
+      CARGO_FLAGS: --profile ci --features skip_docker_tests
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -88,6 +88,6 @@ jobs:
         with:
           cache-on-failure: true
       - name: build
-        run: cargo test --features ${{ env.KAMU_FEATURES }} --no-run
+        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: run tests
-        run: cargo test --features ${{ env.KAMU_FEATURES }}
+        run: cargo test ${{ env.CARGO_FLAGS }}

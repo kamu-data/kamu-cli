@@ -15,6 +15,12 @@ resolver = "2"
 edition = "2021"
 
 
+[profile.dev]
+# Change this to 2 when you need to attach a debugger. In most cases line info
+# is enough and will speed up builds.
+debug = 1
+
+
 # Emit the line info tables for our crates to produce useful crash reports and backtraces.
 # We don't emit info for dependencies as this significantly increases binary size.
 # See: https://doc.rust-lang.org/cargo/reference/profiles.html#debug
@@ -22,3 +28,15 @@ edition = "2021"
 opendatafabric = { debug = 1 }
 kamu = { debug = 1 }
 kamu-cli = { debug = 1 }
+
+
+[profile.ci]
+inherits = "dev"
+# CI builds often are closer to from-scratch builds. Incremental adds an extra
+# dependency-tracking overhead and significantly increases the amount of IO and
+# the size of ./target, which make caching less effective
+# See: https://matklad.github.io/2021/09/04/fast-rust-builds.html#CI-Workflow
+incremental = false
+# Line info is enough to get good backtraces in CI - we don't need the
+# full debugging symbols that only useful when attacing a debugger.
+debug = 1
