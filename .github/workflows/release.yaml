@@ -82,7 +82,7 @@ jobs:
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           components: rustfmt
-      - run: cargo build -p kamu-cli --release --target=${{ matrix.target }} --features $KAMU_FEATURES
+      - run: cargo build -p kamu-cli --release --target=${{ matrix.target }} --features ${{ env.KAMU_FEATURES }}
       - name: Rename binary
         shell: bash
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}.exe target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
