@@ -106,6 +106,6 @@ jobs:
       #       target/
       #     key: ${{ runner.os }}-cargo
       - name: build
-        run: cargo test --features $KAMU_FEATURES --no-run
+        run: cargo test --features ${{ env.KAMU_FEATURES }} --no-run
       - name: run tests
-        run: cargo test --features $KAMU_FEATURES
+        run: cargo test --features ${{ env.KAMU_FEATURES }}
