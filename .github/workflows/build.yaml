@@ -40,20 +40,14 @@ jobs:
     env:
       KAMU_FEATURES: ftp
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
       - uses: ibnesayeed/setup-ipfs@master
         with:
           ipfs_version: "0.19"
-      # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
-      #   with:
-      #     path: |
-      #       ~/.cargo/bin/
-      #       ~/.cargo/registry/index/
-      #       ~/.cargo/registry/cache/
-      #       ~/.cargo/git/db/
-      #       target/
-      #     key: ${{ runner.os }}-cargo
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: Configure podman runtime
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
@@ -74,15 +68,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
-      # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
-      #   with:
-      #     path: |
-      #       ~/.cargo/bin/
-      #       ~/.cargo/registry/index/
-      #       ~/.cargo/registry/cache/
-      #       ~/.cargo/git/db/
-      #       target/
-      #     key: ${{ runner.os }}-cargo
+      - uses: swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: build
         run: cargo test --features $KAMU_FEATURES --no-run
       - name: run tests
@@ -96,15 +84,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
-      # - uses: actions/cache@v3 # Source: https://github.com/actions/cache/blob/main/examples.md#rust---cargo
-      #   with:
-      #     path: |
-      #       ~/.cargo/bin/
-      #       ~/.cargo/registry/index/
-      #       ~/.cargo/registry/cache/
-      #       ~/.cargo/git/db/
-      #       target/
-      #     key: ${{ runner.os }}-cargo
+      - uses: swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: build
         run: cargo test --features ${{ env.KAMU_FEATURES }} --no-run
       - name: run tests
