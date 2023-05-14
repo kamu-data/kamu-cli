@@ -38,5 +38,5 @@ inherits = "dev"
 # See: https://matklad.github.io/2021/09/04/fast-rust-builds.html#CI-Workflow
 incremental = false
 # Line info is enough to get good backtraces in CI - we don't need the
-# full debugging symbols that only useful when attacing a debugger.
+# full debugging symbols that are only useful when attaching a debugger.
 debug = 1
