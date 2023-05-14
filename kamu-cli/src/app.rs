@@ -165,7 +165,7 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
     let config_svc = ConfigService::new(workspace_layout);
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
-    tracing::info!(config = ?config, "Loaded configuration");
+    tracing::info!(?config, "Loaded configuration");
 
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
