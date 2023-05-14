@@ -13,7 +13,6 @@ use opendatafabric::*;
 
 use dill::component;
 use std::path::Path;
-use std::time::Duration;
 use url::Url;
 
 #[component]
@@ -24,43 +23,35 @@ impl ResourceLoaderImpl {
         Self {}
     }
 
-    pub fn load_dataset_snapshot_from_http(
+    pub async fn load_dataset_snapshot_from_http(
         &self,
         url: &Url,
     ) -> Result<DatasetSnapshot, ResourceError> {
-        let mut h = curl::easy::Easy::new();
-        h.url(url.as_str())?;
-        h.get(true)?;
-        h.connect_timeout(Duration::from_secs(30))?;
-
-        let mut buffer = Vec::new();
-
+        match reqwest::get(url.clone())
+            .await
+            .int_err()?
+            .error_for_status()
         {
-            let mut transfer = h.transfer();
-
-            transfer.write_function(|data| {
-                buffer.extend_from_slice(data);
-                Ok(data.len())
-            })?;
-
-            transfer.perform()?;
-        }
-
-        match h.response_code()? {
-            200 => {
-                let snapshot = YamlDatasetSnapshotDeserializer
-                    .read_manifest(&buffer)
-                    .map_err(|e| ResourceError::serde(e))?;
-                Ok(snapshot)
+            Ok(response) => {
+                let bytes = response.bytes().await.int_err()?;
+                YamlDatasetSnapshotDeserializer
+                    .read_manifest(&bytes)
+                    .map_err(|e| ResourceError::serde(e))
             }
-            404 => Err(ResourceError::not_found(url.as_str().to_owned(), None)),
-            _ => Err(ResourceError::unreachable(url.as_str().to_owned(), None)),
+            Err(err) if err.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+                Err(ResourceError::not_found(url.as_str().to_owned(), None))
+            }
+            Err(err) => Err(ResourceError::unreachable(
+                url.as_str().to_owned(),
+                Some(err.into()),
+            )),
         }
     }
 }
 
+#[async_trait::async_trait]
 impl ResourceLoader for ResourceLoaderImpl {
-    fn load_dataset_snapshot_from_path(
+    async fn load_dataset_snapshot_from_path(
         &self,
         path: &Path,
     ) -> Result<DatasetSnapshot, ResourceError> {
@@ -71,30 +62,31 @@ impl ResourceLoader for ResourceLoaderImpl {
         Ok(snapshot)
     }
 
-    fn load_dataset_snapshot_from_url(&self, url: &Url) -> Result<DatasetSnapshot, ResourceError> {
+    async fn load_dataset_snapshot_from_url(
+        &self,
+        url: &Url,
+    ) -> Result<DatasetSnapshot, ResourceError> {
         match url.scheme() {
             "file" => {
-                self.load_dataset_snapshot_from_path(&url.to_file_path().expect("Invalid file URL"))
+                let path = url.to_file_path().expect("Invalid file URL");
+                self.load_dataset_snapshot_from_path(&path).await
             }
-            "http" | "https" => self.load_dataset_snapshot_from_http(url),
+            "http" | "https" => self.load_dataset_snapshot_from_http(url).await,
             _ => unimplemented!("Unsupported scheme {}", url.scheme()),
         }
     }
 
-    fn load_dataset_snapshot_from_ref(&self, sref: &str) -> Result<DatasetSnapshot, ResourceError> {
+    async fn load_dataset_snapshot_from_ref(
+        &self,
+        sref: &str,
+    ) -> Result<DatasetSnapshot, ResourceError> {
         let path = Path::new(sref);
         if path.exists() {
-            self.load_dataset_snapshot_from_path(path)
+            self.load_dataset_snapshot_from_path(path).await
         } else if let Ok(url) = Url::parse(sref) {
-            self.load_dataset_snapshot_from_url(&url)
+            self.load_dataset_snapshot_from_url(&url).await
         } else {
-            self.load_dataset_snapshot_from_path(path)
+            self.load_dataset_snapshot_from_path(path).await
         }
-    }
-}
-
-impl From<curl::Error> for ResourceError {
-    fn from(e: curl::Error) -> Self {
-        ResourceError::from(e.int_err())
     }
 }

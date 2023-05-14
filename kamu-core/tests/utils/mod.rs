@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#[cfg(feature = "ftp")]
 mod ftp_server;
+#[cfg(feature = "ftp")]
 pub use ftp_server::*;
 
 mod http_server;

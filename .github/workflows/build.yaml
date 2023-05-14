@@ -37,6 +37,8 @@ jobs:
   test_linux:
     name: Test / Linux
     runs-on: ubuntu-latest
+    env:
+      KAMU_FEATURES: ftp
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -56,17 +58,19 @@ jobs:
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
       - name: build
-        run: cargo test --features test_ftp --no-run
+        run: cargo test --features $KAMU_FEATURES --no-run
       - name: pull test images
-        run: cargo test test_setup_pull_images --features test_ftp
+        run: cargo test --features $KAMU_FEATURES test_setup_pull_images
       - name: run tests
-        run: cargo test --verbose --features test_ftp
+        run: cargo test --features $KAMU_FEATURES
       - name: check git diff 
         run: git diff && git diff-index --quiet HEAD # Ensure all generated files are up-to-date
 
   test_macos:
     name: Test / MacOS
     runs-on: macos-latest
+    env:
+      KAMU_FEATURES: skip_docker_tests
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -80,13 +84,15 @@ jobs:
       #       target/
       #     key: ${{ runner.os }}-cargo
       - name: build
-        run: cargo test --features skip_docker_tests --no-run
+        run: cargo test --features $KAMU_FEATURES --no-run
       - name: run tests
-        run: cargo test --verbose --features skip_docker_tests
+        run: cargo test --features $KAMU_FEATURES
 
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
+    env:
+      KAMU_FEATURES: skip_docker_tests
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
@@ -100,6 +106,6 @@ jobs:
       #       target/
       #     key: ${{ runner.os }}-cargo
       - name: build
-        run: cargo test --features skip_docker_tests --no-run
+        run: cargo test --features $KAMU_FEATURES --no-run
       - name: run tests
-        run: cargo test --verbose --features skip_docker_tests
+        run: cargo test --features $KAMU_FEATURES

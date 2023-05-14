@@ -14,5 +14,7 @@ pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.5.0";
 
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";
-pub const FTP: &str = "docker.io/bogem/ftp";
 pub const MINIO: &str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
+
+#[cfg(feature = "ftp")]
+pub const FTP: &str = "docker.io/bogem/ftp";

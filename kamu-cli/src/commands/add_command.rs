@@ -45,20 +45,18 @@ impl AddCommand {
         }
     }
 
-    fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
-        self.snapshot_refs
-            .iter()
-            .map(|r| {
-                (
-                    r.clone(),
-                    self.resource_loader.load_dataset_snapshot_from_ref(r),
-                )
-            })
-            .collect()
+    async fn load_specific(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+        let mut res = Vec::new();
+        for r in &self.snapshot_refs {
+            let load = self.resource_loader.load_dataset_snapshot_from_ref(r).await;
+            res.push((r.clone(), load))
+        }
+        res
     }
 
-    fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
-        self.snapshot_refs
+    async fn load_recursive(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+        let files_iter = self
+            .snapshot_refs
             .iter()
             .map(|r| std::path::Path::new(r).join("**").join("*.yaml"))
             .flat_map(|p| {
@@ -69,17 +67,20 @@ impl AddCommand {
             .filter(|p| {
                 self.is_snapshot_file(p)
                     .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))
-            })
-            .map(|p| {
-                (
-                    p.to_str().unwrap().to_owned(),
-                    self.resource_loader.load_dataset_snapshot_from_path(&p),
-                )
-            })
-            .collect()
+            });
+
+        let mut res = Vec::new();
+        for path in files_iter {
+            let load = self
+                .resource_loader
+                .load_dataset_snapshot_from_path(&path)
+                .await;
+            res.push((path.to_str().unwrap().to_owned(), load))
+        }
+        res
     }
 
-    fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+    async fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
         match opendatafabric::serde::yaml::YamlDatasetSnapshotDeserializer
             .read_manifests(std::io::stdin())
         {
@@ -136,11 +137,11 @@ impl Command for AddCommand {
         }
 
         let load_results = if self.recursive {
-            self.load_recursive()
+            self.load_recursive().await
         } else if self.stdin {
-            self.load_stdin()
+            self.load_stdin().await
         } else {
-            self.load_specific()
+            self.load_specific().await
         };
 
         let (snapshots, mut errors): (Vec<_>, Vec<_>) =

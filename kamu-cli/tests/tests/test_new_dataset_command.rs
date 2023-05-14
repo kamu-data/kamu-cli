@@ -41,6 +41,7 @@ async fn test_root_dataset_parses() {
     let loader = ResourceLoaderImpl::new();
     loader
         .load_dataset_snapshot_from_path(&path)
+        .await
         .expect("Failed to parse template");
 }
 
@@ -59,5 +60,6 @@ async fn test_derivative_dataset_parses() {
     let loader = ResourceLoaderImpl::new();
     loader
         .load_dataset_snapshot_from_path(&path)
+        .await
         .expect("Failed to parse template");
 }

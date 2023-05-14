@@ -18,11 +18,9 @@ use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
 use std::assert_matches::assert_matches;
 use std::borrow::Cow;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use std::time::Duration;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -34,7 +32,7 @@ pub struct FetchService {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Reimplement with async libraries
+// TODO: Split this service apart into pluggable protocol implementations
 impl FetchService {
     pub fn new(
         container_runtime: Arc<ContainerRuntime>,
@@ -55,27 +53,46 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
-        let fetch_step = fetch_step.clone();
-        let prev_source_state = prev_source_state.cloned();
-        let target_path = target_path.to_owned();
-        let container_runtime = self.container_runtime.clone();
-        let container_log_dir = self.container_log_dir.clone();
+        // TODO: Convert all implementations to non-blocking
+        if !Self::requires_blocking_fetch(fetch_step)? {
+            self.fetch_nonblocking(fetch_step, prev_source_state, target_path, listener)
+                .await
+        } else {
+            let fetch_step = fetch_step.clone();
+            let prev_source_state = prev_source_state.cloned();
+            let target_path = target_path.to_owned();
+            let container_runtime = self.container_runtime.clone();
+            let container_log_dir = self.container_log_dir.clone();
 
-        tokio::task::spawn_blocking(move || {
-            Self::fetch_impl(
-                &fetch_step,
-                prev_source_state.as_ref(),
-                &target_path,
-                listener,
-                container_runtime,
-                container_log_dir,
-            )
-        })
-        .await
-        .unwrap()
+            tokio::task::spawn_blocking(move || {
+                Self::fetch_blocking(
+                    &fetch_step,
+                    prev_source_state.as_ref(),
+                    &target_path,
+                    listener,
+                    container_runtime,
+                    container_log_dir,
+                )
+            })
+            .await
+            .unwrap()
+        }
     }
 
-    fn fetch_impl(
+    fn requires_blocking_fetch(fetch_step: &FetchStep) -> Result<bool, IngestError> {
+        match fetch_step {
+            FetchStep::Url(furl) => {
+                let url = Self::template_url(&furl.url)?;
+                match url.scheme() {
+                    "http" | "https" => Ok(false),
+                    _ => Ok(true),
+                }
+            }
+            _ => Ok(true),
+        }
+    }
+
+    fn fetch_blocking(
         fetch_step: &FetchStep,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -86,7 +103,6 @@ impl FetchService {
         match &fetch_step {
             FetchStep::Url(furl) => {
                 let url = Self::template_url(&furl.url)?;
-                let headers = Self::template_headers(&furl.headers)?;
 
                 match url.scheme() {
                     "file" => Self::fetch_file(
@@ -97,21 +113,21 @@ impl FetchService {
                         target_path,
                         listener.as_ref(),
                     ),
-                    "http" | "https" => Self::fetch_http(
-                        &url,
-                        &headers,
-                        furl.event_time.as_ref(),
-                        prev_source_state,
-                        target_path,
-                        listener.as_ref(),
-                    ),
-                    "ftp" => Self::fetch_ftp(
-                        &url,
-                        furl.event_time.as_ref(),
-                        prev_source_state,
-                        target_path,
-                        listener.as_ref(),
-                    ),
+                    "ftp" => {
+                        cfg_if::cfg_if! {
+                            if #[cfg(feature = "ftp")] {
+                                Self::fetch_ftp(
+                                    &url,
+                                    furl.event_time.as_ref(),
+                                    prev_source_state,
+                                    target_path,
+                                    listener.as_ref(),
+                                )
+                            } else {
+                                unimplemented!("Kamu was compiled without FTP support")
+                            }
+                        }
+                    }
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
@@ -126,6 +142,38 @@ impl FetchService {
                 target_path,
                 listener,
             ),
+        }
+    }
+
+    pub async fn fetch_nonblocking(
+        &self,
+        fetch_step: &FetchStep,
+        prev_source_state: Option<&PollingSourceState>,
+        target_path: &Path,
+        listener: Arc<dyn FetchProgressListener>,
+    ) -> Result<FetchResult, IngestError> {
+        match fetch_step {
+            FetchStep::Url(furl) => {
+                let url = Self::template_url(&furl.url)?;
+                let headers = Self::template_headers(&furl.headers)?;
+
+                match url.scheme() {
+                    "http" | "https" => {
+                        self.fetch_http(
+                            url,
+                            headers,
+                            furl.event_time.as_ref(),
+                            prev_source_state,
+                            target_path,
+                            listener.as_ref(),
+                        )
+                        .await
+                    }
+                    // TODO: Replace with proper error type
+                    scheme => unimplemented!("Unsupported scheme: {}", scheme),
+                }
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -263,7 +311,7 @@ impl FetchService {
                     // TODO: This is insecure
                     let value = match std::env::var(&env_var.name) {
                         Ok(value) => Ok(value),
-                        Err(_) => Err(IngestInputNotFound::new(&env_var.name)),
+                        Err(_) => Err(IngestParameterNotFound::new(&env_var.name)),
                     }?;
                     environment_vars.push((env_var.name.clone(), value));
                 }
@@ -513,14 +561,23 @@ impl FetchService {
         }))
     }
 
-    fn fetch_http(
-        url: &Url,
-        headers: &Vec<RequestHeader>,
+    // TODO: Externalize configuration
+    const HTTP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+    const HTTP_MAX_REDIRECTS: usize = 10;
+
+    async fn fetch_http(
+        &self,
+        url: Url,
+        headers: Vec<RequestHeader>,
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
+        use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+        use reqwest::StatusCode;
+        use tokio::io::AsyncWriteExt;
+
         match event_time_source {
             None | Some(EventTimeSource::FromMetadata) => (),
             Some(src) => {
@@ -535,123 +592,99 @@ impl FetchService {
             }
         };
 
-        let target_path_tmp = target_path.with_extension("tmp");
+        let client = reqwest::Client::builder()
+            .connect_timeout(Self::HTTP_CONNECT_TIMEOUT)
+            .redirect(reqwest::redirect::Policy::limited(Self::HTTP_MAX_REDIRECTS))
+            .build()
+            .int_err()?;
 
-        let mut h = curl::easy::Easy::new();
-        h.url(url.as_str())?;
-        h.get(true)?;
-        h.connect_timeout(Duration::from_secs(30))?;
-        h.progress(true)?;
-        h.follow_location(true)?;
-
-        let mut header_list = curl::easy::List::new();
-        for hdr in headers {
-            header_list.append(&format!("{}: {}", hdr.name, hdr.value))?;
-        }
+        let mut headers: HeaderMap = headers
+            .into_iter()
+            .map(|h| {
+                let name = HeaderName::try_from(h.name).unwrap();
+                let value = HeaderValue::try_from(h.value).unwrap();
+                (name, value)
+            })
+            .collect();
 
         match prev_source_state {
             None => (),
             Some(PollingSourceState::ETag(etag)) => {
-                header_list.append(&format!("If-None-Match: {}", etag))?
+                headers.insert(
+                    reqwest::header::IF_NONE_MATCH,
+                    HeaderValue::try_from(etag).unwrap(),
+                );
             }
-            Some(PollingSourceState::LastModified(last_modified)) => header_list.append(
-                &format!("If-Modified-Since: {}", last_modified.to_rfc2822()),
-            )?,
+            Some(PollingSourceState::LastModified(last_modified)) => {
+                headers.insert(
+                    reqwest::header::IF_MODIFIED_SINCE,
+                    HeaderValue::try_from(last_modified.to_rfc2822()).unwrap(),
+                );
+            }
         }
 
-        h.http_headers(header_list)?;
+        let mut response = match client.get(url.clone()).headers(headers).send().await {
+            Ok(r) => Ok(r),
+            Err(err) if err.is_connect() || err.is_timeout() => {
+                Err(IngestError::unreachable(url.as_str(), Some(err.into())))
+            }
+            Err(err) => Err(err.int_err().into()),
+        }?;
 
-        let mut last_modified: Option<DateTime<Utc>> = None;
-        let mut etag: Option<String> = None;
-        {
-            let mut target_file = std::fs::File::create(&target_path_tmp).int_err()?;
-
-            let mut transfer = h.transfer();
-
-            transfer.header_function(|header| {
-                let s = std::str::from_utf8(header).unwrap();
-                if let Some((name, val)) = Self::split_header(s) {
-                    match &name.to_lowercase()[..] {
-                        "last-modified" => {
-                            last_modified = Some(Self::parse_http_date_time(val));
-                        }
-                        "etag" => {
-                            etag = Some(val.to_owned());
-                        }
-                        _ => (),
-                    }
-                }
-                true
-            })?;
-
-            transfer.write_function(|data| {
-                let written = target_file.write(data).unwrap();
-                Ok(written)
-            })?;
-
-            transfer.progress_function(|f_total, f_downloaded, _, _| {
-                let total = f_total as u64;
-                let downloaded = f_downloaded as u64;
-                if downloaded > 0 {
-                    listener.on_progress(&FetchProgress {
-                        total_bytes: std::cmp::max(total, downloaded),
-                        fetched_bytes: downloaded,
-                    });
-                }
-                true
-            })?;
-
-            transfer.perform().map_err(|e| {
-                std::fs::remove_file(&target_path_tmp).unwrap();
-                match e.code() {
-                    curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
-                        IngestError::unreachable(url.as_str(), Some(e.into()))
-                    }
-                    curl_sys::CURLE_COULDNT_CONNECT => {
-                        IngestError::unreachable(url.as_str(), Some(e.into()))
-                    }
-                    _ => e.int_err().into(),
-                }
-            })?;
+        match response.status() {
+            StatusCode::OK => (),
+            StatusCode::NOT_MODIFIED => {
+                return Ok(FetchResult::UpToDate);
+            }
+            StatusCode::NOT_FOUND => {
+                return Err(IngestError::not_found(url.as_str(), None));
+            }
+            code => {
+                return Err(IngestError::unreachable(
+                    url.as_str(),
+                    Some(HttpStatusError::new(code.as_u16() as u32).into()),
+                ))
+            }
         }
 
-        let source_state = if let Some(etag) = etag {
-            Some(PollingSourceState::ETag(etag))
-        } else if let Some(last_modified) = &last_modified {
-            Some(PollingSourceState::LastModified(last_modified.clone()))
+        let mut source_event_time = None;
+        let source_state = if let Some(etag) = response.headers().get(reqwest::header::ETAG) {
+            Some(PollingSourceState::ETag(
+                etag.to_str().int_err()?.to_string(),
+            ))
+        } else if let Some(last_modified) = response.headers().get(reqwest::header::LAST_MODIFIED) {
+            let last_modified = Self::parse_http_date_time(last_modified.to_str().int_err()?);
+            source_event_time = Some(last_modified.clone());
+            Some(PollingSourceState::LastModified(last_modified))
         } else {
             None
         };
 
-        match h.response_code()? {
-            200 => {
-                std::fs::rename(target_path_tmp, target_path).unwrap();
-                Ok(FetchResult::Updated(FetchResultUpdated {
-                    source_state,
-                    source_event_time: last_modified,
-                    has_more: false,
-                }))
-            }
-            304 => {
-                std::fs::remove_file(&target_path_tmp).unwrap();
-                Ok(FetchResult::UpToDate)
-            }
-            404 => {
-                std::fs::remove_file(&target_path_tmp).unwrap();
-                Err(IngestError::not_found(url.as_str(), None))
-            }
-            code => {
-                std::fs::remove_file(&target_path_tmp).unwrap();
-                Err(IngestError::unreachable(
-                    url.as_str(),
-                    Some(HttpStatusError::new(code).into()),
-                ))
-            }
+        let total_bytes = response.content_length();
+        let mut downloaded_bytes = 0;
+        let mut file = tokio::fs::File::create(target_path).await.int_err()?;
+
+        while let Some(chunk) = response.chunk().await.int_err()? {
+            file.write_all(&chunk).await.int_err()?;
+
+            downloaded_bytes += chunk.len() as u64;
+
+            listener.on_progress(&FetchProgress {
+                total_bytes: std::cmp::max(total_bytes.unwrap_or(0), downloaded_bytes),
+                fetched_bytes: downloaded_bytes,
+            });
         }
+
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state,
+            source_event_time,
+            has_more: false,
+        }))
     }
 
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
+    #[cfg(feature = "ftp")]
     fn fetch_ftp(
         url: &Url,
         _event_time_source: Option<&EventTimeSource>,
@@ -659,10 +692,12 @@ impl FetchService {
         target_path: &Path,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
+        use std::io::prelude::*;
+
         let target_path_tmp = target_path.with_extension("tmp");
 
         let mut h = curl::easy::Easy::new();
-        h.connect_timeout(Duration::from_secs(30))?;
+        h.connect_timeout(std::time::Duration::from_secs(30))?;
         h.url(url.as_str())?;
         h.progress(true)?;
 
@@ -709,16 +744,6 @@ impl FetchService {
             source_event_time: None,
             has_more: false,
         }))
-    }
-
-    fn split_header<'a>(h: &'a str) -> Option<(&'a str, &'a str)> {
-        if let Some(sep) = h.find(':') {
-            let (name, tail) = h.split_at(sep);
-            let val = tail[1..].trim();
-            Some((name, val))
-        } else {
-            None
-        }
     }
 
     fn parse_http_date_time(val: &str) -> DateTime<Utc> {
@@ -823,6 +848,7 @@ impl HttpStatusError {
     }
 }
 
+#[cfg(feature = "ftp")]
 impl std::convert::From<curl::Error> for IngestError {
     fn from(e: curl::Error) -> Self {
         Self::Internal(e.int_err())

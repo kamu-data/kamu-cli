@@ -13,18 +13,22 @@ use opendatafabric::DatasetSnapshot;
 use std::backtrace::Backtrace;
 use thiserror::Error;
 
+#[async_trait::async_trait]
 pub trait ResourceLoader: Send + Sync {
-    fn load_dataset_snapshot_from_path(
+    async fn load_dataset_snapshot_from_path(
         &self,
         path: &std::path::Path,
     ) -> Result<DatasetSnapshot, ResourceError>;
 
-    fn load_dataset_snapshot_from_url(
+    async fn load_dataset_snapshot_from_url(
         &self,
         url: &url::Url,
     ) -> Result<DatasetSnapshot, ResourceError>;
 
-    fn load_dataset_snapshot_from_ref(&self, sref: &str) -> Result<DatasetSnapshot, ResourceError>;
+    async fn load_dataset_snapshot_from_ref(
+        &self,
+        sref: &str,
+    ) -> Result<DatasetSnapshot, ResourceError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

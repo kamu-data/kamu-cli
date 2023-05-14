@@ -19,7 +19,10 @@ doctest = false
 
 [features]
 default = []
+
 web-ui = []
+ftp = ["kamu/ftp"]
+
 skip_docker_tests = []
 
 

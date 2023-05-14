@@ -11,8 +11,6 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use crate::utils::{FtpServer, HttpServer};
-
 use chrono::prelude::*;
 use chrono::Utc;
 use container_runtime::ContainerRuntime;
@@ -142,7 +140,7 @@ async fn test_fetch_url_http_not_found() {
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
-    let http_server = HttpServer::new(&tempdir.path().join("srv"));
+    let http_server = crate::utils::HttpServer::new(&tempdir.path().join("srv"));
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
@@ -184,7 +182,7 @@ async fn test_fetch_url_http_ok() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let http_server = HttpServer::new(&server_dir);
+    let http_server = crate::utils::HttpServer::new(&server_dir);
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
@@ -285,7 +283,7 @@ async fn test_fetch_url_http_env_interpolation() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let http_server = HttpServer::new(&server_dir);
+    let http_server = crate::utils::HttpServer::new(&server_dir);
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!(
@@ -333,8 +331,9 @@ async fn test_fetch_url_http_env_interpolation() {
 // URL: ftp
 ///////////////////////////////////////////////////////////////////////////////
 
+#[cfg(feature = "ftp")]
 #[tokio::test]
-#[cfg_attr(any(feature = "skip_docker_tests", not(feature = "test_ftp")), ignore)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
@@ -354,7 +353,7 @@ async fn test_fetch_url_ftp_ok() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let ftp_server = FtpServer::new(&server_dir);
+    let ftp_server = crate::utils::FtpServer::new(&server_dir);
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("ftp://foo:bar@localhost:{}/data.csv", ftp_server.host_port),
@@ -607,7 +606,7 @@ async fn test_fetch_container_ok() {
     );
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: HttpServer::IMAGE.to_owned(),
+        image: crate::utils::HttpServer::IMAGE.to_owned(),
         command: Some(vec!["/bin/bash".to_owned()]),
         args: Some(vec![
             "-c".to_owned(),

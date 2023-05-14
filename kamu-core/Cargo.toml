@@ -12,10 +12,12 @@ doctest = false
 
 
 [features]
+default = []
+
+ftp = ["dep:curl", "dep:curl-sys"]
+
 skip_docker_tests = []
-# FTP protocol relies on fixed range of ports that might conflict
-# with other applications, thus we only enable FTP tests conditionally in CI
-test_ftp = []
+
 
 [dependencies]
 # Kamu
@@ -34,8 +36,8 @@ serde_yaml = "0.9"
 # Ingest
 # TODO: Using curl brings a lot of overhead including compiling and linking openssl
 # We should replace it with reqwest + a separate FTP client or drop FTP support in favor of container-based ingest.
-curl = { version = "0.4", features = ["http2", "protocol-ftp", "static-curl", "static-ssl"] }
-curl-sys = "0.4"
+curl = { optional = true, version = "0.4", features = ["protocol-ftp", "static-curl", "static-ssl"] }
+curl-sys = { optional = true, version = "0.4" }
 flate2 = "1"  # GZip decoder
 fs_extra = "1.3"  # Copy files with progress, get directory sizes
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "stream", "gzip", "brotli", "deflate"] }

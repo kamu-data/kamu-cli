@@ -22,7 +22,7 @@ fn test_setup_pull_images() {
     container_runtime.ensure_image(docker_images::MINIO, None);
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "test_ftp")] {
+        if #[cfg(feature = "ftp")] {
             container_runtime.ensure_image(docker_images::FTP, None);
         }
     }

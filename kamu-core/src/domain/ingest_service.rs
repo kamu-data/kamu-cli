@@ -140,11 +140,11 @@ impl IngestMultiListener for NullIngestMultiListener {}
 
 #[derive(Error, Debug)]
 #[error("Environment variable {name} not set")]
-pub struct IngestInputNotFound {
+pub struct IngestParameterNotFound {
     pub name: String,
 }
 
-impl IngestInputNotFound {
+impl IngestParameterNotFound {
     pub fn new(name: impl Into<String>) -> Self {
         Self { name: name.into() }
     }
@@ -177,10 +177,10 @@ pub enum IngestError {
         ImageNotFoundError,
     ),
     #[error(transparent)]
-    InputNotFound(
+    ParameterNotFound(
         #[from]
         #[backtrace]
-        IngestInputNotFound,
+        IngestParameterNotFound,
     ),
     #[error(transparent)]
     ProcessError(
