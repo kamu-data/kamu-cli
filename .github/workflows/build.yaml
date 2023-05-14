@@ -52,7 +52,8 @@ jobs:
       #       ~/.cargo/git/db/
       #       target/
       #     key: ${{ runner.os }}-cargo
-      - run: |
+      - name: Configure podman runtime
+        run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
       - name: build
         run: cargo test --features test_ftp --no-run
