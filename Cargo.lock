@@ -1323,6 +1323,8 @@ dependencies = [
  "regex",
  "serde",
  "thiserror",
+ "tokio",
+ "tracing",
  "url",
 ]
 
