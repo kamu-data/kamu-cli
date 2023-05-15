@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs};
+use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs, TimeoutError};
 use odf::{
     engine::{EngineGrpcClient, ExecuteQueryError},
     ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess,
@@ -50,39 +50,25 @@ impl ODFEngine {
         }
     }
 
-    #[tracing::instrument(level = "info", name = "execute_query", skip_all)]
-    async fn transform_impl(
+    #[tracing::instrument(level = "info", skip_all, fields(container_name = %engine_container.container_name))]
+    async fn execute_query(
         &self,
-        run_info: RunInfo,
+        run_info: &RunInfo,
+        engine_container: &EngineContainer,
+        engine_client: &mut EngineGrpcClient,
         request: odf::ExecuteQueryRequest,
     ) -> Result<odf::ExecuteQueryResponseSuccess, EngineError> {
-        let engine_container = EngineContainer::new(
-            self.container_runtime.clone(),
-            self.engine_config.clone(),
-            &self.image,
-            &run_info,
-            vec![(
-                self.workspace_layout.datasets_dir.clone(),
-                PathBuf::from(Self::CT_VOLUME_DIR),
-            )],
-        )?;
+        tracing::info!(?request, "Performing engine operation");
 
-        let mut client = engine_container.connect_client(&run_info).await?;
-
-        tracing::info!(
-            id = engine_container.container_name.as_str(),
-            image = self.image.as_str(),
-            ?request,
-            "Performing engine operation",
-        );
-
-        let response = client.execute_query(request).await;
+        let response = engine_client.execute_query(request).await;
 
         tracing::info!(?response, "Operation response");
 
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
                 if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
+                    tracing::info!("Fixing up file permissions");
+
                     self.container_runtime.exec_shell_cmd(ExecArgs::default(), &engine_container.container_name, &[format!(
                         "chown -R {}:{} {}",
                         users::get_current_uid(),
@@ -162,7 +148,27 @@ impl Engine for ODFEngine {
 
         let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
 
-        self.transform_impl(run_info, request_adj).await
+        let engine_container = EngineContainer::new(
+            self.container_runtime.clone(),
+            self.engine_config.clone(),
+            &self.image,
+            &run_info,
+            vec![(
+                self.workspace_layout.datasets_dir.clone(),
+                PathBuf::from(Self::CT_VOLUME_DIR),
+            )],
+        )
+        .await?;
+
+        let mut engine_client = engine_container.connect_client(&run_info).await?;
+
+        self.execute_query(
+            &run_info,
+            &engine_container,
+            &mut engine_client,
+            request_adj,
+        )
+        .await
     }
 }
 
@@ -260,7 +266,8 @@ struct EngineContainer {
 impl EngineContainer {
     const ADAPTER_PORT: u16 = 2884;
 
-    pub fn new(
+    #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(image))]
+    pub async fn new(
         container_runtime: ContainerRuntime,
         config: ODFEngineConfig,
         image: &str,
@@ -272,7 +279,7 @@ impl EngineContainer {
 
         let container_name = format!("kamu-engine-{}", &run_info.run_id);
 
-        let mut cmd = container_runtime.run_cmd(RunArgs {
+        let mut command = container_runtime.run_cmd(RunArgs {
             image: image.to_owned(),
             container_name: Some(container_name.clone()),
             volume_map: volume_map,
@@ -281,24 +288,35 @@ impl EngineContainer {
             ..RunArgs::default()
         });
 
-        tracing::info!(command = ?cmd, image, id = container_name.as_str(), "Starting engine");
+        tracing::info!(?command, %container_name, "Starting engine");
 
         let engine_process = KillOnDrop::new(
-            cmd.stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
+            command
+                .stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
                 .stderr(std::process::Stdio::from(stderr_file)) // Stdio::inherit()
                 .spawn()
                 .map_err(|e| EngineError::internal(e, run_info.log_files()))?,
         );
 
-        let adapter_host_port = container_runtime
-            .wait_for_host_port(&container_name, Self::ADAPTER_PORT, config.start_timeout)
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+        let adapter_host_port = {
+            let container_runtime = container_runtime.clone();
+            let container_name = container_name.clone();
 
-        container_runtime
-            .wait_for_socket(adapter_host_port, config.start_timeout)
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+            tokio::task::spawn_blocking(move || -> Result<u16, TimeoutError> {
+                let adapter_host_port = container_runtime.wait_for_host_port(
+                    &container_name,
+                    Self::ADAPTER_PORT,
+                    config.start_timeout,
+                )?;
 
-        tracing::info!(id = container_name.as_str(), "Engine running");
+                container_runtime.wait_for_socket(adapter_host_port, config.start_timeout)?;
+
+                Ok(adapter_host_port)
+            })
+            .await
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?
+        };
 
         Ok(Self {
             container_runtime,
