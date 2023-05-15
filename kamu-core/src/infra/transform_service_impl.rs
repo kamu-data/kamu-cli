@@ -270,11 +270,10 @@ impl TransformServiceImpl {
             .try_filter_map(|(_, b)| async move {
                 match b.event {
                     MetadataEvent::SetTransform(st) => Ok(Some(st)),
-                    MetadataEvent::SetPollingSource(_) => {
-                        Err("Transform called on non-derivative dataset"
-                            .int_err()
-                            .into())
-                    }
+                    MetadataEvent::SetPollingSource(_) => Err("Transform called on \
+                                                               non-derivative dataset"
+                        .int_err()
+                        .into()),
                     _ => Ok(None),
                 }
             })
@@ -442,7 +441,8 @@ impl TransformServiceImpl {
         if let Some((first_unprocessed_hash, first_unprocessed_block)) = blocks_unprocessed.last() {
             if first_unprocessed_block.prev_block_hash != last_processed_block {
                 panic!(
-                    "Input data for {} is inconsistent - first unprocessed block {} does not imediately follows last processed block {:?}",
+                    "Input data for {} is inconsistent - first unprocessed block {} does not \
+                     imediately follows last processed block {:?}",
                     input_handle, first_unprocessed_hash, last_processed_block
                 );
             }
@@ -475,7 +475,8 @@ impl TransformServiceImpl {
             (None, None) => None,
             (Some(start), Some(end)) if start <= end => Some(OffsetInterval { start, end }),
             _ => panic!(
-                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset range ended up as ({:?}, {:?})",
+                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset \
+                 range ended up as ({:?}, {:?})",
                 input_handle, block_interval, offset_start, offset_end
             ),
         };

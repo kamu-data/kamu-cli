@@ -206,8 +206,9 @@ impl Default for ProtocolConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IpfsConfig {
     /// HTTP Gateway URL to use for downloads.
-    /// For safety it defaults to `http://localhost:8080` which is where a local IPFS daemon would run.
-    /// If you don't have IPFS installed you can set this URL to one of the public gateways like `https://ipfs.io`.
+    /// For safety it defaults to `http://localhost:8080` - a local IPFS daemon.
+    /// If you don't have IPFS installed you can set this URL to
+    /// one of the public gateways like `https://ipfs.io`.
     /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
     pub http_gateway: Option<Url>,
 

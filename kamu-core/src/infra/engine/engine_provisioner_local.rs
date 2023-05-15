@@ -124,8 +124,8 @@ impl EngineProvisionerLocal {
 
         let container_runtime = self.container_runtime.clone();
         let image = image.to_owned();
-        tokio::task::spawn_blocking(move ||
-            // TODO: Return better errors
+        // TODO: Return better errors
+        tokio::task::spawn_blocking(move || {
             container_runtime
                 .pull_cmd(&image)
                 .stdout(Stdio::null())
@@ -136,7 +136,8 @@ impl EngineProvisionerLocal {
                 .map_err(|error| {
                     tracing::error!(?error, "Failed to pull engine image");
                     EngineProvisioningError::image_not_found(&image)
-                }))
+                })
+        })
         .await
         .unwrap()?;
 
@@ -183,7 +184,11 @@ impl EngineProvisionerLocal {
             (Some(1), _) => 1,
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
-                tracing::warn!("Ingoring specified engine max concurrency of {} since running in the Host networking mode", multi);
+                tracing::warn!(
+                    "Ingoring specified engine max concurrency of {} since running in the Host \
+                     networking mode",
+                    multi
+                );
                 1
             }
         }

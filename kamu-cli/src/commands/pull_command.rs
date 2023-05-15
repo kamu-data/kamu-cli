@@ -137,10 +137,10 @@ impl PullCommand {
 
         if !pull_aliases.is_empty() {
             return Err(CLIError::usage_error(format!(
-                    "Ingesting data into remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
-                    pull_aliases.join("\n- ")
-                )
-            ));
+                "Ingesting data into remote dataset will cause histories to diverge. Existing \
+                 pull aliases:\n{}",
+                pull_aliases.join("\n- ")
+            )));
         }
 
         let fetch_str = self.fetch.as_ref().unwrap();
@@ -463,9 +463,12 @@ impl PrettyIngestProgress {
     fn new_progress_bar(prefix: &str, pos: u64, len: u64) -> indicatif::ProgressBar {
         let pb = indicatif::ProgressBar::hidden();
         let style = indicatif::ProgressStyle::default_bar()
-        .template("{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-        .unwrap()
-        .progress_chars("#>-");
+            .template(
+                "{spinner:.cyan} Downloading {prefix:.white.bold}:\n  [{elapsed_precise}] \
+                 [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
+            )
+            .unwrap()
+            .progress_chars("#>-");
         pb.set_style(style);
         pb.set_prefix(prefix.to_owned());
         pb.set_length(len);
@@ -862,9 +865,12 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::ReadMetadata => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Syncing metadata {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Syncing metadata {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
@@ -874,9 +880,13 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::TransferData => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Syncing data & checkpoints {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Syncing data & checkpoints {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} \
+                             ({bytes_per_sec}, {eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.bytes_read as u64);
@@ -886,9 +896,12 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::CommitBlocks => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Committing blocks {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Committing blocks {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);

@@ -434,9 +434,10 @@ impl FetchService {
             Some(EventTimeSource::FromPath(fp)) => Some(fp),
             Some(src) => {
                 return Err(EventTimeSourceError::incompatible(format!(
-                "Files glob source only supports deriving event time from file path, found: {:?}",
-                src
-            ))
+                    "Files glob source only supports deriving event time from file path, found: \
+                     {:?}",
+                    src
+                ))
                 .into())
             }
         };

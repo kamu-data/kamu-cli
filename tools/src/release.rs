@@ -112,8 +112,12 @@ fn update_crates(new_version: &Version) {
             new_version.to_string(),
         ])
         .status()
-        .expect("Failed to execute `cargo set-version` - make sure `cago-edit` is installed (`cargo install cargo-edit`)")
-        .exit_ok().expect("`cargo set-version` returned non-zero exit code");
+        .expect(
+            "Failed to execute `cargo set-version` - make sure `cago-edit` is installed (`cargo \
+             install cargo-edit`)",
+        )
+        .exit_ok()
+        .expect("`cargo set-version` returned non-zero exit code");
 }
 
 fn update_license(license_path: &Path, current_version: &Version, new_version: &Version) {

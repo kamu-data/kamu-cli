@@ -81,20 +81,22 @@ async fn test_dataset_schema() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
-                                    schema { content } 
+                                    schema { content }
                                 }
                             }
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -132,10 +134,11 @@ async fn test_dataset_tail() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
@@ -145,7 +148,8 @@ async fn test_dataset_tail() {
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -165,10 +169,11 @@ async fn test_dataset_tail_empty() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 0, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
@@ -178,7 +183,8 @@ async fn test_dataset_tail_empty() {
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);

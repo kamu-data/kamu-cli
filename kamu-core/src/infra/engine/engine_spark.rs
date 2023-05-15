@@ -147,11 +147,9 @@ impl SparkEngine {
             },
             &[
                 indoc::indoc!(
-                    "/opt/bitnami/spark/bin/spark-submit \
-                    --master=local[4] \
-                    --driver-memory=2g \
-                    --class=dev.kamu.engine.spark.ingest.IngestApp \
-                    /opt/engine/bin/engine.spark.jar"
+                    "/opt/bitnami/spark/bin/spark-submit --master=local[4] --driver-memory=2g \
+                     --class=dev.kamu.engine.spark.ingest.IngestApp \
+                     /opt/engine/bin/engine.spark.jar"
                 )
                 .to_owned(),
                 chown,

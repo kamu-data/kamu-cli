@@ -159,7 +159,10 @@ pub enum WorkspaceUpgradeError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error("Workspace version {workspace_version} is newer than supported version {latest_supported_version} - upgrade to latest software version")]
+#[error(
+    "Workspace version {workspace_version} is newer than supported version \
+     {latest_supported_version} - upgrade to latest software version"
+)]
 pub struct WorkspaceFutureVersionError {
     pub workspace_version: WorkspaceVersion,
     pub latest_supported_version: WorkspaceVersion,

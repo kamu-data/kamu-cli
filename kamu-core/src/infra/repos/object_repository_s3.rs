@@ -229,7 +229,10 @@ where
         let size = if let Some(size) = options.size_hint {
             size
         } else {
-            panic!("Writing stream into s3 requires knowing the total size (until we implement multi-part uploads)")
+            panic!(
+                "Writing stream into s3 requires knowing the total size (until we implement \
+                 multi-part uploads)"
+            )
         };
 
         let key = self.get_key(&hash);

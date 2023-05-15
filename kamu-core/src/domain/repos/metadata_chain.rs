@@ -475,8 +475,11 @@ impl Display for SequenceIntegrityError {
         if let Some(prev_block_hash) = &self.prev_block_hash {
             write!(
                 f,
-                "Block {} with sequence number {} cannot be followed by block with sequence number {}",
-                prev_block_hash, self.prev_block_sequence_number.unwrap(), self.next_block_sequence_number
+                "Block {} with sequence number {} cannot be followed by block with sequence \
+                 number {}",
+                prev_block_hash,
+                self.prev_block_sequence_number.unwrap(),
+                self.next_block_sequence_number
             )
         } else {
             write!(

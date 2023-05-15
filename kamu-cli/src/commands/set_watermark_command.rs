@@ -84,10 +84,10 @@ impl Command for SetWatermarkCommand {
         if !pull_aliases.is_empty() {
             // TODO: Should this check be performed at domain model level?
             return Err(CLIError::usage_error(format!(
-                    "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
-                    pull_aliases.join("\n- ")
-                ))
-            );
+                "Setting watermark on a remote dataset will cause histories to diverge. Existing \
+                 pull aliases:\n{}",
+                pull_aliases.join("\n- ")
+            )));
         }
 
         match self

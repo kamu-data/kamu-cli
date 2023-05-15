@@ -97,7 +97,12 @@ impl SqlShellImpl {
                 .container_runtime
                 .run_shell_cmd(args, &["sleep".to_owned(), "999999".to_owned()]);
 
-            tracing::info!(command = ?cmd, stdout = ?spark_stdout_path, stderr = ?spark_stderr_path, "Starting Spark container");
+            tracing::info!(
+                command = ?cmd,
+                stdout = ?spark_stdout_path,
+                stderr = ?spark_stderr_path,
+                "Starting Spark container"
+            );
 
             cmd.stdin(Stdio::null())
                 .stdout(Stdio::from(File::create(&spark_stdout_path)?))
@@ -226,26 +231,27 @@ impl SqlShellImpl {
             tracing::info!("Starting SQL shell");
 
             // Relying on shell to send signal to child processes
-            let mut beeline_cmd = self.container_runtime
-                .exec_shell_cmd(
-                    ExecArgs {
-                        tty: true,
-                        interactive: true,
-                        work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
+            let mut beeline_cmd = self.container_runtime.exec_shell_cmd(
+                ExecArgs {
+                    tty: true,
+                    interactive: true,
+                    work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
+                },
+                "kamu-spark",
+                &[
+                    "../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql \
+                     --color=true"
+                        .to_owned(),
+                    match command {
+                        Some(s) => format!("-e '{}'", s.as_ref()),
+                        None => "".to_owned(),
                     },
-                    "kamu-spark",
-                    &[
-                        "../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql --color=true".to_owned(),
-                        match command {
-                            Some(s) => format!("-e '{}'", s.as_ref()),
-                            None => "".to_owned(),
-                        },
-                        match output_format {
-                            Some(s) => format!("--outputformat={}", s.as_ref()),
-                            None => "".to_owned(),
-                        }
-                    ],
-                );
+                    match output_format {
+                        Some(s) => format!("--outputformat={}", s.as_ref()),
+                        None => "".to_owned(),
+                    },
+                ],
+            );
 
             tracing::info!(command = ?beeline_cmd, "Running beeline");
             beeline_cmd.spawn()?.wait()?;

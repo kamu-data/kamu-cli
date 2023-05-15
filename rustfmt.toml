@@ -1,0 +1,9 @@
+# Reference: https://rust-lang.github.io/rustfmt/?version=master
+
+# Add newline breaks to string literals where necessary
+format_strings = true
+
+# Error if unable to get comments or string literals within `max_width`.
+# Without this option rustfmt often silently gives up formatting the entire file.
+# Setting it at least allows us to catch unformatted code in CI.
+error_on_unformatted = true

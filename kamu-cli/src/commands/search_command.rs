@@ -48,9 +48,14 @@ impl SearchCommand {
         let mut table = Table::new();
         table.set_format(TableWriter::get_table_format());
 
-        table.set_titles(
-            row![bc->"Name", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
-        );
+        table.set_titles(row![
+            bc->"Name",
+            bc->"Kind",
+            bc->"Description",
+            bc->"Updated",
+            bc->"Records",
+            bc->"Size",
+        ]);
 
         for name in &search_result.datasets {
             table.add_row(Row::new(vec![

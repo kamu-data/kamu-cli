@@ -52,24 +52,26 @@ async fn metadata_chain_append_event() {
     let res = schema
         .execute(
             indoc!(
-                r#"{
-                datasets {
-                    byOwnerAndName (accountName: "kamu", datasetName: "foo") {
-                        metadata {
-                            chain {
-                                commitEvent (
-                                    event: "<content>",
-                                    eventFormat: YAML,
-                                ) {
-                                    ... on CommitResultSuccess {
-                                        oldHead
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName (accountName: "kamu", datasetName: "foo") {
+                            metadata {
+                                chain {
+                                    commitEvent (
+                                        event: "<content>",
+                                        eventFormat: YAML,
+                                    ) {
+                                        ... on CommitResultSuccess {
+                                            oldHead
+                                        }
                                     }
                                 }
                             }
                         }
-                    } 
-                } 
-            }"#
+                    }
+                }
+                "#
             )
             .replace("<content>", &event_yaml.escape_default().to_string()),
         )

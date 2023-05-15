@@ -34,17 +34,17 @@ async fn test_add_recursive() {
     std::fs::write(
         kamu.workspace_path().join("commented.yaml"),
         format!(
-            indoc::indoc!(
-                r"
+            indoc::indoc! {
+                "
 
                 # Some
-                
+
                 # Weird
                 #
                 # Comment
                 {}
                 "
-            ),
+            },
             &manifest
         ),
     )
@@ -53,12 +53,12 @@ async fn test_add_recursive() {
     // Non-manifest YAML file
     std::fs::write(
         kamu.workspace_path().join("non-manifest.yaml"),
-        indoc::indoc!(
-            r"
+        indoc::indoc! {
+            "
             foo:
-            - bar
-            ",
-        ),
+              - bar
+            "
+        },
     )
     .unwrap();
 

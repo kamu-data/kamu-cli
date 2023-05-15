@@ -32,13 +32,15 @@ async fn dataset_by_id_does_not_exist() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc!(
-            r#"{
+            r#"
+            {
                 datasets {
                     byId (datasetId: "did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM") {
                         name
                     }
                 }
-            }"#
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -79,13 +81,15 @@ async fn dataset_by_id() {
     let res = schema
         .execute(
             indoc!(
-                r#"{
+                r#"
+                {
                     datasets {
                         byId (datasetId: "<id>") {
                             name
                         }
                     }
-                }"#
+                }
+                "#
             )
             .replace("<id>", &create_result.dataset_handle.id.to_string()),
         )
@@ -117,17 +121,19 @@ async fn dataset_create_empty() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            r#"{
+            r#"
+            {
                 datasets {
                     createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
-                        ... on CreateDatasetResultSuccess { 
-                            dataset { 
-                                name 
-                            } 
-                        } 
-                    } 
-                } 
-            }"#
+                        ... on CreateDatasetResultSuccess {
+                            dataset {
+                                name
+                            }
+                        }
+                    }
+                }
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -172,10 +178,11 @@ async fn dataset_create_from_snapshot() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc!(
-            r#"{
+            r#"
+            {
                 datasets {
                     createFromSnapshot (accountId: "kamu", snapshot: "<content>", snapshotFormat: YAML) {
-                        ... on CreateDatasetResultSuccess { 
+                        ... on CreateDatasetResultSuccess {
                             dataset {
                                 name
                                 kind
@@ -183,7 +190,8 @@ async fn dataset_create_from_snapshot() {
                         }
                     }
                 }
-            }"#
+            }
+            "#
         ).replace("<content>", &snapshot_yaml.escape_default().to_string()))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -216,7 +224,8 @@ async fn dataset_create_from_snapshot_malformed() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc!(
-            r#"{
+            r#"
+            {
                 datasets {
                     createFromSnapshot (accountId: "kamu", snapshot: "version: 1", snapshotFormat: YAML) {
                         ... on MetadataManifestMalformed {
@@ -224,7 +233,8 @@ async fn dataset_create_from_snapshot_malformed() {
                         }
                     }
                 }
-            }"#
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);

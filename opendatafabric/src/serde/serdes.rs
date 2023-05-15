@@ -177,7 +177,8 @@ impl Display for UnsupportedVersionError {
         } else if self.manifest_version > max_version {
             write!(
                 f,
-                "Unsupported version: manifest has version {} while maximum supported version is {}",
+                "Unsupported version: manifest has version {} while maximum supported version is \
+                 {}",
                 self.manifest_version, max_version
             )?;
         } else {

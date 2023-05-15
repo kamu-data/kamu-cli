@@ -57,8 +57,11 @@ fn test_prep_pipe() {
 
     assert!(target_path.exists());
     assert_eq!(
-        std::fs::read_to_string(&target_path).unwrap().replace("\r", ""),
-        "{\"city\":\"A\",\"population\":100}\n{\"city\":\"B\",\"population\":200}\n{\"city\":\"A\",\"population\":110}\n"
+        std::fs::read_to_string(&target_path)
+            .unwrap()
+            .replace("\r", ""),
+        "{\"city\":\"A\",\"population\":100}\n{\"city\":\"B\",\"population\":200}\n{\"city\":\"A\"\
+         ,\"population\":110}\n"
     );
 }
 
