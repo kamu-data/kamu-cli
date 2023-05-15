@@ -9,15 +9,15 @@
 
 use std::path::Path;
 
-use crate::domain::{BoxedError, InternalError};
-use chrono::{DateTime, Duration, Utc};
-use opendatafabric::Multihash;
-
 use async_trait::async_trait;
 use bytes::Bytes;
+use chrono::{DateTime, Duration, Utc};
+use opendatafabric::Multihash;
 use thiserror::Error;
 use tokio::io::AsyncRead;
 use url::Url;
+
+use crate::domain::{BoxedError, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

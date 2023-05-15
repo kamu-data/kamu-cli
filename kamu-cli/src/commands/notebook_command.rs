@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::IpAddr;
+use std::sync::Arc;
+use std::time::Duration;
+
+use console::style as s;
+use container_runtime::ContainerRuntime;
+use kamu::infra::*;
+
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::NotebookServerImpl;
 use crate::output::OutputConfig;
 use crate::JupyterConfig;
-use container_runtime::ContainerRuntime;
-use kamu::infra::*;
-
-use console::style as s;
-use std::net::IpAddr;
-use std::sync::Arc;
-use std::time::Duration;
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,

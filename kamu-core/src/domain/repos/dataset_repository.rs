@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use chrono::Utc;
-use opendatafabric::*;
-
-use async_trait::async_trait;
 use std::collections::{HashSet, LinkedList};
 use std::pin::Pin;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+use chrono::Utc;
+use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

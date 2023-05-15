@@ -7,19 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use kamu::infra::utils::docker_images;
-use kamu::infra::WorkspaceLayout;
-use opendatafabric::serde::yaml::Manifest;
-
 use dill::*;
 use duration_string::DurationString;
+use kamu::infra::utils::docker_images;
+use kamu::infra::WorkspaceLayout;
 use merge::Merge;
+use opendatafabric::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use std::fmt::Write;
 use url::Url;
 
 use crate::error::CLIError;

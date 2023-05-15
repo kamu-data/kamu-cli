@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use std::backtrace::Backtrace;
+use std::path::PathBuf;
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use std::backtrace::Backtrace;
-use std::path::PathBuf;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////

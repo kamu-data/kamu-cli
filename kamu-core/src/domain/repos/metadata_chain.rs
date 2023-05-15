@@ -9,13 +9,13 @@
 
 use std::fmt::Display;
 
-use super::metadata_stream::DynMetadataStream;
-use crate::domain::*;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
-
 use async_trait::async_trait;
+use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use strum_macros::EnumString;
 use thiserror::Error;
+
+use super::metadata_stream::DynMetadataStream;
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

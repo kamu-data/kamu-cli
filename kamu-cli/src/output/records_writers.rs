@@ -7,15 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::any::Any;
+
 use chrono::{DateTime, Utc};
 use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::arrow::util::display::array_value_to_string;
-use datafusion::arrow::{datatypes::DataType, record_batch::RecordBatch};
 pub use kamu::infra::utils::records_writers::{
-    CsvWriter, CsvWriterBuilder, JsonArrayWriter, JsonLineDelimitedWriter, RecordsWriter,
+    CsvWriter,
+    CsvWriterBuilder,
+    JsonArrayWriter,
+    JsonLineDelimitedWriter,
+    RecordsWriter,
 };
 use prettytable::{Cell, Row, Table};
-use std::any::Any;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

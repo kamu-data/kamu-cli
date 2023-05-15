@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{convert::TryFrom, ops::Deref};
+use std::convert::TryFrom;
+use std::ops::Deref;
 
 use async_graphql::*;
 use datafusion::error::DataFusionError;

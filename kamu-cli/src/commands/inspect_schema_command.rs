@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use std::sync::Arc;
 
 use datafusion::parquet::schema::types::Type;
 use kamu::domain::*;
 use opendatafabric::*;
-use std::sync::Arc;
+
+use super::{CLIError, Command};
 
 pub struct InspectSchemaCommand {
     query_svc: Arc<dyn QueryService>,
@@ -46,8 +47,7 @@ impl InspectSchemaCommand {
 
     // TODO: This produces DDL that doesn't match the SQL types we use elsewhere
     fn print_schema_ddl_rec(&self, t: &Type, depth: i32) {
-        use datafusion::parquet::basic::ConvertedType;
-        use datafusion::parquet::basic::Type as BasicType;
+        use datafusion::parquet::basic::{ConvertedType, Type as BasicType};
 
         self.indent(depth);
 

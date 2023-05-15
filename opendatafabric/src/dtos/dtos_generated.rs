@@ -12,10 +12,12 @@
 // See: http://opendatafabric.org/
 ///////////////////////////////////////////////////////////////////////////////
 
+use std::path::PathBuf;
+
+use chrono::{DateTime, Utc};
+
 use crate::formats::Multihash;
 use crate::identity::{DatasetID, DatasetName};
-use chrono::{DateTime, Utc};
-use std::path::PathBuf;
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData

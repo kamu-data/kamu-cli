@@ -7,19 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::OutputConfig;
-
-use super::{CLIError, Command};
-use kamu::domain::*;
-use kamu::infra::DotStyle;
-use kamu::infra::DotVisitor;
-use kamu::infra::WorkspaceLayout;
-use opendatafabric::*;
-
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use kamu::domain::*;
+use kamu::infra::{DotStyle, DotVisitor, WorkspaceLayout};
+use opendatafabric::*;
+
+use super::{CLIError, Command};
+use crate::OutputConfig;
 
 pub struct LineageCommand {
     local_repo: Arc<dyn DatasetRepository>,

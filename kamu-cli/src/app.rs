@@ -254,7 +254,8 @@ fn configure_logging(
     use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
     use tracing_log::LogTracer;
     use tracing_subscriber::fmt::format::FmtSpan;
-    use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::EnvFilter;
 
     // Logging may be already initialized when running under tests
     if tracing::dispatcher::has_been_set() {
@@ -346,9 +347,9 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
 
     OutputConfig {
         quiet,
-        verbosity_level: verbosity_level,
-        is_tty: is_tty,
-        format: format,
+        verbosity_level,
+        is_tty,
+        format,
     }
 }
 

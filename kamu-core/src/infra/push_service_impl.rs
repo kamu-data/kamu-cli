@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
+use std::sync::Arc;
 
 use dill::*;
-use std::sync::Arc;
+use opendatafabric::*;
+
+use crate::domain::*;
 
 pub struct PushServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -83,7 +84,7 @@ impl PushServiceImpl {
                     original_request: request,
                 }),
                 Err(e) => Err(PushResponse {
-                    local_handle: local_handle,
+                    local_handle,
                     remote_ref: request.remote_ref.clone(),
                     result: Err(e),
                     original_request: request,

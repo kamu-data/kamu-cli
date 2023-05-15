@@ -40,8 +40,9 @@ pub fn get_parquet_logical_hash(
 
 #[tracing::instrument(level = "info")]
 pub fn get_file_physical_hash(file_path: &Path) -> Result<Multihash, std::io::Error> {
-    use digest::Digest;
     use std::io::Read;
+
+    use digest::Digest;
 
     let mut file = std::fs::File::open(file_path)?;
     let mut buffer = [0; 2048];

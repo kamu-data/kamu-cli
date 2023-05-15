@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use opendatafabric::*;
 use thiserror::Error;
 
-use std::sync::Arc;
+use crate::domain::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service

@@ -9,11 +9,11 @@
 
 use std::sync::Arc;
 
-use super::{CLIError, Command};
-use crate::output::*;
-
 use kamu::domain::QueryService;
 use opendatafabric::*;
+
+use super::{CLIError, Command};
+use crate::output::*;
 
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,

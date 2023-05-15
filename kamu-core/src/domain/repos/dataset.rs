@@ -9,12 +9,12 @@
 
 use std::path::Path;
 
-use crate::domain::*;
-use opendatafabric::*;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use opendatafabric::*;
 use thiserror::Error;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
-
-use chrono::prelude::*;
-use dill::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use chrono::prelude::*;
+use dill::*;
+use opendatafabric::*;
 use url::Url;
+
+use crate::domain::*;
 
 pub struct PullServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,

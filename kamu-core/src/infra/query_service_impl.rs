@@ -7,26 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::{
-    catalog::{catalog::CatalogProvider, schema::SchemaProvider},
-    datasource::TableProvider,
-    prelude::*,
-};
-use datafusion::{
-    execution::context::SessionState,
-    parquet::{
-        basic::LogicalType,
-        file::reader::{FileReader, SerializedFileReader},
-        schema::types::Type,
-    },
-};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use datafusion::catalog::catalog::CatalogProvider;
+use datafusion::catalog::schema::SchemaProvider;
+use datafusion::datasource::TableProvider;
+use datafusion::execution::context::SessionState;
+use datafusion::parquet::basic::LogicalType;
+use datafusion::parquet::file::reader::{FileReader, SerializedFileReader};
+use datafusion::parquet::schema::types::Type;
+use datafusion::prelude::*;
 use dill::*;
 use futures::stream::TryStreamExt;
 use opendatafabric::*;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
 
 use crate::domain::*;
 use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;

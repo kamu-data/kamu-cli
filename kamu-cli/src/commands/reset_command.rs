@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::common;
-use super::{CLIError, Command};
+use std::sync::Arc;
+
 use kamu::domain::*;
 use opendatafabric::*;
-use std::sync::Arc;
+
+use super::{common, CLIError, Command};
 
 pub struct ResetCommand {
     local_repo: Arc<dyn DatasetRepository>,

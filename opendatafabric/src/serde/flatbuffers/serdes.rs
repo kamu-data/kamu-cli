@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::proxies_generated as fbgen;
-use crate::dtos::*;
-use crate::formats::Multicodec;
 use ::flatbuffers;
 
 pub use super::convertors_generated::*;
+use super::proxies_generated as fbgen;
+use crate::dtos::*;
+use crate::formats::Multicodec;
 pub use crate::serde::*;
 
 ///////////////////////////////////////////////////////////////////////////////

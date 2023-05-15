@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{sync_service::*, DatasetNotFoundError, GetDatasetError};
-use crate::domain::InternalError;
-use opendatafabric::*;
-
 use std::sync::Arc;
+
+use opendatafabric::*;
 use thiserror::Error;
+
+use super::sync_service::*;
+use super::{DatasetNotFoundError, GetDatasetError};
+use crate::domain::InternalError;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service

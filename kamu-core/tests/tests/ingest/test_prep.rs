@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::io::prelude::*;
+
 use indoc::indoc;
 use kamu::domain::IngestError;
 use kamu::infra::ingest::*;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
-use std::io::prelude::*;
 
 #[test]
 fn test_prep_pipe() {

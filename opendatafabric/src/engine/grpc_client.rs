@@ -7,17 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
-use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
-use crate::{
-    ExecuteQueryRequest, ExecuteQueryResponse, ExecuteQueryResponseInternalError,
-    ExecuteQueryResponseInvalidQuery, ExecuteQueryResponseSuccess,
-};
+use thiserror::Error;
 
 use super::grpc_generated::engine_client::EngineClient as EngineClientGRPC;
 use super::grpc_generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
-
-use thiserror::Error;
+use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
+use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
+use crate::{
+    ExecuteQueryRequest,
+    ExecuteQueryResponse,
+    ExecuteQueryResponseInternalError,
+    ExecuteQueryResponseInvalidQuery,
+    ExecuteQueryResponseSuccess,
+};
 
 pub struct EngineGrpcClient {
     client: EngineClientGRPC<tonic::transport::Channel>,

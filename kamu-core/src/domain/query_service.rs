@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRef;
 use thiserror::Error;
+
+use crate::domain::*;
 
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {

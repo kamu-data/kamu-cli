@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::*;
-
-use container_runtime::{ContainerHandle, ContainerRuntime, PullImageListener, RunArgs};
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+use container_runtime::{ContainerHandle, ContainerRuntime, PullImageListener, RunArgs};
+use kamu::infra::*;
 
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,

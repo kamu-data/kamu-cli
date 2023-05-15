@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{domain::*, infra::get_staging_name};
-use opendatafabric::{Multicodec, Multihash};
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use std::{
-    marker::PhantomData,
-    path::{Path, PathBuf},
-};
+use opendatafabric::{Multicodec, Multihash};
 use tokio::io::{AsyncRead, AsyncWriteExt};
+
+use crate::domain::*;
+use crate::infra::get_staging_name;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

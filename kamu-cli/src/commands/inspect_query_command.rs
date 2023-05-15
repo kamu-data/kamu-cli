@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
-use crate::{OutputConfig, WritePager};
-
-use kamu::domain::*;
-use opendatafabric::*;
+use std::io::Write;
+use std::sync::Arc;
 
 use chrono::SecondsFormat;
 use console::style;
 use futures::TryStreamExt;
-use std::{io::Write, sync::Arc};
+use kamu::domain::*;
+use opendatafabric::*;
+
+use super::{CLIError, Command};
+use crate::{OutputConfig, WritePager};
 
 pub struct InspectQueryCommand {
     local_repo: Arc<dyn DatasetRepository>,

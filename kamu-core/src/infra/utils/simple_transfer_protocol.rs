@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::sync_service::DatasetNotFoundError;
-use crate::domain::*;
-use crate::infra::*;
+use std::sync::{Arc, Mutex};
 
 use futures::TryStreamExt;
 use opendatafabric::*;
-use std::sync::{Arc, Mutex};
+
+use crate::domain::sync_service::DatasetNotFoundError;
+use crate::domain::*;
+use crate::infra::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,7 +85,7 @@ impl SimpleTransferProtocol {
             } => {
                 if !force {
                     return Err(SyncError::DestinationAhead(DestinationAheadError {
-                        src_head: src_head,
+                        src_head,
                         dst_head: dst_head.unwrap(),
                         dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
@@ -96,7 +97,7 @@ impl SimpleTransferProtocol {
             } => {
                 if !force {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
-                        src_head: src_head,
+                        src_head,
                         dst_head: dst_head.unwrap(),
                         uncommon_blocks_in_dst,
                         uncommon_blocks_in_src,

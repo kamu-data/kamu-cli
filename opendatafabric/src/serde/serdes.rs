@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{DatasetSnapshot, ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
-use std::{backtrace::Backtrace, fmt::Display};
+use std::backtrace::Backtrace;
+use std::fmt::Display;
+
 use thiserror::Error;
 
 use super::Buffer;
+use crate::{DatasetSnapshot, ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
 
 ///////////////////////////////////////////////////////////////////////////////
 // MetadataBlockVersion

@@ -7,17 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::*;
-
-use container_runtime::{
-    ContainerHandle, ContainerRuntime, ContainerRuntimeType, PullImageListener, RunArgs,
-};
 use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+use container_runtime::{
+    ContainerHandle,
+    ContainerRuntime,
+    ContainerRuntimeType,
+    PullImageListener,
+    RunArgs,
+};
+use kamu::infra::*;
 
 use crate::JupyterConfig;
 
@@ -122,7 +126,7 @@ impl NotebookServerImpl {
             work_dir: Some(PathBuf::from("/opt/workdir")),
             expose_ports: vec![80],
             volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
-            environment_vars: environment_vars,
+            environment_vars,
             args: vec![
                 "jupyter".to_owned(),
                 "notebook".to_owned(),
@@ -262,6 +266,6 @@ impl TokenExtractor {
                     }
                 }
             })?;
-        Ok(Self { handle: handle })
+        Ok(Self { handle })
     }
 }

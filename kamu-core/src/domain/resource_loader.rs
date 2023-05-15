@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{BoxedError, InternalError};
-use opendatafabric::DatasetSnapshot;
-
 use std::backtrace::Backtrace;
+
+use opendatafabric::DatasetSnapshot;
 use thiserror::Error;
+
+use crate::domain::{BoxedError, InternalError};
 
 #[async_trait::async_trait]
 pub trait ResourceLoader: Send + Sync {
@@ -65,17 +66,11 @@ pub enum ResourceError {
 
 impl ResourceError {
     pub fn unreachable(path: String, source: Option<BoxedError>) -> Self {
-        Self::Unreachable {
-            path: path,
-            source: source,
-        }
+        Self::Unreachable { path, source }
     }
 
     pub fn not_found(path: String, source: Option<BoxedError>) -> Self {
-        Self::NotFound {
-            path: path,
-            source: source,
-        }
+        Self::NotFound { path, source }
     }
 
     pub fn serde(e: impl std::error::Error + Send + Sync + 'static) -> Self {

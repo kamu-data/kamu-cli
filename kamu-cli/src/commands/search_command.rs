@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
-use crate::{output::*, records_writers::TableWriter};
+use std::sync::Arc;
+
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::sync::Arc;
+use super::{CLIError, Command};
+use crate::output::*;
+use crate::records_writers::TableWriter;
 
 pub struct SearchCommand {
     search_svc: Arc<dyn SearchService>,

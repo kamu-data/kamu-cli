@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::infra::*;
-
-use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
 use std::fs::File;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+
+use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
+use kamu::infra::*;
 
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,

@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::DummySmartTransferProtocolClient;
+use std::assert_matches::assert_matches;
+use std::path::Path;
+use std::sync::Arc;
+
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
-use std::path::Path;
-use std::sync::Arc;
 use url::Url;
+
+use crate::utils::DummySmartTransferProtocolClient;
 
 // Create repo/bar dataset in a repo and check it appears in searches
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {

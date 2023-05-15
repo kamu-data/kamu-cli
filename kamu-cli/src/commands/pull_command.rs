@@ -7,17 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{BatchError, CLIError, Command};
-use crate::output::OutputConfig;
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 use kamu::domain::*;
 use opendatafabric::*;
 use url::Url;
 
-use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::time::Duration;
+use super::{BatchError, CLIError, Command};
+use crate::output::OutputConfig;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -63,7 +63,7 @@ impl PullCommand {
             remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.clone()).collect(),
-            all: all,
+            all,
             recursive,
             fetch_uncacheable,
             as_name,
@@ -689,7 +689,7 @@ impl PrettyTransformProgress {
             curr_progress: Mutex::new(multi_progress.add(Self::new_spinner(
                 &Self::spinner_message(dataset_handle, 0, "Applying derivative transformations"),
             ))),
-            multi_progress: multi_progress,
+            multi_progress,
         }
     }
 

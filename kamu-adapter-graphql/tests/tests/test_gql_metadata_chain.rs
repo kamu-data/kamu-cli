@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_graphql::*;
 use indoc::indoc;
 use kamu::domain::*;
@@ -14,8 +16,6 @@ use kamu::infra;
 use kamu::testing::MetadataFactory;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
-
-use std::sync::Arc;
 
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {

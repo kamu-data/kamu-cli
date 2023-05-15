@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::object_repository::AccessError;
-use crate::domain::InternalError;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
+
+use crate::domain::repos::object_repository::AccessError;
+use crate::domain::InternalError;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -7,27 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::sync::Arc;
+
 use container_runtime::ContainerRuntime;
+use datafusion::arrow::array::{Array, Int32Array, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::basic::{Compression, GzipLevel};
+use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::parquet::record::RowAccessor;
-use datafusion::{
-    arrow::{
-        array::{Array, Int32Array, StringArray},
-        datatypes::{DataType, Field, Schema},
-        record_batch::RecordBatch,
-    },
-    parquet::file::properties::WriterProperties,
-};
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
-use std::sync::Arc;
 use tempfile::TempDir;
 
 #[test_log::test(tokio::test)]

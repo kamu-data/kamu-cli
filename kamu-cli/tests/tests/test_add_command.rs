@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::Kamu;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::testing::MetadataFactory;
 use opendatafabric as odf;
+
+use crate::utils::Kamu;
 
 #[test_log::test(tokio::test)]
 async fn test_add_recursive() {

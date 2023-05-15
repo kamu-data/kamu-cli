@@ -7,15 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{fs, io, path::Path};
+use std::path::Path;
+use std::{fs, io};
 
-use kamu::{
-    domain::{
-        CommitOpts, CommitResult, DatasetExt, DatasetRepository, InsertOpts, ObjectRepository,
-    },
-    infra::{DatasetLayout, ObjectRepositoryLocalFS},
-    testing::{AddDataBuilder, MetadataFactory},
+use kamu::domain::{
+    CommitOpts,
+    CommitResult,
+    DatasetExt,
+    DatasetRepository,
+    InsertOpts,
+    ObjectRepository,
 };
+use kamu::infra::{DatasetLayout, ObjectRepositoryLocalFS};
+use kamu::testing::{AddDataBuilder, MetadataFactory};
 use opendatafabric::{DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////

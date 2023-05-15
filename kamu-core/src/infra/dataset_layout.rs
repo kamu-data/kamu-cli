@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{DataSlice, Multihash};
 use std::path::PathBuf;
+
+use opendatafabric::{DataSlice, Multihash};
 
 /// Describes the layout of the dataset on disk
 #[derive(Debug, Clone)]

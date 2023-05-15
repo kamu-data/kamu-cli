@@ -9,14 +9,15 @@
 
 use std::str::FromStr;
 
-use kamu::{
-    domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, SyncResult},
-    testing::{DatasetTestHelper, MetadataFactory},
-};
+use kamu::domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, SyncResult};
+use kamu::testing::{DatasetTestHelper, MetadataFactory};
 use opendatafabric::{DatasetKind, DatasetRef, DatasetRefRemote, MetadataEvent};
 
 use crate::harness::{
-    await_client_server_flow, commit_add_data_event, copy_folder_recursively, ClientSideHarness,
+    await_client_server_flow,
+    commit_add_data_event,
+    copy_folder_recursively,
+    ClientSideHarness,
     ServerSideHarness,
 };
 

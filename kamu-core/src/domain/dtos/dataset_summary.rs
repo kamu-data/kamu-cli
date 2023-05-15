@@ -11,8 +11,7 @@ use chrono::{DateTime, Utc};
 use opendatafabric::serde::yaml::*;
 use opendatafabric::{DatasetID, DatasetKind, Multihash, TransformInput};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
-use serde_with::skip_serializing_none;
+use serde_with::{serde_as, skip_serializing_none};
 
 // TODO: Summary should carry pointers to all refs
 // and specify values that change between refs per each "branch"

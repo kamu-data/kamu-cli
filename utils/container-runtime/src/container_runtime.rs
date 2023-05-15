@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::backtrace::Backtrace;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -14,7 +15,6 @@ use std::time::{Duration, Instant};
 
 use dill::*;
 use serde::{Deserialize, Serialize};
-use std::backtrace::Backtrace;
 use thiserror::Error;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -547,7 +547,7 @@ pub struct NetworkHandle {
 
 impl NetworkHandle {
     fn new(remove: Command) -> Self {
-        Self { remove: remove }
+        Self { remove }
     }
 }
 

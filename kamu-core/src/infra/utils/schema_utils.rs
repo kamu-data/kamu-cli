@@ -11,8 +11,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use datafusion::common::DFSchema;
-use datafusion::parquet::basic::Type as PhysicalType;
-use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit};
+use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
 
 /// Prints schema in a style of `parquet-schema` output

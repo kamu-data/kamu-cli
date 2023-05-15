@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::Multihash;
 use std::sync::Arc;
+
+use opendatafabric::Multihash;
 use url::Url;
 
 pub use super::simple_transfer_protocol::DatasetFactoryFn;

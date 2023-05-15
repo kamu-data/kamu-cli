@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
 use std::backtrace::{Backtrace, BacktraceStatus};
 use std::error::Error;
 use std::fmt::Display;
+
+use kamu::domain::*;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////

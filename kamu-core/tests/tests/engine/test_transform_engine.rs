@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::sync::Arc;
+
 use container_runtime::ContainerRuntime;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::record::RowAccessor;
 use futures::StreamExt;
 use indoc::indoc;
@@ -16,10 +20,6 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use datafusion::arrow::record_batch::RecordBatch;
-use std::assert_matches::assert_matches;
-use std::sync::Arc;
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,

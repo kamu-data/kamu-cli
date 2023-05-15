@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::DatasetSummary;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
+use std::convert::TryFrom;
 
 use chrono::prelude::*;
 use indoc::indoc;
-use std::convert::TryFrom;
+use kamu::domain::DatasetSummary;
+use opendatafabric::serde::yaml::Manifest;
+use opendatafabric::*;
 
 #[test]
 fn serde_dataset_summary() {

@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::services::ConfigService;
-
-use super::{CLIError, Command};
-use kamu::domain::*;
+use std::io::Write;
+use std::sync::Arc;
+use std::{fs, path};
 
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use glob;
-use std::fs;
-use std::io::Write;
-use std::path;
-use std::sync::Arc;
+use kamu::domain::*;
+
+use super::{CLIError, Command};
+use crate::services::ConfigService;
 
 pub struct CompleteCommand {
     local_repo: Option<Arc<dyn DatasetRepository>>,

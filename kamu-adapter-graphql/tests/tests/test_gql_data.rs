@@ -7,19 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+use std::sync::Arc;
+
 use datafusion::arrow::array::*;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::arrow::datatypes::Field;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::infra;
-use kamu::testing::MetadataFactory;
-use kamu::testing::ParquetWriterHelper;
+use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use opendatafabric::*;
-
-use std::path::Path;
-use std::sync::Arc;
 
 async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());

@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::*;
-use futures::TryStreamExt;
-use opendatafabric::*;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use std::path::PathBuf;
-use std::sync::Arc;
+use futures::TryStreamExt;
+use opendatafabric::*;
 use url::Url;
+
+use crate::domain::*;
+use crate::infra::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

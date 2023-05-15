@@ -9,11 +9,11 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use opendatafabric::serde::yaml::Manifest;
+use opendatafabric::*;
 
 use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

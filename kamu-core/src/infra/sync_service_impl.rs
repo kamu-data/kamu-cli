@@ -7,18 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
+use dill::*;
+use opendatafabric::*;
+use url::Url;
+
+use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use crate::domain::sync_service::DatasetNotFoundError;
 use crate::domain::*;
 use crate::infra::utils::ipfs_wrapper::*;
 use crate::infra::utils::simple_transfer_protocol::{DatasetFactoryFn, SimpleTransferProtocol};
 use crate::infra::utils::smart_transfer_protocol::ObjectTransferOptions;
-use opendatafabric::*;
-
-use dill::*;
-use std::sync::Arc;
-use url::Url;
-
-use super::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -354,7 +354,7 @@ impl SyncServiceImpl {
             }) => {
                 if !opts.force {
                     return Err(SyncError::DestinationAhead(DestinationAheadError {
-                        src_head: src_head,
+                        src_head,
                         dst_head: dst_head.unwrap(),
                         dst_ahead_size: rhs_ahead_blocks.len(),
                     }));
@@ -366,7 +366,7 @@ impl SyncServiceImpl {
             }) => {
                 if !opts.force {
                     return Err(SyncError::DatasetsDiverged(DatasetsDivergedError {
-                        src_head: src_head,
+                        src_head,
                         dst_head: dst_head.unwrap(),
                         uncommon_blocks_in_dst: uncommon_blocks_in_rhs,
                         uncommon_blocks_in_src: uncommon_blocks_in_lhs,

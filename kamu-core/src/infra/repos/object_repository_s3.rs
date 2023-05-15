@@ -7,20 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{
-    domain::*,
-    infra::utils::s3_context::{AsyncReadObj, S3Context},
-};
-use async_trait::async_trait;
-use aws_sdk_s3::{
-    operation::{get_object::GetObjectError, head_object::HeadObjectError},
-    presigning::PresigningConfig,
-};
-use bytes::Bytes;
+use std::marker::PhantomData;
+use std::path::Path;
 
+use async_trait::async_trait;
+use aws_sdk_s3::operation::get_object::GetObjectError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
+use aws_sdk_s3::presigning::PresigningConfig;
+use bytes::Bytes;
 use opendatafabric::{Multicodec, Multihash};
-use std::{marker::PhantomData, path::Path};
 use url::Url;
+
+use crate::domain::*;
+use crate::infra::utils::s3_context::{AsyncReadObj, S3Context};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

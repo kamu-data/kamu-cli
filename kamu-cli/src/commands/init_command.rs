@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::AlreadyInWorkspace;
+use std::sync::Arc;
 
-use super::{CLIError, Command};
 use kamu::infra::*;
 
-use std::sync::Arc;
+use super::{CLIError, Command};
+use crate::AlreadyInWorkspace;
 
 pub struct InitCommand {
     workspace_layout: Arc<WorkspaceLayout>,

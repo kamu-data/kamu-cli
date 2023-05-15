@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::*;
-use opendatafabric::*;
+use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use std::sync::Arc;
+use opendatafabric::*;
+
+use crate::domain::*;
+use crate::infra::*;
 
 pub struct VerificationServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,

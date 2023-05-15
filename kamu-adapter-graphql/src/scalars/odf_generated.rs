@@ -12,12 +12,12 @@
 // See: http://opendatafabric.org/
 ///////////////////////////////////////////////////////////////////////////////
 
-use crate::queries::Dataset;
-use crate::scalars::{DatasetID, DatasetName, Multihash, OSPath};
-
 use async_graphql::*;
 use chrono::{DateTime, Utc};
 use opendatafabric as odf;
+
+use crate::queries::Dataset;
+use crate::scalars::{DatasetID, DatasetName, Multihash, OSPath};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -1252,7 +1252,7 @@ impl From<odf::TransformSql> for TransformSql {
         Self {
             engine: v.engine.into(),
             version: v.version.map(Into::into),
-            queries: queries,
+            queries,
             temporal_tables: v
                 .temporal_tables
                 .map(|v| v.into_iter().map(Into::into).collect()),

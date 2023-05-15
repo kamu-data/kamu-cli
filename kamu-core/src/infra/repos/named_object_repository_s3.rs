@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
-use crate::domain::*;
-use crate::infra::utils::s3_context::S3Context;
-
 use async_trait::async_trait;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
+
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
+use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

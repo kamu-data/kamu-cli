@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::*;
+use std::path::Path;
 
 use chrono::{DateTime, Utc};
-use std::path::Path;
+use opendatafabric::*;
 
 use super::IDFactory;
 

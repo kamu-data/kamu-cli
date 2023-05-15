@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
 use opendatafabric::DatasetName;
 
-use std::path::{Path, PathBuf};
-use std::{fs::OpenOptions, io::Write};
+use super::{CLIError, Command};
 
 pub struct NewDatasetCommand {
     name: DatasetName,
@@ -32,8 +34,8 @@ impl NewDatasetCommand {
     {
         Self {
             name,
-            is_root: is_root,
-            is_derivative: is_derivative,
+            is_root,
+            is_derivative,
             output_path: output_path.map(|p| p.as_ref().to_owned()),
         }
     }

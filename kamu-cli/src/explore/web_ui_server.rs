@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
 use rust_embed::RustEmbed;
 use serde::Serialize;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

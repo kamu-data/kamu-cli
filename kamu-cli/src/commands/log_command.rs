@@ -7,22 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::output::OutputConfig;
-
-use super::{CLIError, Command};
-use kamu::domain::*;
-use opendatafabric::*;
-
-use chrono::prelude::*;
-use console::style;
-use futures::{StreamExt, TryStreamExt};
-use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
-use opendatafabric::MetadataBlock;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::io::Write;
 use std::sync::Arc;
+
+use chrono::prelude::*;
+use console::style;
+use futures::{StreamExt, TryStreamExt};
+use kamu::domain::*;
+use opendatafabric::serde::yaml::YamlMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
+use opendatafabric::{MetadataBlock, *};
+
+use super::{CLIError, Command};
+use crate::output::OutputConfig;
 
 pub struct LogCommand {
     local_repo: Arc<dyn DatasetRepository>,

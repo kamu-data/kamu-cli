@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
-use kamu::{
-    domain::*,
-    infra::{utils::smart_transfer_protocol::SmartTransferProtocolClient, *},
-};
+use kamu::domain::*;
+use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::infra::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
 use opendatafabric::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use tempfile::TempDir;

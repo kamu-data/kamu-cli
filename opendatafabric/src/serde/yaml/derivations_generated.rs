@@ -12,13 +12,14 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
-use super::formats::{datetime_rfc3339, datetime_rfc3339_opt};
-use crate::*;
+use std::path::PathBuf;
+
 use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use chrono::{DateTime, Utc};
-use serde_with::serde_as;
-use serde_with::skip_serializing_none;
-use std::path::PathBuf;
+use serde_with::{serde_as, skip_serializing_none};
+
+use super::formats::{datetime_rfc3339, datetime_rfc3339_opt};
+use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 

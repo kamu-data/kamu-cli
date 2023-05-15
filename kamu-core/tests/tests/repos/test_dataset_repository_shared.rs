@@ -9,7 +9,8 @@
 
 use std::assert_matches::assert_matches;
 
-use kamu::{domain::*, testing::MetadataFactory};
+use kamu::domain::*;
+use kamu::testing::MetadataFactory;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
-use crate::domain::*;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::Client;
 use url::Url;
+
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

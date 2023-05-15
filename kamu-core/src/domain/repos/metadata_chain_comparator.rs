@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::{MetadataBlock, Multihash};
-
 use async_trait::async_trait;
+use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
 use tokio_stream::StreamExt;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

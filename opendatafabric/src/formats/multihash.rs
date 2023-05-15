@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt;
+
 use serde::de::{Deserialize, Deserializer, Error, Visitor};
 use serde::{Serialize, Serializer};
-use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 

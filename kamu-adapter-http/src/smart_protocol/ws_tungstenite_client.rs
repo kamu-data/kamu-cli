@@ -7,23 +7,29 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::component;
 use futures::SinkExt;
+use kamu::domain::*;
+use kamu::infra::utils::smart_transfer_protocol::{
+    DatasetFactoryFn,
+    ObjectTransferOptions,
+    SmartTransferProtocolClient,
+};
 use opendatafabric::{AsTypedBlock, Multihash};
-use serde::{de::DeserializeOwned, Serialize};
-use std::sync::Arc;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use tokio::net::TcpStream;
+use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
-use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
-
-use kamu::infra::utils::smart_transfer_protocol::{DatasetFactoryFn, SmartTransferProtocolClient};
-use kamu::{domain::*, infra::utils::smart_transfer_protocol::ObjectTransferOptions};
-
-use crate::{
-    smart_protocol::{dataset_helper::*, errors::*, messages::*, phases::*},
-    ws_common::{self, ReadMessageError, WriteMessageError},
-};
+use crate::smart_protocol::dataset_helper::*;
+use crate::smart_protocol::errors::*;
+use crate::smart_protocol::messages::*;
+use crate::smart_protocol::phases::*;
+use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -484,7 +490,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             SyncResult::UpToDate
         };
 
-        use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
+        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
+        use tokio_tungstenite::tungstenite::protocol::CloseFrame;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,
@@ -598,7 +605,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        use tokio_tungstenite::tungstenite::protocol::{frame::coding::CloseCode, CloseFrame};
+        use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
+        use tokio_tungstenite::tungstenite::protocol::CloseFrame;
         ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Normal,

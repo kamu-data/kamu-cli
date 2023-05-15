@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
-
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
+
+use opendatafabric::*;
 use thiserror::Error;
+
+use crate::domain::*;
 
 const BUFFER_SIZE: usize = 8096;
 
@@ -139,10 +140,7 @@ impl PipeStream {
             })
             .unwrap();
 
-        Ok(Self {
-            ingress: ingress,
-            stdout: stdout,
-        })
+        Ok(Self { ingress, stdout })
     }
 }
 
@@ -233,8 +231,8 @@ impl DecompressZipStream {
             .unwrap();
 
         Ok(Self {
-            ingress: ingress,
-            consumer: consumer,
+            ingress,
+            consumer,
             done_recvr: rx,
         })
     }
@@ -283,7 +281,7 @@ struct DecompressGzipStream {
 impl DecompressGzipStream {
     fn new(input: Box<dyn Stream>) -> Self {
         let decoder = flate2::read::GzDecoder::new(input);
-        Self { decoder: decoder }
+        Self { decoder }
     }
 }
 
@@ -334,7 +332,7 @@ impl FileSink {
             })
             .unwrap();
 
-        Self { ingress: ingress }
+        Self { ingress }
     }
 
     fn join(self: Box<Self>) -> Result<(), IngestError> {

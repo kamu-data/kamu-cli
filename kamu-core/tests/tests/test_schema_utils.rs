@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use datafusion::parquet::basic::Type as PhysicalType;
-use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition};
+use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
 use kamu::infra::utils::schema_utils::write_schema_parquet_json;
 

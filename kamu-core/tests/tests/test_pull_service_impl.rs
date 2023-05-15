@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
-use kamu::infra::*;
-use kamu::testing::*;
-use opendatafabric::*;
-
-use chrono::prelude::*;
 use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
+use chrono::prelude::*;
+use kamu::domain::*;
+use kamu::infra::*;
+use kamu::testing::*;
+use opendatafabric::*;
 
 use crate::utils::DummySmartTransferProtocolClient;
 

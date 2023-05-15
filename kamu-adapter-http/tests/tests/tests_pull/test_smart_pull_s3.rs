@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{harness::ServerSideS3Harness, tests::tests_pull::test_smart_pull_shared};
+use crate::harness::ServerSideS3Harness;
+use crate::tests::tests_pull::test_smart_pull_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::metadata_chain::IterBlocksError;
-use opendatafabric::*;
-
-use futures::{future, Future, Stream, TryStreamExt};
-use pin_project::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use futures::{future, Future, Stream, TryStreamExt};
+use opendatafabric::*;
+use pin_project::pin_project;
+
+use super::metadata_chain::IterBlocksError;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

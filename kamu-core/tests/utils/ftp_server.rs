@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use container_runtime::{ContainerRuntime, RunArgs};
-use kamu::infra::utils::docker_images;
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+use container_runtime::{ContainerRuntime, RunArgs};
+use kamu::infra::utils::docker_images;
 
 // TODO: Consider replacing with in-process server for speed
 pub struct FtpServer {
@@ -74,8 +74,8 @@ impl FtpServer {
         Self {
             container_runtime,
             container_name: server_name,
-            process: process,
-            host_port: host_port,
+            process,
+            host_port,
         }
     }
 }

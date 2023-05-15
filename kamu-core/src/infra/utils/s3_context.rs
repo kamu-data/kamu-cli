@@ -8,12 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use aws_sdk_s3::error::SdkError;
-use aws_sdk_s3::operation::{
-    delete_object::{DeleteObjectError, DeleteObjectOutput},
-    get_object::{GetObjectError, GetObjectOutput},
-    head_object::{HeadObjectError, HeadObjectOutput},
-    put_object::{PutObjectError, PutObjectOutput},
-};
+use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
+use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
+use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
+use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
 use aws_smithy_http::byte_stream::ByteStream;

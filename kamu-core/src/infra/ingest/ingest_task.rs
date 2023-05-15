@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
-use crate::domain::*;
-use crate::infra::*;
-use chrono::DateTime;
-use chrono::Utc;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use container_runtime::ContainerRuntime;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use container_runtime::ContainerRuntime;
-use std::path::Path;
-use std::path::PathBuf;
-use std::sync::Arc;
+use super::*;
+use crate::domain::*;
+use crate::infra::*;
 
 pub struct IngestTask {
     dataset_handle: DatasetHandle,
@@ -298,7 +297,8 @@ impl IngestTask {
         source_state: Option<&PollingSourceState>,
     ) -> Result<PathBuf, InternalError> {
         use opendatafabric::serde::flatbuffers::{
-            FlatbuffersEnumSerializable, FlatbuffersSerializable,
+            FlatbuffersEnumSerializable,
+            FlatbuffersSerializable,
         };
 
         let mut fb = ::flatbuffers::FlatBufferBuilder::with_capacity(1024);

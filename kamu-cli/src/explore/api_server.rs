@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::Catalog;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+use dill::Catalog;
 
 // Extractor of dataset identity for smart transfer protocol
 #[derive(serde::Deserialize)]
@@ -25,8 +26,7 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        use axum::extract::Extension;
-        use axum::extract::Path;
+        use axum::extract::{Extension, Path};
 
         let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
 

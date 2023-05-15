@@ -7,19 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
-use kamu::infra::*;
-use kamu::testing::ParquetReaderHelper;
-use kamu_cli::CLIError;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
-
 use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures::stream::TryStreamExt;
+use kamu::domain::*;
+use kamu::infra::*;
+use kamu::testing::ParquetReaderHelper;
+use kamu_cli::CLIError;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 use thiserror::Error;
 
 // Test wrapper on top of CLI library

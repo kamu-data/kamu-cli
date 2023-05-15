@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use std::sync::Arc;
+
 use kamu::domain::*;
 use opendatafabric::RepoName;
 
-use std::sync::Arc;
+use super::{CLIError, Command};
 
 pub struct RepositoryDeleteCommand {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
@@ -33,8 +34,8 @@ impl RepositoryDeleteCommand {
         Self {
             remote_repo_reg,
             names: names.collect(),
-            all: all,
-            no_confirmation: no_confirmation,
+            all,
+            no_confirmation,
         }
     }
 

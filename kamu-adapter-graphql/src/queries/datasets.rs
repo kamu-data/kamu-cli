@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
-
 use async_graphql::*;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::domain::DatasetRepositoryExt;
 use opendatafabric as odf;
+
+use crate::queries::*;
+use crate::scalars::*;
+use crate::utils::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 

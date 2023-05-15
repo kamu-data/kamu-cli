@@ -7,18 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{
-    path::{Path, PathBuf},
-    process::Child,
-    sync::Arc,
-    time::Duration,
-};
+use std::path::{Path, PathBuf};
+use std::process::Child;
+use std::sync::Arc;
+use std::time::Duration;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeType, ExecArgs, RunArgs, TimeoutError};
-use odf::{
-    engine::{EngineGrpcClient, ExecuteQueryError},
-    ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess,
-};
+use odf::engine::{EngineGrpcClient, ExecuteQueryError};
+use odf::{ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess};
 use opendatafabric as odf;
 use rand::Rng;
 
@@ -282,7 +278,7 @@ impl EngineContainer {
         let mut command = container_runtime.run_cmd(RunArgs {
             image: image.to_owned(),
             container_name: Some(container_name.clone()),
-            volume_map: volume_map,
+            volume_map,
             user: Some("root".to_owned()),
             expose_ports: vec![Self::ADAPTER_PORT],
             ..RunArgs::default()

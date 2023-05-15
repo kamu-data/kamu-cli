@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::path::Path;
+
+use chrono::{TimeZone, Utc};
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use chrono::{TimeZone, Utc};
-use std::assert_matches::assert_matches;
-use std::path::Path;
 
 fn init_chain(root: &Path) -> impl MetadataChain {
     let blocks_dir = root.join("blocks");

@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::queries::Account;
-use crate::scalars::*;
-
 use async_graphql::*;
 use chrono::{DateTime, Utc};
 use opendatafabric as odf;
+
+use crate::queries::Account;
+use crate::scalars::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // MetadataBlockExtended

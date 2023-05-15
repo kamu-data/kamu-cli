@@ -9,12 +9,10 @@
 
 #![feature(exit_status_error)]
 
-use std::{
-    io::BufRead,
-    path::{Path, PathBuf},
-    process::Command,
-    str::FromStr,
-};
+use std::io::BufRead;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str::FromStr;
 
 fn main() {
     let matches = clap::Command::new("create-test-workspace")

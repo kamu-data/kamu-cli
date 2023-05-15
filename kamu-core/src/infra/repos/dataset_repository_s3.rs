@@ -16,9 +16,9 @@ use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
 
-use crate::{domain::*, infra::utils::s3_context::S3Context};
-
 use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
+use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
