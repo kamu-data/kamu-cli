@@ -42,8 +42,9 @@ pub trait SyncService: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SyncOptions {
-    /// Whether the source of data can be assumed non-malicious to skip hash sum and other expensive checks.
-    /// Defaults to `true` when the source is local workspace.
+    /// Whether the source of data can be assumed non-malicious to skip hash sum
+    /// and other expensive checks. Defaults to `true` when the source is
+    /// local workspace.
     pub trust_source: Option<bool>,
 
     /// Whether destination dataset should be created if it does not exist
@@ -164,8 +165,9 @@ pub enum SyncError {
         #[backtrace]
         RepositoryNotFoundError,
     ),
-    // TODO: Report divergence type (e.g. remote is ahead of local)
-    //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
+    // TODO: Report divergence type:
+    // Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead
+    // by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})
     #[error(transparent)]
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]

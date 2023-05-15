@@ -23,8 +23,8 @@ use crate::infra::utils::s3_context::{AsyncReadObj, S3Context};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Pass a single type that configures digest algo, multicodec, and hash base
-// TODO: Verify atomic behavior
+// TODO: Pass a single type that configures digest algo, multicodec, and hash
+// base TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
     _phantom: PhantomData<D>,

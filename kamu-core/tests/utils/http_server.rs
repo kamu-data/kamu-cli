@@ -13,7 +13,8 @@ use std::time::Duration;
 use container_runtime::{ContainerRuntime, RunArgs};
 use kamu::infra::utils::docker_images;
 
-// TODO: Implement caching headers in `HttpFileServer` so we could get rid of this class
+// TODO: Implement caching headers in `HttpFileServer` so we could get rid of
+// this class
 pub struct HttpServer {
     container_runtime: ContainerRuntime,
     pub container_name: String,

@@ -74,7 +74,8 @@ pub struct AttachmentsEmbedded {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Describes a range of metadata blocks as an arithmetic interval of block hashes
+/// Describes a range of metadata blocks as an arithmetic interval of block
+/// hashes
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct BlockInterval {
     /// Start of the closed interval [start; end]
@@ -132,7 +133,8 @@ pub enum DatasetKind {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Represents a snapshot of the dataset definition in a single point in time.
-/// This type is typically used for defining new datasets and changing the existing ones.
+/// This type is typically used for defining new datasets and changing the
+/// existing ones.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetSnapshot {
     /// Alias of the dataset.
@@ -200,9 +202,11 @@ pub struct EventTimeSourceFromPath {
 /// Indicates that derivative transformation has been performed.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQuery {
-    /// Defines inputs used in this transaction. Slices corresponding to every input must be present.
+    /// Defines inputs used in this transaction. Slices corresponding to every
+    /// input must be present.
     pub input_slices: Vec<InputSlice>,
-    /// Hash of the checkpoint file used to restore transformation state, if any.
+    /// Hash of the checkpoint file used to restore transformation state, if
+    /// any.
     pub input_checkpoint: Option<Multihash>,
     /// Describes output data written during this transaction, if any.
     pub output_data: Option<DataSlice>,
@@ -227,7 +231,8 @@ pub struct ExecuteQueryInput {
     pub vocab: DatasetVocabulary,
     /// Data that went into this transaction.
     pub data_interval: Option<OffsetInterval>,
-    /// TODO: This will be removed when coordinator will be slicing data for the engine
+    /// TODO: This will be removed when coordinator will be slicing data for the
+    /// engine
     pub data_paths: Vec<PathBuf>,
     /// TODO: replace with actual DDL or Parquet schema
     pub schema_file: PathBuf,
@@ -239,7 +244,8 @@ pub struct ExecuteQueryInput {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Sent by the coordinator to an engine to perform the next step of data transformation
+/// Sent by the coordinator to an engine to perform the next step of data
+/// transformation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
     /// Unique identifier of the output dataset
@@ -343,9 +349,11 @@ pub struct FetchStepFilesGlob {
 pub struct FetchStepContainer {
     /// Image name and and an optional tag.
     pub image: String,
-    /// Specifies the entrypoint. Not executed within a shell. The default OCI image's ENTRYPOINT is used if this is not provided.
+    /// Specifies the entrypoint. Not executed within a shell. The default OCI
+    /// image's ENTRYPOINT is used if this is not provided.
     pub command: Option<Vec<String>>,
-    /// Arguments to the entrypoint. The OCI image's CMD is used if this is not provided.
+    /// Arguments to the entrypoint. The OCI image's CMD is used if this is not
+    /// provided.
     pub args: Option<Vec<String>>,
     /// Environment variables to propagate into or set in the container.
     pub env: Option<Vec<EnvVar>>,
@@ -401,7 +409,8 @@ pub enum MergeStrategy {
 /// the set of columns can only grow.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyLedger {
-    /// Names of the columns that uniquely identify the record throughout its lifetime
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime
     pub primary_key: Vec<String>,
 }
 
@@ -437,20 +446,26 @@ pub struct MergeStrategyLedger {
 ///
 /// Schema Changes:
 ///
-/// This strategy will always preserve all columns from the existing and new snapshots, so the set of columns can only grow.
+/// This strategy will always preserve all columns from the existing and new
+/// snapshots, so the set of columns can only grow.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategySnapshot {
-    /// Names of the columns that uniquely identify the record throughout its lifetime.
+    /// Names of the columns that uniquely identify the record throughout its
+    /// lifetime.
     pub primary_key: Vec<String>,
-    /// Names of the columns to compared to determine if a row has changed between two snapshots.
+    /// Names of the columns to compared to determine if a row has changed
+    /// between two snapshots.
     pub compare_columns: Option<Vec<String>>,
     /// Name of the observation type column that will be added to the data.
     pub observation_column: Option<String>,
-    /// Name of the observation type when the data with certain primary key is seen for the first time.
+    /// Name of the observation type when the data with certain primary key is
+    /// seen for the first time.
     pub obsv_added: Option<String>,
-    /// Name of the observation type when the data with certain primary key has changed compared to the last time it was seen.
+    /// Name of the observation type when the data with certain primary key has
+    /// changed compared to the last time it was seen.
     pub obsv_changed: Option<String>,
-    /// Name of the observation type when the data with certain primary key has been seen before but now is missing from the snapshot.
+    /// Name of the observation type when the data with certain primary key has
+    /// been seen before but now is missing from the snapshot.
     pub obsv_removed: Option<String>,
 }
 
@@ -459,7 +474,8 @@ pub struct MergeStrategySnapshot {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// An individual block in the metadata chain that captures the history of modifications of a dataset.
+/// An individual block in the metadata chain that captures the history of
+/// modifications of a dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MetadataBlock {
     /// System time when this block was written.
@@ -521,7 +537,8 @@ pub enum PrepStep {
 pub struct PrepStepDecompress {
     /// Name of a compression algorithm used on data.
     pub format: CompressionFormat,
-    /// Path to a data file within a multi-file archive. Can contain glob patterns.
+    /// Path to a data file within a multi-file archive. Can contain glob
+    /// patterns.
     pub sub_path: Option<String>,
 }
 
@@ -555,27 +572,38 @@ pub enum ReadStep {
 /// Reader for comma-separated files.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepCsv {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
     pub schema: Option<Vec<String>>,
     /// Sets a single character as a separator for each field and value.
     pub separator: Option<String>,
     /// Decodes the CSV files by the given encoding type.
     pub encoding: Option<String>,
-    /// Sets a single character used for escaping quoted values where the separator can be part of the value. Set an empty string to turn off quotations.
+    /// Sets a single character used for escaping quoted values where the
+    /// separator can be part of the value. Set an empty string to turn off
+    /// quotations.
     pub quote: Option<String>,
-    /// Sets a single character used for escaping quotes inside an already quoted value.
+    /// Sets a single character used for escaping quotes inside an already
+    /// quoted value.
     pub escape: Option<String>,
-    /// Sets a single character used for skipping lines beginning with this character.
+    /// Sets a single character used for skipping lines beginning with this
+    /// character.
     pub comment: Option<String>,
     /// Use the first line as names of columns.
     pub header: Option<bool>,
-    /// If it is set to true, the specified or inferred schema will be forcibly applied to datasource files, and headers in CSV files will be ignored. If the option is set to false, the schema will be validated against all headers in CSV files in the case when the header option is set to true.
+    /// If it is set to true, the specified or inferred schema will be forcibly
+    /// applied to datasource files, and headers in CSV files will be ignored.
+    /// If the option is set to false, the schema will be validated against all
+    /// headers in CSV files in the case when the header option is set to true.
     pub enforce_schema: Option<bool>,
-    /// Infers the input schema automatically from data. It requires one extra pass over the data.
+    /// Infers the input schema automatically from data. It requires one extra
+    /// pass over the data.
     pub infer_schema: Option<bool>,
-    /// A flag indicating whether or not leading whitespaces from values being read should be skipped.
+    /// A flag indicating whether or not leading whitespaces from values being
+    /// read should be skipped.
     pub ignore_leading_white_space: Option<bool>,
-    /// A flag indicating whether or not trailing whitespaces from values being read should be skipped.
+    /// A flag indicating whether or not trailing whitespaces from values being
+    /// read should be skipped.
     pub ignore_trailing_white_space: Option<bool>,
     /// Sets the string representation of a null value.
     pub null_value: Option<String>,
@@ -595,10 +623,12 @@ pub struct ReadStepCsv {
     pub multi_line: Option<bool>,
 }
 
-/// Reader for files containing concatenation of multiple JSON records with the same schema.
+/// Reader for files containing concatenation of multiple JSON records with the
+/// same schema.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepJsonLines {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
     pub schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format.
     pub date_format: Option<String>,
@@ -615,23 +645,27 @@ pub struct ReadStepJsonLines {
 /// Reader for GeoJSON files.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
     pub schema: Option<Vec<String>>,
 }
 
 /// Reader for ESRI Shapefile format.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepEsriShapefile {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
     pub schema: Option<Vec<String>>,
-    /// Path to a data file within a multi-file archive. Can contain glob patterns.
+    /// Path to a data file within a multi-file archive. Can contain glob
+    /// patterns.
     pub sub_path: Option<String>,
 }
 
 /// Reader for Apache Parquet format.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepParquet {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more appropriate data types.
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
     pub schema: Option<Vec<String>>,
 }
 
@@ -654,7 +688,8 @@ pub struct RequestHeader {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#seed-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Establishes the identity of the dataset. Always the first metadata event in the chain.
+/// Establishes the identity of the dataset. Always the first metadata event in
+/// the chain.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Seed {
     /// Unique identity of the dataset.
@@ -711,7 +746,8 @@ pub struct SetLicense {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Contains information on how extenrally-hosted data can be ingested into the root dataset.
+/// Contains information on how extenrally-hosted data can be ingested into the
+/// root dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetPollingSource {
     /// Determines where data is sourced from.
@@ -722,7 +758,8 @@ pub struct SetPollingSource {
     pub read: ReadStep,
     /// Pre-processing query that shapes the data.
     pub preprocess: Option<Transform>,
-    /// Determines how newly-ingested data should be merged with existing history.
+    /// Determines how newly-ingested data should be merged with existing
+    /// history.
     pub merge: MergeStrategy,
 }
 
@@ -786,9 +823,11 @@ pub enum SourceCaching {
 /// The state of the source the data was added from to allow fast resuming.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SourceState {
-    /// Identifies the type of the state. Standard types include: `odf/etag`, `odf/last-modified`.
+    /// Identifies the type of the state. Standard types include: `odf/etag`,
+    /// `odf/last-modified`.
     pub kind: String,
-    /// Identifies the source data was ingested from. Standard sources include: `odf/poll`
+    /// Identifies the source data was ingested from. Standard sources include:
+    /// `odf/poll`
     pub source: String,
     /// Opaque value representing the state.
     pub value: String,
@@ -802,7 +841,8 @@ pub struct SourceState {
 /// Defines a query in a multi-step SQL transformation.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SqlQueryStep {
-    /// Name of the temporary view that will be created from result of the query.
+    /// Name of the temporary view that will be created from result of the
+    /// query.
     pub alias: Option<String>,
     /// SQL query the result of which will be exposed under the alias.
     pub query: String,
@@ -813,7 +853,8 @@ pub struct SqlQueryStep {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Temporary Flink-specific extension for creating temporal tables from streams.
+/// Temporary Flink-specific extension for creating temporal tables from
+/// streams.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TemporalTable {
     /// Name of the dataset to be converted into a temporal table.
@@ -841,9 +882,12 @@ pub struct TransformSql {
     pub version: Option<String>,
     /// SQL query the result of which will be used as an output.
     pub query: Option<String>,
-    /// Use this instead of query field for specifying multi-step SQL transformations. Each step acts as a shorthand for `CREATE TEMPORARY VIEW <alias> AS (<query>)`.
+    /// Use this instead of query field for specifying multi-step SQL
+    /// transformations. Each step acts as a shorthand for `CREATE TEMPORARY
+    /// VIEW <alias> AS (<query>)`.
     pub queries: Option<Vec<SqlQueryStep>>,
-    /// Temporary Flink-specific extension for creating temporal tables from streams.
+    /// Temporary Flink-specific extension for creating temporal tables from
+    /// streams.
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
 
@@ -855,7 +899,8 @@ pub struct TransformSql {
 /// Describes a derivative transformation input
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformInput {
-    /// Unique dataset identifier. This field is required in metadata blocks and can be empty only in a DatasetSnapshot.
+    /// Unique dataset identifier. This field is required in metadata blocks and
+    /// can be empty only in a DatasetSnapshot.
     pub id: Option<DatasetID>,
     /// An alias of this input to be used in queries.
     pub name: DatasetName,

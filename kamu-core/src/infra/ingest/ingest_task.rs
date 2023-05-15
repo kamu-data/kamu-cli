@@ -287,10 +287,11 @@ impl IngestTask {
         name
     }
 
-    /// Savepoint is considered valid only when it corresponts to the identical fetch step and
-    /// the source state of the previous commit - this way savepoint is always based on next state increment
-    /// after the previous run. We ensure validity by naming the savepoint based on a hash of the fetch step
-    /// and the source state in flatbuffers representation.
+    /// Savepoint is considered valid only when it corresponts to the identical
+    /// fetch step and the source state of the previous commit - this way
+    /// savepoint is always based on next state increment after the previous
+    /// run. We ensure validity by naming the savepoint based on a hash of the
+    /// fetch step and the source state in flatbuffers representation.
     fn get_savepoint_path(
         &self,
         fetch_step: &FetchStep,

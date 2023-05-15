@@ -86,7 +86,8 @@ pub struct InsertResult {
 pub struct InsertOpts<'a> {
     /// Insert object using provided hash computed elsewhere.
     ///
-    /// Warning: Use only when you fully trust the source of the precomputed hash.
+    /// Warning: Use only when you fully trust the source of the precomputed
+    /// hash.
     pub precomputed_hash: Option<&'a Multihash>,
 
     /// Insert will result in error if computed hash does not match this one.

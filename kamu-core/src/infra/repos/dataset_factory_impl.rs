@@ -196,7 +196,8 @@ impl DatasetFactoryImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Refactor to multiple factory providers that get dispatched based on URL schema
+// TODO: Refactor to multiple factory providers that get dispatched based on URL
+// schema
 #[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
     async fn get_dataset(

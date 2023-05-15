@@ -279,11 +279,12 @@ impl SyncServiceImpl {
             .await
             .int_err()?;
 
-        // If we try to access the IPNS key via HTTP gateway rigt away this may take a very long time
-        // if the key does not exist, as IPFS will be reaching out to remote nodes. To avoid long wait
-        // times on first push we make an assumption that this key is owned by the local IPFS node and
-        // try resolving it with a short timeout. If resolution fails - we assume that the key was not
-        // published yet.
+        // If we try to access the IPNS key via HTTP gateway rigt away this may take a
+        // very long time if the key does not exist, as IPFS will be reaching
+        // out to remote nodes. To avoid long wait times on first push we make
+        // an assumption that this key is owned by the local IPFS node and
+        // try resolving it with a short timeout. If resolution fails - we assume that
+        // the key was not published yet.
         let (old_cid, dst_head, chains_comparison) =
             match self.ipfs_client.name_resolve_local(&key.id).await? {
                 None => {

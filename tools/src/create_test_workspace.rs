@@ -23,7 +23,8 @@ fn main() {
 
     init_workspace(&work_dir, matches.contains_id("force"));
 
-    // BC dataset does not contain unique IDs so it's a pain to slice and we pull it whole
+    // BC dataset does not contain unique IDs so it's a pain to slice and we pull it
+    // whole
     Command::new("kamu")
         .current_dir(&work_dir)
         .args(&[

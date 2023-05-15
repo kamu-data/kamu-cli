@@ -24,7 +24,8 @@ pub struct DatasetLayout {
     pub data_dir: PathBuf,
     /// Directory containing the checkpoint files
     pub checkpoints_dir: PathBuf,
-    /// Directory containing auxiliary information (e.g. summary, lookup tables etc.)
+    /// Directory containing auxiliary information (e.g. summary, lookup tables
+    /// etc.)
     pub info_dir: PathBuf,
 }
 

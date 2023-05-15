@@ -26,7 +26,8 @@ impl SearchServiceImpl {
         Self { remote_repo_reg }
     }
 
-    // TODO: This is crude temporary implementation until ODF specifies registry interface
+    // TODO: This is crude temporary implementation until ODF specifies registry
+    // interface
     async fn search_in_resource(
         &self,
         url: &Url,

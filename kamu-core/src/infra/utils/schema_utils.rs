@@ -20,7 +20,8 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
     Ok(())
 }
 
-/// Similar to [`print_schema_parquet`], but uses JSON format that does not require a custom parser
+/// Similar to [write_schema_parquet], but uses JSON format that does not
+/// require a custom parser
 pub fn write_schema_parquet_json(
     output: &mut dyn Write,
     schema: &Type,

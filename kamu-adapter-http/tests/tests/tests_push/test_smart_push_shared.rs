@@ -280,8 +280,9 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
     let commit_result =
         commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
 
-    // Let's pretend that previous attempts uploaded some data files, but the rest was discarded.
-    // To mimic this, artifficially copy just the data folder, contaning a data block
+    // Let's pretend that previous attempts uploaded some data files, but the rest
+    // was discarded. To mimic this, artifficially copy just the data folder,
+    // contaning a data block
     copy_folder_recursively(
         &client_dataset_layout.data_dir,
         &server_dataset_layout.data_dir,
@@ -361,8 +362,9 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
     let commit_result =
         commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
 
-    // Let's pretend that previous attempts uploaded new data files, but the commit did not succceed in general.
-    // To mimic this, artifficially copy just the data folder, contaning a data block
+    // Let's pretend that previous attempts uploaded new data files, but the commit
+    // did not succceed in general. To mimic this, artifficially copy just the
+    // data folder, contaning a data block
     copy_folder_recursively(
         &client_dataset_layout.data_dir,
         &server_dataset_layout.data_dir,

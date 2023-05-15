@@ -77,7 +77,8 @@ impl MetadataChain {
         Ok(block.map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
     }
 
-    /// Returns a metadata block corresponding to the specified hash and encoded in desired format
+    /// Returns a metadata block corresponding to the specified hash and encoded
+    /// in desired format
     async fn block_by_hash_encoded(
         &self,
         ctx: &Context<'_>,

@@ -14,7 +14,8 @@ use opendatafabric::{Multicodec, Multihash};
 
 const LOGICAL_HASH_BATCH_SIZE: usize = 10_000;
 
-/// Computes a stable hash based on a content (as opposed to a binary layout) of a Parquet file.
+/// Computes a stable hash based on a content (as opposed to a binary layout) of
+/// a Parquet file.
 #[tracing::instrument(level = "info")]
 pub fn get_parquet_logical_hash(
     data_path: &Path,

@@ -47,7 +47,8 @@ impl ReadService {
         'a: 'b,
     {
         // Terminate early for zero-sized files
-        // TODO: Should we still call an engine if only to propagate source_event_time to it?
+        // TODO: Should we still call an engine if only to propagate source_event_time
+        // to it?
         if src_data_path.metadata().int_err()?.len() == 0 {
             return Ok(ExecuteQueryResponseSuccess {
                 data_interval: None,

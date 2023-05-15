@@ -88,7 +88,8 @@ pub struct EngineConfig {
     pub max_concurrency: Option<u32>,
     /// Type of the runtime to use when running the data processing engines
     pub runtime: Option<ContainerRuntimeType>,
-    /// Type of the networking namespace (relevant when running in container environments)
+    /// Type of the networking namespace (relevant when running in container
+    /// environments)
     pub network_ns: Option<NetworkNamespaceType>,
     /// Timeout for starting an engine container
     pub start_timeout: Option<DurationString>,
@@ -211,7 +212,8 @@ pub struct IpfsConfig {
     /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
     pub http_gateway: Option<Url>,
 
-    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it to the Gateway.
+    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it
+    /// to the Gateway.
     pub pre_resolve_dnslink: Option<bool>,
 }
 

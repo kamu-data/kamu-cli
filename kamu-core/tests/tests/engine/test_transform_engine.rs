@@ -139,7 +139,8 @@ impl DatasetHelper {
             assert_eq!(new_slice.logical_hash, orig_slice.logical_hash);
         }
 
-        // Rename new file according to new physical hash and delete the original data and checkpoint
+        // Rename new file according to new physical hash and delete the original data
+        // and checkpoint
         let new_data_path = self.dataset_layout.data_slice_path(&new_slice);
         std::fs::rename(&tmp_path, &new_data_path).unwrap();
         std::fs::remove_file(&orig_data_path).unwrap();

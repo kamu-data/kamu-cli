@@ -29,7 +29,8 @@ pub trait Engine: Send + Sync {
     ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
-// TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
+// TODO: This interface is temporary and will be removed when ingestion is moved
+// from Spark into Kamu
 #[async_trait::async_trait]
 pub trait IngestEngine: Send + Sync {
     async fn ingest(

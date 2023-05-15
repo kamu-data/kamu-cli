@@ -124,8 +124,8 @@ pub enum ContainerRuntimeType {
 }
 
 /// Corresponds to podman's containers.conf::netns
-/// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s) it usually runs
-/// uses host network namespace.
+/// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)
+/// it usually runs uses host network namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NetworkNamespaceType {
@@ -141,8 +141,9 @@ pub struct ContainerRuntime {
 }
 
 // TODO: This is a hack primarily for tests that use containers not to
-// spam docker/podman with many pull requests at a time. While docker's daemon architecture
-// handles concurrent pulls well, podman seem to sometimes does not deduplicate pulls well.
+// spam docker/podman with many pull requests at a time. While docker's daemon
+// architecture handles concurrent pulls well, podman seem to sometimes does not
+// deduplicate pulls well.
 static PULL_IMAGE_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[component(pub)]

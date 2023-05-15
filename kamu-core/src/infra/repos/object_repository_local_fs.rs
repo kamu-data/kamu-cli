@@ -24,7 +24,8 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Pass a single type that configures digest algo, multicodec, and hash base
+// TODO: Pass a single type that configures digest algo, multicodec, and hash
+// base
 pub struct ObjectRepositoryLocalFS<D, const C: u32> {
     root: PathBuf,
     _phantom: PhantomData<D>,
@@ -52,7 +53,8 @@ where
         self.root.join(hash.to_multibase_string())
     }
 
-    // TODO: We should newtype Path and ensure repositoris are created for directories that exist
+    // TODO: We should newtype Path and ensure repositoris are created for
+    // directories that exist
     fn get_path_write(&self, hash: &Multihash) -> Result<PathBuf, std::io::Error> {
         if !self.root.exists() {
             std::fs::create_dir_all(&self.root)?;

@@ -179,9 +179,10 @@ async fn create_graph_in_repository(
 }
 
 // Adding a remote dataset is a bit of a pain.
-// We cannot add a local dataset and then add a pull alias without adding all of its dependencies too.
-// So instead we're creating a repository based on temp dir and syncing it into the main workspace.
-// TODO: Add simpler way to import remote dataset
+// We cannot add a local dataset and then add a pull alias without adding all of
+// its dependencies too. So instead we're creating a repository based on temp
+// dir and syncing it into the main workspace. TODO: Add simpler way to import
+// remote dataset
 async fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
     reg: Arc<RemoteRepositoryRegistryImpl>,

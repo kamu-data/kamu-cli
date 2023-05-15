@@ -101,7 +101,8 @@ pub enum DatasetPushRequestError {
     InvalidHead(DatasetPushInvalidHeadError),
 }
 
-// Wrong head suggested during push. Client's data on what the head is got out of date.
+// Wrong head suggested during push. Client's data on what the head is got out
+// of date.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushInvalidHeadError {
     pub actual_head: Option<Multihash>,

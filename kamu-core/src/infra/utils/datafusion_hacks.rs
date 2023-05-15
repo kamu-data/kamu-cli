@@ -117,7 +117,8 @@ impl TableProvider for ListingTableOfFiles {
     }
 
     fn supports_filter_pushdown(&self, _filter: &Expr) -> Result<TableProviderFilterPushDown> {
-        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so have to remove pushdown
+        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so
+        // have to remove pushdown
         Ok(TableProviderFilterPushDown::Inexact)
     }
 
@@ -136,7 +137,8 @@ impl ListingTableOfFiles {
         _filters: &'a [Expr],
         limit: Option<usize>,
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
-        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so have to remove parititioning
+        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so
+        // have to remove parititioning
         let store = ctx
             .runtime_env()
             .object_store(ObjectStoreUrl::local_filesystem())?;

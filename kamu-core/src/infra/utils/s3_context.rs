@@ -56,8 +56,8 @@ impl S3Context {
         bucket: String,
         root_folder_key: String,
     ) -> Self {
-        // Note: Falling back to `unspecified` region as SDK errors out when the region not set
-        // even if using custom endpoint
+        // Note: Falling back to `unspecified` region as SDK errors out when the region
+        // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
             .or_else("unspecified");
         let sdk_config = aws_config::from_env().region(region_provider).load().await;
@@ -295,8 +295,9 @@ impl S3Context {
                 .int_err()?;
 
             // TODO: concurrency safety.
-            // It is important not to allow parallel writes of Head reference file in the same bucket.
-            // Consider optimistic locking (comparing old head with expected before final commit).
+            // It is important not to allow parallel writes of Head reference file in the
+            // same bucket. Consider optimistic locking (comparing old head with
+            // expected before final commit).
 
             has_next_page = list_response.is_truncated();
             if let Some(contents) = list_response.contents {

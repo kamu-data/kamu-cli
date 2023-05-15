@@ -25,7 +25,8 @@ pub struct ObjectTransferOptions {
 impl Default for ObjectTransferOptions {
     fn default() -> Self {
         // Use number of allowed parallel threads on the target system.
-        // Run single-threaded transfer as a fallback, if the parallelism grade cannot be determined
+        // Run single-threaded transfer as a fallback, if the parallelism grade cannot
+        // be determined
         let max_parallel_transfers = std::thread::available_parallelism()
             .map(|nz| nz.get())
             .unwrap_or(1_usize);

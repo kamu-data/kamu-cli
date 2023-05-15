@@ -200,7 +200,8 @@ pub enum CLIError {
         source: BoxedError,
         backtrace: Backtrace,
     },
-    /// Indicates that an operation has failed while some changes could've already been applied
+    /// Indicates that an operation has failed while some changes could've
+    /// already been applied
     #[error("Partial failure")]
     PartialFailure,
     #[error("{source}")]

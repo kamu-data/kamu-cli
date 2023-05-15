@@ -41,8 +41,9 @@ impl FlatbuffersMetadataBlockSerializer {
 impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
     fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
         // TODO: PERF: Serializing nested flatbuffers turned out to be a pain
-        // It's hard to make the inner object length-prefixed in order to then treat it as a [ubyte] array
-        // so for now we allocate twice and copy inner object into secondary buffer :(
+        // It's hard to make the inner object length-prefixed in order to then treat it
+        // as a [ubyte] array so for now we allocate twice and copy inner object
+        // into secondary buffer :(
         //
         // See: https://github.com/google/flatbuffers/issues/7005
         let block_buffer = self.serialize_metadata_block(block);

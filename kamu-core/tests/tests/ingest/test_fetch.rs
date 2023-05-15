@@ -481,7 +481,8 @@ async fn test_fetch_files_glob() {
         .unwrap();
     assert_matches!(res3, FetchResult::UpToDate);
 
-    // Doesn't consider files with names lexicographically "smaller" than last fetched
+    // Doesn't consider files with names lexicographically "smaller" than last
+    // fetched
     let src_path_0 = tempdir.path().join("data-2020-01-01.csv");
     std::fs::write(
         &src_path_0,

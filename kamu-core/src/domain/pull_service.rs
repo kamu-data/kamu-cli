@@ -52,13 +52,15 @@ pub trait PullService: Send + Sync {
 pub struct PullRequest {
     pub local_ref: Option<DatasetRef>,
     pub remote_ref: Option<DatasetRefRemote>,
-    /// Allows to override the fetch source on root datasets (e.g. to pull data from a specific file)
+    /// Allows to override the fetch source on root datasets (e.g. to pull data
+    /// from a specific file)
     pub ingest_from: Option<FetchStep>,
 }
 
 #[derive(Debug)]
 pub struct PullResponse {
-    /// Parameters passed into the call. Empty for datasets that were pulled as recursive dependencies.
+    /// Parameters passed into the call. Empty for datasets that were pulled as
+    /// recursive dependencies.
     pub original_request: Option<PullRequest>,
     /// Local dataset handle, if resolved
     pub local_ref: Option<DatasetRef>,
@@ -74,7 +76,8 @@ pub struct PullOptions {
     pub recursive: bool,
     /// Pull all known datasets
     pub all: bool,
-    /// Whether the datasets pulled from remotes should be permanently associated with them
+    /// Whether the datasets pulled from remotes should be permanently
+    /// associated with them
     pub add_aliases: bool,
     /// Ingest-specific options
     pub ingest_options: IngestOptions,

@@ -195,8 +195,8 @@ impl DecompressZipStream {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
 
         // TODO: Threading is a complete overkill here
-        // Only reason for this is the ownership/lifetime issues when creating archive from references
-        // See: https://github.com/mvdnes/zip-rs/issues/111
+        // Only reason for this is the ownership/lifetime issues when creating archive
+        // from references See: https://github.com/mvdnes/zip-rs/issues/111
         let ingress = std::thread::Builder::new()
             .name("decompress_zip_stream".to_owned())
             .spawn(move || {

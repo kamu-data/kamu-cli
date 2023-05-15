@@ -204,7 +204,8 @@ struct UpdateSummaryIncrement {
 
 impl UpdateSummaryIncrement {
     fn seen_chain_beginning(&self) -> bool {
-        // Seed blocks are guaranteed to appear only once in a chain, and only at the very beginning
+        // Seed blocks are guaranteed to appear only once in a chain, and only at the
+        // very beginning
         return self.seen_id.is_some();
     }
 

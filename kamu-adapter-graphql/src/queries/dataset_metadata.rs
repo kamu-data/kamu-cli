@@ -155,7 +155,8 @@ impl DatasetMetadata {
             }))
     }
 
-    /// Current readme file as discovered from attachments associated with the dataset
+    /// Current readme file as discovered from attachments associated with the
+    /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
         if let Some(attachments) = self
             .get_last_block_of_type::<odf::SetAttachments>(ctx)

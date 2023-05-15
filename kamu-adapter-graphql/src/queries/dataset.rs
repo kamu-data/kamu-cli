@@ -38,7 +38,8 @@ impl Dataset {
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        // TODO: Should we resolve reference at this point or allow unresolved and fail later?
+        // TODO: Should we resolve reference at this point or allow unresolved and fail
+        // later?
         let hdl = local_repo.resolve_dataset_ref(dataset_ref).await?;
         Ok(Dataset::new(Account::mock(), hdl))
     }
@@ -58,7 +59,8 @@ impl Dataset {
     }
 
     /// Symbolic name of the dataset.
-    /// Name can change over the dataset's lifetime. For unique identifier use `id()`.
+    /// Name can change over the dataset's lifetime. For unique identifier use
+    /// `id()`.
     async fn name(&self) -> DatasetName {
         self.dataset_handle.alias.dataset_name.clone().into()
     }

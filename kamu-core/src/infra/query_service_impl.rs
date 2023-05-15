@@ -67,9 +67,9 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| sv.into())
             .unwrap_or_default();
 
-        // TODO: This is a workaround for Arrow not handling timestamps with explicit timezones.
-        // We basically have to re-cast all timestamp fields into timestamps after querying.
-        // See:
+        // TODO: This is a workaround for Arrow not handling timestamps with explicit
+        // timezones. We basically have to re-cast all timestamp fields into
+        // timestamps after querying. See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
         let res_schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
@@ -215,8 +215,8 @@ impl CatalogProvider for KamuCatalog {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Performance is poor as it essentially reads all data files in the workspace
-// and in some cases (like 'show tables') even twice
+// TODO: Performance is poor as it essentially reads all data files in the
+// workspace and in some cases (like 'show tables') even twice
 #[derive(Clone)]
 struct KamuSchema {
     local_repo: Arc<dyn DatasetRepository>,

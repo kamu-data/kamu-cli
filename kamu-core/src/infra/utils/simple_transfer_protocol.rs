@@ -33,7 +33,8 @@ pub struct SimpleTransferProtocol;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl SimpleTransferProtocol {
-    // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need to ensure repos are Sync)
+    // TODO: PERF: Parallelism opportunity for data and checkpoint downloads (need
+    // to ensure repos are Sync)
     pub async fn sync(
         &self,
         src_ref: &DatasetRefAny,
@@ -338,8 +339,9 @@ impl SimpleTransferProtocol {
                                 Some(&checkpoint.physical_hash)
                             },
                             expected_hash: Some(&checkpoint.physical_hash),
-                            // This hint is necessary only for S3 implementation that does not currently support
-                            // streaming uploads without knowing Content-Length. We should remove it in future.
+                            // This hint is necessary only for S3 implementation that does not
+                            // currently support streaming uploads
+                            // without knowing Content-Length. We should remove it in future.
                             size_hint: Some(checkpoint.size as usize),
                             ..Default::default()
                         },
@@ -425,7 +427,8 @@ impl SimpleTransferProtocol {
         }
 
         // Update reference, atomically commiting the sync operation
-        // Any failures before this point may result in dangling files but will keep the destination dataset in its original logical state
+        // Any failures before this point may result in dangling files but will keep the
+        // destination dataset in its original logical state
         match dst
             .as_metadata_chain()
             .set_ref(

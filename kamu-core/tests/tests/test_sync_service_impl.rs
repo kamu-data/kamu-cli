@@ -268,7 +268,8 @@ async fn do_test_sync(
         if src_head == b3 && dst_head == exta_head
     );
 
-    // Try push from dataset_1 with --force: it should abandon the diverged_head block
+    // Try push from dataset_1 with --force: it should abandon the diverged_head
+    // block
     assert_matches!(
         sync_svc
             .sync(

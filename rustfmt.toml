@@ -1,7 +1,11 @@
 # Reference: https://rust-lang.github.io/rustfmt/?version=master
+edition = "2021"
 
 # Add newline breaks to string literals where necessary
 format_strings = true
+
+# Ensure comments fit the `max_width` (ignores mardown headers and URLs).
+wrap_comments = true
 
 # Error if unable to get comments or string literals within `max_width`.
 # Without this option rustfmt often silently gives up formatting the entire file.

@@ -25,7 +25,8 @@ pub type MultihashShort<'a> = MultihashShortGeneric<'a, MAX_HASH_LENGTH_BYTES>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// S specifies maximum hash size in bytes(!) this type can handle, not the exact length of it
+/// S specifies maximum hash size in bytes(!) this type can handle, not the
+/// exact length of it
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MultihashGeneric<const S: usize> {
     /// The code of the Multihash.

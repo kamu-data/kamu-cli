@@ -26,16 +26,18 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 ///
 /// These combinators can be implemented differently by various metadata chains
 /// to make certain operations more efficient, for example:
-/// - Filters can use the raw block representations (e.g. flatbuffers)
-///   to skip undesired blocks without constructing DTOs
-/// - Implementations can use skip lists and lookup tables to traverse the chain faster.
+/// - Filters can use the raw block representations (e.g. flatbuffers) to skip
+///   undesired blocks without constructing DTOs
+/// - Implementations can use skip lists and lookup tables to traverse the chain
+///   faster.
 pub trait MetadataStream<'a>:
     Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>
 {
-    // TODO: Reconsider this method as it may result in incorrect logic of checkpoint propagation.
-    // In cases when AddData is followed by SetWatermark the client may incorrectly assume that
-    // the checkpoint is missing when inspecting SetWatermark event, while in fact they should've
-    // scanned the chain further.
+    // TODO: Reconsider this method as it may result in incorrect logic of
+    // checkpoint propagation. In cases when AddData is followed by SetWatermark
+    // the client may incorrectly assume that the checkpoint is missing when
+    // inspecting SetWatermark event, while in fact they should've scanned the
+    // chain further.
     fn filter_data_stream_blocks(
         self: Pin<Box<Self>>,
     ) -> Pin<
