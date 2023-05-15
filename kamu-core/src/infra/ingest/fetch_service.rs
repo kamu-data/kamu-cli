@@ -16,6 +16,7 @@ use std::sync::Arc;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
+use container_runtime::nonblocking::ContainerRuntime;
 use container_runtime::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
@@ -62,8 +63,6 @@ impl FetchService {
             let fetch_step = fetch_step.clone();
             let prev_source_state = prev_source_state.cloned();
             let target_path = target_path.to_owned();
-            let container_runtime = self.container_runtime.clone();
-            let container_log_dir = self.container_log_dir.clone();
 
             tokio::task::spawn_blocking(move || {
                 Self::fetch_blocking(
@@ -71,8 +70,6 @@ impl FetchService {
                     prev_source_state.as_ref(),
                     &target_path,
                     listener,
-                    container_runtime,
-                    container_log_dir,
                 )
             })
             .await
@@ -89,6 +86,7 @@ impl FetchService {
                     _ => Ok(true),
                 }
             }
+            FetchStep::Container(_) => Ok(false),
             _ => Ok(true),
         }
     }
@@ -98,8 +96,6 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: Arc<dyn FetchProgressListener>,
-        container_runtime: Arc<ContainerRuntime>,
-        container_log_dir: PathBuf,
     ) -> Result<FetchResult, IngestError> {
         match &fetch_step {
             FetchStep::Url(furl) => {
@@ -135,14 +131,7 @@ impl FetchService {
             FetchStep::FilesGlob(fglob) => {
                 Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
             }
-            FetchStep::Container(fetch) => Self::fetch_container(
-                container_runtime,
-                container_log_dir,
-                fetch,
-                prev_source_state,
-                target_path,
-                listener,
-            ),
+            FetchStep::Container(_) => unreachable!(),
         }
     }
 
@@ -174,7 +163,11 @@ impl FetchService {
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
             }
-            _ => unreachable!(),
+            FetchStep::Container(fetch) => {
+                self.fetch_container(fetch, prev_source_state, target_path, listener)
+                    .await
+            }
+            FetchStep::FilesGlob(_) => unreachable!(),
         }
     }
 
@@ -238,9 +231,8 @@ impl FetchService {
     // TODO: Env var security
     // TODO: Allow containers to output watermarks
     #[tracing::instrument(level = "info", name = "commit", skip_all)]
-    fn fetch_container(
-        container_runtime: Arc<ContainerRuntime>,
-        container_log_dir: PathBuf,
+    async fn fetch_container(
+        &self,
         fetch: &FetchStepContainer,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -248,16 +240,14 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         use rand::Rng;
 
-        if !container_runtime.has_image(&fetch.image) {
-            Self::pull_image(
-                container_runtime.as_ref(),
-                &fetch.image,
-                listener
-                    .clone()
-                    .get_pull_image_listener()
-                    .unwrap_or_else(|| Arc::new(NullPullImageListener)),
-            )?;
-        }
+        let pull_image_listener = listener
+            .clone()
+            .get_pull_image_listener()
+            .unwrap_or_else(|| Arc::new(NullPullImageListener));
+
+        self.container_runtime
+            .ensure_image(&fetch.image, Some(pull_image_listener.as_ref()))
+            .await?;
 
         listener.on_progress(&FetchProgress {
             total_bytes: 0,
@@ -270,11 +260,13 @@ impl FetchService {
             .map(char::from)
             .collect();
 
-        let out_dir = container_log_dir.join(format!("fetch-{}", &run_id));
+        let out_dir = self.container_log_dir.join(format!("fetch-{}", &run_id));
 
         std::fs::create_dir_all(&out_dir).int_err()?;
 
-        let stderr_path = container_log_dir.join(format!("fetch-{}.err.txt", run_id));
+        let stderr_path = self
+            .container_log_dir
+            .join(format!("fetch-{}.err.txt", run_id));
 
         let stdout_file = std::fs::File::create(target_path).int_err()?;
         let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
@@ -319,7 +311,8 @@ impl FetchService {
             }
         }
 
-        let status = container_runtime
+        let status = self
+            .container_runtime
             .run_cmd(RunArgs {
                 image: fetch.image.clone(),
                 entry_point: fetch.command.as_ref().map(|cmd| cmd.join(" ")),
@@ -331,13 +324,14 @@ impl FetchService {
             .stdout(Stdio::from(stdout_file))
             .stderr(Stdio::from(stderr_file))
             .status()
+            .await
             .int_err()?;
 
         // Fix permissions
-        if container_runtime.config.runtime == ContainerRuntimeType::Docker {
+        if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
             cfg_if::cfg_if! {
                 if #[cfg(unix)] {
-                    container_runtime
+                    self.container_runtime
                         .run_shell_cmd(
                             RunArgs {
                                 image: fetch.image.clone(),
@@ -354,7 +348,9 @@ impl FetchService {
                         )
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
-                        .status().int_err()?;
+                        .status()
+                        .await
+                        .int_err()?;
                 }
             }
         }
@@ -388,33 +384,6 @@ impl FetchService {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(image))]
-    fn pull_image(
-        container_runtime: &ContainerRuntime,
-        image: &str,
-        listener: Arc<dyn PullImageListener>,
-    ) -> Result<(), IngestError> {
-        listener.begin(image);
-
-        // TODO: Better error handling
-        container_runtime
-            .pull_cmd(image)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .int_err()?
-            .exit_ok()
-            .map_err(|error| {
-                tracing::error!(?error, "Failed to pull ingest image");
-                ImageNotFoundError::new(image)
-            })?;
-
-        tracing::info!("Successfully pulled ingest image");
-        listener.success();
-
-        Ok(())
-    }
-
     fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
@@ -439,7 +408,7 @@ impl FetchService {
                      {:?}",
                     src
                 ))
-                .into())
+                .into());
             }
         };
 
@@ -517,7 +486,7 @@ impl FetchService {
                     ),
                     src
                 ))
-                .into())
+                .into());
             }
         };
 
@@ -590,7 +559,7 @@ impl FetchService {
                     ),
                     src
                 ))
-                .into())
+                .into());
             }
         };
 
@@ -645,7 +614,7 @@ impl FetchService {
                 return Err(IngestError::unreachable(
                     url.as_str(),
                     Some(HttpStatusError::new(code.as_u16() as u32).into()),
-                ))
+                ));
             }
         }
 

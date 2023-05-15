@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
 use chrono::Utc;
-use container_runtime::ContainerRuntime;
+use container_runtime::nonblocking::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra::ingest::*;

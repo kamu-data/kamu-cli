@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use container_runtime::ContainerRuntime;
+use container_runtime::nonblocking::ContainerRuntime;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 

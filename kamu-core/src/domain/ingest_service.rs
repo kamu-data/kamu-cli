@@ -10,6 +10,7 @@
 use std::backtrace::Backtrace;
 use std::sync::Arc;
 
+use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -172,10 +173,10 @@ pub enum IngestError {
         source: Option<BoxedError>,
     },
     #[error(transparent)]
-    ImageNotFound(
+    ImagePull(
         #[from]
         #[backtrace]
-        ImageNotFoundError,
+        ImagePullError,
     ),
     #[error(transparent)]
     ParameterNotFound(

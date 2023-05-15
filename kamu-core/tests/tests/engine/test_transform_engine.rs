@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use container_runtime::ContainerRuntime;
+use container_runtime::nonblocking::ContainerRuntime;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::record::RowAccessor;
 use futures::StreamExt;

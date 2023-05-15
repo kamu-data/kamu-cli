@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use container_runtime::{ContainerRuntime, NetworkNamespaceType, NullPullImageListener};
+use container_runtime::nonblocking::ContainerRuntime;
+use container_runtime::*;
 use dill::*;
 
 use super::engine_odf::*;
@@ -52,18 +52,18 @@ impl EngineProvisionerLocal {
 
         Self {
             spark_ingest_engine: Arc::new(SparkEngine::new(
-                container_runtime.clone(),
+                container_runtime.clone().into_blocking(),
                 &config.spark_image,
                 workspace_layout.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
-                container_runtime.clone(),
+                container_runtime.clone().into_blocking(),
                 engine_config.clone(),
                 &config.spark_image,
                 workspace_layout.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
-                container_runtime.clone(),
+                container_runtime.clone().into_blocking(),
                 engine_config.clone(),
                 &config.flink_image,
                 workspace_layout.clone(),
@@ -83,65 +83,31 @@ impl EngineProvisionerLocal {
         image: &str,
         listener: Arc<dyn EngineProvisioningListener>,
     ) -> Result<(), EngineProvisioningError> {
-        let pull_image = {
+        let mut pull_image = {
+            let state = self.state.lock().unwrap();
+            !state.known_images.contains(image)
+        };
+
+        if pull_image && self.container_runtime.has_image(image).await.int_err()? {
             let mut state = self.state.lock().unwrap();
-            if state.known_images.contains(image) {
-                false
-            } else if self.container_runtime.has_image(image) {
-                state.known_images.insert(image.to_owned());
-                false
-            } else {
-                true
-            }
+            state.known_images.insert(image.to_owned());
+            pull_image = false;
         };
 
         if pull_image {
-            self.pull_image(
-                image,
-                listener
-                    .get_pull_image_listener()
-                    .unwrap_or_else(|| Arc::new(NullPullImageListener)),
-            )
-            .await?;
+            let listener = listener
+                .get_pull_image_listener()
+                .unwrap_or_else(|| Arc::new(NullPullImageListener));
 
+            self.container_runtime
+                .pull_image(image, Some(listener.as_ref()))
+                .await?;
             {
                 let mut state = self.state.lock().unwrap();
                 state.known_images.insert(image.to_owned());
             }
         }
 
-        Ok(())
-    }
-
-    #[tracing::instrument(level = "info", skip_all, fields(image))]
-    async fn pull_image(
-        &self,
-        image: &str,
-        listener: Arc<dyn PullImageListener>,
-    ) -> Result<(), EngineProvisioningError> {
-        listener.begin(image);
-
-        let container_runtime = self.container_runtime.clone();
-        let image = image.to_owned();
-        // TODO: Return better errors
-        tokio::task::spawn_blocking(move || {
-            container_runtime
-                .pull_cmd(&image)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .map_err(|e| EngineProvisioningError::internal(e))?
-                .exit_ok()
-                .map_err(|error| {
-                    tracing::error!(?error, "Failed to pull engine image");
-                    EngineProvisioningError::image_not_found(&image)
-                })
-        })
-        .await
-        .unwrap()?;
-
-        tracing::info!("Successfully pulled engine image");
-        listener.success();
         Ok(())
     }
 
@@ -230,7 +196,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.flink_engine.clone() as Arc<dyn Engine>,
                 &self.config.flink_image,
             )),
-            _ => Err(EngineProvisioningError::image_not_found(engine_id)),
+            _ => Err(format!("Unsupported engine {}", engine_id).int_err()),
         }?;
 
         self.ensure_image(image, listener.clone()).await?;
@@ -304,17 +270,17 @@ pub struct EngineProvisionerNull;
 impl EngineProvisioner for EngineProvisionerNull {
     async fn provision_engine(
         &self,
-        engine_id: &str,
+        _engine_id: &str,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<EngineHandle, EngineProvisioningError> {
-        Err(EngineProvisioningError::image_not_found(engine_id))
+        unimplemented!()
     }
 
     async fn provision_ingest_engine(
         &self,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
     ) -> Result<IngestEngineHandle, EngineProvisioningError> {
-        Err(EngineProvisioningError::image_not_found("spark-ingest"))
+        unimplemented!()
     }
 
     fn release_engine(&self, _engine: &dyn Engine) {}
