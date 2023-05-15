@@ -180,7 +180,8 @@ type Dataset {
 	id: DatasetID!
 	"""
 	Symbolic name of the dataset.
-	Name can change over the dataset's lifetime. For unique identifier use `id()`.
+	Name can change over the dataset's lifetime. For unique identifier use
+	`id()`.
 	"""
 	name: DatasetName!
 	"""
@@ -231,12 +232,14 @@ type DatasetData {
 	"""
 	numRecordsTotal: Int!
 	"""
-	An estimated size of data on disk not accounting for replication or caching
+	An estimated size of data on disk not accounting for replication or
+	caching
 	"""
 	estimatedSize: Int!
 	"""
 	Returns the specified number of the latest records in the dataset
-	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
+	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
+	event_time DESC LIMIT N`
 	"""
 	tail(limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
 }
@@ -286,7 +289,8 @@ type DatasetMetadata {
 	"""
 	currentInfo: SetInfo!
 	"""
-	Current readme file as discovered from attachments associated with the dataset
+	Current readme file as discovered from attachments associated with the
+	dataset
 	"""
 	currentReadme: String
 	"""
@@ -454,7 +458,8 @@ type MetadataChain {
 	"""
 	blockByHash(hash: Multihash!): MetadataBlockExtended
 	"""
-	Returns a metadata block corresponding to the specified hash and encoded in desired format
+	Returns a metadata block corresponding to the specified hash and encoded
+	in desired format
 	"""
 	blockByHashEncoded(hash: Multihash!, format: MetadataManifestFormat!): String
 	"""
@@ -517,7 +522,8 @@ type PageBasedInfo {
 	"""
 	currentPage: Int!
 	"""
-	Approximate number of total pages assuming number of nodes per page stays the same
+	Approximate number of total pages assuming number of nodes per page
+	stays the same
 	"""
 	totalPages: Int
 }
