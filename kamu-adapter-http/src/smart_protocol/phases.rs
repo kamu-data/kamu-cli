@@ -21,6 +21,7 @@ pub enum PushPhase {
     InitialRequest,
     MetadataRequest,
     ObjectsRequest,
+    ObjectsUploadProgress,
     CompleteRequest,
 }
 

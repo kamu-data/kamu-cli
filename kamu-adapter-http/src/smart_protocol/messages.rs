@@ -147,7 +147,24 @@ pub enum ObjectPushStrategy {
     HttpUpload,
 }
 
-/// Push stage 3: complete handshake indication
+/// Push stage 3: object upload progress
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsUploadInProgress {
+    pub details: ObjectsUploadProgressDetails,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub enum ObjectsUploadProgressDetails {
+    Running(ObjectsUploadProgressDetailsRunning),
+    Complete,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ObjectsUploadProgressDetailsRunning {
+    pub uploaded_objects_count: i32,
+}
+
+/// Push stage 4: complete handshake indication
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushComplete {}
 

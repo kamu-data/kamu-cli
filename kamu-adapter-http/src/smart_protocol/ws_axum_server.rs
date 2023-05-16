@@ -384,8 +384,10 @@ async fn try_handle_push_objects_request(
             PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
         })?;
 
+    let objects_count = request.object_files.len();
+
     tracing::debug!(
-        objects_count = % request.object_files.len(),
+        objects_count = % objects_count,
         "Push client sent a push objects request",
     );
 
@@ -408,6 +410,25 @@ async fn try_handle_push_objects_request(
     )
     .await
     .map_err(|e| PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest)))?;
+
+    loop {
+        let progress = read_payload::<DatasetPushObjectsUploadInProgress>(socket)
+            .await
+            .map_err(|e| {
+                PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsUploadProgress))
+            })?;
+
+        match progress.details {
+            ObjectsUploadProgressDetails::Running(p) => {
+                tracing::debug!(
+                    uploaded_objects_count = % p.uploaded_objects_count,
+                    total_objects_count = % objects_count,
+                    "Objects upload progress notification"
+                );
+            }
+            ObjectsUploadProgressDetails::Complete => break,
+        }
+    }
 
     Ok(request.is_truncated)
 }

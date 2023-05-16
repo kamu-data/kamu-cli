@@ -20,6 +20,7 @@ use crate::domain::{Dataset, SyncError, SyncListener, SyncResult};
 #[derive(Debug, Eq, PartialEq)]
 pub struct ObjectTransferOptions {
     pub max_parallel_transfers: usize,
+    pub min_upload_progress_delay_sec: u64,
 }
 
 impl Default for ObjectTransferOptions {
@@ -33,6 +34,7 @@ impl Default for ObjectTransferOptions {
 
         Self {
             max_parallel_transfers,
+            min_upload_progress_delay_sec: 1,
         }
     }
 }
