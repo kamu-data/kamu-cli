@@ -9,19 +9,18 @@
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use crate::harness::await_client_server_flow;
 use ::serde::Deserialize;
-use axum::{
-    extract::{FromRequestParts, Path},
-    http::StatusCode,
-    routing::IntoMakeService,
-    Router,
-};
+use axum::extract::{FromRequestParts, Path};
+use axum::http::StatusCode;
+use axum::routing::IntoMakeService;
+use axum::Router;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
+
+use crate::harness::await_client_server_flow;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

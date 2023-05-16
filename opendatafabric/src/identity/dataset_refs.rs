@@ -9,6 +9,7 @@
 
 use std::fmt;
 use std::sync::Arc;
+
 use url::Url;
 
 use super::dataset_handles::*;
@@ -42,8 +43,9 @@ pub enum DatasetRefRemote {
 /// References any dataset, local or remote.
 ///
 /// Note that when interpreting reference such as `"foo/bar"` there is an
-/// ambiguity between treating it as `<account>/<dataset>` or `<repo>/<dataset>`.
-/// That's why this reference needs to be disambiguated before accessing those parameters.
+/// ambiguity between treating it as `<account>/<dataset>` or
+/// `<repo>/<dataset>`. That's why this reference needs to be disambiguated
+/// before accessing those parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatasetRefAny {
     ID(Option<RepoName>, DatasetID),

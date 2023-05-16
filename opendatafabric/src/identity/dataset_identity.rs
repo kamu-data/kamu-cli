@@ -7,11 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::cmp;
 use std::convert::{AsRef, TryFrom};
-use std::fmt;
-use std::ops;
 use std::sync::Arc;
+use std::{cmp, fmt, ops};
 
 use ed25519_dalek::Keypair;
 

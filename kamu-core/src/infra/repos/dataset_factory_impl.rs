@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
+use dill::*;
+use url::Url;
+
 use crate::domain::*;
 use crate::infra::utils::s3_context::S3Context;
 use crate::infra::*;
-
-use dill::*;
-use std::sync::Arc;
-use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -195,7 +196,8 @@ impl DatasetFactoryImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Refactor to multiple factory providers that get dispatched based on URL schema
+// TODO: Refactor to multiple factory providers that get dispatched based on URL
+// schema
 #[async_trait::async_trait]
 impl DatasetFactory for DatasetFactoryImpl {
     async fn get_dataset(

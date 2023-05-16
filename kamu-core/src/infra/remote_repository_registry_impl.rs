@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
-use crate::domain::*;
-use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::*;
-
-use dill::*;
 use std::convert::TryInto;
 use std::sync::Arc;
+
+use dill::*;
+use opendatafabric::serde::yaml::Manifest;
+use opendatafabric::*;
 use url::Url;
+
+use super::*;
+use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -82,7 +83,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         let manifest = Manifest {
             kind: "Repository".to_owned(),
             version: 1,
-            content: RepositoryAccessInfo { url: url },
+            content: RepositoryAccessInfo { url },
         };
 
         let file = std::fs::File::create(&file_path).int_err()?;

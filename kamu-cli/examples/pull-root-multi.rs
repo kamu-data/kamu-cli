@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
 use opendatafabric::*;
-
-use chrono::{DateTime, Utc};
-use std::str::FromStr;
-use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {

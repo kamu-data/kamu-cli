@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::infra::utils::docker_images;
-use container_runtime::{ContainerRuntime, RunArgs};
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+use container_runtime::{ContainerRuntime, RunArgs};
+
+use crate::infra::utils::docker_images;
 
 pub struct MinioServer {
     container_runtime: ContainerRuntime,
@@ -76,9 +77,9 @@ impl MinioServer {
         Self {
             container_runtime,
             container_name: server_name,
-            process: process,
-            address: address,
-            host_port: host_port,
+            process,
+            address,
+            host_port,
             access_key: access_key.to_owned(),
             secret_key: secret_key.to_owned(),
         }

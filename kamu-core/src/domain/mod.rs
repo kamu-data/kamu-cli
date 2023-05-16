@@ -35,8 +35,7 @@ mod engine_provisioner;
 pub use engine_provisioner::*;
 
 pub mod ingest_service;
-pub use ingest_service::IngestRequest;
-pub use ingest_service::*;
+pub use ingest_service::{IngestRequest, *};
 
 mod provenance_service;
 pub use provenance_service::*;
@@ -72,7 +71,6 @@ mod transform_service;
 pub use transform_service::*;
 
 mod verification_service;
-pub use verification_service::*;
-
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
+pub use verification_service::*;

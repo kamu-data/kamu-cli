@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+use std::sync::Arc;
+
 use arrow::record_batch::RecordBatch;
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::parquet::errors::ParquetError;
-use std::path::Path;
-use std::sync::Arc;
 
 pub struct ParquetWriterHelper;
 

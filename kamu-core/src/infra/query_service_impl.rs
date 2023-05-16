@@ -7,26 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::{
-    catalog::{catalog::CatalogProvider, schema::SchemaProvider},
-    datasource::TableProvider,
-    prelude::*,
-};
-use datafusion::{
-    execution::context::SessionState,
-    parquet::{
-        basic::LogicalType,
-        file::reader::{FileReader, SerializedFileReader},
-        schema::types::Type,
-    },
-};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use datafusion::catalog::catalog::CatalogProvider;
+use datafusion::catalog::schema::SchemaProvider;
+use datafusion::datasource::TableProvider;
+use datafusion::execution::context::SessionState;
+use datafusion::parquet::basic::LogicalType;
+use datafusion::parquet::file::reader::{FileReader, SerializedFileReader};
+use datafusion::parquet::schema::types::Type;
+use datafusion::prelude::*;
 use dill::*;
 use futures::stream::TryStreamExt;
 use opendatafabric::*;
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
 
 use crate::domain::*;
 use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
@@ -73,9 +67,9 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| sv.into())
             .unwrap_or_default();
 
-        // TODO: This is a workaround for Arrow not handling timestamps with explicit timezones.
-        // We basically have to re-cast all timestamp fields into timestamps after querying.
-        // See:
+        // TODO: This is a workaround for Arrow not handling timestamps with explicit
+        // timezones. We basically have to re-cast all timestamp fields into
+        // timestamps after querying. See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
         let res_schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
@@ -221,8 +215,8 @@ impl CatalogProvider for KamuCatalog {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Performance is poor as it essentially reads all data files in the workspace
-// and in some cases (like 'show tables') even twice
+// TODO: Performance is poor as it essentially reads all data files in the
+// workspace and in some cases (like 'show tables') even twice
 #[derive(Clone)]
 struct KamuSchema {
     local_repo: Arc<dyn DatasetRepository>,

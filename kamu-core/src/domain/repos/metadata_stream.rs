@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::metadata_chain::IterBlocksError;
-use opendatafabric::*;
-
-use futures::{future, Future, Stream, TryStreamExt};
-use pin_project::pin_project;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+use futures::{future, Future, Stream, TryStreamExt};
+use opendatafabric::*;
+use pin_project::pin_project;
+
+use super::metadata_chain::IterBlocksError;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,16 +26,18 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 ///
 /// These combinators can be implemented differently by various metadata chains
 /// to make certain operations more efficient, for example:
-/// - Filters can use the raw block representations (e.g. flatbuffers)
-///   to skip undesired blocks without constructing DTOs
-/// - Implementations can use skip lists and lookup tables to traverse the chain faster.
+/// - Filters can use the raw block representations (e.g. flatbuffers) to skip
+///   undesired blocks without constructing DTOs
+/// - Implementations can use skip lists and lookup tables to traverse the chain
+///   faster.
 pub trait MetadataStream<'a>:
     Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>
 {
-    // TODO: Reconsider this method as it may result in incorrect logic of checkpoint propagation.
-    // In cases when AddData is followed by SetWatermark the client may incorrectly assume that
-    // the checkpoint is missing when inspecting SetWatermark event, while in fact they should've
-    // scanned the chain further.
+    // TODO: Reconsider this method as it may result in incorrect logic of
+    // checkpoint propagation. In cases when AddData is followed by SetWatermark
+    // the client may incorrectly assume that the checkpoint is missing when
+    // inspecting SetWatermark event, while in fact they should've scanned the
+    // chain further.
     fn filter_data_stream_blocks(
         self: Pin<Box<Self>>,
     ) -> Pin<

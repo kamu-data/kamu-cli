@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use ::serde::{Deserialize, Serialize};
+
 use super::derivations_generated::*;
 use super::{ContentFreeManifest, Manifest};
 use crate::dtos::*;
 pub use crate::serde::*;
-use ::serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Wrapeprs

@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::Kamu;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::testing::MetadataFactory;
 use opendatafabric as odf;
+
+use crate::utils::Kamu;
 
 #[test_log::test(tokio::test)]
 async fn test_add_recursive() {
@@ -34,17 +35,17 @@ async fn test_add_recursive() {
     std::fs::write(
         kamu.workspace_path().join("commented.yaml"),
         format!(
-            indoc::indoc!(
-                r"
+            indoc::indoc! {
+                "
 
                 # Some
-                
+
                 # Weird
                 #
                 # Comment
                 {}
                 "
-            ),
+            },
             &manifest
         ),
     )
@@ -53,12 +54,12 @@ async fn test_add_recursive() {
     // Non-manifest YAML file
     std::fs::write(
         kamu.workspace_path().join("non-manifest.yaml"),
-        indoc::indoc!(
-            r"
+        indoc::indoc! {
+            "
             foo:
-            - bar
-            ",
-        ),
+              - bar
+            "
+        },
     )
     .unwrap();
 

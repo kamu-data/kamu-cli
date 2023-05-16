@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::{CommandError, Kamu};
+use std::assert_matches::assert_matches;
+use std::error::Error;
+use std::path::Path;
+
 use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
 use opendatafabric::*;
-use std::assert_matches::assert_matches;
-use std::error::Error;
-use std::path::Path;
+
+use crate::utils::{CommandError, Kamu};
 
 async fn init_v0_workspace(workspace_path: &Path) {
     let workspace_root = workspace_path.join(".kamu");

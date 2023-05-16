@@ -14,7 +14,8 @@ use opendatafabric::{Multicodec, Multihash};
 
 const LOGICAL_HASH_BATCH_SIZE: usize = 10_000;
 
-/// Computes a stable hash based on a content (as opposed to a binary layout) of a Parquet file.
+/// Computes a stable hash based on a content (as opposed to a binary layout) of
+/// a Parquet file.
 #[tracing::instrument(level = "info")]
 pub fn get_parquet_logical_hash(
     data_path: &Path,
@@ -40,8 +41,9 @@ pub fn get_parquet_logical_hash(
 
 #[tracing::instrument(level = "info")]
 pub fn get_file_physical_hash(file_path: &Path) -> Result<Multihash, std::io::Error> {
-    use digest::Digest;
     use std::io::Read;
+
+    use digest::Digest;
 
     let mut file = std::fs::File::open(file_path)?;
     let mut buffer = [0; 2048];

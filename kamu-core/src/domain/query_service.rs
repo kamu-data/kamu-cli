@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRef;
 use thiserror::Error;
 
+use crate::domain::*;
+
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
     /// Returns the specified number of the latest records in the dataset
-    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY offset DESC LIMIT N`
+    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
+    /// offset DESC LIMIT N`
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
@@ -31,7 +32,8 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError>;
 
-    /// Returns the schema of the given dataset, if it is already defined by this moment, None otherwise
+    /// Returns the schema of the given dataset, if it is already defined by
+    /// this moment, None otherwise
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
 }
 

@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{domain::*, infra::get_staging_name};
-use opendatafabric::{Multicodec, Multihash};
+use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use std::{
-    marker::PhantomData,
-    path::{Path, PathBuf},
-};
+use opendatafabric::{Multicodec, Multihash};
 use tokio::io::{AsyncRead, AsyncWriteExt};
+
+use crate::domain::*;
+use crate::infra::get_staging_name;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,8 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Pass a single type that configures digest algo, multicodec, and hash base
+// TODO: Pass a single type that configures digest algo, multicodec, and hash
+// base
 pub struct ObjectRepositoryLocalFS<D, const C: u32> {
     root: PathBuf,
     _phantom: PhantomData<D>,
@@ -52,7 +53,8 @@ where
         self.root.join(hash.to_multibase_string())
     }
 
-    // TODO: We should newtype Path and ensure repositoris are created for directories that exist
+    // TODO: We should newtype Path and ensure repositoris are created for
+    // directories that exist
     fn get_path_write(&self, hash: &Multihash) -> Result<PathBuf, std::io::Error> {
         if !self.root.exists() {
             std::fs::create_dir_all(&self.root)?;

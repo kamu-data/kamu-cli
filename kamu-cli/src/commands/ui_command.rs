@@ -10,12 +10,15 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
-use super::{CLIError, Command};
-use crate::OutputConfig;
+use std::net::IpAddr;
+use std::str::FromStr;
+use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use std::{net::IpAddr, str::FromStr, sync::Arc};
+
+use super::{CLIError, Command};
+use crate::OutputConfig;
 
 pub struct UICommand {
     catalog: Catalog,

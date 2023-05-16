@@ -7,19 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::DummySmartTransferProtocolClient;
-use crate::utils::{HttpFileServer, IpfsDaemon};
+use std::assert_matches::assert_matches;
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::Arc;
+
 use kamu::domain::*;
 use kamu::infra::utils::ipfs_wrapper::IpfsClient;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
-use std::path::Path;
-use std::str::FromStr;
-use std::sync::Arc;
 use url::Url;
+
+use crate::utils::{DummySmartTransferProtocolClient, HttpFileServer, IpfsDaemon};
 
 async fn append_random_data(
     local_repo: &dyn DatasetRepository,
@@ -268,7 +268,8 @@ async fn do_test_sync(
         if src_head == b3 && dst_head == exta_head
     );
 
-    // Try push from dataset_1 with --force: it should abandon the diverged_head block
+    // Try push from dataset_1 with --force: it should abandon the diverged_head
+    // block
     assert_matches!(
         sync_svc
             .sync(

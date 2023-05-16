@@ -9,13 +9,13 @@
 
 use std::fmt::Display;
 
-use super::metadata_stream::DynMetadataStream;
-use crate::domain::*;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
-
 use async_trait::async_trait;
+use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use strum_macros::EnumString;
 use thiserror::Error;
+
+use super::metadata_stream::DynMetadataStream;
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,10 +27,12 @@ pub trait MetadataChain: Send + Sync {
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    /// Iterates the chain in reverse order starting with specified block and following the previous block links.
-    /// The interval returned is `[head, tail)` - tail is exclusive.
-    /// If `tail` argument is provided but not encountered the iteration will continue until first block followed by an error.
-    /// If `ignore_missing_tail` argument is provided, the exception is not generated if tail is not detected while traversing from head
+    /// Iterates the chain in reverse order starting with specified block and
+    /// following the previous block links. The interval returned is `[head,
+    /// tail)` - tail is exclusive. If `tail` argument is provided but not
+    /// encountered the iteration will continue until first block followed by an
+    /// error. If `ignore_missing_tail` argument is provided, the exception
+    /// is not generated if tail is not detected while traversing from head
     fn iter_blocks_interval<'a>(
         &'a self,
         head: &'a Multihash,
@@ -91,12 +93,14 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
-    /// Convenience function to iterate blocks starting with the `head` reference
+    /// Convenience function to iterate blocks starting with the `head`
+    /// reference
     fn iter_blocks<'a>(&'a self) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(&BlockRef::Head, None)
     }
 
-    /// Convenience function to iterate blocks starting with the specified reference
+    /// Convenience function to iterate blocks starting with the specified
+    /// reference
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(&head, None)
     }
@@ -142,7 +146,8 @@ pub struct SetRefOpts<'a> {
     /// Ensure new value points to a valid block
     pub validate_block_present: bool,
 
-    /// Validate that old reference still points to the specified block (compare-and-swap)
+    /// Validate that old reference still points to the specified block
+    /// (compare-and-swap)
     pub check_ref_is: Option<Option<&'a Multihash>>,
 }
 
@@ -173,15 +178,18 @@ pub struct AppendOpts<'a> {
     /// Update specified reference to the block after appending
     pub update_ref: Option<&'a BlockRef>,
 
-    /// Validate that `update_ref` points to the same block as `block.prev_block_hash` (compare-and-swap)
+    /// Validate that `update_ref` points to the same block as
+    /// `block.prev_block_hash` (compare-and-swap)
     pub check_ref_is_prev_block: bool,
 
-    /// Validate that `update_ref` points to the specified block (compare-and-swap)
+    /// Validate that `update_ref` points to the specified block
+    /// (compare-and-swap)
     pub check_ref_is: Option<Option<&'a Multihash>>,
 
     /// Append block using the provided hash computed elsewhere.
     ///
-    /// Warning: Use only when you fully trust the source of the precomputed hash.
+    /// Warning: Use only when you fully trust the source of the precomputed
+    /// hash.
     pub precomputed_hash: Option<&'a Multihash>,
 
     /// Append will result in error if computed hash does not match this one.
@@ -475,8 +483,11 @@ impl Display for SequenceIntegrityError {
         if let Some(prev_block_hash) = &self.prev_block_hash {
             write!(
                 f,
-                "Block {} with sequence number {} cannot be followed by block with sequence number {}",
-                prev_block_hash, self.prev_block_sequence_number.unwrap(), self.next_block_sequence_number
+                "Block {} with sequence number {} cannot be followed by block with sequence \
+                 number {}",
+                prev_block_hash,
+                self.prev_block_sequence_number.unwrap(),
+                self.next_block_sequence_number
             )
         } else {
             write!(

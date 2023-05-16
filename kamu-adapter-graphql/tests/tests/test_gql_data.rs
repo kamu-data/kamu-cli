@@ -7,19 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+use std::sync::Arc;
+
 use datafusion::arrow::array::*;
-use datafusion::arrow::datatypes::DataType;
-use datafusion::arrow::datatypes::Field;
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::infra;
-use kamu::testing::MetadataFactory;
-use kamu::testing::ParquetWriterHelper;
+use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use opendatafabric::*;
-
-use std::path::Path;
-use std::sync::Arc;
 
 async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
@@ -81,20 +78,22 @@ async fn test_dataset_schema() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
-                                    schema { content } 
+                                    schema { content }
                                 }
                             }
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -132,10 +131,11 @@ async fn test_dataset_tail() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
@@ -145,7 +145,8 @@ async fn test_dataset_tail() {
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -165,10 +166,11 @@ async fn test_dataset_tail_empty() {
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(indoc::indoc!(
-            "{
+            r#"
+            {
                 datasets {
-                    byOwnerAndName(accountName: \"kamu\", datasetName: \"foo\") {
-                        name 
+                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                        name
                         data {
                             tail(limit: 0, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
@@ -178,7 +180,8 @@ async fn test_dataset_tail_empty() {
                         }
                     }
                 }
-            }"
+            }
+            "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);

@@ -1,0 +1,22 @@
+# Reference: https://rust-lang.github.io/rustfmt/?version=master
+edition = "2021"
+
+# Add newline breaks to string literals where necessary
+format_strings = true
+
+# Ensure comments fit the `max_width` (ignores markdown headers and URLs).
+wrap_comments = true
+
+# Error if unable to get comments or string literals within `max_width`.
+# Without this option rustfmt often silently gives up formatting the entire file.
+# Setting it at least allows us to catch unformatted code in CI.
+error_on_unformatted = true
+
+# Split imports into 3 groups, flatten to module-level granularity, and sort them.
+group_imports = "StdExternalCrate"
+imports_granularity = "Module"
+imports_layout = "HorizontalVertical"
+reorder_imports = true
+
+# Collapse `Struct { x: x }` into `Struct { x }` when possible.
+use_field_init_shorthand = true

@@ -17,11 +17,7 @@ pub struct Buffer<T> {
 
 impl<T> Buffer<T> {
     pub fn new(head: usize, tail: usize, buf: Vec<T>) -> Self {
-        Self {
-            buf: buf,
-            head: head,
-            tail: tail,
-        }
+        Self { buf, head, tail }
     }
 
     pub fn inner(&self) -> &[T] {

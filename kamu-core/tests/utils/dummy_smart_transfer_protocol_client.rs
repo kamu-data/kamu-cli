@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::Multihash;
 use std::sync::Arc;
-use url::Url;
 
-use kamu::{
-    domain::{Dataset, SyncError, SyncListener, SyncResult},
-    infra::utils::simple_transfer_protocol::DatasetFactoryFn,
-    infra::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient},
+use kamu::domain::{Dataset, SyncError, SyncListener, SyncResult};
+use kamu::infra::utils::simple_transfer_protocol::DatasetFactoryFn;
+use kamu::infra::utils::smart_transfer_protocol::{
+    ObjectTransferOptions,
+    SmartTransferProtocolClient,
 };
+use opendatafabric::Multihash;
+use url::Url;
 
 pub struct DummySmartTransferProtocolClient {}
 

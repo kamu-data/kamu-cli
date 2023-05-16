@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
-
 use std::backtrace::Backtrace;
 use std::sync::Arc;
+
+use opendatafabric::*;
 use thiserror::Error;
+
+use crate::domain::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -227,20 +228,20 @@ impl IngestError {
     pub fn unreachable(path: impl Into<String>, source: Option<BoxedError>) -> Self {
         IngestError::Unreachable {
             path: path.into(),
-            source: source,
+            source,
         }
     }
 
     pub fn not_found(path: impl Into<String>, source: Option<BoxedError>) -> Self {
         IngestError::NotFound {
             path: path.into(),
-            source: source,
+            source,
         }
     }
 
     pub fn pipe(command: Vec<String>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
         IngestError::PipeError {
-            command: command,
+            command,
             source: e.into(),
             backtrace: Backtrace::capture(),
         }

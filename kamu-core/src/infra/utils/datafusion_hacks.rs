@@ -7,23 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{any::Any, sync::Arc};
+use std::any::Any;
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use datafusion::{
-    arrow::datatypes::{Schema, SchemaRef},
-    datasource::{
-        datasource::TableProviderFilterPushDown, file_format::FileFormat, TableProvider, TableType,
-    },
-    datasource::{
-        file_format::parquet::ParquetFormat, listing::PartitionedFile, object_store::ObjectStoreUrl,
-    },
-    error::Result,
-    execution::context::SessionState,
-    logical_expr::Expr,
-    physical_expr::PhysicalSortExpr,
-    physical_plan::{empty::EmptyExec, file_format::FileScanConfig, ExecutionPlan, Statistics},
-};
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::datasource::datasource::TableProviderFilterPushDown;
+use datafusion::datasource::file_format::parquet::ParquetFormat;
+use datafusion::datasource::file_format::FileFormat;
+use datafusion::datasource::listing::PartitionedFile;
+use datafusion::datasource::object_store::ObjectStoreUrl;
+use datafusion::datasource::{TableProvider, TableType};
+use datafusion::error::Result;
+use datafusion::execution::context::SessionState;
+use datafusion::logical_expr::Expr;
+use datafusion::physical_expr::PhysicalSortExpr;
+use datafusion::physical_plan::empty::EmptyExec;
+use datafusion::physical_plan::file_format::FileScanConfig;
+use datafusion::physical_plan::{ExecutionPlan, Statistics};
 use futures::StreamExt;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -116,7 +117,8 @@ impl TableProvider for ListingTableOfFiles {
     }
 
     fn supports_filter_pushdown(&self, _filter: &Expr) -> Result<TableProviderFilterPushDown> {
-        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so have to remove pushdown
+        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so
+        // have to remove pushdown
         Ok(TableProviderFilterPushDown::Inexact)
     }
 
@@ -135,7 +137,8 @@ impl ListingTableOfFiles {
         _filters: &'a [Expr],
         limit: Option<usize>,
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
-        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so have to remove parititioning
+        // NOTE: We don't have access to datafusion::datasource::listing::helpers, so
+        // have to remove parititioning
         let store = ctx
             .runtime_env()
             .object_store(ObjectStoreUrl::local_filesystem())?;

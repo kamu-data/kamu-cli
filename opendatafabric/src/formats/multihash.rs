@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt;
+
 use serde::de::{Deserialize, Deserializer, Error, Visitor};
 use serde::{Serialize, Serializer};
-use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 
@@ -24,7 +25,8 @@ pub type MultihashShort<'a> = MultihashShortGeneric<'a, MAX_HASH_LENGTH_BYTES>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// S specifies maximum hash size in bytes(!) this type can handle, not the exact length of it
+/// S specifies maximum hash size in bytes(!) this type can handle, not the
+/// exact length of it
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct MultihashGeneric<const S: usize> {
     /// The code of the Multihash.

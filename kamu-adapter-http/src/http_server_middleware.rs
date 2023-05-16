@@ -7,17 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::extract::FromRequestParts;
-use axum::RequestExt;
-use axum::{body::Body, http::Request, http::StatusCode, response::Response};
-use kamu::domain::{DatasetRepository, GetDatasetError};
-use opendatafabric::DatasetRef;
 use std::future::Future;
 use std::marker::PhantomData;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use axum::body::Body;
+use axum::extract::FromRequestParts;
+use axum::http::{Request, StatusCode};
+use axum::response::Response;
+use axum::RequestExt;
+use kamu::domain::{DatasetRepository, GetDatasetError};
+use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
 /////////////////////////////////////////////////////////////////////////////////

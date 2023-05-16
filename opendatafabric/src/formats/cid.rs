@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt;
+
 use serde::de::{Deserialize, Deserializer, Error, Visitor};
 use serde::{Serialize, Serializer};
-use std::fmt;
 use thiserror::Error;
 use unsigned_varint as uvar;
 
@@ -23,7 +24,8 @@ pub type CID = CIDGeneric<{ super::multihash::MAX_HASH_LENGTH_BYTES }>;
 
 /// CIDv1
 /// See https://github.com/multiformats/cid
-/// S specifies maximum hash size in bytes(!) this type can handle, not the exact length of it
+/// S specifies maximum hash size in bytes(!) this type can handle, not the
+/// exact length of it
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct CIDGeneric<const S: usize> {
     /// Content type or format of the data being addressed

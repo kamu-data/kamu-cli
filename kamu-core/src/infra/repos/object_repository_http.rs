@@ -9,14 +9,14 @@
 
 use std::path::Path;
 
-use crate::domain::*;
-use opendatafabric::Multihash;
-
 use async_trait::async_trait;
 use bytes::Bytes;
+use opendatafabric::Multihash;
 use reqwest::Client;
 use tokio::io::AsyncRead;
 use url::Url;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_trait::async_trait;
+use opendatafabric::Multihash;
+
 use crate::domain::repos::named_object_repository::{DeleteError, GetError};
 use crate::domain::repos::reference_repository::SetRefError;
 use crate::domain::*;
-use opendatafabric::Multihash;
-
-use async_trait::async_trait;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

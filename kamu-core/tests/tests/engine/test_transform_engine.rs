@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::sync::Arc;
+
 use container_runtime::ContainerRuntime;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::record::RowAccessor;
 use futures::StreamExt;
 use indoc::indoc;
@@ -16,10 +20,6 @@ use kamu::domain::*;
 use kamu::infra::*;
 use kamu::testing::*;
 use opendatafabric::*;
-
-use datafusion::arrow::record_batch::RecordBatch;
-use std::assert_matches::assert_matches;
-use std::sync::Arc;
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
@@ -139,7 +139,8 @@ impl DatasetHelper {
             assert_eq!(new_slice.logical_hash, orig_slice.logical_hash);
         }
 
-        // Rename new file according to new physical hash and delete the original data and checkpoint
+        // Rename new file according to new physical hash and delete the original data
+        // and checkpoint
         let new_data_path = self.dataset_layout.data_slice_path(&new_slice);
         std::fs::rename(&tmp_path, &new_data_path).unwrap();
         std::fs::remove_file(&orig_data_path).unwrap();

@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use std::backtrace::Backtrace;
+use std::path::PathBuf;
 
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
-use std::backtrace::Backtrace;
-use std::path::PathBuf;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -29,7 +29,8 @@ pub trait Engine: Send + Sync {
     ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
-// TODO: This interface is temporary and will be removed when ingestion is moved from Spark into Kamu
+// TODO: This interface is temporary and will be removed when ingestion is moved
+// from Spark into Kamu
 #[async_trait::async_trait]
 pub trait IngestEngine: Send + Sync {
     async fn ingest(

@@ -9,11 +9,13 @@
 
 use std::fmt::Display;
 
-use crate::{
-    ExecuteQueryResponseInternalError, ExecuteQueryResponseInvalidQuery, ReadStepCsv, SetVocab,
-};
-
 use super::DatasetVocabulary;
+use crate::{
+    ExecuteQueryResponseInternalError,
+    ExecuteQueryResponseInvalidQuery,
+    ReadStepCsv,
+    SetVocab,
+};
 
 impl Default for DatasetVocabulary {
     fn default() -> Self {

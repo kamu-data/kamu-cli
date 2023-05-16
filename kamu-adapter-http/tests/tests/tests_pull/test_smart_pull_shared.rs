@@ -9,16 +9,22 @@
 
 use std::str::FromStr;
 
-use kamu::{
-    domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult},
-    testing::{DatasetTestHelper, MetadataFactory},
-};
+use kamu::domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult};
+use kamu::testing::{DatasetTestHelper, MetadataFactory};
 use opendatafabric::{
-    DatasetKind, DatasetName, DatasetRef, DatasetRefAny, DatasetRefRemote, MetadataEvent,
+    DatasetKind,
+    DatasetName,
+    DatasetRef,
+    DatasetRefAny,
+    DatasetRefRemote,
+    MetadataEvent,
 };
 
 use crate::harness::{
-    await_client_server_flow, commit_add_data_event, copy_folder_recursively, ClientSideHarness,
+    await_client_server_flow,
+    commit_add_data_event,
+    copy_folder_recursively,
+    ClientSideHarness,
     ServerSideHarness,
 };
 
@@ -281,8 +287,9 @@ pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHa
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
 
-    // Let's pretend that previous attempts uploaded some data files, but the rest was discarded.
-    // To mimic this, artifficially copy just the data folder, contaning a data block
+    // Let's pretend that previous attempts uploaded some data files, but the rest
+    // was discarded. To mimic this, artifficially copy just the data folder,
+    // contaning a data block
     copy_folder_recursively(
         &server_dataset_layout.data_dir,
         &client_dataset_layout.data_dir,
@@ -366,8 +373,9 @@ pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_suc
     let commit_result =
         commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
 
-    // Let's pretend that previous attempts uploaded some data files, but the rest was discarded.
-    // To mimic this, artifficially copy just the data folder, contaning a data block
+    // Let's pretend that previous attempts uploaded some data files, but the rest
+    // was discarded. To mimic this, artifficially copy just the data folder,
+    // contaning a data block
     copy_folder_recursively(
         &server_dataset_layout.data_dir,
         &client_dataset_layout.data_dir,

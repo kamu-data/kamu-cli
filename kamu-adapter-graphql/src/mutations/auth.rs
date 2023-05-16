@@ -12,7 +12,8 @@ use serde::Deserialize;
 
 pub(crate) struct Auth;
 
-// TODO: We should somehow separate auth method implementations from this pure-API crate
+// TODO: We should somehow separate auth method implementations from this
+// pure-API crate
 #[Object]
 impl Auth {
     // TODO: PERF: Cache client instance?

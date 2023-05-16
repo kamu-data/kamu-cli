@@ -7,13 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{collections::HashMap, path::Path, sync::Mutex};
+use std::collections::HashMap;
+use std::path::Path;
+use std::sync::Mutex;
 
-use crate::domain::*;
 use async_trait::async_trait;
 use bytes::Bytes;
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::AsyncRead;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::*;
-use opendatafabric::*;
+use std::sync::Arc;
 
 use dill::*;
 use futures::TryStreamExt;
-use std::sync::Arc;
+use opendatafabric::*;
+
+use crate::domain::*;
+use crate::infra::*;
 
 pub struct VerificationServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -56,7 +57,8 @@ impl VerificationServiceImpl {
         };
         let tail = block_range.0;
 
-        // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks` estimate
+        // TODO: Avoid collecting and stream instead, perhaps use nonce for `num_blocks`
+        // estimate
         use futures::TryStreamExt;
         let plan: Vec<_> = chain
             .iter_blocks_interval(&head, tail.as_ref(), false)
@@ -212,8 +214,9 @@ impl VerificationServiceImpl {
             .try_collect()
             .await?;
 
-        // To verify sequence integrity, let's build a temporary chain from the same blocks in memory.
-        // Here we reuse validations implemented in append rules when adding blocks to new chain.
+        // To verify sequence integrity, let's build a temporary chain from the same
+        // blocks in memory. Here we reuse validations implemented in append
+        // rules when adding blocks to new chain.
         let in_memory_chain = MetadataChainImpl::new(
             ObjectRepositoryInMemory::new(),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),

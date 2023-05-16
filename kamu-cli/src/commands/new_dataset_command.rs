@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+
 use opendatafabric::DatasetName;
 
-use indoc::indoc;
-use std::path::{Path, PathBuf};
-use std::{fs::OpenOptions, io::Write};
+use super::{CLIError, Command};
 
 pub struct NewDatasetCommand {
     name: DatasetName,
@@ -33,8 +34,8 @@ impl NewDatasetCommand {
     {
         Self {
             name,
-            is_root: is_root,
-            is_derivative: is_derivative,
+            is_root,
+            is_derivative,
             output_path: output_path.map(|p| p.as_ref().to_owned()),
         }
     }
@@ -42,7 +43,7 @@ impl NewDatasetCommand {
     pub fn get_content(name: &str, is_root: bool) -> String {
         if is_root {
             format!(
-                indoc!(
+                indoc::indoc!(
                     r#"
                     ---
                     kind: DatasetSnapshot
@@ -67,8 +68,8 @@ impl NewDatasetCommand {
                           # OPTIONAL: How to prepare the binary data
                           # Includes decompression, file filtering, format conversions
                           prepare:
-                          - kind: decompress
-                            format: zip
+                            - kind: decompress
+                              format: zip
                           # How to interpret the data.
                           # Includes data format, schema to apply, error handling
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
@@ -77,9 +78,9 @@ impl NewDatasetCommand {
                             header: true
                             timestampFormat: yyyy-M-d
                             schema:
-                            - "date TIMESTAMP"
-                            - "city STRING"
-                            - "population STRING"
+                              - "date TIMESTAMP"
+                              - "city STRING"
+                              - "population STRING"
                           # OPTIONAL: Pre-processing query that shapes the data.
                           # Useful for converting text data read from CSVs into strict types
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
@@ -88,21 +89,23 @@ impl NewDatasetCommand {
                             # Use one of the supported engines and a query in its dialect
                             # See: https://docs.kamu.dev/cli/transform/supported-engines/
                             engine: spark
-                            query: >
-                              SELECT
+                            query: |
+                              select
                                 date,
                                 city,
-                                CAST(REPLACE(population, ",", "") as BIGINT)  -- removes commas between thousands
-                              FROM input
+                                -- remove commas between thousands
+                                cast(replace(population, ",", "") as bigint)
+                              from input
                           # How to combine data ingested in the past with the new data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
                           merge:
                             kind: ledger
                             primaryKey:
-                            - date
-                            - city
-                        # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
-                        # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
+                              - date
+                              - city
+                          # Lets you manipulate names of the system columns to avoid conflicts
+                          # or use names better suited for yout data.
+                          # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
                           eventTimeColumn: date
                     "#
@@ -111,7 +114,7 @@ impl NewDatasetCommand {
             )
         } else {
             format!(
-                indoc!(
+                indoc::indoc!(
                     r#"
                     ---
                     kind: DatasetSnapshot
@@ -119,7 +122,8 @@ impl NewDatasetCommand {
                     content:
                       # A human-friendly alias of the dataset
                       name: {}
-                      # Derivative sources produce data by transforming and combining one or multiple existing datasets.
+                      # Derivative sources produce data by transforming and combining
+                      # one or multiple existing datasets.
                       kind: derivative
                       # List of metadata events that get dataset into its initial state
                       # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
@@ -127,7 +131,7 @@ impl NewDatasetCommand {
                         # Transformation that will be applied to produce new data
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
                         - kind: setTransform
-                          # References the datasets that will be used as sources.
+                          # References the datasets that will be used as inputs.
                           # Note: We are associating inputs by name, but could also use IDs.
                           inputs:
                             - name: com.example.city-populations
@@ -136,13 +140,14 @@ impl NewDatasetCommand {
                           transform:
                             kind: sql
                             engine: spark
-                            query: >
-                              SELECT
+                            query: |
+                              select
                                 date,
                                 city,
                                 population + 1 as population
-                              FROM `com.example.city-populations`
-                        # Lets you manipulate names of the system columns to avoid conflicts or use names better suited for yout data.
+                              from `com.example.city-populations`
+                        # Lets you manipulate names of the system columns to avoid
+                        # conflicts or use names better suited for yout data.
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
                         - kind: setVocab
                           eventTimeColumn: date

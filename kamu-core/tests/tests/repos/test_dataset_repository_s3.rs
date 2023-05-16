@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::test_dataset_repository_shared;
-use kamu::{
-    infra::{utils::s3_context::S3Context, DatasetRepositoryS3},
-    testing::MinioServer,
-};
+use kamu::infra::utils::s3_context::S3Context;
+use kamu::infra::DatasetRepositoryS3;
+use kamu::testing::MinioServer;
 use url::Url;
+
+use super::test_dataset_repository_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -102,5 +102,4 @@ macro_rules! impl_enum_variant {
     };
 }
 
-pub(crate) use impl_enum_variant;
-pub(crate) use impl_enum_with_variants;
+pub(crate) use {impl_enum_variant, impl_enum_with_variants};

@@ -7,19 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
-use kamu::infra::utils::docker_images;
-use kamu::infra::WorkspaceLayout;
-use opendatafabric::serde::yaml::Manifest;
-
 use dill::*;
 use duration_string::DurationString;
+use kamu::infra::utils::docker_images;
+use kamu::infra::WorkspaceLayout;
 use merge::Merge;
+use opendatafabric::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use std::fmt::Write;
 use url::Url;
 
 use crate::error::CLIError;
@@ -89,7 +88,8 @@ pub struct EngineConfig {
     pub max_concurrency: Option<u32>,
     /// Type of the runtime to use when running the data processing engines
     pub runtime: Option<ContainerRuntimeType>,
-    /// Type of the networking namespace (relevant when running in container environments)
+    /// Type of the networking namespace (relevant when running in container
+    /// environments)
     pub network_ns: Option<NetworkNamespaceType>,
     /// Timeout for starting an engine container
     pub start_timeout: Option<DurationString>,
@@ -206,12 +206,14 @@ impl Default for ProtocolConfig {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IpfsConfig {
     /// HTTP Gateway URL to use for downloads.
-    /// For safety it defaults to `http://localhost:8080` which is where a local IPFS daemon would run.
-    /// If you don't have IPFS installed you can set this URL to one of the public gateways like `https://ipfs.io`.
+    /// For safety it defaults to `http://localhost:8080` - a local IPFS daemon.
+    /// If you don't have IPFS installed you can set this URL to
+    /// one of the public gateways like `https://ipfs.io`.
     /// List of public gateways can be found here: https://ipfs.github.io/public-gateway-checker/
     pub http_gateway: Option<Url>,
 
-    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it to the Gateway.
+    /// Whether kamu should pre-resolve IPNS DNSLink names using DNS or leave it
+    /// to the Gateway.
     pub pre_resolve_dnslink: Option<bool>,
 }
 

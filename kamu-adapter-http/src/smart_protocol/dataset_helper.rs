@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{collections::VecDeque, io::Read};
+use std::collections::VecDeque;
+use std::io::Read;
 
-use crate::smart_protocol::{errors::ObjectUploadError, messages::*};
 use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
@@ -18,6 +18,9 @@ use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
 use thiserror::Error;
 use url::Url;
+
+use crate::smart_protocol::errors::ObjectUploadError;
+use crate::smart_protocol::messages::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -172,8 +175,9 @@ pub async fn decode_metadata_batch(
         .into_iter()
         .map(|(hash, bytes)| {
             // TODO: Avoid depending on specific implementation of MetadataChain.
-            // This is currently necessary because we need to be able to deserialize blocks BEFORE
-            // an instance of MetadataChain exists. Consider injecting a configurable block deserializer.
+            // This is currently necessary because we need to be able to deserialize blocks
+            // BEFORE an instance of MetadataChain exists. Consider injecting a
+            // configurable block deserializer.
             match kamu::infra::MetadataChainImpl::<(), ()>::deserialize_block(&hash, &bytes) {
                 Ok(block) => Ok((hash, block)),
                 Err(err) => Err(err),

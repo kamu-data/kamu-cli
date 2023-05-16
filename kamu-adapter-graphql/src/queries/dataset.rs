@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
-
 use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu::domain;
 use kamu::domain::{MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
+
+use crate::queries::*;
+use crate::scalars::*;
+use crate::utils::*;
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
@@ -38,7 +38,8 @@ impl Dataset {
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        // TODO: Should we resolve reference at this point or allow unresolved and fail later?
+        // TODO: Should we resolve reference at this point or allow unresolved and fail
+        // later?
         let hdl = local_repo.resolve_dataset_ref(dataset_ref).await?;
         Ok(Dataset::new(Account::mock(), hdl))
     }
@@ -58,7 +59,8 @@ impl Dataset {
     }
 
     /// Symbolic name of the dataset.
-    /// Name can change over the dataset's lifetime. For unique identifier use `id()`.
+    /// Name can change over the dataset's lifetime. For unique identifier use
+    /// `id()`.
     async fn name(&self) -> DatasetName {
         self.dataset_handle.alias.dataset_name.clone().into()
     }

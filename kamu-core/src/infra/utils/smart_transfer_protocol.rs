@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::Multihash;
 use std::sync::Arc;
+
+use opendatafabric::Multihash;
 use url::Url;
 
 pub use super::simple_transfer_protocol::DatasetFactoryFn;
@@ -24,7 +25,8 @@ pub struct ObjectTransferOptions {
 impl Default for ObjectTransferOptions {
     fn default() -> Self {
         // Use number of allowed parallel threads on the target system.
-        // Run single-threaded transfer as a fallback, if the parallelism grade cannot be determined
+        // Run single-threaded transfer as a fallback, if the parallelism grade cannot
+        // be determined
         let max_parallel_transfers = std::thread::available_parallelism()
             .map(|nz| nz.get())
             .unwrap_or(1_usize);

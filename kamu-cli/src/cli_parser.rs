@@ -91,11 +91,11 @@ pub fn cli() -> Command {
                 .help("Suppress all non-essential output"),
         ])
         .after_help(indoc::indoc!(
-            "
-            To get help around individual commands use:
+            r#"
+            To get help for individual commands use:
               kamu <command> -h
               kamu <command> <sub-command> -h
-            "
+            "#
         ))
         .subcommands(
             [
@@ -121,34 +121,29 @@ pub fn cli() -> Command {
                             .help("Dataset manifest reference(s) (path, or URL)"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    This command creates a new dataset from the provided DatasetSnapshot manifest.
+                        r#"
+                        This command creates a new dataset from the provided DatasetSnapshot manifest.
 
-                    Note that after kamu creates a dataset the changes in the source file will \
-                    not have any effect unless you run the add command again. When you are \
-                    experimenting with adding new dataset you currently may need to delete \
-                    and re-add it multiple times until you get your parameters and schema right.
+                        Note that after kamu creates a dataset the changes in the source file will not have any effect unless you run the add command again. When you are experimenting with adding new dataset you currently may need to delete and re-add it multiple times until you get your parameters and schema right.
 
-                    In future versions the add command will allow you to modify the structure \
-                    of already existing datasets (e.g. changing schema in a compatible way).
+                        In future versions the add command will allow you to modify the structure of already existing datasets (e.g. changing schema in a compatible way).
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Add a root/derivative dataset from local manifest:
+                        Add a root/derivative dataset from local manifest:
 
-                        kamu add org.example.data.yaml
+                            kamu add org.example.data.yaml
 
-                    Add datasets from all manifests found in the current directory:
+                        Add datasets from all manifests found in the current directory:
 
-                        kamu add --recursive .
+                            kamu add --recursive .
 
-                    Add a dataset from manifest hosted externally (e.g. on GihHub):
+                        Add a dataset from manifest hosted externally (e.g. on GihHub):
 
-                        kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib\
-                        /master/ca.bankofcanada.exchange-rates.daily.yaml
+                            kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.bankofcanada.exchange-rates.daily.yaml
 
-                    To add dataset from a repository see `kamu pull` command.
-                    "
+                        To add dataset from a repository see `kamu pull` command.
+                        "#
                     )),
                 Command::new("complete")
                     .about("Completes a command in the shell")
@@ -161,50 +156,45 @@ pub fn cli() -> Command {
                             .index(2),
                     )
                     .after_help(indoc::indoc!(
-                        "
-                    This hidden command is called by shell completions to use domain knowledge \
-                    to complete commands and arguments.
+                        r#"
+                        This hidden command is called by shell completions to use domain knowledge to complete commands and arguments.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Should complete to \"new\":
+                        Should complete to "new":
 
-                        kamu complete \"kamu ne\" 1
+                            kamu complete "kamu ne" 1
 
-                    Should complete to \"--derivative\":
+                        Should complete to "--derivative":
 
-                        kamu complete \"kamu new --de\" 2
-                    "
+                            kamu complete "kamu new --de" 2
+                        "#
                     )),
                 Command::new("completions")
                     .about("Generate tab-completion scripts for your shell")
                     .after_help(indoc::indoc!(
-                        "
-                    The command outputs on `stdout`, allowing you to re-direct the output to the \
-                    file of your choosing. Where you place the file will depend on which shell \
-                    and which operating system you are using. Your particular configuration may \
-                    also determine where these scripts need to be placed.
+                        r#"
+                        The command outputs to STDOUT, allowing you to re-direct the output to the file of your choosing. Where you place the file will depend on which shell and which operating system you are using. Your particular configuration may also determine where these scripts need to be placed.
 
-                    Here are some common set ups:
+                        Here are some common set ups:
 
-                    #### BASH ####
+                        #### BASH ####
 
-                    Append the following to your `~/.bashrc`:
+                        Append the following to your `~/.bashrc`:
 
-                        source <(kamu completions bash)
+                            source <(kamu completions bash)
 
-                    You will need to reload your shell session (or execute the same command in \
-                    your current one) for changes to take effect.
+                        You will need to reload your shell session (or execute the same command in your current one) for changes to take effect.
 
-                    #### ZSH ####
+                        #### ZSH ####
 
-                    Append the following to your `~/.zshrc`:
+                        Append the following to your `~/.zshrc`:
 
-                        autoload -U +X bashcompinit && bashcompinit
-                        source <(kamu completions bash)
+                            autoload -U +X bashcompinit && bashcompinit
+                            source <(kamu completions bash)
 
-                    Please contribute a guide for your favorite shell!
-                    "
+                        Please contribute a guide for your favorite shell!
+                        "#
                     ))
                     .arg(Arg::new("shell").required(true).value_parser(
                         clap::builder::EnumValueParser::<clap_complete::Shell>::new(),
@@ -236,9 +226,7 @@ pub fn cli() -> Command {
                                 Arg::new("with-defaults")
                                     .long("with-defaults")
                                     .action(ArgAction::SetTrue)
-                                    .help(
-                                        "Get default value if config option is not explicitly set",
-                                    ),
+                                    .help("Get default value if config option is not explicitly set"),
                                 Arg::new("cfgkey")
                                     .required(true)
                                     .index(1)
@@ -259,37 +247,33 @@ pub fn cli() -> Command {
                             ]),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Configuration in `kamu` is managed very similarly to `git`. Starting with \
-                    your current workspace and going up the directory tree you can have \
-                    multiple `.kamuconfig` YAML files which are all merged together to get the \
-                    resulting config.
+                        r#"
+                        Configuration in `kamu` is managed very similarly to `git`. Starting with your current workspace and going up the directory tree you can have multiple `.kamuconfig` YAML files which are all merged together to get the resulting config.
 
-                    Most commonly you will have a workspace-scoped config inside the `.kamu` \
-                    directory and the user-scoped config residing in your home directory.
+                        Most commonly you will have a workspace-scoped config inside the `.kamu` directory and the user-scoped config residing in your home directory.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    List current configuration as combined view of config files:
+                        List current configuration as combined view of config files:
 
-                        kamu config list
+                            kamu config list
 
-                    Get current configuration value:
+                        Get current configuration value:
 
-                        kamu config get engine.runtime
+                            kamu config get engine.runtime
 
-                    Set configuration value in workspace scope:
+                        Set configuration value in workspace scope:
 
-                        kamu config set engine.runtime podman
+                            kamu config set engine.runtime podman
 
-                    Set configuration value in user scope:
+                        Set configuration value in user scope:
 
-                        kamu config set --user engine.runtime podman
+                            kamu config set --user engine.runtime podman
 
-                    Unset or revert to default value:
+                        Unset or revert to default value:
 
-                        kamu config set --user engine.runtime
-                    "
+                            kamu config set --user engine.runtime
+                        "#
                     )),
                 Command::new("delete")
                     .about("Delete a dataset")
@@ -317,22 +301,19 @@ pub fn cli() -> Command {
                             .help("Don't ask for confirmation"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    This command deletes the dataset from your workspace, including both \
-                    metadata and the raw data.
+                        r#"
+                        This command deletes the dataset from your workspace, including both metadata and the raw data.
 
-                    Take great care when deleting root datasets. If you have not pushed \
-                    your local changes to a repository - the data will be lost.
+                        Take great care when deleting root datasets. If you have not pushed your local changes to a repository - the data will be lost.
 
-                    Deleting a derivative dataset is usually not a big deal, since they \
-                    can always be reconstructed, but it will disrupt downstream consumers.
+                        Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Delete a local dataset:
+                        Delete a local dataset:
 
-                        kamu delete my.dataset
-                    "
+                            kamu delete my.dataset
+                        "#
                     )),
                 Command::new("init")
                     .about("Initialize an empty workspace in the current directory")
@@ -348,16 +329,13 @@ pub fn cli() -> Command {
                             .help("List image names instead of pulling"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    A workspace is where kamu stores all the important information about \
-                    datasets (metadata) and in some cases raw data.
+                        r#"
+                        A workspace is where kamu stores all the important information about datasets (metadata) and in some cases raw data.
 
-                    It is recommended to create one kamu workspace per data science project, \
-                    grouping all related datasets together.
+                        It is recommended to create one kamu workspace per data science project, grouping all related datasets together.
 
-                    Initializing a workspace creates a `.kamu` directory contains dataset \
-                    metadata, data, and all supporting files (configs, known repositories etc.).
-                    "
+                        Initializing a workspace creates a `.kamu` directory contains dataset metadata, data, and all supporting files (configs, known repositories etc.).
+                        "#
                     )),
                 Command::new("inspect")
                     .about("Group of commands for exploring dataset metadata")
@@ -386,24 +364,23 @@ pub fn cli() -> Command {
                                     .help("Local dataset reference(s)"),
                             ])
                             .after_help(indoc::indoc!(
-                                "
-                            Presents the dataset-level lineage that includes current \
-                            and past dependencies.
+                                r#"
+                                Presents the dataset-level lineage that includes current and past dependencies.
 
-                            ### Examples ###
+                                ### Examples ###
 
-                            Show lineage of a single dataset:
+                                Show lineage of a single dataset:
 
-                                kamu inspect lineage my.dataset
+                                    kamu inspect lineage my.dataset
 
-                            Show lineage graph of all datasets in a browser:
+                                Show lineage graph of all datasets in a browser:
 
-                                kamu inspect lineage -b
+                                    kamu inspect lineage --browse
 
-                            Render the lineage graph into a png image (needs graphviz installed):
+                                Render the lineage graph into a png image (needs graphviz installed):
 
-                                kamu inspect lineage -o dot | dot -Tpng > depgraph.png
-                            "
+                                    kamu inspect lineage -o dot | dot -Tpng > depgraph.png
+                                "#
                             )),
                         Command::new("query")
                             .about("Shows the transformations used by a derivative dataset")
@@ -413,12 +390,9 @@ pub fn cli() -> Command {
                                 .value_parser(value_parse_dataset_ref_local)
                                 .help("Local dataset reference")])
                             .after_help(indoc::indoc!(
-                                "
-                            This command allows you to audit the transformations performed \
-                            by a derivative dataset and their evolution. Such audit is an \
-                            important step in validating the trustworthiness of data (see \
-                            `kamu verify` command).
-                            "
+                                r#"
+                                This command allows you to audit the transformations performed by a derivative dataset and their evolution. Such audit is an important step in validating the trustworthiness of data (see `kamu verify` command).
+                                "#
                             )),
                         Command::new("schema")
                             .about("Shows the dataset schema")
@@ -436,20 +410,19 @@ pub fn cli() -> Command {
                                     .help("Format of an output"),
                             ])
                             .after_help(indoc::indoc!(
-                                "
-                            Displays the schema of the dataset. Note that dataset schemas can \
-                            evolve over time and by default the latest schema will be shown.
+                                r#"
+                                Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
-                            ### Examples ###
+                                ### Examples ###
 
-                            Show logical schema of a dataset in the DDL format:
+                                Show logical schema of a dataset in the DDL format:
 
-                                kamu inspect schema my.dataset
+                                    kamu inspect schema my.dataset
 
-                            Show physical schema of the underlying Parquet files:
+                                Show physical schema of the underlying Parquet files:
 
-                                kamu inspect schema my.dataset -o parquet
-                            "
+                                    kamu inspect schema my.dataset -o parquet
+                                "#
                             )),
                     ]),
                 tabular_output_params(
@@ -461,21 +434,21 @@ pub fn cli() -> Command {
                             .action(ArgAction::Count)
                             .help("Show more details (repeat for more)")])
                         .after_help(indoc::indoc!(
-                            "
-                        ### Examples ###
+                            r#"
+                            ### Examples ###
 
-                        To see a human-friendly list of datasets in your workspace:
+                            To see a human-friendly list of datasets in your workspace:
 
-                            kamu list
+                                kamu list
 
-                        To see more details:
+                            To see more details:
 
-                            kamu list -w
+                                kamu list -w
 
-                        To get a machine-readable list of datasets:
+                            To get a machine-readable list of datasets:
 
-                            kamu list -o csv
-                        "
+                                kamu list -o csv
+                            "#
                         )),
                 ),
                 Command::new("log")
@@ -503,33 +476,31 @@ pub fn cli() -> Command {
                             .help("Maximum number of blocks to display"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Metadata of a dataset contains historical record of everything that \
-                    ever influenced how data currently looks like.
+                        r#"
+                        Metadata of a dataset contains historical record of everything that ever influenced how data currently looks like.
 
-                    This includes events such as:
-                    - Data ingestion / transformation
-                    - Change of query
-                    - Change of schema
-                    - Change of source URL or other ingestion steps in a root dataset
+                        This includes events such as:
+                        - Data ingestion / transformation
+                        - Change of query
+                        - Change of schema
+                        - Change of source URL or other ingestion steps in a root dataset
 
-                    Use this command to explore how dataset evolved over time.
+                        Use this command to explore how dataset evolved over time.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Show brief summaries of individual metadata blocks:
+                        Show brief summaries of individual metadata blocks:
 
-                        kamu log org.example.data
+                            kamu log org.example.data
 
-                    Show detailed content of all blocks:
+                        Show detailed content of all blocks:
 
-                        kamu log -o yaml org.example.data
+                            kamu log -o yaml org.example.data
 
-                    Using a filter to inspect blocks containing query changes of a \
-                    derivative dataset:
+                        Using a filter to inspect blocks containing query changes of a derivative dataset:
 
-                        kamu log -o yaml --filter source org.example.data
-                    "
+                            kamu log -o yaml --filter source org.example.data
+                        "#
                     )),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")
@@ -549,29 +520,24 @@ pub fn cli() -> Command {
                             .help("Name of the new dataset"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    This command will create a dataset manifest from a template allowing \
-                    you to customize the most relevant parts without having to remember \
-                    the exact structure of the yaml file.
+                        r#"
+                        This command will create a dataset manifest from a template allowing you to customize the most relevant parts without having to remember the exact structure of the yaml file.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Create `org.example.data.yaml` file from template in the current directory:
+                        Create `org.example.data.yaml` file from template in the current directory:
 
-                        kamu new org.example.data --root
-                    "
+                            kamu new org.example.data --root
+                        "#
                     )),
                 Command::new("notebook")
                     .about("Starts the notebook server for exploring the data in the workspace")
                     .after_help(indoc::indoc!(
-                        "
-                    This command will run the Jupyter server and the Spark engine connected \
-                    together, letting you query data with SQL before pulling it into the \
-                    notebook for final processing and visualization.
+                        r#"
+                        This command will run the Jupyter server and the Spark engine connected together, letting you query data with SQL before pulling it into the notebook for final processing and visualization.
 
-                    For more information check out notebook examples at \
-                    https://github.com/kamu-data/kamu-cli
-                    "
+                        For more information check out notebook examples at https://github.com/kamu-data/kamu-cli
+                        "#
                     ))
                     .args([
                         Arg::new("address")
@@ -587,10 +553,7 @@ pub fn cli() -> Command {
                             .long("env")
                             .value_name("VAR")
                             .action(ArgAction::Append)
-                            .help(concat!(
-                                "Propagate or set an environment variable in the notebook ",
-                                "(e.g. `-e VAR` or `-e VAR=foo`)"
-                            )),
+                            .help("Propagate or set an environment variable in the notebook (e.g. `-e VAR` or `-e VAR=foo`)"),
                     ]),
                 Command::new("pull")
                     .about("Pull new data into the datasets")
@@ -622,9 +585,7 @@ pub fn cli() -> Command {
                         Arg::new("no-alias")
                             .long("no-alias")
                             .action(ArgAction::SetTrue)
-                            .help(
-                                "Don't automatically add a remote push alias for this destination",
-                            ),
+                            .help("Don't automatically add a remote push alias for this destination"),
                         Arg::new("fetch")
                             .long("fetch")
                             .value_name("SRC")
@@ -632,63 +593,54 @@ pub fn cli() -> Command {
                         Arg::new("set-watermark")
                             .long("set-watermark")
                             .value_name("TIME")
-                            .help(concat!(
-                                "Injects a manual watermark into the dataset to signify that ",
-                                "no data is expected to arrive with event time that precedes it"
-                            )),
+                            .help("Injects a manual watermark into the dataset to signify that no data is expected to arrive with event time that precedes it"),
                         Arg::new("force")
                             .short('f')
                             .long("force")
                             .action(ArgAction::SetTrue)
-                            .help(
-                                "Overwrite local version with remote, \
-                                even if revisions have diverged",
-                            ),
+                            .help("Overwrite local version with remote, even if revisions have diverged"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Pull is a multi-functional command that lets you make changes to a local \
-                    dataset. Depending on the parameters and the types of datasets involved \
-                    it can be used to:
-                    - Ingest new data into a root dataset from an external source
-                    - Run transformations on a derivative dataset to process previously unseen data
-                    - Pull dataset from a remote repository into your workspace
-                    - Update watermark on a dataset
+                        r#"
+                        Pull is a multi-functional command that lets you make changes to a local dataset. Depending on the parameters and the types of datasets involved it can be used to:
+                        - Ingest new data into a root dataset from an external source
+                        - Run transformations on a derivative dataset to process previously unseen data
+                        - Pull dataset from a remote repository into your workspace
+                        - Update watermark on a dataset
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Fetch latest data in a specific dataset:
+                        Fetch latest data in a specific dataset:
 
-                        kamu pull org.example.data
+                            kamu pull org.example.data
 
-                    Fetch latest data for the entire dependency tree of a dataset:
+                        Fetch latest data for the entire dependency tree of a dataset:
 
-                        kamu pull --recursive org.example.derivative
+                            kamu pull --recursive org.example.derivative
 
-                    Refresh data of all datasets in the workspace:
+                        Refresh data of all datasets in the workspace:
 
-                        kamu pull --all
+                            kamu pull --all
 
-                    Fetch dataset from a registered repository:
+                        Fetch dataset from a registered repository:
 
-                        kamu pull kamu/org.example.data
+                            kamu pull kamu/org.example.data
 
-                    Fetch dataset from a URL (optionally renaming it):
+                        Fetch dataset from a URL (see `kamu repo add -h` for supported sources):
 
-                        kamu pull ipfs://bafy...a0dx/data
-                        kamu pull s3://my-bucket.example.org/odf/org.example.data
-                        kamu pull s3+https://example.org:5000/data --as org.example.data
+                            kamu pull ipfs://bafy...a0dx/data
+                            kamu pull s3://my-bucket.example.org/odf/org.example.data
+                            kamu pull s3+https://example.org:5000/data --as org.example.data
 
-                    Advance the watermark of a dataset:
+                        Advance the watermark of a dataset:
 
-                        kamu pull --set-watermark 2020-01-01 org.example.data
+                            kamu pull --set-watermark 2020-01-01 org.example.data
 
-                    Ingest data into the root dataset from file or URL (format should match \
-                    one expected by the 'prepare' step):
+                        Ingest data into the root dataset from file or URL (format should match one expected by the 'prepare' step):
 
-                        kamu pull org.example.data --fetch path/to/data.csv
-                        kamu pull org.example.data --fetch https://example.com/data.csv
-                    "
+                            kamu pull org.example.data --fetch path/to/data.csv
+                            kamu pull org.example.data --fetch https://example.com/data.csv
+                        "#
                     )),
                 Command::new("push")
                     .about("Push local data into a repository")
@@ -706,9 +658,7 @@ pub fn cli() -> Command {
                         Arg::new("no-alias")
                             .long("no-alias")
                             .action(ArgAction::SetTrue)
-                            .help(
-                                "Don't automatically add a remote push alias for this destination",
-                            ),
+                            .help("Don't automatically add a remote push alias for this destination"),
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
@@ -723,41 +673,32 @@ pub fn cli() -> Command {
                             .short('f')
                             .long("force")
                             .action(ArgAction::SetTrue)
-                            .help(
-                                "Overwrite remote version with local, \
-                                even if revisions have diverged",
-                            ),
+                            .help("Overwrite remote version with local, even if revisions have diverged"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Use this command to share your new dataset or new data with others. \
-                    All changes performed by this command are atomic and non-destructive. \
-                    This command will analyze the state of the dataset at the repository \
-                    and will only upload data and metadata that wasn't previously seen.
+                        r#"
+                        Use this command to share your new dataset or new data with others. All changes performed by this command are atomic and non-destructive. This command will analyze the state of the dataset at the repository and will only upload data and metadata that wasn't previously seen.
 
-                    Similarly to git, if someone else modified the dataset concurrently \
-                    with you - your push will be rejected and you will have to resolve \
-                    the conflict.
+                        Similarly to git, if someone else modified the dataset concurrently with you - your push will be rejected and you will have to resolve the conflict.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Sync dataset to a destination URL:
+                        Sync dataset to a destination URL (see `kamu repo add -h` for supported protocols):
 
-                        kamu push org.example.data --to \
-                        s3://my-bucket.example.org/odf/org.example.data
+                            kamu push org.example.data --to s3://my-bucket.example.org/odf/org.example.data
 
-                    Sync dataset to a named repository (see `kamu repo` command group):
+                        Sync dataset to a named repository (see `kamu repo` command group):
 
-                        kamu push org.example.data --to kamu-hub/org.example.data
+                            kamu push org.example.data --to kamu-hub/org.example.data
 
-                    Sync dataset that already has a push alias:
+                        Sync dataset that already has a push alias:
 
-                        kamu push org.example.data
+                            kamu push org.example.data
 
-                    Add dataset to local IPFS node and update IPNS entry to the new CID:
+                        Add dataset to local IPFS node and update IPNS entry to the new CID:
 
-                        kamu push org.example.data --to ipns://k5..zy
-                    "
+                            kamu push org.example.data --to ipns://k5..zy
+                        "#
                     )),
                 Command::new("rename")
                     .about("Rename a dataset")
@@ -773,17 +714,16 @@ pub fn cli() -> Command {
                             .help("The new name to give it"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Use this command to rename a dataset in your local workspace.
+                        r#"
+                        Use this command to rename a dataset in your local workspace. Renaming is safe in terms of downstream derivative datasets as they use stable dataset IDs to define their inputs.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Renaming is often useful when you pull a remote dataset by URL and it \
-                    gets auto-assigned not the most convenient name:
+                        Renaming is often useful when you pull a remote dataset by URL and it gets auto-assigned not the most convenient name:
 
-                        kamu pull ipfs://bafy...a0da
-                        kamu rename bafy...a0da my.dataset
-                    "
+                            kamu pull ipfs://bafy...a0da
+                            kamu rename bafy...a0da my.dataset
+                        "#
                     )),
                 Command::new("reset")
                     .about("Revert the dataset back to the specified state")
@@ -805,15 +745,11 @@ pub fn cli() -> Command {
                             .help("Don't ask for confirmation"),
                     ])
                     .after_help(indoc::indoc!(
-                        r"
-                Resetting a dataset to the specified block erases all metadata blocks \
-                that followed it and deletes all data added since that point. This can \
-                sometimes be useful to resolve conflicts, but otherwise should be used with care.
+                        r#"
+                        Resetting a dataset to the specified block erases all metadata blocks that followed it and deletes all data added since that point. This can sometimes be useful to resolve conflicts, but otherwise should be used with care.
 
-                Keep in mind that blocks that were pushed to a repository could've \
-                been already observed by other people, so resetting the history will not let \
-                you take that data back.
-                "
+                        Keep in mind that blocks that were pushed to a repository could've been already observed by other people, so resetting the history will not let you take that data back and instead create conflicts for the downstream consumers of your data.
+                        "#
                     )),
                 Command::new("repo")
                     .about("Manage set of tracked repositories")
@@ -823,16 +759,23 @@ pub fn cli() -> Command {
                         Command::new("add")
                             .about("Adds a repository")
                             .after_help(indoc::indoc!(
-                                "
-                            For Local Filesystem basic repository use following URL formats:
-                                file:///home/me/example/repository
-                                file:///c:/Users/me/example/repository
+                                r#"
+                                For local file system repositories use the following URL formats:
 
-                            For S3-compatible basic repository use following URL formats:
-                                s3://bucket.my-company.example
-                                s3+http://my-minio-server:9000/bucket
-                                s3+https://my-minio-server:9000/bucket
-                        "
+                                    file:///home/me/example/repository/
+                                    file:///c:/Users/me/example/repository/
+
+                                For S3-compatible basic repositories use:
+
+                                    s3://bucket.my-company.example/
+                                    s3+http://my-minio-server:9000/bucket/
+                                    s3+https://my-minio-server:9000/bucket/
+
+                                For ODF-compatible smart repositories use:
+
+                                    odf+http://odf-server/
+                                    odf+https://odf-server/
+                                "#
                             ))
                             .args([
                                 Arg::new("name")
@@ -930,48 +873,39 @@ pub fn cli() -> Command {
                                     ]),
                             ])
                             .after_help(indoc::indoc!(
-                                "
-                            When you pull and push datasets from repositories kamu uses aliases \
-                            to let you avoid specifying the full remote referente each time. \
-                            Aliases are usually created the first time you do a push or pull \
-                            and saved for later. If you have an unusual setup (e.g. pushing to \
-                            multiple repositories) you can use this command to manage the aliases.
+                                r#"
+                                When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
 
-                            ### Examples ###
+                                ### Examples ###
 
-                            List all aliases:
+                                List all aliases:
 
-                                kamu repo alias list
+                                    kamu repo alias list
 
-                            List all aliases of a specific dataset:
+                                List all aliases of a specific dataset:
 
-                                kamu repo alias list org.example.data
+                                    kamu repo alias list org.example.data
 
-                            Add a new pull alias:
+                                Add a new pull alias:
 
-                                kamu repo alias add --pull \
-                                org.example.data kamu.dev/me/org.example.data
-                            "
+                                    kamu repo alias add --pull org.example.data kamu.dev/me/org.example.data
+                                "#
                             )),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Repositories are nodes on the network that let users exchange datasets. \
-                    In the most basic form, a repository can simply be a location where the \
-                    dataset files are hosted over one of the supported file or object-based \
-                    data transfer protocols. The owner of a dataset will have push privileges \
-                    to this location, while other participants can pull data from it.
+                        r#"
+                        Repositories are nodes on the network that let users exchange datasets. In the most basic form, a repository can simply be a location where the dataset files are hosted over one of the supported file or object-based data transfer protocols. The owner of a dataset will have push privileges to this location, while other participants can pull data from it.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Show available repositories:
+                        Show available repositories:
 
-                        kamu repo list
+                            kamu repo list
 
-                    Add S3 bucket as a repository:
+                        Add S3 bucket as a repository:
 
-                        kamu repo add example-repo s3://bucket.my-company.example
-                    "
+                            kamu repo add example-repo s3://bucket.my-company.example/
+                        "#
                     )),
                 tabular_output_params(
                     Command::new("search")
@@ -989,50 +923,50 @@ pub fn cli() -> Command {
                                 .help("Repository name(s) to search in"),
                         ])
                         .after_help(indoc::indoc!(
-                            "
-                        Search is delegated to the repository implementations and its \
-                        capabilities depend on the type of the repo. Whereas smart \
-                        repos may support advanced full-text search, simple storage-only \
-                        repos may be limited to a substring search by dataset name.
+                            r#"
+                            Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by dataset name.
 
-                        ### Examples ###
+                            ### Examples ###
 
-                        Search all repositories:
+                            Search all repositories:
 
-                            kamu search covid19
+                                kamu search covid19
 
-                        Search only specific repositories:
+                            Search only specific repositories:
 
-                            kamu search covid19 --repo kamu --repo statcan.gc.ca
-                        "
+                                kamu search covid19 --repo kamu --repo statcan.gc.ca
+                            "#
                         )),
                 ),
                 tabular_output_params(
                     Command::new("sql")
                         .about("Executes an SQL query or drops you into an SQL shell")
                         .subcommand(
-                            Command::new("server").about("Run JDBC server only").args([
-                                Arg::new("address")
-                                    .long("address")
-                                    .value_parser(value_parser!(IpAddr))
-                                    .default_value("127.0.0.1")
-                                    .help("Expose JDBC server on specific network interface"),
-                                Arg::new("port")
-                                    .long("port")
-                                    .default_value("10000")
-                                    .value_parser(value_parser!(u16))
-                                    .help("Expose JDBC server on specific port"),
-                                Arg::new("livy")
-                                    .long("livy")
-                                    .action(ArgAction::SetTrue)
-                                    .help("Run Livy server instead of JDBC")
-                                    .hide(true),
-                            ]),
+                            Command::new("server")
+                                .about("Run JDBC server only")
+                                .args([
+                                    Arg::new("address")
+                                        .long("address")
+                                        .value_parser(value_parser!(IpAddr))
+                                        .default_value("127.0.0.1")
+                                        .help("Expose JDBC server on specific network interface"),
+                                    Arg::new("port")
+                                        .long("port")
+                                        .default_value("10000")
+                                        .value_parser(value_parser!(u16))
+                                        .help("Expose JDBC server on specific port"),
+                                    Arg::new("livy")
+                                        .long("livy")
+                                        .action(ArgAction::SetTrue)
+                                        .help("Run Livy server instead of JDBC")
+                                        .hide(true),
+                                ]),
                         )
                         .args([
-                            Arg::new("url").long("url").value_name("URL").help(
-                                "URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)",
-                            ),
+                            Arg::new("url")
+                                .long("url")
+                                .value_name("URL")
+                                .help("URL of a running JDBC server (e.g jdbc:hive2://example.com:10000)"),
                             Arg::new("command")
                                 .short('c')
                                 .long("command")
@@ -1049,37 +983,31 @@ pub fn cli() -> Command {
                                 .help("Engine type to use for this SQL session"),
                         ])
                         .after_help(indoc::indoc!(
-                            "
-                        SQL shell allows you to explore data of all dataset in your \
-                        workspace using one of the supported data processing engines. \
-                        This can be a great way to prepare and test a query that you \
-                        cal later turn into derivative dataset.
+                            r#"
+                            SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
-                        ### Examples ###
+                            ### Examples ###
 
-                        Drop into SQL shell:
+                            Drop into SQL shell:
 
-                            kamu sql
+                                kamu sql
 
-                        Execute SQL command and return its output in CSV format:
+                            Execute SQL command and return its output in CSV format:
 
-                            kamu sql -c 'SELECT * FROM `org.example.data` LIMIT 10' -o csv
+                                kamu sql -c 'SELECT * FROM `org.example.data` LIMIT 10' -o csv
 
-                        Run SQL server to use with external data processing tools:
+                            Run SQL server to use with external data processing tools:
 
-                            kamu sql server --address 0.0.0.0 --port 8080
+                                kamu sql server --address 0.0.0.0 --port 8080
 
-                        Connect to a remote SQL server:
+                            Connect to a remote SQL server:
 
-                            kamu sql --url jdbc:hive2://example.com:10000
+                                kamu sql --url jdbc:hive2://example.com:10000
 
-                        Note: Currently when connecting to a remote SQL kamu server \
-                        you will need to manually instruct it to load datasets from \
-                        the data files. This can be done using the following command:
+                            Note: Currently when connecting to a remote SQL kamu server you will need to manually instruct it to load datasets from the data files. This can be done using the following command:
 
-                            CREATE TEMP VIEW `my.dataset` AS \
-                            (SELECT * FROM parquet.`kamu_data/my.dataset`);
-                    "
+                                CREATE TEMP VIEW `my.dataset` AS (SELECT * FROM parquet.`kamu_data/my.dataset`);
+                            "#
                         )),
                 ),
                 Command::new("system")
@@ -1116,21 +1044,21 @@ pub fn cli() -> Command {
                                     .help("Expose HTTP server on specific port"),
                             ])
                             .after_help(indoc::indoc!(
-                                "
-                            ### Examples ###
+                                r#"
+                                ### Examples ###
 
-                            Run API server on a specified port:
+                                Run API server on a specified port:
 
-                                kamu system api-server --http-port 12312
+                                    kamu system api-server --http-port 12312
 
-                            Execute a single GraphQL query and print result to stdout:
+                                Execute a single GraphQL query and print result to stdout:
 
-                                kamu system api-server gql-query '{ apiVersion }'
+                                    kamu system api-server gql-query '{ apiVersion }'
 
-                            Print out GraphQL API schema:
+                                Print out GraphQL API schema:
 
-                                kamu system api-server gql-schema
-                            "
+                                    kamu system api-server gql-schema
+                                "#
                             )),
                         Command::new("ipfs")
                             .about("IPFS helpers")
@@ -1161,12 +1089,11 @@ pub fn cli() -> Command {
                                 .help("Number of records to display"),
                         ])
                         .after_help(indoc::indoc!(
-                            "
-                    This command is simply a shortcut for:
+                            r#"
+                            This command is simply a shortcut for:
 
-                        kamu sql --engine datafusion --command 'SELECT * FROM \"{dataset}\" \
-                        ORDER BY {offset_col} DESC LIMIT {num_records}'
-                    "
+                                kamu sql --engine datafusion --command 'select * from "{dataset}" order by {offset_col} desc limit {num_records}'
+                            "#
                         )),
                 ),
                 Command::new("ui")
@@ -1182,20 +1109,19 @@ pub fn cli() -> Command {
                             .help("Which port to run HTTP server on"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Starts a built-in HTTP + GraphQL server and opens a pre-packaged \
-                    Web UI application in your browser.
+                        r#"
+                        Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Starts server and opens UI in your default browser:
+                        Starts server and opens UI in your default browser:
 
-                        kamu ui
+                            kamu ui
 
-                    Start server on a specific port:
+                        Start server on a specific port:
 
-                        kamu ui --http-port 12345
-                    "
+                            kamu ui --http-port 12345
+                        "#
                     )),
                 Command::new("verify")
                     .about("Verifies the validity of a dataset")
@@ -1204,17 +1130,11 @@ pub fn cli() -> Command {
                             .short('r')
                             .long("recursive")
                             .action(ArgAction::SetTrue)
-                            .help(
-                                "Verify the entire transformation chain \
-                            starting with root datasets",
-                            ),
+                            .help("Verify the entire transformation chain starting with root datasets"),
                         Arg::new("integrity")
                             .long("integrity")
                             .action(ArgAction::SetTrue)
-                            .help(concat!(
-                                "Check only the hashes of metadata ",
-                                "and data without replaying transformations"
-                            )),
+                            .help("Check only the hashes of metadata and data without replaying transformations"),
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
@@ -1224,48 +1144,34 @@ pub fn cli() -> Command {
                             .help("Local dataset reference(s)"),
                     ])
                     .after_help(indoc::indoc!(
-                        "
-                    Validity of derivative data is determined by:
-                    - Trustworthiness of the source data that went into it
-                    - Soundness of the derivative transformation chain that shaped it
-                    - Guaranteeing that derivative data was in fact produced by \
-                    declared transformations
+                        r#"
+                        Validity of derivative data is determined by:
+                        - Trustworthiness of the source data that went into it
+                        - Soundness of the derivative transformation chain that shaped it
+                        - Guaranteeing that derivative data was in fact produced by declared transformations
 
-                    For the first two, you can inspect the dataset lineage so see which root \
-                    datasets the data is coming from and whether their publishers are credible. \
-                    Then you can audit all derivative transformations to ensure they are sound \
-                    and non-malicious.
+                        For the first two, you can inspect the dataset lineage so see which root datasets the data is coming from and whether their publishers are credible. Then you can audit all derivative transformations to ensure they are sound and non-malicious.
 
-                    This command can help you with the last stage. It uses the history of \
-                    transformations stored in metadata to first compare the hashes of data \
-                    with ones stored in metadata (i.e. verify that data corresponds to metadata). \
-                    Then it repeats all declared transformations locally to ensure that what's \
-                    declared in metadata actually produces the presented result.
+                        This command can help you with the last stage. It uses the history of transformations stored in metadata to first compare the hashes of data with ones stored in metadata (i.e. verify that data corresponds to metadata). Then it repeats all declared transformations locally to ensure that what's declared in metadata actually produces the presented result.
 
-                    The combination of the above steps can give you a high certainty that the \
-                    data you're using is trustworthy.
+                        The combination of the above steps can give you a high certainty that the data you're using is trustworthy.
 
-                    When called on a root dataset the command will only perform the integrity \
-                    check of comparing data hashes to metadata.
+                        When called on a root dataset the command will only perform the integrity check of comparing data hashes to metadata.
 
-                    ### Examples ###
+                        ### Examples ###
 
-                    Verify the data in a dataset starting from its immediate inputs:
+                        Verify the data in a dataset starting from its immediate inputs:
 
-                        kamu verify com.example.deriv
+                            kamu verify com.example.deriv
 
-                    Verify the entire transformation chain starting with root datasets \
-                    (may download a lot of data):
+                        Verify the entire transformation chain starting with root datasets (may download a lot of data):
 
-                        kamu pull --recursive com.example.deriv
+                            kamu pull --recursive com.example.deriv
 
-                    Verify only the hashes of metadata and data, without replaying the \
-                    transformations. This is useful when you trust the peers performing \
-                    transformations but want to ensure data was not tampered in storage \
-                    or during the transmission:
+                        Verify only the hashes of metadata and data, without replaying the transformations. This is useful when you trust the peers performing transformations but want to ensure data was not tampered in storage or during the transmission:
 
-                        kamu verify --integrity com.example.deriv
-                    "
+                            kamu verify --integrity com.example.deriv
+                        "#
                     )),
             ],
         )
@@ -1293,8 +1199,8 @@ fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
     match DatasetRefRemote::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(format!(
-            "Remote reference should be in form: \
-            `did:odf:...` or `repository/account/dataset-id` or `scheme://some-url`",
+            "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id` \
+             or `scheme://some-url`",
         )),
     }
 }
@@ -1303,9 +1209,8 @@ fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     match DatasetRefAny::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(format!(
-            "Dataset reference should be in form: \
-            `my.dataset.id` or `repository/account/dataset-id` or `did:odf:...` \
-            or `scheme://some-url`",
+            "Dataset reference should be in form: `my.dataset.id` or \
+             `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url`",
         )),
     }
 }
@@ -1322,7 +1227,7 @@ fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
 fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
     match Multihash::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!("Block hash must be a valid multihash string",)),
+        Err(_) => Err(format!("Block hash must be a valid multihash string")),
     }
 }
 

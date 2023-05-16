@@ -9,12 +9,10 @@
 
 #![feature(exit_status_error)]
 
-use std::{
-    io::BufRead,
-    path::{Path, PathBuf},
-    process::Command,
-    str::FromStr,
-};
+use std::io::BufRead;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str::FromStr;
 
 fn main() {
     let matches = clap::Command::new("create-test-workspace")
@@ -25,7 +23,8 @@ fn main() {
 
     init_workspace(&work_dir, matches.contains_id("force"));
 
-    // BC dataset does not contain unique IDs so it's a pain to slice and we pull it whole
+    // BC dataset does not contain unique IDs so it's a pain to slice and we pull it
+    // whole
     Command::new("kamu")
         .current_dir(&work_dir)
         .args(&[

@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
+use std::sync::Arc;
+
+use chrono::DateTime;
 use kamu::domain::*;
 use opendatafabric::*;
 
-use chrono::DateTime;
-use std::sync::Arc;
+use super::{CLIError, Command};
 
 pub struct SetWatermarkCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
@@ -84,10 +85,10 @@ impl Command for SetWatermarkCommand {
         if !pull_aliases.is_empty() {
             // TODO: Should this check be performed at domain model level?
             return Err(CLIError::usage_error(format!(
-                    "Setting watermark on a remote dataset will cause histories to diverge. Existing pull aliases:\n{}",
-                    pull_aliases.join("\n- ")
-                ))
-            );
+                "Setting watermark on a remote dataset will cause histories to diverge. Existing \
+                 pull aliases:\n{}",
+                pull_aliases.join("\n- ")
+            )));
         }
 
         match self

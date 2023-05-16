@@ -7,17 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
 use indoc::indoc;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
-use std::convert::TryFrom;
 
 #[test]
 fn serde_dataset_snapshot_root() {
     let data = indoc!(
-        "
+        r#"
         kind: DatasetSnapshot
         version: 1
         content:
@@ -44,7 +45,8 @@ fn serde_dataset_snapshot_root() {
             merge:
               kind: snapshot
               primaryKey:
-              - id\n"
+              - id
+        "#
     );
 
     let expected = DatasetSnapshot {
@@ -116,7 +118,7 @@ fn serde_dataset_snapshot_root() {
 #[test]
 fn serde_dataset_snapshot_derivative() {
     let data = indoc!(
-        "
+        r#"
         kind: DatasetSnapshot
         version: 1
         content:
@@ -130,7 +132,8 @@ fn serde_dataset_snapshot_derivative() {
             transform:
               kind: sql
               engine: spark
-              query: SOME_SQL\n"
+              query: SOME_SQL
+        "#
     );
 
     let expected = DatasetSnapshot {

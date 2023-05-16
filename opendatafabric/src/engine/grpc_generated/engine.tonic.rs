@@ -63,8 +63,8 @@ pub mod engine_client {
         }
         /// Compress requests with the given encoding.
         ///
-        /// This requires the server to support it otherwise it might respond with an
-        /// error.
+        /// This requires the server to support it otherwise it might respond
+        /// with an error.
         #[must_use]
         pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.inner = self.inner.send_compressed(encoding);
@@ -101,7 +101,8 @@ pub mod engine_client {
 pub mod engine_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    /// Generated trait containing gRPC methods that should be implemented for use with EngineServer.
+    /// Generated trait containing gRPC methods that should be implemented for
+    /// use with EngineServer.
     #[async_trait]
     pub trait Engine: Send + Sync + 'static {
         /// Server streaming response type for the ExecuteQuery method.
@@ -144,7 +145,8 @@ pub mod engine_server {
             self.accept_compression_encodings.enable(encoding);
             self
         }
-        /// Compress responses with the given encoding, if the client supports it.
+        /// Compress responses with the given encoding, if the client supports
+        /// it.
         #[must_use]
         pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.send_compression_encodings.enable(encoding);

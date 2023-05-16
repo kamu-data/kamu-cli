@@ -7,17 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::*;
-use chrono::DateTime;
-use chrono::Utc;
-use opendatafabric::*;
-
-use dill::*;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use dill::*;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use opendatafabric::*;
+
+use crate::domain::*;
+use crate::infra::*;
 
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -270,11 +270,10 @@ impl TransformServiceImpl {
             .try_filter_map(|(_, b)| async move {
                 match b.event {
                     MetadataEvent::SetTransform(st) => Ok(Some(st)),
-                    MetadataEvent::SetPollingSource(_) => {
-                        Err("Transform called on non-derivative dataset"
-                            .int_err()
-                            .into())
-                    }
+                    MetadataEvent::SetPollingSource(_) => Err("Transform called on \
+                                                               non-derivative dataset"
+                        .int_err()
+                        .into()),
                     _ => Ok(None),
                 }
             })
@@ -325,7 +324,8 @@ impl TransformServiceImpl {
 
         let vocab = self.get_vocab(&dataset_handle.as_local_ref()).await?;
 
-        // TODO: Checkpoint hash should be contained in metadata explicitly, not inferred
+        // TODO: Checkpoint hash should be contained in metadata explicitly, not
+        // inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
@@ -344,7 +344,8 @@ impl TransformServiceImpl {
             .int_err()?;
 
         // TODO: This service shouldn't know specifics of dataset layouts
-        // perhaps it should only receive a staging file to write into from Dataset interface
+        // perhaps it should only receive a staging file to write into from Dataset
+        // interface
         let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
         // TODO: Avoid giving engines write access directly to data and checkpoint dirs
         // to prevent accidents and creation of garbage files like .crc
@@ -438,11 +439,13 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
 
-        // Sanity check: First (chronologically) unprocessed block should immediately follow the last processed block
+        // Sanity check: First (chronologically) unprocessed block should immediately
+        // follow the last processed block
         if let Some((first_unprocessed_hash, first_unprocessed_block)) = blocks_unprocessed.last() {
             if first_unprocessed_block.prev_block_hash != last_processed_block {
                 panic!(
-                    "Input data for {} is inconsistent - first unprocessed block {} does not imediately follows last processed block {:?}",
+                    "Input data for {} is inconsistent - first unprocessed block {} does not \
+                     imediately follows last processed block {:?}",
                     input_handle, first_unprocessed_hash, last_processed_block
                 );
             }
@@ -475,7 +478,8 @@ impl TransformServiceImpl {
             (None, None) => None,
             (Some(start), Some(end)) if start <= end => Some(OffsetInterval { start, end }),
             _ => panic!(
-                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset range ended up as ({:?}, {:?})",
+                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset \
+                 range ended up as ({:?}, {:?})",
                 input_handle, block_interval, offset_start, offset_end
             ),
         };
@@ -743,7 +747,8 @@ impl TransformServiceImpl {
                             .output_data
                             .as_ref()
                             .map(|s| s.interval.start)
-                            .unwrap_or(0), // TODO: Assuming offset does not matter if block is not supposed to produce data
+                            .unwrap_or(0), /* TODO: Assuming offset does not matter if block is
+                                            * not supposed to produce data */
                         transform: source.transform.clone(),
                         vocab: vocab.clone().unwrap_or_default(),
                         inputs,
@@ -930,8 +935,9 @@ impl TransformService for TransformServiceImpl {
 
             let mut cmp_actual_event = actual_event.clone();
 
-            // Parquet format is non-reproducible, so we rely only on logical hash for equivalence test
-            // and overwrite the physical hash and size with the expected values for comparison
+            // Parquet format is non-reproducible, so we rely only on logical hash for
+            // equivalence test and overwrite the physical hash and size with
+            // the expected values for comparison
             if let Some(actual_slice) = &mut cmp_actual_event.output_data {
                 if let Some(expected_slice) = &expected_event.output_data {
                     actual_slice.physical_hash = expected_slice.physical_hash.clone();
@@ -939,7 +945,8 @@ impl TransformService for TransformServiceImpl {
                 }
             }
 
-            // Currently we're considering checkpoints non-reproducible and thus exclude them from equivalence test
+            // Currently we're considering checkpoints non-reproducible and thus exclude
+            // them from equivalence test
             cmp_actual_event.output_checkpoint = expected_event.output_checkpoint.clone();
 
             if expected_event != cmp_actual_event {

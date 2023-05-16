@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use chrono::prelude::*;
 use opendatafabric::*;
-use std::convert::TryFrom;
 
 const TEST_SEQUENCE_NUMBER: i32 = 132;
 

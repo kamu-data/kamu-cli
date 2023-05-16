@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::*;
 use opendatafabric::*;
-
-use crate::{domain::*, infra::utils::s3_context::S3Context};
-
-use std::sync::Arc;
 use url::Url;
+
+use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 
 pub struct SearchServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
@@ -25,7 +26,8 @@ impl SearchServiceImpl {
         Self { remote_repo_reg }
     }
 
-    // TODO: This is crude temporary implementation until ODF specifies registry interface
+    // TODO: This is crude temporary implementation until ODF specifies registry
+    // interface
     async fn search_in_resource(
         &self,
         url: &Url,

@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_graphql::*;
+
 use crate::queries::*;
 use crate::scalars::*;
-
-use async_graphql::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 

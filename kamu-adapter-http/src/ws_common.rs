@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu::domain::BoxedError;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////

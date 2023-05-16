@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use container_runtime::PullImageListener;
-
 use std::backtrace::Backtrace;
 use std::ops::Deref;
 use std::sync::Arc;
+
+use container_runtime::PullImageListener;
 use thiserror::Error;
 
 use super::engine::{Engine, IngestEngine};

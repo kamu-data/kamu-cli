@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 
-use super::test_dataset_repository_shared;
-
 use kamu::infra::*;
 use tempfile::TempDir;
+
+use super::test_dataset_repository_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

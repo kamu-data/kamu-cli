@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
-use kamu::infra::*;
-use kamu::testing::*;
-use opendatafabric::*;
-
-use chrono::prelude::*;
 use std::assert_matches::assert_matches;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+
+use chrono::prelude::*;
+use kamu::domain::*;
+use kamu::infra::*;
+use kamu::testing::*;
+use opendatafabric::*;
 
 use crate::utils::DummySmartTransferProtocolClient;
 
@@ -179,9 +179,10 @@ async fn create_graph_in_repository(
 }
 
 // Adding a remote dataset is a bit of a pain.
-// We cannot add a local dataset and then add a pull alias without adding all of its dependencies too.
-// So instead we're creating a repository based on temp dir and syncing it into the main workspace.
-// TODO: Add simpler way to import remote dataset
+// We cannot add a local dataset and then add a pull alias without adding all of
+// its dependencies too. So instead we're creating a repository based on temp
+// dir and syncing it into the main workspace. TODO: Add simpler way to import
+// remote dataset
 async fn create_graph_remote(
     ws: Arc<WorkspaceLayout>,
     reg: Arc<RemoteRepositoryRegistryImpl>,

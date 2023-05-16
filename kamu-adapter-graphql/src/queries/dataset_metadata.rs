@@ -7,18 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
-
 use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu::domain;
-use kamu::domain::DatasetRepositoryExt;
-use kamu::domain::{MetadataChainExt, TryStreamExtExt};
+use kamu::domain::{DatasetRepositoryExt, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};
+
+use crate::queries::*;
+use crate::scalars::*;
+use crate::utils::*;
 
 pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
@@ -156,7 +155,8 @@ impl DatasetMetadata {
             }))
     }
 
-    /// Current readme file as discovered from attachments associated with the dataset
+    /// Current readme file as discovered from attachments associated with the
+    /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
         if let Some(attachments) = self
             .get_last_block_of_type::<odf::SetAttachments>(ctx)

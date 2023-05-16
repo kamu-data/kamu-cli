@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
-use crate::domain::*;
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use std::collections::HashMap;
-use std::sync::Mutex;
+
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

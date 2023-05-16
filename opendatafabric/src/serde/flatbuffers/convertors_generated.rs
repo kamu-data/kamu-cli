@@ -19,10 +19,11 @@ mod odf {
     pub use crate::formats::*;
     pub use crate::identity::*;
 }
-use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
-use chrono::prelude::*;
 use std::convert::TryFrom;
 use std::path::PathBuf;
+
+use ::flatbuffers::{FlatBufferBuilder, Table, UnionWIPOffset, WIPOffset};
+use chrono::prelude::*;
 
 pub trait FlatbuffersSerializable<'fb> {
     type OffsetT;

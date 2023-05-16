@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
-
 use std::sync::Arc;
+
+use opendatafabric::*;
 use thiserror::Error;
+
+use crate::domain::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -41,8 +42,9 @@ pub trait SyncService: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct SyncOptions {
-    /// Whether the source of data can be assumed non-malicious to skip hash sum and other expensive checks.
-    /// Defaults to `true` when the source is local workspace.
+    /// Whether the source of data can be assumed non-malicious to skip hash sum
+    /// and other expensive checks. Defaults to `true` when the source is
+    /// local workspace.
     pub trust_source: Option<bool>,
 
     /// Whether destination dataset should be created if it does not exist
@@ -163,8 +165,9 @@ pub enum SyncError {
         #[backtrace]
         RepositoryNotFoundError,
     ),
-    // TODO: Report divergence type (e.g. remote is ahead of local)
-    //#[error("Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})")]
+    // TODO: Report divergence type:
+    // Local dataset ({local_head}) and remote ({remote_head}) have diverged (remote is ahead
+    // by {uncommon_blocks_in_remote} blocks, local is ahead by {uncommon_blocks_in_local})
     #[error(transparent)]
     DatasetsDiverged(#[from] DatasetsDivergedError),
     #[error(transparent)]
@@ -206,7 +209,11 @@ impl DatasetNotFoundError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]
-#[error("Source and destination datasets have diverged and have {uncommon_blocks_in_src} and {uncommon_blocks_in_dst} different blocks respectively, source head is {src_head}, destination head is {dst_head}")]
+#[error(
+    "Source and destination datasets have diverged and have {uncommon_blocks_in_src} and \
+     {uncommon_blocks_in_dst} different blocks respectively, source head is {src_head}, \
+     destination head is {dst_head}"
+)]
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,

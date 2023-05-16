@@ -47,7 +47,8 @@ pub enum OutputFormat {
     Json,
     /// One Json object per line - easily splittable format
     JsonLD,
-    /// Structure of arrays - more compact and efficient format for encoding entire dataframe
+    /// Structure of arrays - more compact and efficient format for encoding
+    /// entire dataframe
     JsonSoA,
     /// A pretty human-readable table
     Table,

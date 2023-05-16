@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu::domain::*;
 use std::backtrace::{Backtrace, BacktraceStatus};
 use std::error::Error;
 use std::fmt::Display;
+
+use kamu::domain::*;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -199,7 +200,8 @@ pub enum CLIError {
         source: BoxedError,
         backtrace: Backtrace,
     },
-    /// Indicates that an operation has failed while some changes could've already been applied
+    /// Indicates that an operation has failed while some changes could've
+    /// already been applied
     #[error("Partial failure")]
     PartialFailure,
     #[error("{source}")]

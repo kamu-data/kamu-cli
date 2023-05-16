@@ -7,18 +7,21 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{collections::VecDeque, sync::Arc};
+use std::collections::VecDeque;
+use std::sync::Arc;
 
-use ::serde::{de::DeserializeOwned, Serialize};
+use ::serde::de::DeserializeOwned;
+use ::serde::Serialize;
 use axum::extract::ws::Message;
+use kamu::domain::*;
 use opendatafabric::*;
 use url::Url;
 
-use crate::{
-    smart_protocol::{dataset_helper::*, errors::*, messages::*, phases::*},
-    ws_common::{self, ReadMessageError, WriteMessageError},
-};
-use kamu::domain::*;
+use crate::smart_protocol::dataset_helper::*;
+use crate::smart_protocol::errors::*;
+use crate::smart_protocol::messages::*;
+use crate::smart_protocol::phases::*;
+use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////
 

@@ -85,6 +85,7 @@ pub struct PageBasedInfo {
     /// Index of the current page
     pub current_page: usize,
 
-    /// Approximate number of total pages assuming number of nodes per page stays the same
+    /// Approximate number of total pages assuming number of nodes per page
+    /// stays the same
     pub total_pages: Option<usize>,
 }

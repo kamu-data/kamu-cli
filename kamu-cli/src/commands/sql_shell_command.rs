@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::common::PullImageProgress;
-use super::{CLIError, Command};
-use crate::explore::SqlShellImpl;
-use crate::output::*;
+use std::sync::Arc;
+use std::time::Duration;
+
 use container_runtime::ContainerRuntime;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::*;
 
-use std::sync::Arc;
-use std::time::Duration;
+use super::common::PullImageProgress;
+use super::{CLIError, Command};
+use crate::explore::SqlShellImpl;
+use crate::output::*;
 
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
@@ -127,7 +128,10 @@ impl Command for SqlShellCommand {
             &self.url,
         ) {
             (Some("datafusion"), Some(_), None) => self.run_datafusion_command().await,
-            (Some("datafusion"), _, _) => Err(CLIError::usage_error("DataFusion engine currently doesn't have a shell and only supports single command execution")),
+            (Some("datafusion"), _, _) => Err(CLIError::usage_error(
+                "DataFusion engine currently doesn't have a shell and only supports single \
+                 command execution",
+            )),
             (Some("spark") | None, _, _) => self.run_spark_shell(),
             _ => unreachable!(),
         }

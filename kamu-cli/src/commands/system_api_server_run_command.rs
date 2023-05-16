@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
-use crate::OutputConfig;
+use std::net::IpAddr;
+use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use std::{net::IpAddr, sync::Arc};
+
+use super::{CLIError, Command};
+use crate::OutputConfig;
 
 pub struct APIServerRunCommand {
     catalog: Catalog,

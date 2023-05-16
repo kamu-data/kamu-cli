@@ -7,15 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::*;
-
-use chrono::prelude::*;
-use dill::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use chrono::prelude::*;
+use dill::*;
+use opendatafabric::*;
 use url::Url;
+
+use crate::domain::*;
 
 pub struct PullServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
@@ -43,9 +44,10 @@ impl PullServiceImpl {
         }
     }
 
-    // This function descends down the dependency tree of datasets (starting with provided references)
-    // assigning depth index to every dataset in the graph(s).
-    // Datasets that share the same depth level are independent and can be pulled in parallel.
+    // This function descends down the dependency tree of datasets (starting with
+    // provided references) assigning depth index to every dataset in the
+    // graph(s). Datasets that share the same depth level are independent and
+    // can be pulled in parallel.
     async fn collect_pull_graph(
         &self,
         requests: &Vec<PullRequest>,
@@ -103,7 +105,8 @@ impl PullServiceImpl {
         };
 
         // Resolve the name of a local dataset if it exists
-        // or a name to create dataset with if syncing from remote and creation is allowed
+        // or a name to create dataset with if syncing from remote and creation is
+        // allowed
         let local_alias = if let Some(hdl) = &local_handle {
             // Target exists
             hdl.alias.clone()
@@ -187,7 +190,8 @@ impl PullServiceImpl {
                 ));
             }
 
-            // TODO: EVO: Should be accounting for historical dependencies, not only current ones?
+            // TODO: EVO: Should be accounting for historical dependencies, not only current
+            // ones?
             let mut max_dep_depth = -1;
 
             for dep in summary.dependencies {

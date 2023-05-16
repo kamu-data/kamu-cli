@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::{InternalError, ResultIntoInternal};
 use chrono::{DateTime, SecondsFormat, Utc};
 use opendatafabric::serde::yaml::{datetime_rfc3339_opt, SourceStateDef};
 use opendatafabric::SourceState;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
+
+use crate::domain::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////
 

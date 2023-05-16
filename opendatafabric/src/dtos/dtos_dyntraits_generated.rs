@@ -12,12 +12,14 @@
 // See: http://opendatafabric.org/
 ///////////////////////////////////////////////////////////////////////////////
 
+use std::path::Path;
+
+use chrono::{DateTime, Utc};
+
 use crate::dtos;
 use crate::dtos::{CompressionFormat, DatasetKind, SourceOrdering};
 use crate::formats::*;
 use crate::identity::{DatasetID, DatasetName};
-use chrono::{DateTime, Utc};
-use std::path::Path;
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData

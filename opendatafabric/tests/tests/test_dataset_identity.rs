@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::*;
-
+use std::assert_matches::assert_matches;
+use std::convert::TryFrom;
+use std::str::FromStr;
 use std::sync::Arc;
-use std::{assert_matches::assert_matches, convert::TryFrom, str::FromStr};
+
+use opendatafabric::*;
 use url::Url;
 
 #[test]

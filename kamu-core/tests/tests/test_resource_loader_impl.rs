@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::utils::HttpFileServer;
+use std::path::Path;
+
 use kamu::domain::{ResourceError, ResourceLoader};
 use kamu::infra::ResourceLoaderImpl;
 use kamu::testing::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use std::path::Path;
+use crate::utils::HttpFileServer;
 
 fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
     let snapshot = MetadataFactory::dataset_snapshot().name("test").build();

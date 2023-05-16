@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
-use opendatafabric::*;
-
 use async_trait::async_trait;
+use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
+
+use super::*;
 
 #[async_trait]
 pub trait RemoteRepositoryRegistry: Send + Sync {

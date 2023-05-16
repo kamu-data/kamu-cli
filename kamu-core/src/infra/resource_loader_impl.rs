@@ -7,13 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
+use std::path::Path;
 
 use dill::component;
-use std::path::Path;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 use url::Url;
+
+use crate::domain::*;
 
 #[component]
 pub struct ResourceLoaderImpl {}

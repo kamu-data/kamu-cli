@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
-use crate::{output::*, records_writers::TableWriter};
+use std::sync::Arc;
+
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::sync::Arc;
+use super::{CLIError, Command};
+use crate::output::*;
+use crate::records_writers::TableWriter;
 
 pub struct SearchCommand {
     search_svc: Arc<dyn SearchService>,
@@ -48,9 +50,14 @@ impl SearchCommand {
         let mut table = Table::new();
         table.set_format(TableWriter::get_table_format());
 
-        table.set_titles(
-            row![bc->"Name", bc->"Kind", bc->"Description", bc->"Updated", bc->"Records", bc->"Size"],
-        );
+        table.set_titles(row![
+            bc->"Name",
+            bc->"Kind",
+            bc->"Description",
+            bc->"Updated",
+            bc->"Records",
+            bc->"Size",
+        ]);
 
         for name in &search_result.datasets {
             table.add_row(Row::new(vec![

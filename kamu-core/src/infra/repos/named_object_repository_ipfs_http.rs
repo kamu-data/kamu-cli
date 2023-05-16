@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
-use crate::domain::*;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::Client;
 use url::Url;
+
+use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,7 +24,8 @@ pub struct NamedObjectRepositoryIpfsHttp {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Similar to `NamedObjectRepositoryHttp` but has error handling special-cased for IPFS gateway
+/// Similar to `NamedObjectRepositoryHttp` but has error handling special-cased
+/// for IPFS gateway
 impl NamedObjectRepositoryIpfsHttp {
     pub fn new(client: Client, base_url: Url) -> Self {
         assert!(
@@ -50,14 +51,16 @@ impl NamedObjectRepository for NamedObjectRepositoryIpfsHttp {
             Ok(resp) => Ok(resp),
             // When unable to find CID:
             // - Kubo version <= 0.14.0 returns 404
-            // - Kubo 0.15.0 <= version < 0.19.0 returns 400 - we consider this a bug and don't support them
+            // - Kubo 0.15.0 <= version < 0.19.0 returns 400 - we consider this a bug and don't
+            //   support them
             // - Kubo version >= 0.19.0 returns 500 - very ambiguous, but will have to do :(
             //
             // See: https://github.com/ipfs/kubo/issues/9514
             //
             // Note that we only do this in named repository as found / not-found matters most when
-            // we are checking for /refs/head to see if dataset exists. We prefer to get internall error
-            // on non existing block rather than risk confusing missing block with actuall server errors from Kubo.
+            // we are checking for /refs/head to see if dataset exists. We prefer to get internall
+            // error on non existing block rather than risk confusing missing block with
+            // actuall server errors from Kubo.
             Err(e)
                 if e.status() == Some(reqwest::StatusCode::NOT_FOUND)
                     || e.status() == Some(reqwest::StatusCode::INTERNAL_SERVER_ERROR) =>

@@ -9,10 +9,9 @@
 
 use std::path::Path;
 
-use datafusion::parquet::{
-    file::{reader::FileReader, serialized_reader::SerializedFileReader},
-    record::reader::RowIter,
-};
+use datafusion::parquet::file::reader::FileReader;
+use datafusion::parquet::file::serialized_reader::SerializedFileReader;
+use datafusion::parquet::record::reader::RowIter;
 
 pub struct ParquetReaderHelper {
     pub reader: SerializedFileReader<std::fs::File>,

@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::serde::{flatbuffers::*, EngineProtocolDeserializer, EngineProtocolSerializer};
-use opendatafabric::*;
+use std::convert::TryFrom;
 
 use chrono::prelude::*;
 use digest::Digest;
-use std::convert::TryFrom;
+use opendatafabric::serde::flatbuffers::*;
+use opendatafabric::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
+use opendatafabric::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::engine::IngestRequest;
-use crate::domain::*;
-use crate::infra::*;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use container_runtime::*;
 use opendatafabric::engine::ExecuteQueryError;
@@ -17,9 +17,10 @@ use opendatafabric::serde::yaml::YamlEngineProtocol;
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::*;
 use rand::Rng;
-use std::fs::File;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+
+use crate::domain::engine::IngestRequest;
+use crate::domain::*;
+use crate::infra::*;
 
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
@@ -48,7 +49,7 @@ impl RunInfo {
         std::fs::create_dir_all(&in_out_dir).expect("Failed to create in-out directory");
 
         Self {
-            in_out_dir: in_out_dir,
+            in_out_dir,
             stdout_path: workspace_layout
                 .run_info_dir
                 .join(format!("spark-{}.out.txt", run_id)),
@@ -70,7 +71,7 @@ impl SparkEngine {
         workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
-            container_runtime: container_runtime,
+            container_runtime,
             image: image.to_owned(),
             workspace_layout,
         }
@@ -141,17 +142,15 @@ impl SparkEngine {
         let mut cmd = self.container_runtime.run_shell_cmd(
             RunArgs {
                 image: self.image.clone(),
-                volume_map: volume_map,
+                volume_map,
                 user: Some("root".to_owned()),
                 ..RunArgs::default()
             },
             &[
                 indoc::indoc!(
-                    "/opt/bitnami/spark/bin/spark-submit \
-                    --master=local[4] \
-                    --driver-memory=2g \
-                    --class=dev.kamu.engine.spark.ingest.IngestApp \
-                    /opt/engine/bin/engine.spark.jar"
+                    "/opt/bitnami/spark/bin/spark-submit --master=local[4] --driver-memory=2g \
+                     --class=dev.kamu.engine.spark.ingest.IngestApp \
+                     /opt/engine/bin/engine.spark.jar"
                 )
                 .to_owned(),
                 chown,

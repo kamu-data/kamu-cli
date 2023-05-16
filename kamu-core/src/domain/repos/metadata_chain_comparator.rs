@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use opendatafabric::{MetadataBlock, Multihash};
-
 use async_trait::async_trait;
+use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
 use tokio_stream::StreamExt;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,8 @@ impl MetadataChainComparator {
         rhs_head: Option<&Multihash>,
         listener: &dyn CompareChainsListener,
     ) -> Result<CompareChainsResult, CompareChainsError> {
-        // When source and destination point to the same block, chains are equal, no further scanning required
+        // When source and destination point to the same block, chains are equal, no
+        // further scanning required
         if Some(&lhs_head) == rhs_head.as_ref() {
             return Ok(CompareChainsResult::Equal);
         }
@@ -64,7 +65,8 @@ impl MetadataChainComparator {
             -1
         };
 
-        // If numbers are equal, it's a guaranteed divergence, as we've checked blocks for equality above
+        // If numbers are equal, it's a guaranteed divergence, as we've checked blocks
+        // for equality above
         if lhs_sequence_number == rhs_sequence_number {
             let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
                 &lhs_chain,
@@ -158,7 +160,8 @@ impl MetadataChainComparator {
             .try_collect()
             .await?;
 
-        // If last read block points to the previous hash that is identical to earlier head, there is no divergence
+        // If last read block points to the previous hash that is identical to earlier
+        // head, there is no divergence
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
         if expected_common_ancestor_hash.is_some()

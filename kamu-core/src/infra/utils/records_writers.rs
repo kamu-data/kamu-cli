@@ -10,8 +10,10 @@
 use std::io::Write;
 
 pub use datafusion::arrow::csv::{Writer as CsvWriter, WriterBuilder as CsvWriterBuilder};
-pub use datafusion::arrow::json::ArrayWriter as JsonArrayWriter;
-pub use datafusion::arrow::json::LineDelimitedWriter as JsonLineDelimitedWriter;
+pub use datafusion::arrow::json::{
+    ArrayWriter as JsonArrayWriter,
+    LineDelimitedWriter as JsonLineDelimitedWriter,
+};
 use datafusion::arrow::record_batch::RecordBatch;
 
 /////////////////////////////////////////////////////////////////////////////////////////

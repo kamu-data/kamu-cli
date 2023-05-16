@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
+use async_trait::async_trait;
+use futures::TryStreamExt;
 use opendatafabric::serde::flatbuffers::*;
 use opendatafabric::*;
 
-use async_trait::async_trait;
-use futures::TryStreamExt;
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -208,7 +208,8 @@ where
                 {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
-                        "Input checkpoint does not correspond to the previous checkpoint in the chain",
+                        "Input checkpoint does not correspond to the previous checkpoint in the \
+                         chain",
                     ))
                     .into());
                 }
@@ -222,7 +223,8 @@ where
                 {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                         e.clone(),
-                        "Event neither has data nor it advances checkpoint, watermark, or source state",
+                        "Event neither has data nor it advances checkpoint, watermark, or source \
+                         state",
                     ))
                     .into());
                 }
@@ -267,7 +269,8 @@ where
                 if e.input_checkpoint.as_ref() != prev_checkpoint {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
-                        "Input checkpoint does not correspond to the previous checkpoint in the chain",
+                        "Input checkpoint does not correspond to the previous checkpoint in the \
+                         chain",
                     ))
                     .into());
                 }

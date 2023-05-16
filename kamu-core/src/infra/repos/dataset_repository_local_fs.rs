@@ -7,16 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::*;
-use futures::TryStreamExt;
-use opendatafabric::*;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use std::path::PathBuf;
-use std::sync::Arc;
+use futures::TryStreamExt;
+use opendatafabric::*;
 use url::Url;
+
+use crate::domain::*;
+use crate::infra::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +43,8 @@ impl DatasetRepositoryLocalFs {
     }
 
     pub fn from(root: impl Into<PathBuf>) -> Self {
-        //let info_repo = NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
+        //let info_repo =
+        // NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
         Self {
             root: root.into(),
             //info_repo,
@@ -76,11 +78,13 @@ impl DatasetRegistry for DatasetRepositoryLocalFs {
 impl DatasetRepository for DatasetRepositoryLocalFs {
     // TODO: PERF: Cache data and speed up lookups by ID
     //
-    // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing all summaries
-    // multiple threads calling this function or iterating all datasets can result in significant thrashing.
-    // We use a lock here until we have a better solution.
+    // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing
+    // all summaries multiple threads calling this function or iterating all
+    // datasets can result in significant thrashing. We use a lock here until we
+    // have a better solution.
     //
-    // Note that this lock does not prevent concurrent updates to summaries, only reduces the chances of it.
+    // Note that this lock does not prevent concurrent updates to summaries, only
+    // reduces the chances of it.
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRef,
@@ -205,8 +209,10 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume ownership
-        // - Dataset existed before (has valid head) - we should error out with name collision
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we
+        //   assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name
+        //   collision
         let head = match dataset
             .as_metadata_chain()
             .append(

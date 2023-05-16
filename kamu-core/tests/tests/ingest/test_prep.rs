@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+use std::io::prelude::*;
+
 use indoc::indoc;
 use kamu::domain::IngestError;
 use kamu::infra::ingest::*;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
-use std::io::prelude::*;
 
 #[test]
 fn test_prep_pipe() {
@@ -57,8 +57,11 @@ fn test_prep_pipe() {
 
     assert!(target_path.exists());
     assert_eq!(
-        std::fs::read_to_string(&target_path).unwrap().replace("\r", ""),
-        "{\"city\":\"A\",\"population\":100}\n{\"city\":\"B\",\"population\":200}\n{\"city\":\"A\",\"population\":110}\n"
+        std::fs::read_to_string(&target_path)
+            .unwrap()
+            .replace("\r", ""),
+        "{\"city\":\"A\",\"population\":100}\n{\"city\":\"B\",\"population\":200}\n{\"city\":\"A\"\
+         ,\"population\":110}\n"
     );
 }
 

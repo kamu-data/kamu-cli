@@ -7,14 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::Path;
+use std::sync::Arc;
+
+use chrono::{DateTime, Utc};
+use opendatafabric::*;
+
 use crate::domain::engine::IngestRequest;
 use crate::domain::*;
 use crate::infra::*;
-use opendatafabric::*;
-
-use chrono::{DateTime, Utc};
-use std::path::Path;
-use std::sync::Arc;
 
 pub struct ReadService {
     engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -46,7 +47,8 @@ impl ReadService {
         'a: 'b,
     {
         // Terminate early for zero-sized files
-        // TODO: Should we still call an engine if only to propagate source_event_time to it?
+        // TODO: Should we still call an engine if only to propagate source_event_time
+        // to it?
         if src_data_path.metadata().int_err()?.len() == 0 {
             return Ok(ExecuteQueryResponseSuccess {
                 data_interval: None,

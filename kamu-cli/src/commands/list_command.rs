@@ -7,14 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{CLIError, Command};
-use crate::output::*;
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 use chrono_humanize::HumanTime;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use opendatafabric::*;
-use std::sync::Arc;
+
+use super::{CLIError, Command};
+use crate::output::*;
 
 pub struct ListCommand {
     local_repo: Arc<dyn DatasetRepository>,
@@ -81,11 +83,9 @@ impl ListCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        use datafusion::arrow::{
-            array::{StringArray, TimestampMicrosecondArray, UInt64Array},
-            datatypes::{DataType, Field, Schema, TimeUnit},
-            record_batch::RecordBatch,
-        };
+        use datafusion::arrow::array::{StringArray, TimestampMicrosecondArray, UInt64Array};
+        use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+        use datafusion::arrow::record_batch::RecordBatch;
 
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))

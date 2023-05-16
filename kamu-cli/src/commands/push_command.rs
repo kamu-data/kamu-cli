@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{BatchError, CLIError, Command};
-use crate::output::OutputConfig;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 use kamu::domain::*;
 use opendatafabric::*;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::time::Duration;
+use super::{BatchError, CLIError, Command};
+use crate::output::OutputConfig;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Command
@@ -298,9 +298,12 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::ReadMetadata => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Analyzing metadata {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Analyzing metadata {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
@@ -310,9 +313,13 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::TransferData => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Syncing data & checkpoints {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Syncing data & checkpoints {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} \
+                             ({bytes_per_sec}, {eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.bytes_written as u64);
@@ -322,9 +329,12 @@ impl SyncListener for PrettySyncProgress {
                 SyncStage::CommitBlocks => {
                     let pb = indicatif::ProgressBar::hidden();
                     let style = indicatif::ProgressStyle::default_bar()
-                .template("{spinner:.cyan} Syncing metadata {prefix:.dim}:\n  [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})")
-                .unwrap()
-                .progress_chars("#>-");
+                        .template(
+                            "{spinner:.cyan} Syncing metadata {prefix:.dim}:\n  \
+                             [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                        )
+                        .unwrap()
+                        .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);

@@ -9,8 +9,7 @@
 
 use std::sync::Arc;
 
-use datafusion::parquet::basic::Type as PhysicalType;
-use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition};
+use datafusion::parquet::basic::{ConvertedType, LogicalType, Repetition, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
 use kamu::infra::utils::schema_utils::write_schema_parquet_json;
 
@@ -63,17 +62,43 @@ fn test_write_schema_parquet_json_group() {
 
     let mut buf = Vec::new();
     write_schema_parquet_json(&mut buf, &message).unwrap();
-    let actual = String::from_utf8(buf).unwrap();
+    let actual: serde_json::Value = serde_json::from_slice(&buf).unwrap();
 
-    let expected = indoc::indoc!(
-        r#"{"name": "schema", "type": "struct", "fields": [
-        {"name": "field", "type": "struct", "repetition": "OPTIONAL", "fields": [
-        {"name": "f1", "repetition": "REQUIRED", "type": "INT32", "logicalType": "INT_32"}, 
-        {"name": "f2", "repetition": "OPTIONAL", "type": "BYTE_ARRAY", "logicalType": "UTF8"}, 
-        {"name": "f3", "repetition": "OPTIONAL", "type": "BYTE_ARRAY", "logicalType": "STRING"}]}, 
-        {"name": "f4", "repetition": "REPEATED", "type": "FIXED_LEN_BYTE_ARRAY(12)", "logicalType": "INTERVAL"}, 
-        {"name": "f5", "repetition": "OPTIONAL", "type": "FIXED_LEN_BYTE_ARRAY(9)", "logicalType": "DECIMAL(19,4)"}]}"#
-    ).replace('\n', "");
+    let expected = serde_json::json!({
+        "name": "schema",
+        "type": "struct",
+        "fields": [{
+            "name": "field",
+            "type": "struct",
+            "repetition": "OPTIONAL",
+            "fields": [{
+                "name": "f1",
+                "repetition": "REQUIRED",
+                "type": "INT32",
+                "logicalType": "INT_32"
+            }, {
+                "name": "f2",
+                "repetition": "OPTIONAL",
+                "type": "BYTE_ARRAY",
+                "logicalType": "UTF8"
+            }, {
+                "name": "f3",
+                "repetition": "OPTIONAL",
+                "type": "BYTE_ARRAY",
+                "logicalType": "STRING"
+            }]
+        }, {
+            "name": "f4",
+            "repetition": "REPEATED",
+            "type": "FIXED_LEN_BYTE_ARRAY(12)",
+            "logicalType": "INTERVAL"
+        }, {
+            "name": "f5",
+            "repetition": "OPTIONAL",
+            "type": "FIXED_LEN_BYTE_ARRAY(9)",
+            "logicalType": "DECIMAL(19,4)"
+        }]
+    });
 
     assert_eq!(actual, expected);
 }

@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::scalars::*;
-use crate::utils::*;
-
 use async_graphql::*;
 use kamu::domain;
-use kamu::domain::GetSummaryOpts;
-use kamu::domain::QueryError;
+use kamu::domain::{GetSummaryOpts, QueryError};
 use opendatafabric as odf;
+
+use crate::scalars::*;
+use crate::utils::*;
 
 pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
@@ -39,7 +38,8 @@ impl DatasetData {
         Ok(summary.num_records)
     }
 
-    /// An estimated size of data on disk not accounting for replication or caching
+    /// An estimated size of data on disk not accounting for replication or
+    /// caching
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
@@ -50,7 +50,8 @@ impl DatasetData {
     }
 
     /// Returns the specified number of the latest records in the dataset
-    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY event_time DESC LIMIT N`
+    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
+    /// event_time DESC LIMIT N`
     async fn tail(
         &self,
         ctx: &Context<'_>,

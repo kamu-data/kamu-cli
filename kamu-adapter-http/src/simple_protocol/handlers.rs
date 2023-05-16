@@ -16,17 +16,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::smart_protocol::ws_axum_server;
-use axum::{extract::Extension, headers::ContentLength, TypedHeader};
+use std::str::FromStr;
+use std::sync::Arc;
+
+use axum::extract::Extension;
+use axum::headers::ContentLength;
+use axum::TypedHeader;
 use futures::TryStreamExt;
 use kamu::domain::*;
-
-use opendatafabric::{
-    serde::{flatbuffers::FlatbuffersMetadataBlockSerializer, MetadataBlockSerializer},
-    DatasetRef, Multihash,
-};
-use std::{str::FromStr, sync::Arc};
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
+use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
+
+use crate::smart_protocol::ws_axum_server;
 
 /////////////////////////////////////////////////////////////////////////////////
 

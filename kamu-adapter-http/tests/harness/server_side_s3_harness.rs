@@ -7,18 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{
-    net::{IpAddr, Ipv4Addr},
-    path::PathBuf,
-    str::FromStr,
-    sync::Arc,
-};
+use std::net::{IpAddr, Ipv4Addr};
+use std::path::PathBuf;
+use std::str::FromStr;
+use std::sync::Arc;
 
-use kamu::{
-    domain::{DatasetRepository, InternalError, ResultIntoInternal},
-    infra::{utils::s3_context::S3Context, DatasetLayout, DatasetRepositoryS3},
-    testing::MinioServer,
-};
+use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal};
+use kamu::infra::utils::s3_context::S3Context;
+use kamu::infra::{DatasetLayout, DatasetRepositoryS3};
+use kamu::testing::MinioServer;
 use url::Url;
 
 use super::{ServerSideHarness, TestAPIServer};

@@ -16,9 +16,9 @@ use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
 
-use crate::{domain::*, infra::utils::s3_context::S3Context};
-
 use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
+use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -213,8 +213,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
-        // - Dataset was partially created before (no head yet) and was not GC'd - so we assume ownership
-        // - Dataset existed before (has valid head) - we should error out with name collision
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we
+        //   assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name
+        //   collision
         let head = match dataset
             .as_metadata_chain()
             .append(seed_block.into(), AppendOpts::default())

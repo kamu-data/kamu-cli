@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::{sync::Mutex, time::Duration};
+use std::sync::Mutex;
+use std::time::Duration;
 
 use kamu::domain::PullImageListener;
 use read_input::prelude::*;

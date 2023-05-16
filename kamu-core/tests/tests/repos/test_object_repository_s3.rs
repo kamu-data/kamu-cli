@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use kamu::domain::*;
 use kamu::infra::utils::s3_context::S3Context;
 use kamu::infra::*;
 use kamu::testing::MinioServer;
 use opendatafabric::*;
-
-use std::assert_matches::assert_matches;
 use url::Url;
 
 use super::test_object_repository_shared;

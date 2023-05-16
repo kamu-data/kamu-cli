@@ -11,8 +11,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use datafusion::common::DFSchema;
-use datafusion::parquet::basic::Type as PhysicalType;
-use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit};
+use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
 
 /// Prints schema in a style of `parquet-schema` output
@@ -21,7 +20,8 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
     Ok(())
 }
 
-/// Similar to [`print_schema_parquet`], but uses JSON format that does not require a custom parser
+/// Similar to [write_schema_parquet], but uses JSON format that does not
+/// require a custom parser
 pub fn write_schema_parquet_json(
     output: &mut dyn Write,
     schema: &Type,

@@ -7,20 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::domain::*;
-use crate::infra::utils::docker_images;
-use crate::infra::*;
-
-use super::engine_odf::*;
-use super::engine_spark::*;
-
-use container_runtime::NetworkNamespaceType;
-use container_runtime::{ContainerRuntime, NullPullImageListener};
-use dill::*;
 use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use container_runtime::{ContainerRuntime, NetworkNamespaceType, NullPullImageListener};
+use dill::*;
+
+use super::engine_odf::*;
+use super::engine_spark::*;
+use crate::domain::*;
+use crate::infra::utils::docker_images;
+use crate::infra::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,7 +68,7 @@ impl EngineProvisionerLocal {
                 &config.flink_image,
                 workspace_layout.clone(),
             )),
-            container_runtime: container_runtime,
+            container_runtime,
             state: Mutex::new(State {
                 outstanding_handles: 0,
                 known_images: HashSet::new(),
@@ -124,8 +123,8 @@ impl EngineProvisionerLocal {
 
         let container_runtime = self.container_runtime.clone();
         let image = image.to_owned();
-        tokio::task::spawn_blocking(move ||
-            // TODO: Return better errors
+        // TODO: Return better errors
+        tokio::task::spawn_blocking(move || {
             container_runtime
                 .pull_cmd(&image)
                 .stdout(Stdio::null())
@@ -136,7 +135,8 @@ impl EngineProvisionerLocal {
                 .map_err(|error| {
                     tracing::error!(?error, "Failed to pull engine image");
                     EngineProvisioningError::image_not_found(&image)
-                }))
+                })
+        })
         .await
         .unwrap()?;
 
@@ -183,7 +183,11 @@ impl EngineProvisionerLocal {
             (Some(1), _) => 1,
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
-                tracing::warn!("Ingoring specified engine max concurrency of {} since running in the Host networking mode", multi);
+                tracing::warn!(
+                    "Ingoring specified engine max concurrency of {} since running in the Host \
+                     networking mode",
+                    multi
+                );
                 1
             }
         }

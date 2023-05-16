@@ -7,21 +7,22 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::*;
-use crate::domain::*;
-use opendatafabric::serde::yaml::*;
-use opendatafabric::*;
-
-use ::serde::{Deserialize, Serialize};
-use ::serde_with::skip_serializing_none;
-use chrono::{DateTime, SubsecRound, TimeZone, Utc};
-use container_runtime::*;
 use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
+
+use ::serde::{Deserialize, Serialize};
+use ::serde_with::skip_serializing_none;
+use chrono::{DateTime, SubsecRound, TimeZone, Utc};
+use container_runtime::*;
+use opendatafabric::serde::yaml::*;
+use opendatafabric::*;
 use url::Url;
+
+use super::*;
+use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -434,9 +435,10 @@ impl FetchService {
             Some(EventTimeSource::FromPath(fp)) => Some(fp),
             Some(src) => {
                 return Err(EventTimeSourceError::incompatible(format!(
-                "Files glob source only supports deriving event time from file path, found: {:?}",
-                src
-            ))
+                    "Files glob source only supports deriving event time from file path, found: \
+                     {:?}",
+                    src
+                ))
                 .into())
             }
         };
@@ -847,7 +849,7 @@ struct HttpStatusError {
 
 impl HttpStatusError {
     fn new(code: u32) -> Self {
-        Self { code: code }
+        Self { code }
     }
 }
 
