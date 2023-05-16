@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.124.0"
+version = "0.124.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license-file = "../LICENSE.txt"
@@ -22,8 +22,8 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.124.0", path = "../opendatafabric" }
-container-runtime = { version = "0.124.0", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.124.1", path = "../opendatafabric" }
+container-runtime = { version = "0.124.1", path = "../utils/container-runtime" }
 
 # Serialization
 flatbuffers = "23"
