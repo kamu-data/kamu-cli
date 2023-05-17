@@ -34,7 +34,8 @@ impl Default for ObjectTransferOptions {
 
         Self {
             max_parallel_transfers,
-            min_upload_progress_delay_sec: 1,
+            // Should be less than idle timeout rules in the load balancer
+            min_upload_progress_delay_sec: 10,
         }
     }
 }

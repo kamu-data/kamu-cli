@@ -387,7 +387,7 @@ async fn try_handle_push_objects_request(
     let objects_count = request.object_files.len();
 
     tracing::debug!(
-        objects_count = % objects_count,
+        % objects_count,
         "Push client sent a push objects request",
     );
 

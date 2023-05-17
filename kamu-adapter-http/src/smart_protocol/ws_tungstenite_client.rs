@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::iter;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
@@ -329,50 +328,51 @@ impl WsSmartTransferProtocolClient {
         src: Arc<dyn Dataset>,
         transfer_options: ObjectTransferOptions,
     ) -> Result<(), SyncError> {
-        let total_files_count = push_objects_response.object_transfer_strategies.len();
         let uploaded_files_counter = Arc::new(AtomicI32::new(0));
-        let cloned_counters: Vec<_> = iter::repeat_with(|| uploaded_files_counter.clone())
-            .take(total_files_count)
+
+        let task_data: Vec<_> = push_objects_response
+            .object_transfer_strategies
+            .into_iter()
+            .map(|s| (s, uploaded_files_counter.clone()))
             .collect();
 
-        let export_task = tokio::spawn(async move {
+        let mut export_task = tokio::spawn(async move {
             let src_ref = src.as_ref();
             use futures::stream::{StreamExt, TryStreamExt};
-            futures::stream::iter(iter::zip(
-                push_objects_response.object_transfer_strategies,
-                cloned_counters,
-            ))
-            .map(Ok)
-            .try_for_each_concurrent(
-                /* limit */ transfer_options.max_parallel_transfers,
-                |(s, counter)| async move {
-                    let export_result = dataset_export_object_file(src_ref, &s).await;
-                    counter.fetch_add(1, Ordering::Relaxed);
-                    export_result
-                },
-            )
-            .await
+            futures::stream::iter(task_data)
+                .map(Ok)
+                .try_for_each_concurrent(
+                    /* limit */ transfer_options.max_parallel_transfers,
+                    |(s, counter)| async move {
+                        let export_result = dataset_export_object_file(src_ref, &s).await;
+                        counter.fetch_add(1, Ordering::Relaxed);
+                        export_result
+                    },
+                )
+                .await
         });
 
-        while !export_task.is_finished() {
-            tokio::time::sleep(std::time::Duration::from_secs(
-                transfer_options.min_upload_progress_delay_sec,
-            ))
-            .await;
-            if !export_task.is_finished() {
-                let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
-                match self
-                    .push_send_objects_upload_progress(socket, uploaded_files_count)
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::debug!("Push process aborted with error: {}", e);
-                        return Err(SyncError::Internal(e.int_err()));
+        let mut notify_interval = tokio::time::interval(std::time::Duration::from_secs(
+            transfer_options.min_upload_progress_delay_sec,
+        ));
+
+        loop {
+            tokio::select! {
+                _ = notify_interval.tick() => {
+                        let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
+                        tracing::debug!(%uploaded_files_count, "Time to notify about the upload progress");
+                        self
+                            .push_send_objects_upload_progress(socket, uploaded_files_count)
+                            .await
+                            .map_err(
+                                |e| SyncError::Internal(e.int_err())
+                            )?;
                     }
-                }
+                _ = &mut export_task => break
             }
         }
+
+        tracing::debug!("Uploading group of files finished");
 
         match self.push_send_objects_upload_complete(socket).await {
             Ok(_) => {}
