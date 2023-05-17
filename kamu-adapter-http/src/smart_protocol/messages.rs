@@ -147,9 +147,13 @@ pub enum ObjectPushStrategy {
     HttpUpload,
 }
 
-/// Push stage 3: object upload progress
+/// Push stage 3: object upload progress request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct DatasetPushObjectsUploadInProgress {
+pub struct DatasetPushObjectsUploadProgressRequest {}
+
+/// Push stage 3: object upload progress response
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct DatasetPushObjectsUploadProgressResponse {
     pub details: ObjectsUploadProgressDetails,
 }
 

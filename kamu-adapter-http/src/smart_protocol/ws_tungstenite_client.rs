@@ -352,15 +352,11 @@ impl WsSmartTransferProtocolClient {
                 .await
         });
 
-        let mut notify_interval = tokio::time::interval(std::time::Duration::from_secs(
-            transfer_options.min_upload_progress_delay_sec,
-        ));
-
         loop {
             tokio::select! {
-                _ = notify_interval.tick() => {
+                _ = read_payload::<DatasetPushObjectsUploadProgressRequest>(socket) => {
                         let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
-                        tracing::debug!(%uploaded_files_count, "Time to notify about the upload progress");
+                        tracing::debug!(%uploaded_files_count, "Notifying server about the upload progress");
                         self
                             .push_send_objects_upload_progress(socket, uploaded_files_count)
                             .await
@@ -393,7 +389,7 @@ impl WsSmartTransferProtocolClient {
         tracing::debug!("Sending push objects upload progress");
         write_payload(
             socket,
-            DatasetPushObjectsUploadInProgress {
+            DatasetPushObjectsUploadProgressResponse {
                 details: ObjectsUploadProgressDetails::Running(
                     ObjectsUploadProgressDetailsRunning {
                         uploaded_objects_count,
@@ -415,7 +411,7 @@ impl WsSmartTransferProtocolClient {
         tracing::debug!("Sending push objects upload progress");
         write_payload(
             socket,
-            DatasetPushObjectsUploadInProgress {
+            DatasetPushObjectsUploadProgressResponse {
                 details: ObjectsUploadProgressDetails::Complete,
             },
         )
