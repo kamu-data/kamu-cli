@@ -25,6 +25,11 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////
 
+// Should be less than idle timeout rules in the load balancer
+const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
+
+/////////////////////////////////////////////////////////////////////////////////
+
 async fn read_payload<TMessagePayload: DeserializeOwned>(
     socket: &mut axum::extract::ws::WebSocket,
 ) -> Result<TMessagePayload, ReadMessageError> {
@@ -384,8 +389,10 @@ async fn try_handle_push_objects_request(
             PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsRequest))
         })?;
 
+    let objects_count = request.object_files.len();
+
     tracing::debug!(
-        objects_count = % request.object_files.len(),
+        % objects_count,
         "Push client sent a push objects request",
     );
 
@@ -408,6 +415,43 @@ async fn try_handle_push_objects_request(
     )
     .await
     .map_err(|e| PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsRequest)))?;
+
+    let mut notify_interval = tokio::time::interval(std::time::Duration::from_secs(
+        MIN_UPLOAD_PROGRESS_PING_DELAY_SEC,
+    ));
+    notify_interval.tick().await; // clear first immediate interval tick
+
+    loop {
+        tokio::select! {
+            _ = notify_interval.tick() => {
+                tracing::debug!("Time to ask client about the upload progress");
+                write_payload::<DatasetPushObjectsUploadProgressRequest>(socket, DatasetPushObjectsUploadProgressRequest {})
+                    .await
+                    .map_err(|e| {
+                        PushServerError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
+                    })?;
+            },
+            progress_response_result = read_payload::<DatasetPushObjectsUploadProgressResponse>(socket) => {
+                let progress = progress_response_result
+                    .map_err(|e| {
+                        PushServerError::ReadFailed(PushReadError::new(e, PushPhase::ObjectsUploadProgress))
+                    })?;
+                match progress.details {
+                    ObjectsUploadProgressDetails::Running(p) => {
+                        tracing::debug!(
+                            uploaded_objects_count = % p.uploaded_objects_count,
+                            total_objects_count = % objects_count,
+                            "Objects upload progress notification"
+                        );
+                    }
+                    ObjectsUploadProgressDetails::Complete => {
+                        tracing::debug!("Objects upload complete");
+                        break;
+                    }
+                }
+            }
+        }
+    }
 
     Ok(request.is_truncated)
 }

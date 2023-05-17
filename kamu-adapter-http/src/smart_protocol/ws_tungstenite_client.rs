@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
 use dill::component;
@@ -320,6 +321,107 @@ impl WsSmartTransferProtocolClient {
         Ok(dataset_objects_push_response)
     }
 
+    async fn export_group_of_object_files(
+        &self,
+        socket: &mut TungsteniteStream,
+        push_objects_response: DatasetPushObjectsTransferResponse,
+        src: Arc<dyn Dataset>,
+        transfer_options: ObjectTransferOptions,
+    ) -> Result<(), SyncError> {
+        let uploaded_files_counter = Arc::new(AtomicI32::new(0));
+
+        let task_data: Vec<_> = push_objects_response
+            .object_transfer_strategies
+            .into_iter()
+            .map(|s| (s, uploaded_files_counter.clone()))
+            .collect();
+
+        let mut export_task = tokio::spawn(async move {
+            let src_ref = src.as_ref();
+            use futures::stream::{StreamExt, TryStreamExt};
+            futures::stream::iter(task_data)
+                .map(Ok)
+                .try_for_each_concurrent(
+                    /* limit */ transfer_options.max_parallel_transfers,
+                    |(s, counter)| async move {
+                        let export_result = dataset_export_object_file(src_ref, &s).await;
+                        counter.fetch_add(1, Ordering::Relaxed);
+                        export_result
+                    },
+                )
+                .await
+        });
+
+        loop {
+            tokio::select! {
+                _ = read_payload::<DatasetPushObjectsUploadProgressRequest>(socket) => {
+                        let uploaded_files_count: i32 = uploaded_files_counter.load(Ordering::Relaxed);
+                        tracing::debug!(%uploaded_files_count, "Notifying server about the upload progress");
+                        self
+                            .push_send_objects_upload_progress(socket, uploaded_files_count)
+                            .await
+                            .map_err(
+                                |e| SyncError::Internal(e.int_err())
+                            )?;
+                    }
+                _ = &mut export_task => break
+            }
+        }
+
+        tracing::debug!("Uploading group of files finished");
+
+        match self.push_send_objects_upload_complete(socket).await {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::debug!("Push process aborted with error: {}", e);
+                return Err(SyncError::Internal(e.int_err()));
+            }
+        };
+
+        Ok(())
+    }
+
+    async fn push_send_objects_upload_progress(
+        &self,
+        socket: &mut TungsteniteStream,
+        uploaded_objects_count: i32,
+    ) -> Result<(), PushClientError> {
+        tracing::debug!("Sending push objects upload progress");
+        write_payload(
+            socket,
+            DatasetPushObjectsUploadProgressResponse {
+                details: ObjectsUploadProgressDetails::Running(
+                    ObjectsUploadProgressDetailsRunning {
+                        uploaded_objects_count,
+                    },
+                ),
+            },
+        )
+        .await
+        .map_err(|e| {
+            PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
+        })?;
+        Ok(())
+    }
+
+    async fn push_send_objects_upload_complete(
+        &self,
+        socket: &mut TungsteniteStream,
+    ) -> Result<(), PushClientError> {
+        tracing::debug!("Sending push objects upload progress");
+        write_payload(
+            socket,
+            DatasetPushObjectsUploadProgressResponse {
+                details: ObjectsUploadProgressDetails::Complete,
+            },
+        )
+        .await
+        .map_err(|e| {
+            PushClientError::WriteFailed(PushWriteError::new(e, PushPhase::ObjectsUploadProgress))
+        })?;
+        Ok(())
+    }
+
     async fn push_send_complete_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -587,15 +689,13 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let src_ref = src.as_ref();
-        use futures::stream::{StreamExt, TryStreamExt};
-        futures::stream::iter(push_objects_response.object_transfer_strategies)
-            .map(Ok)
-            .try_for_each_concurrent(
-                /* limit */ transfer_options.max_parallel_transfers,
-                |s| async move { dataset_export_object_file(src_ref, &s).await },
-            )
-            .await?;
+        self.export_group_of_object_files(
+            &mut ws_stream,
+            push_objects_response,
+            src,
+            transfer_options,
+        )
+        .await?;
 
         match self.push_send_complete_request(&mut ws_stream).await {
             Ok(_) => {}
