@@ -21,43 +21,35 @@ async fn test_container_terminate_not_called() {
 
     rt.ensure_image(TEST_IMAGE, None).await.unwrap();
 
-    let container_name = {
-        let container = rt
-            .run_attached(TEST_IMAGE)
-            .container_name_prefix("kamu-test-")
-            .args(["sleep", "10"])
-            .init(true)
-            .spawn()
-            .unwrap();
+    let container = rt
+        .run_attached(TEST_IMAGE)
+        .container_name_prefix("kamu-test-")
+        .args(["sleep", "9999"])
+        .init(true)
+        .spawn()
+        .unwrap();
 
-        assert_matches!(
-            container
-                .wait_for_container(Duration::from_millis(1000))
-                .await,
-            Ok(_)
-        );
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
-        container.container_name().to_string()
+    assert_matches!(
+        container
+            .wait_for_container(Duration::from_millis(1000))
+            .await,
+        Ok(_)
+    );
 
-        // ContainerProcess::terminate() not called
-        // Drop will perform blocking cleanup and will complain in logs
-    };
+    let container_name = container.container_name().to_string();
+
+    // ContainerProcess::terminate() not called
+    // Drop will perform blocking cleanup and will complain in logs
+    drop(container);
 
     // Ensure container no longer exists
-    // Sometimes it seems the container will linger in `podman ps` than the
-    // controlling process, so we give it some time to clear out
-    let mut result = None;
-    for _ in 0..5 {
-        let res = rt
-            .wait_for_container(&container_name, Duration::from_millis(100))
-            .await;
-        if res.is_err() {
-            result = Some(res);
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    assert_matches!(result, Some(Err(ContainerRuntimeError::Timeout(_))));
+    assert_matches!(
+        rt.wait_for_container(&container_name, Duration::from_millis(100))
+            .await,
+        Err(ContainerRuntimeError::Timeout(_))
+    )
 }
 
 #[test_log::test(tokio::test)]
@@ -69,7 +61,7 @@ async fn test_container_terminate_awaited() {
 
     let mut container = rt
         .run_attached(TEST_IMAGE)
-        .args(["sleep", "10"])
+        .args(["sleep", "999"])
         .init(true)
         .spawn()
         .unwrap();

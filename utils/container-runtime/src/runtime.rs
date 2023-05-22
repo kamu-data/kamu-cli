@@ -37,8 +37,15 @@ impl ContainerRuntime {
         Self { config }
     }
 
-    fn new_command(&self) -> Command {
+    pub(crate) fn new_command(&self) -> Command {
         Command::new(match self.config.runtime {
+            ContainerRuntimeType::Docker => "docker",
+            ContainerRuntimeType::Podman => "podman",
+        })
+    }
+
+    pub(crate) fn new_command_std(&self) -> std::process::Command {
+        std::process::Command::new(match self.config.runtime {
             ContainerRuntimeType::Docker => "docker",
             ContainerRuntimeType::Podman => "podman",
         })
@@ -212,9 +219,19 @@ impl ContainerRuntime {
         self.exec_cmd(exec_args, container_name, ["sh", "-c", shell_cmd.as_ref()])
     }
 
-    pub fn kill_cmd(&self, container_name: &str) -> Command {
-        let mut cmd = self.new_command();
-        cmd.arg("kill").arg(container_name);
+    pub fn kill_cmd(&self, container_name: &str, signal: Signal) -> Command {
+        self.kill_cmd_std(container_name, signal).into()
+    }
+
+    pub fn kill_cmd_std(&self, container_name: &str, signal: Signal) -> std::process::Command {
+        let mut cmd = self.new_command_std();
+        cmd.arg("kill")
+            .arg("--signal")
+            .arg(match signal {
+                Signal::TERM => "TERM",
+                Signal::KILL => "KILL",
+            })
+            .arg(container_name);
         cmd
     }
 
@@ -225,7 +242,11 @@ impl ContainerRuntime {
     }
 
     pub fn remove_network_cmd(&self, network_name: &str) -> Command {
-        let mut cmd = self.new_command();
+        self.remove_network_cmd_std(network_name).into()
+    }
+
+    pub(crate) fn remove_network_cmd_std(&self, network_name: &str) -> std::process::Command {
+        let mut cmd = self.new_command_std();
         cmd.arg("network").arg("rm").arg(network_name);
         cmd
     }
@@ -242,8 +263,7 @@ impl ContainerRuntime {
             return Err(ProcessError::from_output(command, output).into());
         }
 
-        let remove = self.remove_network_cmd(network_name);
-        Ok(NetworkHandle::new(remove))
+        Ok(NetworkHandle::new(self.clone(), network_name.to_string()))
     }
 
     pub async fn has_network(&self, name: &str) -> Result<bool, ContainerRuntimeError> {
@@ -442,4 +462,9 @@ impl ContainerRuntime {
             PathBuf::from(s_norm)
         }
     }
+}
+
+pub enum Signal {
+    TERM,
+    KILL,
 }

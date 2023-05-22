@@ -8,11 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use std::process::Stdio;
-use std::time::{Duration, Instant};
 
-use tokio::process::Command;
-
-use crate::ContainerRuntimeError;
+use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // NetworkHandle
@@ -21,22 +18,23 @@ use crate::ContainerRuntimeError;
 #[must_use]
 #[derive(Debug)]
 pub struct NetworkHandle {
-    remove: Option<Command>,
+    runtime: ContainerRuntime,
+    network_name: Option<String>,
 }
 
 impl NetworkHandle {
-    const DROP_TIMEOUT: Duration = Duration::from_millis(500);
-    const DROP_TICK_TIMEOUT: Duration = Duration::from_millis(10);
-
-    pub fn new(remove: Command) -> Self {
+    pub fn new(runtime: ContainerRuntime, network_name: String) -> Self {
         Self {
-            remove: Some(remove),
+            runtime,
+            network_name: Some(network_name),
         }
     }
 
     pub async fn free(mut self) -> Result<(), ContainerRuntimeError> {
-        if let Some(mut cmd) = self.remove.take() {
-            cmd.stdout(Stdio::null())
+        if let Some(network_name) = self.network_name.take() {
+            self.runtime
+                .remove_network_cmd(&network_name)
+                .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .status()
                 .await?;
@@ -47,23 +45,17 @@ impl NetworkHandle {
 
 impl Drop for NetworkHandle {
     fn drop(&mut self) {
-        if let Some(mut cmd) = self.remove.take() {
+        if let Some(network_name) = self.network_name.take() {
             tracing::warn!(
-                ?cmd,
+                network_name,
                 "Network handle was not freed - cleaning up synchronously"
             );
-
-            if let Ok(mut child) = cmd.stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
-                // TODO: Ideally we would reach to inner handle and block on it, but tokio makes
-                // it hard, so we do a busy loop.
-                let start = Instant::now();
-                while (Instant::now() - start) < Self::DROP_TIMEOUT {
-                    match child.try_wait() {
-                        Ok(None) => std::thread::sleep(Self::DROP_TICK_TIMEOUT),
-                        Ok(Some(_)) | Err(_) => break,
-                    }
-                }
-            }
+            let _ = self
+                .runtime
+                .remove_network_cmd_std(&network_name)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
         }
     }
 }

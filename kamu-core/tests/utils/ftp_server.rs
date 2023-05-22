@@ -41,7 +41,7 @@ impl FtpServer {
         let container = container_runtime
             .run_attached(Self::IMAGE)
             .container_name_prefix("kamu-test-ftp-")
-            .map_port(21, 21)
+            .expose_port(21)
             .map_port_range((47400, 47470), (47400, 47470))
             .volume(server_dir, "/home/vsftpd")
             .environment_vars([

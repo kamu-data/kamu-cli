@@ -13,15 +13,7 @@ use std::time::Duration;
 
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout, Command};
 
-use crate::{
-    ContainerRuntime,
-    ContainerRuntimeError,
-    ExecArgs,
-    RunArgs,
-    Terminate,
-    TerminateStatus,
-    TimeoutError,
-};
+use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // ContainerRunCommand
@@ -424,6 +416,14 @@ impl ContainerProcess {
 
     #[tracing::instrument(level = "debug", name = "terminate_container", skip_all, fields(container_name = %self.container_name))]
     pub async fn terminate(&mut self) -> std::io::Result<TerminateStatus> {
+        // Send SIGTERM to the main process in the container
+        self.runtime
+            .kill_cmd(&self.container_name, Signal::TERM)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await?;
+
         self.child.terminate(self.terminate_timeout).await
     }
 }
@@ -437,6 +437,15 @@ impl Drop for ContainerProcess {
                 "Container was not terminated - cleaning up synchronously"
             );
 
+            // Send SIGTERM to the main process in the container
+            let _ = self
+                .runtime
+                .kill_cmd_std(&self.container_name, Signal::TERM)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+
+            // Terminate attached subprocess
             let _ = self.child.terminate_blocking(self.terminate_timeout);
         }
     }

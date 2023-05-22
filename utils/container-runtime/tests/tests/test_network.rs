@@ -18,14 +18,13 @@ async fn test_network_handle_free_not_called() {
 
     let network_name = common::get_random_name("kamu-test-network-");
 
-    {
-        let _network = rt.create_network(&network_name).await.unwrap();
+    let network = rt.create_network(&network_name).await.unwrap();
 
-        assert!(rt.has_network(&network_name).await.unwrap());
+    assert!(rt.has_network(&network_name).await.unwrap());
 
-        // Network dropped without freeing
-        // Drop will complain loudly and perfor a blocking clean up
-    }
+    // Network dropped without freeing
+    // Drop will complain loudly and perfor a blocking clean up
+    drop(network);
 
     assert!(!rt.has_network(&network_name).await.unwrap());
 }
