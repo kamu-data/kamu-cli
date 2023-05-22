@@ -29,6 +29,9 @@ async fn test_container_terminate_not_called() {
         .spawn()
         .unwrap();
 
+    // TODO: It seems that podman itself has some race condition that when attached
+    // process is terminated very early during the initialization it may leave a
+    // hanging container
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     assert_matches!(
@@ -65,6 +68,11 @@ async fn test_container_terminate_awaited() {
         .init(true)
         .spawn()
         .unwrap();
+
+    // TODO: It seems that podman itself has some race condition that when attached
+    // process is terminated very early during the initialization it may leave a
+    // hanging container
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let status = container.terminate().await.unwrap();
     assert_matches!(status, TerminateStatus::Exited(_));

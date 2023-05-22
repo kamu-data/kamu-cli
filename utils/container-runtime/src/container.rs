@@ -424,6 +424,7 @@ impl ContainerProcess {
             .status()
             .await?;
 
+        // Terminate the attached subprocess
         self.child.terminate(self.terminate_timeout).await
     }
 }
@@ -445,7 +446,7 @@ impl Drop for ContainerProcess {
                 .stderr(Stdio::null())
                 .status();
 
-            // Terminate attached subprocess
+            // Terminate the attached subprocess
             let _ = self.child.terminate_blocking(self.terminate_timeout);
         }
     }

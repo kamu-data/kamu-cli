@@ -56,7 +56,7 @@ jobs:
       - name: build
         run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: pull test images
-        run: cargo test ${{ env.CARGO_FLAGS }} test_setup_pull_images
+        run: cargo test ${{ env.CARGO_FLAGS }} test_setup_pull_images -- --nocapture
       - name: run tests
         run: cargo test ${{ env.CARGO_FLAGS }}
       - name: check git diff 
