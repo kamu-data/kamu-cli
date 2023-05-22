@@ -19,8 +19,6 @@ use tokio::process::Command;
 #[derive(Error, Debug)]
 pub enum ContainerRuntimeError {
     #[error(transparent)]
-    Timeout(#[from] TimeoutError),
-    #[error(transparent)]
     Process(#[from] ProcessError),
     #[error(transparent)]
     IO(#[from] std::io::Error),
@@ -52,6 +50,24 @@ pub struct ImagePullErrorRuntime {
     pub image_name: String,
     pub source: ContainerRuntimeError,
     pub backtrace: Backtrace,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum WaitForResourceError {
+    #[error(transparent)]
+    Failed(#[from] ResourceFailedError),
+    #[error(transparent)]
+    Timeout(#[from] TimeoutError),
+    #[error(transparent)]
+    Runtime(#[from] ContainerRuntimeError),
+}
+
+impl From<std::io::Error> for WaitForResourceError {
+    fn from(value: std::io::Error) -> Self {
+        Self::Runtime(value.into())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -102,6 +118,24 @@ impl TimeoutError {
     pub fn new(d: Duration) -> Self {
         Self {
             duration: d,
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("{message}")]
+pub struct ResourceFailedError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl ResourceFailedError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
             backtrace: Backtrace::capture(),
         }
     }

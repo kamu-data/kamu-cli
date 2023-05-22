@@ -23,7 +23,7 @@ mod terminate;
 pub use args::*;
 pub use config::*;
 pub use container::*;
-pub use errors::{ContainerRuntimeError, ImagePullError, TimeoutError};
+pub use errors::{ContainerRuntimeError, ImagePullError, TimeoutError, WaitForResourceError};
 pub use handles::*;
 pub use listener::*;
 pub use runtime::*;

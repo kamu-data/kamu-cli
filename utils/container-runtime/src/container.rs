@@ -361,7 +361,7 @@ impl ContainerProcess {
             .exec_shell_cmd(exec_args, &self.container_name, shell_cmd)
     }
 
-    pub async fn wait_for_container(&self, timeout: Duration) -> Result<(), ContainerRuntimeError> {
+    pub async fn wait_for_container(&self, timeout: Duration) -> Result<(), WaitForResourceError> {
         self.runtime
             .wait_for_container(&self.container_name, timeout)
             .await
@@ -380,7 +380,7 @@ impl ContainerProcess {
         &self,
         container_port: u16,
         timeout: Duration,
-    ) -> Result<u16, ContainerRuntimeError> {
+    ) -> Result<u16, WaitForResourceError> {
         self.runtime
             .wait_for_host_port(&self.container_name, container_port, timeout)
             .await
@@ -393,7 +393,7 @@ impl ContainerProcess {
         &self,
         container_port: u16,
         timeout: Duration,
-    ) -> Result<u16, ContainerRuntimeError> {
+    ) -> Result<u16, WaitForResourceError> {
         let start = std::time::Instant::now();
 
         let host_port = self.wait_for_host_port(container_port, timeout).await?;
@@ -416,15 +416,6 @@ impl ContainerProcess {
 
     #[tracing::instrument(level = "debug", name = "terminate_container", skip_all, fields(container_name = %self.container_name))]
     pub async fn terminate(&mut self) -> std::io::Result<TerminateStatus> {
-        // Send SIGTERM to the main process in the container
-        self.runtime
-            .kill_cmd(&self.container_name, Signal::TERM)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .await?;
-
-        // Terminate the attached subprocess
         self.child.terminate(self.terminate_timeout).await
     }
 }
@@ -438,15 +429,6 @@ impl Drop for ContainerProcess {
                 "Container was not terminated - cleaning up synchronously"
             );
 
-            // Send SIGTERM to the main process in the container
-            let _ = self
-                .runtime
-                .kill_cmd_std(&self.container_name, Signal::TERM)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-
-            // Terminate the attached subprocess
             let _ = self.child.terminate_blocking(self.terminate_timeout);
         }
     }

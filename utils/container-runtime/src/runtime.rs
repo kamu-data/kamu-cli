@@ -321,26 +321,38 @@ impl ContainerRuntime {
         &self,
         container_name: &str,
         timeout: Duration,
-    ) -> Result<(), ContainerRuntimeError> {
+    ) -> Result<(), WaitForResourceError> {
         let start = Instant::now();
 
         loop {
             let res = self
                 .new_command()
-                .arg("inspect")
+                .args(["inspect", "--format", "{{ .State.Status }}"])
                 .arg(container_name)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
+                .output()
                 .await?;
 
-            if res.success() {
-                break Ok(());
-            } else if start.elapsed() >= timeout {
-                break Err(TimeoutError::new(timeout).into());
-            } else {
-                tokio::time::sleep(Self::TICK_INTERVAL).await;
+            let stdout = std::str::from_utf8(&res.stdout).unwrap().trim();
+
+            if res.status.success() {
+                match stdout {
+                    "running" => return Ok(()),
+                    "created" => {}
+                    _ => {
+                        return Err(ResourceFailedError::new(format!(
+                            "Container transitioned into '{}' state",
+                            stdout
+                        ))
+                        .into())
+                    }
+                }
             }
+
+            if start.elapsed() >= timeout {
+                return Err(TimeoutError::new(timeout).into());
+            }
+
+            tokio::time::sleep(Self::TICK_INTERVAL).await;
         }
     }
 
@@ -350,7 +362,7 @@ impl ContainerRuntime {
         container_name: &str,
         container_port: u16,
         timeout: Duration,
-    ) -> Result<u16, ContainerRuntimeError> {
+    ) -> Result<u16, WaitForResourceError> {
         let start = Instant::now();
 
         loop {
@@ -410,7 +422,7 @@ impl ContainerRuntime {
         &self,
         host_port: u16,
         timeout: Duration,
-    ) -> Result<(), ContainerRuntimeError> {
+    ) -> Result<(), WaitForResourceError> {
         let start = Instant::now();
 
         loop {
