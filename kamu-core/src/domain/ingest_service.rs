@@ -10,6 +10,7 @@
 use std::backtrace::Backtrace;
 use std::sync::Arc;
 
+use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -107,7 +108,7 @@ pub enum IngestStage {
 
 pub trait IngestListener: Send + Sync {
     fn begin(&self) {}
-    fn on_stage_progress(&self, _stage: IngestStage, _n: u64, _out_of: u64) {}
+    fn on_stage_progress(&self, _stage: IngestStage, _progress: u64, _out_of: TotalSteps) {}
 
     fn success(&self, _result: &IngestResult) {}
     fn error(&self, _error: &IngestError) {}
@@ -121,6 +122,11 @@ pub trait IngestListener: Send + Sync {
     ) -> Option<Arc<dyn EngineProvisioningListener>> {
         None
     }
+}
+
+pub enum TotalSteps {
+    Unknown,
+    Exact(u64),
 }
 
 pub struct NullIngestListener;
@@ -172,10 +178,10 @@ pub enum IngestError {
         source: Option<BoxedError>,
     },
     #[error(transparent)]
-    ImageNotFound(
+    ImagePull(
         #[from]
         #[backtrace]
-        ImageNotFoundError,
+        ImagePullError,
     ),
     #[error(transparent)]
     ParameterNotFound(

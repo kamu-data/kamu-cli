@@ -27,7 +27,7 @@ struct S3 {
     url: Url,
 }
 
-fn run_s3_server() -> S3 {
+async fn run_s3_server() -> S3 {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
@@ -37,7 +37,7 @@ fn run_s3_server() -> S3 {
     let bucket = "test-bucket";
     std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
 
     let url = Url::parse(&format!(
         "s3+http://{}:{}/{}",
@@ -55,10 +55,10 @@ fn run_s3_server() -> S3 {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[ignore = "We do not yet handle unauthorized errors correctly"]
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_unauthorized() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
@@ -68,18 +68,18 @@ async fn test_unauthorized() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes_long() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     use rand::RngCore;
@@ -99,10 +99,10 @@ async fn test_insert_bytes_long() {
     assert_eq!(&repo.get_bytes(&hash).await.unwrap()[..], data);
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
@@ -139,7 +139,7 @@ async fn test_insert_stream() {
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream_long() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     use rand::RngCore;
@@ -170,26 +170,26 @@ async fn test_insert_stream_long() {
     assert_eq!(data, data_received[..]);
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_delete(&repo).await;
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_precomputed() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_expect() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_expect(&repo).await;
 }

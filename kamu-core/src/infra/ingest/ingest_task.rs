@@ -199,7 +199,7 @@ impl IngestTask {
             .int_err()?;
 
         self.listener
-            .on_stage_progress(IngestStage::CheckCache, 0, 1);
+            .on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let first_ingest = self.next_offset == 0;
         let uncacheable =
@@ -219,18 +219,22 @@ impl IngestTask {
                 uncacheable,
             }),
             FetchStepResult::Updated(savepoint) => {
-                self.listener.on_stage_progress(IngestStage::Prepare, 0, 1);
+                self.listener
+                    .on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(1));
                 let prepare_result = self.prepare(&savepoint).await?;
 
-                self.listener.on_stage_progress(IngestStage::Read, 0, 1);
+                self.listener
+                    .on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(1));
                 let read_result = self
                     .read(&prepare_result, savepoint.source_event_time)
                     .await?;
 
                 self.listener
-                    .on_stage_progress(IngestStage::Preprocess, 0, 1);
-                self.listener.on_stage_progress(IngestStage::Merge, 0, 1);
-                self.listener.on_stage_progress(IngestStage::Commit, 0, 1);
+                    .on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(1));
+                self.listener
+                    .on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(1));
+                self.listener
+                    .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let commit_res = self
                     .maybe_commit(savepoint.source_state.as_ref(), &read_result, &prev_head)
@@ -588,7 +592,10 @@ impl FetchProgressListener for FetchProgressListenerBridge {
         self.listener.on_stage_progress(
             IngestStage::Fetch,
             progress.fetched_bytes,
-            progress.total_bytes,
+            match progress.total_bytes {
+                TotalBytes::Unknown => TotalSteps::Unknown,
+                TotalBytes::Exact(v) => TotalSteps::Exact(v),
+            },
         );
     }
 

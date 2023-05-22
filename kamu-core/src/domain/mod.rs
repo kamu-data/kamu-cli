@@ -12,7 +12,7 @@
 pub mod dtos;
 pub use dtos::*;
 
-mod error;
+pub mod error;
 pub use error::*;
 
 // Repositories

@@ -64,7 +64,7 @@ impl TestPullService {
         listener.begin();
 
         sleep_rand(200, 1500);
-        listener.on_stage_progress(IngestStage::CheckCache, 0, 0);
+        listener.on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
         let size = 10u64.pow(6) + ((20 * 10u64.pow(6)) as f64 * rand::random::<f64>()) as u64;
@@ -73,23 +73,23 @@ impl TestPullService {
         let num_chunks = size / chunk_size as u64;
         let chunk_sleep = (download_time / num_chunks as f64 * 1000f64) as u64;
         for i in (0..size).step_by(chunk_size) {
-            listener.on_stage_progress(IngestStage::Fetch, i, size);
+            listener.on_stage_progress(IngestStage::Fetch, i, TotalSteps::Exact(size));
             sleep(chunk_sleep);
         }
 
-        listener.on_stage_progress(IngestStage::Prepare, 0, 0);
+        listener.on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
-        listener.on_stage_progress(IngestStage::Read, 0, 0);
+        listener.on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
-        listener.on_stage_progress(IngestStage::Preprocess, 0, 0);
+        listener.on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
-        listener.on_stage_progress(IngestStage::Merge, 0, 0);
+        listener.on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
-        listener.on_stage_progress(IngestStage::Commit, 0, 0);
+        listener.on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(0));
 
         sleep_rand(200, 1500);
 

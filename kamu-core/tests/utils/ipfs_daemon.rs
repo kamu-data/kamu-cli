@@ -7,43 +7,50 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::process::Stdio;
+
 use kamu::infra::utils::ipfs_wrapper::IpfsClient;
+use tokio::process::{Child, Command};
 
 pub struct IpfsDaemon {
     temp_dir: tempfile::TempDir,
-    process: std::process::Child,
+    #[allow(dead_code)]
+    process: Child,
 }
 
 impl IpfsDaemon {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
 
-        std::process::Command::new("ipfs")
+        Command::new("ipfs")
             .env("IPFS_PATH", temp_dir.path())
             .args(["init", "--profile", "test"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
+            .await
             .unwrap()
             .exit_ok()
             .unwrap();
 
         // TODO: assign random free port
-        std::process::Command::new("ipfs")
+        Command::new("ipfs")
             .env("IPFS_PATH", temp_dir.path())
             .args(["config", "Addresses.Gateway", "/ip4/127.0.0.1/tcp/33101"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
+            .await
             .unwrap()
             .exit_ok()
             .unwrap();
 
-        let process = std::process::Command::new("ipfs")
+        let process = Command::new("ipfs")
             .env("IPFS_PATH", temp_dir.path())
             .args(["daemon", "--offline"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
+            .kill_on_drop(true)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .unwrap();
 
@@ -53,6 +60,7 @@ impl IpfsDaemon {
         let container_runtime = container_runtime::ContainerRuntime::default();
         container_runtime
             .wait_for_socket(this.http_port(), std::time::Duration::from_secs(15))
+            .await
             .unwrap();
 
         this
@@ -69,12 +77,5 @@ impl IpfsDaemon {
 
     pub fn client(&self) -> IpfsClient {
         IpfsClient::new(Some(self.ipfs_path()), true)
-    }
-}
-
-impl Drop for IpfsDaemon {
-    fn drop(&mut self) {
-        let _ = self.process.kill();
-        let _ = self.process.wait();
     }
 }

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -219,17 +218,7 @@ impl PullCommand {
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable);
         let listener = Arc::new(pull_progress.clone());
-
-        let draw_thread = std::thread::spawn(move || {
-            pull_progress.draw();
-        });
-
-        let res = self.pull(Some(listener.clone())).await;
-
-        listener.finish();
-        draw_thread.join().unwrap();
-
-        res
+        self.pull(Some(listener.clone())).await
     }
 
     async fn pull(
@@ -355,7 +344,6 @@ impl Command for PullCommand {
 struct PrettyPullProgress {
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
-    finished: Arc<AtomicBool>,
 }
 
 impl PrettyPullProgress {
@@ -363,21 +351,7 @@ impl PrettyPullProgress {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
-            finished: Arc::new(AtomicBool::new(false)),
         }
-    }
-
-    fn draw(&self) {
-        loop {
-            if self.finished.load(Ordering::SeqCst) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-    }
-
-    fn finish(&self) {
-        self.finished.store(true, Ordering::SeqCst);
     }
 }
 
@@ -473,6 +447,7 @@ impl PrettyIngestProgress {
         pb.set_prefix(prefix.to_owned());
         pb.set_length(len);
         pb.set_position(pos);
+        pb.enable_steady_tick(Duration::from_millis(100));
         pb
     }
 
@@ -524,7 +499,7 @@ impl PrettyIngestProgress {
 }
 
 impl IngestListener for PrettyIngestProgress {
-    fn on_stage_progress(&self, stage: IngestStage, n: u64, out_of: u64) {
+    fn on_stage_progress(&self, stage: IngestStage, n: u64, out_of: TotalSteps) {
         let mut state = self.state.lock().unwrap();
         state.stage = stage;
 
@@ -540,7 +515,10 @@ impl IngestListener for PrettyIngestProgress {
                 ProgressStyle::Bar => self.multi_progress.add(Self::new_progress_bar(
                     &self.dataset_handle.alias.to_string(),
                     n,
-                    out_of,
+                    match out_of {
+                        TotalSteps::Unknown => n,
+                        TotalSteps::Exact(t) => t,
+                    },
                 )),
             }
         } else {
@@ -548,7 +526,11 @@ impl IngestListener for PrettyIngestProgress {
                 .curr_progress
                 .set_message(self.message_for_stage(stage));
             if state.curr_progress_style == ProgressStyle::Bar {
-                state.curr_progress.set_position(n)
+                state.curr_progress.set_position(n);
+                state.curr_progress.set_length(match out_of {
+                    TotalSteps::Unknown => n,
+                    TotalSteps::Exact(t) => t,
+                });
             }
         }
     }
@@ -643,7 +625,7 @@ impl EngineProvisioningListener for PrettyIngestProgress {
     }
 
     fn success(&self) {
-        self.on_stage_progress(IngestStage::Read, 0, 0);
+        self.on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(0));
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
@@ -670,7 +652,7 @@ impl PullImageListener for PrettyIngestProgress {
             state.curr_progress.finish();
             state.stage
         };
-        self.on_stage_progress(stage, 0, 0);
+        self.on_stage_progress(stage, 0, TotalSteps::Exact(0));
     }
 }
 
@@ -875,6 +857,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
                     pb.set_position(stats.src.metadata_blocks_read as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
                 SyncStage::TransferData => {
@@ -891,6 +874,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.bytes_read as u64);
                     pb.set_position(stats.src.bytes_read as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
                 SyncStage::CommitBlocks => {
@@ -906,6 +890,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);
                     pb.set_position(stats.dst.metadata_blocks_writen as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
             };

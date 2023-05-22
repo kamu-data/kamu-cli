@@ -7,11 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod engine_config;
-mod engine_container;
-mod engine_odf;
-mod engine_provisioner_local;
-mod engine_spark;
+pub fn get_random_name(prefix: &str) -> String {
+    use rand::distributions::Alphanumeric;
+    use rand::Rng;
 
-pub use engine_config::*;
-pub use engine_provisioner_local::*;
+    let mut name = String::with_capacity(10 + prefix.len());
+    name.push_str(prefix);
+    name.extend(
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .map(char::from),
+    );
+    name
+}

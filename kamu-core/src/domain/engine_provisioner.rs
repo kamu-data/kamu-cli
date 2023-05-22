@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::backtrace::Backtrace;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use container_runtime::PullImageListener;
+use container_runtime::{ImagePullError, PullImageListener};
 use thiserror::Error;
 
 use super::engine::{Engine, IngestEngine};
+use super::InternalError;
 
 ///////////////////////////////////////////////////////////////////////////////
 // EngineProvisioner
@@ -61,50 +61,12 @@ impl EngineProvisioningListener for NullEngineProvisioningListener {}
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-
 #[derive(Debug, Error)]
 pub enum EngineProvisioningError {
-    #[error("{0}")]
-    ImageNotFound(#[from] ImageNotFoundError),
-    #[error("Internal error: {source}")]
-    InternalError {
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-#[error("Image not found: {image_name}")]
-pub struct ImageNotFoundError {
-    pub image_name: String,
-    pub backtrace: Backtrace,
-}
-
-impl ImageNotFoundError {
-    pub fn new(image_name: impl Into<String>) -> Self {
-        Self {
-            image_name: image_name.into(),
-            backtrace: Backtrace::capture(),
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-impl EngineProvisioningError {
-    pub fn image_not_found<S: Into<String>>(image_name: S) -> Self {
-        Self::ImageNotFound(ImageNotFoundError::new(image_name))
-    }
-
-    pub fn internal(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::InternalError {
-            source: e.into(),
-            backtrace: Backtrace::capture(),
-        }
-    }
+    #[error(transparent)]
+    ImagePull(#[from] ImagePullError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

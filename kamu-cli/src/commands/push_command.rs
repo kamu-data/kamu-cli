@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -111,17 +110,7 @@ impl PushCommand {
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
         let progress = PrettyPushProgress::new();
         let listener = Arc::new(progress.clone());
-
-        let draw_thread = std::thread::spawn(move || {
-            progress.draw();
-        });
-
-        let results = self.do_push(Some(listener.clone())).await;
-
-        listener.finish();
-        draw_thread.join().unwrap();
-
-        results
+        self.do_push(Some(listener.clone())).await
     }
 }
 
@@ -202,28 +191,13 @@ impl Command for PushCommand {
 #[derive(Clone)]
 struct PrettyPushProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
-    pub finished: Arc<AtomicBool>,
 }
 
 impl PrettyPushProgress {
     fn new() -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
-            finished: Arc::new(AtomicBool::new(false)),
         }
-    }
-
-    fn draw(&self) {
-        loop {
-            if self.finished.load(Ordering::SeqCst) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-    }
-
-    fn finish(&self) {
-        self.finished.store(true, Ordering::SeqCst);
     }
 }
 
@@ -308,6 +282,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
                     pb.set_position(stats.src.metadata_blocks_read as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
                 SyncStage::TransferData => {
@@ -324,6 +299,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.bytes_written as u64);
                     pb.set_position(stats.dst.bytes_written as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
                 SyncStage::CommitBlocks => {
@@ -339,6 +315,7 @@ impl SyncListener for PrettySyncProgress {
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
                     pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);
                     pb.set_position(stats.dst.metadata_blocks_writen as u64);
+                    pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
             };

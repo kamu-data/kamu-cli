@@ -102,7 +102,7 @@ async fn test_search_s3() {
     let bucket = "test-bucket";
     std::fs::create_dir(tmp_repo_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key).await;
 
     use std::str::FromStr;
     let repo_url = Url::from_str(&format!(
