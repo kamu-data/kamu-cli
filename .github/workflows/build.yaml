@@ -10,6 +10,7 @@ on:
   workflow_dispatch: {}
 env:
   RUST_LOG: "debug"
+  RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
 jobs:
   lint_fmt:
