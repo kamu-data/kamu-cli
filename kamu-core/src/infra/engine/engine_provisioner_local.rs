@@ -11,7 +11,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use container_runtime::nonblocking::ContainerRuntime;
 use container_runtime::*;
 use dill::*;
 
@@ -52,18 +51,18 @@ impl EngineProvisionerLocal {
 
         Self {
             spark_ingest_engine: Arc::new(SparkEngine::new(
-                container_runtime.clone().into_blocking(),
+                container_runtime.clone(),
                 &config.spark_image,
                 workspace_layout.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
-                container_runtime.clone().into_blocking(),
+                container_runtime.clone(),
                 engine_config.clone(),
                 &config.spark_image,
                 workspace_layout.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
-                container_runtime.clone().into_blocking(),
+                container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
                 workspace_layout.clone(),

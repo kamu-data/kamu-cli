@@ -13,17 +13,30 @@ use kamu::infra::utils::docker_images;
 // Not really a test - used by CI to separate pulling of test images
 // into its own phase
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
-#[test_log::test]
-fn test_setup_pull_images() {
+#[test_log::test(tokio::test)]
+async fn test_setup_pull_images() {
     let container_runtime = ContainerRuntime::default();
-    container_runtime.ensure_image(docker_images::SPARK, None);
-    container_runtime.ensure_image(docker_images::FLINK, None);
-    container_runtime.ensure_image(docker_images::HTTPD, None);
-    container_runtime.ensure_image(docker_images::MINIO, None);
+
+    container_runtime
+        .ensure_image(docker_images::SPARK, None)
+        .await
+        .unwrap();
+    container_runtime
+        .ensure_image(docker_images::FLINK, None)
+        .await
+        .unwrap();
+    container_runtime
+        .ensure_image(docker_images::HTTPD, None)
+        .await
+        .unwrap();
+    container_runtime
+        .ensure_image(docker_images::MINIO, None)
+        .await
+        .unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "ftp")] {
-            container_runtime.ensure_image(docker_images::FTP, None);
+            container_runtime.ensure_image(docker_images::FTP, None).await.unwrap();
         }
     }
 }

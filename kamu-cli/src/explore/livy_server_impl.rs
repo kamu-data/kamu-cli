@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::fs::File;
-use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use container_runtime::{ContainerHandle, ContainerRuntime, PullImageListener, RunArgs};
+use container_runtime::*;
+use kamu::domain::error::*;
 use kamu::infra::*;
 
 pub struct LivyServerImpl {
@@ -30,19 +30,23 @@ impl LivyServerImpl {
         }
     }
 
-    pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
+    pub async fn ensure_images(
+        &self,
+        listener: &mut dyn PullImageListener,
+    ) -> Result<(), ImagePullError> {
         self.container_runtime
-            .ensure_image(&self.image, Some(listener));
+            .ensure_image(&self.image, Some(listener))
+            .await
     }
 
-    pub fn run<StartedClb>(
+    pub async fn run<StartedClb>(
         &self,
         addr: &str,
         host_port: u16,
         workspace_layout: &WorkspaceLayout,
         inherit_stdio: bool,
         on_started: StartedClb,
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), InternalError>
     where
         StartedClb: FnOnce() + Send + 'static,
     {
@@ -51,60 +55,46 @@ impl LivyServerImpl {
         let livy_stdout_path = workspace_layout.run_info_dir.join("livy.out.txt");
         let livy_stderr_path = workspace_layout.run_info_dir.join("livy.err.txt");
 
-        let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: self.image.clone(),
-            container_name: Some("kamu-livy".to_owned()),
-            entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
-            user: Some("root".to_owned()),
-            expose_port_map_addr: vec![(addr.to_owned(), host_port, LIVY_PORT)],
-            work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
-            volume_map: vec![(
-                workspace_layout.datasets_dir.clone(),
-                PathBuf::from("/opt/bitnami/spark/work-dir"),
-            )],
-            ..RunArgs::default()
-        });
-
-        tracing::info!(command = ?livy_cmd, "Starting Livy container");
-
-        let mut livy = livy_cmd
+        let mut livy = self
+            .container_runtime
+            .run_attached(&self.image)
+            .container_name("kamu-livy")
+            .entry_point("/opt/livy/bin/livy-server")
+            .user("root")
+            .map_port_with_address(addr, host_port, LIVY_PORT)
+            .work_dir("/opt/bitnami/spark/work-dir")
+            .volume(
+                &workspace_layout.datasets_dir,
+                "/opt/bitnami/spark/work-dir",
+            )
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {
-                Stdio::from(File::create(&livy_stdout_path)?)
+                Stdio::from(File::create(&livy_stdout_path).int_err()?)
             })
             .stderr(if inherit_stdio {
                 Stdio::inherit()
             } else {
-                Stdio::from(File::create(&livy_stderr_path)?)
+                Stdio::from(File::create(&livy_stderr_path).int_err()?)
             })
-            .spawn()?;
+            .spawn()
+            .int_err()?;
 
-        let _drop_livy = ContainerHandle::new(self.container_runtime.clone(), "kamu-livy");
-
-        self.container_runtime
-            .wait_for_socket(host_port, Duration::from_secs(60))
-            .expect("Livy did not start");
+        livy.wait_for_host_socket(LIVY_PORT, Duration::from_secs(60))
+            .await
+            .int_err()?;
 
         on_started();
 
         let exit = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(libc::SIGINT, exit.clone())?;
-        signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
+        signal_hook::flag::register(libc::SIGINT, exit.clone()).int_err()?;
+        signal_hook::flag::register(libc::SIGTERM, exit.clone()).int_err()?;
 
         while !exit.load(Ordering::Relaxed) {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
-        cfg_if::cfg_if! {
-            if #[cfg(unix)] {
-                unsafe {
-                    libc::kill(livy.id() as libc::pid_t, libc::SIGTERM);
-                }
-            }
-        }
-
-        livy.wait()?;
+        livy.terminate().await.int_err()?;
         Ok(())
     }
 }

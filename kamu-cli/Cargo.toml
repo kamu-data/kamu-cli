@@ -93,7 +93,7 @@ libc = "0.2"  # Signal names
 regex = "1"
 shlex = "1"  # Parsing partial input for custom completions
 signal-hook = "0.3"  # Signal handling
-tokio = { version = "1", default-features = false, features = [] }
+tokio = { version = "1", default-features = false, features = ["io-util"] }
 tempfile = "3"
 thiserror = "1"
 url = "2"

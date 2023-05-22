@@ -106,27 +106,27 @@ impl PullService for TestPullService {
         listener.begin();
 
         sleep(500);
-        listener.on_stage_progress(IngestStage::CheckCache, 0, 0);
+        listener.on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(0));
 
         sleep(1000);
         for i in (0..200000).step_by(1000) {
-            listener.on_stage_progress(IngestStage::Fetch, i, 200000);
+            listener.on_stage_progress(IngestStage::Fetch, i, TotalSteps::Exact(200000));
             sleep(5);
         }
 
-        listener.on_stage_progress(IngestStage::Prepare, 0, 0);
+        listener.on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(0));
 
         sleep(1000);
-        listener.on_stage_progress(IngestStage::Read, 0, 0);
+        listener.on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(0));
 
         sleep(1000);
-        listener.on_stage_progress(IngestStage::Preprocess, 0, 0);
+        listener.on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(0));
 
         sleep(1000);
-        listener.on_stage_progress(IngestStage::Merge, 0, 0);
+        listener.on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(0));
 
         sleep(1000);
-        listener.on_stage_progress(IngestStage::Commit, 0, 0);
+        listener.on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(0));
 
         sleep(1000);
 

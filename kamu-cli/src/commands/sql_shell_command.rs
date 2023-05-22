@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
+use kamu::domain::error::*;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::*;
 
@@ -53,7 +54,7 @@ impl SqlShellCommand {
         }
     }
 
-    fn run_spark_shell(&self) -> Result<(), CLIError> {
+    async fn run_spark_shell(&self) -> Result<(), CLIError> {
         let sql_shell = SqlShellImpl::new(
             self.container_runtime.clone(),
             self.engine_prov_config.spark_image.clone(),
@@ -61,7 +62,10 @@ impl SqlShellCommand {
 
         let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let mut pull_progress = PullImageProgress::new("container");
-            sql_shell.ensure_images(&mut pull_progress);
+            sql_shell
+                .ensure_images(&mut pull_progress)
+                .await
+                .int_err()?;
 
             let s = indicatif::ProgressBar::new_spinner();
             let style = indicatif::ProgressStyle::default_spinner()
@@ -75,27 +79,29 @@ impl SqlShellCommand {
             None
         };
 
-        sql_shell.run(
-            &self.workspace_layout,
-            match self.output_config.format {
-                OutputFormat::Csv => Some("csv"),
-                OutputFormat::Json => Some("json"),
-                OutputFormat::JsonLD => {
-                    unimplemented!("Line-delimited Json is not yet supported by this command")
-                }
-                OutputFormat::JsonSoA => {
-                    unimplemented!("SoA Json is not yet supported by this command")
-                }
-                OutputFormat::Table => Some("table"),
-            },
-            self.url.clone(),
-            self.command.as_ref(),
-            || {
-                if let Some(s) = spinner {
-                    s.finish_and_clear()
-                }
-            },
-        )?;
+        sql_shell
+            .run(
+                &self.workspace_layout,
+                match self.output_config.format {
+                    OutputFormat::Csv => Some("csv"),
+                    OutputFormat::Json => Some("json"),
+                    OutputFormat::JsonLD => {
+                        unimplemented!("Line-delimited Json is not yet supported by this command")
+                    }
+                    OutputFormat::JsonSoA => {
+                        unimplemented!("SoA Json is not yet supported by this command")
+                    }
+                    OutputFormat::Table => Some("table"),
+                },
+                self.url.clone(),
+                self.command.as_ref(),
+                || {
+                    if let Some(s) = spinner {
+                        s.finish_and_clear()
+                    }
+                },
+            )
+            .await?;
 
         Ok(())
     }
@@ -132,7 +138,7 @@ impl Command for SqlShellCommand {
                 "DataFusion engine currently doesn't have a shell and only supports single \
                  command execution",
             )),
-            (Some("spark") | None, _, _) => self.run_spark_shell(),
+            (Some("spark") | None, _, _) => self.run_spark_shell().await,
             _ => unreachable!(),
         }
     }

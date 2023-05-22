@@ -16,7 +16,6 @@ use opendatafabric::engine::ExecuteQueryError;
 use opendatafabric::serde::yaml::YamlEngineProtocol;
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::*;
-use rand::Rng;
 
 use crate::domain::engine::IngestRequest;
 use crate::domain::*;
@@ -36,6 +35,7 @@ struct RunInfo {
 
 impl RunInfo {
     fn new(workspace_layout: &WorkspaceLayout, operation: &str) -> Self {
+        use rand::Rng;
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(10)
@@ -103,19 +103,11 @@ impl SparkEngine {
         let response_path = run_info.in_out_dir.join("response.yaml");
 
         {
-            tracing::info!(request = ?request, path = ?request_path, "Writing request");
+            tracing::info!(?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request)
                 .map_err(|e| EngineError::internal(e, Vec::new()))?;
         }
-
-        let volume_map = vec![
-            (run_info.in_out_dir.clone(), self.in_out_dir_in_container()),
-            (
-                self.workspace_layout.root_dir.clone(),
-                self.workspace_dir_in_container(),
-            ),
-        ];
 
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
         let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
@@ -139,34 +131,27 @@ impl SparkEngine {
             }
         };
 
-        let mut cmd = self.container_runtime.run_shell_cmd(
-            RunArgs {
-                image: self.image.clone(),
-                volume_map,
-                user: Some("root".to_owned()),
-                ..RunArgs::default()
-            },
-            &[
-                indoc::indoc!(
-                    "/opt/bitnami/spark/bin/spark-submit --master=local[4] --driver-memory=2g \
-                     --class=dev.kamu.engine.spark.ingest.IngestApp \
-                     /opt/engine/bin/engine.spark.jar"
-                )
-                .to_owned(),
-                chown,
-            ],
-        );
-
-        tracing::info!(command = ?cmd, "Running Spark job");
-
-        let status = tokio::task::spawn_blocking(move || {
-            cmd.stdout(std::process::Stdio::from(stdout_file))
-                .stderr(std::process::Stdio::from(stderr_file))
-                .status()
-        })
-        .await
-        .map_err(|e| EngineError::internal(e, run_info.log_files()))?
-        .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+        let status = self
+            .container_runtime
+            .run_attached(&self.image)
+            .volumes([
+                (&run_info.in_out_dir, self.in_out_dir_in_container()),
+                (
+                    &self.workspace_layout.root_dir,
+                    self.workspace_dir_in_container(),
+                ),
+            ])
+            .user("root")
+            .shell_cmd(format!(
+                "/opt/bitnami/spark/bin/spark-submit --master=local[4] --driver-memory=2g \
+                 --class=dev.kamu.engine.spark.ingest.IngestApp /opt/engine/bin/engine.spark.jar{}",
+                chown
+            ))
+            .stdout(stdout_file)
+            .stderr(stderr_file)
+            .status()
+            .await
+            .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
         if response_path.exists() {
             let data = std::fs::read_to_string(&response_path)?;
@@ -174,7 +159,7 @@ impl SparkEngine {
                 .read_execute_query_response(data.as_bytes())
                 .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
 
-            tracing::info!(response = ?response, "Read response");
+            tracing::info!(?response, "Read response");
 
             match response {
                 ExecuteQueryResponse::Progress => unreachable!(),

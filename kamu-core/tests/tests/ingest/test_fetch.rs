@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
 use chrono::Utc;
-use container_runtime::nonblocking::ContainerRuntime;
+use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::infra::ingest::*;
@@ -139,7 +139,7 @@ async fn test_fetch_url_http_not_found() {
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
-    let http_server = crate::utils::HttpServer::new(&tempdir.path().join("srv"));
+    let http_server = crate::utils::HttpServer::new(&tempdir.path().join("srv")).await;
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
@@ -181,7 +181,7 @@ async fn test_fetch_url_http_ok() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let http_server = crate::utils::HttpServer::new(&server_dir);
+    let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("http://localhost:{}/data.csv", http_server.host_port),
@@ -213,8 +213,8 @@ async fn test_fetch_url_http_ok() {
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
-            total_bytes: 37,
-            fetched_bytes: 37
+            fetched_bytes: 37,
+            total_bytes: TotalBytes::Exact(37),
         })
     );
 
@@ -282,7 +282,7 @@ async fn test_fetch_url_http_env_interpolation() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let http_server = crate::utils::HttpServer::new(&server_dir);
+    let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!(
@@ -320,8 +320,8 @@ async fn test_fetch_url_http_env_interpolation() {
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
-            total_bytes: 37,
-            fetched_bytes: 37
+            fetched_bytes: 37,
+            total_bytes: TotalBytes::Exact(37),
         })
     );
 }
@@ -352,7 +352,7 @@ async fn test_fetch_url_ftp_ok() {
     );
     std::fs::write(&src_path, content).unwrap();
 
-    let ftp_server = crate::utils::FtpServer::new(&server_dir);
+    let ftp_server = crate::utils::FtpServer::new(&server_dir).await;
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
         url: format!("ftp://foo:bar@localhost:{}/data.csv", ftp_server.host_port),
@@ -378,8 +378,8 @@ async fn test_fetch_url_ftp_ok() {
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
-            total_bytes: 37,
-            fetched_bytes: 37
+            fetched_bytes: 37,
+            total_bytes: TotalBytes::Exact(37),
         })
     );
 }
@@ -629,6 +629,13 @@ async fn test_fetch_container_ok() {
     assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
     assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        listener.get_last_progress(),
+        Some(FetchProgress {
+            fetched_bytes: 37,
+            total_bytes: TotalBytes::Unknown,
+        })
+    );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

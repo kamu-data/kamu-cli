@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use console::style as s;
 use container_runtime::ContainerRuntime;
+use kamu::domain::error::*;
 use kamu::infra::*;
 
 use super::common::PullImageProgress;
@@ -91,7 +92,10 @@ impl Command for NotebookCommand {
 
         let spinner = if self.output_config.verbosity_level == 0 && !self.output_config.quiet {
             let pull_progress = PullImageProgress::new("container");
-            notebook_server.ensure_images(&pull_progress);
+            notebook_server
+                .ensure_images(&pull_progress)
+                .await
+                .int_err()?;
 
             let s = indicatif::ProgressBar::new_spinner();
             let style = indicatif::ProgressStyle::default_spinner()
@@ -105,26 +109,28 @@ impl Command for NotebookCommand {
             None
         };
 
-        notebook_server.run(
-            &self.workspace_layout,
-            self.address.clone(),
-            self.port,
-            environment_vars,
-            self.output_config.verbosity_level > 0,
-            move |url| {
-                if let Some(s) = spinner {
-                    s.finish_and_clear()
-                }
-                eprintln!(
-                    "{}\n  {}",
-                    s("Jupyter server is now running at:").green().bold(),
-                    s(url).bold(),
-                );
-                eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-                let _ = webbrowser::open(url);
-            },
-            || eprintln!("{}", s("Shutting down").yellow()),
-        )?;
+        notebook_server
+            .run(
+                &self.workspace_layout,
+                self.address.clone(),
+                self.port,
+                environment_vars,
+                self.output_config.verbosity_level > 0,
+                move |url| {
+                    if let Some(s) = spinner {
+                        s.finish_and_clear()
+                    }
+                    eprintln!(
+                        "{}\n  {}",
+                        s("Jupyter server is now running at:").green().bold(),
+                        s(url).bold(),
+                    );
+                    eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+                    let _ = webbrowser::open(url);
+                },
+                || eprintln!("{}", s("Shutting down").yellow()),
+            )
+            .await?;
         Ok(())
     }
 }

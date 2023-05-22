@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use console::style as s;
 use container_runtime::ContainerRuntime;
+use kamu::domain::error::*;
 use kamu::infra::*;
 
 use super::common::PullImageProgress;
@@ -63,7 +64,10 @@ impl Command for SqlServerLivyCommand {
             && !self.output_config.quiet
         {
             let mut pull_progress = PullImageProgress::new("engine");
-            livy_server.ensure_images(&mut pull_progress);
+            livy_server
+                .ensure_images(&mut pull_progress)
+                .await
+                .int_err()?;
 
             let s = indicatif::ProgressBar::new_spinner();
             let style = indicatif::ProgressStyle::default_spinner()
@@ -79,23 +83,25 @@ impl Command for SqlServerLivyCommand {
 
         let url = format!("{}:{}", self.address, self.port);
 
-        livy_server.run(
-            &self.address.to_string(),
-            self.port,
-            &self.workspace_layout,
-            self.output_config.verbosity_level > 0,
-            move || {
-                if let Some(s) = spinner {
-                    s.finish_and_clear()
-                }
-                eprintln!(
-                    "{} {}",
-                    s("Livy server is now running on:").green().bold(),
-                    s(url).bold(),
-                );
-                eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-            },
-        )?;
+        livy_server
+            .run(
+                &self.address.to_string(),
+                self.port,
+                &self.workspace_layout,
+                self.output_config.verbosity_level > 0,
+                move || {
+                    if let Some(s) = spinner {
+                        s.finish_and_clear()
+                    }
+                    eprintln!(
+                        "{} {}",
+                        s("Livy server is now running on:").green().bold(),
+                        s(url).bold(),
+                    );
+                    eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+                },
+            )
+            .await?;
         Ok(())
     }
 }

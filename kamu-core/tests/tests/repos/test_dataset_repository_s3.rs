@@ -25,7 +25,7 @@ struct S3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn run_s3_server() -> S3 {
+async fn run_s3_server() -> S3 {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
@@ -35,7 +35,7 @@ fn run_s3_server() -> S3 {
     let bucket = "test-bucket";
     std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
 
     let url = Url::parse(&format!(
         "s3+http://{}:{}/{}",
@@ -63,7 +63,7 @@ async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_create_dataset(&repo).await;
@@ -74,7 +74,7 @@ async fn test_create_dataset() {
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset_from_snapshot() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
@@ -85,7 +85,7 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_rename_dataset() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_rename_dataset(&repo).await;
@@ -96,7 +96,7 @@ async fn test_rename_dataset() {
 #[tokio::test]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete_dataset() {
-    let s3 = run_s3_server();
+    let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
 
     test_dataset_repository_shared::test_delete_dataset(&repo).await;

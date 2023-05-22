@@ -32,7 +32,7 @@ pub struct S3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn run_s3_server() -> S3 {
+async fn run_s3_server() -> S3 {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
@@ -42,7 +42,7 @@ fn run_s3_server() -> S3 {
     let bucket = "test-bucket";
     std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
 
     let url = Url::parse(&format!(
         "s3+http://{}:{}/{}",
@@ -69,7 +69,7 @@ pub struct ServerSideS3Harness {
 
 impl ServerSideS3Harness {
     pub async fn new() -> Self {
-        let s3 = run_s3_server();
+        let s3 = run_s3_server().await;
         let catalog = dill::CatalogBuilder::new()
             .add_value(s3_repo(&s3).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()

@@ -8,16 +8,14 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
-use std::process::Child;
 use std::sync::Arc;
-use std::time::Duration;
 
 use container_runtime::*;
 use odf::engine::{EngineGrpcClient, ExecuteQueryError};
 use odf::{ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess};
 use opendatafabric as odf;
-use rand::Rng;
 
+use super::engine_container::{EngineContainer, LogsConfig};
 use super::ODFEngineConfig;
 use crate::domain::*;
 use crate::infra::WorkspaceLayout;
@@ -46,10 +44,9 @@ impl ODFEngine {
         }
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(container_name = %engine_container.container_name))]
+    #[tracing::instrument(level = "info", skip_all, fields(container_name = engine_container.container_name()))]
     async fn execute_query(
         &self,
-        run_info: &RunInfo,
         engine_container: &EngineContainer,
         engine_client: &mut EngineGrpcClient,
         request: odf::ExecuteQueryRequest,
@@ -65,24 +62,32 @@ impl ODFEngine {
                 if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
                     tracing::info!("Fixing up file permissions");
 
-                    self.container_runtime.exec_shell_cmd(ExecArgs::default(), &engine_container.container_name, &[format!(
-                        "chown -R {}:{} {}",
-                        users::get_current_uid(),
-                        users::get_current_gid(),
-                        Self::CT_VOLUME_DIR
-                    )]).status()?;
+                    engine_container
+                        .exec_shell_cmd(
+                            ExecArgs::default(),
+                            format!(
+                                "chown -R {}:{} {}",
+                                users::get_current_uid(),
+                                users::get_current_gid(),
+                                Self::CT_VOLUME_DIR
+                            )
+                        )
+                        .status()
+                        .await?;
                 }
             }
         }
 
         response.map_err(|e| match e {
             ExecuteQueryError::InvalidQuery(e) => {
-                EngineError::invalid_query(e.message, run_info.log_files())
+                EngineError::invalid_query(e.message, engine_container.log_files())
             }
             e @ ExecuteQueryError::EngineInternalError(_) => {
-                EngineError::internal(e, run_info.log_files())
+                EngineError::internal(e, engine_container.log_files())
             }
-            e @ ExecuteQueryError::RpcError(_) => EngineError::internal(e, run_info.log_files()),
+            e @ ExecuteQueryError::RpcError(_) => {
+                EngineError::internal(e, engine_container.log_files())
+            }
         })
     }
 
@@ -142,13 +147,11 @@ impl Engine for ODFEngine {
             ..request
         };
 
-        let run_info = RunInfo::new(&self.workspace_layout.run_info_dir);
-
         let engine_container = EngineContainer::new(
             self.container_runtime.clone(),
             self.engine_config.clone(),
+            LogsConfig::new(&self.workspace_layout.run_info_dir),
             &self.image,
-            &run_info,
             vec![(
                 self.workspace_layout.datasets_dir.clone(),
                 PathBuf::from(Self::CT_VOLUME_DIR),
@@ -156,251 +159,14 @@ impl Engine for ODFEngine {
         )
         .await?;
 
-        let mut engine_client = engine_container.connect_client(&run_info).await?;
+        let mut engine_client = engine_container.connect_client().await?;
 
-        self.execute_query(
-            &run_info,
-            &engine_container,
-            &mut engine_client,
-            request_adj,
-        )
-        .await
-    }
-}
+        let res = self
+            .execute_query(&engine_container, &mut engine_client, request_adj)
+            .await;
 
-/////////////////////////////////////////////////////////////////////////////////////////
+        engine_container.terminate().await?;
 
-struct RunInfo {
-    run_id: String,
-    logs_dir: PathBuf,
-    stdout_path: PathBuf,
-    stderr_path: PathBuf,
-}
-
-impl RunInfo {
-    fn new(logs_dir: &Path) -> Self {
-        let run_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
-
-        let stdout_path = logs_dir.join(format!("engine-{}.stdout.txt", &run_id));
-        let stderr_path = logs_dir.join(format!("engine-{}.stderr.txt", &run_id));
-
-        Self {
-            run_id,
-            logs_dir: logs_dir.to_owned(),
-            stdout_path,
-            stderr_path,
-        }
-    }
-
-    pub fn log_files(&self) -> Vec<PathBuf> {
-        let mut logs = self.demux_logs().unwrap_or(Vec::new());
-        logs.push(self.stdout_path.clone());
-        logs.push(self.stderr_path.clone());
-        logs
-    }
-
-    // ODF adapters log in bunyan format (JSON per line)
-    // To make logs more readable we parse the logs to demultiplex
-    // logs from multiple processes into different files
-    fn demux_logs(&self) -> Result<Vec<PathBuf>, std::io::Error> {
-        use std::collections::BTreeMap;
-        use std::fs::File;
-        use std::io::{BufRead, Write};
-
-        let mut demuxed: BTreeMap<String, (PathBuf, File)> = BTreeMap::new();
-        let file = File::open(&self.stdout_path)?;
-        let reader = std::io::BufReader::new(file);
-        for line in reader.lines() {
-            let line = line?;
-            let obj: serde_json::Value =
-                serde_json::from_str(&line).unwrap_or(serde_json::Value::Null);
-            let process = &obj["process"];
-            let stream = &obj["stream"];
-            if process.is_null() || !process.is_string() || stream.is_null() || !stream.is_string()
-            {
-                continue;
-            }
-
-            let filename =
-                self.demuxed_filename(process.as_str().unwrap(), stream.as_str().unwrap());
-
-            let file = match demuxed.get_mut(&filename) {
-                Some((_, f)) => f,
-                None => {
-                    let path = self.logs_dir.join(&filename);
-                    let f = File::create(&path)?;
-                    demuxed.insert(filename.clone(), (path, f));
-                    &mut demuxed.get_mut(&filename).unwrap().1
-                }
-            };
-
-            writeln!(file, "{}", obj["msg"].as_str().unwrap_or_default())?;
-        }
-
-        Ok(demuxed.into_values().map(|(path, _)| path).collect())
-    }
-
-    fn demuxed_filename(&self, process: &str, stream: &str) -> String {
-        format!("engine-{}-{}.{}.txt", &self.run_id, process, stream)
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct EngineContainer {
-    container_runtime: ContainerRuntime,
-    config: ODFEngineConfig,
-    container_name: String,
-    adapter_host_port: u16,
-    engine_process: Child,
-}
-
-impl EngineContainer {
-    const ADAPTER_PORT: u16 = 2884;
-
-    #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(image))]
-    pub async fn new(
-        container_runtime: ContainerRuntime,
-        config: ODFEngineConfig,
-        image: &str,
-        run_info: &RunInfo,
-        volume_map: Vec<(PathBuf, PathBuf)>,
-    ) -> Result<Self, EngineError> {
-        let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
-        let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
-
-        let container_name = format!("kamu-engine-{}", &run_info.run_id);
-
-        let mut command = container_runtime.run_cmd(RunArgs {
-            image: image.to_owned(),
-            container_name: Some(container_name.clone()),
-            volume_map,
-            user: Some("root".to_owned()),
-            expose_ports: vec![Self::ADAPTER_PORT],
-            ..RunArgs::default()
-        });
-
-        tracing::info!(?command, %container_name, "Starting engine");
-
-        let engine_process = KillOnDrop::new(
-            command
-                .stdout(std::process::Stdio::from(stdout_file)) // Stdio::inherit()
-                .stderr(std::process::Stdio::from(stderr_file)) // Stdio::inherit()
-                .spawn()
-                .map_err(|e| EngineError::internal(e, run_info.log_files()))?,
-        );
-
-        let adapter_host_port = {
-            let container_runtime = container_runtime.clone();
-            let container_name = container_name.clone();
-
-            tokio::task::spawn_blocking(move || -> Result<u16, TimeoutError> {
-                let adapter_host_port = container_runtime.wait_for_host_port(
-                    &container_name,
-                    Self::ADAPTER_PORT,
-                    config.start_timeout,
-                )?;
-
-                container_runtime.wait_for_socket(adapter_host_port, config.start_timeout)?;
-
-                Ok(adapter_host_port)
-            })
-            .await
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?
-            .map_err(|e| EngineError::internal(e, run_info.log_files()))?
-        };
-
-        Ok(Self {
-            container_runtime,
-            config,
-            container_name,
-            adapter_host_port,
-            engine_process: engine_process.unwrap(),
-        })
-    }
-
-    pub async fn connect_client(
-        &self,
-        run_info: &RunInfo,
-    ) -> Result<EngineGrpcClient, EngineError> {
-        Ok(EngineGrpcClient::connect(
-            &self.container_runtime.get_runtime_host_addr(),
-            self.adapter_host_port,
-        )
-        .await
-        .map_err(|e| EngineError::internal(e, run_info.log_files()))?)
-    }
-
-    pub fn has_exited(&mut self) -> bool {
-        match self.engine_process.try_wait() {
-            Ok(Some(_)) => true,
-            Ok(None) => false,
-            Err(_) => true,
-        }
-    }
-}
-
-impl Drop for EngineContainer {
-    fn drop(&mut self) {
-        if self.has_exited() {
-            return;
-        }
-
-        tracing::info!(id = self.container_name.as_str(), "Shutting down engine");
-
-        cfg_if::cfg_if! {
-            if #[cfg(unix)] {
-                unsafe {
-                    libc::kill(self.engine_process.id() as i32, libc::SIGTERM);
-                }
-
-                let start = std::time::Instant::now();
-                while (std::time::Instant::now() - start) < self.config.shutdown_timeout {
-                    if self.has_exited() {
-                        return;
-                    }
-                    std::thread::sleep(Duration::from_millis(100));
-                }
-
-                tracing::warn!(id = self.container_name.as_str(), "Engine did not shutdown gracefully, killing");
-            }
-        }
-
-        let _ = self.engine_process.kill();
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// TODO: Improve reliability and move this into ContainerRuntime
-struct KillOnDrop(Option<Child>);
-
-impl KillOnDrop {
-    fn new(child: Child) -> Self {
-        Self(Some(child))
-    }
-
-    fn unwrap(mut self) -> Child {
-        self.0.take().unwrap()
-    }
-}
-
-impl Drop for KillOnDrop {
-    fn drop(&mut self) {
-        cfg_if::cfg_if! {
-            if #[cfg(unix)] {
-                if let Some(child) = self.0.take() {
-                    unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
-                }
-            } else {
-                if let Some(mut child) = self.0.take() {
-                    let _ = child.kill();
-                }
-            }
-        }
+        res
     }
 }

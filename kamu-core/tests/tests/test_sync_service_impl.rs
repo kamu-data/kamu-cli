@@ -368,7 +368,7 @@ async fn test_sync_to_from_s3() {
     let bucket = "test-bucket";
     std::fs::create_dir(tmp_repo_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key);
+    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key).await;
 
     let repo_url = Url::from_str(&format!(
         "s3+http://{}:{}/{}",
@@ -410,7 +410,7 @@ async fn test_sync_from_http() {
 async fn test_sync_to_from_ipfs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
-    let ipfs_daemon = IpfsDaemon::new();
+    let ipfs_daemon = IpfsDaemon::new().await;
     let ipfs_client = ipfs_daemon.client();
     let key_id = ipfs_client.key_gen("test").await.unwrap();
     let ipns_url = Url::from_str(&format!("ipns://{}", key_id)).unwrap();

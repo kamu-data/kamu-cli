@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fs::File;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Duration;
 
-use container_runtime::{ContainerHandle, ContainerRuntime, ExecArgs, PullImageListener, RunArgs};
+use container_runtime::*;
+use kamu::domain::error::*;
 use kamu::infra::*;
 
 pub struct SqlShellImpl {
@@ -31,18 +31,22 @@ impl SqlShellImpl {
         }
     }
 
-    pub fn ensure_images(&self, listener: &mut dyn PullImageListener) {
+    pub async fn ensure_images(
+        &self,
+        listener: &mut dyn PullImageListener,
+    ) -> Result<(), ImagePullError> {
         self.container_runtime
-            .ensure_image(&self.image, Some(listener));
+            .ensure_image(&self.image, Some(listener))
+            .await
     }
 
-    pub fn run_server(
+    pub async fn run_server(
         &self,
         workspace_layout: &WorkspaceLayout,
-        mut extra_volume_map: Vec<(PathBuf, PathBuf)>,
+        extra_volume_map: Vec<(PathBuf, PathBuf)>,
         address: Option<&IpAddr>,
         port: Option<u16>,
-    ) -> Result<std::process::Child, std::io::Error> {
+    ) -> Result<ContainerProcess, InternalError> {
         let cwd = Path::new(".").canonicalize().unwrap();
 
         let spark_stdout_path = workspace_layout.run_info_dir.join("spark.out.txt");
@@ -50,116 +54,92 @@ impl SqlShellImpl {
         let thrift_stdout_path = workspace_layout.run_info_dir.join("thrift.out.txt");
         let thrift_stderr_path = workspace_layout.run_info_dir.join("thrift.err.txt");
 
-        // TODO: probably does not belong here?
-        let exit = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(libc::SIGINT, exit.clone())?;
-        signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
-
-        let mut volume_map = vec![
-            (cwd, PathBuf::from("/opt/bitnami/spark/kamu_shell")),
-            (
-                workspace_layout.datasets_dir.clone(),
-                PathBuf::from("/opt/bitnami/spark/kamu_data"),
-            ),
-        ];
-        volume_map.append(&mut extra_volume_map);
-
-        // Start Spark container in the idle loop
-        let spark = {
-            let args = RunArgs {
-                image: self.image.clone(),
-                container_name: Some("kamu-spark".to_owned()),
-                user: Some("root".to_owned()),
-                volume_map,
-                ..RunArgs::default()
-            };
-
-            let args = if let Some(p) = port {
-                RunArgs {
-                    network: Some("host".to_owned()),
-                    expose_port_map_addr: vec![(
-                        address
-                            .map(|a| a.to_string())
-                            .unwrap_or(String::from("127.0.0.1")),
-                        p,
-                        10000,
-                    )],
-                    ..args
-                }
-            } else {
-                RunArgs {
-                    expose_ports: vec![10000],
-                    ..args
-                }
-            };
-
-            let mut cmd = self
+        // Start container in the idle loop
+        let container = {
+            let mut container_builder = self
                 .container_runtime
-                .run_shell_cmd(args, &["sleep".to_owned(), "999999".to_owned()]);
+                .run_attached(&self.image)
+                .init(true)
+                .shell_cmd("sleep 999999")
+                .container_name("kamu-spark")
+                .user("root")
+                .volumes([
+                    (cwd, "/opt/bitnami/spark/kamu_shell"),
+                    (
+                        workspace_layout.datasets_dir.clone(),
+                        "/opt/bitnami/spark/kamu_data",
+                    ),
+                ])
+                .volumes(extra_volume_map)
+                .stdin(Stdio::null())
+                .stdout(std::fs::File::create(&spark_stdout_path).int_err()?)
+                .stderr(std::fs::File::create(&spark_stderr_path).int_err()?);
 
-            tracing::info!(
-                command = ?cmd,
-                stdout = ?spark_stdout_path,
-                stderr = ?spark_stderr_path,
-                "Starting Spark container"
-            );
+            container_builder = if let Some(p) = port {
+                container_builder.network("host").map_port_with_address(
+                    address
+                        .map(|a| a.to_string())
+                        .unwrap_or(String::from("127.0.0.1")),
+                    p,
+                    10000,
+                )
+            } else {
+                container_builder.expose_port(10000)
+            };
 
-            cmd.stdin(Stdio::null())
-                .stdout(Stdio::from(File::create(&spark_stdout_path)?))
-                .stderr(Stdio::from(File::create(&spark_stderr_path)?))
-                .spawn()?
+            let container = container_builder.spawn().int_err()?;
+
+            container
+                .wait_for_container(Duration::from_secs(20))
+                .await
+                .int_err()?;
+
+            container
         };
-
-        tracing::info!("Waiting for container");
-        self.container_runtime
-            .wait_for_container("kamu-spark", std::time::Duration::from_secs(20))
-            .expect("Container did not start");
 
         // Start Thrift Server process inside Spark container
         {
-            let mut cmd = self.container_runtime.exec_shell_cmd(
+            let mut command = container.exec_shell_cmd(
                 ExecArgs {
-                    tty: false,
-                    interactive: false,
                     work_dir: Some(PathBuf::from("/opt/bitnami/spark")),
                     ..ExecArgs::default()
                 },
-                "kamu-spark",
-                &["sbin/start-thriftserver.sh"],
+                "sbin/start-thriftserver.sh",
             );
 
-            tracing::info!(command = ?cmd, "Starting Thrift Server");
+            tracing::info!(?command, "Starting Thrift Server");
 
-            cmd.stdin(Stdio::null())
-                .stdout(Stdio::from(File::create(&thrift_stdout_path)?))
-                .stderr(Stdio::from(File::create(&thrift_stderr_path)?))
-                .spawn()?
-                .wait()?
+            command
+                .stdin(Stdio::null())
+                .stdout(std::fs::File::create(&thrift_stdout_path).int_err()?)
+                .stderr(std::fs::File::create(&thrift_stderr_path).int_err()?)
+                .status()
+                .await
+                .int_err()?
                 .exit_ok()
-                .expect("Thrift server start script returned non-zero code");
+                .int_err()?;
         }
 
         let host_port = if let Some(p) = port {
             p
         } else {
-            self.container_runtime
-                .get_host_port("kamu-spark", 10000)
-                .unwrap()
+            container.try_get_host_port(10000).await.int_err()?.unwrap()
         };
 
         self.container_runtime
-            .wait_for_socket(host_port, std::time::Duration::from_secs(60))
-            .expect("Thrift Server did not start");
+            .wait_for_socket(host_port, Duration::from_secs(60))
+            .await
+            .int_err()?;
 
-        Ok(spark)
+        Ok(container)
     }
 
-    pub fn run_shell<S1, S2>(
+    pub async fn run_shell<S1, S2>(
         &self,
         output_format: Option<S1>,
         command: Option<S2>,
         url: String,
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), InternalError>
     where
         S1: AsRef<str>,
         S2: AsRef<str>,
@@ -191,18 +171,18 @@ impl SqlShellImpl {
             ..RunArgs::default()
         });
 
-        cmd.spawn()?.wait()?;
+        cmd.spawn().int_err()?.wait().await.int_err()?;
 
         Ok(())
     }
 
-    pub fn run_two_in_one<S1, S2, StartedClb>(
+    pub async fn run_two_in_one<S1, S2, StartedClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
         output_format: Option<S1>,
         command: Option<S2>,
         started_clb: StartedClb,
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), InternalError>
     where
         S1: AsRef<str>,
         S2: AsRef<str>,
@@ -211,65 +191,67 @@ impl SqlShellImpl {
         let init_script_path = workspace_layout.run_info_dir.join("shell_init.sql");
         std::fs::write(
             &init_script_path,
-            Self::prepare_shell_init(workspace_layout)?,
-        )?;
+            Self::prepare_shell_init(workspace_layout).int_err()?,
+        )
+        .int_err()?;
 
-        let mut spark = self.run_server(
-            workspace_layout,
-            vec![(
-                init_script_path,
-                PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
-            )],
-            None,
-            None,
-        )?;
+        let mut container = self
+            .run_server(
+                workspace_layout,
+                vec![(
+                    init_script_path,
+                    PathBuf::from("/opt/bitnami/spark/shell_init.sql"),
+                )],
+                None,
+                None,
+            )
+            .await?;
 
         {
-            let _drop_spark = ContainerHandle::new(self.container_runtime.clone(), "kamu-spark");
-
             started_clb();
             tracing::info!("Starting SQL shell");
 
-            // Relying on shell to send signal to child processes
-            let mut beeline_cmd = self.container_runtime.exec_shell_cmd(
+            let beeline_command = format!(
+                "../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql \
+                 --color=true{}{}",
+                match command {
+                    Some(s) => format!("-e '{}'", s.as_ref()),
+                    None => "".to_owned(),
+                },
+                match output_format {
+                    Some(s) => format!("--outputformat={}", s.as_ref()),
+                    None => "".to_owned(),
+                },
+            );
+
+            let mut beeline_cmd = container.exec_shell_cmd(
                 ExecArgs {
                     tty: true,
                     interactive: true,
                     work_dir: Some(PathBuf::from("/opt/bitnami/spark/kamu_shell")),
                 },
-                "kamu-spark",
-                &[
-                    "../bin/beeline -u jdbc:hive2://localhost:10000 -i ../shell_init.sql \
-                     --color=true"
-                        .to_owned(),
-                    match command {
-                        Some(s) => format!("-e '{}'", s.as_ref()),
-                        None => "".to_owned(),
-                    },
-                    match output_format {
-                        Some(s) => format!("--outputformat={}", s.as_ref()),
-                        None => "".to_owned(),
-                    },
-                ],
+                beeline_command,
             );
 
             tracing::info!(command = ?beeline_cmd, "Running beeline");
-            beeline_cmd.spawn()?.wait()?;
+
+            // Relying on shell to send signal to child processes
+            beeline_cmd.spawn().int_err()?.wait().await.int_err()?;
         }
 
-        spark.wait()?;
+        container.terminate().await.int_err()?;
 
         Ok(())
     }
 
-    pub fn run<S1, S2, StartedClb>(
+    pub async fn run<S1, S2, StartedClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
         output_format: Option<S1>,
         url: Option<String>,
         command: Option<S2>,
         started_clb: StartedClb,
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), InternalError>
     where
         S1: AsRef<str>,
         S2: AsRef<str>,
@@ -277,9 +259,10 @@ impl SqlShellImpl {
     {
         if let Some(url) = url {
             started_clb();
-            self.run_shell(output_format, command, url)
+            self.run_shell(output_format, command, url).await
         } else {
             self.run_two_in_one(workspace_layout, output_format, command, started_clb)
+                .await
         }
     }
 

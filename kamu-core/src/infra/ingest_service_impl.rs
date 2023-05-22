@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use container_runtime::nonblocking::ContainerRuntime;
+use container_runtime::ContainerRuntime;
 use dill::*;
 use opendatafabric::*;
 

@@ -7,20 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fs::File;
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
-use container_runtime::{
-    ContainerHandle,
-    ContainerRuntime,
-    ContainerRuntimeType,
-    PullImageListener,
-    RunArgs,
-};
+use container_runtime::*;
+use kamu::domain::error::*;
 use kamu::infra::*;
 
 use crate::JupyterConfig;
@@ -41,16 +36,25 @@ impl NotebookServerImpl {
         }
     }
 
-    pub fn ensure_images(&self, listener: &dyn PullImageListener) {
-        self.container_runtime.ensure_image(
-            self.jupyter_config.livy_image.as_ref().unwrap(),
-            Some(listener),
-        );
+    pub async fn ensure_images(
+        &self,
+        listener: &dyn PullImageListener,
+    ) -> Result<(), ImagePullError> {
         self.container_runtime
-            .ensure_image(self.jupyter_config.image.as_ref().unwrap(), Some(listener));
+            .ensure_image(
+                self.jupyter_config.livy_image.as_ref().unwrap(),
+                Some(listener),
+            )
+            .await?;
+
+        self.container_runtime
+            .ensure_image(self.jupyter_config.image.as_ref().unwrap(), Some(listener))
+            .await?;
+
+        Ok(())
     }
 
-    pub fn run<StartedClb, ShutdownClb>(
+    pub async fn run<StartedClb, ShutdownClb>(
         &self,
         workspace_layout: &WorkspaceLayout,
         address: Option<IpAddr>,
@@ -59,7 +63,7 @@ impl NotebookServerImpl {
         inherit_stdio: bool,
         on_started: StartedClb,
         on_shutdown: ShutdownClb,
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), InternalError>
     where
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
@@ -76,9 +80,14 @@ impl NotebookServerImpl {
             .remove_network_cmd(network_name)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .output();
+            .output()
+            .await;
 
-        let _network = self.container_runtime.create_network(network_name);
+        let network = self
+            .container_runtime
+            .create_network(network_name)
+            .await
+            .int_err()?;
 
         let cwd = Path::new(".").canonicalize().unwrap();
 
@@ -87,47 +96,43 @@ impl NotebookServerImpl {
         let jupyter_stdout_path = workspace_layout.run_info_dir.join("jupyter.out.txt");
         let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
 
-        let mut livy_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: self.jupyter_config.livy_image.clone().unwrap(),
-            container_name: Some("kamu-livy".to_owned()),
-            hostname: Some("kamu-livy".to_owned()),
-            network: Some(network_name.to_owned()),
-            user: Some("root".to_owned()),
-            work_dir: Some(PathBuf::from("/opt/bitnami/spark/work-dir")),
-            volume_map: vec![(
-                workspace_layout.datasets_dir.clone(),
-                PathBuf::from("/opt/bitnami/spark/work-dir"),
-            )],
-            entry_point: Some("/opt/livy/bin/livy-server".to_owned()),
-            ..RunArgs::default()
-        });
-
-        tracing::info!(command = ?livy_cmd, "Starting Livy container");
-
-        let mut livy = livy_cmd
+        let mut livy = self
+            .container_runtime
+            .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
+            .container_name("kamu-livy")
+            .hostname("kamu-livy")
+            .network(network_name)
+            .user("root")
+            .work_dir("/opt/bitnami/spark/work-dir")
+            .volume(
+                &workspace_layout.datasets_dir,
+                "/opt/bitnami/spark/work-dir",
+            )
+            .entry_point("/opt/livy/bin/livy-server")
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {
-                Stdio::from(File::create(&livy_stdout_path)?)
+                Stdio::from(std::fs::File::create(&livy_stdout_path).int_err()?)
             })
             .stderr(if inherit_stdio {
                 Stdio::inherit()
             } else {
-                Stdio::from(File::create(&livy_stderr_path)?)
+                Stdio::from(std::fs::File::create(&livy_stderr_path).int_err()?)
             })
-            .spawn()?;
-        let _drop_livy = ContainerHandle::new(self.container_runtime.clone(), "kamu-livy");
+            .spawn()
+            .int_err()?;
 
-        let mut jupyter_cmd = self.container_runtime.run_cmd(RunArgs {
-            image: self.jupyter_config.image.clone().unwrap(),
-            container_name: Some("kamu-jupyter".to_owned()),
-            network: Some(network_name.to_owned()),
-            user: Some("root".to_owned()),
-            work_dir: Some(PathBuf::from("/opt/workdir")),
-            expose_ports: vec![80],
-            volume_map: vec![(cwd.clone(), PathBuf::from("/opt/workdir"))],
-            environment_vars,
-            args: vec![
+        let mut jupyter = self
+            .container_runtime
+            .run_attached(self.jupyter_config.image.as_ref().unwrap())
+            .container_name("kamu-jupyter")
+            .network(network_name)
+            .user("root")
+            .work_dir("/opt/workdir")
+            .expose_port(80)
+            .volume(&cwd, "/opt/workdir")
+            .environment_vars(environment_vars)
+            .args([
                 "jupyter".to_owned(),
                 "notebook".to_owned(),
                 "--allow-root".to_owned(),
@@ -137,27 +142,22 @@ impl NotebookServerImpl {
                     .to_string(),
                 "--port".to_owned(),
                 port.unwrap_or(80).to_string(),
-            ],
-            ..RunArgs::default()
-        });
-
-        tracing::info!(command = ?jupyter_cmd, "Starting Jupyter container");
-
-        let mut jupyter = jupyter_cmd
+            ])
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {
-                Stdio::from(File::create(&jupyter_stdout_path)?)
+                Stdio::from(std::fs::File::create(&jupyter_stdout_path).int_err()?)
             })
             .stderr(Stdio::piped())
-            .spawn()?;
-        let _drop_jupyter = ContainerHandle::new(self.container_runtime.clone(), "kamu-jupyter");
+            .spawn()
+            .int_err()?;
 
         let docker_host = self.container_runtime.get_runtime_host_addr();
-        let jupyter_port = self
-            .container_runtime
-            .wait_for_host_port("kamu-jupyter", 80, std::time::Duration::from_secs(5))
-            .unwrap_or_default();
+        let jupyter_port = jupyter
+            .wait_for_host_socket(80, Duration::from_secs(10))
+            .await
+            .int_err()?;
+
         let token_clb = move |token: &str| {
             let url = format!("http://{}:{}/?token={}", docker_host, jupyter_port, token);
             on_started(&url);
@@ -165,57 +165,56 @@ impl NotebookServerImpl {
 
         let token_extractor = if inherit_stdio {
             TokenExtractor::new(
-                jupyter.stderr.take().unwrap(),
-                std::io::stderr(),
+                jupyter.take_stderr().unwrap(),
+                tokio::io::stderr(),
                 Some(token_clb),
-            )?
+            )
         } else {
             TokenExtractor::new(
-                jupyter.stderr.take().unwrap(),
-                File::create(&jupyter_stderr_path)?,
+                jupyter.take_stderr().unwrap(),
+                tokio::fs::File::create(&jupyter_stderr_path)
+                    .await
+                    .int_err()?,
                 Some(token_clb),
-            )?
+            )
         };
 
         let exit = Arc::new(AtomicBool::new(false));
-        signal_hook::flag::register(libc::SIGINT, exit.clone())?;
-        signal_hook::flag::register(libc::SIGTERM, exit.clone())?;
+        signal_hook::flag::register(libc::SIGINT, exit.clone()).int_err()?;
+        signal_hook::flag::register(libc::SIGTERM, exit.clone()).int_err()?;
 
         // TODO: Detect crashed processes
         // Relying on shell to send signal to child processes
         while !exit.load(Ordering::Relaxed) {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
 
         on_shutdown();
 
-        jupyter.wait()?;
-        livy.wait()?;
-        token_extractor.handle.join().unwrap();
+        jupyter.terminate().await.int_err()?;
+        livy.terminate().await.int_err()?;
+        network.free().await.int_err()?;
+        token_extractor.handle.await.int_err()?;
 
         // Fix permissions
         if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
             cfg_if::cfg_if! {
                 if #[cfg(unix)] {
                     self.container_runtime
-                        .run_shell_cmd(
-                            RunArgs {
-                                image: self.jupyter_config.image.clone().unwrap(),
-                                user: Some("root".to_owned()),
-                                container_name: Some("kamu-jupyter".to_owned()),
-                                volume_map: vec![(cwd, PathBuf::from("/opt/workdir"))],
-                                ..RunArgs::default()
-                            },
-                            &[format!(
-                                "chown -R {}:{} {}",
-                                users::get_current_uid(),
-                                users::get_current_gid(),
-                                "/opt/workdir"
-                            )],
-                        )
+                        .run_attached(self.jupyter_config.image.as_ref().unwrap())
+                        .shell_cmd(format!(
+                            "chown -R {}:{} {}",
+                            users::get_current_uid(),
+                            users::get_current_gid(),
+                            "/opt/workdir"
+                        ))
+                        .user("root")
+                        .volume(cwd, "/opt/workdir")
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
-                        .status()?;
+                        .status()
+                        .await
+                        .int_err()?;
                 }
             }
         }
@@ -229,43 +228,38 @@ impl NotebookServerImpl {
 ///////////////////////////////////////////////////////////////////////////////
 
 struct TokenExtractor {
-    handle: std::thread::JoinHandle<()>,
+    handle: tokio::task::JoinHandle<()>,
 }
 
 impl TokenExtractor {
-    fn new<R, W, Clb>(
-        input: R,
-        mut output: W,
-        mut on_token: Option<Clb>,
-    ) -> Result<Self, std::io::Error>
+    fn new<R, W, Clb>(input: R, mut output: W, mut on_token: Option<Clb>) -> Self
     where
-        R: std::io::Read + Send + 'static,
-        W: std::io::Write + Send + 'static,
+        R: tokio::io::AsyncRead + Unpin + Send + 'static,
+        W: tokio::io::AsyncWrite + Unpin + Send + 'static,
         Clb: FnOnce(&str) + Send + 'static,
     {
-        let handle = std::thread::Builder::new()
-            .name("jupyter-io".to_owned())
-            .spawn({
-                move || {
-                    use std::io::BufRead;
-                    let mut reader = std::io::BufReader::new(input);
-                    let mut line = String::with_capacity(128);
-                    let re = regex::Regex::new("token=([a-z0-9]+)").unwrap();
-                    loop {
-                        line.clear();
-                        if reader.read_line(&mut line).unwrap() == 0 {
-                            break;
-                        }
-                        output.write_all(line.as_bytes()).unwrap();
-                        if let Some(capture) = re.captures(&line) {
-                            if let Some(clb) = on_token.take() {
-                                let token = capture.get(1).unwrap().as_str();
-                                clb(token);
-                            }
-                        }
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+
+        let handle = tokio::spawn(async move {
+            let re = regex::Regex::new("token=([a-z0-9]+)").unwrap();
+            let mut reader = tokio::io::BufReader::new(input);
+            let mut line = String::with_capacity(1024);
+            loop {
+                line.clear();
+                if reader.read_line(&mut line).await.unwrap() == 0 {
+                    break;
+                }
+
+                output.write_all(line.as_bytes()).await.unwrap();
+                if let Some(capture) = re.captures(&line) {
+                    if let Some(clb) = on_token.take() {
+                        let token = capture.get(1).unwrap().as_str();
+                        clb(token);
                     }
                 }
-            })?;
-        Ok(Self { handle })
+            }
+        });
+
+        Self { handle }
     }
 }

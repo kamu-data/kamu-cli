@@ -16,7 +16,6 @@ use std::sync::Arc;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
-use container_runtime::nonblocking::ContainerRuntime;
 use container_runtime::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
@@ -55,99 +54,23 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
-        // TODO: Convert all implementations to non-blocking
-        if !Self::requires_blocking_fetch(fetch_step)? {
-            self.fetch_nonblocking(fetch_step, prev_source_state, target_path, listener)
-                .await
-        } else {
-            let fetch_step = fetch_step.clone();
-            let prev_source_state = prev_source_state.cloned();
-            let target_path = target_path.to_owned();
-
-            tokio::task::spawn_blocking(move || {
-                Self::fetch_blocking(
-                    &fetch_step,
-                    prev_source_state.as_ref(),
-                    &target_path,
-                    listener,
-                )
-            })
-            .await
-            .unwrap()
-        }
-    }
-
-    fn requires_blocking_fetch(fetch_step: &FetchStep) -> Result<bool, IngestError> {
-        match fetch_step {
-            FetchStep::Url(furl) => {
-                let url = Self::template_url(&furl.url)?;
-                match url.scheme() {
-                    "http" | "https" => Ok(false),
-                    _ => Ok(true),
-                }
-            }
-            FetchStep::Container(_) => Ok(false),
-            _ => Ok(true),
-        }
-    }
-
-    fn fetch_blocking(
-        fetch_step: &FetchStep,
-        prev_source_state: Option<&PollingSourceState>,
-        target_path: &Path,
-        listener: Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
-        match &fetch_step {
-            FetchStep::Url(furl) => {
-                let url = Self::template_url(&furl.url)?;
-
-                match url.scheme() {
-                    "file" => Self::fetch_file(
-                        &url.to_file_path()
-                            .map_err(|_| format!("Invalid url: {}", url).int_err())?,
-                        furl.event_time.as_ref(),
-                        prev_source_state,
-                        target_path,
-                        listener.as_ref(),
-                    ),
-                    "ftp" => {
-                        cfg_if::cfg_if! {
-                            if #[cfg(feature = "ftp")] {
-                                Self::fetch_ftp(
-                                    &url,
-                                    furl.event_time.as_ref(),
-                                    prev_source_state,
-                                    target_path,
-                                    listener.as_ref(),
-                                )
-                            } else {
-                                unimplemented!("Kamu was compiled without FTP support")
-                            }
-                        }
-                    }
-                    scheme => unimplemented!("Unsupported scheme: {}", scheme),
-                }
-            }
-            FetchStep::FilesGlob(fglob) => {
-                Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
-            }
-            FetchStep::Container(_) => unreachable!(),
-        }
-    }
-
-    pub async fn fetch_nonblocking(
-        &self,
-        fetch_step: &FetchStep,
-        prev_source_state: Option<&PollingSourceState>,
-        target_path: &Path,
-        listener: Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
         match fetch_step {
             FetchStep::Url(furl) => {
                 let url = Self::template_url(&furl.url)?;
                 let headers = Self::template_headers(&furl.headers)?;
 
                 match url.scheme() {
+                    "file" => {
+                        Self::fetch_file(
+                            &url.to_file_path()
+                                .map_err(|_| format!("Invalid url: {}", url).int_err())?,
+                            furl.event_time.as_ref(),
+                            prev_source_state,
+                            target_path,
+                            listener.as_ref(),
+                        )
+                        .await
+                    }
                     "http" | "https" => {
                         self.fetch_http(
                             url,
@@ -159,6 +82,7 @@ impl FetchService {
                         )
                         .await
                     }
+                    "ftp" | "ftps" => Self::fetch_ftp(url, target_path, listener).await,
                     // TODO: Replace with proper error type
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
@@ -167,7 +91,10 @@ impl FetchService {
                 self.fetch_container(fetch, prev_source_state, target_path, listener)
                     .await
             }
-            FetchStep::FilesGlob(_) => unreachable!(),
+            FetchStep::FilesGlob(fglob) => {
+                Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
+                    .await
+            }
         }
     }
 
@@ -240,6 +167,7 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         use rand::Rng;
 
+        // Pull image
         let pull_image_listener = listener
             .clone()
             .get_pull_image_listener()
@@ -250,10 +178,11 @@ impl FetchService {
             .await?;
 
         listener.on_progress(&FetchProgress {
-            total_bytes: 0,
             fetched_bytes: 0,
+            total_bytes: TotalBytes::Unknown,
         });
 
+        // Setup logging
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(10)
@@ -261,14 +190,13 @@ impl FetchService {
             .collect();
 
         let out_dir = self.container_log_dir.join(format!("fetch-{}", &run_id));
-
         std::fs::create_dir_all(&out_dir).int_err()?;
 
         let stderr_path = self
             .container_log_dir
             .join(format!("fetch-{}.err.txt", run_id));
 
-        let stdout_file = std::fs::File::create(target_path).int_err()?;
+        let mut target_file = tokio::fs::File::create(target_path).await.int_err()?;
         let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
 
         let new_etag_path = out_dir.join("new-etag");
@@ -283,69 +211,90 @@ impl FetchService {
             ),
         };
 
-        let mut environment_vars = vec![
-            ("ODF_ETAG".to_owned(), prev_etag),
-            ("ODF_LAST_MODIFIED".to_owned(), prev_last_modified),
-            (
-                "ODF_NEW_ETAG_PATH".to_owned(),
-                "/opt/odf/out/new-etag".to_owned(),
-            ),
-            (
-                "ODF_NEW_LAST_MODIFIED_PATH".to_owned(),
-                "/opt/odf/out/new-last-modified".to_owned(),
-            ),
-        ];
+        let mut container_builder = self
+            .container_runtime
+            .run_attached(&fetch.image)
+            .container_name(format!("kamu-fetch-{}", run_id))
+            .args(fetch.args.clone().unwrap_or_default())
+            .environment_vars([
+                ("ODF_ETAG", prev_etag),
+                ("ODF_LAST_MODIFIED", prev_last_modified),
+                ("ODF_NEW_ETAG_PATH", "/opt/odf/out/new-etag".to_owned()),
+                (
+                    "ODF_NEW_LAST_MODIFIED_PATH",
+                    "/opt/odf/out/new-last-modified".to_owned(),
+                ),
+            ])
+            .volume(&out_dir, "/opt/odf/out")
+            .stdout(Stdio::piped())
+            .stderr(stderr_file);
+
+        if let Some(command) = &fetch.command {
+            container_builder = container_builder.entry_point(command.join(" "));
+        }
 
         if let Some(env) = &fetch.env {
             for env_var in env {
                 if let Some(value) = &env_var.value {
-                    environment_vars.push((env_var.name.clone(), value.clone()));
+                    container_builder = container_builder.environment_var(&env_var.name, value);
                 } else {
                     // TODO: This is insecure
                     let value = match std::env::var(&env_var.name) {
                         Ok(value) => Ok(value),
                         Err(_) => Err(IngestParameterNotFound::new(&env_var.name)),
                     }?;
-                    environment_vars.push((env_var.name.clone(), value));
+                    container_builder = container_builder.environment_var(&env_var.name, value);
                 }
             }
         }
 
-        let status = self
-            .container_runtime
-            .run_cmd(RunArgs {
-                image: fetch.image.clone(),
-                entry_point: fetch.command.as_ref().map(|cmd| cmd.join(" ")),
-                args: fetch.args.clone().unwrap_or_default(),
-                volume_map: vec![(out_dir.clone(), PathBuf::from("/opt/odf/out"))],
-                environment_vars,
-                ..RunArgs::default()
-            })
-            .stdout(Stdio::from(stdout_file))
-            .stderr(Stdio::from(stderr_file))
-            .status()
-            .await
-            .int_err()?;
+        // Spawh container
+        let mut container = container_builder.spawn().int_err()?;
+
+        // Handle output in a task
+        let mut stdout = container.take_stdout().unwrap();
+        let output_task = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+            let mut fetched_bytes = 0;
+            let mut buf = [0; 1024];
+
+            loop {
+                let read = stdout.read(&mut buf).await.int_err()?;
+                if read == 0 {
+                    break;
+                }
+
+                fetched_bytes += read as u64;
+                listener.on_progress(&FetchProgress {
+                    fetched_bytes,
+                    total_bytes: TotalBytes::Unknown,
+                });
+
+                target_file.write_all(&buf[..read]).await.int_err()?;
+            }
+
+            Ok::<(), InternalError>(())
+        });
+
+        // Wait for container to exit
+        let status = container.wait().await.int_err()?;
+        output_task.await.int_err()?.int_err()?;
 
         // Fix permissions
         if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
             cfg_if::cfg_if! {
                 if #[cfg(unix)] {
                     self.container_runtime
-                        .run_shell_cmd(
-                            RunArgs {
-                                image: fetch.image.clone(),
-                                volume_map: vec![(out_dir.clone(), PathBuf::from("/opt/odf/out"))],
-                                user: Some("root".to_owned()),
-                                ..RunArgs::default()
-                            },
-                            &[format!(
-                                "chown -R {}:{} {}",
-                                users::get_current_uid(),
-                                users::get_current_gid(),
-                                "/opt/odf/out"
-                            )],
-                        )
+                        .run_attached(&fetch.image)
+                        .shell_cmd(format!(
+                            "chown -R {}:{} {}",
+                            users::get_current_uid(),
+                            users::get_current_gid(),
+                            "/opt/odf/out"
+                        ))
+                        .user("root")
+                        .volume(out_dir, "/opt/odf/out")
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .status()
@@ -384,7 +333,7 @@ impl FetchService {
         }
     }
 
-    fn fetch_files_glob(
+    async fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -437,7 +386,12 @@ impl FetchService {
 
         matched_files.sort_by(|a, b| b.0.cmp(&a.0));
 
-        tracing::info!(pattern = fglob.path.as_str(), last_filename = ?last_filename, matches = ?matched_files, "Matched the glob pattern");
+        tracing::info!(
+            pattern = fglob.path.as_str(),
+            ?last_filename,
+            matches = ?matched_files,
+            "Matched the glob pattern"
+        );
 
         if matched_files.is_empty() {
             return if prev_source_state.is_some() {
@@ -448,7 +402,7 @@ impl FetchService {
         }
 
         let (first_filename, first_path) = matched_files.pop().unwrap();
-        let fetch_res = Self::fetch_file(&first_path, None, None, target_path, listener)?;
+        let fetch_res = Self::fetch_file(&first_path, None, None, target_path, listener).await?;
         assert_matches!(fetch_res, FetchResult::Updated(_));
 
         let source_event_time = match event_time_source {
@@ -465,16 +419,16 @@ impl FetchService {
 
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
-    fn fetch_file(
+    // TODO: PERF: Use symlinks
+    // TODO: PERF: Consider compression
+    async fn fetch_file(
         path: &Path,
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
-        use fs_extra::file::*;
-
-        tracing::info!(path = ?path, "Ingesting file");
+        tracing::info!(?path, "Ingesting file");
 
         match event_time_source {
             None | Some(EventTimeSource::FromMetadata) => (),
@@ -490,12 +444,14 @@ impl FetchService {
             }
         };
 
-        let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => {
-                IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
-            }
-            _ => e.int_err().into(),
-        })?;
+        let meta = tokio::fs::metadata(path)
+            .await
+            .map_err(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => {
+                    IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
+                }
+                _ => e.int_err().into(),
+            })?;
 
         let mod_time: DateTime<Utc> = meta
             .modified()
@@ -509,21 +465,28 @@ impl FetchService {
             }
         }
 
-        let mut options = CopyOptions::new();
-        options.overwrite = true;
+        let mut fetched_bytes = 0;
+        let total_bytes = TotalBytes::Exact(meta.len());
+        let mut source = tokio::fs::File::open(path).await.int_err()?;
+        let mut target = tokio::fs::File::create(target_path).await.int_err()?;
 
-        let handle = |pr: TransitProcess| {
-            let progress = FetchProgress {
-                total_bytes: pr.total_bytes,
-                fetched_bytes: pr.copied_bytes,
-            };
+        let mut buf = [0u8; 1024];
+        loop {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-            listener.on_progress(&progress);
-        };
+            let read = source.read(&mut buf).await.int_err()?;
+            if read == 0 {
+                break;
+            }
 
-        // TODO: PERF: Use symlinks
-        // TODO: PERF: Support compression
-        fs_extra::file::copy_with_progress(path, target_path, &options, handle).int_err()?;
+            target.write_all(&buf[..read]).await.int_err()?;
+
+            fetched_bytes += read as u64;
+            listener.on_progress(&FetchProgress {
+                fetched_bytes,
+                total_bytes,
+            });
+        }
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::LastModified(mod_time)),
@@ -631,18 +594,21 @@ impl FetchService {
             None
         };
 
-        let total_bytes = response.content_length();
-        let mut downloaded_bytes = 0;
+        let total_bytes = response
+            .content_length()
+            .map(|b| TotalBytes::Exact(b))
+            .unwrap_or(TotalBytes::Unknown);
+        let mut fetched_bytes = 0;
         let mut file = tokio::fs::File::create(target_path).await.int_err()?;
 
         while let Some(chunk) = response.chunk().await.int_err()? {
             file.write_all(&chunk).await.int_err()?;
 
-            downloaded_bytes += chunk.len() as u64;
+            fetched_bytes += chunk.len() as u64;
 
             listener.on_progress(&FetchProgress {
-                total_bytes: std::cmp::max(total_bytes.unwrap_or(0), downloaded_bytes),
-                fetched_bytes: downloaded_bytes,
+                fetched_bytes,
+                total_bytes,
             });
         }
 
@@ -656,13 +622,36 @@ impl FetchService {
         }))
     }
 
+    #[allow(unused_variables)]
+    async fn fetch_ftp(
+        url: Url,
+        target_path: &Path,
+        listener: Arc<dyn FetchProgressListener>,
+    ) -> Result<FetchResult, IngestError> {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "ftp")] {
+                let target_path = target_path.to_owned();
+                tokio::task::spawn_blocking(move || {
+                        Self::fetch_ftp_impl(
+                            url,
+                            &target_path,
+                            listener.as_ref(),
+                        )
+                    })
+                    .await
+                    .int_err()?
+            } else {
+                unimplemented!("Kamu was compiled without FTP support")
+            }
+        }
+    }
+
+    // TODO: convert to non-blocking
     // TODO: not implementing caching as some FTP servers throw errors at us
     // when we request filetime :(
     #[cfg(feature = "ftp")]
-    fn fetch_ftp(
-        url: &Url,
-        _event_time_source: Option<&EventTimeSource>,
-        _prev_source_state: Option<&PollingSourceState>,
+    fn fetch_ftp_impl(
+        url: Url,
         target_path: &Path,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
@@ -686,12 +675,12 @@ impl FetchService {
             })?;
 
             transfer.progress_function(|f_total, f_downloaded, _, _| {
-                let total = f_total as u64;
-                let downloaded = f_downloaded as u64;
-                if downloaded > 0 {
+                let total_bytes = f_total as u64;
+                let fetched_bytes = f_downloaded as u64;
+                if fetched_bytes > 0 {
                     listener.on_progress(&FetchProgress {
-                        total_bytes: std::cmp::max(total, downloaded),
-                        fetched_bytes: downloaded,
+                        fetched_bytes,
+                        total_bytes: TotalBytes::Exact(std::cmp::max(total_bytes, fetched_bytes)),
                     });
                 }
                 true
@@ -789,8 +778,14 @@ pub struct FetchResultUpdated {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FetchProgress {
-    pub total_bytes: u64,
     pub fetched_bytes: u64,
+    pub total_bytes: TotalBytes,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum TotalBytes {
+    Unknown,
+    Exact(u64),
 }
 
 pub trait FetchProgressListener: Send + Sync {
