@@ -5,17 +5,31 @@ authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
 
+
 [lib]
 doctest = false
+
 
 [features]
 skip_docker_tests = []
 
+
 [dependencies]
+async-trait = "0.1"
+cfg-if = "1"
 dill = "0.5"
+libc = "0.2"
+rand = "0.8"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "1"
-tokio = { version = "1", default-features = false, features=["process", "sync", "parking_lot"] }
+tokio = { version = "1", default-features = false, features=["time", "sync", "process", "parking_lot"] }
 tracing = "0.1"
 url = "2"
+
+
+[dev-dependencies]
+env_logger = "0.10"
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

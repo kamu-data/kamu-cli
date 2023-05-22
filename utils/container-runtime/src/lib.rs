@@ -12,15 +12,19 @@
 #![feature(error_generic_member_access)]
 
 mod args;
-mod blocking;
-mod common;
 mod config;
+mod container;
 mod errors;
+mod handles;
 mod listener;
-pub mod nonblocking;
+mod runtime;
+mod terminate;
 
 pub use args::*;
-pub use blocking::*; // TODO: Deprecate
 pub use config::*;
+pub use container::*;
 pub use errors::{ContainerRuntimeError, ImagePullError, TimeoutError};
+pub use handles::*;
 pub use listener::*;
+pub use runtime::*;
+pub use terminate::*;

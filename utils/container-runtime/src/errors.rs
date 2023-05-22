@@ -8,10 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
-use std::process::{Command, Output};
+use std::process::Output;
 use std::time::Duration;
 
 use thiserror::Error;
+use tokio::process::Command;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
