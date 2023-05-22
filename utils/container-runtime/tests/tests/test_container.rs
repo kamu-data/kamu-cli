@@ -27,7 +27,6 @@ async fn test_container_terminate_not_called() {
             .container_name_prefix("kamu-test-")
             .args(["sleep", "10"])
             .init(true)
-            .remove(true)
             .spawn()
             .unwrap();
 
@@ -63,7 +62,6 @@ async fn test_container_terminate_awaited() {
         .run_attached(TEST_IMAGE)
         .args(["sleep", "10"])
         .init(true)
-        .remove(true)
         .spawn()
         .unwrap();
 

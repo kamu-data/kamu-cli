@@ -9,6 +9,7 @@ on:
   # manual trigger
   workflow_dispatch: {}
 env:
+  RUST_LOG: "debug"
   RUST_BACKTRACE: "1"
 jobs:
   lint_fmt:
