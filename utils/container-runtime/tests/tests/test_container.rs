@@ -44,11 +44,20 @@ async fn test_container_terminate_not_called() {
     };
 
     // Ensure container no longer exists
-    assert_matches!(
-        rt.wait_for_container(&container_name, Duration::from_millis(100))
-            .await,
-        Err(ContainerRuntimeError::Timeout(_))
-    )
+    // Sometimes it seems the container will linger in `podman ps` than the
+    // controlling process, so we give it some time to clear out
+    let mut result = None;
+    for _ in 0..5 {
+        let res = rt
+            .wait_for_container(&container_name, Duration::from_millis(100))
+            .await;
+        if res.is_err() {
+            result = Some(res);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert_matches!(result, Some(Err(ContainerRuntimeError::Timeout(_))));
 }
 
 #[test_log::test(tokio::test)]
