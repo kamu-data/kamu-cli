@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::time::Duration;
 
-use container_runtime::{ContainerRuntime, ContainerRuntimeError, TerminateStatus};
+use container_runtime::*;
 
 const TEST_IMAGE: &str = "docker.io/busybox:latest";
 
@@ -29,11 +29,6 @@ async fn test_container_terminate_not_called() {
         .spawn()
         .unwrap();
 
-    // TODO: It seems that podman itself has some race condition that when attached
-    // process is terminated very early during the initialization it may leave a
-    // hanging container
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
     assert_matches!(
         container
             .wait_for_container(Duration::from_millis(1000))
@@ -48,11 +43,25 @@ async fn test_container_terminate_not_called() {
     drop(container);
 
     // Ensure container no longer exists
-    assert_matches!(
-        rt.wait_for_container(&container_name, Duration::from_millis(100))
-            .await,
-        Err(ContainerRuntimeError::Timeout(_))
-    )
+    let res = match rt
+        .wait_for_container(&container_name, Duration::from_millis(100))
+        .await
+    {
+        res @ Ok(_) => {
+            std::process::Command::new("podman")
+                .args(["ps", "-a"])
+                .status()
+                .unwrap();
+            std::process::Command::new("sh")
+                .args(["-c", "ps -ef | grep podman"])
+                .status()
+                .unwrap();
+            res
+        }
+        res @ _ => res,
+    };
+
+    assert_matches!(res, Err(WaitForResourceError::Timeout(_)));
 }
 
 #[test_log::test(tokio::test)]
@@ -69,10 +78,12 @@ async fn test_container_terminate_awaited() {
         .spawn()
         .unwrap();
 
-    // TODO: It seems that podman itself has some race condition that when attached
-    // process is terminated very early during the initialization it may leave a
-    // hanging container
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_matches!(
+        container
+            .wait_for_container(Duration::from_millis(1000))
+            .await,
+        Ok(_)
+    );
 
     let status = container.terminate().await.unwrap();
     assert_matches!(status, TerminateStatus::Exited(_));

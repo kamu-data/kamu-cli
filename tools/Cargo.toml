@@ -1,6 +1,6 @@
 [package]
 name = "kamu-tools"
-version = "0.125.0"
+version = "0.125.1"
 description = "Tools for managing this repo"
 edition.workspace = true
 publish = false
