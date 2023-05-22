@@ -14,6 +14,22 @@ use container_runtime::*;
 
 const TEST_IMAGE: &str = "docker.io/busybox:latest";
 
+// TODO: Remove this once we finished debugging the flaky test problem
+fn dump_state(hint: &str) {
+    let podman = std::process::Command::new("podman")
+        .args(["ps", "-a"])
+        .output()
+        .unwrap();
+    let ps = std::process::Command::new("sh")
+        .args(["-c", "ps -ef | grep podman"])
+        .output()
+        .unwrap();
+
+    tracing::warn!("{}", hint);
+    tracing::warn!("{}", std::str::from_utf8(&podman.stdout).unwrap());
+    tracing::warn!("{}", std::str::from_utf8(&ps.stdout).unwrap());
+}
+
 #[test_log::test(tokio::test)]
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_container_terminate_not_called() {
@@ -36,32 +52,22 @@ async fn test_container_terminate_not_called() {
         Ok(_)
     );
 
+    dump_state("<<<<<<<<< State pre-drop:");
+
     let container_name = container.container_name().to_string();
 
     // ContainerProcess::terminate() not called
     // Drop will perform blocking cleanup and will complain in logs
     drop(container);
 
-    // Ensure container no longer exists
-    let res = match rt
-        .wait_for_container(&container_name, Duration::from_millis(100))
-        .await
-    {
-        res @ Ok(_) => {
-            std::process::Command::new("podman")
-                .args(["ps", "-a"])
-                .status()
-                .unwrap();
-            std::process::Command::new("sh")
-                .args(["-c", "ps -ef | grep podman"])
-                .status()
-                .unwrap();
-            res
-        }
-        res @ _ => res,
-    };
+    dump_state(">>>>>>>>> State post-drop:");
 
-    assert_matches!(res, Err(WaitForResourceError::Timeout(_)));
+    // Ensure container no longer exists
+    assert_matches!(
+        rt.wait_for_container(&container_name, Duration::from_millis(100))
+            .await,
+        Err(WaitForResourceError::Timeout(_))
+    );
 }
 
 #[test_log::test(tokio::test)]
@@ -85,6 +91,11 @@ async fn test_container_terminate_awaited() {
         Ok(_)
     );
 
+    dump_state("<<<<<<<<< State pre-terminate:");
+
     let status = container.terminate().await.unwrap();
+
+    dump_state(">>>>>>>>> State post-terminate:");
+
     assert_matches!(status, TerminateStatus::Exited(_));
 }
