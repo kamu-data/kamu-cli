@@ -148,6 +148,9 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<QueryServiceImpl>();
     b.bind::<dyn QueryService, QueryServiceImpl>();
 
+    b.add::<QueryDataAccessorLocalFs>();
+    b.bind::<dyn QueryDataAccessor, QueryDataAccessorLocalFs>();
+
     b.add::<EngineProvisionerLocal>();
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 

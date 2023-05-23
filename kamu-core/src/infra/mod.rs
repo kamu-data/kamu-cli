@@ -75,3 +75,9 @@ pub use transform_service_impl::*;
 
 mod verification_service_impl;
 pub use verification_service_impl::*;
+
+mod query_data_accessor_local_fs;
+pub use query_data_accessor_local_fs::*;
+
+mod query_data_accessor_s3;
+pub use query_data_accessor_s3::*;

@@ -14,25 +14,92 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::infra;
-use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::infra::utils::s3_context::S3Context;
+use kamu::infra::{self};
+use kamu::testing::{MetadataFactory, MinioServer, ParquetWriterHelper};
 use opendatafabric::*;
+use reqwest::Url;
+use tempfile::TempDir;
 
-async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(dead_code)]
+struct S3 {
+    tmp_dir: tempfile::TempDir,
+    minio: MinioServer,
+    url: Url,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn run_s3_server() -> S3 {
+    let access_key = "AKIAIOSFODNN7EXAMPLE";
+    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
+    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+    std::env::set_var("AWS_DEFAULT_REGION", "us-east-1");
+
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let bucket = "test-bucket";
+    std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
+
+    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
+
+    let url = Url::parse(&format!(
+        "s3+http://{}:{}/{}",
+        minio.address, minio.host_port, bucket
+    ))
+    .unwrap();
+
+    S3 {
+        tmp_dir,
+        minio,
+        url,
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let dataset_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(local_repo)
+    dill::CatalogBuilder::new()
+        .add_value(dataset_repo)
         .add_value(workspace_layout.as_ref().clone())
         .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
         .add::<infra::QueryServiceImpl>()
         .bind::<dyn QueryService, infra::QueryServiceImpl>()
-        .build();
+        .add::<infra::QueryDataAccessorLocalFs>()
+        .bind::<dyn QueryDataAccessor, infra::QueryDataAccessorLocalFs>()
+        .build()
+}
 
-    let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
+/////////////////////////////////////////////////////////////////////////////////////////
 
-    let dataset = local_repo
+async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
+    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
+    let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
+    let datafusion_session_context_builder =
+        infra::QueryDataAccessorS3::new(s3_context.bucket.clone(), endpoint.clone().unwrap(), true);
+    let dataset_repo = infra::DatasetRepositoryS3::new(s3_context, endpoint.unwrap());
+
+    dill::CatalogBuilder::new()
+        .add_value(dataset_repo)
+        .add_value(datafusion_session_context_builder)
+        .bind::<dyn DatasetRepository, infra::DatasetRepositoryS3>()
+        .add::<infra::QueryServiceImpl>()
+        .bind::<dyn QueryService, infra::QueryServiceImpl>()
+        .bind::<dyn QueryDataAccessor, infra::QueryDataAccessorS3>()
+        .build()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
+    let dataset = dataset_repo
         .create_dataset(
             &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
@@ -65,17 +132,14 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
         )
         .await
         .unwrap();
-
-    cat
 }
 
-#[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_schema() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+/////////////////////////////////////////////////////////////////////////////////////////
 
-    let schema = kamu_adapter_graphql::schema(cat);
+async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
+    create_test_dataset(&catalog, tempdir.path()).await;
+
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -124,11 +188,26 @@ async fn test_dataset_schema() {
 
 #[test_log::test(tokio::test)]
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_tail() {
+async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    test_dataset_schema_common(catalog, &tempdir).await;
+}
 
-    let schema = kamu_adapter_graphql::schema(cat);
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_dataset_schema_s3() {
+    let s3 = run_s3_server().await;
+    let catalog = create_catalog_with_s3_workspace(&s3).await;
+    test_dataset_schema_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
+    create_test_dataset(&catalog, tempdir.path()).await;
+
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -159,11 +238,26 @@ async fn test_dataset_tail() {
 
 #[test_log::test(tokio::test)]
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_tail_empty() {
+async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    test_dataset_tail_common(catalog, &tempdir).await;
+}
 
-    let schema = kamu_adapter_graphql::schema(cat);
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_dataset_tail_s3() {
+    let s3 = run_s3_server().await;
+    let catalog = create_catalog_with_s3_workspace(&s3).await;
+    test_dataset_tail_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_tail_empty_common(catalog: dill::Catalog, tempdir: &TempDir) {
+    create_test_dataset(&catalog, tempdir.path()).await;
+
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -191,3 +285,21 @@ async fn test_dataset_tail_empty() {
     let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
     assert_eq!(data, serde_json::json!([]));
 }
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
+async fn test_dataset_tail_empty_local_fs() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    test_dataset_tail_empty_common(catalog, &tempdir).await;
+}
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_dataset_tail_empty_s3() {
+    let s3 = run_s3_server().await;
+    let catalog = create_catalog_with_s3_workspace(&s3).await;
+    test_dataset_tail_empty_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

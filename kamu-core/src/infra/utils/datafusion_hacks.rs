@@ -34,8 +34,10 @@ use futures::StreamExt;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ListingTableOfFiles {
+    object_store_url: url::Url,
+    object_store: Arc<dyn object_store::ObjectStore>,
     format: Arc<ParquetFormat>,
-    files: Vec<String>,
+    files: Vec<object_store::path::Path>,
     /// File fields only
     file_schema: SchemaRef,
     /// File fields + partition columns
@@ -43,20 +45,25 @@ pub struct ListingTableOfFiles {
 }
 
 impl ListingTableOfFiles {
-    pub async fn try_new(ctx: &SessionState, files: Vec<String>) -> Result<Self> {
+    pub async fn try_new(
+        object_store_url: url::Url,
+        object_store: Arc<dyn object_store::ObjectStore>,
+        ctx: &SessionState,
+        files: Vec<object_store::path::Path>,
+    ) -> Result<Self> {
         let format = Arc::new(ParquetFormat::new());
 
         // Infer schema
-        let store = ctx
-            .runtime_env()
-            .object_store(ObjectStoreUrl::local_filesystem())?;
+        let file_path = files.first().unwrap();
+        let file_meta = object_store.head(&file_path).await?;
 
-        let file_path = object_store::path::Path::parse(files.first().unwrap()).unwrap();
-        let file_meta = store.head(&file_path).await?;
-
-        let file_schema = format.infer_schema(ctx, &store, &[file_meta]).await?;
+        let file_schema = format
+            .infer_schema(ctx, &object_store, &[file_meta])
+            .await?;
 
         Ok(Self {
+            object_store_url,
+            object_store,
             format,
             files,
             table_schema: Arc::new(Schema::new(file_schema.fields().clone())),
@@ -101,7 +108,8 @@ impl TableProvider for ListingTableOfFiles {
             .create_physical_plan(
                 ctx,
                 FileScanConfig {
-                    object_store_url: ObjectStoreUrl::local_filesystem(),
+                    object_store_url: ObjectStoreUrl::parse(self.object_store_url.as_str())
+                        .unwrap(),
                     file_schema: Arc::clone(&self.file_schema),
                     file_groups: partitioned_file_lists,
                     statistics,
@@ -139,15 +147,10 @@ impl ListingTableOfFiles {
     ) -> Result<(Vec<Vec<PartitionedFile>>, Statistics)> {
         // NOTE: We don't have access to datafusion::datasource::listing::helpers, so
         // have to remove parititioning
-        let store = ctx
-            .runtime_env()
-            .object_store(ObjectStoreUrl::local_filesystem())?;
-
         let mut file_list = Vec::new();
 
-        for file in &self.files {
-            let file_path = object_store::path::Path::parse(file).unwrap();
-            let object_meta = store.head(&file_path).await?;
+        for file_path in &self.files {
+            let object_meta = self.object_store.head(file_path).await?;
             file_list.push(PartitionedFile {
                 object_meta,
                 partition_values: Vec::new(),

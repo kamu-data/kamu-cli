@@ -48,7 +48,7 @@ zip = "0.6"
 arrow = { version = "38", features = ["chrono-tz"] }
 arrow-digest = "38"
 datafusion = "24"
-object_store = "0.5"
+object_store = { version = "0.5", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"
 

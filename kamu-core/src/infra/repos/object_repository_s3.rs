@@ -258,10 +258,13 @@ where
 
     async fn insert_file_move<'a>(
         &'a self,
-        _src: &Path,
-        _options: InsertOpts<'a>,
+        src: &Path,
+        options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        let file = tokio::fs::File::open(src).await.int_err()?;
+        let insert_result = self.insert_stream(Box::new(file), options).await?;
+        tokio::fs::remove_file(src).await.int_err()?;
+        Ok(insert_result)
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {

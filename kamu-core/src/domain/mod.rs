@@ -28,6 +28,9 @@ pub use remote_repository_registry::*;
 
 // Services
 
+mod query_data_accessor;
+pub use query_data_accessor::*;
+
 pub mod engine;
 pub use engine::*;
 
