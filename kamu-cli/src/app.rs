@@ -219,6 +219,16 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
             .flink
             .clone()
             .unwrap(),
+        datafusion_image: config
+            .engine
+            .as_ref()
+            .unwrap()
+            .images
+            .as_ref()
+            .unwrap()
+            .datafusion
+            .clone()
+            .unwrap(),
     });
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();

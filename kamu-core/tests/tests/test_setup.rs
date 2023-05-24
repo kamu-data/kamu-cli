@@ -26,6 +26,10 @@ async fn test_setup_pull_images() {
         .await
         .unwrap();
     container_runtime
+        .ensure_image(docker_images::DATAFUSION, None)
+        .await
+        .unwrap();
+    container_runtime
         .ensure_image(docker_images::HTTPD, None)
         .await
         .unwrap();

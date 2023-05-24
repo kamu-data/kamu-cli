@@ -140,17 +140,20 @@ impl Default for EngineConfig {
 #[derive(Debug, Clone, Merge, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EngineImagesConfig {
+    /// UNSTABLE: Spark engine image
+    pub spark: Option<String>,
     /// UNSTABLE: Flink engine image
     pub flink: Option<String>,
-    /// UNSTABLE: Flink engine image
-    pub spark: Option<String>,
+    /// UNSTABLE: Datafusion engine image
+    pub datafusion: Option<String>,
 }
 
 impl EngineImagesConfig {
     pub fn new() -> Self {
         Self {
-            flink: None,
             spark: None,
+            flink: None,
+            datafusion: None,
         }
     }
 
@@ -162,8 +165,9 @@ impl EngineImagesConfig {
 impl Default for EngineImagesConfig {
     fn default() -> Self {
         Self {
-            flink: Some(docker_images::FLINK.to_owned()),
             spark: Some(docker_images::SPARK.to_owned()),
+            flink: Some(docker_images::FLINK.to_owned()),
+            datafusion: Some(docker_images::DATAFUSION.to_owned()),
         }
     }
 }

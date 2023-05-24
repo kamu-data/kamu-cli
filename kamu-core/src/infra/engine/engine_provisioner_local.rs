@@ -27,6 +27,7 @@ pub struct EngineProvisionerLocal {
     spark_ingest_engine: Arc<dyn IngestEngine>,
     spark_engine: Arc<dyn Engine>,
     flink_engine: Arc<dyn Engine>,
+    datafusion_engine: Arc<dyn Engine>,
     container_runtime: ContainerRuntime,
     state: Mutex<State>,
     notify: tokio::sync::Notify,
@@ -65,6 +66,12 @@ impl EngineProvisionerLocal {
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
+                workspace_layout.clone(),
+            )),
+            datafusion_engine: Arc::new(ODFEngine::new(
+                container_runtime.clone(),
+                engine_config.clone(),
+                &config.datafusion_image,
                 workspace_layout.clone(),
             )),
             container_runtime,
@@ -195,6 +202,10 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.flink_engine.clone() as Arc<dyn Engine>,
                 &self.config.flink_image,
             )),
+            "datafusion" => Ok((
+                self.datafusion_engine.clone() as Arc<dyn Engine>,
+                &self.config.datafusion_image,
+            )),
             _ => Err(format!("Unsupported engine {}", engine_id).int_err()),
         }?;
 
@@ -244,6 +255,7 @@ pub struct EngineProvisionerLocalConfig {
     // TODO: Remove in favor of explicit images in ODF protocol
     pub spark_image: String,
     pub flink_image: String,
+    pub datafusion_image: String,
 }
 
 // This is for tests only
@@ -255,6 +267,7 @@ impl Default for EngineProvisionerLocalConfig {
             shutdown_timeout: Duration::from_secs(5),
             spark_image: docker_images::SPARK.to_owned(),
             flink_image: docker_images::FLINK.to_owned(),
+            datafusion_image: docker_images::DATAFUSION.to_owned(),
         }
     }
 }
