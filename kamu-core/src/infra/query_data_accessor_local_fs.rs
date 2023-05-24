@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion::prelude::SessionContext;
 use dill::*;
 use opendatafabric::{DataSlice, DatasetHandle};
 
@@ -33,12 +33,9 @@ impl QueryDataAccessorLocalFs {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl QueryDataAccessor for QueryDataAccessorLocalFs {
-    fn session_context(&self) -> Result<SessionContext, InternalError> {
-        let cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("kamu", "kamu");
-
-        Ok(SessionContext::with_config(cfg))
+    fn bind_object_store(&self, _session_context: &SessionContext) -> Result<(), InternalError> {
+        // File-system object store is built-in
+        Ok(())
     }
 
     fn object_store_url(&self) -> url::Url {

@@ -15,7 +15,7 @@ use super::InternalError;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait QueryDataAccessor: Send + Sync {
-    fn session_context(&self) -> Result<SessionContext, InternalError>;
+    fn bind_object_store(&self, session_context: &SessionContext) -> Result<(), InternalError>;
 
     fn object_store_url(&self) -> url::Url;
 

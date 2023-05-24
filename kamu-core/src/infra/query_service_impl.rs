@@ -44,7 +44,15 @@ impl QueryServiceImpl {
     }
 
     fn session_context(&self, options: QueryOptions) -> Result<SessionContext, InternalError> {
-        let session_context = self.query_data_accessor.session_context()?;
+        let cfg = SessionConfig::new()
+            .with_information_schema(true)
+            .with_default_catalog_and_schema("kamu", "kamu");
+
+        let session_context = SessionContext::with_config(cfg);
+
+        self.query_data_accessor
+            .bind_object_store(&session_context)?;
+
         session_context.register_catalog(
             "kamu",
             Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(

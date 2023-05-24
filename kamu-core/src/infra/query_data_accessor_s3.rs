@@ -10,7 +10,7 @@
 use std::env;
 use std::sync::Arc;
 
-use datafusion::prelude::{SessionConfig, SessionContext};
+use datafusion::prelude::SessionContext;
 use dill::*;
 use object_store::aws::AmazonS3Builder;
 use opendatafabric::{DataSlice, DatasetHandle};
@@ -40,13 +40,7 @@ impl QueryDataAccessorS3 {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl QueryDataAccessor for QueryDataAccessorS3 {
-    fn session_context(&self) -> Result<SessionContext, InternalError> {
-        let cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("kamu", "kamu");
-
-        let ctx = SessionContext::with_config(cfg);
-
+    fn bind_object_store(&self, session_context: &SessionContext) -> Result<(), InternalError> {
         let s3_builder = AmazonS3Builder::new()
             .with_endpoint(self.endpoint.clone())
             .with_bucket_name(self.bucket_name.clone())
@@ -58,10 +52,11 @@ impl QueryDataAccessor for QueryDataAccessorS3 {
         let s3 = s3_builder.build().int_err()?;
 
         let s3_url = Url::parse(self.endpoint.as_str()).unwrap();
-        ctx.runtime_env()
+        session_context
+            .runtime_env()
             .register_object_store(&s3_url, Arc::new(s3));
 
-        Ok(ctx)
+        Ok(())
     }
 
     fn object_store_url(&self) -> Url {
