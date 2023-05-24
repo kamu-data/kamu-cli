@@ -175,16 +175,16 @@ where
         &self,
         _hash: &Multihash,
         _opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
-        Err(GetExternalTransferUrlError::NotSupported)
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
+        Err(GetExternalUrlError::NotSupported)
     }
 
     async fn get_external_upload_url(
         &self,
         _hash: &Multihash,
         _opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
-        Err(GetExternalTransferUrlError::NotSupported)
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
+        Err(GetExternalUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

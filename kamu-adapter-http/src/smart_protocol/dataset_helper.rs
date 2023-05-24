@@ -457,13 +457,13 @@ pub async fn prepare_pull_object_transfer_strategy(
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
-            GetExternalTransferUrlError::NotSupported => Ok(TransferUrl {
+            GetExternalUrlError::NotSupported => Ok(TransferUrl {
                 url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
-            GetExternalTransferUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+            GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
             // AccessError
-            GetExternalTransferUrlError::Internal(e) => Err(e),
+            GetExternalUrlError::Internal(e) => Err(e),
         },
     };
 
@@ -533,13 +533,13 @@ pub async fn prepare_push_object_transfer_strategy(
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
-                GetExternalTransferUrlError::NotSupported => Ok(TransferUrl {
+                GetExternalUrlError::NotSupported => Ok(TransferUrl {
                     url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                     expires_at: None,
                 }),
-                GetExternalTransferUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+                GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
                 // AccessError
-                GetExternalTransferUrlError::Internal(e) => Err(e),
+                GetExternalUrlError::Internal(e) => Err(e),
             },
         };
         match transfer_url_result {

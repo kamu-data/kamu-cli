@@ -143,13 +143,13 @@ impl ObjectRepository for ObjectRepositoryHttp {
         &self,
         hash: &Multihash,
         _opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         match self.base_url.join(&hash.to_multibase_string()) {
-            Ok(url) => Ok(GetExternalTransferUrlResult {
+            Ok(url) => Ok(GetExternalUrlResult {
                 url,
                 expires_at: None,
             }),
-            Err(e) => Err(GetExternalTransferUrlError::Internal(e.int_err())),
+            Err(e) => Err(GetExternalUrlError::Internal(e.int_err())),
         }
     }
 
@@ -157,7 +157,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         &self,
         _hash: &Multihash,
         _opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         Err(AccessError::ReadOnly(None).into())
     }
 

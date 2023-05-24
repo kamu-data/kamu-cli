@@ -140,7 +140,7 @@ where
         &self,
         hash: &Multihash,
         opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -159,7 +159,7 @@ where
             .await
             .int_err()?;
 
-        Ok(GetExternalTransferUrlResult {
+        Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
@@ -169,7 +169,7 @@ where
         &self,
         hash: &Multihash,
         opts: ExternalTransferOpts,
-    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -188,7 +188,7 @@ where
             .await
             .int_err()?;
 
-        Ok(GetExternalTransferUrlResult {
+        Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
