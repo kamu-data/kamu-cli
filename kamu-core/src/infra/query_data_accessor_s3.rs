@@ -13,7 +13,6 @@ use std::sync::Arc;
 use datafusion::prelude::SessionContext;
 use dill::*;
 use object_store::aws::AmazonS3Builder;
-use opendatafabric::{DataSlice, DatasetHandle};
 use url::Url;
 
 use crate::domain::{InternalError, QueryDataAccessor, ResultIntoInternal};
@@ -51,7 +50,7 @@ impl QueryDataAccessor for QueryDataAccessorS3 {
 
         let s3 = s3_builder.build().int_err()?;
 
-        let s3_url = Url::parse(self.endpoint.as_str()).unwrap();
+        let s3_url = self.object_store_url();
         session_context
             .runtime_env()
             .register_object_store(&s3_url, Arc::new(s3));
@@ -60,25 +59,7 @@ impl QueryDataAccessor for QueryDataAccessorS3 {
     }
 
     fn object_store_url(&self) -> Url {
-        Url::parse(&self.endpoint.as_str()).unwrap()
-    }
-
-    fn data_object_store_path(
-        &self,
-        dataset_handle: &DatasetHandle,
-        data_slice: &DataSlice,
-    ) -> object_store::path::Path {
-        assert!(
-            !dataset_handle.alias.is_multitenant(),
-            "Multitenancy is not yet supported"
-        );
-
-        let slice_path_str = format!(
-            "{}/data/{}",
-            dataset_handle.alias.dataset_name.as_str(),
-            data_slice.physical_hash.to_multibase_string()
-        );
-        object_store::path::Path::from_url_path(slice_path_str).unwrap()
+        Url::parse(format!("s3+{}/{}", self.endpoint, self.bucket_name).as_str()).unwrap()
     }
 }
 

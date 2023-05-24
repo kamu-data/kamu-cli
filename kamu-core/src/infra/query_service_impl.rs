@@ -92,12 +92,20 @@ impl QueryServiceImpl {
                     self.query_data_accessor.as_ref(),
                 )?;
 
-                let data_slice_store_path = self
-                    .query_data_accessor
-                    .data_object_store_path(&dataset_handle, &last_data_slice);
+                let object_store_url = self.query_data_accessor.object_store_url();
+                let object_store_url_len = object_store_url.as_str().len();
 
-                let metadata =
-                    read_data_slice_metadata(object_store, &data_slice_store_path).await?;
+                let last_slice_url = dataset
+                    .as_data_repo()
+                    .get_internal_url(&last_data_slice.physical_hash)
+                    .await
+                    .int_err()?;
+
+                let last_slice_path = object_store::path::Path::from(
+                    last_slice_url.as_str().get(object_store_url_len..).unwrap(),
+                );
+
+                let metadata = read_data_slice_metadata(object_store, &last_slice_path).await?;
 
                 Ok(Some(metadata.file_metadata().schema().clone()))
             }
@@ -303,6 +311,9 @@ impl KamuSchema {
             .get_dataset(&dataset_handle.as_local_ref())
             .await
         {
+            let object_store_url = self.query_data_accessor.object_store_url();
+            let object_store_url_len = object_store_url.as_str().len();
+
             let mut files = Vec::new();
             let mut num_records = 0;
 
@@ -314,10 +325,17 @@ impl KamuSchema {
 
             while let Some(slice) = slices.try_next().await.int_err()? {
                 num_records += slice.interval.end - slice.interval.start + 1;
-                let data_object_store_path = self
-                    .query_data_accessor
-                    .data_object_store_path(dataset_handle, &slice);
-                files.push(data_object_store_path);
+
+                let slice_url = dataset
+                    .as_data_repo()
+                    .get_internal_url(&slice.physical_hash)
+                    .await
+                    .int_err()?;
+
+                let slice_path = object_store::path::Path::from(
+                    slice_url.as_str().get(object_store_url_len..).unwrap(),
+                );
+                files.push(slice_path);
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;
                 }

@@ -134,6 +134,11 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(Box::new(reader))
     }
 
+    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
+        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
+        Ok(url)
+    }
+
     async fn get_external_download_url(
         &self,
         hash: &Multihash,

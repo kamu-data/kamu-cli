@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::AsyncRead;
+use url::Url;
 
 use crate::domain::*;
 
@@ -71,6 +72,10 @@ impl ObjectRepository for ObjectRepositoryInMemory {
 
     async fn get_stream(&self, _hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
         panic!("get_stream not allowed for in-memory repository");
+    }
+
+    async fn get_internal_url(&self, _hash: &Multihash) -> Result<Url, GetError> {
+        panic!("get_internal_url not allowed for in-memory repository");
     }
 
     async fn get_external_download_url(

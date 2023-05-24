@@ -36,6 +36,8 @@ pub trait ObjectRepository: Send + Sync {
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;
 
+    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError>;
+
     async fn get_external_download_url(
         &self,
         hash: &Multihash,

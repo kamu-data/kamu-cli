@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::{AsyncRead, AsyncWriteExt};
+use url::Url;
 
 use crate::domain::*;
 use crate::infra::get_staging_name;
@@ -162,6 +163,12 @@ where
         let file = tokio::fs::File::open(path).await.int_err()?;
 
         Ok(Box::new(file))
+    }
+
+    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
+        let url_str = format!("file://{}", self.get_path(&hash).to_string_lossy());
+        let url = Url::parse(url_str.as_str()).int_err()?;
+        Ok(url)
     }
 
     async fn get_external_download_url(

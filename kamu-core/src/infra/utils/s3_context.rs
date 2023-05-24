@@ -132,18 +132,12 @@ impl S3Context {
     }
 
     pub fn make_url(&self) -> Url {
-        let folder_suffix = if self.root_folder_key.is_empty() {
-            String::from("")
-        } else {
-            format!("{}/", self.root_folder_key)
-        };
-
         let context_url_str = match &self.endpoint {
             Some(endpoint) => {
-                format!("s3+{}/{}/{}", endpoint, self.bucket, folder_suffix)
+                format!("s3+{}/{}/{}", endpoint, self.bucket, self.root_folder_key)
             }
             None => {
-                format!("s3://{}/{}", self.bucket, folder_suffix)
+                format!("s3://{}/{}", self.bucket, self.root_folder_key)
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()

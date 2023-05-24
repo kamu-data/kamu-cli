@@ -121,6 +121,14 @@ where
         Ok(Box::new(stream))
     }
 
+    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
+        let context_url = self.s3_context.make_url();
+        let url = context_url
+            .join(hash.to_multibase_string().as_str())
+            .int_err()?;
+        Ok(url)
+    }
+
     async fn get_external_download_url(
         &self,
         hash: &Multihash,
