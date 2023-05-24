@@ -81,8 +81,8 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
     let datafusion_session_context_builder =
-        infra::QueryDataAccessorS3::new(s3_context.bucket.clone(), endpoint.clone().unwrap(), true);
-    let dataset_repo = infra::DatasetRepositoryS3::new(s3_context, endpoint.unwrap());
+        infra::QueryDataAccessorS3::new(s3_context.bucket.clone(), endpoint.unwrap(), true);
+    let dataset_repo = infra::DatasetRepositoryS3::new(s3_context);
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)

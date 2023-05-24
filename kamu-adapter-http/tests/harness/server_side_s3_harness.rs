@@ -125,11 +125,8 @@ impl ServerSideHarness for ServerSideS3Harness {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
-    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
-    DatasetRepositoryS3::new(
-        S3Context::from_items(endpoint.clone(), bucket, key_prefix).await,
-        endpoint.unwrap(),
-    )
+    let s3_context = S3Context::from_url(&s3.url).await;
+    DatasetRepositoryS3::new(s3_context)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

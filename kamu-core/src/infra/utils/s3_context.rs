@@ -26,6 +26,7 @@ use crate::domain::*;
 #[derive(Clone)]
 pub struct S3Context {
     pub client: Client,
+    pub endpoint: Option<String>,
     pub bucket: String,
     pub root_folder_key: String,
 }
@@ -39,13 +40,20 @@ pub type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
 
-    pub fn new<S1, S2>(client: Client, bucket: S1, root_folder_key: S2) -> Self
+    pub fn new<S1, S2, S3>(
+        client: Client,
+        endpoint: Option<S1>,
+        bucket: S2,
+        root_folder_key: S3,
+    ) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
+        S3: Into<String>,
     {
         Self {
             client,
+            endpoint: endpoint.map(|e| e.into()),
             bucket: bucket.into(),
             root_folder_key: root_folder_key.into(),
         }
@@ -61,7 +69,7 @@ impl S3Context {
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
             .or_else("unspecified");
         let sdk_config = aws_config::from_env().region(region_provider).load().await;
-        let s3_config = if let Some(endpoint) = endpoint {
+        let s3_config = if let Some(endpoint) = endpoint.clone() {
             aws_sdk_s3::config::Builder::from(&sdk_config)
                 .endpoint_url(endpoint)
                 .force_path_style(true)
@@ -73,7 +81,7 @@ impl S3Context {
         // TODO: PERF: Client construction is expensive and should only be done once
         let client = Client::from_conf(s3_config);
 
-        Self::new(client, bucket, root_folder_key)
+        Self::new(client, endpoint, bucket, root_folder_key)
     }
 
     pub async fn from_url(url: &Url) -> Self {
@@ -121,6 +129,24 @@ impl S3Context {
         };
 
         (endpoint, bucket, root_folder_key)
+    }
+
+    pub fn make_url(&self) -> Url {
+        let folder_suffix = if self.root_folder_key.is_empty() {
+            String::from("")
+        } else {
+            format!("{}/", self.root_folder_key)
+        };
+
+        let context_url_str = match &self.endpoint {
+            Some(endpoint) => {
+                format!("s3+{}/{}/{}", endpoint, self.bucket, folder_suffix)
+            }
+            None => {
+                format!("s3://{}/{}", self.bucket, folder_suffix)
+            }
+        };
+        Url::parse(context_url_str.as_str()).unwrap()
     }
 
     pub fn get_key(&self, key: &str) -> String {
