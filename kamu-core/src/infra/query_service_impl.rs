@@ -86,7 +86,7 @@ impl QueryServiceImpl {
 
                 let data_slice_store_path = self
                     .query_data_accessor
-                    .data_object_store_path(&dataset_handle.alias, &last_data_slice);
+                    .data_object_store_path(&dataset_handle, &last_data_slice);
 
                 let metadata =
                     read_data_slice_metadata(object_store, &data_slice_store_path).await?;
@@ -308,7 +308,7 @@ impl KamuSchema {
                 num_records += slice.interval.end - slice.interval.start + 1;
                 let data_object_store_path = self
                     .query_data_accessor
-                    .data_object_store_path(&dataset_handle.alias, &slice);
+                    .data_object_store_path(dataset_handle, &slice);
                 files.push(data_object_store_path);
                 if limit.is_some() && limit.unwrap() <= num_records as u64 {
                     break;
@@ -423,7 +423,7 @@ impl SchemaProvider for KamuSchema {
                 if files.is_empty() {
                     None
                 } else {
-                    let object_store_url = self.query_data_accessor.dataset_object_store_url();
+                    let object_store_url = self.query_data_accessor.object_store_url();
 
                     let object_store = access_dataset_object_store(
                         &self.session_context,
@@ -453,7 +453,7 @@ fn access_dataset_object_store(
     session_context: &SessionContext,
     query_data_accessor: &dyn QueryDataAccessor,
 ) -> Result<Arc<dyn object_store::ObjectStore>, QueryError> {
-    let object_store_url = Box::new(query_data_accessor.dataset_object_store_url());
+    let object_store_url = Box::new(query_data_accessor.object_store_url());
 
     let object_store = session_context
         .runtime_env()

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use datafusion::datasource::object_store::ObjectStoreUrl;
 use datafusion::prelude::{SessionConfig, SessionContext};
 use dill::*;
-use opendatafabric::{DataSlice, DatasetAlias};
+use opendatafabric::{DataSlice, DatasetHandle};
 
 use super::WorkspaceLayout;
 use crate::domain::{InternalError, QueryDataAccessor};
@@ -41,16 +41,16 @@ impl QueryDataAccessor for QueryDataAccessorLocalFs {
         Ok(SessionContext::with_config(cfg))
     }
 
-    fn dataset_object_store_url(&self) -> url::Url {
+    fn object_store_url(&self) -> url::Url {
         url::Url::parse(ObjectStoreUrl::local_filesystem().as_str()).unwrap()
     }
 
     fn data_object_store_path(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_handle: &DatasetHandle,
         data_slice: &DataSlice,
     ) -> object_store::path::Path {
-        let dataset_layout = self.workspace_layout.dataset_layout(dataset_alias);
+        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
         let data_slice_path = dataset_layout.data_slice_path(data_slice);
         object_store::path::Path::from_filesystem_path(data_slice_path).unwrap()
     }
