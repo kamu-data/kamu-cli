@@ -122,7 +122,14 @@ where
     }
 
     async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
-        let context_url = self.s3_context.make_url();
+        let context_url = Url::parse(
+            format!(
+                "s3://{}/{}",
+                self.s3_context.bucket, self.s3_context.root_folder_key
+            )
+            .as_str(),
+        )
+        .unwrap();
         let url = context_url
             .join(hash.to_multibase_string().as_str())
             .int_err()?;

@@ -59,7 +59,7 @@ impl QueryDataAccessor for QueryDataAccessorS3 {
     }
 
     fn object_store_url(&self) -> Url {
-        Url::parse(format!("s3+{}/{}", self.endpoint, self.bucket_name).as_str()).unwrap()
+        Url::parse(format!("s3://{}/", self.bucket_name).as_str()).unwrap()
     }
 }
 
