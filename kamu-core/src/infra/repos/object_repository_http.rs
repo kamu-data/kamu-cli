@@ -134,25 +134,25 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(Box::new(reader))
     }
 
-    async fn get_download_url(
+    async fn get_external_download_url(
         &self,
         hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
         match self.base_url.join(&hash.to_multibase_string()) {
-            Ok(url) => Ok(GetTransferUrlResult {
+            Ok(url) => Ok(GetExternalTransferUrlResult {
                 url,
                 expires_at: None,
             }),
-            Err(e) => Err(GetTransferUrlError::Internal(e.int_err())),
+            Err(e) => Err(GetExternalTransferUrlError::Internal(e.int_err())),
         }
     }
 
-    async fn get_upload_url(
+    async fn get_external_upload_url(
         &self,
         _hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
         Err(AccessError::ReadOnly(None).into())
     }
 

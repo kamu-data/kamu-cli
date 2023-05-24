@@ -425,19 +425,28 @@ pub async fn prepare_pull_object_transfer_strategy(
             dataset
                 .as_metadata_chain()
                 .as_object_repo()
-                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
+                .get_external_download_url(
+                    &object_file_ref.physical_hash,
+                    ExternalTransferOpts::default(),
+                )
                 .await
         }
         ObjectType::DataSlice => {
             dataset
                 .as_data_repo()
-                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
+                .get_external_download_url(
+                    &object_file_ref.physical_hash,
+                    ExternalTransferOpts::default(),
+                )
                 .await
         }
         ObjectType::Checkpoint => {
             dataset
                 .as_checkpoint_repo()
-                .get_download_url(&object_file_ref.physical_hash, TransferOpts::default())
+                .get_external_download_url(
+                    &object_file_ref.physical_hash,
+                    ExternalTransferOpts::default(),
+                )
                 .await
         }
     };
@@ -448,12 +457,13 @@ pub async fn prepare_pull_object_transfer_strategy(
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
-            GetTransferUrlError::NotSupported => Ok(TransferUrl {
+            GetExternalTransferUrlError::NotSupported => Ok(TransferUrl {
                 url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                 expires_at: None,
             }),
-            GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
-            GetTransferUrlError::Internal(e) => Err(e),
+            GetExternalTransferUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+            // AccessError
+            GetExternalTransferUrlError::Internal(e) => Err(e),
         },
     };
 
@@ -512,7 +522,10 @@ pub async fn prepare_push_object_transfer_strategy(
         })
     } else {
         let get_upload_url_result = object_repo
-            .get_upload_url(&object_file_ref.physical_hash, TransferOpts::default())
+            .get_external_upload_url(
+                &object_file_ref.physical_hash,
+                ExternalTransferOpts::default(),
+            )
             .await;
         let transfer_url_result = match get_upload_url_result {
             Ok(result) => Ok(TransferUrl {
@@ -520,12 +533,13 @@ pub async fn prepare_push_object_transfer_strategy(
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
-                GetTransferUrlError::NotSupported => Ok(TransferUrl {
+                GetExternalTransferUrlError::NotSupported => Ok(TransferUrl {
                     url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
                     expires_at: None,
                 }),
-                GetTransferUrlError::Access(e) => Err(e.int_err()), // TODO: propagate AccessError
-                GetTransferUrlError::Internal(e) => Err(e),
+                GetExternalTransferUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
+                // AccessError
+                GetExternalTransferUrlError::Internal(e) => Err(e),
             },
         };
         match transfer_url_result {

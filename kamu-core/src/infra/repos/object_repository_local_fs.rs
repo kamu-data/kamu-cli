@@ -164,20 +164,20 @@ where
         Ok(Box::new(file))
     }
 
-    async fn get_download_url(
+    async fn get_external_download_url(
         &self,
         _hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
-        Err(GetTransferUrlError::NotSupported)
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+        Err(GetExternalTransferUrlError::NotSupported)
     }
 
-    async fn get_upload_url(
+    async fn get_external_upload_url(
         &self,
         _hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
-        Err(GetTransferUrlError::NotSupported)
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
+        Err(GetExternalTransferUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

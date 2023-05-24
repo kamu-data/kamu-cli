@@ -121,11 +121,11 @@ where
         Ok(Box::new(stream))
     }
 
-    async fn get_download_url(
+    async fn get_external_download_url(
         &self,
         hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -144,17 +144,17 @@ where
             .await
             .int_err()?;
 
-        Ok(GetTransferUrlResult {
+        Ok(GetExternalTransferUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
     }
 
-    async fn get_upload_url(
+    async fn get_external_upload_url(
         &self,
         hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalTransferUrlResult, GetExternalTransferUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -173,7 +173,7 @@ where
             .await
             .int_err()?;
 
-        Ok(GetTransferUrlResult {
+        Ok(GetExternalTransferUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
