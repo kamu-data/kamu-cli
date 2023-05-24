@@ -87,7 +87,7 @@ impl ContainerRuntime {
         Ok(())
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(image))]
+    #[tracing::instrument(level = "info", skip_all, fields(%image))]
     pub async fn pull_image(
         &self,
         image: &str,
@@ -316,7 +316,7 @@ impl ContainerRuntime {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(container_name))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%container_name))]
     pub async fn wait_for_container(
         &self,
         container_name: &str,
@@ -356,7 +356,7 @@ impl ContainerRuntime {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(container_name))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%container_name))]
     pub async fn wait_for_host_port(
         &self,
         container_name: &str,

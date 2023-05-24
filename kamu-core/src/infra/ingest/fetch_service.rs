@@ -157,7 +157,6 @@ impl FetchService {
     // TODO: Progress reporting
     // TODO: Env var security
     // TODO: Allow containers to output watermarks
-    #[tracing::instrument(level = "info", name = "commit", skip_all)]
     async fn fetch_container(
         &self,
         fetch: &FetchStepContainer,
