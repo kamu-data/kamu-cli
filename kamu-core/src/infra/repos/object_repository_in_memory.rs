@@ -74,7 +74,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         panic!("get_stream not allowed for in-memory repository");
     }
 
-    async fn get_internal_url(&self, _hash: &Multihash) -> Result<Url, GetError> {
+    async fn get_internal_url(&self, _hash: &Multihash) -> Url {
         panic!("get_internal_url not allowed for in-memory repository");
     }
 

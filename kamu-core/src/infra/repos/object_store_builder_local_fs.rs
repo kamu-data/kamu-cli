@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::datasource::object_store::ObjectStoreUrl;
-use datafusion::prelude::SessionContext;
-use dill::*;
+use std::sync::Arc;
 
-use crate::domain::{InternalError, QueryDataAccessor};
+use dill::*;
+use url::Url;
+
+use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-pub struct QueryDataAccessorLocalFs {}
+pub struct ObjectStoreBuilderLocalFs {}
 
-impl QueryDataAccessorLocalFs {
+impl ObjectStoreBuilderLocalFs {
     pub fn new() -> Self {
         Self {}
     }
@@ -26,14 +27,13 @@ impl QueryDataAccessorLocalFs {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl QueryDataAccessor for QueryDataAccessorLocalFs {
-    fn bind_object_store(&self, _session_context: &SessionContext) -> Result<(), InternalError> {
-        // File-system object store is built-in
-        Ok(())
+impl ObjectStoreBuilder for ObjectStoreBuilderLocalFs {
+    fn object_store_url(&self) -> Url {
+        Url::parse("file://").unwrap()
     }
 
-    fn object_store_url(&self) -> url::Url {
-        url::Url::parse(ObjectStoreUrl::local_filesystem().as_str()).unwrap()
+    fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
+        Ok(Arc::new(object_store::local::LocalFileSystem::new()))
     }
 }
 

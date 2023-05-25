@@ -165,10 +165,8 @@ where
         Ok(Box::new(file))
     }
 
-    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
-        let url_str = format!("file://{}", self.get_path(&hash).to_string_lossy());
-        let url = Url::parse(url_str.as_str()).int_err()?;
-        Ok(url)
+    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+        Url::from_file_path(self.get_path(&hash)).unwrap()
     }
 
     async fn get_external_download_url(

@@ -121,7 +121,9 @@ where
         Ok(Box::new(stream))
     }
 
-    async fn get_internal_url(&self, hash: &Multihash) -> Result<Url, GetError> {
+    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+        // TODO: This URL does not account for endpoint and it will collide in case we
+        // work with multiple S3-like storages having same buckets names
         let context_url = Url::parse(
             format!(
                 "s3://{}/{}",
@@ -130,10 +132,10 @@ where
             .as_str(),
         )
         .unwrap();
-        let url = context_url
+
+        context_url
             .join(hash.to_multibase_string().as_str())
-            .int_err()?;
-        Ok(url)
+            .unwrap()
     }
 
     async fn get_external_download_url(

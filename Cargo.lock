@@ -2671,6 +2671,7 @@ dependencies = [
  "container-runtime",
  "curl",
  "curl-sys",
+ "dashmap",
  "datafusion",
  "digest 0.10.6",
  "dill",
