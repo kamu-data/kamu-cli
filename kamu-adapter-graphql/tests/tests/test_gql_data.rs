@@ -14,8 +14,8 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::infra;
 use kamu::infra::utils::s3_context::S3Context;
+use kamu::infra::{self, IpfsGateway, LogicalUrlConfig};
 use kamu::testing::{MetadataFactory, MinioServer, ParquetWriterHelper};
 use opendatafabric::*;
 use reqwest::Url;
@@ -80,9 +80,14 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
-    let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
+    let (endpoint, bucket, key_prefix) = S3Context::split_physical_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
-    let dataset_repo = infra::DatasetRepositoryS3::new(s3_context.clone());
+
+    let dataset_factory =
+        infra::DatasetFactoryImpl::new(IpfsGateway::default(), LogicalUrlConfig::default());
+
+    let dataset_repo =
+        infra::DatasetRepositoryS3::new(s3_context.clone(), Arc::new(dataset_factory));
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
@@ -97,6 +102,7 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
             s3_context.bucket,
             endpoint.unwrap(),
             true,
+            LogicalUrlConfig::default(),
         ))
         .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderS3>()
         .build()

@@ -203,7 +203,10 @@ async fn create_graph_remote(
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
         Arc::new(DatasetRepositoryLocalFs::new(ws.clone())),
-        Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
+        Arc::new(DatasetFactoryImpl::new(
+            IpfsGateway::default(),
+            LogicalUrlConfig::default(),
+        )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
     );

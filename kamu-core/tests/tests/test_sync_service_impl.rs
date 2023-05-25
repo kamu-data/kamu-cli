@@ -110,7 +110,10 @@ async fn do_test_sync(
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
+        ipfs_gateway,
+        LogicalUrlConfig::default(),
+    ));
 
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),

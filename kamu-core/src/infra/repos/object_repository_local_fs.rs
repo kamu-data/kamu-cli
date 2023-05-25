@@ -165,7 +165,7 @@ where
         Ok(Box::new(file))
     }
 
-    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+    async fn get_internal_logical_url(&self, hash: &Multihash) -> Url {
         Url::from_file_path(self.get_path(&hash)).unwrap()
     }
 

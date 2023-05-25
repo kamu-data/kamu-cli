@@ -228,6 +228,7 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::infra::utils::ipfs_wrapper::IpfsClient::default());
+    catalog.add_value(LogicalUrlConfig::default());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

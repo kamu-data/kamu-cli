@@ -60,7 +60,10 @@ async fn run_s3_server() -> S3 {
 async fn test_unauthorized() {
     let s3 = run_s3_server().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
@@ -72,7 +75,10 @@ async fn test_unauthorized() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
 
@@ -80,7 +86,10 @@ async fn test_insert_bytes() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes_long() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
 
     use rand::RngCore;
 
@@ -103,7 +112,10 @@ async fn test_insert_bytes_long() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
@@ -140,7 +152,10 @@ async fn test_insert_stream() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream_long() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
 
     use rand::RngCore;
 
@@ -174,7 +189,10 @@ async fn test_insert_stream_long() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
     test_object_repository_shared::test_delete(&repo).await;
 }
 
@@ -182,7 +200,10 @@ async fn test_delete() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_precomputed() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
 
@@ -190,7 +211,10 @@ async fn test_insert_precomputed() {
 #[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_expect() {
     let s3 = run_s3_server().await;
-    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+        S3Context::from_physical_url(&s3.url).await,
+        Url::parse("kamu://some").unwrap(),
+    );
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
 

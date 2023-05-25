@@ -43,7 +43,7 @@ pub trait ObjectRepository: Send + Sync {
     /// authorized to access the data. To let any anouthorized user access
     /// the data use [ObjectRepository::get_external_download_url()] to issue a
     /// pre-signed URL.
-    async fn get_internal_url(&self, hash: &Multihash) -> Url;
+    async fn get_internal_logical_url(&self, hash: &Multihash) -> Url;
 
     /// Returns a URL that should be accessible to any unauthorized user.
     ///

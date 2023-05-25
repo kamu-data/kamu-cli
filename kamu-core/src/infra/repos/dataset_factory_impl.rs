@@ -20,6 +20,7 @@ use crate::infra::*;
 
 pub struct DatasetFactoryImpl {
     ipfs_gateway: IpfsGateway,
+    logical_url_config: LogicalUrlConfig,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +40,11 @@ type DatasetImplLocalFS = DatasetImpl<
 
 #[component(pub)]
 impl DatasetFactoryImpl {
-    pub fn new(ipfs_gateway: IpfsGateway) -> Self {
-        Self { ipfs_gateway }
+    pub fn new(ipfs_gateway: IpfsGateway, logical_url_config: LogicalUrlConfig) -> Self {
+        Self {
+            ipfs_gateway,
+            logical_url_config,
+        }
     }
 
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
@@ -71,21 +75,30 @@ impl DatasetFactoryImpl {
         ))
     }
 
-    pub async fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
-        let s3_context = S3Context::from_url(&base_url).await;
+    async fn get_s3(&self, base_url: Url) -> Result<impl Dataset, InternalError> {
+        let s3_context = S3Context::from_physical_url(&base_url).await;
         let client = s3_context.client;
         let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
         let key_prefix = s3_context.root_folder_key;
 
+        let logical_dataset_root = self
+            .logical_url_config
+            .logical_root
+            .join(key_prefix.as_str())
+            .unwrap();
+
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
-                    client.clone(),
-                    endpoint.clone(),
-                    bucket.clone(),
-                    format!("{}blocks/", key_prefix),
-                )),
+                ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+                    S3Context::new(
+                        client.clone(),
+                        endpoint.clone(),
+                        bucket.clone(),
+                        format!("{}blocks/", key_prefix),
+                    ),
+                    logical_dataset_root.join("blocks/").unwrap(),
+                ),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
                     endpoint.clone(),
@@ -93,18 +106,24 @@ impl DatasetFactoryImpl {
                     format!("{}refs/", key_prefix),
                 ))),
             ),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
-                format!("{}data/", key_prefix),
-            )),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
-                client.clone(),
-                endpoint.clone(),
-                bucket.clone(),
-                format!("{}checkpoints/", key_prefix),
-            )),
+            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+                S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{}data/", key_prefix),
+                ),
+                logical_dataset_root.join("data/").unwrap(),
+            ),
+            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(
+                S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{}checkpoints/", key_prefix),
+                ),
+                logical_dataset_root.join("checkpoints/").unwrap(),
+            ),
             NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
@@ -236,7 +255,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds))
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3(url.clone()).await?;
+                let ds = self.get_s3(url.clone()).await?;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {
@@ -267,8 +286,25 @@ impl Default for IpfsGateway {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Debug)]
+pub struct LogicalUrlConfig {
+    pub logical_root: Url,
+}
+
+impl Default for LogicalUrlConfig {
+    fn default() -> Self {
+        Self {
+            logical_root: Url::parse("kamu://datasets").unwrap(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error("Failed to resolve DNSLink record: {record}")]
 struct DnsLinkResolutionError {
     pub record: String,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

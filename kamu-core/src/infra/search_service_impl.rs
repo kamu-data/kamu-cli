@@ -54,7 +54,7 @@ impl SearchServiceImpl {
                 }
             }
             "s3" | "s3+http" | "s3+https" => {
-                let s3_context = S3Context::from_url(&url).await;
+                let s3_context = S3Context::from_physical_url(&url).await;
                 let folders_common_prefixes = s3_context.bucket_list_folders().await?;
 
                 let query = query.unwrap_or_default();

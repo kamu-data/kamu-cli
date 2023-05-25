@@ -84,44 +84,48 @@ impl S3Context {
         Self::new(client, endpoint, bucket, root_folder_key)
     }
 
-    pub async fn from_url(url: &Url) -> Self {
-        let (endpoint, bucket, root_folder_key) = Self::split_url(url);
+    pub async fn from_physical_url(physical_url: &Url) -> Self {
+        let (endpoint, bucket, root_folder_key) = Self::split_physical_url(physical_url);
 
         assert!(
             root_folder_key.is_empty() || root_folder_key.ends_with('/'),
             "Base URL does not contain a trailing slash: {}",
-            url
+            physical_url
         );
 
         Self::from_items(endpoint, bucket, root_folder_key).await
     }
 
-    pub fn split_url(url: &Url) -> (Option<String>, String, String) {
+    pub fn split_physical_url(physical_url: &Url) -> (Option<String>, String, String) {
         // TODO: Support virtual hosted style URLs
         // See https://aws.amazon.com/blogs/aws/amazon-s3-path-deprecation-plan-the-rest-of-the-story/
-        let (endpoint, path): (Option<String>, String) =
-            match (url.scheme(), url.host_str(), url.port(), url.path()) {
-                ("s3", Some(host), None, path) => {
-                    return (
-                        None,
-                        host.to_owned(),
-                        path.trim_start_matches('/').to_owned(),
-                    )
-                }
-                ("s3+http", Some(host), None, path) => {
-                    (Some(format!("http://{}", host)), path.to_owned())
-                }
-                ("s3+http", Some(host), Some(port), path) => {
-                    (Some(format!("http://{}:{}", host, port)), path.to_owned())
-                }
-                ("s3+https", Some(host), None, path) => {
-                    (Some(format!("https://{}", host)), path.to_owned())
-                }
-                ("s3+https", Some(host), Some(port), path) => {
-                    (Some(format!("https://{}:{}", host, port)), path.to_owned())
-                }
-                _ => panic!("Unsupported S3 url format: {}", url),
-            };
+        let (endpoint, path): (Option<String>, String) = match (
+            physical_url.scheme(),
+            physical_url.host_str(),
+            physical_url.port(),
+            physical_url.path(),
+        ) {
+            ("s3", Some(host), None, path) => {
+                return (
+                    None,
+                    host.to_owned(),
+                    path.trim_start_matches('/').to_owned(),
+                )
+            }
+            ("s3+http", Some(host), None, path) => {
+                (Some(format!("http://{}", host)), path.to_owned())
+            }
+            ("s3+http", Some(host), Some(port), path) => {
+                (Some(format!("http://{}:{}", host, port)), path.to_owned())
+            }
+            ("s3+https", Some(host), None, path) => {
+                (Some(format!("https://{}", host)), path.to_owned())
+            }
+            ("s3+https", Some(host), Some(port), path) => {
+                (Some(format!("https://{}:{}", host, port)), path.to_owned())
+            }
+            _ => panic!("Unsupported S3 url format: {}", physical_url),
+        };
 
         let (bucket, root_folder_key) = match path.trim_start_matches('/').split_once('/') {
             Some((b, p)) => (b.to_owned(), p.to_owned()),
@@ -131,7 +135,7 @@ impl S3Context {
         (endpoint, bucket, root_folder_key)
     }
 
-    pub fn make_url(&self) -> Url {
+    pub fn make_physical_url(&self) -> Url {
         let context_url_str = match &self.endpoint {
             Some(endpoint) => {
                 format!("s3+{}/{}/{}", endpoint, self.bucket, self.root_folder_key)

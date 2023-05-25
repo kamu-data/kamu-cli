@@ -27,6 +27,7 @@ use crate::infra::utils::s3_context::{AsyncReadObj, S3Context};
 // base TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
+    logical_root: Url,
     _phantom: PhantomData<D>,
 }
 
@@ -37,9 +38,10 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
-    pub fn new(s3_context: S3Context) -> Self {
+    pub fn new(s3_context: S3Context, logical_root: Url) -> Self {
         Self {
             s3_context,
+            logical_root,
             _phantom: PhantomData,
         }
     }
@@ -121,19 +123,8 @@ where
         Ok(Box::new(stream))
     }
 
-    async fn get_internal_url(&self, hash: &Multihash) -> Url {
-        // TODO: This URL does not account for endpoint and it will collide in case we
-        // work with multiple S3-like storages having same buckets names
-        let context_url = Url::parse(
-            format!(
-                "s3://{}/{}",
-                self.s3_context.bucket, self.s3_context.root_folder_key
-            )
-            .as_str(),
-        )
-        .unwrap();
-
-        context_url
+    async fn get_internal_logical_url(&self, hash: &Multihash) -> Url {
+        self.logical_root
             .join(hash.to_multibase_string().as_str())
             .unwrap()
     }

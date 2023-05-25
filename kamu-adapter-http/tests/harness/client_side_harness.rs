@@ -71,7 +71,8 @@ impl ClientSideHarness {
         b.add_value(workspace_layout.clone())
             .add_value(ContainerRuntime::default())
             .add_value(utils::ipfs_wrapper::IpfsClient::default())
-            .add_value(IpfsGateway::default());
+            .add_value(IpfsGateway::default())
+            .add_value(LogicalUrlConfig::default());
 
         let catalog = b.build();
 

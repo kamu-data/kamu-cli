@@ -14,6 +14,7 @@ use dill::*;
 use object_store::aws::AmazonS3Builder;
 use url::Url;
 
+use super::LogicalUrlConfig;
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -23,14 +24,21 @@ pub struct ObjectStoreBuilderS3 {
     bucket_name: String,
     endpoint: String,
     allow_http: bool,
+    logical_url_config: LogicalUrlConfig,
 }
 
 impl ObjectStoreBuilderS3 {
-    pub fn new(bucket_name: String, endpoint: String, allow_http: bool) -> Self {
+    pub fn new(
+        bucket_name: String,
+        endpoint: String,
+        allow_http: bool,
+        logical_url_config: LogicalUrlConfig,
+    ) -> Self {
         Self {
             bucket_name,
             endpoint,
             allow_http,
+            logical_url_config,
         }
     }
 }
@@ -41,7 +49,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     fn object_store_url(&self) -> Url {
         // TODO: This URL does not account for endpoint and it will collide in case we
         // work with multiple S3-like storages having same buckets names
-        Url::parse(format!("s3://{}/", self.bucket_name).as_str()).unwrap()
+        self.logical_url_config.logical_root.clone()
     }
 
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {

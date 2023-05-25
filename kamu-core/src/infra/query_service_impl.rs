@@ -93,7 +93,7 @@ impl QueryServiceImpl {
                 let data_url = Box::new(
                     dataset
                         .as_data_repo()
-                        .get_internal_url(&last_data_slice.physical_hash)
+                        .get_internal_logical_url(&last_data_slice.physical_hash)
                         .await,
                 );
 
@@ -326,7 +326,7 @@ impl KamuSchema {
 
             let slice_url = dataset
                 .as_data_repo()
-                .get_internal_url(&slice.physical_hash)
+                .get_internal_logical_url(&slice.physical_hash)
                 .await;
 
             files.push(object_store::path::Path::from_url_path(slice_url.path()).int_err()?);
@@ -396,7 +396,7 @@ impl KamuSchema {
         let data_url = Box::new(
             dataset
                 .as_data_repo()
-                .get_internal_url(&Multihash::from_digest_sha3_256(b""))
+                .get_internal_logical_url(&Multihash::from_digest_sha3_256(b""))
                 .await,
         );
 

@@ -31,7 +31,10 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
         local_repo.clone(),
-        Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
+        Arc::new(DatasetFactoryImpl::new(
+            IpfsGateway::default(),
+            LogicalUrlConfig::default(),
+        )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
     );

@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use kamu::infra::utils::s3_context::S3Context;
-use kamu::infra::DatasetRepositoryS3;
+use kamu::infra::{DatasetFactoryImpl, DatasetRepositoryS3, IpfsGateway, LogicalUrlConfig};
 use kamu::testing::MinioServer;
 use url::Url;
 
@@ -53,8 +55,11 @@ async fn run_s3_server() -> S3 {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
-    let s3_context = S3Context::from_url(&s3.url).await;
-    DatasetRepositoryS3::new(s3_context)
+    let s3_context = S3Context::from_physical_url(&s3.url).await;
+    let dataset_factory =
+        DatasetFactoryImpl::new(IpfsGateway::default(), LogicalUrlConfig::default());
+
+    DatasetRepositoryS3::new(s3_context, Arc::new(dataset_factory))
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

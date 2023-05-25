@@ -14,7 +14,13 @@ use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal};
 use kamu::infra::utils::s3_context::S3Context;
-use kamu::infra::{DatasetLayout, DatasetRepositoryS3};
+use kamu::infra::{
+    DatasetFactoryImpl,
+    DatasetLayout,
+    DatasetRepositoryS3,
+    IpfsGateway,
+    LogicalUrlConfig,
+};
 use kamu::testing::MinioServer;
 use url::Url;
 
@@ -125,8 +131,11 @@ impl ServerSideHarness for ServerSideS3Harness {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
-    let s3_context = S3Context::from_url(&s3.url).await;
-    DatasetRepositoryS3::new(s3_context)
+    let s3_context = S3Context::from_physical_url(&s3.url).await;
+    let dataset_factory =
+        DatasetFactoryImpl::new(IpfsGateway::default(), LogicalUrlConfig::default());
+
+    DatasetRepositoryS3::new(s3_context, Arc::new(dataset_factory))
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

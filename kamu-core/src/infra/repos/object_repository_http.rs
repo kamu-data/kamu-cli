@@ -134,7 +134,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Ok(Box::new(reader))
     }
 
-    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+    async fn get_internal_logical_url(&self, hash: &Multihash) -> Url {
         self.base_url.join(&hash.to_multibase_string()).unwrap()
     }
 

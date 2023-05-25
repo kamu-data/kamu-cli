@@ -16,7 +16,7 @@ use opendatafabric::*;
 use thiserror::Error;
 use url::Url;
 
-use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
+use super::get_downstream_dependencies_impl;
 use crate::domain::*;
 use crate::infra::utils::s3_context::S3Context;
 
@@ -25,13 +25,17 @@ use crate::infra::utils::s3_context::S3Context;
 #[component(pub)]
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
+    dataset_factory: Arc<dyn DatasetFactory>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRepositoryS3 {
-    pub fn new(s3_context: S3Context) -> Self {
-        Self { s3_context }
+    pub fn new(s3_context: S3Context, dataset_factory: Arc<dyn DatasetFactory>) -> Self {
+        Self {
+            s3_context,
+            dataset_factory,
+        }
     }
 
     fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
@@ -40,7 +44,7 @@ impl DatasetRepositoryS3 {
             "Multitenancy is not yet supported by S3 repo"
         );
 
-        let context_url = self.s3_context.make_url();
+        let context_url = self.s3_context.make_physical_url();
         context_url
             .join(format!("{}/", &dataset_alias.dataset_name).as_str())
             .unwrap()
@@ -49,13 +53,16 @@ impl DatasetRepositoryS3 {
     async fn get_dataset_impl(
         &self,
         dataset_alias: &DatasetAlias,
-    ) -> Result<impl Dataset, InternalError> {
+    ) -> Result<Arc<dyn Dataset>, InternalError> {
         assert!(
             !dataset_alias.is_multitenant(),
             "Multitenancy is not yet supported by S3 repo"
         );
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
-        DatasetFactoryImpl::get_s3(dataset_url).await
+        self.dataset_factory
+            .get_dataset(&dataset_url, false)
+            .await
+            .int_err()
     }
 
     async fn delete_dataset_s3_objects(
@@ -99,16 +106,6 @@ impl DatasetRepositoryS3 {
             .await?;
 
         Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl Clone for DatasetRepositoryS3 {
-    fn clone(&self) -> Self {
-        Self {
-            s3_context: self.s3_context.clone(),
-        }
     }
 }
 
@@ -190,8 +187,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.alias).await?;
-        Ok(Arc::new(dataset))
+        self.get_dataset_impl(&handle.alias)
+            .await
+            .map_err(|e| GetDatasetError::Internal(e))
     }
 
     async fn create_dataset(
@@ -201,7 +199,11 @@ impl DatasetRepository for DatasetRepositoryS3 {
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
-        let dataset = DatasetFactoryImpl::get_s3(dataset_url).await?;
+        let dataset = self
+            .dataset_factory
+            .get_dataset(&dataset_url, true)
+            .await
+            .int_err()?;
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
@@ -227,7 +229,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         Ok(CreateDatasetResult {
             dataset_handle: DatasetHandle::new(dataset_id, dataset_alias.clone()),
-            dataset: Arc::new(dataset),
+            dataset,
             head,
         })
     }

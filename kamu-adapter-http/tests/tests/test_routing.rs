@@ -99,7 +99,7 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default())
+    let dataset = DatasetFactoryImpl::new(IpfsGateway::default(), LogicalUrlConfig::default())
         .get_dataset(&dataset_url, false)
         .await
         .unwrap();
