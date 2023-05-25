@@ -15,8 +15,8 @@ pub mod dynamic {
     pub use super::dtos_dyntraits_generated::*;
 }
 
-mod dtos_trait_impls;
-pub use dtos_trait_impls::*;
+mod dtos_extra;
+pub use dtos_extra::*;
 
 mod constants;
 pub use constants::*;

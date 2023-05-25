@@ -126,15 +126,16 @@ impl QueryService for QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let vocab: DatasetVocabulary = dataset
+        let vocab = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
             .try_first()
             .await
             .int_err()?
-            .map(|sv| sv.into())
-            .unwrap_or_default();
+            .map(|sv| -> DatasetVocabulary { sv.into() })
+            .unwrap_or_default()
+            .into_resolved();
 
         let ctx = self
             .session_context(QueryOptions {
@@ -192,7 +193,7 @@ impl QueryService for QueryServiceImpl {
             r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
             fields = fields.join(", "),
             dataset = dataset_handle.alias,
-            offset_col = vocab.offset_column.unwrap_or("offset".to_owned()),
+            offset_col = vocab.offset_column.to_owned(),
             num_records = num_records
         );
 
