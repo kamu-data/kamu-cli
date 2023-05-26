@@ -45,16 +45,16 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-arrow = { version = "38", features = ["chrono-tz"] }
-arrow-digest = "38"
-datafusion = "24"
+arrow = { version = "39", features = ["chrono-tz"] }
+arrow-digest = "39"
+datafusion = "25"
 object_store = { version = "0.5", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"
 
 # Repositories
 aws-config = { version = "0.55" }
-aws-sdk-s3 = { version = "0.27" }
+aws-sdk-s3 = { version = "0.28" }
 aws-smithy-http = { version = "0.55", features = ["rt-tokio"] }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
