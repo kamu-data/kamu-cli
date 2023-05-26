@@ -1,6 +1,6 @@
 [package]
 name = "kamu-cli"
-version = "0.126.2"
+version = "0.127.0"
 description = "Decentralized data management tool"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
@@ -29,11 +29,11 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.126.2", path = "../opendatafabric" }
-kamu = { version = "0.126.2", path = "../kamu-core" }
-kamu-adapter-graphql = { version = "0.126.2", path = "../kamu-adapter-graphql" }
-kamu-adapter-http = { version = "0.126.2", path = "../kamu-adapter-http" }
-container-runtime = { version = "0.126.2", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.127.0", path = "../opendatafabric" }
+kamu = { version = "0.127.0", path = "../kamu-core" }
+kamu-adapter-graphql = { version = "0.127.0", path = "../kamu-adapter-graphql" }
+kamu-adapter-http = { version = "0.127.0", path = "../kamu-adapter-http" }
+container-runtime = { version = "0.127.0", path = "../utils/container-runtime" }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations

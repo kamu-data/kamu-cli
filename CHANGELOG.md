@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.127.0] - 2023-05-27
+### Added
+- Experimental support for new [`datafusion` engine](https://github.com/kamu-data/kamu-engine-datafusion) based on [Apache Arrow DataFusion](https://github.com/apache/arrow-datafusion). Although its a batch-oriented engine it can provide a massive performance boost for simple filter/map operations. See the [updated documentation](https://docs.kamu.dev/cli/supported-engines/) for details and current limitations.
+
 ## [0.126.2] - 2023-05-26
 ### Fixed
 - AWS S3 object store is getting proper credentials from already resolved AWS SDK cache

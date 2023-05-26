@@ -1,6 +1,6 @@
 [package]
 name = "container-runtime"
-version = "0.126.2"
+version = "0.127.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
