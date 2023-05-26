@@ -45,13 +45,26 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     }
 
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
-        let s3_builder = AmazonS3Builder::new()
+        let env_aws_default_region = env::var("AWS_DEFAULT_REGION");
+        let env_aws_access_key_id = env::var("AWS_ACCESS_KEY_ID");
+        let env_aws_secret_access_key = env::var("AWS_SECRET_ACCESS_KEY");
+
+        let mut s3_builder = AmazonS3Builder::new()
             .with_endpoint(self.endpoint.clone())
             .with_bucket_name(self.bucket_name.clone())
-            .with_region(env::var("AWS_DEFAULT_REGION").unwrap())
-            .with_access_key_id(env::var("AWS_ACCESS_KEY_ID").unwrap())
-            .with_secret_access_key(env::var("AWS_SECRET_ACCESS_KEY").unwrap())
             .with_allow_http(self.allow_http);
+
+        if let Ok(aws_default_region) = env_aws_default_region {
+            s3_builder = s3_builder.with_region(aws_default_region);
+        }
+
+        if let Ok(aws_access_key_id) = env_aws_access_key_id {
+            s3_builder = s3_builder.with_access_key_id(aws_access_key_id);
+        }
+
+        if let Ok(aws_secret_access_key) = env_aws_secret_access_key {
+            s3_builder = s3_builder.with_secret_access_key(aws_secret_access_key);
+        }
 
         let object_store = s3_builder.build().int_err()?;
 
