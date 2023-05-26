@@ -128,6 +128,8 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
     let dataset_repo = infra::DatasetRepositoryS3::new(s3_context.clone());
 
+    let s3_credentials = s3_context.credentials().await;
+
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .bind::<dyn DatasetRepository, infra::DatasetRepositoryS3>()
@@ -138,8 +140,8 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
         .add_value(infra::ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderLocalFs>()
         .add_value(infra::ObjectStoreBuilderS3::new(
-            s3_context.bucket,
-            endpoint.unwrap(),
+            s3_context,
+            s3_credentials,
             true,
         ))
         .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderS3>()

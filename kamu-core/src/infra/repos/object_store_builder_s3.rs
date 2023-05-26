@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::env;
 use std::sync::Arc;
 
 use dill::*;
@@ -15,21 +14,26 @@ use object_store::aws::AmazonS3Builder;
 use url::Url;
 
 use crate::domain::*;
+use crate::infra::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 pub struct ObjectStoreBuilderS3 {
-    bucket_name: String,
-    endpoint: String,
+    s3_context: S3Context,
+    credentials: aws_sdk_s3::config::Credentials,
     allow_http: bool,
 }
 
 impl ObjectStoreBuilderS3 {
-    pub fn new(bucket_name: String, endpoint: String, allow_http: bool) -> Self {
+    pub fn new(
+        s3_context: S3Context,
+        credentials: aws_sdk_s3::config::Credentials,
+        allow_http: bool,
+    ) -> Self {
         Self {
-            bucket_name,
-            endpoint,
+            s3_context,
+            credentials,
             allow_http,
         }
     }
@@ -41,30 +45,21 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     fn object_store_url(&self) -> Url {
         // TODO: This URL does not account for endpoint and it will collide in case we
         // work with multiple S3-like storages having same buckets names
-        Url::parse(format!("s3://{}/", self.bucket_name).as_str()).unwrap()
+        Url::parse(format!("s3://{}/", self.s3_context.bucket).as_str()).unwrap()
     }
 
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
-        let env_aws_default_region = env::var("AWS_DEFAULT_REGION");
-        let env_aws_access_key_id = env::var("AWS_ACCESS_KEY_ID");
-        let env_aws_secret_access_key = env::var("AWS_SECRET_ACCESS_KEY");
+        // Endpoint and region are mandatory
+        let endpoint = self.s3_context.endpoint.clone().unwrap();
+        let region = self.s3_context.region().unwrap();
 
-        let mut s3_builder = AmazonS3Builder::new()
-            .with_endpoint(self.endpoint.clone())
-            .with_bucket_name(self.bucket_name.clone())
+        let s3_builder = AmazonS3Builder::new()
+            .with_endpoint(endpoint)
+            .with_region(region)
+            .with_access_key_id(self.credentials.access_key_id())
+            .with_secret_access_key(self.credentials.secret_access_key())
+            .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
-
-        if let Ok(aws_default_region) = env_aws_default_region {
-            s3_builder = s3_builder.with_region(aws_default_region);
-        }
-
-        if let Ok(aws_access_key_id) = env_aws_access_key_id {
-            s3_builder = s3_builder.with_access_key_id(aws_access_key_id);
-        }
-
-        if let Ok(aws_secret_access_key) = env_aws_secret_access_key {
-            s3_builder = s3_builder.with_secret_access_key(aws_secret_access_key);
-        }
 
         let object_store = s3_builder.build().int_err()?;
 
