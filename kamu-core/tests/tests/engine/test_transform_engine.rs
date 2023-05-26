@@ -107,7 +107,11 @@ impl DatasetHelper {
             record_batch.schema(),
             Some(
                 WriterProperties::builder()
-                    .set_column_dictionary_enabled(ColumnPath::new(vec!["city".to_string()]), true)
+                    .set_max_row_group_size(1)
+                    .set_column_dictionary_enabled(
+                        ColumnPath::new(vec!["city".to_string(), "population_x10".to_string()]),
+                        true,
+                    )
                     .build(),
             ),
         )
@@ -440,6 +444,20 @@ async fn test_transform_with_engine_flink() {
         MetadataFactory::transform()
             .engine("flink")
             .query("SELECT event_time, city, population * 10 as population_x10 FROM root")
+            .build(),
+    )
+    .await
+}
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(feature = "skip_docker_tests", ignore)]
+async fn test_transform_with_engine_datafusion() {
+    test_transform_common(
+        MetadataFactory::transform()
+            .engine("datafusion")
+            .query(
+                "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
+            )
             .build(),
     )
     .await
