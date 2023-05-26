@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use console::style as s;
 use container_runtime::ContainerRuntime;
-use kamu::domain::error::*;
+use internal_error::*;
 use kamu::infra::*;
 
 use super::common::PullImageProgress;

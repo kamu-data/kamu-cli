@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::*;
-use kamu::domain::error::*;
+use internal_error::*;
 use kamu::infra::*;
 
 use crate::JupyterConfig;

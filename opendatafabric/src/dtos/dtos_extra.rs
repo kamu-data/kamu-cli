@@ -130,7 +130,7 @@ impl<'a> DatasetVocabularyResolved<'a> {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl TransformSql {
-    pub fn normalize_queries(mut self) -> Self {
+    pub fn normalize_queries(mut self, implicit_alias: Option<String>) -> Self {
         if let Some(query) = self.query {
             assert!(!self.queries.is_some());
 
@@ -155,6 +155,15 @@ impl TransformSql {
             nameless_queries <= 1,
             "TransformSql has multiple queries without an alias"
         );
+
+        if nameless_queries > 0 {
+            for step in self.queries.as_mut().unwrap() {
+                if step.alias.is_none() {
+                    step.alias = implicit_alias;
+                    break;
+                }
+            }
+        }
 
         self
     }
@@ -204,7 +213,7 @@ impl Display for ExecuteQueryResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
-            write!(f, "\n\n--- Backtrace ---\n{}", bt)?;
+            write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
         }
         Ok(())
     }

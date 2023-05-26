@@ -12,9 +12,6 @@
 pub mod dtos;
 pub use dtos::*;
 
-pub mod error;
-pub use error::*;
-
 // Repositories
 
 pub mod repos;
@@ -71,6 +68,8 @@ mod transform_service;
 pub use transform_service::*;
 
 mod verification_service;
+
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
+pub use internal_error::*;
 pub use verification_service::*;

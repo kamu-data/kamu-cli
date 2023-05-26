@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
+use internal_error::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
@@ -74,13 +75,13 @@ pub struct IngestRequest {
 
 #[derive(Debug, Error)]
 pub enum EngineError {
-    #[error("{0}")]
+    #[error(transparent)]
     InvalidQuery(#[from] InvalidQueryError),
-    #[error("{0}")]
+    #[error(transparent)]
     ProcessError(#[from] ProcessError),
-    #[error("{0}")]
+    #[error(transparent)]
     ContractError(#[from] ContractError),
-    #[error("{0}")]
+    #[error(transparent)]
     InternalError(#[from] InternalEngineError),
 }
 
@@ -176,20 +177,16 @@ impl std::fmt::Display for ContractError {
 #[derive(Debug, Error)]
 pub struct InternalEngineError {
     #[source]
-    pub source: Box<dyn std::error::Error + Send + Sync>,
+    pub source: InternalError,
     pub log_files: Vec<PathBuf>,
-    #[backtrace]
-    pub backtrace: Backtrace,
 }
 
 impl std::fmt::Display for InternalEngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Internal error: {}", self.source)?;
-
         if self.log_files.len() != 0 {
-            write!(f, "\nSee log files for details:\n")?;
+            write!(f, "Internal engine error, see log files for details:")?;
             for path in self.log_files.iter() {
-                write!(f, "- {}\n", path.display())?;
+                write!(f, "\n- {}", path.display())?;
             }
         }
 
@@ -220,14 +217,10 @@ impl EngineError {
         })
     }
 
-    pub fn internal<E>(e: E, log_files: Vec<PathBuf>) -> Self
-    where
-        E: std::error::Error + Send + Sync + 'static,
-    {
+    pub fn internal(e: impl Into<BoxedError>, log_files: Vec<PathBuf>) -> Self {
         EngineError::InternalError(InternalEngineError {
-            source: e.into(),
+            source: InternalError::new(e),
             log_files: normalize_logs(log_files),
-            backtrace: Backtrace::capture(),
         })
     }
 }

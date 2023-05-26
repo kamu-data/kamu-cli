@@ -11,6 +11,8 @@ doctest = false
 
 
 [dependencies]
+internal-error = { version = "0.127.0", path = "../utils/internal-error" }
+
 chrono = { version = "0.4", features = ["serde"] }
 indoc = "2"
 thiserror = "1"

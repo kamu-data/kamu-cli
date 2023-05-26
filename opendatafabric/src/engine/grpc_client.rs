@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::*;
 use thiserror::Error;
 
 use super::grpc_generated::engine_client::EngineClient as EngineClientGRPC;
@@ -38,18 +39,23 @@ impl EngineGrpcClient {
     ) -> Result<ExecuteQueryResponseSuccess, ExecuteQueryError> {
         let fb = FlatbuffersEngineProtocol
             .write_execute_query_request(&request)
-            .unwrap();
+            .int_err()?;
 
         let request_grpc = tonic::Request::new(ExecuteQueryRequestGRPC {
             flatbuffer: fb.collapse_vec(),
         });
 
-        let mut stream = self.client.execute_query(request_grpc).await?.into_inner();
+        let mut stream = self
+            .client
+            .execute_query(request_grpc)
+            .await
+            .int_err()?
+            .into_inner();
 
-        while let Some(response_grpc) = stream.message().await? {
+        while let Some(response_grpc) = stream.message().await.int_err()? {
             let response = FlatbuffersEngineProtocol
                 .read_execute_query_response(&response_grpc.flatbuffer)
-                .unwrap();
+                .int_err()?;
 
             match response {
                 ExecuteQueryResponse::Progress => (),
@@ -59,7 +65,11 @@ impl EngineGrpcClient {
             }
         }
 
-        unreachable!("Engine did not transmit Success or Error message in the response stream")
+        Err(
+            "Engine did not transmit Success or Error message in the response stream"
+                .int_err()
+                .into(),
+        )
     }
 }
 
@@ -71,8 +81,8 @@ pub enum ExecuteQueryError {
     InvalidQuery(ExecuteQueryResponseInvalidQuery),
     #[error("Engine internal error: {0}")]
     EngineInternalError(ExecuteQueryResponseInternalError),
-    #[error("Rpc error: {0}")]
-    RpcError(#[from] tonic::Status),
+    #[error(transparent)]
+    InternalError(#[from] InternalError),
 }
 
 impl From<ExecuteQueryResponseInvalidQuery> for ExecuteQueryError {

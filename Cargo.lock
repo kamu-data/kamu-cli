@@ -2604,6 +2604,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
+name = "internal-error"
+version = "0.127.0"
+dependencies = [
+ "test-log",
+ "thiserror",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2733,6 +2741,7 @@ dependencies = [
  "http",
  "hyper",
  "indoc",
+ "internal-error",
  "itertools",
  "libc",
  "object_store",
@@ -2858,6 +2867,7 @@ dependencies = [
  "hyper",
  "indicatif",
  "indoc",
+ "internal-error",
  "itertools",
  "kamu",
  "kamu-adapter-graphql",
@@ -3472,6 +3482,7 @@ dependencies = [
  "flatbuffers",
  "hex",
  "indoc",
+ "internal-error",
  "prost",
  "rand 0.7.3",
  "serde",

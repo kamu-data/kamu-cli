@@ -103,13 +103,13 @@ pub enum TransformError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error("Engine provisioning error")]
+    #[error(transparent)]
     EngineProvisioningError(
         #[from]
         #[backtrace]
         EngineProvisioningError,
     ),
-    #[error("Engine error")]
+    #[error(transparent)]
     EngineError(
         #[from]
         #[backtrace]

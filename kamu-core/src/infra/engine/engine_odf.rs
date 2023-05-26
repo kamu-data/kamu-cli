@@ -28,8 +28,6 @@ pub struct ODFEngine {
 }
 
 impl ODFEngine {
-    const CT_VOLUME_DIR: &'static str = "/opt/engine/volume";
-
     pub fn new(
         container_runtime: ContainerRuntime,
         engine_config: ODFEngineConfig,
@@ -53,6 +51,9 @@ impl ODFEngine {
     ) -> Result<odf::ExecuteQueryResponseSuccess, EngineError> {
         tracing::info!(?request, "Performing engine operation");
 
+        let new_checkpoint_path = request.new_checkpoint_path.clone();
+        let out_data_path = request.out_data_path.clone();
+
         let response = engine_client.execute_query(request).await;
 
         tracing::info!(?response, "Operation response");
@@ -66,10 +67,11 @@ impl ODFEngine {
                         .exec_shell_cmd(
                             ExecArgs::default(),
                             format!(
-                                "chown -R {}:{} {}",
+                                "chown -Rf {}:{} {} {}",
                                 users::get_current_uid(),
                                 users::get_current_gid(),
-                                Self::CT_VOLUME_DIR
+                                new_checkpoint_path.display(),
+                                out_data_path.display(),
                             )
                         )
                         .status()
@@ -85,37 +87,25 @@ impl ODFEngine {
             e @ ExecuteQueryError::EngineInternalError(_) => {
                 EngineError::internal(e, engine_container.log_files())
             }
-            e @ ExecuteQueryError::RpcError(_) => {
+            ExecuteQueryError::InternalError(e) => {
                 EngineError::internal(e, engine_container.log_files())
             }
         })
     }
 
-    fn to_container_path(&self, host_path: &Path) -> PathBuf {
-        let host_path = Self::canonicalize_via_parent(host_path).unwrap();
-        let datasets_path = self.workspace_layout.datasets_dir.canonicalize().unwrap();
-        let repo_rel_path = host_path.strip_prefix(datasets_path).unwrap();
-
-        let mut container_path = Self::CT_VOLUME_DIR.to_owned();
-        container_path.push('/');
-        container_path.push_str(&repo_rel_path.to_string_lossy());
-        PathBuf::from(container_path)
+    fn workspace_dir_in_container(&self) -> PathBuf {
+        PathBuf::from("/opt/engine/workspace")
     }
 
-    fn canonicalize_via_parent(path: &Path) -> Result<PathBuf, std::io::Error> {
-        match path.canonicalize() {
-            Ok(p) => Ok(p),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                if let Some(parent) = path.parent() {
-                    let mut cp = Self::canonicalize_via_parent(parent)?;
-                    cp.push(path.file_name().unwrap());
-                    Ok(cp)
-                } else {
-                    Err(e)
-                }
-            }
-            e @ _ => e,
-        }
+    fn to_container_path(&self, host_path: &Path) -> PathBuf {
+        assert!(host_path.is_absolute());
+        assert!(self.workspace_layout.root_dir.is_absolute());
+        let rel = host_path
+            .strip_prefix(&self.workspace_layout.root_dir)
+            .unwrap();
+        let joined = self.workspace_dir_in_container().join(rel);
+        let unix_path = joined.to_str().unwrap().replace("\\", "/");
+        PathBuf::from(unix_path)
     }
 }
 
@@ -152,9 +142,11 @@ impl Engine for ODFEngine {
             self.engine_config.clone(),
             LogsConfig::new(&self.workspace_layout.run_info_dir),
             &self.image,
+            // TODO: Avoid giving access to the entire workspace data
+            // TODO: Use read-only permissions where possible
             vec![(
-                self.workspace_layout.datasets_dir.clone(),
-                PathBuf::from(Self::CT_VOLUME_DIR),
+                self.workspace_layout.root_dir.clone(),
+                self.workspace_dir_in_container(),
             )],
         )
         .await?;

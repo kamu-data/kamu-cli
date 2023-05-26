@@ -1,0 +1,18 @@
+[package]
+name = "internal-error"
+version = "0.127.0"
+authors = ["Kamu Data Inc. <info@kamu.dev>"]
+edition.workspace = true
+license = "Apache-2.0"
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+thiserror = "1"
+
+
+[dev-dependencies]
+test-log = { version = "0.2" }

@@ -439,19 +439,21 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_eq!(
-        plan[0].operation.request.inputs,
-        deriv_req_t2.request.inputs
-    );
-    assert_eq!(plan[0].operation.request, deriv_req_t2.request);
-    assert_eq!(
-        plan[1].operation.request.inputs,
-        deriv_req_t4.request.inputs
-    );
-    assert_eq!(plan[1].operation.request, deriv_req_t4.request);
-    assert_eq!(
-        plan[2].operation.request.inputs,
-        deriv_req_t6.request.inputs
-    );
-    assert_eq!(plan[2].operation.request, deriv_req_t6.request);
+    assert_requests_eqivalent(&plan[0].operation.request, &deriv_req_t2.request);
+    assert_requests_eqivalent(&plan[1].operation.request, &deriv_req_t4.request);
+    assert_requests_eqivalent(&plan[2].operation.request, &deriv_req_t6.request);
+}
+
+fn assert_requests_eqivalent(lhs: &ExecuteQueryRequest, rhs: &ExecuteQueryRequest) {
+    // Paths are randomly generated, so ignoring them for this check
+    let mut lhs = lhs.clone();
+    let mut rhs = rhs.clone();
+
+    lhs.new_checkpoint_path = Default::default();
+    lhs.out_data_path = Default::default();
+    rhs.new_checkpoint_path = Default::default();
+    rhs.out_data_path = Default::default();
+
+    assert_eq!(lhs.inputs, rhs.inputs);
+    assert_eq!(lhs, rhs);
 }

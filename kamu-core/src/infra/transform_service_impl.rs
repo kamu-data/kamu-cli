@@ -344,24 +344,21 @@ impl TransformServiceImpl {
             .int_err()?;
 
         // TODO: This service shouldn't know specifics of dataset layouts
-        // perhaps it should only receive a staging file to write into from Dataset
-        // interface
-        let output_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
-        // TODO: Avoid giving engines write access directly to data and checkpoint dirs
-        // to prevent accidents and creation of garbage files like .crc
-        let out_data_path = output_layout.data_dir.join(".pending");
-        let prev_checkpoint_path = prev_checkpoint
-            .as_ref()
-            .map(|cp| output_layout.checkpoint_path(&cp.physical_hash));
-        let new_checkpoint_path = output_layout.checkpoints_dir.join(".pending");
+        let prev_checkpoint_path = prev_checkpoint.as_ref().map(|cp| {
+            self.workspace_layout
+                .dataset_layout(&dataset_handle.alias)
+                .checkpoint_path(&cp.physical_hash)
+        });
 
-        // Clean up previous state leftovers
-        if out_data_path.exists() {
-            std::fs::remove_file(&out_data_path).int_err()?;
-        }
-        if new_checkpoint_path.exists() {
-            std::fs::remove_file(&new_checkpoint_path).int_err()?;
-        }
+        // TODO: Reconsider where to store staged files
+        let out_data_path = self
+            .workspace_layout
+            .run_info_dir
+            .join(super::repos::get_staging_name());
+        let new_checkpoint_path = self
+            .workspace_layout
+            .run_info_dir
+            .join(super::repos::get_staging_name());
 
         assert!(
             !dataset_handle.alias.is_multitenant(),

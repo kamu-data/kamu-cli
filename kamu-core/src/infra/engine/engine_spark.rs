@@ -117,11 +117,12 @@ impl SparkEngine {
             if #[cfg(unix)] {
                 let chown = if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
                     format!(
-                        "; chown -R {}:{} {} {}",
+                        "; chown -Rf {}:{} {} {} {} || true",
                         users::get_current_uid(),
                         users::get_current_gid(),
-                        self.workspace_dir_in_container().display(),
-                        self.in_out_dir_in_container().display()
+                        self.in_out_dir_in_container().display(),
+                        request.new_checkpoint_path.display(),
+                        request.output_data_path.display(),
                     )
                 } else {
                     "".to_owned()
@@ -136,6 +137,8 @@ impl SparkEngine {
             .run_attached(&self.image)
             .volumes([
                 (&run_info.in_out_dir, self.in_out_dir_in_container()),
+                // TODO: Avoid giving access to the entire workspace data
+                // TODO: Use read-only permissions where possible
                 (
                     &self.workspace_layout.root_dir,
                     self.workspace_dir_in_container(),

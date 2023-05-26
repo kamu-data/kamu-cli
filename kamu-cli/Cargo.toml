@@ -29,6 +29,7 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
+internal-error = { version = "0.127.0", path = "../utils/internal-error" }
 opendatafabric = { version = "0.127.0", path = "../opendatafabric" }
 kamu = { version = "0.127.0", path = "../kamu-core" }
 kamu-adapter-graphql = { version = "0.127.0", path = "../kamu-adapter-graphql" }

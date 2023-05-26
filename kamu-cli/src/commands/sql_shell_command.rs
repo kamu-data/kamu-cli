@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
-use kamu::domain::error::*;
+use internal_error::*;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::infra::*;
 
