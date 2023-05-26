@@ -1,9 +1,23 @@
 [bans]
+# Forbid multiple versions of same dependency (with some exceptions)
 # TODO: Change to "deny" once we crack down on duplication
 multiple-versions = "warn"
 # Avoid adding dependencies to this list as this slows down compilation.
 # Find another ways to avoid duplication.
-skip = []
+skip-tree = [
+]
+
+# We should always specify version ranges
+wildcards = "deny"
+
+# We specify features explicitly to avoid bloat
+workspace-default-features = "deny"
+features = [
+    { name = "kamu", allow = ["default"] },
+    { name = "kamu-cli", allow = ["default"] },
+]
+
+# Crates we shouldn't use
 deny = [
     # Use `md-5` instead, which is part of the RustCrypto ecosystem
     { name = "md5" },

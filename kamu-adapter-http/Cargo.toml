@@ -16,9 +16,9 @@ skip_docker_tests = []
 
 [dependencies]
 dill = "0.5"
-opendatafabric = { version = "0.126.2", path = "../opendatafabric" }
-kamu = { version = "0.126.2", path = "../kamu-core" }
-container-runtime = { version = "0.126.2", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.126.2", path = "../opendatafabric", default-features = false }
+kamu = { version = "0.126.2", path = "../kamu-core", default-features = false }
+container-runtime = { version = "0.126.2", path = "../utils/container-runtime", default-features = false }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.7", features = ["async-read-body"] }

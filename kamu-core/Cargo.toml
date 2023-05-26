@@ -22,7 +22,7 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.126.2", path = "../opendatafabric" }
+opendatafabric = { version = "0.126.2", path = "../opendatafabric", default-features = false }
 container-runtime = { version = "0.126.2", path = "../utils/container-runtime" }
 
 # Serialization
