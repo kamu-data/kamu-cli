@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use container_runtime::*;
 
-const TEST_IMAGE: &str = "docker.io/busybox:latest";
+pub const TEST_IMAGE: &str = "docker.io/busybox:latest";
 
 // TODO: Remove this once we finished debugging the flaky test problem
 fn dump_state(hint: &str) {
