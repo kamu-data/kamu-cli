@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-http"
-version = "0.126.1"
+version = "0.126.2"
 authors = ["Sergei Zaychenko <szaychenko@kamu.dev>"]
 edition.workspace = true
 publish = false
@@ -16,9 +16,9 @@ skip_docker_tests = []
 
 [dependencies]
 dill = "0.5"
-opendatafabric = { version = "0.126.1", path = "../opendatafabric" }
-kamu = { version = "0.126.1", path = "../kamu-core" }
-container-runtime = { version = "0.126.1", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.126.2", path = "../opendatafabric" }
+kamu = { version = "0.126.2", path = "../kamu-core" }
+container-runtime = { version = "0.126.2", path = "../utils/container-runtime" }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.7", features = ["async-read-body"] }

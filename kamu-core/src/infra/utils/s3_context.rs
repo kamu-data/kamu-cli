@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use aws_credential_types::Credentials;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
@@ -141,6 +142,19 @@ impl S3Context {
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()
+    }
+
+    pub async fn credentials(&self) -> Credentials {
+        use aws_credential_types::cache::ProvideCachedCredentials;
+        let credentials_cache = self.client.conf().credentials_cache();
+        credentials_cache
+            .provide_cached_credentials()
+            .await
+            .unwrap()
+    }
+
+    pub fn region(&self) -> Option<&str> {
+        self.client.conf().region().map(|r| r.as_ref())
     }
 
     pub fn get_key(&self, key: &str) -> String {

@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.126.1"
+version = "0.126.2"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license-file = "../LICENSE.txt"
@@ -22,8 +22,8 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.126.1", path = "../opendatafabric" }
-container-runtime = { version = "0.126.1", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.126.2", path = "../opendatafabric" }
+container-runtime = { version = "0.126.2", path = "../utils/container-runtime" }
 
 # Serialization
 flatbuffers = "23"
@@ -56,6 +56,7 @@ sha3 = "0.10"
 aws-config = { version = "0.55" }
 aws-sdk-s3 = { version = "0.28" }
 aws-smithy-http = { version = "0.55", features = ["rt-tokio"] }
+aws-credential-types = "*"
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
 # Utils
