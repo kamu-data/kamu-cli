@@ -56,7 +56,7 @@ sha3 = "0.10"
 aws-config = { version = "0.55" }
 aws-sdk-s3 = { version = "0.28" }
 aws-smithy-http = { version = "0.55", features = ["rt-tokio"] }
-aws-credential-types = "*"
+aws-credential-types = { version = "0.55" }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
 # Utils
