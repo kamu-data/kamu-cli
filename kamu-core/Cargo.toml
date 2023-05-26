@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.125.1"
+version = "0.126.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license-file = "../LICENSE.txt"
@@ -22,8 +22,8 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-opendatafabric = { version = "0.125.1", path = "../opendatafabric" }
-container-runtime = { version = "0.125.1", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.126.0", path = "../opendatafabric" }
+container-runtime = { version = "0.126.0", path = "../utils/container-runtime" }
 
 # Serialization
 flatbuffers = "23"
@@ -45,16 +45,16 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-arrow = { version = "38", features = ["chrono-tz"] }
-arrow-digest = "38"
-datafusion = "24"
-object_store = "0.5"
+arrow = { version = "39", features = ["chrono-tz"] }
+arrow-digest = "39"
+datafusion = "25"
+object_store = { version = "0.5", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"
 
 # Repositories
 aws-config = { version = "0.55" }
-aws-sdk-s3 = { version = "0.27" }
+aws-sdk-s3 = { version = "0.28" }
 aws-smithy-http = { version = "0.55", features = ["rt-tokio"] }
 trust-dns-resolver = "0.22"  # TODO: Needed for DNSLink resolution with IPFS
 
@@ -65,6 +65,7 @@ async-trait = "0.1"
 bytes = "1"
 cfg-if = "1"  # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
+dashmap = "5"
 futures = "0.3"
 glob = "0.3"  # Used for glob fetch
 hyper = "0.14"

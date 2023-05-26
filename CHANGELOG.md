@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.126.0] - 2023-05-26
+### Changed
+- Refactoring of query service to support S3-based dataset repositories
+
 ## [0.125.1] - 2023-05-22
 ### Fixed
 - Container will be considered ready only when reaching `running` status, not `created`

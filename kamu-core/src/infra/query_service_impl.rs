@@ -7,15 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use datafusion::catalog::catalog::CatalogProvider;
 use datafusion::catalog::schema::SchemaProvider;
 use datafusion::datasource::TableProvider;
-use datafusion::execution::context::SessionState;
+use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
 use datafusion::parquet::basic::LogicalType;
-use datafusion::parquet::file::reader::{FileReader, SerializedFileReader};
+use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use dill::*;
@@ -24,25 +24,94 @@ use opendatafabric::*;
 
 use crate::domain::*;
 use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
-use crate::infra::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct QueryServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
-    workspace_layout: Arc<WorkspaceLayout>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    object_store_registry: Arc<dyn ObjectStoreRegistry>,
 }
 
 #[component(pub)]
 impl QueryServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        dataset_repo: Arc<dyn DatasetRepository>,
+        object_store_registry: Arc<dyn ObjectStoreRegistry>,
     ) -> Self {
         Self {
-            local_repo,
-            workspace_layout,
+            dataset_repo,
+            object_store_registry,
+        }
+    }
+
+    fn session_context(&self, options: QueryOptions) -> Result<SessionContext, InternalError> {
+        let cfg = SessionConfig::new()
+            .with_information_schema(true)
+            .with_default_catalog_and_schema("kamu", "kamu");
+
+        let runtime_config = RuntimeConfig {
+            object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
+            ..RuntimeConfig::default()
+        };
+        let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
+        let session_context = SessionContext::with_config_rt(cfg, runtime);
+
+        session_context.register_catalog(
+            "kamu",
+            Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
+                session_context.clone(),
+                self.dataset_repo.clone(),
+                options,
+            )))),
+        );
+        Ok(session_context)
+    }
+
+    async fn get_schema_impl(
+        &self,
+        session_context: &SessionContext,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError> {
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let last_data_slice_opt = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_data)
+            .try_first()
+            .await
+            .int_err()?;
+
+        match last_data_slice_opt {
+            Some(last_data_slice) => {
+                // TODO: Avoid boxing url - requires datafusion to fix API
+                let data_url = Box::new(
+                    dataset
+                        .as_data_repo()
+                        .get_internal_url(&last_data_slice.physical_hash)
+                        .await,
+                );
+
+                let object_store = session_context.runtime_env().object_store(&data_url)?;
+
+                let data_path =
+                    object_store::path::Path::from_url_path(data_url.path()).int_err()?;
+
+                let metadata = read_data_slice_metadata(object_store, &data_path).await?;
+
+                Ok(Some(metadata.file_metadata().schema().clone()))
+            }
+            None => Ok(None),
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
@@ -51,9 +120,9 @@ impl QueryService for QueryServiceImpl {
         dataset_ref: &DatasetRef,
         num_records: u64,
     ) -> Result<DataFrame, QueryError> {
-        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
@@ -67,12 +136,23 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| sv.into())
             .unwrap_or_default();
 
+        let ctx = self
+            .session_context(QueryOptions {
+                datasets: vec![DatasetQueryOptions {
+                    dataset_ref: dataset_handle.as_local_ref(),
+                    limit: Some(num_records),
+                }],
+            })
+            .map_err(|e| QueryError::Internal(e))?;
+
         // TODO: This is a workaround for Arrow not handling timestamps with explicit
         // timezones. We basically have to re-cast all timestamp fields into
         // timestamps after querying. See:
         // - https://github.com/apache/arrow-datafusion/issues/959
         // - https://github.com/apache/arrow-rs/issues/393
-        let res_schema = self.get_schema(&dataset_handle.as_local_ref()).await?;
+        let res_schema = self
+            .get_schema_impl(&ctx, &dataset_handle.as_local_ref())
+            .await?;
         if let None = res_schema {
             return Err(QueryError::DatasetSchemaNotAvailable(
                 DatasetSchemaNotAvailableError {
@@ -116,16 +196,7 @@ impl QueryService for QueryServiceImpl {
             num_records = num_records
         );
 
-        self.sql_statement(
-            &query,
-            QueryOptions {
-                datasets: vec![DatasetQueryOptions {
-                    dataset_ref: dataset_handle.as_local_ref(),
-                    limit: Some(num_records),
-                }],
-            },
-        )
-        .await
+        Ok(ctx.sql(&query).await?)
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(statement))]
@@ -134,52 +205,17 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError> {
-        let cfg = SessionConfig::new()
-            .with_information_schema(true)
-            .with_default_catalog_and_schema("kamu", "kamu");
-
-        let ctx = SessionContext::with_config(cfg);
-        ctx.register_catalog(
-            "kamu",
-            Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
-                self.local_repo.clone(),
-                self.workspace_layout.clone(),
-                options,
-                ctx.state(),
-            )))),
-        );
-
+        let ctx = self
+            .session_context(options)
+            .map_err(|e| QueryError::Internal(e))?;
         Ok(ctx.sql(statement).await?)
     }
 
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
-        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self
-            .local_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
-
-        // TODO: This service shouldn't know the specifics of dataset layouts
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
-
-        let last_data_file_opt = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_data)
-            .map_ok(|slice| dataset_layout.data_slice_path(&slice))
-            .try_first()
-            .await
-            .int_err()?;
-
-        match last_data_file_opt {
-            Some(last_data_file) => {
-                let file = std::fs::File::open(&last_data_file).int_err()?;
-                let reader = SerializedFileReader::new(file).int_err()?;
-                Ok(Some(reader.metadata().file_metadata().schema().clone()))
-            }
-            None => Ok(None),
-        }
+        let ctx = self
+            .session_context(QueryOptions::default())
+            .map_err(|e| QueryError::Internal(e))?;
+        self.get_schema_impl(&ctx, dataset_ref).await
     }
 }
 
@@ -219,30 +255,33 @@ impl CatalogProvider for KamuCatalog {
 // workspace and in some cases (like 'show tables') even twice
 #[derive(Clone)]
 struct KamuSchema {
-    local_repo: Arc<dyn DatasetRepository>,
-    workspace_layout: Arc<WorkspaceLayout>,
+    session_context: SessionContext,
+    dataset_repo: Arc<dyn DatasetRepository>,
     options: QueryOptions,
-    ctx: SessionState,
 }
 
 impl KamuSchema {
     fn new(
-        local_repo: Arc<dyn DatasetRepository>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        session_context: SessionContext,
+        dataset_repo: Arc<dyn DatasetRepository>,
         options: QueryOptions,
-        ctx: SessionState,
     ) -> Self {
         Self {
-            local_repo,
-            workspace_layout,
+            session_context,
+            dataset_repo,
             options,
-            ctx,
         }
     }
 
-    async fn has_data(&self, dataset_handle: &DatasetHandle) -> Result<bool, InternalError> {
+    async fn has_data(&self, dataset_handle: &DatasetHandle) -> Result<bool, QueryError> {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await
+            .unwrap();
+
         let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
-        let files = self.collect_data_files(dataset_handle, limit).await?;
+        let files = self.collect_data_files(dataset.as_ref(), limit).await?;
 
         if files.is_empty() {
             return Ok(false);
@@ -250,49 +289,54 @@ impl KamuSchema {
 
         // TODO: Datafusion does not yet support nested types
         // See: https://github.com/apache/arrow-datafusion/issues/2326
-        let nested = Self::is_nested(files.first().unwrap())?;
+        let nested = self
+            .is_nested(dataset.as_ref(), files.first().unwrap())
+            .await?;
+
         Ok(!nested)
     }
 
-    fn is_nested(file: &Path) -> Result<bool, InternalError> {
-        let reader = SerializedFileReader::new(std::fs::File::open(file).int_err()?).int_err()?;
-        let schema = reader.metadata().file_metadata().schema();
+    async fn is_nested(
+        &self,
+        dataset: &dyn Dataset,
+        file: &object_store::path::Path,
+    ) -> Result<bool, QueryError> {
+        let (_, object_store) = self.object_store_for(dataset).await;
+        let metadata = read_data_slice_metadata(object_store, &file).await?;
+        let schema = metadata.file_metadata().schema();
         Ok(schema.get_fields().iter().any(|f| f.is_group()))
     }
 
     async fn collect_data_files(
         &self,
-        dataset_handle: &DatasetHandle,
+        dataset: &dyn Dataset,
         limit: Option<u64>,
-    ) -> Result<Vec<PathBuf>, InternalError> {
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
+    ) -> Result<Vec<object_store::path::Path>, InternalError> {
+        let mut files = Vec::new();
+        let mut num_records = 0;
 
-        if let Ok(dataset) = self
-            .local_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await
-        {
-            let mut files = Vec::new();
-            let mut num_records = 0;
+        let mut slices = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.output_data);
 
-            let mut slices = dataset
-                .as_metadata_chain()
-                .iter_blocks()
-                .filter_data_stream_blocks()
-                .filter_map_ok(|(_, b)| b.event.output_data);
+        while let Some(slice) = slices.try_next().await.int_err()? {
+            num_records += slice.interval.end - slice.interval.start + 1;
 
-            while let Some(slice) = slices.try_next().await.int_err()? {
-                num_records += slice.interval.end - slice.interval.start + 1;
-                files.push(dataset_layout.data_slice_path(&slice));
-                if limit.is_some() && limit.unwrap() <= num_records as u64 {
-                    break;
-                }
+            let slice_url = dataset
+                .as_data_repo()
+                .get_internal_url(&slice.physical_hash)
+                .await;
+
+            files.push(object_store::path::Path::from_url_path(slice_url.path()).int_err()?);
+
+            if limit.is_some() && limit.unwrap() <= num_records as u64 {
+                break;
             }
-
-            Ok(files)
-        } else {
-            Ok(Vec::new())
         }
+
+        Ok(files)
     }
 
     fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
@@ -312,7 +356,7 @@ impl KamuSchema {
     async fn table_names_impl(&self) -> Vec<String> {
         if self.options.datasets.is_empty() {
             let mut res = Vec::new();
-            let mut dataset_handles = self.local_repo.get_all_datasets();
+            let mut dataset_handles = self.dataset_repo.get_all_datasets();
 
             while let Some(hdl) = dataset_handles.try_next().await.unwrap() {
                 if self.has_data(&hdl).await.unwrap() {
@@ -336,11 +380,40 @@ impl KamuSchema {
             Err(_) => return false,
         };
 
-        self.local_repo
+        self.dataset_repo
             .try_resolve_dataset_ref(&dataset_name.into())
             .await
             .unwrap()
             .is_some()
+    }
+
+    async fn object_store_for(
+        &self,
+        dataset: &dyn Dataset,
+    ) -> (url::Url, Arc<dyn object_store::ObjectStore>) {
+        // TODO: Abusing the fact that we can get Url for a non-existing
+        // hash
+        let data_url = Box::new(
+            dataset
+                .as_data_repo()
+                .get_internal_url(&Multihash::from_digest_sha3_256(b""))
+                .await,
+        );
+
+        let object_store = self
+            .session_context
+            .runtime_env()
+            .object_store(&data_url)
+            .unwrap();
+
+        let object_store_url = url::Url::parse(&format!(
+            "{}://{}",
+            data_url.scheme(),
+            &data_url[url::Position::BeforeHost..url::Position::AfterPort],
+        ))
+        .unwrap();
+
+        (object_store_url, object_store)
     }
 }
 
@@ -375,37 +448,65 @@ impl SchemaProvider for KamuSchema {
     }
 
     async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_name = DatasetName::try_from(name);
-        if let Err(_) = dataset_name {
+        // TODO: multitencancy
+        let dataset_name = match DatasetName::try_from(name) {
+            Ok(name) => name,
+            Err(_) => return None,
+        };
+
+        let dataset_handle = match self
+            .dataset_repo
+            .resolve_dataset_ref(&dataset_name.as_local_ref())
+            .await
+        {
+            Ok(hdl) => hdl,
+            Err(_) => return None,
+        };
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await
+            .unwrap();
+
+        let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
+        let files = self
+            .collect_data_files(dataset.as_ref(), limit)
+            .await
+            .unwrap();
+
+        if files.is_empty() {
             return None;
         }
-        let dataset_ref_local = &dataset_name.unwrap().into();
 
-        match self.local_repo.resolve_dataset_ref(dataset_ref_local).await {
-            Err(_) => None,
-            Ok(dataset_handle) => {
-                let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
-                let files = self
-                    .collect_data_files(&dataset_handle, limit)
-                    .await
-                    .unwrap();
+        let (object_store_url, object_store) = self.object_store_for(dataset.as_ref()).await;
 
-                if files.is_empty() {
-                    None
-                } else {
-                    let table = ListingTableOfFiles::try_new(
-                        &self.ctx,
-                        files
-                            .into_iter()
-                            .map(|p| p.to_string_lossy().into())
-                            .collect(),
-                    )
-                    .await
-                    .unwrap();
+        let table = ListingTableOfFiles::try_new(
+            object_store_url,
+            object_store,
+            &self.session_context.state(),
+            files,
+        )
+        .await
+        .unwrap();
 
-                    Some(Arc::new(table))
-                }
-            }
-        }
+        Some(Arc::new(table))
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn read_data_slice_metadata(
+    object_store: Arc<dyn object_store::ObjectStore>,
+    data_slice_store_path: &object_store::path::Path,
+) -> Result<Arc<ParquetMetaData>, QueryError> {
+    let object_meta = object_store.head(&data_slice_store_path).await.int_err()?;
+
+    let mut parquet_object_reader = ParquetObjectReader::new(object_store, object_meta);
+
+    use datafusion::parquet::arrow::async_reader::AsyncFileReader;
+    let metadata = parquet_object_reader.get_metadata().await.int_err()?;
+    Ok(metadata)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

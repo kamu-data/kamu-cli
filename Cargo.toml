@@ -16,9 +16,9 @@ edition = "2021"
 
 
 [profile.dev]
-# Change this to 2 when you need to attach a debugger. In most cases line info
-# is enough and will speed up builds.
-debug = 1
+# Change this to 1 for faster builds that still preserve enough info for backtraces.
+# Use 2 when you need to attach a debugger.
+debug = 2
 
 
 # Emit the line info tables for our crates to produce useful crash reports and backtraces.

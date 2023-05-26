@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use opendatafabric::{Multicodec, Multihash};
 use tokio::io::AsyncRead;
+use url::Url;
 
 use crate::domain::*;
 
@@ -73,20 +74,24 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         panic!("get_stream not allowed for in-memory repository");
     }
 
-    async fn get_download_url(
-        &self,
-        _hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
-        Err(GetTransferUrlError::NotSupported)
+    async fn get_internal_url(&self, _hash: &Multihash) -> Url {
+        panic!("get_internal_url not allowed for in-memory repository");
     }
 
-    async fn get_upload_url(
+    async fn get_external_download_url(
         &self,
         _hash: &Multihash,
-        _opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
-        Err(GetTransferUrlError::NotSupported)
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
+        Err(GetExternalUrlError::NotSupported)
+    }
+
+    async fn get_external_upload_url(
+        &self,
+        _hash: &Multihash,
+        _opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
+        Err(GetExternalUrlError::NotSupported)
     }
 
     async fn insert_bytes<'a>(

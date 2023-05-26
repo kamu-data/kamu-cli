@@ -121,11 +121,28 @@ where
         Ok(Box::new(stream))
     }
 
-    async fn get_download_url(
+    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+        // TODO: This URL does not account for endpoint and it will collide in case we
+        // work with multiple S3-like storages having same buckets names
+        let context_url = Url::parse(
+            format!(
+                "s3://{}/{}",
+                self.s3_context.bucket, self.s3_context.root_folder_key
+            )
+            .as_str(),
+        )
+        .unwrap();
+
+        context_url
+            .join(hash.to_multibase_string().as_str())
+            .unwrap()
+    }
+
+    async fn get_external_download_url(
         &self,
         hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -144,17 +161,17 @@ where
             .await
             .int_err()?;
 
-        Ok(GetTransferUrlResult {
+        Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
     }
 
-    async fn get_upload_url(
+    async fn get_external_upload_url(
         &self,
         hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError> {
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
         let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
 
         let presigned_conf = PresigningConfig::builder()
@@ -173,7 +190,7 @@ where
             .await
             .int_err()?;
 
-        Ok(GetTransferUrlResult {
+        Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
             expires_at: Some(expires_at.into()),
         })
@@ -258,10 +275,13 @@ where
 
     async fn insert_file_move<'a>(
         &'a self,
-        _src: &Path,
-        _options: InsertOpts<'a>,
+        src: &Path,
+        options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        unimplemented!()
+        let file = tokio::fs::File::open(src).await.int_err()?;
+        let insert_result = self.insert_stream(Box::new(file), options).await?;
+        tokio::fs::remove_file(src).await.int_err()?;
+        Ok(insert_result)
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {

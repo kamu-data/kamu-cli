@@ -25,17 +25,13 @@ use crate::infra::utils::s3_context::S3Context;
 #[component(pub)]
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
-    endpoint: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRepositoryS3 {
-    pub fn new(s3_context: S3Context, endpoint: String) -> Self {
-        Self {
-            s3_context,
-            endpoint,
-        }
+    pub fn new(s3_context: S3Context) -> Self {
+        Self { s3_context }
     }
 
     fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
@@ -44,13 +40,10 @@ impl DatasetRepositoryS3 {
             "Multitenancy is not yet supported by S3 repo"
         );
 
-        let dataset_url_string = format!(
-            "s3+{}/{}/{}/",
-            self.endpoint,
-            self.s3_context.bucket,
-            self.s3_context.get_key(&dataset_alias.dataset_name)
-        );
-        Url::parse(dataset_url_string.as_str()).unwrap()
+        let context_url = self.s3_context.make_url();
+        context_url
+            .join(format!("{}/", &dataset_alias.dataset_name).as_str())
+            .unwrap()
     }
 
     async fn get_dataset_impl(
@@ -115,7 +108,6 @@ impl Clone for DatasetRepositoryS3 {
     fn clone(&self) -> Self {
         Self {
             s3_context: self.s3_context.clone(),
-            endpoint: self.endpoint.clone(),
         }
     }
 }

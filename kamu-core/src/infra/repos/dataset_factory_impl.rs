@@ -74,6 +74,7 @@ impl DatasetFactoryImpl {
     pub async fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
         let s3_context = S3Context::from_url(&base_url).await;
         let client = s3_context.client;
+        let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
         let key_prefix = s3_context.root_folder_key;
 
@@ -81,27 +82,32 @@ impl DatasetFactoryImpl {
             MetadataChainImpl::new(
                 ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                     client.clone(),
+                    endpoint.clone(),
                     bucket.clone(),
                     format!("{}blocks/", key_prefix),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
+                    endpoint.clone(),
                     bucket.clone(),
                     format!("{}refs/", key_prefix),
                 ))),
             ),
             ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
+                endpoint.clone(),
                 bucket.clone(),
                 format!("{}data/", key_prefix),
             )),
             ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
+                endpoint.clone(),
                 bucket.clone(),
                 format!("{}checkpoints/", key_prefix),
             )),
             NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
+                endpoint.clone(),
                 bucket.clone(),
                 format!("{}info/", key_prefix),
             )),

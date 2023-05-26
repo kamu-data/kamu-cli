@@ -1,6 +1,6 @@
 [package]
 name = "opendatafabric"
-version = "0.125.1"
+version = "0.126.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ indoc = "2"
 thiserror = "1"
 
 # Multiformats
-bs58 = "0.4"  # base58 codec
+bs58 = "0.5"  # base58 codec
 digest = "0.10"
 sha3 = "0.10"
 unsigned-varint = "0.7"

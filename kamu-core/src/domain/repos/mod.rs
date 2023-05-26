@@ -36,3 +36,6 @@ pub use dataset_factory::*;
 
 pub mod dataset_repository;
 pub use dataset_repository::*;
+
+mod object_store_registry;
+pub use object_store_registry::*;

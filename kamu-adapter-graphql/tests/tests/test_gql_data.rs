@@ -18,21 +18,31 @@ use kamu::infra;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use opendatafabric::*;
 
-async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+/////////////////////////////////////////////////////////////////////////////////////////
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(local_repo)
+async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
+    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
+    let dataset_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+
+    dill::CatalogBuilder::new()
+        .add_value(dataset_repo)
         .add_value(workspace_layout.as_ref().clone())
         .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
         .add::<infra::QueryServiceImpl>()
         .bind::<dyn QueryService, infra::QueryServiceImpl>()
-        .build();
+        .add::<infra::ObjectStoreRegistryImpl>()
+        .bind::<dyn ObjectStoreRegistry, infra::ObjectStoreRegistryImpl>()
+        .add_value(infra::ObjectStoreBuilderLocalFs::new())
+        .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderLocalFs>()
+        .build()
+}
 
-    let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
+/////////////////////////////////////////////////////////////////////////////////////////
 
-    let dataset = local_repo
+async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
+    let dataset = dataset_repo
         .create_dataset(
             &DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
@@ -65,17 +75,18 @@ async fn create_test_dataset(tempdir: &Path) -> dill::Catalog {
         )
         .await
         .unwrap();
-
-    cat
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_schema() {
+async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -122,13 +133,16 @@ async fn test_dataset_schema() {
     );
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_tail() {
+async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -157,13 +171,16 @@ async fn test_dataset_tail() {
     assert_eq!(data, serde_json::json!([{"blah":"c","offset":2}]));
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
-async fn test_dataset_tail_empty() {
+async fn test_dataset_tail_empty_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let cat = create_test_dataset(tempdir.path()).await;
+    let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
+    create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema(catalog);
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -191,3 +208,5 @@ async fn test_dataset_tail_empty() {
     let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
     assert_eq!(data, serde_json::json!([]));
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

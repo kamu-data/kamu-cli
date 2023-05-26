@@ -36,17 +36,37 @@ pub trait ObjectRepository: Send + Sync {
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError>;
 
-    async fn get_download_url(
-        &self,
-        hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError>;
+    /// Returns an object URL for internal operations.
+    ///
+    /// When, for example, working with S3-backed repo an internal Url will be
+    /// in the form of "s3://bucket/a/b/c", so the user has to be
+    /// authorized to access the data. To let any anouthorized user access
+    /// the data use [ObjectRepository::get_external_download_url()] to issue a
+    /// pre-signed URL.
+    async fn get_internal_url(&self, hash: &Multihash) -> Url;
 
-    async fn get_upload_url(
+    /// Returns a URL that should be accessible to any unauthorized user.
+    ///
+    /// When, for example, working with S3-backed repo this method will issue a
+    /// pre-signed URL that (for a limited time) will be accessible to any user.
+    /// For refering to objects internally use
+    /// [ObjectRepository::get_internal_url()].
+    async fn get_external_download_url(
         &self,
         hash: &Multihash,
-        opts: TransferOpts,
-    ) -> Result<GetTransferUrlResult, GetTransferUrlError>;
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError>;
+
+    /// Returns a URL which an unauthorized user can upload data to.
+    ///
+    /// When, for example, working with S3-backed repo this method will issue a
+    /// pre-signed URL that (for a limited time) will be accessible to any user
+    /// to upload data via HTTP PUT request.
+    async fn get_external_upload_url(
+        &self,
+        hash: &Multihash,
+        opts: ExternalTransferOpts,
+    ) -> Result<GetExternalUrlResult, GetExternalUrlError>;
 
     async fn insert_bytes<'a>(
         &'a self,
@@ -100,14 +120,14 @@ pub struct InsertOpts<'a> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default, Debug, Clone)]
-pub struct TransferOpts {
+pub struct ExternalTransferOpts {
     pub expiration: Option<Duration>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct GetTransferUrlResult {
+pub struct GetExternalUrlResult {
     pub url: Url,
     pub expires_at: Option<DateTime<Utc>>,
 }
@@ -168,7 +188,7 @@ impl From<ContainsError> for GetError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetTransferUrlError {
+pub enum GetExternalUrlError {
     #[error("Repository does not support external transfers")]
     NotSupported,
     #[error(transparent)]
