@@ -75,29 +75,44 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
         .unwrap()
         .dataset;
 
+    // Write data spread over two commits
     let tmp_data_path = tempdir.join("data");
     let schema = Arc::new(Schema::new(vec![
         Field::new("offset", DataType::UInt64, false),
         Field::new("blah", DataType::Utf8, false),
     ]));
-    let a: Arc<dyn Array> = Arc::new(UInt64Array::from(vec![0, 1, 2]));
-    let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
-    let record_batch =
-        RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
-    ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
+    let batches = [
+        (
+            UInt64Array::from(vec![0, 1]),
+            StringArray::from(vec!["a", "b"]),
+        ),
+        (UInt64Array::from(vec![2]), StringArray::from(vec!["c"])),
+    ];
 
-    dataset
-        .commit_add_data(
-            None,
-            Some(OffsetInterval { start: 0, end: 3 }),
-            Some(tmp_data_path),
-            None,
-            None,
-            None,
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap();
+    let mut offset = 0;
+    for (a, b) in batches {
+        let record_batch =
+            RecordBatch::try_new(schema.clone(), vec![Arc::new(a), Arc::new(b)]).unwrap();
+        ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
+
+        dataset
+            .commit_add_data(
+                None,
+                Some(OffsetInterval {
+                    start: offset,
+                    end: offset + record_batch.num_rows() as i64 - 1,
+                }),
+                Some(tmp_data_path.clone()),
+                None,
+                None,
+                None,
+                CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+
+        offset += record_batch.num_rows() as i64;
+    }
 
     dataset_alias
 }

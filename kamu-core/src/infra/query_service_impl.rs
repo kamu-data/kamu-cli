@@ -19,11 +19,10 @@ use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use dill::*;
-use futures::stream::TryStreamExt;
+use futures::stream::{self, StreamExt, TryStreamExt};
 use opendatafabric::*;
 
 use crate::domain::*;
-use crate::infra::utils::datafusion_hacks::ListingTableOfFiles;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -282,16 +281,18 @@ impl KamuSchema {
             .unwrap();
 
         let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
-        let files = self.collect_data_files(dataset.as_ref(), limit).await?;
+        let file_hashes = self
+            .collect_data_file_hashes(dataset.as_ref(), limit)
+            .await?;
 
-        if files.is_empty() {
+        if file_hashes.is_empty() {
             return Ok(false);
         }
 
         // TODO: Datafusion does not yet support nested types
         // See: https://github.com/apache/arrow-datafusion/issues/2326
         let nested = self
-            .is_nested(dataset.as_ref(), files.first().unwrap())
+            .is_nested(dataset.as_ref(), file_hashes.first().unwrap())
             .await?;
 
         Ok(!nested)
@@ -300,19 +301,31 @@ impl KamuSchema {
     async fn is_nested(
         &self,
         dataset: &dyn Dataset,
-        file: &object_store::path::Path,
+        data_file_hash: &Multihash,
     ) -> Result<bool, QueryError> {
-        let (_, object_store) = self.object_store_for(dataset).await;
-        let metadata = read_data_slice_metadata(object_store, &file).await?;
+        // We have to read file with raw ObjectStore and Parquet to access the metadata
+        // TODO: Avoid boxing due invalid API in datafusion
+        let data_url = Box::new(
+            dataset
+                .as_data_repo()
+                .get_internal_url(data_file_hash)
+                .await,
+        );
+
+        let object_store = self.session_context.runtime_env().object_store(&data_url)?;
+
+        let data_path = object_store::path::Path::from_url_path(data_url.path()).int_err()?;
+
+        let metadata = read_data_slice_metadata(object_store, &data_path).await?;
         let schema = metadata.file_metadata().schema();
         Ok(schema.get_fields().iter().any(|f| f.is_group()))
     }
 
-    async fn collect_data_files(
+    async fn collect_data_file_hashes(
         &self,
         dataset: &dyn Dataset,
         limit: Option<u64>,
-    ) -> Result<Vec<object_store::path::Path>, InternalError> {
+    ) -> Result<Vec<Multihash>, InternalError> {
         let mut files = Vec::new();
         let mut num_records = 0;
 
@@ -323,14 +336,9 @@ impl KamuSchema {
             .filter_map_ok(|(_, b)| b.event.output_data);
 
         while let Some(slice) = slices.try_next().await.int_err()? {
+            files.push(slice.physical_hash);
+
             num_records += slice.interval.end - slice.interval.start + 1;
-
-            let slice_url = dataset
-                .as_data_repo()
-                .get_internal_url(&slice.physical_hash)
-                .await;
-
-            files.push(object_store::path::Path::from_url_path(slice_url.path()).int_err()?);
 
             if limit.is_some() && limit.unwrap() <= num_records as u64 {
                 break;
@@ -386,35 +394,6 @@ impl KamuSchema {
             .await
             .unwrap()
             .is_some()
-    }
-
-    async fn object_store_for(
-        &self,
-        dataset: &dyn Dataset,
-    ) -> (url::Url, Arc<dyn object_store::ObjectStore>) {
-        // TODO: Abusing the fact that we can get Url for a non-existing
-        // hash
-        let data_url = Box::new(
-            dataset
-                .as_data_repo()
-                .get_internal_url(&Multihash::from_digest_sha3_256(b""))
-                .await,
-        );
-
-        let object_store = self
-            .session_context
-            .runtime_env()
-            .object_store(&data_url)
-            .unwrap();
-
-        let object_store_url = url::Url::parse(&format!(
-            "{}://{}",
-            data_url.scheme(),
-            &data_url[url::Position::BeforeHost..url::Position::AfterPort],
-        ))
-        .unwrap();
-
-        (object_store_url, object_store)
     }
 }
 
@@ -472,7 +451,7 @@ impl SchemaProvider for KamuSchema {
 
         let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
         let files = self
-            .collect_data_files(dataset.as_ref(), limit)
+            .collect_data_file_hashes(dataset.as_ref(), limit)
             .await
             .unwrap();
 
@@ -480,18 +459,28 @@ impl SchemaProvider for KamuSchema {
             return None;
         }
 
-        let (object_store_url, object_store) = self.object_store_for(dataset.as_ref()).await;
+        let object_repo = dataset.as_data_repo();
+        let file_urls: Vec<String> = stream::iter(files)
+            .then(|h| async move { object_repo.get_internal_url(&h).await })
+            .map(|url| url.into())
+            .collect()
+            .await;
 
-        let table = ListingTableOfFiles::try_new(
-            object_store_url,
-            object_store,
-            &self.session_context.state(),
-            files,
-        )
-        .await
-        .unwrap();
+        let df = self
+            .session_context
+            .read_parquet(
+                file_urls,
+                ParquetReadOptions {
+                    file_extension: "",
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                },
+            )
+            .await
+            .unwrap();
 
-        Some(Arc::new(table))
+        Some(df.into_view())
     }
 }
 
