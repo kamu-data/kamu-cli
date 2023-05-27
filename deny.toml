@@ -17,12 +17,18 @@ features = [
     { name = "kamu-cli", allow = ["default"] },
 ]
 
-# Crates we shouldn't use
 deny = [
+    ### Crates we shouldn't use ####
     # Use `md-5` instead, which is part of the RustCrypto ecosystem
     { name = "md5" },
-    # TODO: We should decide whether to stick with OpenSSL
-    # { name = "rustls" },
+    # TODO: We should decide whether to stick with rustls or openssl and deny one of them
+
+    ### Creates we deny multiple versions of (until we flip to skip-tree) ###
+    { name = "arrow", deny-multiple-versions = true },
+    { name = "axum", deny-multiple-versions = true },
+    { name = "datafusion", deny-multiple-versions = true },
+    # { name = "rustls", deny-multiple-versions = true },
+    { name = "tokio", deny-multiple-versions = true },
 ]
 
 
