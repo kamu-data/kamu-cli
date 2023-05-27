@@ -9,7 +9,7 @@
 
 use std::path::Path;
 
-use arrow::record_batch::RecordBatchReader;
+use datafusion::arrow::record_batch::RecordBatchReader;
 use opendatafabric::{Multicodec, Multihash};
 
 const LOGICAL_HASH_BATCH_SIZE: usize = 10_000;

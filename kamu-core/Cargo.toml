@@ -46,8 +46,7 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-arrow = { version = "39", features = ["chrono-tz"] }
-arrow-digest = "39"
+arrow-digest = "39"  # Note: Keep in sync with version of arrow used by datafusion
 datafusion = "25"
 object_store = { version = "0.5", features = ["aws"] }
 digest = "0.10"

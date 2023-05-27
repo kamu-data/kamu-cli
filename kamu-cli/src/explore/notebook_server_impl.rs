@@ -203,7 +203,7 @@ impl NotebookServerImpl {
                     self.container_runtime
                         .run_attached(self.jupyter_config.image.as_ref().unwrap())
                         .shell_cmd(format!(
-                            "chown -R {}:{} {}",
+                            "chown -Rf {}:{} {}",
                             users::get_current_uid(),
                             users::get_current_gid(),
                             "/opt/workdir"

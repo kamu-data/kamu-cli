@@ -10,9 +10,9 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use arrow::record_batch::RecordBatch;
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::errors::ParquetError;
 
 pub struct ParquetWriterHelper;

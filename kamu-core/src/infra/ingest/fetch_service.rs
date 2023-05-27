@@ -287,7 +287,7 @@ impl FetchService {
                     self.container_runtime
                         .run_attached(&fetch.image)
                         .shell_cmd(format!(
-                            "chown -R {}:{} {}",
+                            "chown -Rf {}:{} {}",
                             users::get_current_uid(),
                             users::get_current_gid(),
                             "/opt/odf/out"

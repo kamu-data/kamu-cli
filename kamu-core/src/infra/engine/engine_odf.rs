@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
@@ -74,6 +75,8 @@ impl ODFEngine {
                                 out_data_path.display(),
                             )
                         )
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
                         .status()
                         .await?;
                 }

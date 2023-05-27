@@ -9,6 +9,7 @@
 
 use std::fs::File;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
@@ -112,26 +113,6 @@ impl SparkEngine {
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
         let stderr_file = std::fs::File::create(&run_info.stderr_path)?;
 
-        // TODO: chown hides exit status
-        cfg_if::cfg_if! {
-            if #[cfg(unix)] {
-                let chown = if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
-                    format!(
-                        "; chown -Rf {}:{} {} {} {} || true",
-                        users::get_current_uid(),
-                        users::get_current_gid(),
-                        self.in_out_dir_in_container().display(),
-                        request.new_checkpoint_path.display(),
-                        request.output_data_path.display(),
-                    )
-                } else {
-                    "".to_owned()
-                };
-            } else {
-                let chown = "".to_owned();
-            }
-        };
-
         let status = self
             .container_runtime
             .run_attached(&self.image)
@@ -145,16 +126,46 @@ impl SparkEngine {
                 ),
             ])
             .user("root")
-            .shell_cmd(format!(
+            .shell_cmd(
                 "/opt/bitnami/spark/bin/spark-submit --master=local[4] --driver-memory=2g \
-                 --class=dev.kamu.engine.spark.ingest.IngestApp /opt/engine/bin/engine.spark.jar{}",
-                chown
-            ))
+                 --class=dev.kamu.engine.spark.ingest.IngestApp /opt/engine/bin/engine.spark.jar",
+            )
             .stdout(stdout_file)
             .stderr(stderr_file)
             .status()
             .await
             .map_err(|e| EngineError::internal(e, run_info.log_files()))?;
+
+        // Fix permissions
+        if self.container_runtime.config.runtime == ContainerRuntimeType::Docker {
+            cfg_if::cfg_if! {
+                if #[cfg(unix)] {
+                    self.container_runtime
+                        .run_attached(&self.image)
+                        .shell_cmd(format!(
+                            "chown -Rf {}:{} {} {} {}",
+                            users::get_current_uid(),
+                            users::get_current_gid(),
+                            self.in_out_dir_in_container().display(),
+                            request.new_checkpoint_path.display(),
+                            request.output_data_path.display(),
+                        ))
+                        .user("root")
+                        .volumes([
+                            (&run_info.in_out_dir, self.in_out_dir_in_container()),
+                            (
+                                &self.workspace_layout.root_dir,
+                                self.workspace_dir_in_container(),
+                            ),
+                        ])
+                        .stdout(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .await
+                        .map_err(|e| EngineError::internal(e, Vec::new()))?;
+                }
+            }
+        }
 
         if response_path.exists() {
             let data = std::fs::read_to_string(&response_path)?;
