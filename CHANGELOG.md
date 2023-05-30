@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.127.1] - 2023-05-29 (**BREAKING**)
+### Fixed
+- Handle "Interrupted system call" error when waiting for container to spawn.
+
 ## [0.127.0] - 2023-05-29 (**BREAKING**)
 ### Changed
 -  Upgraded to new `spark` engine image that better follows the ODF spec regarding the timestamp formats. This may cause schema harmonization issues when querying the history of old datasets.

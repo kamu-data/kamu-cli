@@ -1,6 +1,6 @@
 [package]
 name = "kamu"
-version = "0.127.0"
+version = "0.127.1"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license-file = "../LICENSE.txt"
@@ -22,9 +22,9 @@ skip_docker_tests = []
 [dependencies]
 # Kamu
 dill = "0.5"
-internal-error = { version = "0.127.0", path = "../utils/internal-error" }
-container-runtime = { version = "0.127.0", path = "../utils/container-runtime" }
-opendatafabric = { version = "0.127.0", path = "../opendatafabric", default-features = false }
+internal-error = { version = "0.127.1", path = "../utils/internal-error" }
+container-runtime = { version = "0.127.1", path = "../utils/container-runtime" }
+opendatafabric = { version = "0.127.1", path = "../opendatafabric", default-features = false }
 
 # Serialization
 flatbuffers = "23"

@@ -1,7 +1,6 @@
 # Inputs:
 # - IMAGE_REPO
 # - KAMU_VERSION
-KAMU_S3_URL=s3://datasets.kamu.dev/example/
 
 
 .PHONY: image
@@ -21,4 +20,4 @@ image-push:
 workspace:
 	mkdir -p workspace && \
 	cd workspace/ && \
-	KAMU_S3_URL=$(KAMU_S3_URL) ../init-workspace.sh
+	../init-workspace.sh

@@ -1333,7 +1333,7 @@ checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
 name = "container-runtime"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -2605,7 +2605,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "test-log",
  "thiserror",
@@ -2709,7 +2709,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "arrow-digest",
  "async-recursion",
@@ -2778,7 +2778,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -2801,7 +2801,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -2839,7 +2839,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2908,7 +2908,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-tools"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "chrono",
  "clap",
@@ -3471,7 +3471,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.127.0"
+version = "0.127.1"
 dependencies = [
  "bs58",
  "byteorder",

@@ -20,8 +20,12 @@ use tokio::process::Command;
 pub enum ContainerRuntimeError {
     #[error(transparent)]
     Process(#[from] ProcessError),
-    #[error(transparent)]
-    IO(#[from] std::io::Error),
+    #[error("IO Error")]
+    IO {
+        #[from]
+        source: std::io::Error,
+        backtrace: Backtrace,
+    },
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -83,12 +87,12 @@ pub struct ProcessError {
 impl std::fmt::Display for ProcessError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Process exited with code {}", self.code)?;
-        writeln!(f, "  Command: {:?}", self.command)?;
+        writeln!(f, "- {:?}", self.command)?;
         if let Some(stdout) = &self.stdout {
-            writeln!(f, "  StdOut: {}", stdout)?;
+            writeln!(f, "- STDOUT: {}", stdout)?;
         }
         if let Some(stderr) = &self.stderr {
-            writeln!(f, "  StdErr: {}", stderr)?;
+            writeln!(f, "- STDERR: {}", stderr)?;
         }
         Ok(())
     }

@@ -413,6 +413,7 @@ impl ContainerRuntime {
             Ok(_) => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(true),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => Ok(false),
             Err(e) => Err(e.into()),
         }
     }
