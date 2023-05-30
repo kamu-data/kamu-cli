@@ -4,7 +4,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.127.0] - 2023-05-27
+## [0.127.0] - 2023-05-29 (**BREAKING**)
+### Changed
+-  Upgraded to new `spark` engine image that better follows the ODF spec regarding the timestamp formats. This may cause schema harmonization issues when querying the history of old datasets.
 ### Added
 - Experimental support for new [`datafusion` engine](https://github.com/kamu-data/kamu-engine-datafusion) based on [Apache Arrow DataFusion](https://github.com/apache/arrow-datafusion). Although its a batch-oriented engine it can provide a massive performance boost for simple filter/map operations. See the [updated documentation](https://docs.kamu.dev/cli/supported-engines/) for details and current limitations.
 
@@ -63,9 +65,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Preserving previous watermark upon fetch step returning no data
 
-## [0.121.0] - 2023-05-05
+## [0.121.0] - 2023-05-05 (**BREAKING**)
 ### Changed
-- **Breaking:** Deprecated `.kamu/datasets/<dataset>/cache` directory - a workspace upgrade will be required (see below)
+- Deprecated `.kamu/datasets/<dataset>/cache` directory - a workspace upgrade will be required (see below)
 - Support ingest source state per [ODF RFC-009](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/009-ingest-source-state.md)
 - Introduced workspace-wide cache in `.kamu/cache`
 - Introduced workspace versioning and upgrade procedure via `kamu system upgrade-workspace` command
@@ -172,9 +174,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Upgrade to Flink engine prevents it from crashing on checkpoints over 5 MiB large
 
-## [0.107.0] - 2023-01-25
+## [0.107.0] - 2023-01-25 (**BREAKING**)
 ### Changed
-- **Breaking:** Major upgrade of Apache Flink version
+- Major upgrade of Apache Flink version
 - No updates to exisitng datasets needed, but the verifiability of some datasets may be broken (since we don't yet implement engine versioning as per ODF spec)
 ### Added
 - Flink now supports a much nicer temporal table join syntax:
@@ -265,7 +267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Output truncation in `kamu config *` commands
 
-## [0.97.0] - 2022-08-05
+## [0.97.0] - 2022-08-05 (**BREAKING**)
 ### Added
 - Metadata blocks now contain sequence number (breaking format change!)
 - Optimized sync operations for diverged datasets using sequence number in blocks
@@ -336,17 +338,17 @@ fetch:
 ### Added
 - Support pushing datasets to IPFS via IPNS URLs `kamu push <dataset> ipns://<key_id>`
 
-## [0.87.0] - 2022-05-16
+## [0.87.0] - 2022-05-16 (**BREAKING**)
 ### Changed
-- **Breaking:** We got rid of `.kamu.local` volume directory in favor of keeping all dataset data under `.kamu/datasets/<name>` folders. This unifies the directory structure of the local workspace with how datasets are stored in remote repositories, and makes it easier to sync datasets to and from.
+- We got rid of `.kamu.local` volume directory in favor of keeping all dataset data under `.kamu/datasets/<name>` folders. This unifies the directory structure of the local workspace with how datasets are stored in remote repositories, and makes it easier to sync datasets to and from.
 ### Added
 - Support for `ipns://` URLs in `kamu pull`
 
-## [0.86.0] - 2022-05-16
+## [0.86.0] - 2022-05-16 (**BREAKING**)
 ### Changed
-- **Breaking:** Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes
-- **Breaking:** Data files are now named and stored accodring to their physical hashes, as per ODF spec
-- **Breaking:** Above changes also affect the repository format
+- Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes
+- Data files are now named and stored accodring to their physical hashes, as per ODF spec
+- Above changes also affect the repository format
 - Upgraded to `rustc-1.62.0` and latest dependencies
 - Improved error handling and reporting
 ### Added
@@ -447,19 +449,19 @@ fetch:
 - Added more validation on events that appear in `DatasetSnapshot`s.
 - Fix flag completion after `clap` crate upgrade.
 
-## [0.75.0] - 2022-01-04
+## [0.75.0] - 2022-01-04 (**BREAKING**)
 ### Changed
 - Implements [ODF RFC-004](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/004-metadata-extensibility.md).
-- Breaking: Workspaces will need to be re-created. This is the last major metadata format change - we will be working on stabilizing metadata now.
-- Breaking: Some manifest formats have changed and will need to be updated.
+- Workspaces will need to be re-created. This is the last major metadata format change - we will be working on stabilizing metadata now.
+- Some manifest formats have changed and will need to be updated.
   - `DatasetSnapshot` needs to specify `kind` field (`root` or `derivative`)
   - `DatasetSnapshot.source` was replaced with `metadata` which is an array of metadata events
 
-## [0.74.0] - 2021-12-28
+## [0.74.0] - 2021-12-28 (**BREAKING**)
 ### Changed
 - Implements [ODF RFC-003](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/003-content-addressability.md).
-- Breaking: Workspaces will need to be re-created. Sorry again!
-- Breaking: Some manifest formats have changed and will need to be updated.
+- Workspaces will need to be re-created. Sorry again!
+- Some manifest formats have changed and will need to be updated.
   - `Manifest.apiVersion` renamed to `version`
   - `DatasetSnapshot.id` renamed to `name`
   - `DatasetSourceDerivative.inputs` should now specify `id` (optional) and `name` (required)
@@ -469,19 +471,17 @@ fetch:
 - Metadata format switched to a much faster and compact `flatbuffers`.
   - You can still inspect it as YAML using `kamu log --output-format yaml`
 
-## [0.73.0] - 2021-12-11
+## [0.73.0] - 2021-12-11 (**BREAKING**)
 ### Changed
 - Implements [ODF RFC-002](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/002-logical-data-hashes.md).
-- Breaking change - workspaces will need to be re-created. Sorry again!
 - Engines are no longer responsible for data hashing - a stable hash algorithm is implemented in `kamu`
 - Pending data part files and checkpoints will be stored in `cache` directory along with other ingest artifacts
 ### Added
 - A fully working implementation of data integrity checks
 - `kamu verify` command now accepts `--integrity` flag to only check data hashes without replaying transformations
 
-## [0.72.0] - 2021-12-07
+## [0.72.0] - 2021-12-07 (**BREAKING**)
 ### Changed
-- Breaking change - workspaces will need to be re-created. Sorry!
 - Implements [ODF RFC-001](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/001-record-offsets.md) that adds record offset system column.
 
 ## [0.71.0] - 2021-11-29
@@ -710,17 +710,17 @@ fetch:
 ### Changed
 - Bumped Spark engine version
 
-## [0.38.0] - 2021-03-28
+## [0.38.0] - 2021-03-28 (**BREAKING**)
 ### Changed
 - Maintenance release
 - Upgraded to latest rust toolchain and dependencies
-- BREAKING: Updated `flatbuffers` version that includes support for optional fields - this changes binary layout making this new version incompatible with metadata generated by the previous ones
+- Updated `flatbuffers` version that includes support for optional fields - this changes binary layout making this new version incompatible with metadata generated by the previous ones
 ### Fixed
 - Uncacheable message will no longer obscure he commit message
 
-## [0.37.0] - 2020-12-30
+## [0.37.0] - 2020-12-30 (**BREAKING**)
 ### Changed
-- Breaking: Metadata restructuring means you'll need to re-create your datasets
+- Metadata restructuring means you'll need to re-create your datasets
 - Data files as well as checkpoints are now named with the hash of the block they are associated with
 - Protocol between coordinator and engines was modified to pass data files (in the right order) as well as checkpoints explicitly
 - Intermediate checkpoints are now preserved (for faster validation and resets)
