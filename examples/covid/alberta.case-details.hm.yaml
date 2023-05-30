@@ -12,9 +12,9 @@ content:
       # Transformation that will be applied to produce new data
       transform:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
-          SELECT
+          select
             id,
             date_reported as reported_date,
             case when lower(gender) = 'male' then 'M' 
@@ -33,7 +33,7 @@ content:
                  when age_group = '80+ years' then '80s'
                  else 'UNKNOWN' end as age_group,
             zone as location
-            FROM `alberta.case-details`
+          from "alberta.case-details"
     - kind: setVocab
       eventTimeColumn: reported_date
     - kind: setInfo

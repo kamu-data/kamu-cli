@@ -12,7 +12,7 @@ content:
       # Transformation that will be applied to produce new data
       transform:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT
             row_id as id,
@@ -30,7 +30,7 @@ content:
                  when age_group = '80+' then '80s'
                  else 'UNKNOWN' end as age_group,
             health_region as location
-            FROM `quebec.case-details`
+            FROM "quebec.case-details"
     - kind: setVocab
       eventTimeColumn: reported_date
     - kind: setInfo

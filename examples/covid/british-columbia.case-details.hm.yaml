@@ -12,7 +12,7 @@ content:
       # Transformation that will be applied to produce new data
       transform:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT
             id,
@@ -30,7 +30,7 @@ content:
                  when age_group = '90+' then '90+'
                  else 'UNKNOWN' end as age_group,
             ha as location
-            FROM `british-columbia.case-details`
+            FROM "british-columbia.case-details"
     - kind: setVocab
       eventTimeColumn: reported_date
     - kind: setInfo
