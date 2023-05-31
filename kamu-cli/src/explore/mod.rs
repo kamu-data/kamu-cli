@@ -23,3 +23,6 @@ pub use sql_shell_impl::*;
 mod web_ui_server;
 #[cfg(feature = "web-ui")]
 pub use web_ui_server::*;
+
+mod trace_server;
+pub use trace_server::*;

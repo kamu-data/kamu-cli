@@ -19,6 +19,7 @@ use kamu::infra::*;
 use crate::cli_commands;
 use crate::commands::Command;
 use crate::error::*;
+use crate::explore::TraceServer;
 use crate::output::*;
 use crate::services::*;
 
@@ -48,14 +49,14 @@ pub async fn run(
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
-    let (_log_thread, catalog, output_config) = {
+    let (guards, catalog, output_config) = {
         let mut catalog_builder = configure_catalog();
         catalog_builder.add_value(workspace_layout.clone());
 
-        let output_config = configure_output_format(&matches);
+        let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
 
-        let _log_thread = configure_logging(&output_config, &workspace_layout);
+        let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
@@ -66,7 +67,7 @@ pub async fn run(
 
         load_config(&workspace_layout, &mut catalog_builder);
 
-        (_log_thread, catalog_builder.build(), output_config)
+        (guards, catalog_builder.build(), output_config)
     };
 
     // Evict cache
@@ -84,10 +85,9 @@ pub async fn run(
         command.run().await
     };
 
-    match result {
+    match &result {
         Ok(()) => {
             tracing::info!("Command successful");
-            Ok(())
         }
         Err(err) => {
             tracing::error!(
@@ -99,10 +99,18 @@ pub async fn run(
             if output_config.is_tty && output_config.verbosity_level == 0 {
                 eprintln!("{}", err.pretty(false));
             }
-
-            Err(err)
         }
     }
+
+    // Flush all logging sinks
+    drop(guards);
+
+    if let Some(trace_file) = &output_config.trace_file {
+        // Run a web server and open the trace in the browser if environment allows
+        let _ = TraceServer::maybe_serve_in_browser(trace_file).await;
+    }
+
+    result
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -278,10 +286,7 @@ fn prepare_run_dir(run_dir: &Path) {
     }
 }
 
-fn configure_logging(
-    output_config: &OutputConfig,
-    workspace_layout: &WorkspaceLayout,
-) -> Option<tracing_appender::non_blocking::WorkerGuard> {
+fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceLayout) -> Guards {
     use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
     use tracing_log::LogTracer;
     use tracing_subscriber::fmt::format::FmtSpan;
@@ -295,14 +300,15 @@ fn configure_logging(
             "\n{}",
             console::style(
                 "Oh no, looks like kamu has crashed!\n\
-                Please help us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+                Please help us by reporting this problem at \
+                https://github.com/kamu-data/kamu-cli/issues"
             ).bold()
         );
     });
 
     // Logging may be already initialized when running under tests
     if tracing::dispatcher::has_been_set() {
-        return None;
+        return Guards::default();
     }
 
     // Use configuration from RUST_LOG env var if provided
@@ -322,37 +328,56 @@ fn configure_logging(
             .with_writer(std::io::stderr)
             .init();
 
-        None
-    } else if workspace_layout.run_info_dir.exists() {
-        // Log to file with Bunyan JSON formatter
-        let log_path = workspace_layout.run_info_dir.join("kamu.log");
+        return Guards::default();
+    }
 
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&log_path)
-            .unwrap_or_else(|e| {
-                panic!("Failed to create log file at {}: {}", log_path.display(), e)
-            });
+    if !workspace_layout.run_info_dir.exists() {
+        // Running outside of workspace - discard logs
+        return Guards::default();
+    }
 
-        let (appender, guard) = tracing_appender::non_blocking(file);
+    // Configure Perfetto tracing if enabled
+    let (maybe_perfetto_layer, perfetto_guard) = if let Some(trace_file) = &output_config.trace_file
+    {
+        let (perfetto_layer, perfetto_guard) = tracing_chrome::ChromeLayerBuilder::new()
+            .file(trace_file)
+            .trace_style(tracing_chrome::TraceStyle::Async)
+            .include_locations(true)
+            .include_args(true)
+            .build();
 
-        let formatting_layer = BunyanFormattingLayer::new(BINARY_NAME.to_owned(), appender);
-        let subscriber = tracing_subscriber::registry()
-            .with(env_filter)
-            .with(JsonStorageLayer)
-            .with(formatting_layer);
-
-        // Redirect all standard logging to tracing events
-        LogTracer::init().expect("Failed to set LogTracer");
-
-        tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
-
-        Some(guard)
+        (Some(perfetto_layer), Some(perfetto_guard))
     } else {
-        // Discard logs
-        None
+        (None, None)
+    };
+
+    // Log to file with Bunyan JSON formatter
+    let log_path = workspace_layout.run_info_dir.join("kamu.log");
+
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&log_path)
+        .unwrap_or_else(|e| panic!("Failed to create log file at {}: {}", log_path.display(), e));
+
+    let (appender, appender_guard) = tracing_appender::non_blocking(file);
+
+    let formatting_layer = BunyanFormattingLayer::new(BINARY_NAME.to_owned(), appender);
+    let subscriber = tracing_subscriber::registry()
+        .with(env_filter)
+        .with(JsonStorageLayer)
+        .with(maybe_perfetto_layer)
+        .with(formatting_layer);
+
+    // Redirect all standard logging to tracing events
+    LogTracer::init().expect("Failed to set LogTracer");
+
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+
+    Guards {
+        appender: Some(appender_guard),
+        perfetto: perfetto_guard,
     }
 }
 
@@ -360,12 +385,27 @@ fn configure_logging(
 // Output format
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
+fn configure_output_format(
+    matches: &clap::ArgMatches,
+    workspace_svc: &WorkspaceService,
+) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
     let verbosity_level = matches.get_count("verbose");
 
     let quiet = matches.get_flag("quiet");
+
+    let trace_file = if workspace_svc.is_in_workspace() && matches.get_flag("trace") {
+        Some(
+            workspace_svc
+                .layout()
+                .unwrap()
+                .run_info_dir
+                .join("kamu.perfetto.json"),
+        )
+    } else {
+        None
+    };
 
     let format_str = get_output_format_recursive(matches, &super::cli());
 
@@ -389,6 +429,7 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
         verbosity_level,
         is_tty,
         format,
+        trace_file,
     }
 }
 
@@ -416,4 +457,11 @@ fn get_output_format_recursive<'a>(
     } else {
         None
     }
+}
+
+#[allow(dead_code)]
+#[derive(Default)]
+struct Guards {
+    appender: Option<tracing_appender::non_blocking::WorkerGuard>,
+    perfetto: Option<tracing_chrome::FlushGuard>,
 }

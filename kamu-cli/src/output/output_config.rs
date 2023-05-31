@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
+
 use kamu::infra::utils::records_writers::RecordsWriter;
 
 use super::records_writers::*;
@@ -20,6 +22,8 @@ pub struct OutputConfig {
     pub verbosity_level: u8,
     pub is_tty: bool,
     pub format: OutputFormat,
+    /// Points to the output trace file if Perfetto tracing was enabled
+    pub trace_file: Option<PathBuf>,
 }
 
 impl OutputConfig {
@@ -61,6 +65,7 @@ impl Default for OutputConfig {
             verbosity_level: 0,
             is_tty: false,
             format: OutputFormat::Table,
+            trace_file: None,
         }
     }
 }

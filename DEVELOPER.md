@@ -8,6 +8,7 @@
   - [Code Generation](#code-generation)
 - [Release Procedure](#release-procedure)
 - [IDE Tips](#ide-tips)
+- [Debugging](#debugging)
 
 
 ## Building Locally
@@ -156,3 +157,22 @@ When using VSCode we recommend following extensions:
 - `Even Better TOML` - for editing TOML files
 - `crates` - displays dependency version status in `Cargo.toml`
   - Note: It's better to use `cargo upgrade --dry-run` when upgrading to bump deps across entire workspace
+
+
+## Debugging
+When running `kamu` it automatically logs to `.kamu/run/kamu.log`. Note that the `run` directory is cleaned up between every command.
+
+You can control the log level using standard RUST_LOG environment variable, e.g.:
+
+```sh
+RUST_LOG=debug kamu ...
+RUST_LOG="trace,mio::poll=info" kamu ...
+```
+
+You can also run kamu with verbosity flags as `kamu -vv ...` - in this case log ouptut will be directed straight to STDERR and all visuals will be disabled.
+
+Using `kamu --trace` flag allows you to record the execution of the program and open [Perfetto UI](https://perfetto.dev/) in a browser, allowing to easily analyze async code execution and task performance.
+
+> Note: If you are using Brave or a similar high-security browser and get an error from Perfetto when loading the trace - try disabling the security features to allow the UI app fetch data from `http://localhost:9001`.
+
+<img src="docs/developer_files/trace-perfetto.png" width=300 alt="Perfetto UI displaying a trace">

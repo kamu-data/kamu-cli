@@ -35,7 +35,7 @@ tar = "0.4"
 thiserror = "1"
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", features = ["codec", "compat", "io"] }
+tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
 tokio-tungstenite = "0.18"
 tower = "0.4"
 tracing = "0.1"

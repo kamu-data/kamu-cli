@@ -89,6 +89,10 @@ pub fn cli() -> Command {
                 .short('q')
                 .action(ArgAction::SetTrue)
                 .help("Suppress all non-essential output"),
+            Arg::new("trace")
+                .long("trace")
+                .action(ArgAction::SetTrue)
+                .help("Record and visualize the command execution as perfetto.dev trace")
         ])
         .after_help(indoc::indoc!(
             r#"

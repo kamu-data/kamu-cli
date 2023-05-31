@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+- New `kamu --trace` flag will record the execution of the program and open [Perfetto UI](https://perfetto.dev/) in a browser, allowing to easily analyze async code execution and task performance. Perfetto support is still in early stages and needs more work to correctly display the concurrent tasks.
 - Added a few common aliases like `ls -> list`, `rm -> delete`, `mv -> rename`
 
 ## [0.127.1] - 2023-05-29 (**BREAKING**)

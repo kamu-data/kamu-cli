@@ -75,6 +75,7 @@ serde_yaml = "0.9"
 # Tracing / logging / telemetry
 tracing = "0.1"
 tracing-appender = "0.2"
+tracing-chrome = "0.7"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
@@ -95,6 +96,7 @@ regex = "1"
 shlex = "1"  # Parsing partial input for custom completions
 signal-hook = "0.3"  # Signal handling
 tokio = { version = "1", default-features = false, features = ["io-util"] }
+tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 tempfile = "3"
 thiserror = "1"
 url = "2"

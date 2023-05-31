@@ -47,6 +47,15 @@ impl WorkspaceService {
         }
     }
 
+    //// Layout of the workspace (if we are in one)
+    pub fn layout(&self) -> Option<&WorkspaceLayout> {
+        if self.is_in_workspace() {
+            Some(&self.workspace_layout.as_ref())
+        } else {
+            None
+        }
+    }
+
     /// Whether there is an initialized workspace
     pub fn is_in_workspace(&self) -> bool {
         self.workspace_layout.root_dir.is_dir()
