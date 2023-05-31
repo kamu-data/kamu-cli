@@ -16,8 +16,7 @@ fn main() {
 
     match result {
         Ok(_) => (),
-        Err(err) => {
-            kamu_cli::error::display_cli_error(&err);
+        Err(_) => {
             std::process::exit(1);
         }
     }

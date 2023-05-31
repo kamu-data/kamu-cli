@@ -11,6 +11,7 @@
 #![feature(exit_status_error)]
 #![feature(provide_any)]
 #![feature(error_generic_member_access)]
+#![feature(panic_update_hook)]
 
 pub mod app;
 pub use app::*;
@@ -28,6 +29,7 @@ pub mod explore;
 
 pub mod error;
 pub use error::*;
+pub(crate) mod error_fmt;
 
 pub mod output;
 pub use output::*;

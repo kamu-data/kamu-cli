@@ -36,20 +36,26 @@ pub async fn run(
     workspace_layout: WorkspaceLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
+    // Always capture backtraces for logging - we will separately decide wheter to
+    // display them to the user based on verbocity level
+    if std::env::var_os("RUST_BACKTRACE").is_none() {
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
+
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
-    let (_log_thread, catalog) = {
+    let (_log_thread, catalog, output_config) = {
         let mut catalog_builder = configure_catalog();
         catalog_builder.add_value(workspace_layout.clone());
 
-        let output_format = configure_output_format(&matches);
-        catalog_builder.add_value(output_format.clone());
+        let output_config = configure_output_format(&matches);
+        catalog_builder.add_value(output_config.clone());
 
-        let _log_thread = configure_logging(&output_format, &workspace_layout);
+        let _log_thread = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
             version = VERSION,
             args = ?std::env::args().collect::<Vec<_>>(),
@@ -60,7 +66,7 @@ pub async fn run(
 
         load_config(&workspace_layout, &mut catalog_builder);
 
-        (_log_thread, catalog_builder.build())
+        (_log_thread, catalog_builder.build(), output_config)
     };
 
     // Evict cache
@@ -79,13 +85,22 @@ pub async fn run(
     };
 
     match result {
-        Ok(res) => {
+        Ok(()) => {
             tracing::info!("Command successful");
-            Ok(res)
+            Ok(())
         }
-        Err(e) => {
-            tracing::error!(error = ?e, "Command failed");
-            Err(e)
+        Err(err) => {
+            tracing::error!(
+                error_dbg = ?err,
+                error = %err.pretty(true),
+                "Command failed",
+            );
+
+            if output_config.is_tty && output_config.verbosity_level == 0 {
+                eprintln!("{}", err.pretty(false));
+            }
+
+            Err(err)
         }
     }
 }
@@ -273,6 +288,18 @@ fn configure_logging(
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::EnvFilter;
 
+    // Setup custom panic hook
+    std::panic::update_hook(move |prev, info| {
+        prev(info);
+        eprintln!(
+            "\n{}",
+            console::style(
+                "Oh no, looks like kamu has crashed!\n\
+                Please help us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+            ).bold()
+        );
+    });
+
     // Logging may be already initialized when running under tests
     if tracing::dispatcher::has_been_set() {
         return None;
@@ -292,7 +319,6 @@ fn configure_logging(
         tracing_subscriber::fmt()
             .with_env_filter(env_filter)
             .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
-            .with_thread_names(true)
             .with_writer(std::io::stderr)
             .init();
 
@@ -338,9 +364,6 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
     let is_tty = console::Term::stdout().features().is_attended();
 
     let verbosity_level = matches.get_count("verbose");
-    if verbosity_level > 0 {
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
 
     let quiet = matches.get_flag("quiet");
 
@@ -356,7 +379,7 @@ fn configure_output_format(matches: &clap::ArgMatches) -> OutputConfig {
             if is_tty {
                 OutputFormat::Table
             } else {
-                OutputFormat::Csv
+                OutputFormat::Json
             }
         }
     };

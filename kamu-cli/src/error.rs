@@ -7,146 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::backtrace::{Backtrace, BacktraceStatus};
-use std::error::Error;
+use std::backtrace::Backtrace;
 use std::fmt::Display;
 
 use kamu::domain::*;
 use thiserror::Error;
-
-///////////////////////////////////////////////////////////////////////////////
-
-// TODO: Replace with Display
-pub fn display_cli_error(err: &CLIError) {
-    match err {
-        CLIError::BatchError(b) => print_batch_error(b),
-        e => print_error(e),
-    }
-
-    if let CLIError::CriticalFailure { .. } = err {
-        eprintln!(
-            "\nHelp us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
-        );
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn print_error(error: &dyn Error) {
-    let mut error_chain = Vec::new();
-    let mut err_ref: Option<&dyn Error> = Some(error);
-    while let Some(e) = err_ref {
-        error_chain.push(e);
-        err_ref = e.source();
-    }
-
-    let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
-    unchain_error_messages(&mut error_messages);
-
-    if error_messages.len() == 1 {
-        eprintln!(
-            "{}: {}",
-            console::style("Error").red().bold(),
-            error_messages[0]
-        );
-    } else {
-        eprintln!("{}:", console::style("Error").red().bold());
-
-        for (i, e) in error_messages.iter().enumerate() {
-            eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
-        }
-    }
-
-    // Print the inner most backtrace
-    for e in error_chain.iter().rev() {
-        if let Some(bt) = e.request_ref::<Backtrace>() {
-            if bt.status() == BacktraceStatus::Captured {
-                eprintln!();
-                eprintln!("Backtrace:");
-                eprintln!("{}", console::style(bt).dim());
-                break;
-            }
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn print_batch_error(batch: &BatchError) {
-    eprintln!(
-        "{}: {}",
-        console::style("Error").red().bold(),
-        console::style(&batch.summary)
-    );
-    eprintln!();
-    eprintln!("Summary of individual errors:");
-
-    for (err, ctx) in &batch.errors_with_context {
-        eprintln!();
-
-        let mut error_chain = Vec::new();
-        let mut err_ref: Option<&dyn Error> = Some(err.as_ref());
-        while let Some(e) = err_ref {
-            error_chain.push(e);
-            err_ref = e.source();
-        }
-
-        let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
-        unchain_error_messages(&mut error_messages);
-
-        if error_messages.len() == 1 {
-            eprintln!(
-                "{} {}: {}",
-                console::style(">").green(),
-                console::style(ctx).bold(),
-                error_messages[0]
-            );
-        } else {
-            eprintln!(
-                "{} {}:",
-                console::style(">").green(),
-                console::style(ctx).bold()
-            );
-
-            for (i, e) in error_messages.iter().enumerate() {
-                eprintln!("  {} {}", console::style(format!("{}:", i)).dim(), e);
-            }
-        }
-
-        // Print the inner most backtrace
-        for e in error_chain.iter().rev() {
-            if let Some(bt) = e.request_ref::<Backtrace>() {
-                if bt.status() == BacktraceStatus::Captured {
-                    eprintln!();
-                    eprintln!("Backtrace:");
-                    eprintln!("{}", console::style(bt).dim());
-                    break;
-                }
-            }
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// Ugly workaround that deals with the fact that many libraries have errors that
-// format their messages as `{outer error message}: {inner error message}` that
-// results in a lot of duplication when printing the entire error chain.
-fn unchain_error_messages(errors: &mut Vec<String>) {
-    use itertools::Itertools;
-    for (first, second) in (0..errors.len()).tuple_windows() {
-        if errors[first] == errors[second] {
-            errors[first].truncate(0);
-        } else {
-            let suffix = format!(": {}", &errors[second]);
-            if errors[first].ends_with(&suffix) {
-                let new_len = errors[first].len() - suffix.len();
-                errors[first].truncate(new_len);
-            }
-        }
-    }
-    errors.retain(|s| !s.is_empty());
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -245,6 +110,13 @@ impl CLIError {
         Self::CriticalFailure {
             source: e.into(),
             backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn pretty<'a>(&'a self, include_backtraces: bool) -> impl Display + 'a {
+        super::error_fmt::PrettyCLIError {
+            error: self,
+            include_backtraces,
         }
     }
 }
