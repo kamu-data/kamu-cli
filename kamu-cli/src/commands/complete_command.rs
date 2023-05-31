@@ -177,8 +177,9 @@ impl CompleteCommand {
         // Establish command context
         for arg in args[1..].iter() {
             for s in last_cmd.get_subcommands() {
-                if s.get_name() == *arg {
+                if s.get_name() == *arg || s.get_visible_aliases().find(|a| a == arg).is_some() {
                     last_cmd = s;
+                    break;
                 }
             }
         }

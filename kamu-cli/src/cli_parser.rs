@@ -277,6 +277,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("delete")
                     .about("Delete a dataset")
+                    .visible_alias("rm")
                     .args([
                         Arg::new("all")
                             .short('a')
@@ -427,6 +428,7 @@ pub fn cli() -> Command {
                     ]),
                 tabular_output_params(
                     Command::new("list")
+                        .visible_alias("ls")
                         .about("List all datasets in the workspace")
                         .args([Arg::new("wide")
                             .long("wide")
@@ -702,6 +704,7 @@ pub fn cli() -> Command {
                     )),
                 Command::new("rename")
                     .about("Rename a dataset")
+                    .visible_alias("mv")
                     .args([
                         Arg::new("dataset")
                             .required(true)
@@ -790,6 +793,7 @@ pub fn cli() -> Command {
                             ]),
                         Command::new("delete")
                             .about("Deletes a reference to repository")
+                            .visible_alias("rm")
                             .args([
                                 Arg::new("all")
                                     .short('a')
@@ -808,7 +812,9 @@ pub fn cli() -> Command {
                                     .help("Don't ask for confirmation"),
                             ]),
                         tabular_output_params(
-                            Command::new("list").about("Lists known repositories"),
+                            Command::new("list")
+                                .visible_alias("ls")
+                                .about("Lists known repositories"),
                         ),
                         Command::new("alias")
                             .about("Manage set of remote aliases associated with datasets")
@@ -816,12 +822,15 @@ pub fn cli() -> Command {
                             .arg_required_else_help(true)
                             .subcommands([
                                 tabular_output_params(
-                                    Command::new("list").about("Lists remote aliases").args([
-                                        Arg::new("dataset")
-                                            .index(1)
-                                            .value_parser(value_parse_dataset_ref_local)
-                                            .help("Local dataset reference"),
-                                    ]),
+                                    Command::new("list")
+                                        .about("Lists remote aliases")
+                                        .visible_alias("ls")
+                                        .args([
+                                            Arg::new("dataset")
+                                                .index(1)
+                                                .value_parser(value_parse_dataset_ref_local)
+                                                .help("Local dataset reference"),
+                                        ]),
                                 ),
                                 Command::new("add")
                                     .about("Adds a remote alias to a dataset")
@@ -847,6 +856,7 @@ pub fn cli() -> Command {
                                     ]),
                                 Command::new("delete")
                                     .about("Deletes a remote alias associated with a dataset")
+                                    .visible_alias("rm")
                                     .args([
                                         Arg::new("all")
                                             .short('a')
