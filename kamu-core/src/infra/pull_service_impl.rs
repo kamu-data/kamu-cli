@@ -508,7 +508,7 @@ impl PullService for PullServiceImpl {
             plan.retain(|pi| pi.original_request.is_some());
         }
 
-        tracing::info!(num_items = plan.len(), "Retained pull plan");
+        tracing::info!(num_items = plan.len(), ?plan, "Retained pull plan");
 
         let mut results = Vec::with_capacity(plan.len());
 

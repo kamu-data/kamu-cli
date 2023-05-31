@@ -53,9 +53,8 @@ impl GcService {
     }
 
     /// Evict stale entries to manage cache size
+    #[tracing::instrument(level = "debug", skip_all)]
     pub fn evict_cache(&self) -> Result<GcResult, InternalError> {
-        tracing::info!("Evicting cache");
-
         // TODO: Make const after https://github.com/chronotope/chrono/issues/309
         // Or make into a config option
         let eviction_threshold: Duration = Duration::hours(24);
@@ -82,7 +81,9 @@ impl GcService {
             }
         }
 
-        tracing::info!(%bytes_freed, %entries_freed, "Evicted cache");
+        if bytes_freed > 0 || entries_freed > 0 {
+            tracing::info!(%bytes_freed, %entries_freed, "Evicted cache");
+        }
 
         Ok(GcResult {
             bytes_freed,
