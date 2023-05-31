@@ -326,6 +326,7 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
             .with_env_filter(env_filter)
             .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
             .with_writer(std::io::stderr)
+            .pretty()
             .init();
 
         return Guards::default();
@@ -351,24 +352,19 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
         (None, None)
     };
 
-    // Log to file with Bunyan JSON formatter
-    let log_path = workspace_layout.run_info_dir.join("kamu.log");
+    // Log to file with JSON formatter
+    let (appender, appender_guard) = {
+        let log_path = workspace_layout.run_info_dir.join("kamu.log");
+        tracing_appender::non_blocking(std::fs::File::create(&log_path).unwrap_or_else(|e| {
+            panic!("Failed to create log file at {}: {}", log_path.display(), e)
+        }))
+    };
 
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&log_path)
-        .unwrap_or_else(|e| panic!("Failed to create log file at {}: {}", log_path.display(), e));
-
-    let (appender, appender_guard) = tracing_appender::non_blocking(file);
-
-    let formatting_layer = BunyanFormattingLayer::new(BINARY_NAME.to_owned(), appender);
     let subscriber = tracing_subscriber::registry()
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(maybe_perfetto_layer)
-        .with(formatting_layer);
+        .with(BunyanFormattingLayer::new(BINARY_NAME.to_owned(), appender));
 
     // Redirect all standard logging to tracing events
     LogTracer::init().expect("Failed to set LogTracer");

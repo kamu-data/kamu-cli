@@ -76,7 +76,7 @@ serde_yaml = "0.9"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-chrome = "0.7"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 

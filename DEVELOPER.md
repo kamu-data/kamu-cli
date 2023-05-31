@@ -9,6 +9,8 @@
 - [Release Procedure](#release-procedure)
 - [IDE Tips](#ide-tips)
 - [Debugging](#debugging)
+  - [Logs](#logs)
+  - [Tracing](#tracing)
 
 
 ## Building Locally
@@ -35,6 +37,7 @@ Prerequisites:
   * `cargo binstall cargo-update` - for keeping up with major dependency updates
   * `cargo binstall cargo-deny` - for linting dependencies
   * `cargo binstall cargo-llvm-cov` - for coverage
+  * `cargo binstall bunyan` - for pretty-printing the JSON logs
 
 Clone the repository:
 ```shell
@@ -160,6 +163,8 @@ When using VSCode we recommend following extensions:
 
 
 ## Debugging
+
+### Logs
 When running `kamu` it automatically logs to `.kamu/run/kamu.log`. Note that the `run` directory is cleaned up between every command.
 
 You can control the log level using standard RUST_LOG environment variable, e.g.:
@@ -169,8 +174,15 @@ RUST_LOG=debug kamu ...
 RUST_LOG="trace,mio::poll=info" kamu ...
 ```
 
-You can also run kamu with verbosity flags as `kamu -vv ...` - in this case log ouptut will be directed straight to STDERR and all visuals will be disabled.
+The log file is in Bunyan format with one JSON object per line. It is intended to me machine-readable. When analyzing logs yourself you can pipe it through [`bynyan`] tool (see installation instructions above):
 
+```sh
+cat .kamu/run/kamu.log | bunyan
+```
+
+You can also run kamu with verbosity flags as `kamu -vv ...` for it to log straight to STDERR in a human-readable format.
+
+### Tracing
 Using `kamu --trace` flag allows you to record the execution of the program and open [Perfetto UI](https://perfetto.dev/) in a browser, allowing to easily analyze async code execution and task performance.
 
 > Note: If you are using Brave or a similar high-security browser and get an error from Perfetto when loading the trace - try disabling the security features to allow the UI app fetch data from `http://localhost:9001`.
