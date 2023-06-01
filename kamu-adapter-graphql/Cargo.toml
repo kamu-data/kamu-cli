@@ -1,6 +1,6 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.127.1"
+version = "0.128.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 publish = false
@@ -16,8 +16,8 @@ skip_docker_tests = []
 
 [dependencies]
 dill = { version = "0.5" }
-opendatafabric = { version = "0.127.1", path = "../opendatafabric", default-features = false }
-kamu = { version = "0.127.1", path = "../kamu-core", default-features = false }
+opendatafabric = { version = "0.128.0", path = "../opendatafabric", default-features = false }
+kamu = { version = "0.128.0", path = "../kamu-core", default-features = false }
 
 async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
 chrono = "0.4"

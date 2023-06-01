@@ -1,7 +1,7 @@
 IMAGE_REPO = ghcr.io/kamu-data
 IMAGE_JUPYTER_TAG = 0.5.0
 
-KAMU_VERSION = 0.127.1
+KAMU_VERSION = 0.128.0
 
 
 .PHONY: jupyter

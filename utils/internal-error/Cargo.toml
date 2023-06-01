@@ -1,6 +1,6 @@
 [package]
 name = "internal-error"
-version = "0.127.1"
+version = "0.128.0"
 authors = ["Kamu Data Inc. <info@kamu.dev>"]
 edition.workspace = true
 license = "Apache-2.0"

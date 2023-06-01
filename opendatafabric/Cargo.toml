@@ -1,6 +1,6 @@
 [package]
 name = "opendatafabric"
-version = "0.127.1"
+version = "0.128.0"
 authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
 edition.workspace = true
 license = "Apache-2.0"
@@ -11,7 +11,7 @@ doctest = false
 
 
 [dependencies]
-internal-error = { version = "0.127.1", path = "../utils/internal-error" }
+internal-error = { version = "0.128.0", path = "../utils/internal-error" }
 
 chrono = { version = "0.4", features = ["serde"] }
 indoc = "2"
