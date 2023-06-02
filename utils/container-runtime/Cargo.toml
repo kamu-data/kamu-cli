@@ -1,9 +1,16 @@
 [package]
 name = "container-runtime"
-version = "0.128.0"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition.workspace = true
-license = "Apache-2.0"
+description = "A subprocess-based wrapper on top of Docker/Podman"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
 
 
 [lib]

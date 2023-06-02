@@ -1,10 +1,16 @@
 [package]
 name = "kamu"
-version = "0.128.0"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition.workspace = true
-license-file = "../LICENSE.txt"
-publish = false
+description = "Kamu's core domain model interfaces and common implementations"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
 
 
 [lib]

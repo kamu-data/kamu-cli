@@ -1,9 +1,16 @@
 [package]
 name = "kamu-adapter-graphql"
-version = "0.128.0"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition.workspace = true
-publish = false
+description = "GraphQL adapter for Kamu's domain model"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
 
 
 [lib]

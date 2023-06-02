@@ -1,16 +1,17 @@
 [package]
 name = "kamu-cli"
-version = "0.128.0"
 description = "Decentralized data management tool"
-authors = ["Sergii Mikhtoniuk <mikhtoniuk@gmail.com>"]
-edition.workspace = true
-readme = "../README.md"
-license-file = "../LICENSE.txt"
-publish = false
-homepage = "https://github.com/kamu-data/kamu-cli"
-repository = "https://github.com/kamu-data/kamu-cli"
-keywords = ["cli", "data", "collaboration", "pipeline", "management", "provenance"]
 categories = ["command-line-utilities"]
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
 
 
 [lib]
