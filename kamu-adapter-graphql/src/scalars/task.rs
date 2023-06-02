@@ -10,33 +10,32 @@
 use std::ops::Deref;
 
 use async_graphql::*;
-use opendatafabric as odf;
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// AccountID
+// TaskID
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountID(String);
+pub struct TaskID(String);
 
-impl From<&str> for AccountID {
+impl From<&str> for TaskID {
     fn from(value: &str) -> Self {
         Self(value.to_owned())
     }
 }
 
-impl From<String> for AccountID {
+impl From<String> for TaskID {
     fn from(value: String) -> Self {
         Self(value)
     }
 }
 
-impl Into<String> for AccountID {
+impl Into<String> for TaskID {
     fn into(self) -> String {
         self.0
     }
 }
-impl Deref for AccountID {
+impl Deref for TaskID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -44,7 +43,7 @@ impl Deref for AccountID {
 }
 
 #[Scalar]
-impl ScalarType for AccountID {
+impl ScalarType for TaskID {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
             Ok(Self::from(value.as_str()))
@@ -59,43 +58,12 @@ impl ScalarType for AccountID {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// AccountName
+// TaskStatus
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AccountName(odf::AccountName);
-
-impl From<odf::AccountName> for AccountName {
-    fn from(value: odf::AccountName) -> Self {
-        Self(value)
-    }
-}
-
-impl Into<odf::AccountName> for AccountName {
-    fn into(self) -> odf::AccountName {
-        self.0
-    }
-}
-
-impl Deref for AccountName {
-    type Target = odf::AccountName;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[Scalar]
-impl ScalarType for AccountName {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::AccountName::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskStatus {
+    Queued,
+    Running,
+    Finished,
 }

@@ -8,19 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-mod dataset;
-mod metadata;
-mod multihash;
-mod odf_generated;
-mod os_path;
-mod pagination;
-mod task;
+mod accounts;
 
 pub use account::*;
-pub use dataset::*;
-pub use metadata::*;
-pub use multihash::*;
-pub use odf_generated::*;
-pub use os_path::*;
-pub use pagination::*;
-pub use task::*;
+pub use accounts::*;

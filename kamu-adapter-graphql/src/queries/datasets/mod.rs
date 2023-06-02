@@ -7,20 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod account;
 mod dataset;
-mod metadata;
-mod multihash;
-mod odf_generated;
-mod os_path;
-mod pagination;
-mod task;
+mod dataset_data;
+mod dataset_metadata;
+mod datasets;
+mod metadata_chain;
 
-pub use account::*;
 pub use dataset::*;
-pub use metadata::*;
-pub use multihash::*;
-pub use odf_generated::*;
-pub use os_path::*;
-pub use pagination::*;
-pub use task::*;
+pub use dataset_data::*;
+pub use dataset_metadata::*;
+pub use datasets::*;
+pub use metadata_chain::*;

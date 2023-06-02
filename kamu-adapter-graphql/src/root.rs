@@ -25,17 +25,32 @@ impl Query {
         "0.1".to_string()
     }
 
-    /// Dataset-related functionality group
+    /// Dataset-related functionality group.
+    ///
+    /// Datasets are historical streams of events recorded under a cetrain
+    /// schema.
     async fn datasets(&self) -> Datasets {
         Datasets
     }
 
-    /// Account-related functionality group
+    /// Account-related functionality group.
+    ///
+    /// Accounts can be individual users or organizations registered in the
+    /// system. This groups deals with their identities and permissions.
     async fn accounts(&self) -> Accounts {
         Accounts
     }
 
-    /// Search-related functionality group
+    /// Task-related functionality group.
+    ///
+    /// Tasks are units of scheduling that can perform many functions like
+    /// ingesting new data, running dataset transformations, answering ad-hoc
+    /// queries etc.
+    async fn tasks(&self) -> Tasks {
+        Tasks
+    }
+
+    /// Search-related functionality group.
     async fn search(&self) -> Search {
         Search
     }

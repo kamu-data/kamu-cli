@@ -7,29 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod account;
-pub use account::*;
-
 mod accounts;
-pub use accounts::*;
-
 mod data;
-pub use data::*;
-
-mod dataset_data;
-pub use dataset_data::*;
-
-mod dataset_metadata;
-pub use dataset_metadata::*;
-
-mod dataset;
-pub use dataset::*;
-
 mod datasets;
-pub use datasets::*;
-
-mod metadata_chain;
-pub use metadata_chain::*;
-
 mod search;
+mod tasks;
+
+pub use accounts::*;
+pub use data::*;
+pub use datasets::*;
 pub use search::*;
+pub use tasks::*;
