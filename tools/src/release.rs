@@ -9,10 +9,7 @@
 
 #![feature(exit_status_error)]
 
-extern crate semver;
-extern crate toml_edit;
-
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use chrono::{Datelike, NaiveDate};
 use clap::ArgAction;
@@ -37,8 +34,7 @@ fn main() {
         ])
         .get_matches();
 
-    let crates = get_all_crates();
-    let current_version = get_version(&crates.first().unwrap().cargo_toml_path);
+    let current_version = get_current_version();
     eprintln!("Current version: {}", current_version);
 
     let new_version: Version = if let Some(v) = matches.get_one::<String>("version") {
@@ -74,29 +70,11 @@ fn main() {
     );
 }
 
-fn get_all_crates() -> Vec<Crate> {
+fn get_current_version() -> Version {
     let root_cargo_content = std::fs::read_to_string(Path::new("Cargo.toml"))
         .expect("Could not read root Cargo.toml file");
-    let root_cargo: toml::Value = root_cargo_content
-        .parse()
-        .expect("Failed to parse root Cargo.toml");
-
-    root_cargo["workspace"]["members"]
-        .as_array()
-        .unwrap()
-        .into_iter()
-        .map(|v| v.as_str().unwrap())
-        .filter(|s| *s != "tools")
-        .map(|name| Crate {
-            cargo_toml_path: Path::new(name).join("Cargo.toml"),
-        })
-        .collect()
-}
-
-fn get_version(cargo_toml_path: &Path) -> Version {
-    let content =
-        std::fs::read_to_string(cargo_toml_path).expect("Could not read a Cargo.toml file");
-    let cargo_toml: toml::Value = content.parse().expect("Failed to parse a Cargo.toml");
+    let cargo_toml: toml::Value =
+        toml::from_str(&root_cargo_content).expect("Failed to parse a Cargo.toml");
     cargo_toml["package"]["version"]
         .as_str()
         .unwrap()
@@ -190,11 +168,6 @@ fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
         *d + (NaiveDate::from_ymd_opt(d.year() + years, 1, 1).unwrap()
             - NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap())
     })
-}
-
-#[derive(Debug, Clone)]
-struct Crate {
-    cargo_toml_path: PathBuf,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

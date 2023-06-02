@@ -51,28 +51,3 @@ kamu-base-with-data-push:
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
 		image-push
-
-
-#########################################################################################
-
-
-.PHONY: kamu-dev
-kamu-dev:
-	cd .. \
-		&& cross build --target x86_64-unknown-linux-gnu --release \
-		&& cp target/x86_64-unknown-linux-gnu/release/kamu-cli images/dev/kamu
-
-	# Make sure to run first: cargo run --bin create-test-workspace
-	cp -r ../examples/covid dev/workspace
-
-	docker build \
-		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
-		-t $(IMAGE_REPO)/kamu-base:dev \
-		dev/
-
-	rm -rf dev/kamu dev/workspace
-
-
-.PHONY: kamu-dev-push
-kamu-dev-push:
-	docker push $(IMAGE_REPO)/kamu-base:dev
