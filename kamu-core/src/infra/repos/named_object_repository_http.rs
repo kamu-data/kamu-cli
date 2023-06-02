@@ -12,7 +12,6 @@ use bytes::Bytes;
 use reqwest::Client;
 use url::Url;
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -40,7 +39,7 @@ impl NamedObjectRepositoryHttp {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryHttp {
-    async fn get(&self, name: &str) -> Result<Bytes, GetError> {
+    async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let url = self.base_url.join(name).int_err()?;
 
         let response = self.client.get(url).send().await.int_err()?;
@@ -48,7 +47,7 @@ impl NamedObjectRepository for NamedObjectRepositoryHttp {
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
             Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
-                Err(GetError::NotFound(NotFoundError {
+                Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),
                 }))
             }
@@ -60,11 +59,11 @@ impl NamedObjectRepository for NamedObjectRepositoryHttp {
         Ok(data)
     }
 
-    async fn set(&self, _name: &str, _data: &[u8]) -> Result<(), SetError> {
+    async fn set(&self, _name: &str, _data: &[u8]) -> Result<(), SetNamedError> {
         Err(AccessError::ReadOnly(None).into())
     }
 
-    async fn delete(&self, _name: &str) -> Result<(), DeleteError> {
+    async fn delete(&self, _name: &str) -> Result<(), DeleteNamedError> {
         Err(AccessError::ReadOnly(None).into())
     }
 }

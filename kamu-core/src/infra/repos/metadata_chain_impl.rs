@@ -10,6 +10,7 @@
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use opendatafabric::serde::flatbuffers::*;
+use opendatafabric::serde::*;
 use opendatafabric::*;
 
 use crate::domain::*;

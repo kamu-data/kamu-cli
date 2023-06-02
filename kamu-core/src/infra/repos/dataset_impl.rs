@@ -12,7 +12,6 @@ use chrono::{DateTime, Utc};
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
-use crate::domain::repos::named_object_repository::GetError;
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,9 +50,9 @@ where
     async fn read_summary(&self) -> Result<Option<DatasetSummary>, GetSummaryError> {
         let data = match self.info_repo.get("summary").await {
             Ok(data) => data,
-            Err(GetError::NotFound(_)) => return Ok(None),
-            Err(GetError::Access(e)) => return Err(GetSummaryError::Access(e)),
-            Err(GetError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
+            Err(GetNamedError::NotFound(_)) => return Ok(None),
+            Err(GetNamedError::Access(e)) => return Err(GetSummaryError::Access(e)),
+            Err(GetNamedError::Internal(e)) => return Err(GetSummaryError::Internal(e)),
         };
 
         let manifest: Manifest<DatasetSummary> = serde_yaml::from_slice(&data[..]).int_err()?;
@@ -81,8 +80,8 @@ where
 
         match self.info_repo.set("summary", &data).await {
             Ok(()) => Ok(()),
-            Err(SetError::Access(e)) => Err(GetSummaryError::Access(e)),
-            Err(SetError::Internal(e)) => Err(GetSummaryError::Internal(e)),
+            Err(SetNamedError::Access(e)) => Err(GetSummaryError::Access(e)),
+            Err(SetNamedError::Internal(e)) => Err(GetSummaryError::Internal(e)),
         }?;
 
         Ok(())

@@ -10,7 +10,6 @@
 use async_trait::async_trait;
 use opendatafabric::Multihash;
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError};
 use crate::domain::repos::reference_repository::SetRefError;
 use crate::domain::*;
 
@@ -38,11 +37,11 @@ where
     async fn get(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
         let data = match self.repo.get(&r.as_str()).await {
             Ok(data) => Ok(data),
-            Err(GetError::NotFound(_)) => Err(GetRefError::NotFound(RefNotFoundError {
+            Err(GetNamedError::NotFound(_)) => Err(GetRefError::NotFound(RefNotFoundError {
                 block_ref: r.clone(),
             })),
-            Err(GetError::Access(e)) => Err(GetRefError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetRefError::Internal(e)),
+            Err(GetNamedError::Access(e)) => Err(GetRefError::Access(e)),
+            Err(GetNamedError::Internal(e)) => Err(GetRefError::Internal(e)),
         }?;
         let text = std::str::from_utf8(&data[..]).int_err()?;
         let hash = Multihash::from_multibase_str(&text).int_err()?;
@@ -53,16 +52,16 @@ where
         let multibase = hash.to_multibase_string();
         match self.repo.set(&r.as_str(), multibase.as_bytes()).await {
             Ok(()) => Ok(()),
-            Err(SetError::Access(e)) => Err(SetRefError::Access(e)),
-            Err(SetError::Internal(e)) => Err(SetRefError::Internal(e)),
+            Err(SetNamedError::Access(e)) => Err(SetRefError::Access(e)),
+            Err(SetNamedError::Internal(e)) => Err(SetRefError::Internal(e)),
         }
     }
 
     async fn delete(&self, r: &BlockRef) -> Result<(), DeleteRefError> {
         match self.repo.delete(r.as_str()).await {
             Ok(()) => Ok(()),
-            Err(DeleteError::Access(e)) => Err(DeleteRefError::Access(e)),
-            Err(DeleteError::Internal(e)) => Err(DeleteRefError::Internal(e)),
+            Err(DeleteNamedError::Access(e)) => Err(DeleteRefError::Access(e)),
+            Err(DeleteNamedError::Internal(e)) => Err(DeleteRefError::Internal(e)),
         }
     }
 }

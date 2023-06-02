@@ -13,7 +13,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 
 use super::get_staging_name;
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -47,11 +46,11 @@ impl NamedObjectRepositoryLocalFS {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
-    async fn get(&self, name: &str) -> Result<Bytes, GetError> {
+    async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let data = match tokio::fs::read(self.root.join(name)).await {
             Ok(data) => Ok(data),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                Err(GetError::NotFound(NotFoundError {
+                Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),
                 }))
             }
@@ -61,7 +60,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(Bytes::from(data))
     }
 
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let staging_path = self.get_staging_path().int_err()?;
         tokio::fs::write(&staging_path, data).await.int_err()?;
 
@@ -70,7 +69,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         Ok(())
     }
 
-    async fn delete(&self, name: &str) -> Result<(), DeleteError> {
+    async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         match std::fs::remove_file(self.root.join(name)) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),

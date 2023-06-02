@@ -13,7 +13,7 @@ pub use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
 use crate::dtos::*;
 use crate::formats::Multicodec;
-pub use crate::serde::*;
+use crate::serde::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 // FlatbuffersMetadataBlockSerializer

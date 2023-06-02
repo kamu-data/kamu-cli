@@ -13,7 +13,6 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use bytes::Bytes;
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -37,26 +36,26 @@ impl NamedObjectRepositoryInMemory {
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryInMemory {
     /// Resolves reference to the object hash it's pointing to
-    async fn get(&self, name: &str) -> Result<Bytes, GetError> {
+    async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let objects_by_name = self.objects_by_name.lock().unwrap();
         let res = objects_by_name.get(name);
         match res {
             Some(bytes) => Ok(bytes.clone()),
-            None => Err(GetError::NotFound(NotFoundError {
+            None => Err(GetNamedError::NotFound(NotFoundError {
                 name: String::from(name),
             })),
         }
     }
 
     /// Update referece to point at the specified object hash
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();
         objects_by_name.insert(String::from(name), Bytes::copy_from_slice(data));
         Ok(())
     }
 
     /// Deletes specified reference
-    async fn delete(&self, name: &str) -> Result<(), DeleteError> {
+    async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();
         objects_by_name.remove(name);
         Ok(())

@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use chrono::prelude::*;
 use digest::Digest;
 use opendatafabric::serde::flatbuffers::*;
-use opendatafabric::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
+use opendatafabric::serde::*;
 use opendatafabric::*;
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -19,13 +19,13 @@ use crate::domain::InternalError;
 #[async_trait]
 pub trait NamedObjectRepository {
     /// Resolves reference to the object hash it's pointing to
-    async fn get(&self, name: &str) -> Result<Bytes, GetError>;
+    async fn get(&self, name: &str) -> Result<Bytes, GetNamedError>;
 
     /// Update referece to point at the specified object hash
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError>;
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError>;
 
     /// Deletes specified reference
-    async fn delete(&self, name: &str) -> Result<(), DeleteError>;
+    async fn delete(&self, name: &str) -> Result<(), DeleteNamedError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ pub trait NamedObjectRepository {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetError {
+pub enum GetNamedError {
     #[error(transparent)]
     NotFound(NotFoundError),
     #[error(transparent)]
@@ -53,7 +53,7 @@ pub enum GetError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum SetError {
+pub enum SetNamedError {
     #[error(transparent)]
     Access(
         #[from]
@@ -71,7 +71,7 @@ pub enum SetError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DeleteError {
+pub enum DeleteNamedError {
     #[error(transparent)]
     Access(
         #[from]

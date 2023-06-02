@@ -11,7 +11,6 @@ use async_trait::async_trait;
 use aws_sdk_s3::operation::get_object::GetObjectError;
 use bytes::Bytes;
 
-use crate::domain::repos::named_object_repository::{DeleteError, GetError, SetError};
 use crate::domain::*;
 use crate::infra::utils::s3_context::S3Context;
 
@@ -37,7 +36,7 @@ impl NamedObjectRepositoryS3 {
 
 #[async_trait]
 impl NamedObjectRepository for NamedObjectRepositoryS3 {
-    async fn get(&self, name: &str) -> Result<Bytes, GetError> {
+    async fn get(&self, name: &str) -> Result<Bytes, GetNamedError> {
         let key = self.get_key(name);
 
         tracing::debug!(?key, "Reading object stream");
@@ -46,7 +45,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
             Ok(resp) => Ok(resp),
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
-                GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(NotFoundError {
+                GetObjectError::NoSuchKey(_) => Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),
                 })),
                 err @ _ => Err(err.int_err().into()),
@@ -62,7 +61,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         Ok(Bytes::from(data))
     }
 
-    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetError> {
+    async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let key = self.get_key(name);
 
         tracing::debug!(?key, "Inserting object");
@@ -78,7 +77,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
         Ok(())
     }
 
-    async fn delete(&self, name: &str) -> Result<(), DeleteError> {
+    async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         let key = self.get_key(name);
 
         tracing::debug!(?key, "Deleting object");
