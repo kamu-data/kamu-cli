@@ -22,13 +22,13 @@ skip_docker_tests = []
 
 
 [dependencies]
-dill = { version = "0.5" }
-opendatafabric = { version = "0.128.0", path = "../opendatafabric", default-features = false }
-kamu = { version = "0.128.0", path = "../kamu-core", default-features = false }
+opendatafabric = { workspace = true }
+kamu = { workspace = true }
 
 async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
 chrono = "0.4"
 datafusion = "25"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+dill = "0.5"
 futures = "0.3"
 indoc = "2"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }  # TODO: Remove from this crate (needed by GitHub auth)

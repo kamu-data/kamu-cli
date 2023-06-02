@@ -22,16 +22,16 @@ skip_docker_tests = []
 
 
 [dependencies]
-dill = "0.5"
-opendatafabric = { version = "0.128.0", path = "../opendatafabric", default-features = false }
-kamu = { version = "0.128.0", path = "../kamu-core", default-features = false }
-container-runtime = { version = "0.128.0", path = "../utils/container-runtime", default-features = false }
+container-runtime = { workspace = true }
+opendatafabric = { workspace = true }
+kamu = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.7", features = ["async-read-body"] }
 async-trait = "0.1"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
+dill = "0.5"
 flate2 = "1"                                                           # GZip decoder
 futures = "0.3"
 hyper = "0.14"

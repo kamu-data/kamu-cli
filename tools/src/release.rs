@@ -75,7 +75,7 @@ fn get_current_version() -> Version {
         .expect("Could not read root Cargo.toml file");
     let cargo_toml: toml::Value =
         toml::from_str(&root_cargo_content).expect("Failed to parse a Cargo.toml");
-    cargo_toml["package"]["version"]
+    cargo_toml["workspace"]["package"]["version"]
         .as_str()
         .unwrap()
         .parse()

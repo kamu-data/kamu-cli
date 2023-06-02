@@ -1,15 +1,24 @@
 [workspace]
 members = [
+    "tools",
+    "utils/internal-error",
+    "utils/container-runtime",
     "opendatafabric",
     "kamu-core",
     "kamu-adapter-graphql",
     "kamu-adapter-http",
     "kamu-cli",
-    "tools",
-    "utils/container-runtime",
-    "utils/internal-error",
 ]
 resolver = "2"
+
+
+[workspace.dependencies]
+internal-error = { version = "0.128.0", path = "./utils/internal-error", default-features = false }
+container-runtime = { version = "0.128.0", path = "./utils/container-runtime", default-features = false }
+opendatafabric = { version = "0.128.0", path = "./opendatafabric", default-features = false }
+kamu = { version = "0.128.0", path = "./kamu-core", default-features = false }
+kamu-adapter-graphql = { version = "0.128.0", path = "./kamu-adapter-graphql", default-features = false }
+kamu-adapter-http = { version = "0.128.0", path = "./kamu-adapter-http", default-features = false }
 
 
 [workspace.package]
