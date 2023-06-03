@@ -13,9 +13,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal};
-use kamu::infra::utils::s3_context::S3Context;
-use kamu::infra::{DatasetLayout, DatasetRepositoryS3};
 use kamu::testing::MinioServer;
+use kamu::utils::s3_context::S3Context;
+use kamu::{DatasetLayout, DatasetRepositoryS3};
 use url::Url;
 
 use super::{ServerSideHarness, TestAPIServer};

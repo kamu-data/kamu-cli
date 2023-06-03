@@ -21,8 +21,8 @@ use datafusion::parquet::record::RowAccessor;
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 

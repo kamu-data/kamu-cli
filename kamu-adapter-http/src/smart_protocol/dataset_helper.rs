@@ -178,7 +178,7 @@ pub async fn decode_metadata_batch(
             // This is currently necessary because we need to be able to deserialize blocks
             // BEFORE an instance of MetadataChain exists. Consider injecting a
             // configurable block deserializer.
-            match kamu::infra::MetadataChainImpl::<(), ()>::deserialize_block(&hash, &bytes) {
+            match kamu::MetadataChainImpl::<(), ()>::deserialize_block(&hash, &bytes) {
                 Ok(block) => Ok((hash, block)),
                 Err(err) => Err(err),
             }

@@ -11,8 +11,8 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 

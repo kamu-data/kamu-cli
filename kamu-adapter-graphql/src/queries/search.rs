@@ -9,8 +9,7 @@
 
 use async_graphql::*;
 use futures::TryStreamExt;
-use kamu::domain;
-use kamu::domain::TryStreamExtExt;
+use kamu_domain::{self as domain, TryStreamExtExt};
 
 use crate::queries::*;
 use crate::scalars::*;

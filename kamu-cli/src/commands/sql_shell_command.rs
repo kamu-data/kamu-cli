@@ -13,7 +13,7 @@ use std::time::Duration;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
 use kamu::domain::{QueryOptions, QueryService};
-use kamu::infra::*;
+use kamu::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};

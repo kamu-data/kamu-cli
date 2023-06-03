@@ -16,8 +16,8 @@ use axum::routing::IntoMakeService;
 use axum::Router;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 
 use crate::harness::await_client_server_flow;

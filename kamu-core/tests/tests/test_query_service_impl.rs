@@ -14,10 +14,10 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::infra;
-use kamu::infra::utils::records_writers::JsonArrayWriter;
-use kamu::infra::utils::s3_context::S3Context;
 use kamu::testing::{MetadataFactory, MinioServer, ParquetWriterHelper};
+use kamu::utils::s3_context::S3Context;
+use kamu::*;
+use kamu_data_utils::data::format::JsonArrayWriter;
 use opendatafabric::*;
 use reqwest::Url;
 use tempfile::TempDir;
@@ -102,7 +102,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
                     start: offset,
                     end: offset + record_batch.num_rows() as i64 - 1,
                 }),
-                Some(tmp_data_path.clone()),
+                Some(tmp_data_path.as_path()),
                 None,
                 None,
                 None,
@@ -120,19 +120,19 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
-    let dataset_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir).unwrap());
+    let dataset_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .add_value(workspace_layout.as_ref().clone())
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
-        .add::<infra::QueryServiceImpl>()
-        .bind::<dyn QueryService, infra::QueryServiceImpl>()
-        .add::<infra::ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, infra::ObjectStoreRegistryImpl>()
-        .add_value(infra::ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<QueryServiceImpl>()
+        .bind::<dyn QueryService, QueryServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add_value(ObjectStoreBuilderLocalFs::new())
+        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
         .build()
 }
 
@@ -141,25 +141,21 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
-    let dataset_repo = infra::DatasetRepositoryS3::new(s3_context.clone());
+    let dataset_repo = DatasetRepositoryS3::new(s3_context.clone());
 
     let s3_credentials = s3_context.credentials().await;
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryS3>()
-        .add::<infra::QueryServiceImpl>()
-        .bind::<dyn QueryService, infra::QueryServiceImpl>()
-        .add::<infra::ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, infra::ObjectStoreRegistryImpl>()
-        .add_value(infra::ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderLocalFs>()
-        .add_value(infra::ObjectStoreBuilderS3::new(
-            s3_context,
-            s3_credentials,
-            true,
-        ))
-        .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderS3>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+        .add::<QueryServiceImpl>()
+        .bind::<dyn QueryService, QueryServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add_value(ObjectStoreBuilderLocalFs::new())
+        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add_value(ObjectStoreBuilderS3::new(s3_context, s3_credentials, true))
+        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
         .build()
 }
 
@@ -173,10 +169,8 @@ async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let schema = query_svc.get_schema(&dataset_ref).await.unwrap();
     assert!(schema.is_some());
 
-    use kamu::infra::utils::schema_utils;
-
     let mut buf = Vec::new();
-    schema_utils::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
+    kamu_data_utils::schema::format::write_schema_parquet_json(&mut buf, &schema.unwrap()).unwrap();
     let schema_content = String::from_utf8(buf).unwrap();
     let data_schema_json =
         serde_json::from_str::<serde_json::Value>(schema_content.as_str()).unwrap();

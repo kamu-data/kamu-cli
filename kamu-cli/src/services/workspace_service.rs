@@ -11,7 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::infra::{WorkspaceLayout, WorkspaceVersion};
+use kamu::{WorkspaceLayout, WorkspaceVersion};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

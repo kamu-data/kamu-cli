@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::infra::{DotStyle, DotVisitor, WorkspaceLayout};
+use kamu::{DotStyle, DotVisitor, WorkspaceLayout};
 use opendatafabric::*;
 
 use super::{CLIError, Command};

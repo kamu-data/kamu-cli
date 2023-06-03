@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use async_graphql::*;
 use indoc::indoc;
-use kamu::domain::*;
-use kamu::infra;
 use kamu::testing::MetadataFactory;
+use kamu::*;
+use kamu_domain::*;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
@@ -21,12 +21,12 @@ use opendatafabric::*;
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -57,12 +57,12 @@ async fn dataset_by_id_does_not_exist() {
 #[test_log::test(tokio::test)]
 async fn dataset_by_id() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
@@ -110,12 +110,12 @@ async fn dataset_by_id() {
 #[test_log::test(tokio::test)]
 async fn dataset_create_empty() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -154,12 +154,12 @@ async fn dataset_create_empty() {
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -213,12 +213,12 @@ async fn dataset_create_from_snapshot() {
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot_malformed() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);

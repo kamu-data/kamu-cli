@@ -115,26 +115,14 @@ pub struct MetadataEventDataStreamRef<'a> {
     pub output_watermark: Option<&'a DateTime<Utc>>,
 }
 
-pub struct MetadataBlockDataStream {
-    pub system_time: DateTime<Utc>,
-    pub prev_block_hash: Option<Multihash>,
-    pub event: MetadataEventDataStream,
+pub trait IntoDataStreamEvent {
+    fn into_data_stream_event(self) -> Option<MetadataEventDataStream>;
+    fn as_data_stream_event<'a>(&'a self) -> Option<MetadataEventDataStreamRef<'a>>;
 }
 
-pub struct MetadataBlockDataStreamRef<'a> {
-    pub system_time: &'a DateTime<Utc>,
-    pub prev_block_hash: Option<&'a Multihash>,
-    pub event: MetadataEventDataStreamRef<'a>,
-}
-
-pub trait IntoDataStreamBlock {
-    fn into_data_stream_block(self) -> Option<MetadataBlockDataStream>;
-    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>>;
-}
-
-impl IntoDataStreamBlock for MetadataBlock {
-    fn into_data_stream_block(self) -> Option<MetadataBlockDataStream> {
-        let (output_data, output_checkpoint, output_watermark) = match self.event {
+impl IntoDataStreamEvent for MetadataEvent {
+    fn into_data_stream_event(self) -> Option<MetadataEventDataStream> {
+        let (output_data, output_checkpoint, output_watermark) = match self {
             MetadataEvent::AddData(e) => (e.output_data, e.output_checkpoint, e.output_watermark),
             MetadataEvent::ExecuteQuery(e) => {
                 (e.output_data, e.output_checkpoint, e.output_watermark)
@@ -148,19 +136,15 @@ impl IntoDataStreamBlock for MetadataBlock {
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_) => return None,
         };
-        Some(MetadataBlockDataStream {
-            system_time: self.system_time,
-            prev_block_hash: self.prev_block_hash,
-            event: MetadataEventDataStream {
-                output_data,
-                output_checkpoint,
-                output_watermark,
-            },
+        Some(MetadataEventDataStream {
+            output_data,
+            output_checkpoint,
+            output_watermark,
         })
     }
 
-    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>> {
-        let (output_data, output_checkpoint, output_watermark) = match &self.event {
+    fn as_data_stream_event<'a>(&'a self) -> Option<MetadataEventDataStreamRef<'a>> {
+        let (output_data, output_checkpoint, output_watermark) = match &self {
             MetadataEvent::AddData(e) => (
                 e.output_data.as_ref(),
                 e.output_checkpoint.as_ref(),
@@ -180,14 +164,55 @@ impl IntoDataStreamBlock for MetadataBlock {
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_) => return None,
         };
-        Some(MetadataBlockDataStreamRef {
-            system_time: &self.system_time,
-            prev_block_hash: self.prev_block_hash.as_ref(),
-            event: MetadataEventDataStreamRef {
-                output_data,
-                output_checkpoint,
-                output_watermark,
-            },
+        Some(MetadataEventDataStreamRef {
+            output_data,
+            output_checkpoint,
+            output_watermark,
         })
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct MetadataBlockDataStream {
+    pub system_time: DateTime<Utc>,
+    pub prev_block_hash: Option<Multihash>,
+    pub event: MetadataEventDataStream,
+}
+
+pub struct MetadataBlockDataStreamRef<'a> {
+    pub system_time: &'a DateTime<Utc>,
+    pub prev_block_hash: Option<&'a Multihash>,
+    pub event: MetadataEventDataStreamRef<'a>,
+}
+
+pub trait IntoDataStreamBlock {
+    fn into_data_stream_block(self) -> Option<MetadataBlockDataStream>;
+    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>>;
+}
+
+impl IntoDataStreamBlock for MetadataBlock {
+    fn into_data_stream_block(self) -> Option<MetadataBlockDataStream> {
+        if let Some(event) = self.event.into_data_stream_event() {
+            Some(MetadataBlockDataStream {
+                system_time: self.system_time,
+                prev_block_hash: self.prev_block_hash,
+                event,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>> {
+        if let Some(event) = self.event.as_data_stream_event() {
+            Some(MetadataBlockDataStreamRef {
+                system_time: &self.system_time,
+                prev_block_hash: self.prev_block_hash.as_ref(),
+                event,
+            })
+        } else {
+            None
+        }
     }
 }

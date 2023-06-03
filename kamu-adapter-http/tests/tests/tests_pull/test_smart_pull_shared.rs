@@ -9,16 +9,9 @@
 
 use std::str::FromStr;
 
-use kamu::domain::{CommitOpts, DatasetExt, DatasetRepositoryExt, PullResult};
+use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, MetadataFactory};
-use opendatafabric::{
-    DatasetKind,
-    DatasetName,
-    DatasetRef,
-    DatasetRefAny,
-    DatasetRefRemote,
-    MetadataEvent,
-};
+use opendatafabric::*;
 
 use crate::harness::{
     await_client_server_flow,

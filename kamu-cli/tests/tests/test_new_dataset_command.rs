@@ -10,7 +10,7 @@
 use std::str::FromStr;
 
 use kamu::domain::*;
-use kamu::infra::ResourceLoaderImpl;
+use kamu::ResourceLoaderImpl;
 use kamu_cli::commands::*;
 use kamu_cli::CLIError;
 use opendatafabric::DatasetName;

@@ -14,8 +14,47 @@
 #![feature(provide_any)]
 #![feature(error_generic_member_access)]
 
-pub mod domain;
-pub mod infra;
+// Re-exports
+pub use kamu_domain as domain;
 
-// TODO: Put under feature flag
-pub mod testing;
+mod engine;
+pub mod ingest;
+mod repos;
+pub mod testing; // TODO: Put under feature flag
+pub mod utils;
+
+mod dataset_config;
+mod dataset_layout;
+mod ingest_service_impl;
+mod provenance_service_impl;
+mod pull_service_impl;
+mod push_service_impl;
+mod query_service_impl;
+mod remote_aliases_registry_impl;
+mod remote_repository_registry_impl;
+mod reset_service_impl;
+mod resource_loader_impl;
+mod search_service_impl;
+mod sync_service_impl;
+mod transform_service_impl;
+mod verification_service_impl;
+mod workspace_layout;
+
+pub use dataset_config::*;
+pub use dataset_layout::*;
+pub use engine::*;
+pub use ingest_service_impl::*;
+pub use provenance_service_impl::*;
+pub use pull_service_impl::*;
+pub use push_service_impl::*;
+pub use query_service_impl::*;
+pub use remote_aliases_registry_impl::*;
+pub use remote_repository_registry_impl::*;
+pub use repos::*;
+pub use reset_service_impl::*;
+pub use resource_loader_impl::*;
+pub use search_service_impl::*;
+pub use sync_service_impl::*;
+pub use transform_service_impl::*;
+pub use verification_service_impl::*;
+pub use workspace_layout::*;

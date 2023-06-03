@@ -12,7 +12,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use container_runtime::*;
-use kamu::infra::utils::docker_images;
+use kamu::utils::docker_images;
 
 // TODO: Implement caching headers in `HttpFileServer` so we could get rid of
 // this class

@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use kamu::domain::*;
-use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
-use kamu::infra::*;
+use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
 use opendatafabric::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use tempfile::TempDir;
@@ -70,7 +70,7 @@ impl ClientSideHarness {
 
         b.add_value(workspace_layout.clone())
             .add_value(ContainerRuntime::default())
-            .add_value(utils::ipfs_wrapper::IpfsClient::default())
+            .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
             .add_value(IpfsGateway::default());
 
         let catalog = b.build();

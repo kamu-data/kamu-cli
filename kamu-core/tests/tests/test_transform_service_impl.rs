@@ -12,8 +12,8 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use futures::TryStreamExt;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 
 async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHandle {

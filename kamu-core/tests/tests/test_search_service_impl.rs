@@ -12,8 +12,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
@@ -33,7 +33,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         local_repo.clone(),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
+        Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
     );
 
     let search_svc = SearchServiceImpl::new(remote_repo_reg.clone());

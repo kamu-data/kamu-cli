@@ -17,8 +17,8 @@ use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 
 struct DatasetHelper {
@@ -66,7 +66,6 @@ impl DatasetHelper {
         use datafusion::parquet::arrow::ArrowWriter;
         use datafusion::parquet::file::properties::WriterProperties;
         use datafusion::parquet::schema::types::ColumnPath;
-        use kamu::infra::utils::data_utils;
 
         // Get last block
         let old_head = self
@@ -121,18 +120,23 @@ impl DatasetHelper {
         arrow_writer.close().unwrap();
 
         // Write a dummy checkpoint
-        let new_checkpoint_hash = self
-            .dataset
-            .as_checkpoint_repo()
-            .insert_bytes(b"dummy-checkpoint", InsertOpts::default())
-            .await
-            .unwrap()
-            .hash;
+        let new_checkpoint_hash = {
+            use rand::RngCore;
+            let mut checkpoint_data = [0u8; 128];
+            rand::thread_rng().fill_bytes(&mut checkpoint_data);
+
+            self.dataset
+                .as_checkpoint_repo()
+                .insert_bytes(&checkpoint_data, InsertOpts::default())
+                .await
+                .unwrap()
+                .hash
+        };
 
         // Compute new hashes
         let new_slice = DataSlice {
-            logical_hash: data_utils::get_parquet_logical_hash(&tmp_path).unwrap(),
-            physical_hash: data_utils::get_file_physical_hash(&tmp_path).unwrap(),
+            logical_hash: kamu_data_utils::data::hash::get_parquet_logical_hash(&tmp_path).unwrap(),
+            physical_hash: kamu_data_utils::data::hash::get_file_physical_hash(&tmp_path).unwrap(),
             interval: orig_slice.interval.clone(),
             size: std::fs::metadata(&tmp_path).unwrap().len() as i64,
         };

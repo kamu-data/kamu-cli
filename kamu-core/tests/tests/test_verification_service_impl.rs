@@ -14,9 +14,8 @@ use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::infra::utils::data_utils;
-use kamu::infra::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::*;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
@@ -86,8 +85,10 @@ async fn test_verify_data_consistency() {
     let data_path = tempdir.path().join("data");
 
     ParquetWriterHelper::from_record_batch(&data_path, &record_batch).unwrap();
-    let data_logical_hash = data_utils::get_parquet_logical_hash(&data_path).unwrap();
-    let data_physical_hash = data_utils::get_file_physical_hash(&data_path).unwrap();
+    let data_logical_hash =
+        kamu_data_utils::data::hash::get_parquet_logical_hash(&data_path).unwrap();
+    let data_physical_hash =
+        kamu_data_utils::data::hash::get_file_physical_hash(&data_path).unwrap();
 
     // Commit data
     let dataset = local_repo
@@ -99,7 +100,7 @@ async fn test_verify_data_consistency() {
         .commit_add_data(
             None,
             Some(OffsetInterval { start: 0, end: 0 }),
-            Some(data_path),
+            Some(data_path.as_path()),
             None,
             None,
             None,

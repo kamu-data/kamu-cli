@@ -32,6 +32,7 @@ skip_docker_tests = []
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 opendatafabric = { workspace = true }
+kamu-data-utils = { workspace = true }
 kamu = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }

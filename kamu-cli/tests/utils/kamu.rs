@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use futures::stream::TryStreamExt;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::ParquetReaderHelper;
+use kamu::*;
 use kamu_cli::CLIError;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;

@@ -12,8 +12,8 @@ use std::path::Path;
 
 use chrono::{TimeZone, Utc};
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 
 fn init_chain(root: &Path) -> impl MetadataChain {

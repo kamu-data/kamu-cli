@@ -12,7 +12,7 @@ use std::ops::Deref;
 
 use async_graphql::*;
 use datafusion::error::DataFusionError;
-use kamu::domain::QueryError;
+use kamu_domain::QueryError;
 use opendatafabric as odf;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +139,7 @@ impl DataSchema {
         format: DataSchemaFormat,
     ) -> Result<DataSchema> {
         let parquet_schema =
-            kamu::infra::utils::schema_utils::dataframe_schema_to_parquet_schema(schema);
+            kamu_data_utils::schema::convert::dataframe_schema_to_parquet_schema(schema);
         Self::from_parquet_schema(parquet_schema.as_ref(), format)
     }
 
@@ -148,14 +148,12 @@ impl DataSchema {
         schema: &datafusion::parquet::schema::types::Type,
         format: DataSchemaFormat,
     ) -> Result<DataSchema> {
-        use kamu::infra::utils::schema_utils;
+        use kamu_data_utils::schema::format::*;
 
         let mut buf = Vec::new();
         match format {
-            DataSchemaFormat::Parquet => schema_utils::write_schema_parquet(&mut buf, &schema),
-            DataSchemaFormat::ParquetJson => {
-                schema_utils::write_schema_parquet_json(&mut buf, &schema)
-            }
+            DataSchemaFormat::Parquet => write_schema_parquet(&mut buf, &schema),
+            DataSchemaFormat::ParquetJson => write_schema_parquet_json(&mut buf, &schema),
         }?;
 
         Ok(DataSchema {
@@ -202,7 +200,7 @@ impl DataBatch {
         record_batches: &Vec<datafusion::arrow::record_batch::RecordBatch>,
         format: DataBatchFormat,
     ) -> Result<DataBatch> {
-        use kamu::infra::utils::records_writers::*;
+        use kamu_data_utils::data::format::*;
 
         let num_records: usize = record_batches.iter().map(|b| b.num_rows()).sum();
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use kamu::domain;
+use kamu_domain as domain;
 
 use crate::scalars::*;
 use crate::utils::*;

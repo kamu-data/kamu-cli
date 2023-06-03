@@ -11,7 +11,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use container_runtime::*;
-use kamu::infra::utils::docker_images;
+use kamu::utils::docker_images;
 
 // TODO: Consider replacing with in-process server for speed
 pub struct FtpServer {

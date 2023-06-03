@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::*;
 use opendatafabric::*;
 
 use crate::utils::DummySmartTransferProtocolClient;
@@ -205,7 +205,7 @@ async fn create_graph_remote(
         Arc::new(DatasetRepositoryLocalFs::new(ws.clone())),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(kamu::infra::utils::ipfs_wrapper::IpfsClient::default()),
+        Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
     );
 
     for import_alias in to_import {

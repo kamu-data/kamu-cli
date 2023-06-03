@@ -12,7 +12,7 @@ use std::io::prelude::*;
 
 use indoc::indoc;
 use kamu::domain::IngestError;
-use kamu::infra::ingest::*;
+use kamu::ingest::*;
 use opendatafabric::*;
 
 #[test]

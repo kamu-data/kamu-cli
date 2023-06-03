@@ -10,6 +10,7 @@
 mod engine;
 mod ingest;
 mod repos;
+mod test_metadata_chain_comparator;
 mod test_pull_service_impl;
 mod test_query_service_impl;
 mod test_reset_service_impl;

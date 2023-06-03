@@ -15,8 +15,8 @@ use chrono::Utc;
 use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
-use kamu::infra::ingest::*;
-use kamu::infra::*;
+use kamu::ingest::*;
+use kamu::*;
 use opendatafabric::*;
 use url::Url;
 

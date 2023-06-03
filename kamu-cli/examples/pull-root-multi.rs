@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use kamu::domain::*;
-use kamu::infra::*;
+use kamu::*;
 use kamu_cli::commands::*;
 use kamu_cli::output::OutputConfig;
 use opendatafabric::*;

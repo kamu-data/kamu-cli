@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use container_runtime::ContainerRuntime;
-use kamu::infra::utils::docker_images;
+use kamu::utils::docker_images;
 
 // Not really a test - used by CI to separate pulling of test images
 // into its own phase

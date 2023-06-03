@@ -12,8 +12,8 @@ use std::error::Error;
 use std::path::Path;
 
 use kamu::domain::*;
-use kamu::infra::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::*;
 use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
 use opendatafabric::*;
 
@@ -50,8 +50,8 @@ async fn init_v0_workspace(workspace_path: &Path) {
         .commit_add_data(
             None,
             Some(OffsetInterval { start: 0, end: 10 }),
-            Some(data_path),
-            Some(checkpoint_path),
+            Some(data_path.as_path()),
+            Some(checkpoint_path.as_path()),
             None,
             None,
             CommitOpts::default(),

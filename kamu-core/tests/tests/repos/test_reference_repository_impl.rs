@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
-use kamu::infra::*;
+use kamu::*;
 use opendatafabric::*;
 
 #[tokio::test]

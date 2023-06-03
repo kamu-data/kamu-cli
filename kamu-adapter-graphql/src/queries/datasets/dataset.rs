@@ -10,8 +10,7 @@
 use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
-use kamu::domain;
-use kamu::domain::{MetadataChainExt, TryStreamExtExt};
+use kamu_domain::{self as domain, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 
 use crate::queries::*;

@@ -9,8 +9,7 @@
 
 use async_graphql::*;
 use futures::TryStreamExt;
-use kamu::domain;
-use kamu::domain::DatasetRepositoryExt;
+use kamu_domain::{self as domain, DatasetRepositoryExt};
 use opendatafabric as odf;
 
 use crate::queries::*;

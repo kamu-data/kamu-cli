@@ -10,9 +10,9 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
-use kamu::infra::utils::s3_context::S3Context;
-use kamu::infra::*;
 use kamu::testing::MinioServer;
+use kamu::utils::s3_context::S3Context;
+use kamu::*;
 use opendatafabric::*;
 use url::Url;
 

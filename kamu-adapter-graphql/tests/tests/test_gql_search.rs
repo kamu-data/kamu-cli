@@ -10,20 +10,20 @@
 use std::sync::Arc;
 
 use async_graphql::*;
-use kamu::domain::*;
-use kamu::infra;
 use kamu::testing::MetadataFactory;
+use kamu::*;
+use kamu_domain::*;
 use opendatafabric::*;
 
 #[tokio::test]
 async fn query() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();

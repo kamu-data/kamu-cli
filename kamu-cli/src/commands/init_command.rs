@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::infra::*;
+use kamu::*;
 
 use super::{CLIError, Command};
 use crate::AlreadyInWorkspace;

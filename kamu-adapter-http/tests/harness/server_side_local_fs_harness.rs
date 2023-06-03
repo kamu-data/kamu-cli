@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal};
-use kamu::infra::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
+use kamu::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
 use tempfile::TempDir;
 use url::Url;
 

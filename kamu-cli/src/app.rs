@@ -13,8 +13,8 @@ use std::sync::Arc;
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
-use kamu::infra::utils::smart_transfer_protocol::SmartTransferProtocolClient;
-use kamu::infra::*;
+use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
+use kamu::*;
 
 use crate::cli_commands;
 use crate::commands::Command;
@@ -260,7 +260,7 @@ fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder)
         url: ipfs_conf.http_gateway.clone().unwrap(),
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
-    catalog.add_value(kamu::infra::utils::ipfs_wrapper::IpfsClient::default());
+    catalog.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

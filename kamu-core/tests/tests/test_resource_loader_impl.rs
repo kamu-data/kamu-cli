@@ -10,8 +10,8 @@
 use std::path::Path;
 
 use kamu::domain::{ResourceError, ResourceLoader};
-use kamu::infra::ResourceLoaderImpl;
 use kamu::testing::*;
+use kamu::ResourceLoaderImpl;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 

@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
-use kamu::domain;
-use kamu::domain::{GetSummaryOpts, QueryError};
+use kamu_domain::{self as domain, GetSummaryOpts, QueryError};
 use opendatafabric as odf;
 
 use crate::scalars::*;

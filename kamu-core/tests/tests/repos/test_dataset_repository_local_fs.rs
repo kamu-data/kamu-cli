@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::infra::*;
+use kamu::*;
 use tempfile::TempDir;
 
 use super::test_dataset_repository_shared;

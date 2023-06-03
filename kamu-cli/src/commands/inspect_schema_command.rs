@@ -93,15 +93,12 @@ impl InspectSchemaCommand {
     }
 
     fn print_schema_parquet(&self, schema: &Type) -> Result<(), CLIError> {
-        kamu::infra::utils::schema_utils::write_schema_parquet(&mut std::io::stdout(), schema)?;
+        kamu_data_utils::schema::format::write_schema_parquet(&mut std::io::stdout(), schema)?;
         Ok(())
     }
 
     fn print_schema_json(&self, schema: &Type) -> Result<(), CLIError> {
-        kamu::infra::utils::schema_utils::write_schema_parquet_json(
-            &mut std::io::stdout(),
-            schema,
-        )?;
+        kamu_data_utils::schema::format::write_schema_parquet_json(&mut std::io::stdout(), schema)?;
         Ok(())
     }
 

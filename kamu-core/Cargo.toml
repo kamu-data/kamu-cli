@@ -30,6 +30,8 @@ skip_docker_tests = []
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 opendatafabric = { workspace = true }
+kamu-data-utils = { workspace = true }
+kamu-domain = { workspace = true }
 
 # Serialization
 flatbuffers = "23"
@@ -51,7 +53,6 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-arrow-digest = "39"  # Note: Keep in sync with version of arrow used by datafusion
 datafusion = "25"
 object_store = { version = "0.5", features = ["aws"] }
 digest = "0.10"
@@ -79,7 +80,6 @@ hyper = "0.14"
 indoc = "2"
 itertools = "0.10"
 libc = "0.2"  # Signal names
-pathdiff = "0.2"  # Relative paths
 pin-project = "1"
 rand = "0.8"
 regex = "1"

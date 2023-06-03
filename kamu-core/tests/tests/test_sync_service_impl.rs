@@ -13,9 +13,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::infra::utils::ipfs_wrapper::IpfsClient;
-use kamu::infra::*;
 use kamu::testing::*;
+use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
@@ -63,8 +63,8 @@ async fn append_random_data(
     ds.commit_add_data(
         input_checkpoint,
         Some(data_interval),
-        Some(data_path),
-        Some(checkpoint_path),
+        Some(data_path.as_path()),
+        Some(checkpoint_path.as_path()),
         None,
         None,
         CommitOpts::default(),

@@ -1,0 +1,28 @@
+[package]
+name = "kamu-data-utils"
+description = "Utilities for working with data and schemas"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+opendatafabric = { workspace = true }
+
+arrow-digest = { version = "39", default-features = false }
+datafusion = { version = "25", default-features = false }
+tracing = { version = "0.1", default-features = false }
+
+digest = "0.10"
+sha3 = "0.10"

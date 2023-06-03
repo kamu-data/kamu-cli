@@ -9,8 +9,7 @@
 
 use async_graphql::*;
 use futures::TryStreamExt;
-use kamu::domain;
-use kamu::domain::{DatasetExt, MetadataChainExt};
+use kamu_domain::{self as domain, MetadataChainExt};
 use opendatafabric as odf;
 
 use crate::queries::Account;
@@ -174,6 +173,11 @@ impl MetadataChain {
                 old_head: result.old_head.map(Into::into),
                 new_head: result.new_head.into(),
             }),
+            Err(domain::CommitError::ObjectNotFound(e)) => {
+                CommitResult::AppendError(CommitResultAppendError {
+                    message: format!("Event is referencing a non-existent object {}", e.hash),
+                })
+            }
             Err(domain::CommitError::MetadataAppendError(e)) => {
                 CommitResult::AppendError(CommitResultAppendError {
                     message: e.to_string(),

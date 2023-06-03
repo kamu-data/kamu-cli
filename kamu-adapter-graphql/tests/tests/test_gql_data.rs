@@ -13,27 +13,27 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
-use kamu::domain::*;
-use kamu::infra;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::*;
+use kamu_domain::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
-    let workspace_layout = Arc::new(infra::WorkspaceLayout::create(tempdir).unwrap());
-    let dataset_repo = infra::DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir).unwrap());
+    let dataset_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .add_value(workspace_layout.as_ref().clone())
-        .bind::<dyn DatasetRepository, infra::DatasetRepositoryLocalFs>()
-        .add::<infra::QueryServiceImpl>()
-        .bind::<dyn QueryService, infra::QueryServiceImpl>()
-        .add::<infra::ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, infra::ObjectStoreRegistryImpl>()
-        .add_value(infra::ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, infra::ObjectStoreBuilderLocalFs>()
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<QueryServiceImpl>()
+        .bind::<dyn QueryService, QueryServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add_value(ObjectStoreBuilderLocalFs::new())
+        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
         .build()
 }
 
@@ -67,7 +67,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
         .commit_add_data(
             None,
             Some(OffsetInterval { start: 0, end: 3 }),
-            Some(tmp_data_path),
+            Some(tmp_data_path.as_path()),
             None,
             None,
             None,

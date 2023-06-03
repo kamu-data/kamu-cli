@@ -10,11 +10,8 @@
 use std::sync::Arc;
 
 use kamu::domain::{Dataset, SyncError, SyncListener, SyncResult};
-use kamu::infra::utils::simple_transfer_protocol::DatasetFactoryFn;
-use kamu::infra::utils::smart_transfer_protocol::{
-    ObjectTransferOptions,
-    SmartTransferProtocolClient,
-};
+use kamu::utils::simple_transfer_protocol::DatasetFactoryFn;
+use kamu::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient};
 use opendatafabric::Multihash;
 use url::Url;
 

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
-use kamu::infra::EngineProvisionerLocalConfig;
+use kamu::EngineProvisionerLocalConfig;
 
 use super::{CLIError, Command};
 use crate::JupyterConfig;

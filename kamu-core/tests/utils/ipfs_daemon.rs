@@ -9,7 +9,7 @@
 
 use std::process::Stdio;
 
-use kamu::infra::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::ipfs_wrapper::IpfsClient;
 use tokio::process::{Child, Command};
 
 pub struct IpfsDaemon {

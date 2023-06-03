@@ -10,16 +10,9 @@
 use std::path::Path;
 use std::{fs, io};
 
-use kamu::domain::{
-    CommitOpts,
-    CommitResult,
-    DatasetExt,
-    DatasetRepository,
-    InsertOpts,
-    ObjectRepository,
-};
-use kamu::infra::{DatasetLayout, ObjectRepositoryLocalFS};
+use kamu::domain::*;
 use kamu::testing::{AddDataBuilder, MetadataFactory};
+use kamu::{DatasetLayout, ObjectRepositoryLocalFS};
 use opendatafabric::{DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////

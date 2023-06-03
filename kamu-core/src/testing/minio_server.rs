@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use container_runtime::{ContainerProcess, ContainerRuntime};
 
-use crate::infra::utils::docker_images;
+use crate::utils::docker_images;
 
 pub struct MinioServer {
     pub container_name: String,

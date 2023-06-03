@@ -14,7 +14,7 @@ use std::time::Duration;
 use console::style as s;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
-use kamu::infra::*;
+use kamu::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};

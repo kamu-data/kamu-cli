@@ -2718,7 +2718,6 @@ dependencies = [
 name = "kamu"
 version = "0.128.0"
 dependencies = [
- "arrow-digest",
  "async-recursion",
  "async-stream",
  "async-trait",
@@ -2749,10 +2748,11 @@ dependencies = [
  "indoc",
  "internal-error",
  "itertools",
+ "kamu-data-utils",
+ "kamu-domain",
  "libc",
  "object_store",
  "opendatafabric",
- "pathdiff",
  "pin-project",
  "rand 0.8.5",
  "regex",
@@ -2795,6 +2795,8 @@ dependencies = [
  "futures",
  "indoc",
  "kamu",
+ "kamu-data-utils",
+ "kamu-domain",
  "opendatafabric",
  "reqwest",
  "serde",
@@ -2878,6 +2880,7 @@ dependencies = [
  "kamu",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
+ "kamu-data-utils",
  "libc",
  "merge",
  "mime",
@@ -2913,6 +2916,43 @@ dependencies = [
  "urlencoding",
  "users",
  "webbrowser",
+]
+
+[[package]]
+name = "kamu-data-utils"
+version = "0.128.0"
+dependencies = [
+ "arrow-digest",
+ "datafusion",
+ "digest 0.10.7",
+ "opendatafabric",
+ "sha3",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-domain"
+version = "0.128.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "container-runtime",
+ "datafusion",
+ "futures",
+ "internal-error",
+ "object_store",
+ "opendatafabric",
+ "pathdiff",
+ "pin-project",
+ "serde",
+ "serde_with",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "url",
 ]
 
 [[package]]

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use dill::component;
 use futures::SinkExt;
 use kamu::domain::*;
-use kamu::infra::utils::smart_transfer_protocol::{
+use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
     ObjectTransferOptions,
     SmartTransferProtocolClient,

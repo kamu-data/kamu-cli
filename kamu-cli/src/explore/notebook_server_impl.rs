@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use container_runtime::*;
 use internal_error::*;
-use kamu::infra::*;
+use kamu::*;
 
 use crate::JupyterConfig;
 

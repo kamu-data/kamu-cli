@@ -9,7 +9,7 @@
 
 use std::path::PathBuf;
 
-use kamu::infra::utils::records_writers::RecordsWriter;
+use kamu_data_utils::data::format::RecordsWriter;
 
 use super::records_writers::*;
 pub use super::records_writers::{ColumnFormat, RecordsFormat};

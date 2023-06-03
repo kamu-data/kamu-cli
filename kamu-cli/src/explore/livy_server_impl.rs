@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use container_runtime::*;
 use internal_error::*;
-use kamu::infra::*;
+use kamu::*;
 
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,

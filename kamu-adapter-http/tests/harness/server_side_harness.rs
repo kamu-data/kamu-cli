@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError};
-use kamu::infra::DatasetLayout;
+use kamu::DatasetLayout;
 use reqwest::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
