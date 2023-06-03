@@ -144,8 +144,8 @@ impl SparkEngine {
                         .run_attached(&self.image)
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {} {} {}",
-                            users::get_current_uid(),
-                            users::get_current_gid(),
+                            unsafe { libc::geteuid() },
+                            unsafe { libc::getegid() },
                             self.in_out_dir_in_container().display(),
                             request.new_checkpoint_path.display(),
                             request.output_data_path.display(),

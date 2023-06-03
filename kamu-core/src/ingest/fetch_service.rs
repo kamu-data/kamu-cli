@@ -288,8 +288,8 @@ impl FetchService {
                         .run_attached(&fetch.image)
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
-                            users::get_current_uid(),
-                            users::get_current_gid(),
+                            unsafe { libc::geteuid() },
+                            unsafe { libc::getegid() },
                             "/opt/odf/out"
                         ))
                         .user("root")

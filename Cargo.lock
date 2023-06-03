@@ -2778,7 +2778,6 @@ dependencies = [
  "tracing-subscriber",
  "trust-dns-resolver",
  "url",
- "users",
  "walkdir",
  "zip",
 ]
@@ -2914,7 +2913,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
- "users",
  "webbrowser",
 ]
 
@@ -5419,16 +5417,6 @@ name = "urlencoding"
 version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8db7427f936968176eaa7cdf81b7f98b980b18495ec28f1b5791ac3bfe3eea9"
-
-[[package]]
-name = "users"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24cc0f6d6f267b73e5a2cadf007ba8f9bc39c6a6f9666f8cf25ea809a153b032"
-dependencies = [
- "libc",
- "log",
-]
 
 [[package]]
 name = "utf-8"

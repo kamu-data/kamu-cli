@@ -69,8 +69,8 @@ impl ODFEngine {
                             ExecArgs::default(),
                             format!(
                                 "chown -Rf {}:{} {} {}",
-                                users::get_current_uid(),
-                                users::get_current_gid(),
+                                unsafe { libc::geteuid() },
+                                unsafe { libc::getegid() },
                                 new_checkpoint_path.display(),
                                 out_data_path.display(),
                             )

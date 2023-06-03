@@ -204,8 +204,8 @@ impl NotebookServerImpl {
                         .run_attached(self.jupyter_config.image.as_ref().unwrap())
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
-                            users::get_current_uid(),
-                            users::get_current_gid(),
+                            unsafe { libc::geteuid() },
+                            unsafe { libc::getegid() },
                             "/opt/workdir"
                         ))
                         .user("root")
