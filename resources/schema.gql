@@ -539,21 +539,43 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
+type PullDatasetTask implements Task {
+	"""
+	Unique and stable identitfier of this user account
+	"""
+	id: TaskID!
+	status: TaskStatus!
+}
+
 type Query {
 	"""
 	Returns the version of the GQL API
 	"""
 	apiVersion: String!
 	"""
-	Dataset-related functionality group
+	Dataset-related functionality group.
+	
+	Datasets are historical streams of events recorded under a cetrain
+	schema.
 	"""
 	datasets: Datasets!
 	"""
-	Account-related functionality group
+	Account-related functionality group.
+	
+	Accounts can be individual users or organizations registered in the
+	system. This groups deals with their identities and permissions.
 	"""
 	accounts: Accounts!
 	"""
-	Search-related functionality group
+	Task-related functionality group.
+	
+	Tasks are units of scheduling that can perform many functions like
+	ingesting new data, running dataset transformations, answering ad-hoc
+	queries etc.
+	"""
+	tasks: Tasks!
+	"""
+	Search-related functionality group.
 	"""
 	search: Search!
 	"""
@@ -712,6 +734,26 @@ type SqlQueryStep {
 	query: String!
 }
 
+
+interface Task {
+	id: TaskID!
+	status: TaskStatus!
+}
+
+scalar TaskID
+
+enum TaskStatus {
+	QUEUED
+	RUNNING
+	FINISHED
+}
+
+type Tasks {
+	"""
+	Returns a task by its ID
+	"""
+	byId(taskId: TaskID!): Task
+}
 
 type TemporalTable {
 	name: String!
