@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod task_state;
-mod tasks;
+#![feature(provide_any)]
+#![feature(error_generic_member_access)]
 
-pub use task_state::*;
-pub use tasks::*;
+mod task_service_in_memory;
+
+pub use task_service_in_memory::*;

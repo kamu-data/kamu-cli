@@ -8,7 +8,10 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-mod dataset;
+mod data_batch;
+mod data_query;
+mod data_schema;
+mod dataset_id_name;
 mod metadata;
 mod multihash;
 mod odf_generated;
@@ -17,7 +20,10 @@ mod pagination;
 mod task;
 
 pub use account::*;
-pub use dataset::*;
+pub use data_batch::*;
+pub use data_query::*;
+pub use data_schema::*;
+pub use dataset_id_name::*;
 pub use metadata::*;
 pub use multihash::*;
 pub use odf_generated::*;

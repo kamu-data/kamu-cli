@@ -10,33 +10,29 @@
 use std::ops::Deref;
 
 use async_graphql::*;
+use kamu_domain_task_system as domain;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // TaskID
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TaskID(String);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TaskID(domain::TaskID);
 
-impl From<&str> for TaskID {
-    fn from(value: &str) -> Self {
-        Self(value.to_owned())
+impl From<domain::TaskID> for TaskID {
+    fn from(value: domain::TaskID) -> Self {
+        TaskID(value)
     }
 }
 
-impl From<String> for TaskID {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-impl Into<String> for TaskID {
-    fn into(self) -> String {
+impl Into<domain::TaskID> for TaskID {
+    fn into(self) -> domain::TaskID {
         self.0
     }
 }
+
 impl Deref for TaskID {
-    type Target = String;
+    type Target = domain::TaskID;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -45,8 +41,11 @@ impl Deref for TaskID {
 #[Scalar]
 impl ScalarType for TaskID {
     fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            Ok(Self::from(value.as_str()))
+        if let Value::String(s) = &value {
+            match s.parse() {
+                Ok(i) => Ok(Self(domain::TaskID::new(i))),
+                Err(_) => Err(InputValueError::expected_type(value)),
+            }
         } else {
             Err(InputValueError::expected_type(value))
         }

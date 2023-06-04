@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use async_graphql::Context;
 
+// TODO: Return gql-specific error and get rid of unwraps
 pub(crate) fn from_catalog<T>(ctx: &Context<'_>) -> Result<Arc<T>, dill::InjectionError>
 where
     T: ?Sized + Send + Sync + 'static,

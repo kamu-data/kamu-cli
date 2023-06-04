@@ -25,6 +25,7 @@ skip_docker_tests = []
 opendatafabric = { workspace = true }
 kamu-data-utils = { workspace = true }
 kamu-domain = { workspace = true }
+kamu-domain-task-system = { workspace = true }
 
 async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
 chrono = "0.4"
@@ -41,6 +42,7 @@ tracing = "0.1"
 [dev-dependencies]
 # TODO: Limit to link in-memory implementations only
 kamu = { workspace = true }
+kamu-infra-task-system-in-memory = { workspace = true }
 
 env_logger = "0.10"
 tempfile = "3"

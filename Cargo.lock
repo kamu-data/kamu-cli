@@ -2796,6 +2796,8 @@ dependencies = [
  "kamu",
  "kamu-data-utils",
  "kamu-domain",
+ "kamu-domain-task-system",
+ "kamu-infra-task-system-in-memory",
  "opendatafabric",
  "reqwest",
  "serde",
@@ -2949,6 +2951,41 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "kamu-domain-task-system"
+version = "0.128.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "internal-error",
+ "kamu-domain",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "kamu-infra-task-system-in-memory"
+version = "0.128.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "dill",
+ "kamu-domain",
+ "kamu-domain-task-system",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "thiserror",
  "tracing",
  "url",
 ]
