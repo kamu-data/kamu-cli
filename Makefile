@@ -1,6 +1,40 @@
-ODF_DIR=../open-data-fabric
+ODF_SPEC_DIR=../open-data-fabric
+ODF_CRATE_DIR=./src/domain/opendatafabric
 RUSTFMT=rustfmt --edition 2021
 LICENSE_HEADER=docs/license_header.txt
+
+
+###############################################################################
+# Lint
+###############################################################################
+
+.PHONY: lint
+lint:
+	cargo fmt --check
+	cargo test -p kamu-repo-tools
+	cargo deny check
+
+
+###############################################################################
+# Release
+###############################################################################
+
+.PHONY: release-patch
+release-patch:
+	cargo run -p kamu-repo-tools --bin release --patch
+
+.PHONY: release-minor
+release-minor:
+	cargo run -p kamu-repo-tools --bin release --minor
+
+.PHONY: release-major
+release-major:
+	cargo run -p kamu-repo-tools --bin release --major
+
+
+###############################################################################
+# Codegen
+###############################################################################
 
 define add_license_header
 	cat $(LICENSE_HEADER) > tmp
@@ -11,43 +45,48 @@ endef
 
 .PHONY: codegen-odf-serde
 codegen-odf-serde:
-	python $(ODF_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_DIR)/schemas > opendatafabric/schemas/odf.fbs
-	flatc -o opendatafabric/src/serde/flatbuffers --rust --gen-onefile opendatafabric/schemas/odf.fbs
-	mv opendatafabric/src/serde/flatbuffers/odf_generated.rs opendatafabric/src/serde/flatbuffers/proxies_generated.rs
-	$(RUSTFMT) opendatafabric/src/serde/flatbuffers/proxies_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_CRATE_DIR)/schemas/odf.fbs
+	flatc -o $(ODF_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_CRATE_DIR)/schemas/odf.fbs
+	mv $(ODF_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	$(RUSTFMT) $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
-	python $(ODF_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_DIR)/schemas | $(RUSTFMT) > opendatafabric/src/dtos/dtos_generated.rs
-	python $(ODF_DIR)/tools/jsonschema_to_rust_traits.py $(ODF_DIR)/schemas | $(RUSTFMT) > opendatafabric/src/dtos/dtos_dyntraits_generated.rs
-	python $(ODF_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_DIR)/schemas | $(RUSTFMT) > opendatafabric/src/serde/yaml/derivations_generated.rs
-	python $(ODF_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_DIR)/schemas | $(RUSTFMT) > opendatafabric/src/serde/flatbuffers/convertors_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \
+		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_traits.py $(ODF_SPEC_DIR)/schemas \
+		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
+		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
+		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 
-	$(call add_license_header, "opendatafabric/src/serde/flatbuffers/proxies_generated.rs")
-	$(call add_license_header, "opendatafabric/src/dtos/dtos_generated.rs")
-	$(call add_license_header, "opendatafabric/src/dtos/dtos_dyntraits_generated.rs")
-	$(call add_license_header, "opendatafabric/src/serde/yaml/derivations_generated.rs")
-	$(call add_license_header, "opendatafabric/src/serde/flatbuffers/convertors_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 
 
 .PHONY: codegen-engine-tonic
 codegen-engine-tonic:
 	protoc \
-		-I opendatafabric/schemas \
-		opendatafabric/schemas/engine.proto \
+		-I $(ODF_CRATE_DIR)/schemas \
+		$(ODF_CRATE_DIR)/schemas/engine.proto \
 		--prost_out=opendatafabric/src/engine/grpc_generated \
 		--tonic_out=opendatafabric/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
-	$(RUSTFMT) opendatafabric/src/engine/grpc_generated/engine.rs
-	$(RUSTFMT) opendatafabric/src/engine/grpc_generated/engine.tonic.rs
+	$(RUSTFMT) $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs
+	$(RUSTFMT) $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
 
-	$(call add_license_header, "opendatafabric/src/engine/grpc_generated/engine.rs")
-	$(call add_license_header, "opendatafabric/src/engine/grpc_generated/engine.tonic.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs")
 
 
 .PHONY: codegen-graphql
 codegen-graphql:
-	python $(ODF_DIR)/tools/jsonschema_to_rust_gql.py $(ODF_DIR)/schemas | $(RUSTFMT) > kamu-adapter-graphql/src/scalars/odf_generated.rs
-	$(call add_license_header, "kamu-adapter-graphql/src/scalars/odf_generated.rs")
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_gql.py $(ODF_SPEC_DIR)/schemas \
+		| $(RUSTFMT) > src/adapter/graphql/src/scalars/odf_generated.rs
+	$(call add_license_header, "src/adapter/graphql/src/scalars/odf_generated.rs")
 
 
 .PHONY: codegen

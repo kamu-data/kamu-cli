@@ -2748,8 +2748,8 @@ dependencies = [
  "indoc",
  "internal-error",
  "itertools",
+ "kamu-core",
  "kamu-data-utils",
- "kamu-domain",
  "libc",
  "object_store",
  "opendatafabric",
@@ -2794,10 +2794,10 @@ dependencies = [
  "futures",
  "indoc",
  "kamu",
+ "kamu-core",
  "kamu-data-utils",
- "kamu-domain",
- "kamu-domain-task-system",
- "kamu-infra-task-system-in-memory",
+ "kamu-task-system",
+ "kamu-task-system-inmem",
  "opendatafabric",
  "reqwest",
  "serde",
@@ -2919,19 +2919,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-data-utils"
-version = "0.128.0"
-dependencies = [
- "arrow-digest",
- "datafusion",
- "digest 0.10.7",
- "opendatafabric",
- "sha3",
- "tracing",
-]
-
-[[package]]
-name = "kamu-domain"
+name = "kamu-core"
 version = "0.128.0"
 dependencies = [
  "async-stream",
@@ -2956,13 +2944,39 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-domain-task-system"
+name = "kamu-data-utils"
+version = "0.128.0"
+dependencies = [
+ "arrow-digest",
+ "datafusion",
+ "digest 0.10.7",
+ "opendatafabric",
+ "sha3",
+ "tracing",
+]
+
+[[package]]
+name = "kamu-repo-tools"
+version = "0.128.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "glob",
+ "indoc",
+ "regex",
+ "semver",
+ "toml",
+ "url",
+]
+
+[[package]]
+name = "kamu-task-system"
 version = "0.128.0"
 dependencies = [
  "async-trait",
  "chrono",
  "internal-error",
- "kamu-domain",
+ "kamu-core",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -2973,34 +2987,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-infra-task-system-in-memory"
+name = "kamu-task-system-inmem"
 version = "0.128.0"
 dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
  "dill",
- "kamu-domain",
- "kamu-domain-task-system",
+ "kamu-core",
+ "kamu-task-system",
  "opendatafabric",
  "serde",
  "serde_with",
  "thiserror",
  "tracing",
- "url",
-]
-
-[[package]]
-name = "kamu-tools"
-version = "0.128.0"
-dependencies = [
- "chrono",
- "clap",
- "glob",
- "indoc",
- "regex",
- "semver",
- "toml",
  "url",
 ]
 

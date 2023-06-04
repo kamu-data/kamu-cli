@@ -1,0 +1,26 @@
+[package]
+name = "kamu-repo-tools"
+description = "Tools for managing this repo"
+version = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+[[bin]]
+name = "release"
+path = "src/release.rs"
+
+[dependencies]
+clap = { version = "4", default-features = false, features = ["std"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+glob = { version = "0.3", default-features = false }
+regex = { version = "1", default-features = false, features = ["std", "unicode"] }
+semver = { version = "1", default-features = false }
+toml = { version = "0.7", default-features = false, features = ["parse"] }
+url = { version = "2", default-features = false }
+
+[dev-dependencies]
+indoc = "2"

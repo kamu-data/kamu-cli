@@ -1,0 +1,44 @@
+[package]
+name = "kamu-core"
+description = "Kamu's domain model objects and interfaces"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+container-runtime = { workspace = true }
+opendatafabric = { workspace = true }
+
+async-stream = { version = "0.3", default-features = false }
+async-trait = { version = "0.1", default-features = false }
+bytes = { version = "1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+futures = { version = "0.3", default-features = false }
+pathdiff = { version = "0.2", default-features = false }
+pin-project = { version = "1", default-features = false }
+thiserror = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
+
+# TODO: Avoid this dependency or depend on sub-crates
+datafusion = { version = "25", default-features = false }
+object_store = { version = "0.5", default-features = false }
+
+# TODO: Make serde optional
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_with = { version = "3", default-features = false }

@@ -539,14 +539,6 @@ type PrepStepPipe {
 	command: [String!]!
 }
 
-type PullDatasetTask implements Task {
-	"""
-	Unique and stable identitfier of this user account
-	"""
-	id: TaskID!
-	status: TaskStatus!
-}
-
 type Query {
 	"""
 	Returns the version of the GQL API
@@ -735,24 +727,75 @@ type SqlQueryStep {
 }
 
 
-interface Task {
-	id: TaskID!
-	status: TaskStatus!
-}
-
 scalar TaskID
 
+enum TaskOutcome {
+	"""
+	Task succeeded
+	"""
+	SUCCESS
+	"""
+	Task failed to complete
+	"""
+	FAILED
+	"""
+	Task was cancelled by a user
+	"""
+	CANCELLED
+}
+
+type TaskState {
+	taskId: TaskID!
+	status: TaskStatus!
+	outcome: TaskOutcome
+}
+
+type TaskStateConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [TaskState!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [TaskStateEdge!]!
+}
+
+type TaskStateEdge {
+	node: TaskState!
+}
+
 enum TaskStatus {
+	"""
+	Task is waiting for capacity to be allocated to it
+	"""
 	QUEUED
+	"""
+	Task is being executed
+	"""
 	RUNNING
+	"""
+	Task has reached a certain final outcome (see [TaskState::outcome]
+	field)
+	"""
 	FINISHED
 }
 
 type Tasks {
 	"""
-	Returns a task by its ID
+	Returns current state of a given task
 	"""
-	byId(taskId: TaskID!): Task
+	getTask(taskId: TaskID!): TaskState
+	"""
+	Returns states of tasks associated with a given dataset ordered by
+	creation time from newest to oldest
+	"""
+	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskStateConnection!
 }
 
 type TemporalTable {
