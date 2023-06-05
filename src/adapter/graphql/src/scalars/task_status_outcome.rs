@@ -10,52 +10,16 @@
 use async_graphql::*;
 use kamu_task_system as ts;
 
-use crate::scalars::*;
-
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct TaskState {
-    pub task_id: TaskID,
-    pub status: TaskStatus,
-    pub outcome: Option<TaskOutcome>,
-    //pub logical_plan: LogicalPlan,
-}
-
-impl From<ts::TaskState> for TaskState {
-    fn from(v: ts::TaskState) -> Self {
-        // Unpack so that any update to domain model forces us to update this code
-        let ts::TaskState {
-            task_id,
-            status,
-            logical_plan: _,
-        } = v;
-
-        // Un-nest enum into a field
-        let outcome = match &status {
-            ts::TaskStatus::Queued | ts::TaskStatus::Running => None,
-            ts::TaskStatus::Finished(outcome) => Some((*outcome).into()),
-        };
-
-        Self {
-            task_id: task_id.into(),
-            status: status.into(),
-            outcome,
-            //logical_plan: v.logical_plan.into(),
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
+/// Life-cycle status of a task
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
     /// Task is waiting for capacity to be allocated to it
     Queued,
     /// Task is being executed
     Running,
-    /// Task has reached a certain final outcome (see [TaskState::outcome]
-    /// field)
+    /// Task has reached a certain final outcome (see [TaskOutcome])
     Finished,
 }
 
@@ -71,6 +35,7 @@ impl From<ts::TaskStatus> for TaskStatus {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/// Describes a certain final outcome of the task
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskOutcome {
     /// Task succeeded

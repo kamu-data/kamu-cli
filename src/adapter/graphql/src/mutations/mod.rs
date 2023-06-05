@@ -8,4 +8,6 @@
 // by the Apache License, Version 2.0.
 
 mod auth;
+mod tasks;
 pub(crate) use auth::*;
+pub(crate) use tasks::*;

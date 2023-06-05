@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod task_state;
+mod task;
 mod tasks;
 
-pub use task_state::*;
-pub use tasks::*;
+pub(crate) use task::*;
+pub(crate) use tasks::*;

@@ -72,6 +72,10 @@ impl Mutation {
     async fn auth(&self) -> Auth {
         Auth
     }
+
+    async fn tasks(&self) -> TasksMutations {
+        TasksMutations
+    }
 }
 
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;

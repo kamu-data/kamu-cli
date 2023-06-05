@@ -10,6 +10,9 @@
 #![feature(provide_any)]
 #![feature(error_generic_member_access)]
 
+// Re-exports
+pub use kamu_task_system as domain;
+
 mod task_service_in_memory;
 
 pub use task_service_in_memory::*;

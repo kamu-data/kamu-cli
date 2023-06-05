@@ -13,21 +13,23 @@ use kamu_task_system as ts;
 
 use super::*;
 use crate::scalars::*;
-use crate::utils::*;
+use crate::utils::from_catalog;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct Tasks;
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[Object]
 impl Tasks {
     const DEFAULT_PER_PAGE: usize = 15;
 
     /// Returns current state of a given task
-    async fn get_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Option<TaskState>> {
+    async fn get_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Option<Task>> {
         let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
         match task_svc.get_task(&task_id).await {
-            Ok(task) => Ok(Some(task.into())),
+            Ok(task_state) => Ok(Some(Task::new(task_state))),
             Err(ts::GetTaskError::NotFound(_)) => Ok(None),
             Err(err) => Err(err.into()),
         }
@@ -41,7 +43,7 @@ impl Tasks {
         dataset_id: DatasetID,
         page: Option<usize>,
         per_page: Option<usize>,
-    ) -> Result<TaskStateConnection> {
+    ) -> Result<TaskConnection> {
         let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
@@ -51,7 +53,7 @@ impl Tasks {
             .list_tasks_by_dataset(&dataset_id)
             .skip(page * per_page)
             .take(per_page + 1) // Take one extra to see if next page exists
-            .map_ok(|t| TaskState::from(t))
+            .map_ok(|t| Task::new(t))
             .try_collect()
             .await?;
 
@@ -62,10 +64,10 @@ impl Tasks {
             nodes.pop();
         }
 
-        Ok(TaskStateConnection::new(nodes, page, per_page, total_count))
+        Ok(TaskConnection::new(nodes, page, per_page, total_count))
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-page_based_connection!(TaskState, TaskStateConnection, TaskStateEdge);
+page_based_connection!(Task, TaskConnection, TaskEdge);

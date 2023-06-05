@@ -2882,6 +2882,7 @@ dependencies = [
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-data-utils",
+ "kamu-task-system-inmem",
  "libc",
  "merge",
  "mime",

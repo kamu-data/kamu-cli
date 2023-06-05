@@ -13,8 +13,8 @@ mod dataset_metadata;
 mod datasets;
 mod metadata_chain;
 
-pub use dataset::*;
-pub use dataset_data::*;
-pub use dataset_metadata::*;
-pub use datasets::*;
-pub use metadata_chain::*;
+pub(crate) use dataset::*;
+pub(crate) use dataset_data::*;
+pub(crate) use dataset_metadata::*;
+pub(crate) use datasets::*;
+pub(crate) use metadata_chain::*;
