@@ -154,6 +154,8 @@ impl Kamu {
     pub fn catalog(&self) -> dill::Catalog {
         let mut builder = kamu_cli::configure_catalog();
         builder.add_value(self.workspace_layout.clone());
+
+        builder.validate().unwrap();
         builder.build()
     }
 }

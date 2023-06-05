@@ -65,7 +65,8 @@ pub async fn run(
             "Initializing kamu-cli"
         );
 
-        load_config(&workspace_layout, &mut catalog_builder);
+        let config = load_config(&workspace_layout);
+        register_config_in_catalog(&config, &mut catalog_builder);
 
         (guards, catalog_builder.build(), output_config)
     };
@@ -193,12 +194,16 @@ pub fn configure_catalog() -> CatalogBuilder {
 // Config
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn load_config(workspace_layout: &WorkspaceLayout, catalog: &mut CatalogBuilder) {
+fn load_config(workspace_layout: &WorkspaceLayout) -> CLIConfig {
     let config_svc = ConfigService::new(workspace_layout);
     let config = config_svc.load_with_defaults(ConfigScope::Flattened);
 
     tracing::info!(?config, "Loaded configuration");
+    config
+}
 
+// Public only for tests
+pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuilder) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
     // Registrer JupyterConfig used by some commands

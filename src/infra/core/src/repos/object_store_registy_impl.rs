@@ -28,13 +28,9 @@ pub struct ObjectStoreRegistryImpl {
 }
 
 #[dill::component(pub)]
-#[dill::scope(Singleton)]
+#[dill::scope(dill::Singleton)]
 impl ObjectStoreRegistryImpl {
-    pub fn new(catalog: Arc<dill::Catalog>) -> Self {
-        let builders = catalog
-            .get::<dill::AllOf<dyn ObjectStoreBuilder>>()
-            .unwrap();
-
+    pub fn new(builders: Vec<Arc<dyn ObjectStoreBuilder>>) -> Self {
         let builders = builders
             .into_iter()
             .map(|b| (Self::get_url_key(&b.object_store_url()), b))
