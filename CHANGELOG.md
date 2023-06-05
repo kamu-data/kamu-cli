@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- Task system prototyping (in-memory backend + GQL API)
+
 ## [0.128.0] - 2023-05-31
 ### Added
 - New `kamu --trace` flag will record the execution of the program and open [Perfetto UI](https://perfetto.dev/) in a browser, allowing to easily analyze async code execution and task performance. Perfetto support is still in early stages and needs more work to correctly display the concurrent tasks.
