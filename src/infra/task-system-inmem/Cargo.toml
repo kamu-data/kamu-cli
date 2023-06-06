@@ -27,8 +27,9 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.5"
 thiserror = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false, features=[] }
 tracing = { version = "0.1", default-features = false }
-url = { version = "2", default-features = false }
+url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
