@@ -150,49 +150,59 @@ impl TestPullService {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl PullService for TestPullService {
+    async fn pull(
+        &self,
+        _dataset_ref: &DatasetRefAny,
+        _options: PullOptions,
+        _listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError> {
+        unimplemented!()
+    }
+
+    async fn pull_ext(
+        &self,
+        _request: &PullRequest,
+        _options: PullOptions,
+        _listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError> {
+        unimplemented!()
+    }
+
     async fn pull_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
-        options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+        dataset_refs: Vec<DatasetRefAny>,
+        options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let mut requests = dataset_refs.map(|r| match r.as_local_single_tenant_ref() {
-            Ok(local_ref) => PullRequest {
-                local_ref: Some(local_ref),
-                remote_ref: None,
-                ingest_from: None,
-            },
-            Err(remote_ref) => PullRequest {
-                local_ref: None,
-                remote_ref: Some(remote_ref),
-                ingest_from: None,
-            },
-        });
+        let requests = dataset_refs
+            .into_iter()
+            .map(|r| match r.as_local_single_tenant_ref() {
+                Ok(local_ref) => PullRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: None,
+                    ingest_from: None,
+                },
+                Err(remote_ref) => PullRequest {
+                    local_ref: None,
+                    remote_ref: Some(remote_ref),
+                    ingest_from: None,
+                },
+            })
+            .collect();
 
-        self.pull_multi_ext(
-            &mut requests,
-            options,
-            ingest_listener,
-            transform_listener,
-            sync_listener,
-        )
-        .await
+        self.pull_multi_ext(requests, options, listener).await
     }
 
     async fn pull_multi_ext(
         &self,
-        _requests: &mut dyn Iterator<Item = PullRequest>,
-        _options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        _sync_listener: Option<Arc<dyn SyncMultiListener>>,
+        _requests: Vec<PullRequest>,
+        _options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let in_l = ingest_listener.unwrap();
-        let tr_l = transform_listener.unwrap();
+        let in_l = listener.clone().unwrap().get_ingest_listener().unwrap();
+        let tr_l = listener.unwrap().get_transform_listener().unwrap();
 
         let ingest_handles: Vec<_> = [
             "org.geonames.cities",

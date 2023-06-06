@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub trait PullImageListener {
+pub trait PullImageListener: Send + Sync {
     fn begin(&self, _image: &str) {}
     fn success(&self) {}
 }

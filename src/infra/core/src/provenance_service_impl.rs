@@ -28,7 +28,7 @@ impl ProvenanceServiceImpl {
         Self { local_repo }
     }
 
-    #[async_recursion::async_recursion(?Send)]
+    #[async_recursion::async_recursion]
     async fn visit_upstream_dependencies_rec(
         &self,
         dataset_handle: &DatasetHandle,
@@ -95,7 +95,7 @@ impl ProvenanceServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl ProvenanceService for ProvenanceServiceImpl {
     async fn get_dataset_lineage(
         &self,
@@ -142,7 +142,7 @@ impl<W: Write, S: DotStyle> DotVisitor<W, S> {
     }
 }
 
-impl<W: Write, S: DotStyle> LineageVisitor for DotVisitor<W, S> {
+impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
     fn begin(&mut self) {
         writeln!(self.writer, "digraph datasets {{\nrankdir = LR;").unwrap();
     }

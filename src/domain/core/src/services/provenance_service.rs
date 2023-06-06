@@ -14,7 +14,7 @@ use crate::{DatasetNotFoundError, GetDatasetError, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait ProvenanceService: Sync + Send {
     /// Passes the visitor through the dependency graph of a dataset
     /// Some predefined visitors are available.
@@ -28,7 +28,7 @@ pub trait ProvenanceService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait LineageVisitor {
+pub trait LineageVisitor: Send {
     fn begin(&mut self);
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool;
     fn exit(&mut self, dataset: &NodeInfo<'_>);

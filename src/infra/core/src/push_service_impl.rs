@@ -181,36 +181,38 @@ impl PushServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl PushService for PushServiceImpl {
     async fn push_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
-        options: PushOptions,
+        dataset_refs: Vec<DatasetRefAny>,
+        options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse> {
-        let mut requests = dataset_refs.map(|r| {
-            // TODO: Support local multi-tenancy
-            match r.as_local_single_tenant_ref() {
-                Ok(local_ref) => PushRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: None,
-                },
-                Err(remote_ref) => PushRequest {
-                    local_ref: None,
-                    remote_ref: Some(remote_ref),
-                },
-            }
-        });
+        let requests = dataset_refs
+            .into_iter()
+            .map(|r| {
+                // TODO: Support local multi-tenancy
+                match r.as_local_single_tenant_ref() {
+                    Ok(local_ref) => PushRequest {
+                        local_ref: Some(local_ref),
+                        remote_ref: None,
+                    },
+                    Err(remote_ref) => PushRequest {
+                        local_ref: None,
+                        remote_ref: Some(remote_ref),
+                    },
+                }
+            })
+            .collect();
 
-        self.push_multi_ext(&mut requests, options, sync_listener)
-            .await
+        self.push_multi_ext(requests, options, sync_listener).await
     }
 
     async fn push_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = PushRequest>,
-        options: PushOptions,
+        initial_requests: Vec<PushRequest>,
+        options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse> {
         if options.recursive {
@@ -220,8 +222,6 @@ impl PushService for PushServiceImpl {
             unimplemented!("Pushing all datasets is not yet supported")
         }
 
-        let initial_requests: Vec<_> = requests.collect();
-
         let (plan, errors) = self.collect_plan(&initial_requests).await;
         if !errors.is_empty() {
             return errors;
@@ -230,9 +230,9 @@ impl PushService for PushServiceImpl {
         let sync_results = self
             .sync_svc
             .sync_multi(
-                &mut plan
-                    .iter()
-                    .map(|pi| (pi.local_handle.as_any_ref(), pi.remote_ref.as_any_ref())),
+                plan.iter()
+                    .map(|pi| (pi.local_handle.as_any_ref(), pi.remote_ref.as_any_ref()))
+                    .collect(),
                 options.sync_options,
                 sync_listener,
             )

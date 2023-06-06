@@ -49,13 +49,13 @@ impl PullServiceImpl {
     // can be pulled in parallel.
     async fn collect_pull_graph(
         &self,
-        requests: &Vec<PullRequest>,
-        options: &PullOptions,
+        requests: impl IntoIterator<Item = &PullRequest>,
+        options: &PullMultiOptions,
     ) -> (Vec<PullItem>, Vec<PullResponse>) {
         let mut visited = HashMap::new();
         let mut errors = Vec::new();
 
-        for pr in requests {
+        for pr in requests.into_iter() {
             match self
                 .collect_pull_graph_depth_first(pr, true, options, &mut visited)
                 .await
@@ -81,7 +81,7 @@ impl PullServiceImpl {
         &self,
         request: &PullRequest,
         referenced_explicitly: bool,
-        options: &PullOptions,
+        options: &PullMultiOptions,
         visited: &mut HashMap<DatasetAlias, PullItem>,
     ) -> Result<i32, PullError> {
         tracing::debug!(?request, "Entering node");
@@ -331,22 +331,23 @@ impl PullServiceImpl {
     async fn ingest_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        options: &PullOptions,
+        options: &PullMultiOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let ingest_requests = batch
+            .iter()
+            .map(|pi| IngestRequest {
+                dataset_ref: pi.local_ref.clone(),
+                fetch_override: pi
+                    .original_request
+                    .as_ref()
+                    .and_then(|r| r.ingest_from.clone()),
+            })
+            .collect();
+
         let ingest_results = self
             .ingest_svc
-            .ingest_multi_ext(
-                &mut batch.iter().map(|pi| IngestRequest {
-                    dataset_ref: pi.local_ref.clone(),
-                    fetch_override: pi
-                        .original_request
-                        .as_ref()
-                        .and_then(|r| r.ingest_from.clone()),
-                }),
-                options.ingest_options.clone(),
-                listener,
-            )
+            .ingest_multi_ext(ingest_requests, options.ingest_options.clone(), listener)
             .await;
 
         assert_eq!(batch.len(), ingest_results.len());
@@ -362,21 +363,22 @@ impl PullServiceImpl {
     async fn sync_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        options: &PullOptions,
+        options: &PullMultiOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let sync_requests = batch
+            .iter()
+            .map(|pi| {
+                (
+                    pi.remote_ref.as_ref().unwrap().into(),
+                    pi.local_ref.as_any_ref(),
+                )
+            })
+            .collect();
+
         let sync_results = self
             .sync_svc
-            .sync_multi(
-                &mut batch.iter().map(|pi| {
-                    (
-                        pi.remote_ref.as_ref().unwrap().into(),
-                        pi.local_ref.as_any_ref(),
-                    )
-                }),
-                options.sync_options.clone(),
-                listener,
-            )
+            .sync_multi(sync_requests, options.sync_options.clone(), listener)
             .await;
 
         assert_eq!(batch.len(), sync_results.len());
@@ -410,12 +412,14 @@ impl PullServiceImpl {
     async fn transform_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        _options: &PullOptions,
+        _options: &PullMultiOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
+
         let transform_results = self
             .transform_svc
-            .transform_multi(&mut batch.iter().map(|pi| pi.local_ref.clone()), listener)
+            .transform_multi(transform_requests, listener)
             .await;
 
         assert_eq!(batch.len(), transform_results.len());
@@ -429,53 +433,97 @@ impl PullServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl PullService for PullServiceImpl {
-    async fn pull_multi(
+    async fn pull(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
+        dataset_ref: &DatasetRefAny,
         options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
-    ) -> Result<Vec<PullResponse>, InternalError> {
-        let mut requests = dataset_refs.map(|r| {
-            // TODO: Support local multi-tenancy
-            match r.as_local_single_tenant_ref() {
-                Ok(local_ref) => PullRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: None,
-                    ingest_from: None,
-                },
-                Err(remote_ref) => PullRequest {
-                    local_ref: None,
-                    remote_ref: Some(remote_ref),
-                    ingest_from: None,
-                },
-            }
-        });
+        listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError> {
+        // TODO: Support local multi-tenancy
+        let request = match dataset_ref.as_local_single_tenant_ref() {
+            Ok(local_ref) => PullRequest {
+                local_ref: Some(local_ref),
+                remote_ref: None,
+                ingest_from: None,
+            },
+            Err(remote_ref) => PullRequest {
+                local_ref: None,
+                remote_ref: Some(remote_ref),
+                ingest_from: None,
+            },
+        };
 
-        self.pull_multi_ext(
-            &mut requests,
-            options,
-            ingest_listener,
-            transform_listener,
-            sync_listener,
-        )
-        .await
+        self.pull_ext(&request, options, listener).await
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    async fn pull_ext(
+        &self,
+        request: &PullRequest,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError> {
+        let listener =
+            listener.map(|l| Arc::new(ListenerMultiAdapter(l)) as Arc<dyn PullMultiListener>);
+
+        // TODO: PERF: If we are updating a single dataset using pull_multi will do A
+        // LOT of unnecessary work like analyzing the whole dependency graph.
+        let mut responses = self
+            .pull_multi_ext(
+                vec![request.clone()],
+                PullMultiOptions {
+                    recursive: false,
+                    all: false,
+                    add_aliases: options.add_aliases,
+                    ingest_options: options.ingest_options,
+                    sync_options: options.sync_options,
+                },
+                listener,
+            )
+            .await?;
+
+        assert_eq!(responses.len(), 1);
+        responses.pop().unwrap().result
+    }
+
+    async fn pull_multi(
+        &self,
+        dataset_refs: Vec<DatasetRefAny>,
+        options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
+    ) -> Result<Vec<PullResponse>, InternalError> {
+        let requests = dataset_refs
+            .into_iter()
+            .map(|r| {
+                // TODO: Support local multi-tenancy
+                match r.as_local_single_tenant_ref() {
+                    Ok(local_ref) => PullRequest {
+                        local_ref: Some(local_ref),
+                        remote_ref: None,
+                        ingest_from: None,
+                    },
+                    Err(remote_ref) => PullRequest {
+                        local_ref: None,
+                        remote_ref: Some(remote_ref),
+                        ingest_from: None,
+                    },
+                }
+            })
+            .collect();
+
+        self.pull_multi_ext(requests, options, listener).await
+    }
+
+    #[tracing::instrument(level = "info", name = "pull_multi", skip_all)]
     async fn pull_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = PullRequest>,
-        options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+        requests: Vec<PullRequest>,
+        options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let requests: Vec<_> = if !options.all {
-            requests.collect()
+            requests
         } else {
             use futures::TryStreamExt;
             self.local_repo
@@ -518,16 +566,34 @@ impl PullService for PullServiceImpl {
 
             let results_level: Vec<_> = if depth == 0 && !is_remote {
                 tracing::info!(%depth, ?batch, "Running ingest batch");
-                self.ingest_multi(batch, &options, ingest_listener.clone())
-                    .await?
+                self.ingest_multi(
+                    batch,
+                    &options,
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.clone().get_ingest_listener()),
+                )
+                .await?
             } else if depth == 0 && is_remote {
                 tracing::info!(%depth, ?batch, "Running sync batch");
-                self.sync_multi(batch, &options, sync_listener.clone())
-                    .await?
+                self.sync_multi(
+                    batch,
+                    &options,
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.clone().get_sync_listener()),
+                )
+                .await?
             } else {
                 tracing::info!(%depth, ?batch, "Running transform batch");
-                self.transform_multi(batch, &options, transform_listener.clone())
-                    .await?
+                self.transform_multi(
+                    batch,
+                    &options,
+                    listener
+                        .as_ref()
+                        .and_then(|l| l.clone().get_transform_listener()),
+                )
+                .await?
             };
 
             let errors = results_level.iter().any(|r| r.result.is_err());
@@ -671,5 +737,45 @@ impl Ord for PullItem {
             (None, Some(_)) => Ordering::Less,
             _ => Ordering::Equal,
         }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct ListenerMultiAdapter(Arc<dyn PullListener>);
+
+impl PullMultiListener for ListenerMultiAdapter {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>> {
+        Some(self)
+    }
+
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformMultiListener>> {
+        Some(self)
+    }
+
+    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>> {
+        Some(self)
+    }
+}
+
+impl IngestMultiListener for ListenerMultiAdapter {
+    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
+        self.0.clone().get_ingest_listener()
+    }
+}
+
+impl TransformMultiListener for ListenerMultiAdapter {
+    fn begin_transform(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn TransformListener>> {
+        self.0.clone().get_transform_listener()
+    }
+}
+
+impl SyncMultiListener for ListenerMultiAdapter {
+    fn begin_sync(
+        &self,
+        _src: &DatasetRefAny,
+        _dst: &DatasetRefAny,
+    ) -> Option<Arc<dyn SyncListener>> {
+        self.0.clone().get_sync_listener()
     }
 }

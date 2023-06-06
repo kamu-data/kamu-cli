@@ -20,7 +20,7 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait VerificationService: Send + Sync {
     async fn verify(
         &self,
@@ -32,7 +32,7 @@ pub trait VerificationService: Send + Sync {
 
     async fn verify_multi(
         &self,
-        requests: &mut dyn Iterator<Item = VerificationRequest>,
+        requests: Vec<VerificationRequest>,
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError>;
@@ -99,7 +99,7 @@ pub enum VerificationPhase {
 //       ...
 //     end_phase(ReplayTransform)
 //   success()
-pub trait VerificationListener {
+pub trait VerificationListener: Send + Sync {
     fn begin(&self) {}
     fn success(&self, _result: &VerificationResult) {}
     fn error(&self, _error: &VerificationError) {}
@@ -134,7 +134,7 @@ impl VerificationListener for NullVerificationListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait VerificationMultiListener {
+pub trait VerificationMultiListener: Send + Sync {
     fn begin_verify(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
         None
     }

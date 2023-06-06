@@ -19,7 +19,7 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait TransformService: Send + Sync {
     async fn transform(
         &self,
@@ -29,7 +29,7 @@ pub trait TransformService: Send + Sync {
 
     async fn transform_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        dataset_refs: Vec<DatasetRef>,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)>;
 
@@ -42,7 +42,7 @@ pub trait TransformService: Send + Sync {
 
     async fn verify_transform_multi(
         &self,
-        datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        datasets: Vec<VerificationRequest>,
         listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 }
@@ -82,7 +82,7 @@ impl TransformListener for NullTransformListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub trait TransformMultiListener {
+pub trait TransformMultiListener: Send + Sync {
     fn begin_transform(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn TransformListener>> {
         None
     }

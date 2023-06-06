@@ -20,7 +20,7 @@ use crate::entities::{Engine, IngestEngine};
 // EngineProvisioner
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait EngineProvisioner: Send + Sync {
     async fn provision_engine(
         &self,

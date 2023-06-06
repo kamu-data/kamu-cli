@@ -74,7 +74,7 @@ impl PullCommand {
 
     async fn sync_from(
         &self,
-        listener: Option<Arc<PrettyPullProgress>>,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let local_name = self.as_name.as_ref().unwrap();
         let remote_ref = self.refs[0].as_remote_ref(|_| true).map_err(|_| {
@@ -84,26 +84,23 @@ impl PullCommand {
         Ok(self
             .pull_svc
             .pull_multi_ext(
-                &mut vec![PullRequest {
+                vec![PullRequest {
                     local_ref: Some(local_name.into()),
                     remote_ref: Some(remote_ref),
                     ingest_from: None,
-                }]
-                .into_iter(),
-                PullOptions {
+                }],
+                PullMultiOptions {
                     add_aliases: self.add_aliases,
-                    ..PullOptions::default()
+                    ..Default::default()
                 },
-                None,
-                None,
-                listener.map(|v| v as Arc<dyn SyncMultiListener>),
+                listener.map(|v| v as Arc<dyn PullMultiListener>),
             )
             .await?)
     }
 
     async fn ingest_from(
         &self,
-        listener: Option<Arc<PrettyPullProgress>>,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let dataset_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
             CLIError::usage_error("When using --fetch reference should point to a local dataset")
@@ -165,35 +162,32 @@ impl PullCommand {
         Ok(self
             .pull_svc
             .pull_multi_ext(
-                &mut vec![PullRequest {
+                vec![PullRequest {
                     local_ref: Some(dataset_ref),
                     remote_ref: None,
                     ingest_from: Some(fetch_step),
-                }]
-                .into_iter(),
-                PullOptions {
+                }],
+                PullMultiOptions {
                     ingest_options: IngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                     },
-                    ..PullOptions::default()
+                    ..Default::default()
                 },
-                listener.map(|v| v as Arc<dyn IngestMultiListener>),
-                None,
-                None,
+                listener,
             )
             .await?)
     }
 
     async fn pull_multi(
         &self,
-        listener: Option<Arc<PrettyPullProgress>>,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         Ok(self
             .pull_svc
             .pull_multi(
-                &mut self.refs.iter().cloned(),
-                PullOptions {
+                self.refs.clone(),
+                PullMultiOptions {
                     recursive: self.recursive,
                     all: self.all,
                     add_aliases: self.add_aliases,
@@ -206,11 +200,7 @@ impl PullCommand {
                         ..SyncOptions::default()
                     },
                 },
-                listener.clone().map(|v| v as Arc<dyn IngestMultiListener>),
-                listener
-                    .clone()
-                    .map(|v| v as Arc<dyn TransformMultiListener>),
-                listener.map(|v| v as Arc<dyn SyncMultiListener>),
+                listener,
             )
             .await?)
     }
@@ -218,12 +208,12 @@ impl PullCommand {
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable);
         let listener = Arc::new(pull_progress.clone());
-        self.pull(Some(listener.clone())).await
+        self.pull(Some(listener)).await
     }
 
     async fn pull(
         &self,
-        listener: Option<Arc<PrettyPullProgress>>,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         if self.as_name.is_some() {
             self.sync_from(listener).await
@@ -352,6 +342,20 @@ impl PrettyPullProgress {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
         }
+    }
+}
+
+impl PullMultiListener for PrettyPullProgress {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>> {
+        Some(self)
+    }
+
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformMultiListener>> {
+        Some(self)
+    }
+
+    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>> {
+        Some(self)
     }
 }
 

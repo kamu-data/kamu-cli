@@ -20,7 +20,7 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait IngestService: Send + Sync {
     async fn ingest(
         &self,
@@ -39,14 +39,14 @@ pub trait IngestService: Send + Sync {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        dataset_refs: Vec<DatasetRef>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
 
     async fn ingest_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = IngestRequest>,
+        requests: Vec<IngestRequest>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
@@ -132,7 +132,7 @@ pub enum TotalSteps {
 pub struct NullIngestListener;
 impl IngestListener for NullIngestListener {}
 
-pub trait IngestMultiListener {
+pub trait IngestMultiListener: Send + Sync {
     fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
         None
     }

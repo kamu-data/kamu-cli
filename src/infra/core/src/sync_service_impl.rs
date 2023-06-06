@@ -548,7 +548,7 @@ impl SyncServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl SyncService for SyncServiceImpl {
     async fn sync(
         &self,
@@ -575,7 +575,7 @@ impl SyncService for SyncServiceImpl {
     // TODO: Parallelism
     async fn sync_multi(
         &self,
-        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
+        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
         opts: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti> {

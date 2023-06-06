@@ -101,16 +101,14 @@ impl ClientSideHarness {
     pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {
         self.pull_service
             .pull_multi(
-                &mut vec![dataset_ref].into_iter(),
-                PullOptions {
+                vec![dataset_ref],
+                PullMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
                         ..SyncOptions::default()
                     },
-                    ..PullOptions::default()
+                    ..Default::default()
                 },
-                None,
-                None,
                 None,
             )
             .await
@@ -135,17 +133,16 @@ impl ClientSideHarness {
     ) -> Vec<PushResponse> {
         self.push_service
             .push_multi_ext(
-                &mut vec![PushRequest {
+                vec![PushRequest {
                     local_ref: Some(dataset_local_ref),
                     remote_ref: Some(dataset_remote_ref),
-                }]
-                .into_iter(),
-                PushOptions {
+                }],
+                PushMultiOptions {
                     sync_options: SyncOptions {
                         create_if_not_exists: true,
                         ..SyncOptions::default()
                     },
-                    ..PushOptions::default()
+                    ..PushMultiOptions::default()
                 },
                 None,
             )

@@ -17,7 +17,7 @@ pub enum RemoteAliasKind {
     Push,
 }
 
-pub trait RemoteAliases {
+pub trait RemoteAliases: Send {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,

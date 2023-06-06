@@ -814,7 +814,7 @@ impl TransformServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl TransformService for TransformServiceImpl {
     async fn transform(
         &self,
@@ -829,13 +829,12 @@ impl TransformService for TransformServiceImpl {
 
     async fn transform_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        dataset_refs: Vec<DatasetRef>,
         maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullTransformMultiListener));
 
-        let dataset_refs: Vec<_> = dataset_refs.collect();
         tracing::info!(?dataset_refs, "Transforming multiple datasets");
 
         let mut futures = Vec::new();
@@ -971,7 +970,7 @@ impl TransformService for TransformServiceImpl {
 
     async fn verify_transform_multi(
         &self,
-        _datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        _datasets: Vec<VerificationRequest>,
         _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         unimplemented!()

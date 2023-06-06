@@ -19,7 +19,7 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait SyncService: Send + Sync {
     async fn sync(
         &self,
@@ -31,7 +31,7 @@ pub trait SyncService: Send + Sync {
 
     async fn sync_multi(
         &self,
-        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
+        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
         opts: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti>;
@@ -135,7 +135,7 @@ pub struct SyncPartyStats {
 pub struct NullSyncListener;
 impl SyncListener for NullSyncListener {}
 
-pub trait SyncMultiListener {
+pub trait SyncMultiListener: Send + Sync {
     fn begin_sync(
         &self,
         _src: &DatasetRefAny,

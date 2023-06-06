@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::entities::SetRefError;
 use crate::*;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait ResetService: Send + Sync {
     async fn reset_dataset(
         &self,

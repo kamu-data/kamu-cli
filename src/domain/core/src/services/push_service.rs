@@ -20,19 +20,19 @@ use crate::{DatasetNotFoundError, GetDatasetError};
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait PushService: Send + Sync {
     async fn push_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
-        options: PushOptions,
+        dataset_refs: Vec<DatasetRefAny>,
+        options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse>;
 
     async fn push_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = PushRequest>,
-        options: PushOptions,
+        requests: Vec<PushRequest>,
+        options: PushMultiOptions,
         sync_listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<PushResponse>;
 }
@@ -56,7 +56,7 @@ pub struct PushResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct PushOptions {
+pub struct PushMultiOptions {
     /// Push all dataset dependencies recursively in depth-first order
     pub recursive: bool,
     /// Push all known datasets
@@ -67,7 +67,7 @@ pub struct PushOptions {
     pub sync_options: SyncOptions,
 }
 
-impl Default for PushOptions {
+impl Default for PushMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,

@@ -155,7 +155,7 @@ impl IngestServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl IngestService for IngestServiceImpl {
     async fn ingest(
         &self,
@@ -182,15 +182,18 @@ impl IngestService for IngestServiceImpl {
 
     async fn ingest_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        dataset_refs: Vec<DatasetRef>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
         self.ingest_multi_ext(
-            &mut dataset_refs.map(|r| IngestRequest {
-                dataset_ref: r,
-                fetch_override: None,
-            }),
+            dataset_refs
+                .into_iter()
+                .map(|r| IngestRequest {
+                    dataset_ref: r,
+                    fetch_override: None,
+                })
+                .collect(),
             options,
             maybe_multi_listener,
         )
@@ -199,14 +202,13 @@ impl IngestService for IngestServiceImpl {
 
     async fn ingest_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = IngestRequest>,
+        requests: Vec<IngestRequest>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
 
-        let requests: Vec<_> = requests.collect();
         tracing::info!(?requests, "Ingesting multiple datasets");
 
         let futures: Vec<_> = requests

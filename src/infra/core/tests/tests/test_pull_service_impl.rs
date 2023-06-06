@@ -240,12 +240,14 @@ async fn test_pull_batching_chain() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["c"], PullOptions::default()).await,
+        harness.pull(refs!["c"], PullMultiOptions::default()).await,
         vec![PullBatch::Transform(refs!["c"])]
     );
 
     assert_eq!(
-        harness.pull(refs!["c", "a"], PullOptions::default()).await,
+        harness
+            .pull(refs!["c", "a"], PullMultiOptions::default())
+            .await,
         vec![
             PullBatch::Ingest(refs!["a"]),
             PullBatch::Transform(refs!["c"]),
@@ -256,9 +258,9 @@ async fn test_pull_batching_chain() {
         harness
             .pull(
                 refs!["c"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -293,20 +295,14 @@ async fn test_pull_batching_complex() {
     .await;
 
     assert_eq!(
-        harness.pull(refs!["e"], PullOptions::default()).await,
+        harness.pull(refs!["e"], PullMultiOptions::default()).await,
         vec![PullBatch::Transform(refs!["e"])]
     );
 
     assert_matches!(
         harness
             .pull_svc
-            .pull_multi(
-                &mut vec![ar!("z")].into_iter(),
-                PullOptions::default(),
-                None,
-                None,
-                None
-            )
+            .pull_multi(vec![ar!("z")], PullMultiOptions::default(), None)
             .await
             .unwrap()[0],
         PullResponse {
@@ -319,9 +315,9 @@ async fn test_pull_batching_complex() {
         harness
             .pull(
                 refs!["e"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -381,9 +377,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["e"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -398,9 +394,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["kamu.dev/anonymous/e"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -415,9 +411,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -434,9 +430,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g", "e"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -453,9 +449,9 @@ async fn test_pull_batching_complex_with_remote() {
         harness
             .pull(
                 refs!["g", "kamu.dev/anonymous/e"],
-                PullOptions {
+                PullMultiOptions {
                     recursive: true,
-                    ..PullOptions::default()
+                    ..PullMultiOptions::default()
                 }
             )
             .await,
@@ -484,15 +480,12 @@ async fn test_sync_from() {
     let res = harness
         .pull_svc
         .pull_multi_ext(
-            &mut vec![PullRequest {
+            vec![PullRequest {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("myrepo/foo")),
                 ingest_from: None,
-            }]
-            .into_iter(),
-            PullOptions::default(),
-            None,
-            None,
+            }],
+            PullMultiOptions::default(),
             None,
         )
         .await
@@ -535,15 +528,12 @@ async fn test_sync_from_url_and_local_ref() {
     let res = harness
         .pull_svc
         .pull_multi_ext(
-            &mut vec![PullRequest {
+            vec![PullRequest {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
                 ingest_from: None,
-            }]
-            .into_iter(),
-            PullOptions::default(),
-            None,
-            None,
+            }],
+            PullMultiOptions::default(),
             None,
         )
         .await
@@ -586,15 +576,12 @@ async fn test_sync_from_url_only() {
     let res = harness
         .pull_svc
         .pull_multi_ext(
-            &mut vec![PullRequest {
+            vec![PullRequest {
                 local_ref: None,
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
                 ingest_from: None,
-            }]
-            .into_iter(),
-            PullOptions::default(),
-            None,
-            None,
+            }],
+            PullMultiOptions::default(),
             None,
         )
         .await
@@ -755,12 +742,8 @@ impl PullTestHarness {
         calls
     }
 
-    async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullOptions) -> Vec<PullBatch> {
-        let results = self
-            .pull_svc
-            .pull_multi(&mut refs.into_iter(), options, None, None, None)
-            .await
-            .unwrap();
+    async fn pull(&self, refs: Vec<DatasetRefAny>, options: PullMultiOptions) -> Vec<PullBatch> {
+        let results = self.pull_svc.pull_multi(refs, options, None).await.unwrap();
 
         for res in results {
             assert_matches!(res, PullResponse { result: Ok(_), .. });
@@ -861,7 +844,7 @@ impl TestIngestService {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl IngestService for TestIngestService {
     async fn ingest(
         &self,
@@ -884,7 +867,7 @@ impl IngestService for TestIngestService {
 
     async fn ingest_multi(
         &self,
-        _dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        _dataset_refs: Vec<DatasetRef>,
         _ingest_options: IngestOptions,
         _maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
@@ -893,11 +876,10 @@ impl IngestService for TestIngestService {
 
     async fn ingest_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = IngestRequest>,
+        requests: Vec<IngestRequest>,
         _options: IngestOptions,
         _listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
-        let requests: Vec<_> = requests.collect();
         let results = requests
             .iter()
             .map(|r| {
@@ -929,7 +911,7 @@ impl TestTransformService {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl TransformService for TestTransformService {
     async fn transform(
         &self,
@@ -941,10 +923,9 @@ impl TransformService for TestTransformService {
 
     async fn transform_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRef>,
+        dataset_refs: Vec<DatasetRef>,
         _maybe_multi_listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Vec<(DatasetRef, Result<TransformResult, TransformError>)> {
-        let dataset_refs: Vec<_> = dataset_refs.collect();
         let results = dataset_refs
             .iter()
             .map(|r| (r.clone(), Ok(TransformResult::UpToDate)))
@@ -966,7 +947,7 @@ impl TransformService for TestTransformService {
 
     async fn verify_transform_multi(
         &self,
-        _datasets: &mut dyn Iterator<Item = VerificationRequest>,
+        _datasets: Vec<VerificationRequest>,
         _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         unimplemented!()
@@ -986,7 +967,7 @@ impl TestSyncService {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl SyncService for TestSyncService {
     async fn sync(
         &self,
@@ -1000,7 +981,7 @@ impl SyncService for TestSyncService {
 
     async fn sync_multi(
         &self,
-        src_dst: &mut dyn Iterator<Item = (DatasetRefAny, DatasetRefAny)>,
+        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti> {

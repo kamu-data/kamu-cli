@@ -244,7 +244,7 @@ impl VerificationServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl VerificationService for VerificationServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?block_range))]
     async fn verify(
@@ -310,7 +310,7 @@ impl VerificationService for VerificationServiceImpl {
 
     async fn verify_multi(
         &self,
-        _requests: &mut dyn Iterator<Item = VerificationRequest>,
+        _requests: Vec<VerificationRequest>,
         _options: VerificationOptions,
         _listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> Result<VerificationResult, VerificationError> {

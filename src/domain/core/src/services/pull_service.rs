@@ -19,24 +19,34 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait PullService: Send + Sync {
+    async fn pull(
+        &self,
+        dataset_ref: &DatasetRefAny,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError>;
+
+    async fn pull_ext(
+        &self,
+        request: &PullRequest,
+        options: PullOptions,
+        listener: Option<Arc<dyn PullListener>>,
+    ) -> Result<PullResult, PullError>;
+
     async fn pull_multi(
         &self,
-        dataset_refs: &mut dyn Iterator<Item = DatasetRefAny>,
-        options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+        dataset_refs: Vec<DatasetRefAny>,
+        options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError>;
 
     async fn pull_multi_ext(
         &self,
-        requests: &mut dyn Iterator<Item = PullRequest>,
-        options: PullOptions,
-        ingest_listener: Option<Arc<dyn IngestMultiListener>>,
-        transform_listener: Option<Arc<dyn TransformMultiListener>>,
-        sync_listener: Option<Arc<dyn SyncMultiListener>>,
+        requests: Vec<PullRequest>,
+        options: PullMultiOptions,
+        listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError>;
 
     async fn set_watermark(
@@ -72,6 +82,27 @@ pub struct PullResponse {
 
 #[derive(Debug, Clone)]
 pub struct PullOptions {
+    /// Whether the datasets pulled from remotes should be permanently
+    /// associated with them
+    pub add_aliases: bool,
+    /// Ingest-specific options
+    pub ingest_options: IngestOptions,
+    /// Sync-specific options,
+    pub sync_options: SyncOptions,
+}
+
+impl Default for PullOptions {
+    fn default() -> Self {
+        Self {
+            add_aliases: true,
+            ingest_options: IngestOptions::default(),
+            sync_options: SyncOptions::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PullMultiOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
     /// Pull all known datasets
@@ -85,7 +116,7 @@ pub struct PullOptions {
     pub sync_options: SyncOptions,
 }
 
-impl Default for PullOptions {
+impl Default for PullMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,
@@ -95,6 +126,20 @@ impl Default for PullOptions {
             sync_options: SyncOptions::default(),
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub trait PullListener: Send + Sync {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestListener>>;
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>>;
+    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>>;
+}
+
+pub trait PullMultiListener: Send + Sync {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>>;
+    fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformMultiListener>>;
+    fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

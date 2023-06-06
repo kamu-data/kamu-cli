@@ -166,7 +166,7 @@ impl EngineProvisionerLocal {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl EngineProvisioner for EngineProvisionerLocal {
     async fn provision_ingest_engine(
         &self,
@@ -278,7 +278,7 @@ impl Default for EngineProvisionerLocalConfig {
 
 pub struct EngineProvisionerNull;
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl EngineProvisioner for EngineProvisionerNull {
     async fn provision_engine(
         &self,

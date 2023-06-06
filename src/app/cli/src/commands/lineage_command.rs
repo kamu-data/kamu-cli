@@ -276,7 +276,7 @@ impl<W: Write> HtmlVisitor<W> {
     const TEMPLATE: &'static str = include_str!("../../resources/lineage.html");
 }
 
-impl<W: Write> LineageVisitor for HtmlVisitor<W> {
+impl<W: Write + Send> LineageVisitor for HtmlVisitor<W> {
     fn begin(&mut self) {
         self.dot_visitor.begin()
     }

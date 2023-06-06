@@ -16,7 +16,7 @@ use crate::*;
 // Service
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 pub trait SearchService: Send + Sync {
     async fn search(
         &self,

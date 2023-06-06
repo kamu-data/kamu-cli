@@ -69,12 +69,11 @@ impl PushCommand {
             Ok(self
                 .push_svc
                 .push_multi_ext(
-                    &mut vec![PushRequest {
+                    vec![PushRequest {
                         local_ref: Some(local_ref),
                         remote_ref: Some(remote_ref.clone()),
-                    }]
-                    .into_iter(),
-                    PushOptions {
+                    }],
+                    PushMultiOptions {
                         all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
@@ -87,8 +86,8 @@ impl PushCommand {
             Ok(self
                 .push_svc
                 .push_multi(
-                    &mut self.refs.iter().cloned(),
-                    PushOptions {
+                    self.refs.clone(),
+                    PushMultiOptions {
                         all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,

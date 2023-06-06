@@ -24,7 +24,7 @@ impl ResetServiceImpl {
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl ResetService for ResetServiceImpl {
     async fn reset_dataset(
         &self,
