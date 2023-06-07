@@ -9,14 +9,30 @@
 
 use async_graphql::*;
 use kamu_task_system::*;
-use kamu_task_system_inmem::*;
 use opendatafabric::DatasetID;
+
+mockall::mock! {
+    TaskService {}
+    #[async_trait::async_trait]
+    impl TaskService for TaskService {
+        async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
+        async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError>;
+        fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskStateStream<'a>;
+    }
+}
 
 #[test_log::test(tokio::test)]
 async fn test_task_get_non_existing() {
+    let mut task_svc_mock = MockTaskService::new();
+    task_svc_mock.expect_get_task().return_once(|_| {
+        Err(GetTaskError::NotFound(TaskNotFoundError {
+            task_id: TaskID::new(1),
+        }))
+    });
+
     let cat = dill::CatalogBuilder::new()
-        .add::<TaskServiceInMemory>()
-        .bind::<dyn TaskService, TaskServiceInMemory>()
+        .add_value(task_svc_mock)
+        .bind::<dyn TaskService, MockTaskService>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -25,7 +41,7 @@ async fn test_task_get_non_existing() {
             r#"{
                 tasks {
                     getTask (taskId: "123") {
-                        taskId
+                        id
                     }
                 }
             }"#,
@@ -44,18 +60,25 @@ async fn test_task_get_non_existing() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_get_existing() {
-    let cat = dill::CatalogBuilder::new()
-        .add::<TaskServiceInMemory>()
-        .bind::<dyn TaskService, TaskServiceInMemory>()
-        .build();
-
-    let task_svc = cat.get_one::<dyn TaskService>().unwrap();
-    let expected_task = task_svc
-        .create_task(LogicalPlan::UpdateDataset(UpdateDataset {
+    let returned_task = TaskState {
+        task_id: TaskID::new(123),
+        status: TaskStatus::Finished(TaskOutcome::Success),
+        logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::from_pub_key_ed25519(b"foo"),
-        }))
-        .await
-        .unwrap();
+        }),
+    };
+    let expected_task = returned_task.clone();
+
+    let mut task_svc_mock = MockTaskService::new();
+    task_svc_mock
+        .expect_get_task()
+        .with(mockall::predicate::eq(expected_task.task_id))
+        .return_once(move |_| Ok(returned_task));
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(task_svc_mock)
+        .bind::<dyn TaskService, MockTaskService>()
+        .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
@@ -63,7 +86,9 @@ async fn test_task_get_existing() {
             r#"{{
                 tasks {{
                     getTask (taskId: "{}") {{
-                        taskId
+                        id
+                        status
+                        outcome
                     }}
                 }}
             }}"#,
@@ -76,7 +101,9 @@ async fn test_task_get_existing() {
         value!({
             "tasks": {
                 "getTask": {
-                    "taskId": expected_task.task_id.to_string(),
+                    "id": expected_task.task_id.to_string(),
+                    "status": "FINISHED",
+                    "outcome": "SUCCESS",
                 },
             }
         })
@@ -85,19 +112,26 @@ async fn test_task_get_existing() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_list_by_dataset() {
-    let cat = dill::CatalogBuilder::new()
-        .add::<TaskServiceInMemory>()
-        .bind::<dyn TaskService, TaskServiceInMemory>()
-        .build();
-
     let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
-    let task_svc = cat.get_one::<dyn TaskService>().unwrap();
-    let expected_task = task_svc
-        .create_task(LogicalPlan::UpdateDataset(UpdateDataset {
+
+    let returned_task = TaskState {
+        task_id: TaskID::new(123),
+        status: TaskStatus::Queued,
+        logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: dataset_id.clone(),
-        }))
-        .await
-        .unwrap();
+        }),
+    };
+    let expected_task = returned_task.clone();
+
+    let mut task_svc_mock = MockTaskService::new();
+    task_svc_mock
+        .expect_list_tasks_by_dataset()
+        .return_once(move |_| Box::pin(futures::stream::iter([Ok(returned_task)].into_iter())));
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(task_svc_mock)
+        .bind::<dyn TaskService, MockTaskService>()
+        .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
@@ -106,7 +140,7 @@ async fn test_task_list_by_dataset() {
                 tasks {{
                     listTasksByDataset (datasetId: "{}") {{
                         nodes {{
-                            taskId
+                            id
                             status
                             outcome
                         }}
@@ -129,7 +163,7 @@ async fn test_task_list_by_dataset() {
             "tasks": {
                 "listTasksByDataset": {
                     "nodes": [{
-                        "taskId": expected_task.task_id.to_string(),
+                        "id": expected_task.task_id.to_string(),
                         "status": "QUEUED",
                         "outcome": null,
                     }],

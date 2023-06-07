@@ -490,6 +490,7 @@ scalar Multihash
 
 type Mutation {
 	auth: Auth!
+	tasks: TasksMutations!
 }
 
 type OffsetInterval {
@@ -727,8 +728,47 @@ type SqlQueryStep {
 }
 
 
+type Task {
+	"""
+	Unique and stable identitfier of this task
+	"""
+	id: TaskID!
+	"""
+	Life-cycle status of a task
+	"""
+	status: TaskStatus!
+	"""
+	Describes a certain final outcome of the task once it reaches the
+	"finished" status
+	"""
+	outcome: TaskOutcome
+}
+
+type TaskConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [Task!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [TaskEdge!]!
+}
+
+type TaskEdge {
+	node: Task!
+}
+
 scalar TaskID
 
+"""
+Describes a certain final outcome of the task
+"""
 enum TaskOutcome {
 	"""
 	Task succeeded
@@ -744,32 +784,9 @@ enum TaskOutcome {
 	CANCELLED
 }
 
-type TaskState {
-	taskId: TaskID!
-	status: TaskStatus!
-	outcome: TaskOutcome
-}
-
-type TaskStateConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [TaskState!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [TaskStateEdge!]!
-}
-
-type TaskStateEdge {
-	node: TaskState!
-}
-
+"""
+Life-cycle status of a task
+"""
 enum TaskStatus {
 	"""
 	Task is waiting for capacity to be allocated to it
@@ -780,8 +797,7 @@ enum TaskStatus {
 	"""
 	RUNNING
 	"""
-	Task has reached a certain final outcome (see [TaskState::outcome]
-	field)
+	Task has reached a certain final outcome (see [TaskOutcome])
 	"""
 	FINISHED
 }
@@ -790,12 +806,16 @@ type Tasks {
 	"""
 	Returns current state of a given task
 	"""
-	getTask(taskId: TaskID!): TaskState
+	getTask(taskId: TaskID!): Task
 	"""
 	Returns states of tasks associated with a given dataset ordered by
 	creation time from newest to oldest
 	"""
-	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskStateConnection!
+	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskConnection!
+}
+
+type TasksMutations {
+	crateUpdateDatasetTask(datasetId: DatasetID!): Task!
 }
 
 type TemporalTable {
