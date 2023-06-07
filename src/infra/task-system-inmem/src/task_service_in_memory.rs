@@ -79,6 +79,16 @@ impl TaskServiceInMemory {
                         Err(_) => TaskOutcome::Failed,
                     }
                 }
+                LogicalPlan::Probe(Probe {
+                    dataset_id: _,
+                    busy_time,
+                    end_with_outcome,
+                }) => {
+                    if let Some(busy_time) = busy_time {
+                        tokio::time::sleep(busy_time.clone()).await;
+                    }
+                    end_with_outcome.unwrap_or(TaskOutcome::Success)
+                }
             };
 
             tracing::info!(
@@ -147,7 +157,9 @@ impl TaskService for TaskServiceInMemory {
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
     fn list_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskStateStream {
+        let dataset_id = dataset_id.clone();
         let state = self.state.clone();
+
         Box::pin(async_stream::try_stream! {
             let mut position = 0;
             loop {
@@ -156,7 +168,15 @@ impl TaskService for TaskServiceInMemory {
                     // TODO: This is horrible in every single way.
                     // Real implementation should be reconstituting from event history.
                     // That's how we'll get correct ordering too.
-                    state.task_state.values().skip(position).next().map(|t| t.clone())
+                    state.task_state
+                        .values()
+                        .filter(|t| match &t.logical_plan {
+                            LogicalPlan::UpdateDataset(upd) => upd.dataset_id == dataset_id,
+                            LogicalPlan::Probe(p) => p.dataset_id.as_ref() == Some(&dataset_id),
+                        })
+                        .skip(position)
+                        .next()
+                        .map(|t| t.clone())
                 };
 
                 let Some(task) = maybe_task else {

@@ -178,3 +178,107 @@ async fn test_task_list_by_dataset() {
         })
     );
 }
+
+#[test_log::test(tokio::test)]
+async fn test_task_crate_update_dataset() {
+    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+
+    let expected_logical_plan = LogicalPlan::UpdateDataset(UpdateDataset {
+        dataset_id: dataset_id.clone(),
+    });
+    let returned_task = TaskState {
+        task_id: TaskID::new(123),
+        status: TaskStatus::Queued,
+        logical_plan: expected_logical_plan.clone(),
+    };
+    let expected_task = returned_task.clone();
+
+    let mut task_svc_mock = MockTaskService::new();
+    task_svc_mock
+        .expect_create_task()
+        .withf(move |logical_plan| *logical_plan == expected_logical_plan)
+        .return_once(move |_| Ok(returned_task));
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(task_svc_mock)
+        .bind::<dyn TaskService, MockTaskService>()
+        .build();
+
+    let schema = kamu_adapter_graphql::schema(cat);
+    let res = schema
+        .execute(format!(
+            r#"mutation {{
+                tasks {{
+                    crateUpdateDatasetTask (datasetId: "{}") {{
+                        id
+                    }}
+                }}
+            }}"#,
+            dataset_id,
+        ))
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "tasks": {
+                "crateUpdateDatasetTask": {
+                    "id": expected_task.task_id.to_string(),
+                },
+            },
+        })
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_task_crate_probe() {
+    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+
+    let expected_logical_plan = LogicalPlan::Probe(Probe {
+        dataset_id: Some(dataset_id.clone()),
+        busy_time: Some(std::time::Duration::from_millis(500)),
+        end_with_outcome: Some(TaskOutcome::Failed),
+    });
+    let returned_task = TaskState {
+        task_id: TaskID::new(123),
+        status: TaskStatus::Queued,
+        logical_plan: expected_logical_plan.clone(),
+    };
+    let expected_task = returned_task.clone();
+
+    let mut task_svc_mock = MockTaskService::new();
+    task_svc_mock
+        .expect_create_task()
+        .withf(move |logical_plan| *logical_plan == expected_logical_plan)
+        .return_once(move |_| Ok(returned_task));
+
+    let cat = dill::CatalogBuilder::new()
+        .add_value(task_svc_mock)
+        .bind::<dyn TaskService, MockTaskService>()
+        .build();
+
+    let schema = kamu_adapter_graphql::schema(cat);
+    let res = schema
+        .execute(format!(
+            r#"mutation {{
+                tasks {{
+                    crateProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
+                        id
+                    }}
+                }}
+            }}"#,
+            dataset_id,
+        ))
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "tasks": {
+                "crateProbeTask": {
+                    "id": expected_task.task_id.to_string(),
+                },
+            },
+        })
+    );
+}

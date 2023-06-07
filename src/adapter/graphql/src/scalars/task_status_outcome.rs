@@ -55,3 +55,13 @@ impl From<ts::TaskOutcome> for TaskOutcome {
         }
     }
 }
+
+impl Into<ts::TaskOutcome> for TaskOutcome {
+    fn into(self) -> ts::TaskOutcome {
+        match self {
+            Self::Success => ts::TaskOutcome::Success,
+            Self::Failed => ts::TaskOutcome::Failed,
+            Self::Cancelled => ts::TaskOutcome::Cancelled,
+        }
+    }
+}
