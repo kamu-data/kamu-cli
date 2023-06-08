@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use enum_variants::*;
 
-use super::enum_variants::*;
 use crate::dtos::*;
 use crate::formats::*;
 

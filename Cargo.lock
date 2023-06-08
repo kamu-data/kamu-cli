@@ -1979,6 +1979,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum-variants"
+version = "0.128.0"
+
+[[package]]
 name = "env_logger"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3003,6 +3007,7 @@ version = "0.128.5"
 dependencies = [
  "async-trait",
  "chrono",
+ "enum-variants",
  "internal-error",
  "kamu-core",
  "opendatafabric",
@@ -3618,6 +3623,7 @@ dependencies = [
  "chrono",
  "digest 0.10.7",
  "ed25519-dalek",
+ "enum-variants",
  "flatbuffers",
  "hex",
  "indoc",

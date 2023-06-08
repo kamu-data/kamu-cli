@@ -20,6 +20,7 @@ pub trait EnumWithVariants<E> {
 pub trait VariantOf<E>
 where
     Self: Sized,
+    Self: Into<E>,
 {
     fn is_variant(e: &E) -> bool;
     fn into_variant(e: E) -> Option<Self>;
@@ -30,6 +31,7 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Use derive macro
+#[macro_export]
 macro_rules! impl_enum_with_variants {
     ($typ:ident) => {
         impl EnumWithVariants<$typ> for $typ {
@@ -57,49 +59,48 @@ macro_rules! impl_enum_with_variants {
 }
 
 // TODO: Make a derive macro
+#[macro_export]
 macro_rules! impl_enum_variant {
-    ($typ:ident, $variant:ident) => {
-        impl From<$variant> for $typ {
+    ($enum_type:ident :: $variant:ident ( $variant_type:ident )) => {
+        impl Into<$enum_type> for $variant_type {
             #[inline]
-            fn from(v: $variant) -> $typ {
-                $typ::$variant(v)
+            fn into(self) -> $enum_type {
+                $enum_type::$variant(self)
             }
         }
 
-        impl VariantOf<$typ> for $variant {
+        impl VariantOf<$enum_type> for $variant_type {
             #[inline]
-            fn is_variant(e: &$typ) -> bool {
+            fn is_variant(e: &$enum_type) -> bool {
                 match e {
-                    $typ::$variant(_) => true,
+                    $enum_type::$variant(_) => true,
                     _ => false,
                 }
             }
 
             #[inline]
-            fn into_variant(e: $typ) -> Option<Self> {
+            fn into_variant(e: $enum_type) -> Option<Self> {
                 match e {
-                    $typ::$variant(v) => Some(v),
+                    $enum_type::$variant(v) => Some(v),
                     _ => None,
                 }
             }
 
             #[inline]
-            fn as_variant(e: &$typ) -> Option<&Self> {
+            fn as_variant(e: &$enum_type) -> Option<&Self> {
                 match e {
-                    $typ::$variant(v) => Some(v),
+                    $enum_type::$variant(v) => Some(v),
                     _ => None,
                 }
             }
 
             #[inline]
-            fn as_variant_mut(e: &mut $typ) -> Option<&mut Self> {
+            fn as_variant_mut(e: &mut $enum_type) -> Option<&mut Self> {
                 match e {
-                    $typ::$variant(v) => Some(v),
+                    $enum_type::$variant(v) => Some(v),
                     _ => None,
                 }
             }
         }
     };
 }
-
-pub(crate) use {impl_enum_variant, impl_enum_with_variants};

@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::enum_variants::*;
+use enum_variants::*;
+
 use crate::dtos::*;
 
 impl_enum_with_variants!(MetadataEvent);
 
-impl_enum_variant!(MetadataEvent, AddData);
-impl_enum_variant!(MetadataEvent, ExecuteQuery);
-impl_enum_variant!(MetadataEvent, Seed);
-impl_enum_variant!(MetadataEvent, SetAttachments);
-impl_enum_variant!(MetadataEvent, SetInfo);
-impl_enum_variant!(MetadataEvent, SetLicense);
-impl_enum_variant!(MetadataEvent, SetPollingSource);
-impl_enum_variant!(MetadataEvent, SetTransform);
-impl_enum_variant!(MetadataEvent, SetVocab);
-impl_enum_variant!(MetadataEvent, SetWatermark);
+impl_enum_variant!(MetadataEvent::AddData(AddData));
+impl_enum_variant!(MetadataEvent::ExecuteQuery(ExecuteQuery));
+impl_enum_variant!(MetadataEvent::Seed(Seed));
+impl_enum_variant!(MetadataEvent::SetAttachments(SetAttachments));
+impl_enum_variant!(MetadataEvent::SetInfo(SetInfo));
+impl_enum_variant!(MetadataEvent::SetLicense(SetLicense));
+impl_enum_variant!(MetadataEvent::SetPollingSource(SetPollingSource));
+impl_enum_variant!(MetadataEvent::SetTransform(SetTransform));
+impl_enum_variant!(MetadataEvent::SetVocab(SetVocab));
+impl_enum_variant!(MetadataEvent::SetWatermark(SetWatermark));

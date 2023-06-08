@@ -18,6 +18,7 @@ doctest = false
 
 
 [dependencies]
+enum-variants = { workspace = true }
 internal-error = { workspace = true }
 
 chrono = { version = "0.4", features = ["serde"] }

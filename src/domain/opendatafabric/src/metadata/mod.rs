@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod enum_variants;
+// Re-export
 pub use enum_variants::*;
 
 mod metadata_block_types;
