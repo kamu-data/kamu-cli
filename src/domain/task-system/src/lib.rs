@@ -13,10 +13,12 @@
 // Re-exports
 pub use internal_error::*;
 
+pub mod aggregates;
 pub mod entities;
 pub mod repos;
 pub mod services;
 
+pub use aggregates::*;
 pub use entities::*;
 pub use repos::*;
 pub use services::*;

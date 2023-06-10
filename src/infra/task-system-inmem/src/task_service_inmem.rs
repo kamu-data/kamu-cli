@@ -26,7 +26,7 @@ pub struct TaskServiceInMemory {
 #[derive(Default)]
 struct State {
     task_queue: VecDeque<TaskID>,
-    task_loop_hdl: Option<tokio::task::JoinHandle<()>>,
+    task_loop_hdl: Option<tokio::task::JoinHandle<Result<(), InternalError>>>,
 }
 
 #[component(pub)]
@@ -40,13 +40,12 @@ impl TaskServiceInMemory {
         }
     }
 
-    // TODO: Error handling
     // TODO: Panic tapping?
     async fn run_tasks_loop(
         state: Arc<Mutex<State>>,
         event_store: Arc<dyn TaskEventStore>,
         pull_svc: Arc<dyn PullService>,
-    ) {
+    ) -> Result<(), InternalError> {
         loop {
             // Try to steal a task from the queue
             let task_id = {
@@ -63,25 +62,21 @@ impl TaskServiceInMemory {
                 }
             };
 
-            let task_events = event_store.get_events_by_task(&task_id, None, None);
-            let task_state = TaskStateProjection::project_stream(task_events.map_ok(|i| i.event))
+            let mut task = Task::load(&task_id, event_store.as_ref())
                 .await
-                .unwrap()
+                .int_err()?
                 .unwrap();
 
-            // TODO: Hide into aggregate
-            event_store
-                .save_event(TaskRunning { task_id }.into())
-                .await
-                .unwrap();
+            task.set_running().int_err()?;
+            task.save(event_store.as_ref()).await.int_err()?;
 
             tracing::info!(
                 %task_id,
-                logical_plan = ?task_state.logical_plan,
+                logical_plan = ?task.logical_plan(),
                 "Executing task",
             );
 
-            let outcome = match &task_state.logical_plan {
+            let outcome = match task.logical_plan() {
                 LogicalPlan::UpdateDataset(upd) => {
                     let res = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
@@ -105,16 +100,14 @@ impl TaskServiceInMemory {
             };
 
             tracing::info!(
-                task_id = %task_id,
-                logical_plan = ?task_state.logical_plan,
+                %task_id,
+                logical_plan = ?task.logical_plan(),
                 ?outcome,
                 "Task finished",
             );
 
-            event_store
-                .save_event(TaskFinished { task_id, outcome }.into())
-                .await
-                .unwrap();
+            task.finish(outcome).int_err()?;
+            task.save(event_store.as_ref()).await.int_err()?;
         }
     }
 }
@@ -123,17 +116,12 @@ impl TaskServiceInMemory {
 impl TaskService for TaskServiceInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let task_id = self.event_store.new_task_id();
-        let event = TaskCreated {
-            task_id,
-            logical_plan,
-        };
-
-        self.event_store.save_event(event.clone().into()).await?;
+        let mut task = Task::new(self.event_store.as_ref(), logical_plan);
+        task.save(self.event_store.as_ref()).await.int_err()?;
 
         let queue_len = {
             let mut state = self.state.lock().unwrap();
-            state.task_queue.push_back(task_id);
+            state.task_queue.push_back(*task.id());
 
             // Create loop task upon the first run
             if state.task_loop_hdl.is_none() {
@@ -148,23 +136,22 @@ impl TaskService for TaskServiceInMemory {
         }; // lock
 
         tracing::info!(
-            %task_id,
+            task_id = %task.id(),
             queue_len,
             "Created new task"
         );
 
-        Ok(TaskStateProjection::new(event).into_state())
+        Ok(task.into_state())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError> {
-        let stream = self.event_store.get_events_by_task(task_id, None, None);
-
-        let task_state = TaskStateProjection::project_stream(stream.map_ok(|i| i.event))
+        let task = Task::load(task_id, self.event_store.as_ref())
             .await
             .int_err()?;
 
-        task_state.ok_or(TaskNotFoundError { task_id: *task_id }.into())
+        task.map(Task::into_state)
+            .ok_or(TaskNotFoundError { task_id: *task_id }.into())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
@@ -174,16 +161,18 @@ impl TaskService for TaskServiceInMemory {
         // TODO: This requires a lot more thinking on how to make this performant
         Box::pin(async_stream::try_stream! {
             let relevant_tasks: Vec<_> = self
-            .event_store
-            .get_tasks_by_dataset(&dataset_id)
-            .try_collect()
-            .await
-            .unwrap();
+                .event_store
+                .get_tasks_by_dataset(&dataset_id)
+                .try_collect()
+                .await?;
 
             for task_id in relevant_tasks.into_iter() {
-                let events_stream = self.event_store.get_events_by_task(&task_id, None, None);
-                let proj = TaskStateProjection::project_stream(events_stream.map_ok(|i| i.event)).await;
-                yield proj.int_err()?.unwrap();
+                let task = Task::load(&task_id, self.event_store.as_ref())
+                    .await
+                    .int_err()?
+                    .unwrap();
+
+                yield task.into_state();
             }
         })
     }

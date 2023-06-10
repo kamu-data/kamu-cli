@@ -23,6 +23,14 @@ pub struct TaskEventInstance {
     pub event: TaskEvent,
 }
 
+impl Into<TaskEvent> for TaskEventInstance {
+    fn into(self) -> TaskEvent {
+        self.event
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Replace the below with helper macros
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskEventInstanceTRef<'a, T>

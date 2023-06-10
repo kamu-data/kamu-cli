@@ -7,6 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_event_store_inmem;
-mod test_task_aggregate;
-mod test_task_service_inmem;
+mod aggregate;
+mod errors;
+mod task;
+
+pub use aggregate::*;
+pub use errors::*;
+pub use task::*;
