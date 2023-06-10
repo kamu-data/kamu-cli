@@ -738,6 +738,10 @@ type Task {
 	"""
 	status: TaskStatus!
 	"""
+	Task was ordered to cancel
+	"""
+	cancellationRequested: Boolean!
+	"""
 	Describes a certain final outcome of the task once it reaches the
 	"finished" status
 	"""

@@ -18,6 +18,7 @@ use crate::scalars::*;
 pub struct Task {
     task_id: TaskID,
     status: TaskStatus,
+    cancellation_requested: bool,
     outcome: Option<TaskOutcome>,
 }
 
@@ -29,6 +30,7 @@ impl Task {
         let ts::TaskState {
             task_id,
             status,
+            cancellation_requested,
             logical_plan: _,
         } = state;
 
@@ -41,6 +43,7 @@ impl Task {
         Self {
             task_id: task_id.into(),
             status: status.into(),
+            cancellation_requested,
             outcome,
             //logical_plan: v.logical_plan.into(),
         }
@@ -54,6 +57,11 @@ impl Task {
     /// Life-cycle status of a task
     pub async fn status(&self) -> TaskStatus {
         self.status
+    }
+
+    /// Task was ordered to cancel
+    pub async fn cancellation_requested(&self) -> bool {
+        self.cancellation_requested
     }
 
     /// Describes a certain final outcome of the task once it reaches the

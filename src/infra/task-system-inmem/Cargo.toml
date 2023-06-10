@@ -26,6 +26,7 @@ async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = "0.6"
+futures = "0.3"
 thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features=[] }
 tracing = { version = "0.1", default-features = false }
@@ -34,3 +35,11 @@ url = { version = "2", default-features = false, features = ["serde"] }
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_with = { version = "3", default-features = false }
+
+
+[dev-dependencies]
+env_logger = "0.10"
+mockall = "0.11"
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

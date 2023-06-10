@@ -10,10 +10,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Uniquely identifies a task within a compute node deployment
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TaskID(u64);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct TaskEventID(u64);
 
-impl TaskID {
+impl TaskEventID {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
@@ -21,13 +21,13 @@ impl TaskID {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for TaskID {
+impl std::fmt::Display for TaskEventID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Into<u64> for TaskID {
+impl Into<u64> for TaskEventID {
     fn into(self) -> u64 {
         self.0
     }

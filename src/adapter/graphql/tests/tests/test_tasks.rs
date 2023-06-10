@@ -63,6 +63,7 @@ async fn test_task_get_existing() {
     let returned_task = TaskState {
         task_id: TaskID::new(123),
         status: TaskStatus::Finished(TaskOutcome::Success),
+        cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::from_pub_key_ed25519(b"foo"),
         }),
@@ -88,6 +89,7 @@ async fn test_task_get_existing() {
                     getTask (taskId: "{}") {{
                         id
                         status
+                        cancellationRequested
                         outcome
                     }}
                 }}
@@ -102,6 +104,7 @@ async fn test_task_get_existing() {
             "tasks": {
                 "getTask": {
                     "id": expected_task.task_id.to_string(),
+                    "cancellationRequested": false,
                     "status": "FINISHED",
                     "outcome": "SUCCESS",
                 },
@@ -117,6 +120,7 @@ async fn test_task_list_by_dataset() {
     let returned_task = TaskState {
         task_id: TaskID::new(123),
         status: TaskStatus::Queued,
+        cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: dataset_id.clone(),
         }),
@@ -189,6 +193,7 @@ async fn test_task_crate_update_dataset() {
     let returned_task = TaskState {
         task_id: TaskID::new(123),
         status: TaskStatus::Queued,
+        cancellation_requested: false,
         logical_plan: expected_logical_plan.clone(),
     };
     let expected_task = returned_task.clone();
@@ -242,6 +247,7 @@ async fn test_task_crate_probe() {
     let returned_task = TaskState {
         task_id: TaskID::new(123),
         status: TaskStatus::Queued,
+        cancellation_requested: false,
         logical_plan: expected_logical_plan.clone(),
     };
     let expected_task = returned_task.clone();
