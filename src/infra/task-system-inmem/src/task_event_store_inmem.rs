@@ -64,12 +64,19 @@ impl TaskEventStoreInMemory {
 }
 
 #[async_trait::async_trait]
-impl TaskEventStore for TaskEventStoreInMemory {
-    fn new_task_id(&self) -> TaskID {
-        self.state.lock().unwrap().next_task_id()
+impl EventStore for TaskEventStoreInMemory {
+    type Agg = Task;
+    type EventInstance = TaskEventInstance;
+
+    async fn load(&self, id: &TaskID) -> Result<Task, LoadError<Task>> {
+        let event_stream = self.get_events_by_task(id, None, None);
+        match Task::from_event_stream(event_stream).await? {
+            Some(agg) => Ok(agg),
+            None => Err(AggrateNotFoundError::new(*id).into()),
+        }
     }
 
-    async fn save_event(&self, event: TaskEvent) -> Result<TaskEventID, InternalError> {
+    async fn save_event(&self, event: TaskEvent) -> Result<(), SaveError> {
         let mut s = self.state.lock().unwrap();
 
         if let TaskEvent::Created(e) = &event {
@@ -88,10 +95,10 @@ impl TaskEventStore for TaskEventStoreInMemory {
             event_time: Utc::now(),
             event,
         });
-        Ok(event_id)
+        Ok(())
     }
 
-    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<TaskEventID, InternalError> {
+    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<(), SaveError> {
         let mut s = self.state.lock().unwrap();
 
         let event_time = Utc::now();
@@ -105,7 +112,14 @@ impl TaskEventStore for TaskEventStoreInMemory {
             });
         }
 
-        Ok(s.last_event_id.unwrap())
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl TaskEventStore for TaskEventStoreInMemory {
+    fn new_task_id(&self) -> TaskID {
+        self.state.lock().unwrap().next_task_id()
     }
 
     fn get_events_by_task<'a>(

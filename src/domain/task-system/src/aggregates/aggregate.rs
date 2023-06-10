@@ -18,27 +18,48 @@ use super::errors::*;
 pub trait Aggregate
 where
     Self: Sized,
+    // Access state directly through aggregate
+    Self: std::ops::Deref<Target = Self::State>,
+    // Pass aggregate into functions that expect state
+    Self: AsRef<Self::State>,
+    // Convert aggregate into state (should panic if there are pending events)
+    Self: Into<Self::State>,
+    Self::Id: std::fmt::Debug,
+    Self::Event: std::fmt::Debug,
+    Self::State: std::fmt::Debug,
 {
+    /// Type of the aggregate's identity
     type Id;
-    type EventType;
-    type ProjectionType;
-    type EventStore: ?Sized;
+    /// Type of the event associated with an aggregate
+    type Event;
+    /// Type of the state maintained by an aggregate
+    type State;
 
     /// Initializes an aggregate from projected state
-    fn from_state(state: Self::ProjectionType) -> Self;
+    fn from_genesis_event(event: Self::Event) -> Result<Self, IllegalGenesisError<Self>>;
 
-    /// Initializes an aggregate from projected state
-    fn from_genesis_event(
-        event: Self::EventType,
-    ) -> Result<Self, ProjectionError<Self::ProjectionType, Self::EventType>>;
+    /// Initializes an aggregate from a state snapshot
+    fn from_snapshot(state: Self::State) -> Self;
 
+    /// Update current state projection with an event
+    fn mutate(&mut self, event: Self::Event) -> Result<(), IllegalSequenceError<Self>>;
+
+    /// Extracts all update events from the aggregate
+    fn updates(&mut self) -> Vec<Self::Event>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Helper functions for aggregates
+#[async_trait::async_trait]
+pub trait AggregateExt: Aggregate {
     /// Initializes an aggregate from event stream
     async fn from_event_stream<Stream, Event>(
         mut event_stream: Stream,
-    ) -> Result<Option<Self>, LoadError<Self::ProjectionType, Self::EventType>>
+    ) -> Result<Option<Self>, LoadError<Self>>
     where
         Stream: tokio_stream::Stream<Item = Result<Event, InternalError>> + Send + Unpin,
-        Event: Into<Self::EventType> + Send,
+        Event: Into<Self::Event> + Send,
     {
         use tokio_stream::StreamExt;
 
@@ -52,45 +73,12 @@ where
 
         while let Some(res) = event_stream.next().await {
             let event = res?;
-            agg.apply_no_save(event.into())?;
+            agg.mutate(event.into())?;
         }
 
         Ok(Some(agg))
     }
-
-    /// Initializes an aggregate from the event store
-    async fn load(
-        id: &Self::Id,
-        event_store: &Self::EventStore,
-    ) -> Result<Option<Self>, LoadError<Self::ProjectionType, Self::EventType>>;
-
-    /// Saves pending events into event store
-    async fn save(&mut self, event_store: &Self::EventStore) -> Result<(), SaveError>;
-
-    /// Update current state projection with an event and save it in the pending
-    /// event list
-    fn apply(
-        &mut self,
-        event: Self::EventType,
-    ) -> Result<(), IllegalSequenceError<Self::ProjectionType, Self::EventType>>;
-
-    /// Update current state projection with an event without saving it in the
-    /// pending event list (used when initializing an aggregate)
-    fn apply_no_save(
-        &mut self,
-        event: Self::EventType,
-    ) -> Result<(), IllegalSequenceError<Self::ProjectionType, Self::EventType>>;
-
-    /// Unique identity of an aggregate
-    fn id(&self) -> &Self::Id;
-
-    /// Casts an aggregate into projected state
-    fn as_state(&self) -> &Self::ProjectionType;
-
-    /// Converts an aggregate into projected state.
-    ///
-    /// All pending events have to be saved or the call will panic.
-    fn into_state(self) -> Self::ProjectionType;
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+// Blanket impl
+impl<T> AggregateExt for T where T: Aggregate {}

@@ -15,17 +15,9 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskEventStore: Sync + Send {
+pub trait TaskEventStore: EventStore<Agg = Task, EventInstance = TaskEventInstance> {
     /// Generates new unique task identifier
     fn new_task_id(&self) -> TaskID;
-
-    // TODO: Concurrency control
-    /// Persists a singular event
-    async fn save_event(&self, event: TaskEvent) -> Result<TaskEventID, InternalError>;
-
-    // TODO: Concurrency control
-    /// Persists a series of events
-    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<TaskEventID, InternalError>;
 
     /// Returns the event history of the specified task in chronological order
     fn get_events_by_task<'a>(

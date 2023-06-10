@@ -62,21 +62,17 @@ impl TaskServiceInMemory {
                 }
             };
 
-            let mut task = Task::load(&task_id, event_store.as_ref())
-                .await
-                .int_err()?
-                .unwrap();
-
-            task.set_running().int_err()?;
-            task.save(event_store.as_ref()).await.int_err()?;
+            let mut task = event_store.load(&task_id).await.int_err()?;
+            task.run().int_err()?;
+            event_store.save(&mut task).await.int_err()?;
 
             tracing::info!(
                 %task_id,
-                logical_plan = ?task.logical_plan(),
+                logical_plan = ?task.logical_plan,
                 "Executing task",
             );
 
-            let outcome = match task.logical_plan() {
+            let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
                     let res = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
@@ -101,13 +97,13 @@ impl TaskServiceInMemory {
 
             tracing::info!(
                 %task_id,
-                logical_plan = ?task.logical_plan(),
+                logical_plan = ?task.logical_plan,
                 ?outcome,
                 "Task finished",
             );
 
             task.finish(outcome).int_err()?;
-            task.save(event_store.as_ref()).await.int_err()?;
+            event_store.save(&mut task).await.int_err()?;
         }
     }
 }
@@ -116,12 +112,12 @@ impl TaskServiceInMemory {
 impl TaskService for TaskServiceInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let mut task = Task::new(self.event_store.as_ref(), logical_plan);
-        task.save(self.event_store.as_ref()).await.int_err()?;
+        let mut task = Task::new(self.event_store.new_task_id(), logical_plan);
+        self.event_store.save(&mut task).await.int_err()?;
 
         let queue_len = {
             let mut state = self.state.lock().unwrap();
-            state.task_queue.push_back(*task.id());
+            state.task_queue.push_back(task.task_id);
 
             // Create loop task upon the first run
             if state.task_loop_hdl.is_none() {
@@ -136,22 +132,21 @@ impl TaskService for TaskServiceInMemory {
         }; // lock
 
         tracing::info!(
-            task_id = %task.id(),
+            task_id = %task.task_id,
             queue_len,
             "Created new task"
         );
 
-        Ok(task.into_state())
+        Ok(task.into())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError> {
-        let task = Task::load(task_id, self.event_store.as_ref())
-            .await
-            .int_err()?;
-
-        task.map(Task::into_state)
-            .ok_or(TaskNotFoundError { task_id: *task_id }.into())
+        match self.event_store.load(task_id).await {
+            Ok(task) => Ok(task.into()),
+            Err(LoadError::NotFound(_)) => Err(TaskNotFoundError { task_id: *task_id }.into()),
+            Err(err) => Err(err.int_err().into()),
+        }
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
@@ -167,12 +162,11 @@ impl TaskService for TaskServiceInMemory {
                 .await?;
 
             for task_id in relevant_tasks.into_iter() {
-                let task = Task::load(&task_id, self.event_store.as_ref())
+                let task = self.event_store.load(&task_id)
                     .await
-                    .int_err()?
-                    .unwrap();
+                    .int_err()?;
 
-                yield task.into_state();
+                yield task.into();
             }
         })
     }

@@ -9,8 +9,10 @@
 
 mod aggregate;
 mod errors;
+mod event_store;
 mod task;
 
 pub use aggregate::*;
 pub use errors::*;
+pub use event_store::*;
 pub use task::*;

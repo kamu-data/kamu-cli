@@ -12,15 +12,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum LoadError<Proj, Evt> {
+pub enum LoadError<Agg: Aggregate> {
     #[error(transparent)]
-    ProjectionError(#[from] ProjectionError<Proj, Evt>),
+    NotFound(#[from] AggrateNotFoundError<Agg>),
+    #[error(transparent)]
+    ProjectionError(ProjectionError<Agg>),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
-impl<Proj, Evt> From<IllegalSequenceError<Proj, Evt>> for LoadError<Proj, Evt> {
-    fn from(value: IllegalSequenceError<Proj, Evt>) -> Self {
+// Transitive From
+impl<Agg: Aggregate, Err: Into<ProjectionError<Agg>>> From<Err> for LoadError<Agg> {
+    fn from(value: Err) -> Self {
         Self::ProjectionError(value.into())
     }
 }
@@ -42,24 +45,26 @@ pub enum SaveError {
 
 use internal_error::InternalError;
 
+use crate::Aggregate;
+
 #[derive(thiserror::Error, Debug)]
-pub enum ProjectionError<Proj, Evt> {
+pub enum ProjectionError<Agg: Aggregate> {
     #[error(transparent)]
-    IllegalGenesis(#[from] IllegalGenesisError<Evt>),
+    IllegalGenesis(#[from] IllegalGenesisError<Agg>),
     #[error(transparent)]
-    IllegalSequence(#[from] IllegalSequenceError<Proj, Evt>),
+    IllegalSequence(#[from] IllegalSequenceError<Agg>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
 #[error("Cannot initialize projection from {event:?}")]
-pub struct IllegalGenesisError<Evt> {
-    pub event: Evt,
+pub struct IllegalGenesisError<Agg: Aggregate> {
+    pub event: <Agg as Aggregate>::Event,
 }
 
-impl<Evt> IllegalGenesisError<Evt> {
-    pub fn new(event: Evt) -> Self {
+impl<Agg: Aggregate> IllegalGenesisError<Agg> {
+    pub fn new(event: <Agg as Aggregate>::Event) -> Self {
         Self { event }
     }
 }
@@ -68,13 +73,27 @@ impl<Evt> IllegalGenesisError<Evt> {
 
 #[derive(thiserror::Error, Debug)]
 #[error("Event {event:?} is illegal for state {state:?}")]
-pub struct IllegalSequenceError<Proj, Evt> {
-    pub state: Proj,
-    pub event: Evt,
+pub struct IllegalSequenceError<Agg: Aggregate> {
+    pub state: <Agg as Aggregate>::State,
+    pub event: <Agg as Aggregate>::Event,
 }
 
-impl<Proj, Evt> IllegalSequenceError<Proj, Evt> {
-    pub fn new(state: Proj, event: Evt) -> Self {
+impl<Agg: Aggregate> IllegalSequenceError<Agg> {
+    pub fn new(state: <Agg as Aggregate>::State, event: <Agg as Aggregate>::Event) -> Self {
         Self { state, event }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("{id:?} not found")]
+pub struct AggrateNotFoundError<Agg: Aggregate> {
+    pub id: <Agg as Aggregate>::Id,
+}
+
+impl<Agg: Aggregate> AggrateNotFoundError<Agg> {
+    pub fn new(id: <Agg as Aggregate>::Id) -> Self {
+        Self { id }
     }
 }

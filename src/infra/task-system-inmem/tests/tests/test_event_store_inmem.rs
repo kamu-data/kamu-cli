@@ -50,7 +50,7 @@ async fn test_event_store_get_streams() {
         .into(),
     };
 
-    let event_id_1 = event_store
+    event_store
         .save_event(event_expected.clone().into())
         .await
         .unwrap();
@@ -64,15 +64,13 @@ async fn test_event_store_get_streams() {
     assert_matches!(
         &events[..],
         [TaskEventInstance {
-            event_id,
+            event_id: _,
             event_time: _,
             event: TaskEvent::Created(TaskCreated {
                 task_id,
                 logical_plan,
             })
-        }] if *event_id == event_id_1
-            && *task_id == event_expected.task_id
-            && *logical_plan == event_expected.logical_plan
+        }] if *task_id == event_expected.task_id && *logical_plan == event_expected.logical_plan
     );
 
     let tasks: Vec<_> = event_store

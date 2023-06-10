@@ -17,45 +17,45 @@ use kamu_task_system_inmem::*;
 async fn test_task_agg_create_new() {
     let event_store = TaskEventStoreInMemory::new();
 
-    let mut task = Task::new(&event_store, Probe::default().into());
+    let mut task = Task::new(event_store.new_task_id(), Probe::default().into());
 
     assert_eq!(
         event_store
-            .get_events_by_task(task.id(), None, None)
+            .get_events_by_task(&task.task_id, None, None)
             .count()
             .await,
         0
     );
 
-    task.save(&event_store).await.unwrap();
+    event_store.save(&mut task).await.unwrap();
     assert_eq!(
         event_store
-            .get_events_by_task(task.id(), None, None)
+            .get_events_by_task(&task.task_id, None, None)
             .count()
             .await,
         1
     );
 
-    task.save(&event_store).await.unwrap();
+    event_store.save(&mut task).await.unwrap();
     assert_eq!(
         event_store
-            .get_events_by_task(task.id(), None, None)
+            .get_events_by_task(&task.task_id, None, None)
             .count()
             .await,
         1
     );
 
-    let task = Task::load(task.id(), &event_store).await.unwrap().unwrap();
-    assert_eq!(*task.status(), TaskStatus::Queued);
-    assert_eq!(*task.logical_plan(), LogicalPlan::Probe(Probe::default()));
+    let task = event_store.load(&task.task_id).await.unwrap();
+    assert_eq!(task.status, TaskStatus::Queued);
+    assert_eq!(task.logical_plan, LogicalPlan::Probe(Probe::default()));
 }
 
 #[test_log::test(tokio::test)]
 async fn test_task_agg_illegal_transition() {
     let event_store = TaskEventStoreInMemory::new();
 
-    let mut task = Task::new(&event_store, Probe::default().into());
+    let mut task = Task::new(event_store.new_task_id(), Probe::default().into());
     task.finish(TaskOutcome::Cancelled).unwrap();
 
-    assert_matches!(task.set_running(), Err(IllegalSequenceError { .. }));
+    assert_matches!(task.run(), Err(IllegalSequenceError { .. }));
 }
