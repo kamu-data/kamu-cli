@@ -11,16 +11,15 @@
 #![feature(error_generic_member_access)]
 
 // Re-exports
+pub use event_sourcing::*;
 pub use internal_error::*;
 
 pub mod aggregates;
 pub mod entities;
-mod es_common;
 pub mod repos;
 pub mod services;
 
 pub use aggregates::*;
 pub use entities::*;
-pub use es_common::*;
 pub use repos::*;
 pub use services::*;

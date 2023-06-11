@@ -9,9 +9,9 @@
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
+use event_sourcing::*;
 
 use crate::entities::*;
-use crate::es_common::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

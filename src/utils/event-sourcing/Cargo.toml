@@ -1,0 +1,27 @@
+[package]
+name = "event-sourcing"
+description = "Common types for implementing event-sourced designs"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+thiserror = "1"
+tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false }

@@ -2017,6 +2017,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-sourcing"
+version = "0.128.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "internal-error",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "fast_chemail"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3008,6 +3020,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "enum-variants",
+ "event-sourcing",
  "internal-error",
  "kamu-core",
  "opendatafabric",
