@@ -14,15 +14,12 @@ use crate::Aggregate;
 
 /// Common set of operations for an event store
 #[async_trait::async_trait]
-pub trait EventStore
+pub trait EventStore: Send + Sync
 where
-    Self: Send + Sync,
     Self::Agg: Send,
-    //Self::EventInstance: Into<<Self::Agg as Aggregate>::Event>,
     <Self::Agg as Aggregate>::Event: Send,
 {
     type Agg: Aggregate;
-    type EventInstance;
 
     /// Initializes an aggregate from event history
     async fn load(

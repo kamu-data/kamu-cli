@@ -7,20 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
-#![feature(error_generic_member_access)]
-
-// Re-exports
-pub use internal_error::*;
-
-pub mod aggregates;
-pub mod entities;
-mod es_common;
-pub mod repos;
-pub mod services;
-
-pub use aggregates::*;
-pub use entities::*;
-pub use es_common::*;
-pub use repos::*;
-pub use services::*;
+/// A monotonically increasing identifier
+/// assigned by event stores to events
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EventID(u64);

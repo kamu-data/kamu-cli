@@ -9,9 +9,8 @@
 
 use enum_variants::*;
 
-use super::errors::*;
-use super::Aggregate;
 use crate::entities::*;
+use crate::es_common::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -136,6 +135,10 @@ impl Aggregate for Task {
             }
         }
         Ok(())
+    }
+
+    fn has_updates(&self) -> bool {
+        !self.pending_events.is_empty()
     }
 
     fn updates(&mut self) -> Vec<TaskEvent> {

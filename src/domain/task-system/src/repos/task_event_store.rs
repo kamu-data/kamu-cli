@@ -15,7 +15,7 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskEventStore: EventStore<Agg = Task, EventInstance = TaskEventInstance> {
+pub trait TaskEventStore: EventStore<Agg = Task> {
     /// Generates new unique task identifier
     fn new_task_id(&self) -> TaskID;
 
@@ -23,7 +23,7 @@ pub trait TaskEventStore: EventStore<Agg = Task, EventInstance = TaskEventInstan
     fn get_events_by_task<'a>(
         &'a self,
         task_id: &TaskID,
-        as_of_id: Option<&TaskEventID>,
+        as_of_event: Option<&EventID>,
         as_of_time: Option<&DateTime<Utc>>,
     ) -> TaskEventStream<'a>;
 
@@ -35,7 +35,7 @@ pub trait TaskEventStore: EventStore<Agg = Task, EventInstance = TaskEventInstan
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type TaskEventStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<TaskEventInstance, InternalError>> + Send + 'a>,
+    Box<dyn tokio_stream::Stream<Item = Result<TaskEvent, InternalError>> + Send + 'a>,
 >;
 
 pub type TaskIDStream<'a> =

@@ -63,14 +63,12 @@ async fn test_event_store_get_streams() {
 
     assert_matches!(
         &events[..],
-        [TaskEventInstance {
-            event_id: _,
-            event_time: _,
-            event: TaskEvent::Created(TaskCreated {
+        [
+            TaskEvent::Created(TaskCreated {
                 task_id,
                 logical_plan,
             })
-        }] if *task_id == event_expected.task_id && *logical_plan == event_expected.logical_plan
+        ] if *task_id == event_expected.task_id && *logical_plan == event_expected.logical_plan
     );
 
     let tasks: Vec<_> = event_store

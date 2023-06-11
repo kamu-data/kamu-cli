@@ -44,6 +44,9 @@ where
     /// Update current state projection with an event
     fn mutate(&mut self, event: Self::Event) -> Result<(), IllegalSequenceError<Self>>;
 
+    /// Checks whether an aggregate has pending updates that need to be saved
+    fn has_updates(&self) -> bool;
+
     /// Extracts all update events from the aggregate
     fn updates(&mut self) -> Vec<Self::Event>;
 }

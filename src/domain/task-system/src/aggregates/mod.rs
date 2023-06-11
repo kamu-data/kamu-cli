@@ -7,12 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod aggregate;
-mod errors;
-mod event_store;
 mod task;
 
-pub use aggregate::*;
-pub use errors::*;
-pub use event_store::*;
 pub use task::*;

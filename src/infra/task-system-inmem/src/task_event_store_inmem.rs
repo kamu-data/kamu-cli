@@ -21,12 +21,9 @@ pub struct TaskEventStoreInMemory {
 
 #[derive(Default)]
 struct State {
-    events: Vec<TaskEventInstance>,
+    events: Vec<TaskEvent>,
     tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
-
-    // Auto increment
     last_task_id: Option<TaskID>,
-    last_event_id: Option<TaskEventID>,
 }
 
 impl State {
@@ -40,17 +37,6 @@ impl State {
         self.last_task_id = Some(new_task_id);
         new_task_id
     }
-
-    fn next_event_id(&mut self) -> TaskEventID {
-        let new_event_id = if let Some(last_event_id) = self.last_event_id {
-            let id: u64 = last_event_id.into();
-            TaskEventID::new(id + 1)
-        } else {
-            TaskEventID::new(0)
-        };
-        self.last_event_id = Some(new_event_id);
-        new_event_id
-    }
 }
 
 #[component(pub)]
@@ -61,12 +47,26 @@ impl TaskEventStoreInMemory {
             state: Arc::new(Mutex::new(State::default())),
         }
     }
+
+    fn update_index_by_dataset(
+        tasks_by_dataset: &mut HashMap<DatasetID, Vec<TaskID>>,
+        event: &TaskEvent,
+    ) {
+        if let TaskEvent::Created(e) = &event {
+            if let Some(dataset_id) = e.logical_plan.dataset_id() {
+                let entries = match tasks_by_dataset.entry(dataset_id.clone()) {
+                    Entry::Occupied(v) => v.into_mut(),
+                    Entry::Vacant(v) => v.insert(Vec::default()),
+                };
+                entries.push(event.task_id())
+            }
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl EventStore for TaskEventStoreInMemory {
     type Agg = Task;
-    type EventInstance = TaskEventInstance;
 
     async fn load(&self, id: &TaskID) -> Result<Task, LoadError<Task>> {
         let event_stream = self.get_events_by_task(id, None, None);
@@ -78,38 +78,17 @@ impl EventStore for TaskEventStoreInMemory {
 
     async fn save_event(&self, event: TaskEvent) -> Result<(), SaveError> {
         let mut s = self.state.lock().unwrap();
-
-        if let TaskEvent::Created(e) = &event {
-            if let Some(dataset_id) = e.logical_plan.dataset_id() {
-                let entries = match s.tasks_by_dataset.entry(dataset_id.clone()) {
-                    Entry::Occupied(v) => v.into_mut(),
-                    Entry::Vacant(v) => v.insert(Vec::default()),
-                };
-                entries.push(event.task_id())
-            }
-        }
-
-        let event_id = s.next_event_id();
-        s.events.push(TaskEventInstance {
-            event_id,
-            event_time: Utc::now(),
-            event,
-        });
+        Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
+        s.events.push(event);
         Ok(())
     }
 
     async fn save_events(&self, events: Vec<TaskEvent>) -> Result<(), SaveError> {
         let mut s = self.state.lock().unwrap();
 
-        let event_time = Utc::now();
-
         for event in events {
-            let event_id = s.next_event_id();
-            s.events.push(TaskEventInstance {
-                event_id,
-                event_time: event_time.clone(),
-                event,
-            });
+            Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
+            s.events.push(event);
         }
 
         Ok(())
@@ -125,11 +104,11 @@ impl TaskEventStore for TaskEventStoreInMemory {
     fn get_events_by_task<'a>(
         &'a self,
         task_id: &TaskID,
-        as_of_id: Option<&TaskEventID>,
+        as_of_event: Option<&EventID>,
         as_of_time: Option<&DateTime<Utc>>,
     ) -> TaskEventStream<'a> {
         // TODO: Implement
-        assert_eq!(as_of_id, None);
+        assert_eq!(as_of_event, None);
         assert_eq!(as_of_time, None);
 
         let task_id = task_id.clone();
@@ -144,7 +123,7 @@ impl TaskEventStore for TaskEventStoreInMemory {
                     s.events[current..]
                         .iter()
                         .enumerate()
-                        .filter(|(_, e)| e.event.task_id() == task_id)
+                        .filter(|(_, e)| e.task_id() == task_id)
                         .map(|(i, e)| (current + i, e.clone()))
                         .next()
                 };
