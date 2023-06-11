@@ -187,6 +187,9 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<kamu_task_system_inmem::TaskSchedulerInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskScheduler, kamu_task_system_inmem::TaskSchedulerInMemory>();
 
+    b.add::<kamu_task_system_inmem::TaskExecutorInMemory>();
+    b.bind::<dyn kamu_task_system_inmem::domain::TaskExecutor, kamu_task_system_inmem::TaskExecutorInMemory>();
+
     b.add::<kamu_task_system_inmem::TaskEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskEventStore, kamu_task_system_inmem::TaskEventStoreInMemory>();
 

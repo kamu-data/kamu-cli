@@ -29,6 +29,13 @@ pub trait TaskScheduler: Sync + Send {
 
     /// Attempts to cancel the given task
     async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError>;
+
+    /// Blocks until the next task is available for execution and takes it out
+    /// of the queue (called by [TaskExecutor])
+    async fn take(&self) -> Result<TaskID, TakeTaskError>;
+
+    /// A non-blocking version of [TaskScheduler::take()]
+    async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -66,6 +73,12 @@ pub enum CancelTaskError {
 pub enum ListTasksByDatasetError {
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum TakeTaskError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

@@ -32,6 +32,34 @@ impl<Agg: Aggregate, Err: Into<ProjectionError<Agg>>> From<Err> for LoadError<Ag
     }
 }
 
+impl<Agg: Aggregate> From<UpdateError<Agg>> for LoadError<Agg> {
+    fn from(value: UpdateError<Agg>) -> Self {
+        match value {
+            UpdateError::ProjectionError(err) => Self::ProjectionError(err),
+            UpdateError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// SaveError
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum UpdateError<Agg: Aggregate> {
+    #[error(transparent)]
+    ProjectionError(ProjectionError<Agg>),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+// Transitive From
+impl<Agg: Aggregate, Err: Into<ProjectionError<Agg>>> From<Err> for UpdateError<Agg> {
+    fn from(value: Err) -> Self {
+        Self::ProjectionError(value.into())
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // SaveError
 /////////////////////////////////////////////////////////////////////////////////////////

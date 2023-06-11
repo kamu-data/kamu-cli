@@ -7,16 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
-#![feature(error_generic_member_access)]
+use crate::*;
 
-// Re-exports
-pub use kamu_task_system as domain;
-
-mod task_event_store_inmem;
-mod task_executor_inmem;
-mod task_scheduler_inmem;
-
-pub use task_event_store_inmem::*;
-pub use task_executor_inmem::*;
-pub use task_scheduler_inmem::*;
+#[async_trait::async_trait]
+pub trait TaskExecutor: Sync + Send {
+    /// Runs the executor main loop
+    async fn run(&self) -> Result<(), InternalError>;
+}

@@ -11,3 +11,25 @@
 /// assigned by event stores to events
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EventID(u64);
+
+impl EventID {
+    pub fn new(v: u64) -> Self {
+        Self(v)
+    }
+
+    pub fn into_inner(self) -> u64 {
+        self.0
+    }
+}
+
+impl Into<u64> for EventID {
+    fn into(self) -> u64 {
+        self.0
+    }
+}
+
+impl std::fmt::Display for EventID {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}

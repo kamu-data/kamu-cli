@@ -12,98 +12,26 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use futures::TryStreamExt;
-use kamu_core::{PullOptions, PullService};
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
 pub struct TaskSchedulerInMemory {
     state: Arc<Mutex<State>>,
-
     event_store: Arc<dyn TaskEventStore>,
-    pull_svc: Arc<dyn PullService>,
 }
 
 #[derive(Default)]
 struct State {
     task_queue: VecDeque<TaskID>,
-    task_loop_hdl: Option<tokio::task::JoinHandle<Result<(), InternalError>>>,
 }
 
 #[component(pub)]
 #[scope(Singleton)]
 impl TaskSchedulerInMemory {
-    pub fn new(event_store: Arc<dyn TaskEventStore>, pull_svc: Arc<dyn PullService>) -> Self {
+    pub fn new(event_store: Arc<dyn TaskEventStore>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
             event_store,
-            pull_svc,
-        }
-    }
-
-    // TODO: Panic tapping?
-    async fn run_tasks_loop(
-        state: Arc<Mutex<State>>,
-        event_store: Arc<dyn TaskEventStore>,
-        pull_svc: Arc<dyn PullService>,
-    ) -> Result<(), InternalError> {
-        loop {
-            // Try to steal a task from the queue
-            let task_id = {
-                let mut s = state.lock().unwrap();
-                s.task_queue.pop_front()
-            };
-
-            let task_id = match task_id {
-                Some(t) => t,
-                None => {
-                    // TODO: Use signaling to wake only when needed
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    continue;
-                }
-            };
-
-            let mut task = event_store.load(&task_id).await.int_err()?;
-            task.run().int_err()?;
-            event_store.save(&mut task).await.int_err()?;
-
-            tracing::info!(
-                %task_id,
-                logical_plan = ?task.logical_plan,
-                "Executing task",
-            );
-
-            let outcome = match &task.logical_plan {
-                LogicalPlan::UpdateDataset(upd) => {
-                    let res = pull_svc
-                        .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
-                        .await;
-
-                    match res {
-                        Ok(_) => TaskOutcome::Success,
-                        Err(_) => TaskOutcome::Failed,
-                    }
-                }
-                LogicalPlan::Probe(Probe {
-                    dataset_id: _,
-                    busy_time,
-                    end_with_outcome,
-                }) => {
-                    if let Some(busy_time) = busy_time {
-                        tokio::time::sleep(busy_time.clone()).await;
-                    }
-                    end_with_outcome.unwrap_or(TaskOutcome::Success)
-                }
-            };
-
-            tracing::info!(
-                %task_id,
-                logical_plan = ?task.logical_plan,
-                ?outcome,
-                "Task finished",
-            );
-
-            task.finish(outcome).int_err()?;
-            event_store.save(&mut task).await.int_err()?;
         }
     }
 }
@@ -118,23 +46,13 @@ impl TaskScheduler for TaskSchedulerInMemory {
         let queue_len = {
             let mut state = self.state.lock().unwrap();
             state.task_queue.push_back(task.task_id);
-
-            // Create loop task upon the first run
-            if state.task_loop_hdl.is_none() {
-                state.task_loop_hdl = Some(tokio::spawn(Self::run_tasks_loop(
-                    self.state.clone(),
-                    self.event_store.clone(),
-                    self.pull_svc.clone(),
-                )));
-            }
-
             state.task_queue.len()
-        }; // lock
+        };
 
         tracing::info!(
             task_id = %task.task_id,
             queue_len,
-            "Created new task"
+            "Task queued"
         );
 
         Ok(task.into())
@@ -181,5 +99,42 @@ impl TaskScheduler for TaskSchedulerInMemory {
                 yield task.into();
             }
         })
+    }
+
+    // TODO: Use signaling instead of a loop
+    async fn take(&self) -> Result<TaskID, TakeTaskError> {
+        loop {
+            match self.try_take().await? {
+                Some(task_id) => return Ok(task_id),
+                None => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    continue;
+                }
+            }
+        }
+    }
+
+    // TODO: How to prevent tasks from being lost if executor crashes
+    async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError> {
+        let task_id = {
+            let mut s = self.state.lock().unwrap();
+            s.task_queue.pop_front()
+        };
+
+        let Some(task_id) = task_id else {
+            return Ok(None);
+        };
+
+        let mut task = self.event_store.load(&task_id).await.int_err()?;
+        task.run().int_err()?;
+        self.event_store.save(&mut task).await.int_err()?;
+
+        tracing::info!(
+            %task_id,
+            logical_plan = ?task.logical_plan,
+            "Handing over a task to an executor",
+        );
+
+        Ok(Some(task_id))
     }
 }

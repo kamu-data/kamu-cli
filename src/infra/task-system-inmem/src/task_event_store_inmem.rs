@@ -10,7 +10,6 @@
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
 use dill::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
@@ -68,22 +67,48 @@ impl TaskEventStoreInMemory {
 impl EventStore for TaskEventStoreInMemory {
     type Agg = Task;
 
-    async fn load(&self, id: &TaskID) -> Result<Task, LoadError<Task>> {
-        let event_stream = self.get_events_by_task(id, None, None);
-        match Task::from_event_stream(event_stream).await? {
-            Some(agg) => Ok(agg),
-            None => Err(AggrateNotFoundError::new(*id).into()),
-        }
+    async fn len(&self) -> Result<usize, InternalError> {
+        Ok(self.state.lock().unwrap().events.len())
     }
 
-    async fn save_event(&self, event: TaskEvent) -> Result<(), SaveError> {
-        let mut s = self.state.lock().unwrap();
-        Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
-        s.events.push(event);
-        Ok(())
+    fn get_events<'a>(
+        &'a self,
+        task_id: &TaskID,
+        opts: GetEventsOpts,
+    ) -> EventStream<'a, TaskEvent> {
+        let task_id = task_id.clone();
+
+        // TODO: This should be a buffered stream so we don't lock per event
+        Box::pin(async_stream::try_stream! {
+            let mut seen = opts.from.map(|id| (id.into_inner() + 1) as usize).unwrap_or(0);
+
+            loop {
+                let next = {
+                    let s = self.state.lock().unwrap();
+
+                    let to = opts.to.map(|id| (id.into_inner() + 1) as usize).unwrap_or(s.events.len());
+
+                    s.events[..to]
+                        .iter()
+                        .enumerate()
+                        .skip(seen)
+                        .filter(|(_, e)| e.task_id() == task_id)
+                        .map(|(i, e)| (i, e.clone()))
+                        .next()
+                };
+
+                match next {
+                    None => break,
+                    Some((i, event)) => {
+                        seen = i + 1;
+                        yield (EventID::new(i as u64), event)
+                    }
+                }
+            }
+        })
     }
 
-    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<(), SaveError> {
+    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<EventID, SaveError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {
@@ -91,7 +116,7 @@ impl EventStore for TaskEventStoreInMemory {
             s.events.push(event);
         }
 
-        Ok(())
+        Ok(EventID::new((s.events.len() - 1) as u64))
     }
 }
 
@@ -101,59 +126,28 @@ impl TaskEventStore for TaskEventStoreInMemory {
         self.state.lock().unwrap().next_task_id()
     }
 
-    fn get_events_by_task<'a>(
-        &'a self,
-        task_id: &TaskID,
-        as_of_event: Option<&EventID>,
-        as_of_time: Option<&DateTime<Utc>>,
-    ) -> TaskEventStream<'a> {
-        // TODO: Implement
-        assert_eq!(as_of_event, None);
-        assert_eq!(as_of_time, None);
-
-        let task_id = task_id.clone();
-
-        // TODO: This should be a buffered stream so we don't lock per event
-        Box::pin(async_stream::try_stream! {
-            let mut current = 0;
-
-            loop {
-                let next = {
-                    let s = self.state.lock().unwrap();
-                    s.events[current..]
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, e)| e.task_id() == task_id)
-                        .map(|(i, e)| (current + i, e.clone()))
-                        .next()
-                };
-
-                let event = match next {
-                    None => break,
-                    Some((i, event)) => {
-                        current = i + 1;
-                        event
-                    }
-                };
-
-                yield event;
-            }
-        })
-    }
-
     fn get_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskIDStream<'a> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
-            let mut i = 0;
+            let mut pos = {
+                let s = self.state.lock().unwrap();
+                s.tasks_by_dataset.get(&dataset_id).map(|tasks| tasks.len()).unwrap_or(0)
+            };
 
             loop {
+                if pos == 0 {
+                    break;
+                }
+
+                pos -= 1;
+
                 let next = {
                     let s = self.state.lock().unwrap();
                     s.tasks_by_dataset
                         .get(&dataset_id)
-                        .and_then(|tasks| tasks.get(i).cloned())
+                        .and_then(|tasks| tasks.get(pos).cloned())
                 };
 
                 let task_id = match next {
@@ -161,7 +155,6 @@ impl TaskEventStore for TaskEventStoreInMemory {
                     Some(task_id) => task_id,
                 };
 
-                i += 1;
                 yield task_id;
             }
         })

@@ -19,6 +19,7 @@ use crate::es_common::*;
 pub struct Task {
     state: TaskState,
     pending_events: Vec<TaskEvent>,
+    last_synced_event: Option<EventID>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -31,9 +32,20 @@ impl Task {
             logical_plan,
         };
 
-        let mut this = Self::from_genesis_event(genesis.clone().into()).unwrap();
-        this.pending_events.push(genesis.into());
-        this
+        Self {
+            state: TaskState {
+                task_id,
+                status: TaskStatus::Queued,
+                cancellation_requested: false,
+                logical_plan: genesis.logical_plan.clone(),
+                created_at: genesis.event_time.clone(),
+                ran_at: None,
+                cancellation_requested_at: None,
+                finished_at: None,
+            },
+            pending_events: vec![genesis.into()],
+            last_synced_event: None,
+        }
     }
 
     /// Transition task to a `Running` state
@@ -76,51 +88,12 @@ impl Task {
 
     fn apply(&mut self, event: impl Into<TaskEvent>) -> Result<(), IllegalSequenceError<Self>> {
         let event = event.into();
-        self.mutate(event.clone())?;
+        self.update_state(event.clone())?;
         self.pending_events.push(event);
         Ok(())
     }
-}
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl Aggregate for Task {
-    type Id = TaskID;
-    type Event = TaskEvent;
-    type State = TaskState;
-
-    fn from_genesis_event(event: TaskEvent) -> Result<Self, IllegalGenesisError<Self>> {
-        if !event.is_variant::<TaskCreated>() {
-            return Err(IllegalGenesisError { event });
-        }
-
-        let TaskCreated {
-            event_time,
-            task_id,
-            logical_plan,
-        } = event.into_variant().unwrap();
-
-        Ok(Self::from_snapshot(TaskState {
-            task_id,
-            status: TaskStatus::Queued,
-            cancellation_requested: false,
-            logical_plan,
-            created_at: event_time,
-            ran_at: None,
-            cancellation_requested_at: None,
-            finished_at: None,
-        }))
-    }
-
-    fn from_snapshot(state: TaskState) -> Self {
-        Self {
-            state,
-            pending_events: Vec::new(),
-        }
-    }
-
-    fn mutate(&mut self, event: TaskEvent) -> Result<(), IllegalSequenceError<Self>> {
+    fn update_state(&mut self, event: TaskEvent) -> Result<(), IllegalSequenceError<Self>> {
         assert_eq!(self.state.task_id, event.task_id());
 
         // Check if state transition is legal
@@ -159,6 +132,77 @@ impl Aggregate for Task {
         }
         Ok(())
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl Aggregate for Task {
+    type Id = TaskID;
+    type Event = TaskEvent;
+    type State = TaskState;
+
+    fn id(&self) -> &TaskID {
+        &self.task_id
+    }
+
+    fn from_genesis_event(
+        event_id: EventID,
+        event: TaskEvent,
+    ) -> Result<Self, IllegalGenesisError<Self>> {
+        if !event.is_variant::<TaskCreated>() {
+            return Err(IllegalGenesisError { event });
+        }
+
+        let TaskCreated {
+            event_time,
+            task_id,
+            logical_plan,
+        } = event.into_variant().unwrap();
+
+        Ok(Self {
+            state: TaskState {
+                task_id,
+                status: TaskStatus::Queued,
+                cancellation_requested: false,
+                logical_plan,
+                created_at: event_time,
+                ran_at: None,
+                cancellation_requested_at: None,
+                finished_at: None,
+            },
+            pending_events: Vec::new(),
+            last_synced_event: Some(event_id),
+        })
+    }
+
+    fn from_snapshot(event_id: EventID, state: TaskState) -> Self {
+        Self {
+            state,
+            pending_events: Vec::new(),
+            last_synced_event: Some(event_id),
+        }
+    }
+
+    fn mutate(
+        &mut self,
+        event_id: EventID,
+        event: TaskEvent,
+    ) -> Result<(), IllegalSequenceError<Self>> {
+        if let Some(last_synced_event) = self.last_synced_event {
+            assert!(
+                last_synced_event < event_id,
+                "Attempting to mutate with event {} while state is already synced to {}",
+                event_id,
+                last_synced_event,
+            );
+        }
+
+        self.update_state(event)?;
+
+        self.last_synced_event = Some(event_id);
+        Ok(())
+    }
 
     fn has_updates(&self) -> bool {
         !self.pending_events.is_empty()
@@ -171,6 +215,14 @@ impl Aggregate for Task {
         } else {
             std::mem::take(&mut self.pending_events)
         }
+    }
+
+    fn last_synced_event(&self) -> Option<&EventID> {
+        self.last_synced_event.as_ref()
+    }
+
+    fn update_last_synced_event(&mut self, event_id: EventID) {
+        self.last_synced_event = Some(event_id);
     }
 }
 

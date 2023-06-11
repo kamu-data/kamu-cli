@@ -10,6 +10,7 @@
 use internal_error::InternalError;
 
 use super::errors::*;
+use crate::EventID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +32,9 @@ where
     Self::Id: std::fmt::Debug,
     Self::Event: std::fmt::Debug,
     Self::State: std::fmt::Debug,
+    Self::Id: Clone + Send + Sync,
+    Self::Event: Clone + Send,
+    Self::State: Clone + Send,
 {
     /// Type of the aggregate's identity
     type Id;
@@ -39,20 +43,37 @@ where
     /// Type of the state maintained by an aggregate
     type State;
 
+    /// Unique identity of an aggregate
+    fn id(&self) -> &Self::Id;
+
     /// Initializes an aggregate from projected state
-    fn from_genesis_event(event: Self::Event) -> Result<Self, IllegalGenesisError<Self>>;
+    fn from_genesis_event(
+        event_id: EventID,
+        event: Self::Event,
+    ) -> Result<Self, IllegalGenesisError<Self>>;
 
     /// Initializes an aggregate from a state snapshot
-    fn from_snapshot(state: Self::State) -> Self;
+    fn from_snapshot(event_id: EventID, state: Self::State) -> Self;
 
     /// Update current state projection with an event
-    fn mutate(&mut self, event: Self::Event) -> Result<(), IllegalSequenceError<Self>>;
+    fn mutate(
+        &mut self,
+        event_id: EventID,
+        event: Self::Event,
+    ) -> Result<(), IllegalSequenceError<Self>>;
 
     /// Checks whether an aggregate has pending updates that need to be saved
     fn has_updates(&self) -> bool;
 
-    /// Extracts all update events from the aggregate
+    /// Called by [crate::EventStore] to extracts all pending updates
     fn updates(&mut self) -> Vec<Self::Event>;
+
+    /// Returns the ID corresponding to the last event that reliably stored in
+    /// an event store
+    fn last_synced_event(&self) -> Option<&EventID>;
+
+    /// Called by [crate::EventStore] to update the last synced event ID
+    fn update_last_synced_event(&mut self, event_id: EventID);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -61,31 +82,47 @@ where
 #[async_trait::async_trait]
 pub trait AggregateExt: Aggregate {
     /// Initializes an aggregate from event stream
-    async fn from_event_stream<Stream, Event>(
+    async fn from_event_stream<Stream>(
         mut event_stream: Stream,
     ) -> Result<Option<Self>, LoadError<Self>>
     where
-        Stream: tokio_stream::Stream<Item = Result<Event, InternalError>> + Send + Unpin,
-        Event: Into<Self::Event> + Send,
+        Stream: tokio_stream::Stream<Item = Result<(EventID, Self::Event), InternalError>>
+            + Send
+            + Unpin,
     {
         use tokio_stream::StreamExt;
 
-        let genesis = match event_stream.next().await {
+        let (event_id, event) = match event_stream.next().await {
             None => return Ok(None),
-            Some(Ok(event)) => event,
+            Some(Ok(v)) => v,
             Some(Err(err)) => return Err(err.into()),
         };
 
-        let mut agg = Self::from_genesis_event(genesis.into())?;
+        let mut agg = Self::from_genesis_event(event_id, event)?;
+        agg.mutate_stream(event_stream).await?;
+        Ok(Some(agg))
+    }
+
+    /// Initializes an aggregate from event stream
+    async fn mutate_stream<Stream>(
+        &mut self,
+        mut event_stream: Stream,
+    ) -> Result<(), UpdateError<Self>>
+    where
+        Stream: tokio_stream::Stream<Item = Result<(EventID, Self::Event), InternalError>>
+            + Send
+            + Unpin,
+    {
+        use tokio_stream::StreamExt;
 
         while let Some(res) = event_stream.next().await {
-            let event = res?;
-            agg.mutate(event.into())?;
+            let (event_id, event) = res?;
+            self.mutate(event_id, event)?;
         }
 
-        Ok(Some(agg))
+        Ok(())
     }
 }
 
 // Blanket impl
-impl<T> AggregateExt for T where T: Aggregate {}
+impl<T: ?Sized> AggregateExt for T where T: Aggregate {}

@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use dill::Catalog;
+use internal_error::*;
+use kamu_task_system_inmem::domain::TaskExecutor;
 
 // Extractor of dataset identity for smart transfer protocol
 #[derive(serde::Deserialize)]
@@ -22,11 +25,14 @@ pub struct APIServer {
         hyper::server::conn::AddrIncoming,
         axum::routing::IntoMakeService<axum::Router>,
     >,
+    task_executor: Arc<dyn TaskExecutor>,
 }
 
 impl APIServer {
     pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         use axum::extract::{Extension, Path};
+
+        let task_executor = catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
 
@@ -63,15 +69,21 @@ impl APIServer {
 
         let server = axum::Server::bind(&addr).serve(app.into_make_service());
 
-        Self { server }
+        Self {
+            server,
+            task_executor,
+        }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
         self.server.local_addr()
     }
 
-    pub async fn run(self) -> Result<(), hyper::Error> {
-        self.server.await
+    pub async fn run(self) -> Result<(), InternalError> {
+        tokio::select! {
+            res = self.server => { res.int_err() },
+            res = self.task_executor.run() => { res.int_err() },
+        }
     }
 }
 

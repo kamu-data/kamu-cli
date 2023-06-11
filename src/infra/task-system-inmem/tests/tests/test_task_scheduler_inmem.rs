@@ -10,56 +10,13 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
-use kamu_core::*;
 use kamu_task_system_inmem::domain::*;
 use kamu_task_system_inmem::*;
-use opendatafabric::*;
-
-mockall::mock! {
-    PullService {}
-    #[async_trait::async_trait]
-    impl PullService for PullService {
-        async fn pull(
-            &self,
-            dataset_ref: &DatasetRefAny,
-            options: PullOptions,
-            listener: Option<Arc<dyn PullListener>>,
-        ) -> Result<PullResult, PullError>;
-
-        async fn pull_ext(
-            &self,
-            request: &PullRequest,
-            options: PullOptions,
-            listener: Option<Arc<dyn PullListener>>,
-        ) -> Result<PullResult, PullError>;
-
-        async fn pull_multi(
-            &self,
-            dataset_refs: Vec<DatasetRefAny>,
-            options: PullMultiOptions,
-            listener: Option<Arc<dyn PullMultiListener>>,
-        ) -> Result<Vec<PullResponse>, InternalError>;
-
-        async fn pull_multi_ext(
-            &self,
-            requests: Vec<PullRequest>,
-            options: PullMultiOptions,
-            listener: Option<Arc<dyn PullMultiListener>>,
-        ) -> Result<Vec<PullResponse>, InternalError>;
-
-        async fn set_watermark(
-            &self,
-            dataset_ref: &DatasetRef,
-            watermark: DateTime<Utc>,
-        ) -> Result<PullResult, SetWatermarkError>;
-    }
-}
 
 #[test_log::test(tokio::test)]
-async fn test_create_task() {
+async fn test_creates_task() {
     let event_store = Arc::new(TaskEventStoreInMemory::new());
-    let task_sched = TaskSchedulerInMemory::new(event_store, Arc::new(MockPullService::new()));
+    let task_sched = TaskSchedulerInMemory::new(event_store);
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
@@ -78,4 +35,49 @@ async fn test_create_task() {
         cancellation_requested_at: None,
         finished_at: None,
     } if logical_plan == logical_plan_expected);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_queues_tasks() {
+    let event_store = Arc::new(TaskEventStoreInMemory::new());
+    let task_sched = TaskSchedulerInMemory::new(event_store);
+
+    let task_id_1 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
+
+    let task_id_2 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
+
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_1));
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
+    assert_eq!(task_sched.try_take().await.unwrap(), None);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_task_cancellation() {
+    let event_store = Arc::new(TaskEventStoreInMemory::new());
+    let task_sched = TaskSchedulerInMemory::new(event_store);
+
+    let task_id_1 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
+
+    let task_id_2 = task_sched
+        .create_task(Probe { ..Probe::default() }.into())
+        .await
+        .unwrap()
+        .task_id;
+
+    task_sched.cancel_task(&task_id_1).await.unwrap();
+
+    assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
+    assert_eq!(task_sched.try_take().await.unwrap(), None);
 }

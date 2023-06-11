@@ -20,6 +20,7 @@ mockall::mock! {
         fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskStateStream<'a>;
         async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
         async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError>;
+        async fn take(&self) -> Result<TaskID, TakeTaskError>;
     }
 }
 
