@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use enum_variants::*;
 
 use crate::entities::*;
@@ -181,8 +181,35 @@ impl AsRef<TaskState> for Task {
 }
 
 impl Into<TaskState> for Task {
-    fn into(self) -> TaskState {
+    fn into(mut self) -> TaskState {
         assert!(self.pending_events.is_empty());
-        self.state
+        // Have to replace with dummy state because we implement Drop
+        let task_id = self.state.task_id;
+        let state = std::mem::replace(
+            &mut self.state,
+            TaskState {
+                task_id,
+                status: TaskStatus::Queued,
+                cancellation_requested: false,
+                logical_plan: LogicalPlan::Probe(Probe::default()),
+                created_at: DateTime::<Utc>::MIN_UTC,
+                ran_at: None,
+                cancellation_requested_at: None,
+                finished_at: None,
+            },
+        );
+        state
+    }
+}
+
+impl Drop for Task {
+    fn drop(&mut self) {
+        if !self.pending_events.is_empty() {
+            tracing::error!(
+                task_id = %self.state.task_id,
+                pending_events = ?self.pending_events,
+                "Task is dropped with unsaved events",
+            )
+        }
     }
 }

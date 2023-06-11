@@ -15,15 +15,19 @@ use super::errors::*;
 
 /// Common set of operations for an event-sourced aggregate
 #[async_trait::async_trait]
+#[allow(drop_bounds)]
 pub trait Aggregate
 where
     Self: Sized,
-    // Access state directly through aggregate
+    // Aggregate state should be directly accessible
     Self: std::ops::Deref<Target = Self::State>,
-    // Pass aggregate into functions that expect state
+    // Aggregate can be passed into functions that expect state
     Self: AsRef<Self::State>,
-    // Convert aggregate into state (should panic if there are pending events)
+    // Aggregate should be convertable into the state (must panic if there are pending events)
     Self: Into<Self::State>,
+    // Aggregates should should not be dropped without saving pending events (must log an error
+    // otherwise)
+    Self: Drop,
     Self::Id: std::fmt::Debug,
     Self::Event: std::fmt::Debug,
     Self::State: std::fmt::Debug,
