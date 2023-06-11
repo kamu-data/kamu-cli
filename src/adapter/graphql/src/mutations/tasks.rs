@@ -22,6 +22,13 @@ pub struct TasksMutations;
 
 #[Object]
 impl TasksMutations {
+    /// Requests cancellation of the specified task
+    async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
+        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
+        let task_state = task_svc.cancel_task(&task_id.into()).await?;
+        Ok(Task::new(task_state))
+    }
+
     /// Schedules a task to update the specified dataset by performing polling
     /// ingest or a derivative transformation
     async fn crate_update_dataset_task(

@@ -44,6 +44,15 @@ impl Task {
         })
     }
 
+    /// Task is queued or running and cancellation was not already requested
+    pub fn can_cancel(&mut self) -> bool {
+        match self.status {
+            TaskStatus::Queued if !self.cancellation_requested => true,
+            TaskStatus::Running if !self.cancellation_requested => true,
+            _ => false,
+        }
+    }
+
     /// Set cancellation flag (if not already set)
     pub fn cancel(&mut self) -> Result<(), IllegalSequenceError<Self>> {
         if self.cancellation_requested {

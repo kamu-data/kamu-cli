@@ -836,6 +836,10 @@ type Tasks {
 
 type TasksMutations {
 	"""
+	Requests cancellation of the specified task
+	"""
+	cancelTask(taskId: TaskID!): Task!
+	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""

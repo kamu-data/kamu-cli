@@ -142,11 +142,23 @@ impl TaskService for TaskServiceInMemory {
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
     async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError> {
-        match self.event_store.load(task_id).await {
-            Ok(task) => Ok(task.into()),
-            Err(LoadError::NotFound(_)) => Err(TaskNotFoundError { task_id: *task_id }.into()),
-            Err(err) => Err(err.int_err().into()),
+        let task = self.event_store.load(task_id).await?;
+        Ok(task.into())
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
+    async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError> {
+        let mut task = self.event_store.load(task_id).await?;
+
+        if task.can_cancel() {
+            task.cancel().int_err()?;
+            self.event_store.save(&mut task).await.int_err()?;
+
+            let mut state = self.state.lock().unwrap();
+            state.task_queue.retain(|task_id| *task_id != task.task_id);
         }
+
+        Ok(task.into())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
