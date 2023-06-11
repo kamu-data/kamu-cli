@@ -24,7 +24,7 @@ skip_docker_tests = []
 [dependencies]
 async-trait = "0.1"
 cfg-if = "1"
-dill = "0.6"
+dill = "0.5"
 libc = "0.2"
 rand = "0.8"
 regex = "1"
