@@ -30,7 +30,7 @@ jobs:
           tar -xf kamu-web-ui-any.tar.gz
       - name: Build
         run: |
-          KAMU_WEB_UI_DIR=`pwd`/kamu-web-ui-any \
+          KAMU_WEB_UI_DIR=../../kamu-web-ui-any \
           cross build \
             -p kamu-cli \
             --release \
@@ -59,7 +59,7 @@ jobs:
           tar -xf kamu-web-ui-any.tar.gz
       - name: Build
         run: |
-          KAMU_WEB_UI_DIR=`pwd`/kamu-web-ui-any \
+          KAMU_WEB_UI_DIR=../../kamu-web-ui-any \
           cargo build \
             -p kamu-cli \
             --release \
