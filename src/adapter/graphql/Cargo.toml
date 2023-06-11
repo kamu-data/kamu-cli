@@ -30,7 +30,7 @@ kamu-task-system = { workspace = true }
 async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
 chrono = "0.4"
 datafusion = "25"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-dill = "0.5"
+dill = "0.6"
 futures = "0.3"
 indoc = "2"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }  # TODO: Remove from this crate (needed by GitHub auth)
