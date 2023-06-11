@@ -9,4 +9,4 @@
 
 mod test_event_store_inmem;
 mod test_task_aggregate;
-mod test_task_service_inmem;
+mod test_task_scheduler_inmem;

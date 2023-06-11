@@ -24,8 +24,8 @@ pub struct TasksMutations;
 impl TasksMutations {
     /// Requests cancellation of the specified task
     async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
-        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
-        let task_state = task_svc.cancel_task(&task_id.into()).await?;
+        let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
+        let task_state = task_sched.cancel_task(&task_id.into()).await?;
         Ok(Task::new(task_state))
     }
 
@@ -36,8 +36,8 @@ impl TasksMutations {
         ctx: &Context<'_>,
         dataset_id: DatasetID,
     ) -> Result<Task> {
-        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
-        let task_state = task_svc
+        let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
+        let task_state = task_sched
             .create_task(ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
                 dataset_id: dataset_id.into(),
             }))
@@ -54,8 +54,8 @@ impl TasksMutations {
         busy_time_ms: Option<u64>,
         end_with_outcome: Option<TaskOutcome>,
     ) -> Result<Task> {
-        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
-        let task_state = task_svc
+        let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
+        let task_state = task_sched
             .create_task(ts::LogicalPlan::Probe(ts::Probe {
                 dataset_id: dataset_id.map(Into::into),
                 busy_time: busy_time_ms.map(|millis| std::time::Duration::from_millis(millis)),

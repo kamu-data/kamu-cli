@@ -16,7 +16,7 @@ use kamu_core::{PullOptions, PullService};
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
-pub struct TaskServiceInMemory {
+pub struct TaskSchedulerInMemory {
     state: Arc<Mutex<State>>,
 
     event_store: Arc<dyn TaskEventStore>,
@@ -31,7 +31,7 @@ struct State {
 
 #[component(pub)]
 #[scope(Singleton)]
-impl TaskServiceInMemory {
+impl TaskSchedulerInMemory {
     pub fn new(event_store: Arc<dyn TaskEventStore>, pull_svc: Arc<dyn PullService>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -109,7 +109,7 @@ impl TaskServiceInMemory {
 }
 
 #[async_trait::async_trait]
-impl TaskService for TaskServiceInMemory {
+impl TaskScheduler for TaskSchedulerInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
         let mut task = Task::new(self.event_store.new_task_id(), logical_plan);

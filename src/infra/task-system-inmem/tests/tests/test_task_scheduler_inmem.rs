@@ -59,11 +59,11 @@ mockall::mock! {
 #[test_log::test(tokio::test)]
 async fn test_create_task() {
     let event_store = Arc::new(TaskEventStoreInMemory::new());
-    let task_svc = TaskServiceInMemory::new(event_store, Arc::new(MockPullService::new()));
+    let task_sched = TaskSchedulerInMemory::new(event_store, Arc::new(MockPullService::new()));
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
-    let task_state_actual = task_svc
+    let task_state_actual = task_sched
         .create_task(logical_plan_expected.clone())
         .await
         .unwrap();

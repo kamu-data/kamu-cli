@@ -13,9 +13,9 @@ use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
 mockall::mock! {
-    TaskService {}
+    TaskScheduler {}
     #[async_trait::async_trait]
-    impl TaskService for TaskService {
+    impl TaskScheduler for TaskScheduler {
         async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError>;
         fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskStateStream<'a>;
         async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
@@ -25,16 +25,16 @@ mockall::mock! {
 
 #[test_log::test(tokio::test)]
 async fn test_task_get_non_existing() {
-    let mut task_svc_mock = MockTaskService::new();
-    task_svc_mock.expect_get_task().return_once(|_| {
+    let mut task_sched_mock = MockTaskScheduler::new();
+    task_sched_mock.expect_get_task().return_once(|_| {
         Err(GetTaskError::NotFound(TaskNotFoundError {
             task_id: TaskID::new(1),
         }))
     });
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(task_svc_mock)
-        .bind::<dyn TaskService, MockTaskService>()
+        .add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -76,15 +76,15 @@ async fn test_task_get_existing() {
     };
     let expected_task = returned_task.clone();
 
-    let mut task_svc_mock = MockTaskService::new();
-    task_svc_mock
+    let mut task_sched_mock = MockTaskScheduler::new();
+    task_sched_mock
         .expect_get_task()
         .with(mockall::predicate::eq(expected_task.task_id))
         .return_once(move |_| Ok(returned_task));
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(task_svc_mock)
-        .bind::<dyn TaskService, MockTaskService>()
+        .add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -137,14 +137,14 @@ async fn test_task_list_by_dataset() {
     };
     let expected_task = returned_task.clone();
 
-    let mut task_svc_mock = MockTaskService::new();
-    task_svc_mock
+    let mut task_sched_mock = MockTaskScheduler::new();
+    task_sched_mock
         .expect_list_tasks_by_dataset()
         .return_once(move |_| Box::pin(futures::stream::iter([Ok(returned_task)].into_iter())));
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(task_svc_mock)
-        .bind::<dyn TaskService, MockTaskService>()
+        .add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -212,15 +212,15 @@ async fn test_task_crate_update_dataset() {
     };
     let expected_task = returned_task.clone();
 
-    let mut task_svc_mock = MockTaskService::new();
-    task_svc_mock
+    let mut task_sched_mock = MockTaskScheduler::new();
+    task_sched_mock
         .expect_create_task()
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(task_svc_mock)
-        .bind::<dyn TaskService, MockTaskService>()
+        .add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);
@@ -270,15 +270,15 @@ async fn test_task_crate_probe() {
     };
     let expected_task = returned_task.clone();
 
-    let mut task_svc_mock = MockTaskService::new();
-    task_svc_mock
+    let mut task_sched_mock = MockTaskScheduler::new();
+    task_sched_mock
         .expect_create_task()
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(task_svc_mock)
-        .bind::<dyn TaskService, MockTaskService>()
+        .add_value(task_sched_mock)
+        .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
     let schema = kamu_adapter_graphql::schema(cat);

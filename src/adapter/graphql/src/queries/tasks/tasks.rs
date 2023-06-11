@@ -27,8 +27,8 @@ impl Tasks {
 
     /// Returns current state of a given task
     async fn get_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Option<Task>> {
-        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
-        match task_svc.get_task(&task_id).await {
+        let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
+        match task_sched.get_task(&task_id).await {
             Ok(task_state) => Ok(Some(Task::new(task_state))),
             Err(ts::GetTaskError::NotFound(_)) => Ok(None),
             Err(err) => Err(err.into()),
@@ -44,12 +44,12 @@ impl Tasks {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<TaskConnection> {
-        let task_svc = from_catalog::<dyn ts::TaskService>(ctx).unwrap();
+        let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let mut nodes: Vec<_> = task_svc
+        let mut nodes: Vec<_> = task_sched
             .list_tasks_by_dataset(&dataset_id)
             .skip(page * per_page)
             .take(per_page + 1) // Take one extra to see if next page exists

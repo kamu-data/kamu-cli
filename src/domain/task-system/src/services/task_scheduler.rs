@@ -16,7 +16,7 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskService: Sync + Send {
+pub trait TaskScheduler: Sync + Send {
     /// Creates a new task from provided logical plan
     async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
 

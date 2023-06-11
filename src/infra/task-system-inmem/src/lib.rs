@@ -14,7 +14,7 @@
 pub use kamu_task_system as domain;
 
 mod task_event_store_inmem;
-mod task_service_inmem;
+mod task_scheduler_inmem;
 
 pub use task_event_store_inmem::*;
-pub use task_service_inmem::*;
+pub use task_scheduler_inmem::*;
