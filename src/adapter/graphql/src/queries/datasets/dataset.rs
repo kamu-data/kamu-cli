@@ -53,6 +53,7 @@ impl Dataset {
     }
 
     /// Unique identifier of the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn id(&self) -> DatasetID {
         self.dataset_handle.id.clone().into()
     }
@@ -60,16 +61,19 @@ impl Dataset {
     /// Symbolic name of the dataset.
     /// Name can change over the dataset's lifetime. For unique identifier use
     /// `id()`.
+    #[tracing::instrument(level = "info", skip_all)]
     async fn name(&self) -> DatasetName {
         self.dataset_handle.alias.dataset_name.clone().into()
     }
 
     /// Returns the user or organization that owns this dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn owner(&self) -> &Account {
         &self.account
     }
 
     /// Returns the kind of a dataset (Root or Derivative)
+    #[tracing::instrument(level = "info", skip_all)]
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
@@ -79,17 +83,20 @@ impl Dataset {
     }
 
     /// Access to the data of the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn data(&self) -> DatasetData {
         DatasetData::new(self.dataset_handle.clone())
     }
 
     /// Access to the metadata of the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn metadata(&self) -> DatasetMetadata {
         DatasetMetadata::new(self.dataset_handle.clone())
     }
 
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
+    #[tracing::instrument(level = "info", skip_all)]
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
         let seed = dataset
@@ -103,6 +110,7 @@ impl Dataset {
     }
 
     /// Creation time of the most recent metadata block in the chain
+    #[tracing::instrument(level = "info", skip_all)]
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
         let head = dataset
