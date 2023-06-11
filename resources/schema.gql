@@ -732,7 +732,7 @@ type Task {
 	"""
 	Unique and stable identitfier of this task
 	"""
-	id: TaskID!
+	taskId: TaskID!
 	"""
 	Life-cycle status of a task
 	"""

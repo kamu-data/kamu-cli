@@ -50,7 +50,7 @@ impl Task {
     }
 
     /// Unique and stable identitfier of this task
-    pub async fn id(&self) -> &TaskID {
+    pub async fn task_id(&self) -> &TaskID {
         &self.task_id
     }
 

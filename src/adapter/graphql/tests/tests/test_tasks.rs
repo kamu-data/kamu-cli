@@ -41,7 +41,7 @@ async fn test_task_get_non_existing() {
             r#"{
                 tasks {
                     getTask (taskId: "123") {
-                        id
+                        taskId
                     }
                 }
             }"#,
@@ -87,7 +87,7 @@ async fn test_task_get_existing() {
             r#"{{
                 tasks {{
                     getTask (taskId: "{}") {{
-                        id
+                        taskId
                         status
                         cancellationRequested
                         outcome
@@ -103,7 +103,7 @@ async fn test_task_get_existing() {
         value!({
             "tasks": {
                 "getTask": {
-                    "id": expected_task.task_id.to_string(),
+                    "taskId": expected_task.task_id.to_string(),
                     "cancellationRequested": false,
                     "status": "FINISHED",
                     "outcome": "SUCCESS",
@@ -144,7 +144,7 @@ async fn test_task_list_by_dataset() {
                 tasks {{
                     listTasksByDataset (datasetId: "{}") {{
                         nodes {{
-                            id
+                            taskId
                             status
                             outcome
                         }}
@@ -167,7 +167,7 @@ async fn test_task_list_by_dataset() {
             "tasks": {
                 "listTasksByDataset": {
                     "nodes": [{
-                        "id": expected_task.task_id.to_string(),
+                        "taskId": expected_task.task_id.to_string(),
                         "status": "QUEUED",
                         "outcome": null,
                     }],
@@ -215,7 +215,7 @@ async fn test_task_crate_update_dataset() {
             r#"mutation {{
                 tasks {{
                     crateUpdateDatasetTask (datasetId: "{}") {{
-                        id
+                        taskId
                     }}
                 }}
             }}"#,
@@ -228,7 +228,7 @@ async fn test_task_crate_update_dataset() {
         value!({
             "tasks": {
                 "crateUpdateDatasetTask": {
-                    "id": expected_task.task_id.to_string(),
+                    "taskId": expected_task.task_id.to_string(),
                 },
             },
         })
@@ -269,7 +269,7 @@ async fn test_task_crate_probe() {
             r#"mutation {{
                 tasks {{
                     crateProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
-                        id
+                        taskId
                     }}
                 }}
             }}"#,
@@ -282,7 +282,7 @@ async fn test_task_crate_probe() {
         value!({
             "tasks": {
                 "crateProbeTask": {
-                    "id": expected_task.task_id.to_string(),
+                    "taskId": expected_task.task_id.to_string(),
                 },
             },
         })
