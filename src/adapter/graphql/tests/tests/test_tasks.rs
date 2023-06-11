@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use chrono::Utc;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
@@ -67,6 +68,10 @@ async fn test_task_get_existing() {
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::from_pub_key_ed25519(b"foo"),
         }),
+        created_at: Utc::now(),
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
     };
     let expected_task = returned_task.clone();
 
@@ -124,6 +129,10 @@ async fn test_task_list_by_dataset() {
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: dataset_id.clone(),
         }),
+        created_at: Utc::now(),
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
     };
     let expected_task = returned_task.clone();
 
@@ -195,6 +204,10 @@ async fn test_task_crate_update_dataset() {
         status: TaskStatus::Queued,
         cancellation_requested: false,
         logical_plan: expected_logical_plan.clone(),
+        created_at: Utc::now(),
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
     };
     let expected_task = returned_task.clone();
 
@@ -249,6 +262,10 @@ async fn test_task_crate_probe() {
         status: TaskStatus::Queued,
         cancellation_requested: false,
         logical_plan: expected_logical_plan.clone(),
+        created_at: Utc::now(),
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
     };
     let expected_task = returned_task.clone();
 

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::Utc;
 use enum_variants::*;
 
 use crate::entities::*;
@@ -25,24 +26,20 @@ pub struct Task {
 impl Task {
     pub fn new(task_id: TaskID, logical_plan: LogicalPlan) -> Self {
         let genesis = TaskCreated {
+            event_time: Utc::now(),
             task_id,
             logical_plan,
         };
 
-        Self {
-            state: TaskState {
-                task_id,
-                status: TaskStatus::Queued,
-                cancellation_requested: false,
-                logical_plan: genesis.logical_plan.clone(),
-            },
-            pending_events: vec![genesis.into()],
-        }
+        let mut this = Self::from_genesis_event(genesis.clone().into()).unwrap();
+        this.pending_events.push(genesis.into());
+        this
     }
 
     /// Transition task to a `Running` state
     pub fn run(&mut self) -> Result<(), IllegalSequenceError<Self>> {
         self.apply(TaskRunning {
+            event_time: Utc::now(),
             task_id: self.task_id,
         })
     }
@@ -54,6 +51,7 @@ impl Task {
         }
 
         self.apply(TaskCancelled {
+            event_time: Utc::now(),
             task_id: self.task_id,
         })
     }
@@ -61,6 +59,7 @@ impl Task {
     /// Transition task to a `Finished` state with the specified outcome
     pub fn finish(&mut self, outcome: TaskOutcome) -> Result<(), IllegalSequenceError<Self>> {
         self.apply(TaskFinished {
+            event_time: Utc::now(),
             task_id: self.task_id,
             outcome,
         })
@@ -88,6 +87,7 @@ impl Aggregate for Task {
         }
 
         let TaskCreated {
+            event_time,
             task_id,
             logical_plan,
         } = event.into_variant().unwrap();
@@ -97,6 +97,10 @@ impl Aggregate for Task {
             status: TaskStatus::Queued,
             cancellation_requested: false,
             logical_plan,
+            created_at: event_time,
+            ran_at: None,
+            cancellation_requested_at: None,
+            finished_at: None,
         }))
     }
 
@@ -121,17 +125,27 @@ impl Aggregate for Task {
         // Apply transition
         match event {
             TaskEvent::Created(_) => unreachable!(),
-            TaskEvent::Running(TaskRunning { task_id: _ }) => {
+            TaskEvent::Running(TaskRunning {
+                event_time,
+                task_id: _,
+            }) => {
                 self.state.status = TaskStatus::Running;
+                self.state.ran_at = Some(event_time);
             }
-            TaskEvent::Cancelled(TaskCancelled { task_id: _ }) => {
+            TaskEvent::Cancelled(TaskCancelled {
+                event_time,
+                task_id: _,
+            }) => {
                 self.state.cancellation_requested = true;
+                self.state.cancellation_requested_at = Some(event_time);
             }
             TaskEvent::Finished(TaskFinished {
+                event_time,
                 task_id: _,
                 outcome,
             }) => {
                 self.state.status = TaskStatus::Finished(outcome);
+                self.state.finished_at = Some(event_time);
             }
         }
         Ok(())

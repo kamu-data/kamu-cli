@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-
+use chrono::Utc;
 use futures::TryStreamExt;
 use kamu_task_system_inmem::domain::*;
 use kamu_task_system_inmem::*;
@@ -42,6 +41,7 @@ async fn test_event_store_get_streams() {
     let task_id = TaskID::new(123);
     let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
     let event_expected = TaskCreated {
+        event_time: Utc::now(),
         task_id,
         logical_plan: Probe {
             dataset_id: Some(dataset_id.clone()),
@@ -61,15 +61,7 @@ async fn test_event_store_get_streams() {
         .await
         .unwrap();
 
-    assert_matches!(
-        &events[..],
-        [
-            TaskEvent::Created(TaskCreated {
-                task_id,
-                logical_plan,
-            })
-        ] if *task_id == event_expected.task_id && *logical_plan == event_expected.logical_plan
-    );
+    assert_eq!(&events[..], [event_expected.into()]);
 
     let tasks: Vec<_> = event_store
         .get_tasks_by_dataset(&dataset_id)

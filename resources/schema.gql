@@ -738,7 +738,7 @@ type Task {
 	"""
 	status: TaskStatus!
 	"""
-	Task was ordered to cancel
+	Whether the task was ordered to be cancelled
 	"""
 	cancellationRequested: Boolean!
 	"""
@@ -746,6 +746,22 @@ type Task {
 	"finished" status
 	"""
 	outcome: TaskOutcome
+	"""
+	Time when task was originally created and placed in a queue
+	"""
+	createdAt: DateTime!
+	"""
+	Time when task transitioned into a running state
+	"""
+	ranAt: DateTime
+	"""
+	Time when cancellation of task was requested
+	"""
+	cancellationRequestedAt: DateTime
+	"""
+	Time when task has reached a final outcome
+	"""
+	finishedAt: DateTime
 }
 
 type TaskConnection {

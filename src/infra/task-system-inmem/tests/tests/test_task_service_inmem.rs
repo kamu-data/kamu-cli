@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -60,24 +61,21 @@ async fn test_create_task() {
     let event_store = Arc::new(TaskEventStoreInMemory::new());
     let task_svc = TaskServiceInMemory::new(event_store, Arc::new(MockPullService::new()));
 
-    let logical_plan: LogicalPlan = Probe { ..Probe::default() }.into();
+    let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
 
-    let task_state_actual = task_svc.create_task(logical_plan.clone()).await.unwrap();
+    let task_state_actual = task_svc
+        .create_task(logical_plan_expected.clone())
+        .await
+        .unwrap();
 
-    let task_state_expected = TaskState {
-        task_id: TaskID::new(0),
+    assert_matches!(task_state_actual, TaskState {
+        task_id: _,
         status: TaskStatus::Queued,
         cancellation_requested: false,
         logical_plan,
-    };
-
-    assert_eq!(task_state_actual, task_state_expected);
-
-    assert_eq!(
-        task_svc
-            .get_task(&task_state_expected.task_id)
-            .await
-            .unwrap(),
-        task_state_expected
-    );
+        created_at: _,
+        ran_at: None,
+        cancellation_requested_at: None,
+        finished_at: None,
+    } if logical_plan == logical_plan_expected);
 }

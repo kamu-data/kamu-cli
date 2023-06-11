@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use enum_variants::*;
 
 use super::*;
@@ -31,6 +32,7 @@ pub enum TaskEvent {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskCreated {
+    pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
     pub logical_plan: LogicalPlan,
 }
@@ -39,6 +41,7 @@ pub struct TaskCreated {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskRunning {
+    pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
 }
 
@@ -46,6 +49,7 @@ pub struct TaskRunning {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskCancelled {
+    pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
 }
 
@@ -53,6 +57,7 @@ pub struct TaskCancelled {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskFinished {
+    pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
     pub outcome: TaskOutcome,
 }
@@ -66,6 +71,15 @@ impl TaskEvent {
             TaskEvent::Running(e) => e.task_id,
             TaskEvent::Cancelled(e) => e.task_id,
             TaskEvent::Finished(e) => e.task_id,
+        }
+    }
+
+    pub fn event_time(&self) -> &DateTime<Utc> {
+        match self {
+            TaskEvent::Created(e) => &e.event_time,
+            TaskEvent::Running(e) => &e.event_time,
+            TaskEvent::Cancelled(e) => &e.event_time,
+            TaskEvent::Finished(e) => &e.event_time,
         }
     }
 }
