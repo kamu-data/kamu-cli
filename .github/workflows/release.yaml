@@ -29,12 +29,12 @@ jobs:
           wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
           tar -xf kamu-web-ui-any.tar.gz
       - name: Build
-        run: |
-          KAMU_WEB_UI_DIR=../../kamu-web-ui-any \
-          cross build \
-            -p kamu-cli \
-            --release \
-            --target=${{ matrix.target }} \
+        run: >
+          KAMU_WEB_UI_DIR=../../kamu-web-ui-any
+          cross build
+            -p kamu-cli
+            --release
+            --target=${{ matrix.target }}
             --features ftp,web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
@@ -58,12 +58,12 @@ jobs:
           wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
           tar -xf kamu-web-ui-any.tar.gz
       - name: Build
-        run: |
-          KAMU_WEB_UI_DIR=../../kamu-web-ui-any \
-          cargo build \
-            -p kamu-cli \
-            --release \
-            --target=${{ matrix.target }} \
+        run: >
+          KAMU_WEB_UI_DIR=../../kamu-web-ui-any
+          cargo build
+            -p kamu-cli
+            --release
+            --target=${{ matrix.target }}
             --features ftp,web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
@@ -83,11 +83,11 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
       - name: Build
-        run: |
-          cargo build \
-            -p kamu-cli \
-            --release \
-            --target=${{ matrix.target }} \
+        run: >
+          cargo build 
+            -p kamu-cli 
+            --release 
+            --target=${{ matrix.target }}
             --features ftp
       - name: Rename binary
         shell: bash
