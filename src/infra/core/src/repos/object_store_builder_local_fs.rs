@@ -31,6 +31,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderLocalFs {
         Url::parse("file://").unwrap()
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         Ok(Arc::new(object_store::local::LocalFileSystem::new()))
     }

@@ -113,6 +113,7 @@ impl QueryServiceImpl {
 
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref, num_records))]
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
@@ -210,6 +211,7 @@ impl QueryService for QueryServiceImpl {
         Ok(ctx.sql(statement).await?)
     }
 
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
         let ctx = self
             .session_context(QueryOptions::default())

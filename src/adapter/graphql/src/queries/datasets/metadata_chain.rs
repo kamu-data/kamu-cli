@@ -53,6 +53,7 @@ impl MetadataChain {
     }
 
     /// Returns all named metadata block references
+    #[tracing::instrument(level = "info", skip_all)]
     async fn refs(&self, ctx: &Context<'_>) -> Result<Vec<BlockRef>> {
         let dataset = self.get_dataset(ctx).await?;
         Ok(vec![BlockRef {
@@ -66,6 +67,7 @@ impl MetadataChain {
     }
 
     /// Returns a metadata block corresponding to the specified hash
+    #[tracing::instrument(level = "info", skip_all)]
     async fn block_by_hash(
         &self,
         ctx: &Context<'_>,
@@ -78,6 +80,7 @@ impl MetadataChain {
 
     /// Returns a metadata block corresponding to the specified hash and encoded
     /// in desired format
+    #[tracing::instrument(level = "info", skip_all)]
     async fn block_by_hash_encoded(
         &self,
         ctx: &Context<'_>,
@@ -104,6 +107,7 @@ impl MetadataChain {
     // TODO: Support before/after style iteration
     // TODO: PERF: Avoid traversing entire chain
     /// Iterates all metadata blocks in the reverse chronological order
+    #[tracing::instrument(level = "info", skip_all)]
     async fn blocks(
         &self,
         ctx: &Context<'_>,
@@ -139,6 +143,7 @@ impl MetadataChain {
     }
 
     /// Commits new event to the metadata chain
+    #[tracing::instrument(level = "info", skip_all)]
     async fn commit_event(
         &self,
         ctx: &Context<'_>,

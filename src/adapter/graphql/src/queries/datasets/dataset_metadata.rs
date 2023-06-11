@@ -54,11 +54,13 @@ impl DatasetMetadata {
     }
 
     /// Access to the temporal metadata chain of the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn chain(&self) -> MetadataChain {
         MetadataChain::new(self.dataset_handle.clone())
     }
 
     /// Last recorded watermark
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
         let ds = self.get_dataset(ctx).await?;
         Ok(ds
@@ -71,6 +73,7 @@ impl DatasetMetadata {
     }
 
     /// Latest data schema
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_schema(
         &self,
         ctx: &Context<'_>,
@@ -90,6 +93,7 @@ impl DatasetMetadata {
     }
 
     /// Current upstream dependencies of a dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
@@ -114,6 +118,7 @@ impl DatasetMetadata {
 
     // TODO: Convert to collection
     /// Current downstream dependencies of a dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
@@ -127,6 +132,7 @@ impl DatasetMetadata {
     }
 
     /// Current source used by the root dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
         Ok(self
             .get_last_block_of_type::<odf::SetPollingSource>(ctx)
@@ -135,6 +141,7 @@ impl DatasetMetadata {
     }
 
     /// Current transformation used by the derivative dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
         Ok(self
             .get_last_block_of_type::<odf::SetTransform>(ctx)
@@ -143,6 +150,7 @@ impl DatasetMetadata {
     }
 
     /// Current descriptive information about the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
         Ok(self
             .get_last_block_of_type::<odf::SetInfo>(ctx)
@@ -156,6 +164,7 @@ impl DatasetMetadata {
 
     /// Current readme file as discovered from attachments associated with the
     /// dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
         if let Some(attachments) = self
             .get_last_block_of_type::<odf::SetAttachments>(ctx)
@@ -175,6 +184,7 @@ impl DatasetMetadata {
     }
 
     /// Current license associated with the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
         Ok(self
             .get_last_block_of_type::<odf::SetLicense>(ctx)
@@ -183,6 +193,7 @@ impl DatasetMetadata {
     }
 
     /// Current vocabulary associated with the dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
         Ok(self
             .get_last_block_of_type::<odf::SetVocab>(ctx)

@@ -25,6 +25,7 @@ impl Datasets {
     const DEFAULT_PER_PAGE: usize = 15;
 
     /// Returns dataset by its ID
+    #[tracing::instrument(level = "info", skip_all)]
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = local_repo
@@ -36,6 +37,7 @@ impl Datasets {
     // TODO: Multitenancy
     /// Returns dataset by its owner and name
     #[allow(unused_variables)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn by_owner_and_name(
         &self,
         ctx: &Context<'_>,
@@ -84,6 +86,7 @@ impl Datasets {
 
     /// Returns datasets belonging to the specified account
     #[allow(unused_variables)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,
@@ -97,6 +100,7 @@ impl Datasets {
 
     /// Returns datasets belonging to the specified account
     #[allow(unused_variables)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn by_account_name(
         &self,
         ctx: &Context<'_>,
@@ -109,6 +113,7 @@ impl Datasets {
     }
 
     /// Creates a new empty dataset
+    #[tracing::instrument(level = "info", skip_all)]
     async fn create_empty(
         &self,
         ctx: &Context<'_>,
@@ -140,6 +145,7 @@ impl Datasets {
     }
 
     /// Creates a new dataset from provided DatasetSnapshot manifest
+    #[tracing::instrument(level = "info", skip_all)]
     async fn create_from_snapshot(
         &self,
         ctx: &Context<'_>,

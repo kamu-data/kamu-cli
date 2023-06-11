@@ -48,6 +48,14 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         Url::parse(format!("s3://{}/", self.s3_context.bucket).as_str()).unwrap()
     }
 
+    #[tracing::instrument(
+        level = "info", skip_all,
+        fields(
+            endpoint=self.s3_context.endpoint,
+            region=self.s3_context.region(),
+            bucket=self.s3_context.bucket,
+        ),
+    )]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         // Endpoint and region are mandatory
         let endpoint = self.s3_context.endpoint.clone().unwrap();
