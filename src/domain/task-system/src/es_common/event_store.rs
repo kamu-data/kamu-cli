@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 
 use super::errors::*;
-use crate::{Aggregate, AggregateExt, EventID};
+use crate::{Aggregate, EventID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,22 +55,52 @@ pub trait EventStoreExt: EventStore {
     }
 
     /// Same as [EventStore::load()] but with extra control knobs
+    #[tracing::instrument(
+        level = "debug",
+        name = "load",
+        skip_all,
+        fields(
+            agg_type = %std::any::type_name::<Self::Agg>(),
+            agg_id = %id,
+        )
+    )]
     async fn load_ext(
         &self,
         id: &<Self::Agg as Aggregate>::Id,
         opts: LoadOpts,
     ) -> Result<Self::Agg, LoadError<Self::Agg>> {
-        let event_stream = self.get_events(
+        use tokio_stream::StreamExt;
+
+        let mut event_stream = self.get_events(
             id,
             GetEventsOpts {
                 from: None,
                 to: opts.as_of_event,
             },
         );
-        match AggregateExt::from_event_stream(event_stream).await? {
-            Some(agg) => Ok(agg),
-            None => Err(AggrateNotFoundError::new(id.clone()).into()),
+
+        let (event_id, event) = match event_stream.next().await {
+            Some(Ok(v)) => v,
+            Some(Err(err)) => return Err(err.into()),
+            None => return Err(AggrateNotFoundError::new(id.clone()).into()),
+        };
+
+        let mut agg = Self::Agg::from_genesis_event(event_id, event)?;
+        let mut num_events = 1;
+
+        while let Some(res) = event_stream.next().await {
+            let (event_id, event) = res?;
+            agg.mutate(event_id, event)?;
+            num_events += 1;
         }
+
+        tracing::debug!(
+            num_events,
+            last_synced_event = %agg.last_synced_event().unwrap(),
+            "Loaded aggregate",
+        );
+
+        Ok(agg)
     }
 
     /// Updates the state of an aggregate with events that happened since the
@@ -82,27 +112,79 @@ pub trait EventStoreExt: EventStore {
     }
 
     /// Same as [EventStore::update()] but with extra control knobs
+    #[tracing::instrument(
+        level = "debug",
+        name = "update",
+        skip_all,
+        fields(
+            agg_type = %std::any::type_name::<Self::Agg>(),
+            agg_id = %agg.id(),
+        )
+    )]
     async fn update_ext(
         &self,
         agg: &mut Self::Agg,
         opts: LoadOpts,
     ) -> Result<(), UpdateError<Self::Agg>> {
+        use tokio_stream::StreamExt;
+
         assert!(!agg.has_updates());
-        let event_stream = self.get_events(
+
+        let prev_synced_event = agg.last_synced_event().cloned();
+
+        let mut event_stream = self.get_events(
             agg.id(),
             GetEventsOpts {
-                from: agg.last_synced_event().cloned(),
+                from: prev_synced_event,
                 to: opts.as_of_event,
             },
         );
-        agg.mutate_stream(event_stream).await
+
+        let mut num_events = 1;
+
+        while let Some(res) = event_stream.next().await {
+            let (event_id, event) = res?;
+            agg.mutate(event_id, event)?;
+            num_events += 1;
+        }
+
+        tracing::debug!(
+            num_events,
+            prev_synced_event = ?prev_synced_event,
+            last_synced_event = %agg.last_synced_event().unwrap(),
+            "Updated aggregate",
+        );
+
+        Ok(())
     }
 
     /// Persists pending aggregate events
+    #[tracing::instrument(
+        level = "debug",
+        name = "save",
+        skip_all, fields(
+            agg_type = %std::any::type_name::<Self::Agg>(),
+            agg_id = %agg.id(),
+        )
+    )]
     async fn save(&self, agg: &mut Self::Agg) -> Result<(), SaveError> {
         let events = agg.updates();
-        let event_id = self.save_events(events).await?;
-        agg.update_last_synced_event(event_id);
+
+        if events.len() != 0 {
+            let num_events = events.len();
+            let prev_synced_event = agg.last_synced_event().cloned();
+
+            let last_event_id = self.save_events(events).await?;
+            agg.update_last_synced_event(last_event_id);
+
+            tracing::debug!(
+                num_events,
+                prev_synced_event = ?prev_synced_event,
+                last_synced_event = %last_event_id,
+                "Saved aggregate",
+            );
+        }
+
         Ok(())
     }
 }

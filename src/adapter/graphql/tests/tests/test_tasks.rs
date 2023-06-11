@@ -21,6 +21,7 @@ mockall::mock! {
         async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
         async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError>;
         async fn take(&self) -> Result<TaskID, TakeTaskError>;
+        async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError>;
     }
 }
 

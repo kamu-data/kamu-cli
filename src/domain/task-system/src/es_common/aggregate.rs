@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
-
 use super::errors::*;
 use crate::EventID;
 
@@ -29,7 +27,7 @@ where
     // Aggregates should should not be dropped without saving pending events (must log an error
     // otherwise)
     Self: Drop,
-    Self::Id: std::fmt::Debug,
+    Self::Id: std::fmt::Debug + std::fmt::Display,
     Self::Event: std::fmt::Debug,
     Self::State: std::fmt::Debug,
     Self::Id: Clone + Send + Sync,
@@ -75,54 +73,3 @@ where
     /// Called by [crate::EventStore] to update the last synced event ID
     fn update_last_synced_event(&mut self, event_id: EventID);
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-/// Helper functions for aggregates
-#[async_trait::async_trait]
-pub trait AggregateExt: Aggregate {
-    /// Initializes an aggregate from event stream
-    async fn from_event_stream<Stream>(
-        mut event_stream: Stream,
-    ) -> Result<Option<Self>, LoadError<Self>>
-    where
-        Stream: tokio_stream::Stream<Item = Result<(EventID, Self::Event), InternalError>>
-            + Send
-            + Unpin,
-    {
-        use tokio_stream::StreamExt;
-
-        let (event_id, event) = match event_stream.next().await {
-            None => return Ok(None),
-            Some(Ok(v)) => v,
-            Some(Err(err)) => return Err(err.into()),
-        };
-
-        let mut agg = Self::from_genesis_event(event_id, event)?;
-        agg.mutate_stream(event_stream).await?;
-        Ok(Some(agg))
-    }
-
-    /// Initializes an aggregate from event stream
-    async fn mutate_stream<Stream>(
-        &mut self,
-        mut event_stream: Stream,
-    ) -> Result<(), UpdateError<Self>>
-    where
-        Stream: tokio_stream::Stream<Item = Result<(EventID, Self::Event), InternalError>>
-            + Send
-            + Unpin,
-    {
-        use tokio_stream::StreamExt;
-
-        while let Some(res) = event_stream.next().await {
-            let (event_id, event) = res?;
-            self.mutate(event_id, event)?;
-        }
-
-        Ok(())
-    }
-}
-
-// Blanket impl
-impl<T: ?Sized> AggregateExt for T where T: Aggregate {}
