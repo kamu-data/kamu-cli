@@ -236,7 +236,7 @@ impl Command for ListCommand {
         )
         .unwrap();
 
-        writer.write_batches(&[records])?;
+        writer.write_batch(&records)?;
         writer.finish()?;
 
         Ok(())

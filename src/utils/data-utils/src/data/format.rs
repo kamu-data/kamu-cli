@@ -51,12 +51,8 @@ impl<W: Write> RecordsWriter for CsvWriter<W> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl<W: Write> RecordsWriter for JsonArrayWriter<W> {
-    fn write_batch(&mut self, _records: &RecordBatch) -> Result<(), Error> {
-        unimplemented!();
-    }
-
-    fn write_batches(&mut self, record_batches: &[RecordBatch]) -> Result<(), Error> {
-        JsonArrayWriter::write_batches(self, record_batches).unwrap();
+    fn write_batch(&mut self, records: &RecordBatch) -> Result<(), Error> {
+        JsonArrayWriter::write(self, records).unwrap();
         Ok(())
     }
 
@@ -71,12 +67,8 @@ impl<W: Write> RecordsWriter for JsonArrayWriter<W> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl<W: Write> RecordsWriter for JsonLineDelimitedWriter<W> {
-    fn write_batch(&mut self, _records: &RecordBatch) -> Result<(), Error> {
-        unimplemented!();
-    }
-
-    fn write_batches(&mut self, record_batches: &[RecordBatch]) -> Result<(), Error> {
-        JsonLineDelimitedWriter::write_batches(self, record_batches).unwrap();
+    fn write_batch(&mut self, records: &RecordBatch) -> Result<(), Error> {
+        JsonLineDelimitedWriter::write(self, records).unwrap();
         Ok(())
     }
 

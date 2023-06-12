@@ -223,7 +223,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
 
     let mut buf = Vec::new();
     let mut writer = Box::new(JsonArrayWriter::new(&mut buf));
-    writer.write_batches(&record_batches).unwrap();
+    record_batches.iter().for_each(|b| writer.write(b).unwrap());
     writer.finish().unwrap();
 
     let data_content = String::from_utf8(buf).unwrap();

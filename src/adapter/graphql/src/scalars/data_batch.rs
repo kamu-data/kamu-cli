@@ -39,7 +39,7 @@ impl DataBatch {
     }
 
     pub fn from_records(
-        record_batches: &Vec<datafusion::arrow::record_batch::RecordBatch>,
+        record_batches: &[datafusion::arrow::record_batch::RecordBatch],
         format: DataBatchFormat,
     ) -> Result<DataBatch> {
         use kamu_data_utils::data::format::*;

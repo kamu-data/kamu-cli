@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use datafusion::error::DataFusionError;
-use dill::Singleton;
 use kamu_core::*;
 use object_store::ObjectStore;
 use url::Url;
