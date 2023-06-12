@@ -65,16 +65,23 @@ impl QueryServiceImpl {
         Ok(session_context)
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn get_schema_impl(
         &self,
         session_context: &SessionContext,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        tracing::info!(
+            "QS::get_schema_impl: Dataset handle resolved: {}",
+            dataset_handle
+        );
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+        tracing::info!("QS::get_schema_impl: Dataset resolved");
 
         let last_data_slice_opt = dataset
             .as_metadata_chain()
@@ -85,8 +92,12 @@ impl QueryServiceImpl {
             .await
             .int_err()?;
 
+        tracing::info!("QS::get_schema_impl: Last data slice queried");
+
         match last_data_slice_opt {
             Some(last_data_slice) => {
+                tracing::info!("QS::get_schema_impl: Having last data slice");
+
                 // TODO: Avoid boxing url - requires datafusion to fix API
                 let data_url = Box::new(
                     dataset
@@ -95,12 +106,20 @@ impl QueryServiceImpl {
                         .await,
                 );
 
+                tracing::info!("QS::get_schema_impl: data internal URL: {}", data_url);
+
                 let object_store = session_context.runtime_env().object_store(&data_url)?;
+
+                tracing::info!("QS::get_schema_impl: obtained object store");
 
                 let data_path =
                     object_store::path::Path::from_url_path(data_url.path()).int_err()?;
 
+                tracing::info!("QS::get_schema_impl: obtained data path {}", data_path);
+
                 let metadata = read_data_slice_metadata(object_store, &data_path).await?;
+
+                tracing::info!("QS::get_schema_impl: metadata loaded");
 
                 Ok(Some(metadata.file_metadata().schema().clone()))
             }
@@ -113,17 +132,25 @@ impl QueryServiceImpl {
 
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref, num_records))]
+    #[tracing::instrument(
+        level = "info",
+        name = "query_service::tail",
+        skip_all,
+        fields(dataset_ref, num_records)
+    )]
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
         num_records: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        tracing::info!("QS::Tail: Dataset handle resolved: {}", dataset_handle);
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+        tracing::info!("QS::Tail: Dataset resolved");
 
         let vocab = dataset
             .as_metadata_chain()
@@ -135,6 +162,7 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| -> DatasetVocabulary { sv.into() })
             .unwrap_or_default()
             .into_resolved();
+        tracing::info!("QS::Tail: Vocabulary constructed");
 
         let ctx = self
             .session_context(QueryOptions {
@@ -145,6 +173,8 @@ impl QueryService for QueryServiceImpl {
             })
             .map_err(|e| QueryError::Internal(e))?;
 
+        tracing::info!("QS::Tail: Session context constructed");
+
         // TODO: This is a workaround for Arrow not handling timestamps with explicit
         // timezones. We basically have to re-cast all timestamp fields into
         // timestamps after querying. See:
@@ -153,6 +183,9 @@ impl QueryService for QueryServiceImpl {
         let res_schema = self
             .get_schema_impl(&ctx, &dataset_handle.as_local_ref())
             .await?;
+
+        tracing::info!("QS::Tail: Got schema response: {:?}", res_schema);
+
         if let None = res_schema {
             return Err(QueryError::DatasetSchemaNotAvailable(
                 DatasetSchemaNotAvailableError {
@@ -188,6 +221,8 @@ impl QueryService for QueryServiceImpl {
             Type::PrimitiveType { .. } => unreachable!(),
         };
 
+        tracing::info!("QS::Tail: Got schema fields: {:?}", fields);
+
         let query = format!(
             r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
             fields = fields.join(", "),
@@ -196,7 +231,15 @@ impl QueryService for QueryServiceImpl {
             num_records = num_records
         );
 
-        Ok(ctx.sql(&query).await?)
+        tracing::info!("QS::Tail: Executing query: {}", query);
+
+        match ctx.sql(&query).await {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                tracing::error!("QS::Tail: SQL query for tail failed: {:?}", e);
+                Err(QueryError::DataFusionError(e))
+            }
+        }
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(statement))]

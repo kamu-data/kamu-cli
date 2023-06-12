@@ -54,6 +54,11 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
             endpoint=self.s3_context.endpoint,
             region=self.s3_context.region(),
             bucket=self.s3_context.bucket,
+            allow_http=self.allow_http,
+            // TODO: remove AWS credentials from logs after diagnostics
+            aws_access_key_id=self.credentials.access_key_id(),
+            aws_secret_access_key=self.credentials.secret_access_key(),
+            aws_session_id=self.credentials.session_token(),
         ),
     )]
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
@@ -69,7 +74,13 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
             .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
 
-        let object_store = s3_builder.build().int_err()?;
+        let object_store = match s3_builder.build() {
+            Ok(object_store) => Ok(object_store),
+            Err(e) => {
+                tracing::error!("Failed to build S3 object store: {:?}", e);
+                return Err(e.int_err());
+            }
+        }?;
 
         Ok(Arc::new(object_store))
     }
