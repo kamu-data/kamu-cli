@@ -530,16 +530,34 @@ impl SchemaProvider for KamuSchema {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[tracing::instrument(level = "info", skip_all, fields(data_slice_store_path))]
 async fn read_data_slice_metadata(
     object_store: Arc<dyn object_store::ObjectStore>,
     data_slice_store_path: &object_store::path::Path,
 ) -> Result<Arc<ParquetMetaData>, QueryError> {
-    let object_meta = object_store.head(&data_slice_store_path).await.int_err()?;
+    let object_meta = match object_store.head(&data_slice_store_path).await {
+        Ok(object_meta) => Ok(object_meta),
+        Err(e) => {
+            tracing::error!("object store head failed: {:?}", e);
+            Err(e.int_err())
+        }
+    }?;
+
+    tracing::info!("read_data_slice_metadata object_meta obtained");
 
     let mut parquet_object_reader = ParquetObjectReader::new(object_store, object_meta);
 
     use datafusion::parquet::arrow::async_reader::AsyncFileReader;
-    let metadata = parquet_object_reader.get_metadata().await.int_err()?;
+    let metadata = match parquet_object_reader.get_metadata().await {
+        Ok(metadata) => Ok(metadata),
+        Err(e) => {
+            tracing::error!("parquet reader get metadata failed: {:?}", e);
+            Err(e.int_err())
+        }
+    }?;
+
+    tracing::info!("read_data_slice_metadata metadata obtained");
+
     Ok(metadata)
 }
 
