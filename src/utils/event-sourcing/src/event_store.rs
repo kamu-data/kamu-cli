@@ -168,7 +168,7 @@ pub trait EventStoreExt: EventStore {
         )
     )]
     async fn save(&self, agg: &mut Self::Agg) -> Result<(), SaveError> {
-        let events = agg.updates();
+        let events = agg.take_updates();
 
         if events.len() != 0 {
             let num_events = events.len();

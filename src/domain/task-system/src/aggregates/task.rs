@@ -18,7 +18,7 @@ use crate::entities::*;
 #[derive(Debug)]
 pub struct Task {
     state: TaskState,
-    pending_events: Vec<TaskEvent>,
+    pending_events: Vec<TaskSystemEvent>,
     last_synced_event: Option<EventID>,
 }
 
@@ -86,42 +86,45 @@ impl Task {
         })
     }
 
-    fn apply(&mut self, event: impl Into<TaskEvent>) -> Result<(), IllegalSequenceError<Self>> {
+    fn apply(
+        &mut self,
+        event: impl Into<TaskSystemEvent>,
+    ) -> Result<(), IllegalSequenceError<Self>> {
         let event = event.into();
         self.update_state(event.clone())?;
         self.pending_events.push(event);
         Ok(())
     }
 
-    fn update_state(&mut self, event: TaskEvent) -> Result<(), IllegalSequenceError<Self>> {
+    fn update_state(&mut self, event: TaskSystemEvent) -> Result<(), IllegalSequenceError<Self>> {
         assert_eq!(self.state.task_id, event.task_id());
 
         // Check if state transition is legal
         match (self.state.status, &event) {
-            (TaskStatus::Queued, TaskEvent::Running(_)) => {}
-            (TaskStatus::Queued | TaskStatus::Running, TaskEvent::Cancelled(_)) => {}
-            (TaskStatus::Queued | TaskStatus::Running, TaskEvent::Finished(_)) => {}
+            (TaskStatus::Queued, TaskSystemEvent::TaskRunning(_)) => {}
+            (TaskStatus::Queued | TaskStatus::Running, TaskSystemEvent::TaskCancelled(_)) => {}
+            (TaskStatus::Queued | TaskStatus::Running, TaskSystemEvent::TaskFinished(_)) => {}
             (_, _) => return Err(IllegalSequenceError::new(self.state.clone(), event).into()),
         }
 
         // Apply transition
         match event {
-            TaskEvent::Created(_) => unreachable!(),
-            TaskEvent::Running(TaskRunning {
+            TaskSystemEvent::TaskCreated(_) => unreachable!(),
+            TaskSystemEvent::TaskRunning(TaskRunning {
                 event_time,
                 task_id: _,
             }) => {
                 self.state.status = TaskStatus::Running;
                 self.state.ran_at = Some(event_time);
             }
-            TaskEvent::Cancelled(TaskCancelled {
+            TaskSystemEvent::TaskCancelled(TaskCancelled {
                 event_time,
                 task_id: _,
             }) => {
                 self.state.cancellation_requested = true;
                 self.state.cancellation_requested_at = Some(event_time);
             }
-            TaskEvent::Finished(TaskFinished {
+            TaskSystemEvent::TaskFinished(TaskFinished {
                 event_time,
                 task_id: _,
                 outcome,
@@ -139,7 +142,7 @@ impl Task {
 #[async_trait::async_trait]
 impl Aggregate for Task {
     type Id = TaskID;
-    type Event = TaskEvent;
+    type Event = TaskSystemEvent;
     type State = TaskState;
 
     fn id(&self) -> &TaskID {
@@ -148,7 +151,7 @@ impl Aggregate for Task {
 
     fn from_genesis_event(
         event_id: EventID,
-        event: TaskEvent,
+        event: TaskSystemEvent,
     ) -> Result<Self, IllegalGenesisError<Self>> {
         if !event.is_variant::<TaskCreated>() {
             return Err(IllegalGenesisError { event });
@@ -187,7 +190,7 @@ impl Aggregate for Task {
     fn mutate(
         &mut self,
         event_id: EventID,
-        event: TaskEvent,
+        event: TaskSystemEvent,
     ) -> Result<(), IllegalSequenceError<Self>> {
         if let Some(last_synced_event) = self.last_synced_event {
             assert!(
@@ -208,7 +211,7 @@ impl Aggregate for Task {
         !self.pending_events.is_empty()
     }
 
-    fn updates(&mut self) -> Vec<TaskEvent> {
+    fn take_updates(&mut self) -> Vec<TaskSystemEvent> {
         // Extra check to avoid taking a vec with an allocated buffer
         if self.pending_events.is_empty() {
             Vec::new()

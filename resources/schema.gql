@@ -843,12 +843,12 @@ type TasksMutations {
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""
-	crateUpdateDatasetTask(datasetId: DatasetID!): Task!
+	createUpdateDatasetTask(datasetId: DatasetID!): Task!
 	"""
 	Schedules a task to update the specified dataset by performing polling
 	ingest or a derivative transformation
 	"""
-	crateProbeTask(datasetId: DatasetID, busyTimeMs: Int, endWithOutcome: TaskOutcome): Task!
+	createProbeTask(datasetId: DatasetID, busyTimeMs: Int, endWithOutcome: TaskOutcome): Task!
 }
 
 type TemporalTable {

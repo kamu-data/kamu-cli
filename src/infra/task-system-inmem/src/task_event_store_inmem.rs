@@ -20,7 +20,7 @@ pub struct TaskEventStoreInMemory {
 
 #[derive(Default)]
 struct State {
-    events: Vec<TaskEvent>,
+    events: Vec<TaskSystemEvent>,
     tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
     last_task_id: Option<TaskID>,
 }
@@ -49,9 +49,9 @@ impl TaskEventStoreInMemory {
 
     fn update_index_by_dataset(
         tasks_by_dataset: &mut HashMap<DatasetID, Vec<TaskID>>,
-        event: &TaskEvent,
+        event: &TaskSystemEvent,
     ) {
-        if let TaskEvent::Created(e) = &event {
+        if let TaskSystemEvent::TaskCreated(e) = &event {
             if let Some(dataset_id) = e.logical_plan.dataset_id() {
                 let entries = match tasks_by_dataset.entry(dataset_id.clone()) {
                     Entry::Occupied(v) => v.into_mut(),
@@ -75,7 +75,7 @@ impl EventStore for TaskEventStoreInMemory {
         &'a self,
         task_id: &TaskID,
         opts: GetEventsOpts,
-    ) -> EventStream<'a, TaskEvent> {
+    ) -> EventStream<'a, TaskSystemEvent> {
         let task_id = task_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per event
@@ -108,7 +108,7 @@ impl EventStore for TaskEventStoreInMemory {
         })
     }
 
-    async fn save_events(&self, events: Vec<TaskEvent>) -> Result<EventID, SaveError> {
+    async fn save_events(&self, events: Vec<TaskSystemEvent>) -> Result<EventID, SaveError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {

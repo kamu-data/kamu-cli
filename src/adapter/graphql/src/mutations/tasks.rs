@@ -31,7 +31,7 @@ impl TasksMutations {
 
     /// Schedules a task to update the specified dataset by performing polling
     /// ingest or a derivative transformation
-    async fn crate_update_dataset_task(
+    async fn create_update_dataset_task(
         &self,
         ctx: &Context<'_>,
         dataset_id: DatasetID,
@@ -47,7 +47,7 @@ impl TasksMutations {
 
     /// Schedules a task to update the specified dataset by performing polling
     /// ingest or a derivative transformation
-    async fn crate_probe_task(
+    async fn create_probe_task(
         &self,
         ctx: &Context<'_>,
         dataset_id: Option<DatasetID>,

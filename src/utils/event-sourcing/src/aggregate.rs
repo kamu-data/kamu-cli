@@ -64,7 +64,7 @@ where
     fn has_updates(&self) -> bool;
 
     /// Called by [crate::EventStore] to extracts all pending updates
-    fn updates(&mut self) -> Vec<Self::Event>;
+    fn take_updates(&mut self) -> Vec<Self::Event>;
 
     /// Returns the ID corresponding to the last event that reliably stored in
     /// an event store

@@ -16,16 +16,16 @@ use super::*;
 
 /// All events that model life-cycle of a task
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TaskEvent {
+pub enum TaskSystemEvent {
     /// New task entered the queue
-    Created(TaskCreated),
+    TaskCreated(TaskCreated),
     /// Task execution had started
-    Running(TaskRunning),
+    TaskRunning(TaskRunning),
     /// Cancellation of task was requested (this is not immediate and task may
     /// still finish with a different outcome than cancelled)
-    Cancelled(TaskCancelled),
+    TaskCancelled(TaskCancelled),
     /// Task has reached a final outcome
-    Finished(TaskFinished),
+    TaskFinished(TaskFinished),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -64,29 +64,29 @@ pub struct TaskFinished {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl TaskEvent {
+impl TaskSystemEvent {
     pub fn task_id(&self) -> TaskID {
         match self {
-            TaskEvent::Created(e) => e.task_id,
-            TaskEvent::Running(e) => e.task_id,
-            TaskEvent::Cancelled(e) => e.task_id,
-            TaskEvent::Finished(e) => e.task_id,
+            TaskSystemEvent::TaskCreated(e) => e.task_id,
+            TaskSystemEvent::TaskRunning(e) => e.task_id,
+            TaskSystemEvent::TaskCancelled(e) => e.task_id,
+            TaskSystemEvent::TaskFinished(e) => e.task_id,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            TaskEvent::Created(e) => &e.event_time,
-            TaskEvent::Running(e) => &e.event_time,
-            TaskEvent::Cancelled(e) => &e.event_time,
-            TaskEvent::Finished(e) => &e.event_time,
+            TaskSystemEvent::TaskCreated(e) => &e.event_time,
+            TaskSystemEvent::TaskRunning(e) => &e.event_time,
+            TaskSystemEvent::TaskCancelled(e) => &e.event_time,
+            TaskSystemEvent::TaskFinished(e) => &e.event_time,
         }
     }
 }
 
 // TODO: Replace with derive macro
-impl_enum_with_variants!(TaskEvent);
-impl_enum_variant!(TaskEvent::Created(TaskCreated));
-impl_enum_variant!(TaskEvent::Running(TaskRunning));
-impl_enum_variant!(TaskEvent::Cancelled(TaskCancelled));
-impl_enum_variant!(TaskEvent::Finished(TaskFinished));
+impl_enum_with_variants!(TaskSystemEvent);
+impl_enum_variant!(TaskSystemEvent::TaskCreated(TaskCreated));
+impl_enum_variant!(TaskSystemEvent::TaskRunning(TaskRunning));
+impl_enum_variant!(TaskSystemEvent::TaskCancelled(TaskCancelled));
+impl_enum_variant!(TaskSystemEvent::TaskFinished(TaskFinished));

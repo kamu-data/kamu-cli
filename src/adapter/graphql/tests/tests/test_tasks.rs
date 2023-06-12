@@ -196,7 +196,7 @@ async fn test_task_list_by_dataset() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_task_crate_update_dataset() {
+async fn test_task_create_update_dataset() {
     let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
 
     let expected_logical_plan = LogicalPlan::UpdateDataset(UpdateDataset {
@@ -230,7 +230,7 @@ async fn test_task_crate_update_dataset() {
         .execute(format!(
             r#"mutation {{
                 tasks {{
-                    crateUpdateDatasetTask (datasetId: "{}") {{
+                    createUpdateDatasetTask (datasetId: "{}") {{
                         taskId
                     }}
                 }}
@@ -243,7 +243,7 @@ async fn test_task_crate_update_dataset() {
         res.data,
         value!({
             "tasks": {
-                "crateUpdateDatasetTask": {
+                "createUpdateDatasetTask": {
                     "taskId": expected_task.task_id.to_string(),
                 },
             },
@@ -252,7 +252,7 @@ async fn test_task_crate_update_dataset() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_task_crate_probe() {
+async fn test_task_create_probe() {
     let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
 
     let expected_logical_plan = LogicalPlan::Probe(Probe {
@@ -288,7 +288,7 @@ async fn test_task_crate_probe() {
         .execute(format!(
             r#"mutation {{
                 tasks {{
-                    crateProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
+                    createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
                         taskId
                     }}
                 }}
@@ -301,7 +301,7 @@ async fn test_task_crate_probe() {
         res.data,
         value!({
             "tasks": {
-                "crateProbeTask": {
+                "createProbeTask": {
                     "taskId": expected_task.task_id.to_string(),
                 },
             },
