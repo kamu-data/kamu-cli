@@ -444,8 +444,6 @@ dependencies = [
  "static_assertions",
  "tempfile",
  "thiserror",
- "tracing",
- "tracing-futures",
  "url",
 ]
 
@@ -1341,7 +1339,7 @@ checksum = "21a53c0a4d288377e7415b53dcfc3c04da5cdc2cc95c8d5ac178b58f0b861ad6"
 
 [[package]]
 name = "container-runtime"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -2614,7 +2612,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "test-log",
  "thiserror",
@@ -2718,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -2786,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -2813,7 +2811,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-trait",
  "axum",
@@ -2851,7 +2849,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2922,7 +2920,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2947,7 +2945,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "arrow-digest",
  "datafusion",
@@ -2959,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "chrono",
  "clap",
@@ -2973,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2990,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3551,7 +3549,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.128.3"
+version = "0.128.4"
 dependencies = [
  "bs58",
  "byteorder",
@@ -5267,18 +5265,6 @@ checksum = "0955b8137a1df6f1a2e9a37d8a6656291ff0297c1a97c24e0d8425fe2312f79a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "futures",
- "futures-task",
- "pin-project",
- "tracing",
 ]
 
 [[package]]

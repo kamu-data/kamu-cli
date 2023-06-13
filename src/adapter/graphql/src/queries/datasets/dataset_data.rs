@@ -28,7 +28,6 @@ impl DatasetData {
     }
 
     /// Total number of records in this dataset
-    #[tracing::instrument(level = "info", skip_all)]
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
@@ -40,7 +39,6 @@ impl DatasetData {
 
     /// An estimated size of data on disk not accounting for replication or
     /// caching
-    #[tracing::instrument(level = "info", skip_all)]
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
@@ -53,7 +51,6 @@ impl DatasetData {
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
     /// event_time DESC LIMIT N`
-    #[tracing::instrument(level = "info", skip_all)]
     async fn tail(
         &self,
         ctx: &Context<'_>,

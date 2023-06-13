@@ -57,7 +57,7 @@ tower = "0.4"
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 axum = { version = "0.6", features = ["ws"] }
 axum-extra = { version = "0.7", features = ["async-read-body"] }
-async-graphql = { version = "5", features = ["chrono", "tracing", "url", "apollo_tracing"] }
+async-graphql = { version = "5", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "5"
 serde_json = "1"
 

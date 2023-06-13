@@ -66,13 +66,18 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         let endpoint = self.s3_context.endpoint.clone().unwrap();
         let region = self.s3_context.region().unwrap();
 
-        let s3_builder = AmazonS3Builder::new()
+        let mut s3_builder = AmazonS3Builder::new()
             .with_endpoint(endpoint)
             .with_region(region)
             .with_access_key_id(self.credentials.access_key_id())
             .with_secret_access_key(self.credentials.secret_access_key())
             .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
+
+        s3_builder = match self.credentials.session_token() {
+            Some(session_token) => s3_builder.with_token(session_token),
+            None => s3_builder
+        };
 
         let object_store = match s3_builder.build() {
             Ok(object_store) => Ok(object_store),

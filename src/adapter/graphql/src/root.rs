@@ -79,7 +79,6 @@ pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub fn schema(catalog: dill::Catalog) -> Schema {
     Schema::build(Query, Mutation, EmptySubscription)
         .extension(extensions::ApolloTracing)
-        .extension(extensions::Tracing)
         .data(catalog)
         .finish()
 }
