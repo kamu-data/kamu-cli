@@ -65,23 +65,17 @@ impl QueryServiceImpl {
         Ok(session_context)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_impl(
         &self,
         session_context: &SessionContext,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-        tracing::info!(
-            "QS::get_schema_impl: Dataset handle resolved: {}",
-            dataset_handle
-        );
-
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
-        tracing::info!("QS::get_schema_impl: Dataset resolved");
 
         let last_data_slice_opt = dataset
             .as_metadata_chain()
@@ -90,14 +84,14 @@ impl QueryServiceImpl {
             .filter_map_ok(|(_, b)| b.event.output_data)
             .try_first()
             .await
+            .map_err(|e| {
+                tracing::error!(error = ?e, "Resolving last data slice failed");
+                e
+            })
             .int_err()?;
-
-        tracing::info!("QS::get_schema_impl: Last data slice queried");
 
         match last_data_slice_opt {
             Some(last_data_slice) => {
-                tracing::info!("QS::get_schema_impl: Having last data slice");
-
                 // TODO: Avoid boxing url - requires datafusion to fix API
                 let data_url = Box::new(
                     dataset
@@ -106,20 +100,14 @@ impl QueryServiceImpl {
                         .await,
                 );
 
-                tracing::info!("QS::get_schema_impl: data internal URL: {}", data_url);
-
                 let object_store = session_context.runtime_env().object_store(&data_url)?;
 
-                tracing::info!("QS::get_schema_impl: obtained object store");
+                tracing::debug!("QueryService::get_schema_impl: obtained object store");
 
                 let data_path =
                     object_store::path::Path::from_url_path(data_url.path()).int_err()?;
 
-                tracing::info!("QS::get_schema_impl: obtained data path {}", data_path);
-
                 let metadata = read_data_slice_metadata(object_store, &data_path).await?;
-
-                tracing::info!("QS::get_schema_impl: metadata loaded");
 
                 Ok(Some(metadata.file_metadata().schema().clone()))
             }
@@ -144,13 +132,10 @@ impl QueryService for QueryServiceImpl {
         num_records: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
-        tracing::info!("QS::Tail: Dataset handle resolved: {}", dataset_handle);
-
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
-        tracing::info!("QS::Tail: Dataset resolved");
 
         let vocab = dataset
             .as_metadata_chain()
@@ -162,7 +147,6 @@ impl QueryService for QueryServiceImpl {
             .map(|sv| -> DatasetVocabulary { sv.into() })
             .unwrap_or_default()
             .into_resolved();
-        tracing::info!("QS::Tail: Vocabulary constructed");
 
         let ctx = self
             .session_context(QueryOptions {
@@ -171,9 +155,13 @@ impl QueryService for QueryServiceImpl {
                     limit: Some(num_records),
                 }],
             })
-            .map_err(|e| QueryError::Internal(e))?;
-
-        tracing::info!("QS::Tail: Session context constructed");
+            .map_err(|e| {
+                tracing::error!(
+                    error = ?e,
+                    "QueryService::tail: session context failed to construct"
+                );
+                QueryError::Internal(e)
+            })?;
 
         // TODO: This is a workaround for Arrow not handling timestamps with explicit
         // timezones. We basically have to re-cast all timestamp fields into
@@ -184,7 +172,7 @@ impl QueryService for QueryServiceImpl {
             .get_schema_impl(&ctx, &dataset_handle.as_local_ref())
             .await?;
 
-        tracing::info!("QS::Tail: Got schema response: {:?}", res_schema);
+        tracing::debug!(schema = ?res_schema, "QueryService::tail: Got schema");
 
         if let None = res_schema {
             return Err(QueryError::DatasetSchemaNotAvailable(
@@ -221,7 +209,7 @@ impl QueryService for QueryServiceImpl {
             Type::PrimitiveType { .. } => unreachable!(),
         };
 
-        tracing::info!("QS::Tail: Got schema fields: {:?}", fields);
+        tracing::debug!(fields = ?fields, "QueryService::tail: Got schema fields");
 
         let query = format!(
             r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
@@ -231,12 +219,12 @@ impl QueryService for QueryServiceImpl {
             num_records = num_records
         );
 
-        tracing::info!("QS::Tail: Executing query: {}", query);
+        tracing::debug!(query = %query, "QueryService::tail: Executing SQL query");
 
         match ctx.sql(&query).await {
             Ok(res) => Ok(res),
             Err(e) => {
-                tracing::error!("QS::Tail: SQL query for tail failed: {:?}", e);
+                tracing::error!(error = ?e, "QueryService::tail: SQL query failed");
                 Err(QueryError::DataFusionError(e))
             }
         }
@@ -530,33 +518,37 @@ impl SchemaProvider for KamuSchema {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[tracing::instrument(level = "info", skip_all, fields(data_slice_store_path))]
+#[tracing::instrument(level = "debug", skip_all, fields(data_slice_store_path))]
 async fn read_data_slice_metadata(
     object_store: Arc<dyn object_store::ObjectStore>,
     data_slice_store_path: &object_store::path::Path,
 ) -> Result<Arc<ParquetMetaData>, QueryError> {
-    let object_meta = match object_store.head(&data_slice_store_path).await {
-        Ok(object_meta) => Ok(object_meta),
-        Err(e) => {
-            tracing::error!("object store head failed: {:?}", e);
-            Err(e.int_err())
-        }
-    }?;
-
-    tracing::info!("read_data_slice_metadata object_meta obtained");
+    let object_meta = object_store
+        .head(&data_slice_store_path)
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                error = ?e,
+                "QueryService::read_data_slice_metadata: object store head failed",
+            );
+            e
+        })
+        .int_err()?;
 
     let mut parquet_object_reader = ParquetObjectReader::new(object_store, object_meta);
 
     use datafusion::parquet::arrow::async_reader::AsyncFileReader;
-    let metadata = match parquet_object_reader.get_metadata().await {
-        Ok(metadata) => Ok(metadata),
-        Err(e) => {
-            tracing::error!("parquet reader get metadata failed: {:?}", e);
-            Err(e.int_err())
-        }
-    }?;
-
-    tracing::info!("read_data_slice_metadata metadata obtained");
+    let metadata = parquet_object_reader
+        .get_metadata()
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                error = ?e,
+                "QueryService::read_data_slice_metadata: Parquest reader get metadata failed"
+            );
+            e
+        })
+        .int_err()?;
 
     Ok(metadata)
 }
