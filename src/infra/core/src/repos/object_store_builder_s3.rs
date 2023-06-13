@@ -76,7 +76,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
 
         s3_builder = match self.credentials.session_token() {
             Some(session_token) => s3_builder.with_token(session_token),
-            None => s3_builder
+            None => s3_builder,
         };
 
         let object_store = match s3_builder.build() {
