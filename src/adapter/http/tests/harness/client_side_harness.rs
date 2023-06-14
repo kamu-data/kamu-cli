@@ -71,7 +71,10 @@ impl ClientSideHarness {
         b.add_value(workspace_layout.clone())
             .add_value(ContainerRuntime::default())
             .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
-            .add_value(IpfsGateway::default());
+            .add_value(IpfsGateway::default())
+            .add_value(RemoteRepositoryRegistryConfig::new(
+                workspace_layout.repos_dir,
+            ));
 
         let catalog = b.build();
 

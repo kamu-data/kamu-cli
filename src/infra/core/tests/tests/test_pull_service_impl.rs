@@ -710,7 +710,9 @@ impl PullTestHarness {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
-        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
+        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
+            RemoteRepositoryRegistryConfig::new(workspace_layout.repos_dir.clone()),
+        ));
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
             local_repo.clone(),
             workspace_layout.clone(),

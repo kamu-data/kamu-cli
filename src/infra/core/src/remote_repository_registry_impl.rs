@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryInto;
-use std::sync::Arc;
+use std::path::PathBuf;
 
 use dill::*;
 use kamu_core::*;
@@ -16,21 +16,32 @@ use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 use url::Url;
 
-use super::*;
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct RemoteRepositoryRegistryConfig {
+    repos_dir: PathBuf,
+}
+
+impl RemoteRepositoryRegistryConfig {
+    pub fn new(repos_dir: PathBuf) -> Self {
+        Self { repos_dir }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
 pub struct RemoteRepositoryRegistryImpl {
-    workspace_layout: Arc<WorkspaceLayout>,
+    config: RemoteRepositoryRegistryConfig,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl RemoteRepositoryRegistryImpl {
-    pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        Self { workspace_layout }
+    pub fn new(config: RemoteRepositoryRegistryConfig) -> Self {
+        Self { config }
     }
 }
 
@@ -38,7 +49,7 @@ impl RemoteRepositoryRegistryImpl {
 
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
-        let read_dir = std::fs::read_dir(&self.workspace_layout.repos_dir).unwrap();
+        let read_dir = std::fs::read_dir(&self.config.repos_dir).unwrap();
         Box::new(read_dir.map(|i| {
             i.unwrap()
                 .file_name()
@@ -50,7 +61,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
-        let file_path = self.workspace_layout.repos_dir.join(repo_name);
+        let file_path = self.config.repos_dir.join(repo_name);
 
         if !file_path.exists() {
             return Err(RepositoryNotFoundError {
@@ -66,7 +77,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn add_repository(&self, repo_name: &RepoName, mut url: Url) -> Result<(), AddRepoError> {
-        let file_path = self.workspace_layout.repos_dir.join(repo_name);
+        let file_path = self.config.repos_dir.join(repo_name);
 
         if file_path.exists() {
             return Err(RepositoryAlreadyExistsError {
@@ -92,7 +103,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError> {
-        let file_path = self.workspace_layout.repos_dir.join(repo_name);
+        let file_path = self.config.repos_dir.join(repo_name);
 
         if !file_path.exists() {
             return Err(RepositoryNotFoundError {

@@ -275,6 +275,10 @@ pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuild
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+
+    catalog.add_value(kamu::RemoteRepositoryRegistryConfig::new(
+        workspace_layout.repos_dir.clone(),
+    ));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
