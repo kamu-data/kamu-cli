@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use dill::builder_for;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
@@ -38,8 +39,11 @@ impl ClientSideHarness {
         b.add::<DatasetRepositoryLocalFs>()
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        b.add::<RemoteRepositoryRegistryImpl>()
-            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+        b.add_builder(
+            builder_for::<RemoteRepositoryRegistryImpl>()
+                .with_repos_dir(workspace_layout.repos_dir.clone()),
+        )
+        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>()
             .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
@@ -71,10 +75,7 @@ impl ClientSideHarness {
         b.add_value(workspace_layout.clone())
             .add_value(ContainerRuntime::default())
             .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
-            .add_value(IpfsGateway::default())
-            .add_value(RemoteRepositoryRegistryConfig::new(
-                workspace_layout.repos_dir,
-            ));
+            .add_value(IpfsGateway::default());
 
         let catalog = b.build();
 

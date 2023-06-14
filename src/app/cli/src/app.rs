@@ -50,7 +50,7 @@ pub async fn run(
 
     // Configure application
     let (guards, catalog, output_config) = {
-        let mut catalog_builder = configure_catalog();
+        let mut catalog_builder = configure_catalog(&workspace_layout);
         catalog_builder.add_value(workspace_layout.clone());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
@@ -119,7 +119,7 @@ pub async fn run(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
-pub fn configure_catalog() -> CatalogBuilder {
+pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
     b.add::<ConfigService>();
@@ -133,7 +133,10 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<DatasetFactoryImpl>();
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
-    b.add::<RemoteRepositoryRegistryImpl>();
+    b.add_builder(
+        builder_for::<RemoteRepositoryRegistryImpl>()
+            .with_repos_dir(workspace_layout.repos_dir.clone()),
+    );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
@@ -275,10 +278,6 @@ pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuild
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
-
-    catalog.add_value(kamu::RemoteRepositoryRegistryConfig::new(
-        workspace_layout.repos_dir.clone(),
-    ));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -152,7 +152,7 @@ impl Kamu {
     }
 
     pub fn catalog(&self) -> dill::Catalog {
-        let mut builder = kamu_cli::configure_catalog();
+        let mut builder = kamu_cli::configure_catalog(&self.workspace_layout);
         builder.add_value(self.workspace_layout.clone());
         builder.build()
     }

@@ -18,12 +18,15 @@ use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
-pub struct RemoteRepositoryRegistryConfig {
+#[derive(Clone)]
+pub struct RemoteRepositoryRegistryImpl {
     repos_dir: PathBuf,
 }
 
-impl RemoteRepositoryRegistryConfig {
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
+impl RemoteRepositoryRegistryImpl {
     pub fn new(repos_dir: PathBuf) -> Self {
         Self { repos_dir }
     }
@@ -31,25 +34,9 @@ impl RemoteRepositoryRegistryConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone)]
-pub struct RemoteRepositoryRegistryImpl {
-    config: RemoteRepositoryRegistryConfig,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-#[component(pub)]
-impl RemoteRepositoryRegistryImpl {
-    pub fn new(config: RemoteRepositoryRegistryConfig) -> Self {
-        Self { config }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
-        let read_dir = std::fs::read_dir(&self.config.repos_dir).unwrap();
+        let read_dir = std::fs::read_dir(&self.repos_dir).unwrap();
         Box::new(read_dir.map(|i| {
             i.unwrap()
                 .file_name()
@@ -61,7 +48,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
-        let file_path = self.config.repos_dir.join(repo_name);
+        let file_path = self.repos_dir.join(repo_name);
 
         if !file_path.exists() {
             return Err(RepositoryNotFoundError {
@@ -77,7 +64,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn add_repository(&self, repo_name: &RepoName, mut url: Url) -> Result<(), AddRepoError> {
-        let file_path = self.config.repos_dir.join(repo_name);
+        let file_path = self.repos_dir.join(repo_name);
 
         if file_path.exists() {
             return Err(RepositoryAlreadyExistsError {
@@ -103,7 +90,7 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
     }
 
     fn delete_repository(&self, repo_name: &RepoName) -> Result<(), DeleteRepoError> {
-        let file_path = self.config.repos_dir.join(repo_name);
+        let file_path = self.repos_dir.join(repo_name);
 
         if !file_path.exists() {
             return Err(RepositoryNotFoundError {
