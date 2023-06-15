@@ -23,6 +23,8 @@ use futures::stream::{self, StreamExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
 
+use crate::utils::docker_images;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct QueryServiceImpl {
@@ -248,6 +250,26 @@ impl QueryService for QueryServiceImpl {
             .session_context(QueryOptions::default())
             .map_err(|e| QueryError::Internal(e))?;
         self.get_schema_impl(&ctx, dataset_ref).await
+    }
+
+    async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {
+        Ok(vec![
+            EngineDesc {
+                name: "Spark".to_string(),
+                dialect: QueryDialect::SqlSpark,
+                latest_image: docker_images::SPARK.to_string(),
+            },
+            EngineDesc {
+                name: "Flink".to_string(),
+                dialect: QueryDialect::SqlFlink,
+                latest_image: docker_images::FLINK.to_string(),
+            },
+            EngineDesc {
+                name: "DataFusion".to_string(),
+                dialect: QueryDialect::SqlDataFusion,
+                latest_image: docker_images::DATAFUSION.to_string(),
+            },
+        ])
     }
 }
 

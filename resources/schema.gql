@@ -136,6 +136,10 @@ type DataQueries {
 	Executes a specified query and returns its result
 	"""
 	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
+	"""
+	Lists engines known to the system and recommended for use
+	"""
+	knownEngines: [EngineDesc!]!
 }
 
 union DataQueryResult = DataQueryResultSuccess | DataQueryResultError
@@ -338,6 +342,27 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+"""
+Describes
+"""
+type EngineDesc {
+	"""
+	A short name of the engine, e.g. "Spark", "Flink".
+	Intended for use in UI for quick engine identification and selection.
+	"""
+	name: String!
+	"""
+	Language and dialect this engine is using for queries
+	Indended for configuring code highlighting and completions.
+	"""
+	dialect: QueryDialect!
+	"""
+	OCI image repository and a tag of the latest engine image, e.g.
+	"ghcr.io/kamu-data/engine-datafusion:0.1.2"
+	"""
+	latestImage: String!
+}
 
 type EnvVar {
 	name: String!
@@ -578,7 +603,9 @@ type Query {
 }
 
 enum QueryDialect {
-	DATA_FUSION
+	SQL_SPARK
+	SQL_FLINK
+	SQL_DATA_FUSION
 }
 
 union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet
