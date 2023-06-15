@@ -22,26 +22,23 @@ use super::*;
 #[derive(Clone)]
 pub struct RemoteAliasesRegistryImpl {
     local_repo: Arc<dyn DatasetRepository>,
-    workspace_layout: Arc<WorkspaceLayout>,
+    datasets_dir: PathBuf,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl RemoteAliasesRegistryImpl {
-    pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
-        workspace_layout: Arc<WorkspaceLayout>,
-    ) -> Self {
+    pub fn new(local_repo: Arc<dyn DatasetRepository>, datasets_dir: PathBuf) -> Self {
         Self {
             local_repo,
-            workspace_layout,
+            datasets_dir,
         }
     }
 
     fn get_dataset_metadata_dir(&self, alias: &DatasetAlias) -> PathBuf {
         assert!(!alias.is_multitenant(), "Multitenancy is not supported");
-        self.workspace_layout.datasets_dir.join(&alias.dataset_name)
+        self.datasets_dir.join(&alias.dataset_name)
     }
 
     fn read_config(&self, path: &Path) -> Result<DatasetConfig, InternalError> {

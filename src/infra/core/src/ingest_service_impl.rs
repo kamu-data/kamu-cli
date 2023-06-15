@@ -120,7 +120,8 @@ impl IngestServiceImpl {
             listener,
             self.engine_provisioner.clone(),
             self.container_runtime.clone(),
-            self.workspace_layout.clone(),
+            &self.workspace_layout.run_info_dir,
+            &self.workspace_layout.cache_dir,
         )
         .await?;
 

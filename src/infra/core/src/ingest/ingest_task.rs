@@ -50,7 +50,8 @@ impl IngestTask {
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        run_info_dir: &PathBuf,
+        cache_dir: &PathBuf,
     ) -> Result<Self, InternalError> {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
@@ -146,10 +147,10 @@ impl IngestTask {
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),
             prev_watermark: prev_watermark.unwrap_or_default(),
             vocab: vocab.unwrap_or_default(),
-            fetch_service: FetchService::new(container_runtime, &workspace_layout.run_info_dir),
+            fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_provisioner),
-            cache_dir: workspace_layout.cache_dir.clone(),
+            cache_dir: cache_dir.clone(),
         })
     }
 

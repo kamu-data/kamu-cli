@@ -22,7 +22,7 @@ use opendatafabric::*;
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir).unwrap());
-    let dataset_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let dataset_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)

@@ -127,7 +127,9 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     b.add::<GcService>();
     b.add::<WorkspaceService>();
 
-    b.add::<DatasetRepositoryLocalFs>();
+    b.add_builder(
+        builder_for::<DatasetRepositoryLocalFs>().with_root(workspace_layout.datasets_dir.clone()),
+    );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
@@ -139,7 +141,10 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
-    b.add::<RemoteAliasesRegistryImpl>();
+    b.add_builder(
+        builder_for::<RemoteAliasesRegistryImpl>()
+            .with_datasets_dir(workspace_layout.repos_dir.clone()),
+    );
     b.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
     b.add::<ResourceLoaderImpl>();

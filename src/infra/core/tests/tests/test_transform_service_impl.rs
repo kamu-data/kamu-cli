@@ -97,7 +97,9 @@ async fn append_data_block(
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
@@ -144,7 +146,9 @@ async fn test_get_next_operation() {
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),

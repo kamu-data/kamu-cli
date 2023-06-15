@@ -38,16 +38,13 @@ impl Clone for DatasetRepositoryLocalFs {
 
 #[component(pub)]
 impl DatasetRepositoryLocalFs {
-    pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        Self::from(&workspace_layout.datasets_dir)
+    pub fn new(root: PathBuf) -> Self {
+        Self::from(root)
     }
 
     pub fn from(root: impl Into<PathBuf>) -> Self {
-        //let info_repo =
-        // NamedObjectRepositoryLocalFS::new(&workspace_layout.kamu_root_dir);
         Self {
             root: root.into(),
-            //info_repo,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }

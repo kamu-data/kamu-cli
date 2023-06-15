@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use dill::builder_for;
 use kamu::domain::{DatasetRepository, InternalError, ResultIntoInternal};
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
 use tempfile::TempDir;
@@ -34,8 +35,10 @@ impl ServerSideLocalFsHarness {
         let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
-            .add_value(workspace_layout.clone())
-            .add::<DatasetRepositoryLocalFs>()
+            .add_builder(
+                builder_for::<DatasetRepositoryLocalFs>()
+                    .with_root(workspace_layout.datasets_dir.clone()),
+            )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();
 

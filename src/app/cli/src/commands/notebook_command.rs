@@ -111,7 +111,8 @@ impl Command for NotebookCommand {
 
         notebook_server
             .run(
-                &self.workspace_layout,
+                &self.workspace_layout.datasets_dir,
+                &self.workspace_layout.run_info_dir,
                 self.address.clone(),
                 self.port,
                 environment_vars,

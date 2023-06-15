@@ -213,7 +213,9 @@ async fn test_transform_common(transform: Transform) {
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
 
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         workspace_layout.clone(),
