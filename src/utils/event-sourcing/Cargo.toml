@@ -18,10 +18,16 @@ doctest = false
 
 
 [dependencies]
+event-sourcing-macros = { workspace = true }
 internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 thiserror = "1"
 tokio-stream = { version = "0.1", default-features = false }
-tracing = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+
+
+[dev-dependencies]
+futures = { version = "0.3", default-features = false }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

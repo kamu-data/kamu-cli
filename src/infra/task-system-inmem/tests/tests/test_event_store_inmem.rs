@@ -15,7 +15,7 @@ use opendatafabric::*;
 
 #[test_log::test(tokio::test)]
 async fn test_event_store_empty() {
-    let event_store = TaskEventStoreInMemory::new();
+    let event_store = TaskSystemEventStoreInMemory::new();
 
     let events: Vec<_> = event_store
         .get_events(&TaskID::new(123), GetEventsOpts::default())
@@ -36,7 +36,7 @@ async fn test_event_store_empty() {
 
 #[test_log::test(tokio::test)]
 async fn test_event_store_get_streams() {
-    let event_store = TaskEventStoreInMemory::new();
+    let event_store = TaskSystemEventStoreInMemory::new();
 
     let task_id_1 = TaskID::new(123);
     let task_id_2 = TaskID::new(321);
@@ -69,11 +69,14 @@ async fn test_event_store_get_streams() {
     };
 
     event_store
-        .save_events(vec![
-            event_1.clone().into(),
-            event_2.clone().into(),
-            event_3.clone().into(),
-        ])
+        .save_events(
+            &task_id_1, // Cheating a bit
+            vec![
+                event_1.clone().into(),
+                event_2.clone().into(),
+                event_3.clone().into(),
+            ],
+        )
         .await
         .unwrap();
 

@@ -14,7 +14,7 @@ use dill::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
-pub struct TaskEventStoreInMemory {
+pub struct TaskSystemEventStoreInMemory {
     state: Arc<Mutex<State>>,
 }
 
@@ -40,7 +40,7 @@ impl State {
 
 #[component(pub)]
 #[scope(Singleton)]
-impl TaskEventStoreInMemory {
+impl TaskSystemEventStoreInMemory {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -64,9 +64,7 @@ impl TaskEventStoreInMemory {
 }
 
 #[async_trait::async_trait]
-impl EventStore for TaskEventStoreInMemory {
-    type Agg = Task;
-
+impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
     }
@@ -108,7 +106,12 @@ impl EventStore for TaskEventStoreInMemory {
         })
     }
 
-    async fn save_events(&self, events: Vec<TaskSystemEvent>) -> Result<EventID, SaveError> {
+    // TODO: concurrency
+    async fn save_events(
+        &self,
+        _task_id: &TaskID,
+        events: Vec<TaskSystemEvent>,
+    ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {
@@ -121,7 +124,7 @@ impl EventStore for TaskEventStoreInMemory {
 }
 
 #[async_trait::async_trait]
-impl TaskEventStore for TaskEventStoreInMemory {
+impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
     fn new_task_id(&self) -> TaskID {
         self.state.lock().unwrap().next_task_id()
     }

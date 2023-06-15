@@ -15,7 +15,7 @@ use kamu_task_system::*;
 
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
-    event_store: Arc<dyn TaskEventStore>,
+    event_store: Arc<dyn TaskSystemEventStore>,
     pull_svc: Arc<dyn PullService>,
 }
 
@@ -24,7 +24,7 @@ pub struct TaskExecutorInMemory {
 impl TaskExecutorInMemory {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
-        event_store: Arc<dyn TaskEventStore>,
+        event_store: Arc<dyn TaskSystemEventStore>,
         pull_svc: Arc<dyn PullService>,
     ) -> Self {
         Self {
@@ -41,7 +41,9 @@ impl TaskExecutor for TaskExecutorInMemory {
     async fn run(&self) -> Result<(), InternalError> {
         loop {
             let task_id = self.task_sched.take().await.int_err()?;
-            let mut task = self.event_store.load(&task_id).await.int_err()?;
+            let mut task = Task::load(task_id, self.event_store.as_ref())
+                .await
+                .int_err()?;
 
             tracing::info!(
                 %task_id,
@@ -81,9 +83,9 @@ impl TaskExecutor for TaskExecutorInMemory {
             );
 
             // Refresh the task in case it was updated concurrently (e.g. late cancellation)
-            self.event_store.update(&mut task).await.int_err()?;
+            task.update(self.event_store.as_ref()).await.int_err()?;
             task.finish(outcome).int_err()?;
-            self.event_store.save(&mut task).await.int_err()?;
+            task.save(self.event_store.as_ref()).await.int_err()?;
         }
     }
 }

@@ -25,7 +25,7 @@ impl TasksMutations {
     /// Requests cancellation of the specified task
     async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
-        let task_state = task_sched.cancel_task(&task_id.into()).await?;
+        let task_state = task_sched.cancel_task(task_id.into()).await?;
         Ok(Task::new(task_state))
     }
 

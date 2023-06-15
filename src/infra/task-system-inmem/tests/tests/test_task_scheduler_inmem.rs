@@ -15,7 +15,7 @@ use kamu_task_system_inmem::*;
 
 #[test_log::test(tokio::test)]
 async fn test_creates_task() {
-    let event_store = Arc::new(TaskEventStoreInMemory::new());
+    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let task_sched = TaskSchedulerInMemory::new(event_store);
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
@@ -39,7 +39,7 @@ async fn test_creates_task() {
 
 #[test_log::test(tokio::test)]
 async fn test_queues_tasks() {
-    let event_store = Arc::new(TaskEventStoreInMemory::new());
+    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let task_sched = TaskSchedulerInMemory::new(event_store);
 
     let task_id_1 = task_sched
@@ -61,7 +61,7 @@ async fn test_queues_tasks() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_cancellation() {
-    let event_store = Arc::new(TaskEventStoreInMemory::new());
+    let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
     let task_sched = TaskSchedulerInMemory::new(event_store);
 
     let task_id_1 = task_sched
@@ -76,7 +76,7 @@ async fn test_task_cancellation() {
         .unwrap()
         .task_id;
 
-    task_sched.cancel_task(&task_id_1).await.unwrap();
+    task_sched.cancel_task(task_id_1).await.unwrap();
 
     assert_eq!(task_sched.try_take().await.unwrap(), Some(task_id_2));
     assert_eq!(task_sched.try_take().await.unwrap(), None);

@@ -28,7 +28,7 @@ impl Tasks {
     /// Returns current state of a given task
     async fn get_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Option<Task>> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
-        match task_sched.get_task(&task_id).await {
+        match task_sched.get_task(task_id.into()).await {
             Ok(task_state) => Ok(Some(Task::new(task_state))),
             Err(ts::GetTaskError::NotFound(_)) => Ok(None),
             Err(err) => Err(err.into()),

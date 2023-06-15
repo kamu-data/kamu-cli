@@ -15,7 +15,7 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait TaskEventStore: EventStore<Agg = Task> {
+pub trait TaskSystemEventStore: EventStore<TaskState> {
     /// Generates new unique task identifier
     fn new_task_id(&self) -> TaskID;
 

@@ -26,10 +26,10 @@ pub trait TaskScheduler: Sync + Send {
     fn list_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskStateStream;
 
     /// Returns current state of a given task
-    async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError>;
+    async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;
 
     /// Attempts to cancel the given task
-    async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError>;
+    async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError>;
 
     /// Blocks until the next task is available for execution and takes it out
     /// of the queue (called by [TaskExecutor])
@@ -94,20 +94,20 @@ pub struct TaskNotFoundError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<Task>> for GetTaskError {
-    fn from(value: LoadError<Task>) -> Self {
+impl From<LoadError<TaskState>> for GetTaskError {
+    fn from(value: LoadError<TaskState>) -> Self {
         match value {
-            LoadError::NotFound(err) => Self::NotFound(TaskNotFoundError { task_id: err.id }),
+            LoadError::NotFound(err) => Self::NotFound(TaskNotFoundError { task_id: err.query }),
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),
         }
     }
 }
 
-impl From<LoadError<Task>> for CancelTaskError {
-    fn from(value: LoadError<Task>) -> Self {
+impl From<LoadError<TaskState>> for CancelTaskError {
+    fn from(value: LoadError<TaskState>) -> Self {
         match value {
-            LoadError::NotFound(err) => Self::NotFound(TaskNotFoundError { task_id: err.id }),
+            LoadError::NotFound(err) => Self::NotFound(TaskNotFoundError { task_id: err.query }),
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),
         }

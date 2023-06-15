@@ -16,10 +16,10 @@ mockall::mock! {
     TaskScheduler {}
     #[async_trait::async_trait]
     impl TaskScheduler for TaskScheduler {
-        async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError>;
+        async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;
         fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskStateStream<'a>;
         async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
-        async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError>;
+        async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError>;
         async fn take(&self) -> Result<TaskID, TakeTaskError>;
         async fn try_take(&self) -> Result<Option<TaskID>, TakeTaskError>;
     }

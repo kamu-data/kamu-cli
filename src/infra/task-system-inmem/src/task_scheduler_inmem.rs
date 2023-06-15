@@ -17,7 +17,7 @@ use opendatafabric::DatasetID;
 
 pub struct TaskSchedulerInMemory {
     state: Arc<Mutex<State>>,
-    event_store: Arc<dyn TaskEventStore>,
+    event_store: Arc<dyn TaskSystemEventStore>,
 }
 
 #[derive(Default)]
@@ -28,7 +28,7 @@ struct State {
 #[component(pub)]
 #[scope(Singleton)]
 impl TaskSchedulerInMemory {
-    pub fn new(event_store: Arc<dyn TaskEventStore>) -> Self {
+    pub fn new(event_store: Arc<dyn TaskSystemEventStore>) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
             event_store,
@@ -41,7 +41,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
         let mut task = Task::new(self.event_store.new_task_id(), logical_plan);
-        self.event_store.save(&mut task).await.int_err()?;
+        task.save(self.event_store.as_ref()).await.int_err()?;
 
         let queue_len = {
             let mut state = self.state.lock().unwrap();
@@ -59,18 +59,18 @@ impl TaskScheduler for TaskSchedulerInMemory {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
-    async fn get_task(&self, task_id: &TaskID) -> Result<TaskState, GetTaskError> {
-        let task = self.event_store.load(task_id).await?;
+    async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError> {
+        let task = Task::load(task_id, self.event_store.as_ref()).await?;
         Ok(task.into())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%task_id))]
-    async fn cancel_task(&self, task_id: &TaskID) -> Result<TaskState, CancelTaskError> {
-        let mut task = self.event_store.load(task_id).await?;
+    async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError> {
+        let mut task = Task::load(task_id, self.event_store.as_ref()).await?;
 
         if task.can_cancel() {
             task.cancel().int_err()?;
-            self.event_store.save(&mut task).await.int_err()?;
+            task.save(self.event_store.as_ref()).await.int_err()?;
 
             let mut state = self.state.lock().unwrap();
             state.task_queue.retain(|task_id| *task_id != task.task_id);
@@ -92,9 +92,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
                 .await?;
 
             for task_id in relevant_tasks.into_iter() {
-                let task = self.event_store.load(&task_id)
-                    .await
-                    .int_err()?;
+                let task = Task::load(task_id, self.event_store.as_ref()).await.int_err()?;
 
                 yield task.into();
             }
@@ -125,9 +123,11 @@ impl TaskScheduler for TaskSchedulerInMemory {
             return Ok(None);
         };
 
-        let mut task = self.event_store.load(&task_id).await.int_err()?;
+        let mut task = Task::load(task_id, self.event_store.as_ref())
+            .await
+            .int_err()?;
         task.run().int_err()?;
-        self.event_store.save(&mut task).await.int_err()?;
+        task.save(self.event_store.as_ref()).await.int_err()?;
 
         tracing::info!(
             %task_id,

@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use event_sourcing::*;
 
-use super::*;
+use crate::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents the state of the task at specific point in time (projection)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,4 +34,76 @@ pub struct TaskState {
     pub cancellation_requested_at: Option<DateTime<Utc>>,
     /// Time when task has reached a final outcome
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl Projection for TaskState {
+    type Query = TaskID;
+    type Event = TaskSystemEvent;
+
+    fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
+        use TaskSystemEvent as E;
+
+        match (state, event) {
+            (None, event) => match event {
+                E::TaskCreated(TaskCreated {
+                    event_time,
+                    task_id,
+                    logical_plan,
+                }) => Ok(Self {
+                    task_id,
+                    status: TaskStatus::Queued,
+                    cancellation_requested: false,
+                    logical_plan,
+                    created_at: event_time,
+                    ran_at: None,
+                    cancellation_requested_at: None,
+                    finished_at: None,
+                }),
+                _ => Err(ProjectionError::new(None, event)),
+            },
+            (Some(s), event) => {
+                assert_eq!(s.task_id, event.task_id());
+
+                match event {
+                    E::TaskCreated(_) => Err(ProjectionError::new(Some(s), event)),
+                    E::TaskRunning(TaskRunning {
+                        event_time,
+                        task_id: _,
+                    }) if s.status == TaskStatus::Queued => Ok(Self {
+                        status: TaskStatus::Running,
+                        ran_at: Some(event_time),
+                        ..s
+                    }),
+                    E::TaskCancelled(TaskCancelled {
+                        event_time,
+                        task_id: _,
+                    }) if s.status == TaskStatus::Queued
+                        || s.status == TaskStatus::Running && !s.cancellation_requested =>
+                    {
+                        Ok(Self {
+                            cancellation_requested: true,
+                            cancellation_requested_at: Some(event_time),
+                            ..s
+                        })
+                    }
+                    E::TaskFinished(TaskFinished {
+                        event_time,
+                        task_id: _,
+                        outcome,
+                    }) if s.status == TaskStatus::Queued || s.status == TaskStatus::Running => {
+                        Ok(Self {
+                            status: TaskStatus::Finished(outcome),
+                            finished_at: Some(event_time),
+                            ..s
+                        })
+                    }
+                    E::TaskRunning(_) | E::TaskCancelled(_) | E::TaskFinished(_) => {
+                        Err(ProjectionError::new(Some(s), event))
+                    }
+                }
+            }
+        }
+    }
 }
