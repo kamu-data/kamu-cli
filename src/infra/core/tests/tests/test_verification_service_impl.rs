@@ -35,7 +35,6 @@ async fn test_verify_data_consistency() {
     let verification_svc = Arc::new(VerificationServiceImpl::new(
         local_repo.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
-        workspace_layout.clone(),
     ));
 
     local_repo

@@ -1,0 +1,101 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+use std::path::{Path, PathBuf};
+
+use internal_error::{InternalError, ResultIntoInternal};
+use kamu_core::ObjectRepository;
+use opendatafabric::Multihash;
+use tempfile::{tempdir, TempDir};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct ObjectHashingHelper {
+    object_state: ObjectState,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl ObjectHashingHelper {
+    pub async fn from(
+        object_hash: &Multihash,
+        object_repository: &dyn ObjectRepository,
+    ) -> Result<Self, InternalError> {
+        let object_file_url = object_repository.get_internal_url(object_hash).await;
+        if object_file_url.scheme().eq("file") {
+            let local_path = Path::new(object_file_url.path());
+            Ok(Self {
+                object_state: ObjectState::Local(ObjectStateLocal {
+                    local_path: local_path.to_path_buf(),
+                }),
+            })
+        } else {
+            let temp_dir = tempdir().int_err()?;
+            let temp_file_path = temp_dir.path().join("data");
+            let mut temp_file = tokio::fs::File::create(temp_file_path.clone())
+                .await
+                .int_err()?;
+
+            let mut data_stream = object_repository.get_stream(object_hash).await.int_err()?;
+
+            let mut buf = [0; 4096];
+            loop {
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                let read = data_stream.read(&mut buf).await.int_err()?;
+                if read == 0 {
+                    break;
+                }
+                temp_file.write_all(&buf[..read]).await.int_err()?;
+            }
+
+            Ok(Self {
+                object_state: ObjectState::Stream(ObjectStateStream {
+                    _temp_dir: temp_dir,
+                    temp_file_path,
+                }),
+            })
+        }
+    }
+
+    pub fn logical_hash(&self) -> Result<Multihash, datafusion::parquet::errors::ParquetError> {
+        use kamu_data_utils::data::hash::get_parquet_logical_hash;
+        match &self.object_state {
+            ObjectState::Local(local) => get_parquet_logical_hash(&local.local_path),
+            ObjectState::Stream(stream) => get_parquet_logical_hash(&stream.temp_file_path),
+        }
+    }
+
+    pub fn physical_hash(&self) -> Result<Multihash, std::io::Error> {
+        use kamu_data_utils::data::hash::get_file_physical_hash;
+        match &self.object_state {
+            ObjectState::Local(local) => get_file_physical_hash(&local.local_path),
+            ObjectState::Stream(stream) => get_file_physical_hash(&stream.temp_file_path),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+enum ObjectState {
+    Local(ObjectStateLocal),
+    Stream(ObjectStateStream),
+}
+
+struct ObjectStateLocal {
+    local_path: PathBuf,
+}
+
+struct ObjectStateStream {
+    _temp_dir: TempDir,
+    temp_file_path: PathBuf,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

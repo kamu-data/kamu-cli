@@ -14,12 +14,12 @@ use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 
+use crate::utils::object_hashing_helper::ObjectHashingHelper;
 use crate::*;
 
 pub struct VerificationServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
     transform_service: Arc<dyn TransformService>,
-    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 #[component(pub)]
@@ -27,12 +27,10 @@ impl VerificationServiceImpl {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
         transform_service: Arc<dyn TransformService>,
-        workspace_layout: Arc<WorkspaceLayout>,
     ) -> Self {
         Self {
             local_repo,
             transform_service,
-            workspace_layout,
         }
     }
 
@@ -66,7 +64,6 @@ impl VerificationServiceImpl {
             .try_collect()
             .await?;
 
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
         let num_blocks = plan.len();
 
         listener.begin_phase(VerificationPhase::DataIntegrity);
@@ -80,10 +77,12 @@ impl VerificationServiceImpl {
             );
 
             if let Some(output_slice) = &block.event.output_data {
-                let data_path = dataset_layout.data_slice_path(&output_slice);
-
                 // Check size first
-                let size_actual = std::fs::metadata(&data_path).int_err()?.len();
+                let size_actual = dataset
+                    .as_data_repo()
+                    .get_size(&output_slice.physical_hash)
+                    .await
+                    .int_err()?;
 
                 if size_actual != (output_slice.size as u64) {
                     return Err(VerificationError::DataDoesNotMatchMetadata(
@@ -97,10 +96,12 @@ impl VerificationServiceImpl {
                     ));
                 }
 
-                // Do a fast pass using physical hash
-                let physical_hash_actual =
-                    kamu_data_utils::data::hash::get_file_physical_hash(&data_path).int_err()?;
+                let data_hashing_helper =
+                    ObjectHashingHelper::from(&output_slice.physical_hash, dataset.as_data_repo())
+                        .await?;
 
+                // Do a fast pass using physical hash
+                let physical_hash_actual = data_hashing_helper.physical_hash().int_err()?;
                 if physical_hash_actual != output_slice.physical_hash {
                     // Root data files are non-reproducible by definition, so
                     // if physical hashes don't match - we can give up right away.
@@ -117,9 +118,7 @@ impl VerificationServiceImpl {
                     } else {
                         // Derivative data may be replayed and produce different binary file
                         // but data must have same logical hash to be valid.
-                        let logical_hash_actual =
-                            kamu_data_utils::data::hash::get_parquet_logical_hash(&data_path)
-                                .int_err()?;
+                        let logical_hash_actual = data_hashing_helper.logical_hash().int_err()?;
 
                         if logical_hash_actual != output_slice.logical_hash {
                             return Err(VerificationError::DataDoesNotMatchMetadata(
@@ -136,10 +135,12 @@ impl VerificationServiceImpl {
                 }
 
                 if let Some(checkpoint) = block.event.output_checkpoint {
-                    let checkpoint_path = dataset_layout.checkpoint_path(&checkpoint.physical_hash);
-
                     // Check size
-                    let size_actual = std::fs::metadata(&checkpoint_path).int_err()?.len();
+                    let size_actual = dataset
+                        .as_checkpoint_repo()
+                        .get_size(&checkpoint.physical_hash)
+                        .await
+                        .int_err()?;
 
                     if size_actual != (checkpoint.size as u64) {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
@@ -154,9 +155,14 @@ impl VerificationServiceImpl {
                     }
 
                     // Check physical hash
+                    let checkpoint_hashing_helper = ObjectHashingHelper::from(
+                        &checkpoint.physical_hash,
+                        dataset.as_checkpoint_repo(),
+                    )
+                    .await?;
+
                     let physical_hash_actual =
-                        kamu_data_utils::data::hash::get_file_physical_hash(&checkpoint_path)
-                            .int_err()?;
+                        checkpoint_hashing_helper.physical_hash().int_err()?;
 
                     if physical_hash_actual != checkpoint.physical_hash {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
