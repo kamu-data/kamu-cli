@@ -39,7 +39,7 @@ impl DataQueries {
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
         let df = match query_dialect {
-            QueryDialect::DataFusion => {
+            QueryDialect::SqlDataFusion => {
                 let sql_result = query_svc
                     .sql_statement(&query, domain::QueryOptions::default())
                     .await;
@@ -48,6 +48,7 @@ impl DataQueries {
                     Err(e) => return Ok(e.into()),
                 }
             }
+            _ => unimplemented!(),
         }
         .limit(0, Some(limit as usize))?;
 
@@ -59,5 +60,16 @@ impl DataQueries {
         let data = DataBatch::from_records(&record_batches, data_format)?;
 
         Ok(DataQueryResult::success(Some(schema), data, limit))
+    }
+
+    /// Lists engines known to the system and recommended for use
+    async fn known_engines(&self, ctx: &Context<'_>) -> Result<Vec<EngineDesc>> {
+        let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
+        Ok(query_svc
+            .get_known_engines()
+            .await?
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 }

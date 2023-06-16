@@ -15,6 +15,7 @@ use thiserror::Error;
 
 use crate::*;
 
+// TODO: Support different engines and query dialects
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
     /// Returns the specified number of the latest records in the dataset
@@ -35,6 +36,9 @@ pub trait QueryService: Send + Sync {
     /// Returns the schema of the given dataset, if it is already defined by
     /// this moment, None otherwise
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
+
+    /// Lists engines known to the system and recommended for use
+    async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,6 +54,28 @@ pub struct DatasetQueryOptions {
     /// Number of records that output requires (starting from latest entries)
     /// Setting this value allows to limit the number of part files examined.
     pub limit: Option<u64>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EngineDesc {
+    /// A short name of the engine, e.g. "Spark", "Flink"
+    /// Intended for use in UI for quick engine identification and selection
+    pub name: String,
+    /// Language and dialect this engine is using for queries
+    /// Indended for configuring correct code highlighting and completion
+    pub dialect: QueryDialect,
+    /// OCI image repository and a tag of the latest engine image, e.g.
+    /// "ghcr.io/kamu-data/engine-datafusion:0.1.2"
+    pub latest_image: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueryDialect {
+    SqlSpark,
+    SqlFlink,
+    SqlDataFusion,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

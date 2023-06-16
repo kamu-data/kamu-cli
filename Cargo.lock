@@ -733,7 +733,7 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "regex",
- "sha2 0.10.6",
+ "sha2 0.10.7",
  "time 0.3.22",
  "tracing",
 ]
@@ -767,7 +767,7 @@ dependencies = [
  "md-5",
  "pin-project-lite",
  "sha1",
- "sha2 0.10.6",
+ "sha2 0.10.7",
  "tracing",
 ]
 
@@ -1326,7 +1326,7 @@ checksum = "21a53c0a4d288377e7415b53dcfc3c04da5cdc2cc95c8d5ac178b58f0b861ad6"
 
 [[package]]
 name = "container-runtime"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -1362,9 +1362,9 @@ checksum = "e496a50fda8aacccc86d7529e2c1e0892dbd0f898a6b5645b5561b89c3210efa"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e4c1eaa2012c47becbbad2ab175484c2a84d1185b566fb2cc5b8707343dfe58"
+checksum = "03e69e28e9f7f77debdedbaafa2866e1de9ba56df55a8bd7cfc724c25a09987c"
 dependencies = [
  "libc",
 ]
@@ -1744,7 +1744,7 @@ dependencies = [
  "petgraph",
  "rand 0.8.5",
  "regex",
- "sha2 0.10.6",
+ "sha2 0.10.7",
  "unicode-segmentation",
  "uuid",
 ]
@@ -1803,9 +1803,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22403bd806ca9fe0b1f90a67a123f461e3620ed7a39b74648207cf1682246291"
+checksum = "13ecc60c899801b6268c4b0789a5f6a6e230665ab632ba4f0691ddf1c9946533"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -1814,9 +1814,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7678ff46ce0a1fa9444ff75f04cd2182f87b5c58016743f71cb59a07a24f3ba"
+checksum = "45e4c74c299e72a87399ea685ac4c1220f001cfb655f56e81c0824bc63b8cc01"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1970,7 +1970,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.129.0"
+version = "0.130.0"
 
 [[package]]
 name = "env_logger"
@@ -2008,7 +2008,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2023,7 +2023,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "quote",
  "syn 2.0.18",
@@ -2656,7 +2656,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "test-log",
  "thiserror",
@@ -2760,7 +2760,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -2828,7 +2828,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-graphql",
  "chrono",
@@ -2855,7 +2855,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -2893,7 +2893,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-graphql",
  "async-graphql-axum",
@@ -2965,7 +2965,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2990,7 +2990,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "arrow-digest",
  "datafusion",
@@ -3002,7 +3002,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "chrono",
  "clap",
@@ -3016,7 +3016,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3035,7 +3035,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3635,7 +3635,7 @@ checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
 
 [[package]]
 name = "opendatafabric"
-version = "0.129.0"
+version = "0.130.0"
 dependencies = [
  "bs58",
  "byteorder",
@@ -3837,7 +3837,7 @@ dependencies = [
  "digest 0.10.7",
  "hmac",
  "password-hash",
- "sha2 0.10.6",
+ "sha2 0.10.7",
 ]
 
 [[package]]
@@ -3887,7 +3887,7 @@ checksum = "745a452f8eb71e39ffd8ee32b3c5f51d03845f99786fa9b68db6ff509c505411"
 dependencies = [
  "once_cell",
  "pest",
- "sha2 0.10.6",
+ "sha2 0.10.7",
 ]
 
 [[package]]
@@ -4387,7 +4387,7 @@ version = "7.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "512b0ab6853f7e14e3c8754acb43d6f748bb9ced66aa5915a6553ac8213f7731"
 dependencies = [
- "sha2 0.10.6",
+ "sha2 0.10.7",
  "walkdir",
 ]
 
@@ -4678,9 +4678,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82e6b795fe2e3b1e845bafcb27aa35405c4d47cdfc92af5fc8d3002f76cebdc0"
+checksum = "479fb9d862239e610720565ca91403019f2f00410f1864c5aa7479b950a76ed8"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -4980,9 +4980,9 @@ checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
 
 [[package]]
 name = "test-log"
-version = "0.2.11"
+version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f0c854faeb68a048f0f2dc410c5ddae3bf83854ef0e4977d58306a5edef50e"
+checksum = "d9601d162c1d77e62c1ea0bc8116cd1caf143ce3af947536c3c9052a1677fe0c"
 dependencies = [
  "proc-macro2",
  "quote",
