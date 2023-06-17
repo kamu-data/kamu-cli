@@ -24,8 +24,6 @@ default = []
 web-ui = []
 ftp = ["kamu/ftp"]
 
-skip_docker_tests = []
-
 
 [dependencies]
 # Kamu
@@ -113,4 +111,5 @@ libc = "0.2"  # For getting uid:gid
 [dev-dependencies]
 env_logger = "0.10"
 rand = "0.8"
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }

@@ -1,8 +1,7 @@
 # Developer Guide <!-- omit in toc -->
 - [Building Locally](#building-locally)
-  - [Run Tests with Podman (Recommended)](#run-tests-with-podman-recommended)
-  - [Run Tests with Docker (Alternative)](#run-tests-with-docker-alternative)
-  - [Using Nextest test runner (Optional)](#using-nextest-test-runner-optional)
+  - [Configure Podman as Default Runtime (Recommended)](#configure-podman-as-default-runtime-recommended)
+  - [Run Tests](#run-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
   - [Building with Web UI (Optional)](#building-with-web-ui-optional)
   - [Code Generation](#code-generation)
@@ -36,15 +35,19 @@ Prerequisites:
   * Install [`protoc`](https://github.com/protocolbuffers/protobuf) followed by:
     * `cargo install protoc-gen-prost` - to install [prost protobuf plugin](https://crates.io/crates/protoc-gen-prost)
     * `cargo install protoc-gen-tonic` - to install [tonic protobuf plugin](https://crates.io/crates/protoc-gen-tonic)
-* Cargo toolbelt (optional - if you will be doing releases)
-  * `cargo install cargo-update` - to easily keep your tools up-to-date
-  * `cargo install cargo-binstall` - to install binaries without compiling
-  * `cargo binstall cargo-binstall --force` - make future updates to use precompiled version
-  * `cargo binstall cargo-edit` - for setting crate versions during release
-  * `cargo binstall cargo-update` - for keeping up with major dependency updates
-  * `cargo binstall cargo-deny` - for linting dependencies
-  * `cargo binstall cargo-llvm-cov` - for coverage
-  * `cargo binstall bunyan` - for pretty-printing the JSON logs
+* Cargo toolbelt
+  * Prerequisites:
+    * `cargo install cargo-update` - to easily keep your tools up-to-date
+    * `cargo install cargo-binstall` - to install binaries without compiling
+    * `cargo binstall cargo-binstall --force` - make future updates of `binstall` to use precompiled version
+  * Recommended:
+    * `cargo binstall cargo-nextest` - advanced test runner
+    * `cargo binstall bunyan` - for pretty-printing the JSON logs
+    * `cargo binstall cargo-llvm-cov` - for test coverage
+  * Optional - if you will be doing releases:
+    * `cargo binstall cargo-edit` - for setting crate versions during release
+    * `cargo binstall cargo-update` - for keeping up with major dependency updates
+    * `cargo binstall cargo-deny` - for linting dependencies
 
 Clone the repository:
 ```shell
@@ -71,35 +74,36 @@ curl -s "https://get.kamu.dev" | KAMU_ALIAS=kamu-release sh
 New to Rust? Check out these [IDE configuration tip](#ide-tips).
 
 
-### Run Tests with Podman (Recommended)
-
+### Configure Podman as Default Runtime (Recommended)
 Set podman as preferred runtime for your user:
 ```shell
 cargo run --bin kamu-cli -- config set --user engine.runtime podman
 ```
 
-Run tests (note: upon first run the tests will need to pull extra images and will run longer):
+When you run tests or use `kamu` anywhere in your user directory you will now use `podman` runtime.
+
+If you need to run some tests under `Docker` use:
 ```shell
-cargo test
+KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 ```
 
 
-### Run Tests with Docker (Alternative)
-
-Run tests (note: upon first run the tests will need to pull extra images and will run longer):
-```shell
-KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test
-
-```
-
-### Using Nextest test runner (Optional)
-[Nextest](https://nexte.st/) is a better test runner.
-
-To use it run:
-
+### Run Tests
+You can run all tests as:
 ```sh
-cargo binstall cargo-nextest
-cargo nextest run
+make test
+```
+
+In most cases you can skip tests invlolving very heavy Spark and Flink engines by running:
+```sh
+make test-fast
+```
+
+These are just wappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries. 
+
+To run tests for a specific crate, e.g. `opendatafabric` use:
+```sh
+cargo nextest run -p opendatafabric
 ```
 
 

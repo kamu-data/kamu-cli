@@ -30,8 +30,8 @@ fn dump_state(hint: &str) {
     tracing::warn!("{}", std::str::from_utf8(&ps.stdout).unwrap());
 }
 
+#[test_group::group(containerized, flaky)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_container_terminate_not_called() {
     let rt = ContainerRuntime::default();
 
@@ -70,8 +70,8 @@ async fn test_container_terminate_not_called() {
     );
 }
 
+#[test_group::group(containerized, flaky)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_container_terminate_awaited() {
     let rt = ContainerRuntime::default();
 

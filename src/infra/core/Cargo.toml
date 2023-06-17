@@ -22,8 +22,6 @@ default = []
 
 ftp = ["dep:curl", "dep:curl-sys"]
 
-skip_docker_tests = []
-
 
 [dependencies]
 # Kamu
@@ -102,6 +100,7 @@ libc = "0.2"  # For getting uid:gid
 [dev-dependencies]
 env_logger = "0.10"
 filetime = "0.2"
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

@@ -89,8 +89,8 @@ async fn test_search_local_fs() {
     do_test_search(tmp_workspace_dir.path(), repo_url).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_search_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";

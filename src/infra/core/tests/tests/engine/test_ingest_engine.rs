@@ -26,8 +26,8 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_ingest_csv_with_engine() {
     let harness = IngestTestHarness::new();
 
@@ -92,8 +92,8 @@ async fn test_ingest_csv_with_engine() {
     );
 }
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_ingest_parquet_with_engine() {
     let harness = IngestTestHarness::new();
 

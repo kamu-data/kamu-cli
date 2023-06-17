@@ -429,8 +429,8 @@ async fn test_transform_common(transform: Transform) {
     );
 }
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_transform_with_engine_spark() {
     test_transform_common(
         MetadataFactory::transform()
@@ -441,8 +441,8 @@ async fn test_transform_with_engine_spark() {
     .await
 }
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_transform_with_engine_flink() {
     test_transform_common(
         MetadataFactory::transform()
@@ -453,8 +453,8 @@ async fn test_transform_with_engine_flink() {
     .await
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_transform_with_engine_datafusion() {
     test_transform_common(
         MetadataFactory::transform()

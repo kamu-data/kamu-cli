@@ -17,8 +17,8 @@ use url::Url;
 
 use crate::utils::Kamu;
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_pull_ingest_from_file() {
     let kamu = Kamu::new_workspace_tmp().await;
 

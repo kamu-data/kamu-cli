@@ -132,8 +132,8 @@ async fn test_fetch_url_http_unreachable() {
     assert!(!target_path.exists());
 }
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
@@ -160,8 +160,8 @@ async fn test_fetch_url_http_not_found() {
     assert!(!target_path.exists());
 }
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
@@ -261,8 +261,8 @@ async fn test_fetch_url_http_ok() {
     assert!(target_path.exists());
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_http_env_interpolation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
@@ -331,8 +331,8 @@ async fn test_fetch_url_http_env_interpolation() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "ftp")]
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
@@ -588,8 +588,8 @@ async fn test_fetch_files_glob() {
 // Container
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_fetch_container_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));

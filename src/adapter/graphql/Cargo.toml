@@ -17,10 +17,6 @@ publish = { workspace = true }
 doctest = false
 
 
-[features]
-skip_docker_tests = []
-
-
 [dependencies]
 opendatafabric = { workspace = true }
 kamu-data-utils = { workspace = true }

@@ -54,9 +54,9 @@ async fn run_s3_server() -> S3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[ignore = "We do not yet handle unauthorized errors correctly"]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_unauthorized() {
     let s3 = run_s3_server().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
@@ -68,16 +68,16 @@ async fn test_unauthorized() {
     );
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_bytes_long() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
@@ -99,8 +99,8 @@ async fn test_insert_bytes_long() {
     assert_eq!(&repo.get_bytes(&hash).await.unwrap()[..], data);
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
@@ -136,8 +136,8 @@ async fn test_insert_stream() {
     assert_eq!(data, b"foobar");
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_stream_long() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
@@ -170,24 +170,24 @@ async fn test_insert_stream_long() {
     assert_eq!(data, data_received[..]);
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_delete(&repo).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_precomputed() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_insert_expect() {
     let s3 = run_s3_server().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);

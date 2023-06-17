@@ -16,6 +16,21 @@ lint:
 
 
 ###############################################################################
+# Test
+###############################################################################
+
+# Run all tests using nextest and configured concurrency limits
+.PHONY: test
+test:
+	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run
+
+# Run all tests excluding the heavy engines
+.PHONY: test-fast
+test-fast:
+	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run -E '!test(::engine::)'
+
+
+###############################################################################
 # Release
 ###############################################################################
 
