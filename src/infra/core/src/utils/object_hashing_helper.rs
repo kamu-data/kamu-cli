@@ -22,6 +22,16 @@ pub struct ObjectHashingHelper {
     object_state: ObjectState,
 }
 
+enum ObjectState {
+    Local {
+        path: PathBuf,
+    },
+    Temp {
+        _temp_dir: TempDir,
+        temp_file_path: PathBuf,
+    },
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl ObjectHashingHelper {
@@ -33,9 +43,9 @@ impl ObjectHashingHelper {
         if object_file_url.scheme().eq("file") {
             let local_path = Path::new(object_file_url.path());
             Ok(Self {
-                object_state: ObjectState::Local(ObjectStateLocal {
-                    local_path: local_path.to_path_buf(),
-                }),
+                object_state: ObjectState::Local {
+                    path: local_path.to_path_buf(),
+                },
             })
         } else {
             let temp_dir = tempdir().int_err()?;
@@ -57,10 +67,10 @@ impl ObjectHashingHelper {
             }
 
             Ok(Self {
-                object_state: ObjectState::Stream(ObjectStateStream {
+                object_state: ObjectState::Temp {
                     _temp_dir: temp_dir,
                     temp_file_path,
-                }),
+                },
             })
         }
     }
@@ -68,34 +78,24 @@ impl ObjectHashingHelper {
     pub fn logical_hash(&self) -> Result<Multihash, datafusion::parquet::errors::ParquetError> {
         use kamu_data_utils::data::hash::get_parquet_logical_hash;
         match &self.object_state {
-            ObjectState::Local(local) => get_parquet_logical_hash(&local.local_path),
-            ObjectState::Stream(stream) => get_parquet_logical_hash(&stream.temp_file_path),
+            ObjectState::Local { path } => get_parquet_logical_hash(path),
+            ObjectState::Temp {
+                _temp_dir,
+                temp_file_path,
+            } => get_parquet_logical_hash(temp_file_path),
         }
     }
 
     pub fn physical_hash(&self) -> Result<Multihash, std::io::Error> {
         use kamu_data_utils::data::hash::get_file_physical_hash;
         match &self.object_state {
-            ObjectState::Local(local) => get_file_physical_hash(&local.local_path),
-            ObjectState::Stream(stream) => get_file_physical_hash(&stream.temp_file_path),
+            ObjectState::Local { path } => get_file_physical_hash(path),
+            ObjectState::Temp {
+                _temp_dir,
+                temp_file_path,
+            } => get_file_physical_hash(temp_file_path),
         }
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-enum ObjectState {
-    Local(ObjectStateLocal),
-    Stream(ObjectStateStream),
-}
-
-struct ObjectStateLocal {
-    local_path: PathBuf,
-}
-
-struct ObjectStateStream {
-    _temp_dir: TempDir,
-    temp_file_path: PathBuf,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
