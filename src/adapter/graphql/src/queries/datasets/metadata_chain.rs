@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use futures::TryStreamExt;
 use kamu_core::{self as domain, MetadataChainExt};
 use opendatafabric as odf;
 
+use crate::prelude::*;
 use crate::queries::Account;
-use crate::scalars::*;
-use crate::utils::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef
@@ -48,7 +46,8 @@ impl MetadataChain {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
-            .await?;
+            .await
+            .int_err()?;
         Ok(dataset)
     }
 
@@ -61,7 +60,8 @@ impl MetadataChain {
             block_hash: dataset
                 .as_metadata_chain()
                 .get_ref(&domain::BlockRef::Head)
-                .await?
+                .await
+                .int_err()?
                 .into(),
         }])
     }
@@ -95,8 +95,8 @@ impl MetadataChain {
             Some(block) => match format {
                 MetadataManifestFormat::Yaml => {
                     let ser = odf::serde::yaml::YamlMetadataBlockSerializer;
-                    let buffer = ser.write_manifest(&block)?;
-                    let content = std::str::from_utf8(&buffer)?;
+                    let buffer = ser.write_manifest(&block).int_err()?;
+                    let content = std::str::from_utf8(&buffer).int_err()?;
                     Ok(Some(content.to_string()))
                 }
             },
@@ -123,7 +123,8 @@ impl MetadataChain {
             .as_metadata_chain()
             .iter_blocks()
             .try_collect()
-            .await?;
+            .await
+            .int_err()?;
 
         let total_count = blocks.len();
 
@@ -163,7 +164,7 @@ impl MetadataChain {
                     Err(odf::serde::Error::UnsupportedVersion(e)) => {
                         return Ok(CommitResult::UnsupportedVersion(e.into()))
                     }
-                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.into()),
+                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.int_err().into()),
                 }
             }
         };
@@ -188,7 +189,7 @@ impl MetadataChain {
                     message: e.to_string(),
                 })
             }
-            Err(e @ domain::CommitError::Internal(_)) => return Err(e.into()),
+            Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };
 
         Ok(result)

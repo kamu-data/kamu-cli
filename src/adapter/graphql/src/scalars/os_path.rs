@@ -11,7 +11,7 @@ use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use async_graphql::*;
+use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OSPath(PathBuf);

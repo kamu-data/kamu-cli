@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
-
+use crate::extensions::*;
 use crate::mutations::*;
+use crate::prelude::*;
 use crate::queries::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -79,10 +79,17 @@ impl Mutation {
 }
 
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
+pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
+/// Returns schema builder without any extensions
+pub fn schema_builder(catalog: dill::Catalog) -> SchemaBuilder {
+    Schema::build(Query, Mutation, EmptySubscription).data(catalog)
+}
+
+/// Returns schema preconfigured with default extensions
 pub fn schema(catalog: dill::Catalog) -> Schema {
-    Schema::build(Query, Mutation, EmptySubscription)
+    schema_builder(catalog)
+        .extension(Tracing)
         .extension(extensions::ApolloTracing)
-        .data(catalog)
         .finish()
 }

@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use kamu_task_system as ts;
 
+use crate::prelude::*;
 use crate::queries::Task;
-use crate::scalars::*;
-use crate::utils::from_catalog;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -20,12 +18,13 @@ pub struct TasksMutations;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: Error handling
 #[Object]
 impl TasksMutations {
     /// Requests cancellation of the specified task
     async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
-        let task_state = task_sched.cancel_task(task_id.into()).await?;
+        let task_state = task_sched.cancel_task(task_id.into()).await.int_err()?;
         Ok(Task::new(task_state))
     }
 
@@ -41,7 +40,8 @@ impl TasksMutations {
             .create_task(ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
                 dataset_id: dataset_id.into(),
             }))
-            .await?;
+            .await
+            .int_err()?;
         Ok(Task::new(task_state))
     }
 
@@ -61,7 +61,8 @@ impl TasksMutations {
                 busy_time: busy_time_ms.map(|millis| std::time::Duration::from_millis(millis)),
                 end_with_outcome: end_with_outcome.map(Into::into),
             }))
-            .await?;
+            .await
+            .int_err()?;
         Ok(Task::new(task_state))
     }
 }

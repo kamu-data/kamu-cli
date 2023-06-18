@@ -7,11 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use kamu_core as domain;
 
-use crate::scalars::*;
-use crate::utils::*;
+use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +48,8 @@ impl DataQueries {
             }
             _ => unimplemented!(),
         }
-        .limit(0, Some(limit as usize))?;
+        .limit(0, Some(limit as usize))
+        .int_err()?;
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;
         let record_batches = match df.collect().await {

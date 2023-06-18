@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use futures::{StreamExt, TryStreamExt};
 use kamu_task_system as ts;
 
-use super::*;
-use crate::scalars::*;
-use crate::utils::from_catalog;
+use super::Task;
+use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +29,7 @@ impl Tasks {
         match task_sched.get_task(task_id.into()).await {
             Ok(task_state) => Ok(Some(Task::new(task_state))),
             Err(ts::GetTaskError::NotFound(_)) => Ok(None),
-            Err(err) => Err(err.into()),
+            Err(err) => Err(err.int_err().into()),
         }
     }
 

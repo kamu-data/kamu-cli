@@ -7,15 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 
+use crate::prelude::*;
 use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
@@ -39,7 +37,10 @@ impl Dataset {
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         // later?
-        let hdl = local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let hdl = local_repo
+            .resolve_dataset_ref(dataset_ref)
+            .await
+            .int_err()?;
         Ok(Dataset::new(Account::mock(), hdl))
     }
 
@@ -48,7 +49,8 @@ impl Dataset {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
-            .await?;
+            .await
+            .int_err()?;
         Ok(dataset)
     }
 
@@ -74,7 +76,8 @@ impl Dataset {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
             .get_summary(domain::GetSummaryOpts::default())
-            .await?;
+            .await
+            .int_err()?;
         Ok(summary.kind.into())
     }
 
@@ -97,7 +100,8 @@ impl Dataset {
             .iter_blocks_ref(&domain::BlockRef::Head)
             .map_ok(|(_, b)| b)
             .try_last()
-            .await?
+            .await
+            .int_err()?
             .expect("Dataset without blocks");
         Ok(seed.system_time)
     }
@@ -110,7 +114,8 @@ impl Dataset {
             .iter_blocks_ref(&domain::BlockRef::Head)
             .map_ok(|(_, b)| b)
             .try_first()
-            .await?
+            .await
+            .int_err()?
             .expect("Dataset without blocks");
         Ok(head.system_time)
     }

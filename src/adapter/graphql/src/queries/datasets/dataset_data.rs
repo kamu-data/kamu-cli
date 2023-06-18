@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use kamu_core::{self as domain, GetSummaryOpts, QueryError};
 use opendatafabric as odf;
 
-use crate::scalars::*;
-use crate::utils::*;
+use crate::prelude::*;
 
 pub struct DatasetData {
     dataset_handle: odf::DatasetHandle,
@@ -32,8 +30,12 @@ impl DatasetData {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
-            .await?;
-        let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
+            .await
+            .int_err()?;
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
         Ok(summary.num_records)
     }
 
@@ -43,8 +45,12 @@ impl DatasetData {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
-            .await?;
-        let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
+            .await
+            .int_err()?;
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
         Ok(summary.data_size)
     }
 

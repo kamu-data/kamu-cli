@@ -9,8 +9,9 @@
 
 use std::ops::Deref;
 
-use async_graphql::*;
 use opendatafabric as odf;
+
+use crate::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Multihash(odf::Multihash);

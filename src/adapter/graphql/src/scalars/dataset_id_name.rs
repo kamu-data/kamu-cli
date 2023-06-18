@@ -10,8 +10,9 @@
 use std::convert::TryFrom;
 use std::ops::Deref;
 
-use async_graphql::*;
 use opendatafabric as odf;
+
+use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // DatasetID

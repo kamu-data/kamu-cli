@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
+use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema
@@ -46,7 +46,8 @@ impl DataSchema {
         match format {
             DataSchemaFormat::Parquet => write_schema_parquet(&mut buf, &schema),
             DataSchemaFormat::ParquetJson => write_schema_parquet_json(&mut buf, &schema),
-        }?;
+        }
+        .int_err()?;
 
         Ok(DataSchema {
             format,

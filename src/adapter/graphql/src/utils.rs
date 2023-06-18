@@ -10,6 +10,9 @@
 use std::sync::Arc;
 
 use async_graphql::Context;
+use internal_error::*;
+
+///////////////////////////////////////////////////////////////////////////////
 
 // TODO: Return gql-specific error and get rid of unwraps
 pub(crate) fn from_catalog<T>(ctx: &Context<'_>) -> Result<Arc<T>, dill::InjectionError>
@@ -18,4 +21,42 @@ where
 {
     let cat = ctx.data::<dill::Catalog>().unwrap();
     cat.get_one::<T>()
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// This wrapper is unfortunately necessary because of poor error handling
+/// strategy of async-graphql that:
+///
+/// - prevents ? operator from quietly wrapping any Display value in query
+///   handler into an error thus putting us in danger of leaking sensitive info
+///
+/// - ensures that only `InternalError` can be returned via ? operator
+///
+/// - ensures that original error is preserved as `source` so it can be
+///   inspected and logged by the tracing middleware
+pub enum GqlError {
+    Internal(InternalError),
+    Gql(async_graphql::Error),
+}
+
+impl From<InternalError> for GqlError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}
+
+impl From<async_graphql::Error> for GqlError {
+    fn from(value: async_graphql::Error) -> Self {
+        Self::Gql(value)
+    }
+}
+
+impl Into<async_graphql::Error> for GqlError {
+    fn into(self) -> async_graphql::Error {
+        match self {
+            Self::Internal(err) => async_graphql::Error::new_with_source(err),
+            Self::Gql(err) => err,
+        }
+    }
 }

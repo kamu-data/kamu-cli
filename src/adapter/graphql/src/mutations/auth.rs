@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use serde::Deserialize;
+
+use crate::prelude::*;
 
 pub(crate) struct Auth;
 
@@ -40,17 +41,20 @@ impl Auth {
             ("code", code),
         ];
 
-        let client = self.get_client()?;
+        let client = self.get_client().int_err()?;
 
         let body = client
             .post("https://github.com/login/oauth/access_token")
             .header(reqwest::header::ACCEPT, "application/json")
             .form(&params)
             .send()
-            .await?
-            .error_for_status()?
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?
             .text()
-            .await?;
+            .await
+            .int_err()?;
 
         let token = serde_json::from_str::<AccessToken>(&body).map_err(|_| {
             Error::new("Failed to process auth response")
@@ -62,10 +66,13 @@ impl Auth {
             .bearer_auth(&token.access_token)
             .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
-            .await?
-            .error_for_status()?
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?
             .json::<AccountInfo>()
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(LoginResponse {
             token,
@@ -74,17 +81,20 @@ impl Auth {
     }
 
     async fn account_info(&self, access_token: String) -> Result<AccountInfo> {
-        let client = self.get_client()?;
+        let client = self.get_client().int_err()?;
 
         let account_info = client
             .get("https://api.github.com/user")
             .bearer_auth(access_token)
             .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
-            .await?
-            .error_for_status()?
+            .await
+            .int_err()?
+            .error_for_status()
+            .int_err()?
             .json::<AccountInfo>()
-            .await?;
+            .await
+            .int_err()?;
 
         Ok(account_info)
     }

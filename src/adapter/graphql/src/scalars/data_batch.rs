@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
+use crate::prelude::*;
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBatchFormat {
@@ -70,8 +70,8 @@ impl DataBatch {
                 }
             };
 
-            writer.write_batches(record_batches)?;
-            writer.finish()?;
+            writer.write_batches(record_batches).int_err()?;
+            writer.finish().int_err()?;
         }
 
         Ok(DataBatch {

@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use futures::TryStreamExt;
 use kamu_core::{self as domain, DatasetRepositoryExt};
 use opendatafabric as odf;
 
+use crate::prelude::*;
 use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -166,7 +164,7 @@ impl Datasets {
                             e.into(),
                         ))
                     }
-                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.into()),
+                    Err(e @ odf::serde::Error::IoError { .. }) => return Err(e.int_err().into()),
                 }
             }
         };

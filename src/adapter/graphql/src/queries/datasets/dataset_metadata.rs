@@ -7,16 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use chrono::prelude::*;
 use futures::TryStreamExt;
-use kamu_core::{self as domain, DatasetRepositoryExt, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};
 
+use crate::prelude::*;
 use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
 
 pub struct DatasetMetadata {
     dataset_handle: odf::DatasetHandle,
@@ -34,7 +32,8 @@ impl DatasetMetadata {
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let dataset = local_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
-            .await?;
+            .await
+            .int_err()?;
         Ok(dataset)
     }
 
@@ -49,7 +48,8 @@ impl DatasetMetadata {
             .iter_blocks_ref(&domain::BlockRef::Head)
             .filter_map_ok(|(_, b)| b.into_typed::<T>())
             .try_first()
-            .await?;
+            .await
+            .int_err()?;
         Ok(block)
     }
 
@@ -67,7 +67,8 @@ impl DatasetMetadata {
             .filter_data_stream_blocks()
             .filter_map_ok(|(_, b)| b.event.output_watermark)
             .try_first()
-            .await?)
+            .await
+            .int_err()?)
     }
 
     /// Latest data schema
@@ -81,7 +82,8 @@ impl DatasetMetadata {
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let res_schema = query_svc
             .get_schema(&self.dataset_handle.as_local_ref())
-            .await?;
+            .await
+            .int_err()?;
 
         match res_schema {
             Some(schema) => Ok(Some(DataSchema::from_parquet_schema(&schema, format)?)),
@@ -96,7 +98,8 @@ impl DatasetMetadata {
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
             .get_summary(domain::GetSummaryOpts::default())
-            .await?;
+            .await
+            .int_err()?;
 
         let mut dependencies: Vec<_> = Vec::new();
         for input in summary.dependencies.into_iter() {
@@ -104,9 +107,9 @@ impl DatasetMetadata {
             dependencies.push(Dataset::new(
                 Account::mock(),
                 local_repo
-                    .try_resolve_dataset_ref(&dataset_id.as_local_ref())
-                    .await?
-                    .unwrap(),
+                    .resolve_dataset_ref(&dataset_id.as_local_ref())
+                    .await
+                    .int_err()?,
             ));
         }
         Ok(dependencies)

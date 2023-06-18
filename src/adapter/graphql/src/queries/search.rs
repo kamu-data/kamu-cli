@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::*;
 use futures::TryStreamExt;
 use kamu_core::{self as domain, TryStreamExtExt};
 
-use crate::queries::*;
-use crate::scalars::*;
-use crate::utils::*;
+use crate::prelude::*;
+use crate::queries::{Account, Dataset};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Search
