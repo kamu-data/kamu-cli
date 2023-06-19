@@ -17,10 +17,6 @@ publish = { workspace = true }
 doctest = false
 
 
-[features]
-skip_docker_tests = []
-
-
 [dependencies]
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }

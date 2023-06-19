@@ -17,10 +17,6 @@ publish = { workspace = true }
 doctest = false
 
 
-[features]
-skip_docker_tests = []
-
-
 [dependencies]
 async-trait = "0.1"
 cfg-if = "1"
@@ -37,6 +33,7 @@ url = "2"
 
 [dev-dependencies]
 env_logger = "0.10"
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features=["rt", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

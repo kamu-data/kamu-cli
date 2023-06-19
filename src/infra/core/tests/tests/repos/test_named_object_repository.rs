@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use kamu::domain::repos::named_object_repository::GetError;
 use kamu::domain::*;
 use kamu::infra::*;
 use reqwest::Url;
 
-use crate::utils::HttpFileServer;
-use crate::utils::MinioServer;
-use std::assert_matches::assert_matches;
+use crate::utils::{HttpFileServer, MinioServer};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,8 +51,8 @@ async fn test_basics_local_fs() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_basics_s3() {
     let s3_srv = run_s3_server();
     let repo = NamedObjectRepositoryS3::from_url(&s3_srv.url);

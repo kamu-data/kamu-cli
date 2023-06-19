@@ -203,8 +203,8 @@ async fn test_dataset_schema_local_fs() {
     test_dataset_schema_common(catalog, &tempdir).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_dataset_schema_s3() {
     let s3 = run_s3_server().await;
     let catalog = create_catalog_with_s3_workspace(&s3).await;
@@ -240,8 +240,8 @@ async fn test_dataset_tail_local_fs() {
     test_dataset_tail_common(catalog, &tempdir).await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_dataset_tail_s3() {
     let s3 = run_s3_server().await;
     let catalog = create_catalog_with_s3_workspace(&s3).await;

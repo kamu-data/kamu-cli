@@ -11,8 +11,8 @@ use container_runtime::ContainerRuntime;
 
 use crate::common;
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_network_handle_free_not_called() {
     let rt = ContainerRuntime::default();
 
@@ -29,8 +29,8 @@ async fn test_network_handle_free_not_called() {
     assert!(!rt.has_network(&network_name).await.unwrap());
 }
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_network_handle_free_awaited() {
     let rt = ContainerRuntime::default();
 

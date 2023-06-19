@@ -13,7 +13,7 @@ use super::test_container::TEST_IMAGE;
 
 // Not really a test - used by CI to separate pulling of test images
 // into its own phase
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
+#[test_group::group(containerized, setup)]
 #[test_log::test(tokio::test)]
 async fn test_setup_pull_images() {
     let container_runtime = ContainerRuntime::default();

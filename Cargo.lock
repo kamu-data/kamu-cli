@@ -1336,6 +1336,7 @@ dependencies = [
  "rand 0.8.5",
  "regex",
  "serde",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -2811,6 +2812,7 @@ dependencies = [
  "strum_macros",
  "tar",
  "tempfile",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -2880,6 +2882,7 @@ dependencies = [
  "sha3",
  "tar",
  "tempfile",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -2948,6 +2951,7 @@ dependencies = [
  "shlex",
  "signal-hook",
  "tempfile",
+ "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -4979,6 +4983,19 @@ name = "termtree"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
+
+[[package]]
+name = "test-group"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "710211810efd63fc5fe6d800bf73f2f91bd69a9215e18ff7ca90beeb0bef98b4"
+dependencies = [
+ "hex",
+ "proc-macro2",
+ "quote",
+ "sha2 0.10.7",
+ "syn 2.0.18",
+]
 
 [[package]]
 name = "test-log"

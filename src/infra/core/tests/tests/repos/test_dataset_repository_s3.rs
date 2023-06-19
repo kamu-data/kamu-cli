@@ -59,8 +59,8 @@ async fn s3_repo(s3: &S3) -> DatasetRepositoryS3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset() {
     let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
@@ -70,8 +70,8 @@ async fn test_create_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_create_dataset_from_snapshot() {
     let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
@@ -81,8 +81,8 @@ async fn test_create_dataset_from_snapshot() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_rename_dataset() {
     let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;
@@ -92,8 +92,8 @@ async fn test_rename_dataset() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized)]
 #[tokio::test]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_delete_dataset() {
     let s3 = run_s3_server().await;
     let repo = s3_repo(&s3).await;

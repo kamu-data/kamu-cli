@@ -17,10 +17,6 @@ publish = { workspace = true }
 doctest = false
 
 
-[features]
-skip_docker_tests = []
-
-
 [dependencies]
 opendatafabric = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
@@ -56,6 +52,7 @@ env_logger = "0.10"
 fs_extra = "1.3"                                                    # Recursive folder copy
 serde = { version = "1", features = ["derive"] }
 tempfile = "3"
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tower-http = { version = "0.4", features = ["trace", "cors"] }

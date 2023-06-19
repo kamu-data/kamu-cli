@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt
       - name: cargo fmt --check
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1
       - run: cargo install --locked cargo-deny
       - run: cargo deny check
 
@@ -41,55 +41,67 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_FLAGS: --profile ci --features ftp
+      NEXTEST_FLAGS: --cargo-profile ci --features ftp
     steps:
       - uses: ibnesayeed/setup-ipfs@master
         with:
           ipfs_version: "0.19"
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+      - name: Install cargo tools
+        run: |
+          cargo install --locked cargo-nextest
       - name: Configure podman runtime
         run: |
           echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
       - name: build
         run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: pull test images
-        run: cargo test ${{ env.CARGO_FLAGS }} test_setup_pull_images -- --nocapture
+        run: cargo nextest run ${{ env.NEXTEST_FLAGS }} -E 'test(::setup::)' --no-capture
       - name: run tests
-        run: cargo test ${{ env.CARGO_FLAGS }}
-      - name: check git diff 
-        run: git diff && git diff-index --quiet HEAD # Ensure all generated files are up-to-date
+        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
+      - name: check git diff  # Ensures all generated files are up-to-date
+        run: git diff && git diff-index --quiet HEAD
 
   test_macos:
     name: Test / MacOS
     runs-on: macos-latest
     env:
-      CARGO_FLAGS: --profile ci --features skip_docker_tests
+      CARGO_FLAGS: --profile ci
+      NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+      - name: Install cargo tools
+        run: |
+          cargo install --locked cargo-nextest
       - name: build
         run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: run tests
-        run: cargo test ${{ env.CARGO_FLAGS }}
+        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
 
   test_windows:
     name: Test / Windows
     runs-on: windows-latest
     env:
-      CARGO_FLAGS: --profile ci --features skip_docker_tests
+      CARGO_FLAGS: --profile ci
+      NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
+      - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+      - name: Install cargo tools
+        run: |
+          cargo install --locked cargo-nextest
       - name: build
         run: cargo test ${{ env.CARGO_FLAGS }} --no-run
       - name: run tests
-        run: cargo test ${{ env.CARGO_FLAGS }}
+        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}

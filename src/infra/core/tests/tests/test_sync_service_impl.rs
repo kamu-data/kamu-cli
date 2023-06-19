@@ -355,8 +355,8 @@ async fn test_sync_to_from_local_fs() {
     .await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_sync_to_from_s3() {
     let access_key = "AKIAIOSFODNN7EXAMPLE";
     let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
@@ -405,8 +405,8 @@ async fn test_sync_from_http() {
     .await;
 }
 
+#[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(feature = "skip_docker_tests", ignore)]
 async fn test_sync_to_from_ipfs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
