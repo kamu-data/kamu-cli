@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
@@ -22,6 +23,8 @@ pub struct IngestServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     container_runtime: Arc<ContainerRuntime>,
+    run_info_dir: PathBuf,
+    cache_dir: PathBuf,
 }
 
 #[component(pub)]
@@ -31,12 +34,16 @@ impl IngestServiceImpl {
         local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
+        run_info_dir: PathBuf,
+        cache_dir: PathBuf,
     ) -> Self {
         Self {
             workspace_layout,
             local_repo,
             engine_provisioner,
             container_runtime,
+            run_info_dir,
+            cache_dir,
         }
     }
 
@@ -114,14 +121,14 @@ impl IngestServiceImpl {
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
             dataset,
+            &layout.data_dir,
             options.clone(),
-            layout,
             fetch_override,
             listener,
             self.engine_provisioner.clone(),
             self.container_runtime.clone(),
-            &self.workspace_layout.run_info_dir,
-            &self.workspace_layout.cache_dir,
+            &self.run_info_dir,
+            &self.cache_dir,
         )
         .await?;
 

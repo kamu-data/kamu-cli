@@ -227,12 +227,15 @@ async fn test_transform_common(transform: Transform) {
         local_repo.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
+        workspace_layout.run_info_dir.clone(),
+        workspace_layout.cache_dir.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         engine_provisioner.clone(),
         workspace_layout.clone(),
+        workspace_layout.run_info_dir.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////

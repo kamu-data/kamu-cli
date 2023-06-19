@@ -17,12 +17,14 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
 
+use crate::utils::object_processing_helper::ObjectProcessingHelper;
 use crate::*;
 
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     workspace_layout: Arc<WorkspaceLayout>,
+    run_info_dir: PathBuf,
 }
 
 #[component(pub)]
@@ -31,11 +33,13 @@ impl TransformServiceImpl {
         local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         workspace_layout: Arc<WorkspaceLayout>,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             local_repo,
             engine_provisioner,
             workspace_layout,
+            run_info_dir,
         }
     }
 
@@ -341,22 +345,19 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
 
-        // TODO: This service shouldn't know specifics of dataset layouts
-        let prev_checkpoint_path = prev_checkpoint.as_ref().map(|cp| {
-            self.workspace_layout
-                .dataset_layout(&dataset_handle.alias)
-                .checkpoint_path(&cp.physical_hash)
-        });
+        let prev_checkpoint_helper = if let Some(cp) = prev_checkpoint.as_ref() {
+            Some(
+                ObjectProcessingHelper::from(&cp.physical_hash, dataset.as_checkpoint_repo())
+                    .await
+                    .int_err()?,
+            )
+        } else {
+            None
+        };
 
         // TODO: Reconsider where to store staged files
-        let out_data_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(super::repos::get_staging_name());
-        let new_checkpoint_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(super::repos::get_staging_name());
+        let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
+        let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
 
         assert!(
             !dataset_handle.alias.is_multitenant(),
@@ -375,7 +376,8 @@ impl TransformServiceImpl {
                 vocab,
                 transform: source.transform,
                 inputs: query_inputs,
-                prev_checkpoint_path,
+                prev_checkpoint_path: prev_checkpoint_helper
+                    .map(|helper| helper.storage_path().clone()),
                 new_checkpoint_path,
                 out_data_path,
             },
@@ -505,10 +507,10 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
         let input_chain = input_dataset.as_metadata_chain();
-        let input_layout = self.workspace_layout.dataset_layout(&input_handle.alias);
 
         // List of part files and watermarks that will be used by the engine
         // Note: Engine will still filter the records by the offset interval
+        let mut data_slice_helpers = Vec::new();
         let mut data_paths = Vec::new();
         let mut explicit_watermarks = Vec::new();
 
@@ -525,7 +527,14 @@ impl TransformServiceImpl {
 
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 if let Some(slice) = &block.event.output_data {
-                    data_paths.push(input_layout.data_slice_path(slice));
+                    let data_slice_helper = ObjectProcessingHelper::from(
+                        &slice.physical_hash,
+                        input_dataset.as_data_repo(),
+                    )
+                    .await
+                    .int_err()?;
+                    data_paths.push(data_slice_helper.storage_path().clone());
+                    data_slice_helpers.push(data_slice_helper);
                 }
 
                 if let Some(wm) = block.event.output_watermark {
@@ -543,8 +552,9 @@ impl TransformServiceImpl {
 
         // TODO: Migrate to providing schema directly
         // TODO: Will not work with schema evolution
-        let schema_file = if let Some(p) = data_paths.last() {
-            p.clone()
+
+        let (schema_file, _) = if let Some(p) = data_paths.last() {
+            (p.clone(), None)
         } else {
             let last_slice = input_chain
                 .iter_blocks()
@@ -554,7 +564,16 @@ impl TransformServiceImpl {
                 .await
                 .int_err()?
                 .unwrap();
-            input_layout.data_slice_path(&last_slice)
+
+            let extra_data_slice_helper = ObjectProcessingHelper::from(
+                &last_slice.physical_hash,
+                input_dataset.as_data_repo(),
+            )
+            .await
+            .int_err()?;
+
+            let schema_file = extra_data_slice_helper.storage_path().clone();
+            (schema_file, Some(extra_data_slice_helper))
         };
 
         let vocab = match vocab_hint {

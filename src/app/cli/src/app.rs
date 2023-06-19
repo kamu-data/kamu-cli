@@ -150,10 +150,17 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     b.add::<ResourceLoaderImpl>();
     b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
-    b.add::<IngestServiceImpl>();
+    b.add_builder(
+        builder_for::<IngestServiceImpl>()
+            .with_run_info_dir(workspace_layout.run_info_dir.clone())
+            .with_cache_dir(workspace_layout.datasets_dir.clone()),
+    );
     b.bind::<dyn IngestService, IngestServiceImpl>();
 
-    b.add::<TransformServiceImpl>();
+    b.add_builder(
+        builder_for::<TransformServiceImpl>()
+            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+    );
     b.bind::<dyn TransformService, TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();

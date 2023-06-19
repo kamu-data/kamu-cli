@@ -18,7 +18,7 @@ use tempfile::{tempdir, TempDir};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ObjectHashingHelper {
+pub struct ObjectProcessingHelper {
     object_state: ObjectState,
 }
 
@@ -34,7 +34,7 @@ enum ObjectState {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl ObjectHashingHelper {
+impl ObjectProcessingHelper {
     pub async fn from(
         object_hash: &Multihash,
         object_repository: &dyn ObjectRepository,
@@ -94,6 +94,16 @@ impl ObjectHashingHelper {
                 _temp_dir,
                 temp_file_path,
             } => get_file_physical_hash(temp_file_path),
+        }
+    }
+
+    pub fn storage_path(&self) -> &PathBuf {
+        match &self.object_state {
+            ObjectState::Local { path } => path,
+            ObjectState::Temp {
+                _temp_dir,
+                temp_file_path,
+            } => &temp_file_path,
         }
     }
 }

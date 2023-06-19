@@ -104,6 +104,7 @@ async fn test_get_next_operation() {
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
         workspace_layout.clone(),
+        workspace_layout.run_info_dir.clone(),
     );
 
     let foo = new_root(local_repo.as_ref(), "foo").await;
@@ -153,6 +154,7 @@ async fn test_get_verification_plan_one_to_one() {
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
         workspace_layout.clone(),
+        workspace_layout.run_info_dir.clone(),
     );
 
     // Create root dataset

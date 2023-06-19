@@ -9,7 +9,7 @@
 
 pub mod docker_images;
 pub mod ipfs_wrapper;
-pub mod object_hashing_helper;
+pub mod object_processing_helper;
 pub mod s3_context;
 pub mod simple_transfer_protocol;
 pub mod smart_transfer_protocol;

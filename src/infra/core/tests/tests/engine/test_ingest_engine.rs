@@ -199,6 +199,8 @@ impl IngestTestHarness {
             local_repo.clone(),
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
+            workspace_layout.run_info_dir.clone(),
+            workspace_layout.cache_dir.clone(),
         ));
 
         Self {

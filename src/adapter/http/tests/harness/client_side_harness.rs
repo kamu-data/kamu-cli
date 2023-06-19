@@ -57,8 +57,12 @@ impl ClientSideHarness {
         b.add_value(EngineProvisionerNull)
             .bind::<dyn EngineProvisioner, EngineProvisionerNull>();
 
-        b.add::<IngestServiceImpl>()
-            .bind::<dyn IngestService, IngestServiceImpl>();
+        b.add_builder(
+            builder_for::<IngestServiceImpl>()
+                .with_run_info_dir(workspace_layout.run_info_dir.clone())
+                .with_cache_dir(workspace_layout.datasets_dir.clone()),
+        )
+        .bind::<dyn IngestService, IngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>()
             .bind::<dyn DatasetFactory, DatasetFactoryImpl>();
@@ -69,8 +73,11 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>()
             .bind::<dyn SyncService, SyncServiceImpl>();
 
-        b.add::<TransformServiceImpl>()
-            .bind::<dyn TransformService, TransformServiceImpl>();
+        b.add_builder(
+            builder_for::<TransformServiceImpl>()
+                .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        )
+        .bind::<dyn TransformService, TransformServiceImpl>();
 
         b.add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>();
