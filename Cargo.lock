@@ -3003,7 +3003,9 @@ dependencies = [
  "digest 0.10.7",
  "opendatafabric",
  "sha3",
+ "thiserror",
  "tracing",
+ "url",
 ]
 
 [[package]]

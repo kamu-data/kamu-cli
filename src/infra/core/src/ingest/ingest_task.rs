@@ -17,13 +17,12 @@ use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use super::*;
-use crate::*;
 
 pub struct IngestTask {
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
+    dataset_data_dir: PathBuf,
     options: IngestOptions,
-    layout: DatasetLayout,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
 
@@ -44,8 +43,8 @@ impl IngestTask {
     pub async fn new<'a>(
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
+        dataset_data_dir: &PathBuf,
         options: IngestOptions,
-        layout: DatasetLayout,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -137,8 +136,8 @@ impl IngestTask {
         Ok(Self {
             options,
             dataset_handle,
+            dataset_data_dir: dataset_data_dir.clone(),
             next_offset: next_offset.unwrap(),
-            layout,
             dataset,
             fetch_override,
             listener,
@@ -464,15 +463,29 @@ impl IngestTask {
         let out_checkpoint_cache_key = self.get_random_cache_key("read-cpt-");
         let out_checkpoint_path = self.cache_dir.join(&out_checkpoint_cache_key);
 
+        let prev_checkpoint_path = if let Some(cp) = &self.prev_checkpoint {
+            Some(
+                kamu_data_utils::data::local_url::into_local_path(
+                    self.dataset
+                        .as_checkpoint_repo()
+                        .get_internal_url(&cp)
+                        .await,
+                )
+                .int_err()?,
+            )
+        } else {
+            None
+        };
+
         let engine_response = self
             .read_service
             .read(
                 &self.dataset_handle,
-                &self.layout,
+                &self.dataset_data_dir,
                 self.source.as_ref().unwrap(),
                 &src_data_path,
                 self.prev_watermark.clone(),
-                self.prev_checkpoint.clone(),
+                prev_checkpoint_path.as_ref().map(|cp| cp.as_path()),
                 &self.vocab,
                 system_time.clone(),
                 source_event_time,

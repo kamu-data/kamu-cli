@@ -26,3 +26,6 @@ tracing = { version = "0.1", default-features = false }
 
 digest = "0.10"
 sha3 = "0.10"
+thiserror = "1"
+url = "2"
+
