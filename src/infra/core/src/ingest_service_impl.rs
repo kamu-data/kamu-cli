@@ -121,8 +121,8 @@ impl IngestServiceImpl {
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
             dataset,
-            &layout.data_dir,
             options.clone(),
+            layout,
             fetch_override,
             listener,
             self.engine_provisioner.clone(),

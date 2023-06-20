@@ -15,7 +15,7 @@ use kamu_core::engine::IngestRequest;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::utils::object_processing_helper::ObjectProcessingHelper;
+use crate::DatasetLayout;
 
 pub struct ReadService {
     engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -30,9 +30,8 @@ impl ReadService {
     pub async fn read<'a, 'b>(
         &'a self,
         dataset_handle: &'b DatasetHandle,
-        dataset: &'b dyn Dataset,
+        dataset_layout: &'b DatasetLayout,
         source: &'b SetPollingSource,
-        dataset_data_path: &'b Path,
         src_data_path: &'b Path,
         prev_watermark: Option<DateTime<Utc>>,
         prev_checkpoint: Option<Multihash>,
@@ -62,16 +61,6 @@ impl ReadService {
             .provision_ingest_engine(listener.get_engine_provisioning_listener())
             .await?;
 
-        let prev_checkpoint_helper = if let Some(cp_hash) = prev_checkpoint {
-            Some(
-                ObjectProcessingHelper::from(&cp_hash, dataset.as_checkpoint_repo())
-                    .await
-                    .int_err()?,
-            )
-        } else {
-            None
-        };
-
         let request = IngestRequest {
             dataset_id: dataset_handle.id.clone(),
             dataset_name: dataset_handle.alias.dataset_name.clone(),
@@ -82,9 +71,8 @@ impl ReadService {
             source: source.clone(),
             dataset_vocab: vocab.clone(),
             prev_watermark,
-            prev_checkpoint_path: prev_checkpoint_helper
-                .map(|cp_helper| cp_helper.storage_path().clone()),
-            data_dir: dataset_data_path.to_owned(),
+            prev_checkpoint_path: prev_checkpoint.map(|cp| dataset_layout.checkpoint_path(&cp)),
+            data_dir: dataset_layout.data_dir.clone(),
             output_data_path: out_data_path.to_owned(),
             new_checkpoint_path: out_checkpoint_path.to_owned(),
         };

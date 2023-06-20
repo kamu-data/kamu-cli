@@ -14,7 +14,7 @@ use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::utils::object_processing_helper::ObjectProcessingHelper;
+use crate::utils::cached_object::CachedObject;
 use crate::*;
 
 pub struct VerificationServiceImpl {
@@ -96,11 +96,8 @@ impl VerificationServiceImpl {
                     ));
                 }
 
-                let data_hashing_helper = ObjectProcessingHelper::from(
-                    &output_slice.physical_hash,
-                    dataset.as_data_repo(),
-                )
-                .await?;
+                let data_hashing_helper =
+                    CachedObject::from(&output_slice.physical_hash, dataset.as_data_repo()).await?;
 
                 // Do a fast pass using physical hash
                 let physical_hash_actual = data_hashing_helper.physical_hash().int_err()?;
@@ -157,11 +154,9 @@ impl VerificationServiceImpl {
                     }
 
                     // Check physical hash
-                    let checkpoint_hashing_helper = ObjectProcessingHelper::from(
-                        &checkpoint.physical_hash,
-                        dataset.as_checkpoint_repo(),
-                    )
-                    .await?;
+                    let checkpoint_hashing_helper =
+                        CachedObject::from(&checkpoint.physical_hash, dataset.as_checkpoint_repo())
+                            .await?;
 
                     let physical_hash_actual =
                         checkpoint_hashing_helper.physical_hash().int_err()?;

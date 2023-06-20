@@ -17,12 +17,13 @@ use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use super::*;
+use crate::*;
 
 pub struct IngestTask {
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
-    dataset_data_dir: PathBuf,
     options: IngestOptions,
+    layout: DatasetLayout,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
 
@@ -43,8 +44,8 @@ impl IngestTask {
     pub async fn new<'a>(
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
-        dataset_data_dir: &PathBuf,
         options: IngestOptions,
+        layout: DatasetLayout,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -136,8 +137,8 @@ impl IngestTask {
         Ok(Self {
             options,
             dataset_handle,
-            dataset_data_dir: dataset_data_dir.clone(),
             next_offset: next_offset.unwrap(),
+            layout,
             dataset,
             fetch_override,
             listener,
@@ -467,9 +468,8 @@ impl IngestTask {
             .read_service
             .read(
                 &self.dataset_handle,
-                self.dataset.as_ref(),
+                &self.layout,
                 self.source.as_ref().unwrap(),
-                &self.dataset_data_dir,
                 &src_data_path,
                 self.prev_watermark.clone(),
                 self.prev_checkpoint.clone(),

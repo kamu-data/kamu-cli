@@ -18,7 +18,7 @@ use tempfile::{tempdir, TempDir};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ObjectProcessingHelper {
+pub struct CachedObject {
     object_state: ObjectState,
 }
 
@@ -34,7 +34,7 @@ enum ObjectState {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl ObjectProcessingHelper {
+impl CachedObject {
     pub async fn from(
         object_hash: &Multihash,
         object_repository: &dyn ObjectRepository,
