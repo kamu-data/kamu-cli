@@ -9,7 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_core::ObjectRepository;
@@ -40,8 +40,7 @@ impl CachedObject {
         object_repository: &dyn ObjectRepository,
     ) -> Result<Self, InternalError> {
         let object_file_url = object_repository.get_internal_url(object_hash).await;
-        if object_file_url.scheme().eq("file") {
-            let local_path = Path::new(object_file_url.path());
+        if let Ok(local_path) = object_file_url.to_file_path() {
             Ok(Self {
                 object_state: ObjectState::Local {
                     path: local_path.to_path_buf(),
