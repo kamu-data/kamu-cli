@@ -55,18 +55,18 @@ impl Command for AliasDeleteCommand {
         let mut count = 0;
 
         if self.all {
-            count += aliases.clear(RemoteAliasKind::Pull)?;
-            count += aliases.clear(RemoteAliasKind::Push)?;
+            count += aliases.clear(RemoteAliasKind::Pull).await?;
+            count += aliases.clear(RemoteAliasKind::Push).await?;
         } else if let Some(alias) = &self.alias {
             let both = !self.pull && !self.push;
 
             if self.pull || both {
-                if aliases.delete(alias, RemoteAliasKind::Pull)? {
+                if aliases.delete(alias, RemoteAliasKind::Pull).await? {
                     count += 1;
                 }
             }
             if self.push || both {
-                if aliases.delete(alias, RemoteAliasKind::Push)? {
+                if aliases.delete(alias, RemoteAliasKind::Push).await? {
                     count += 1;
                 }
             }

@@ -17,7 +17,7 @@ use super::AccessError;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-pub trait NamedObjectRepository {
+pub trait NamedObjectRepository: Sync + Send {
     /// Resolves reference to the object hash it's pointing to
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError>;
 

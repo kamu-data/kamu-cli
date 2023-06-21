@@ -34,7 +34,7 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V1_WorkspaceCacheDir;
+    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V2_DatasetConfig;
 
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
@@ -76,6 +76,7 @@ impl WorkspaceLayout {
 pub enum WorkspaceVersion {
     V0_Initial,
     V1_WorkspaceCacheDir,
+    V2_DatasetConfig,
     Unknown(u32),
 }
 
@@ -91,6 +92,7 @@ impl From<u32> for WorkspaceVersion {
         match value {
             0 => WorkspaceVersion::V0_Initial,
             1 => WorkspaceVersion::V1_WorkspaceCacheDir,
+            2 => WorkspaceVersion::V2_DatasetConfig,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -101,6 +103,7 @@ impl Into<u32> for WorkspaceVersion {
         match self {
             Self::V0_Initial => 0,
             Self::V1_WorkspaceCacheDir => 1,
+            Self::V2_DatasetConfig => 2,
             Self::Unknown(value) => value,
         }
     }

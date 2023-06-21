@@ -48,11 +48,8 @@ impl ClientSideHarness {
         )
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
-        b.add_builder(
-            builder_for::<RemoteAliasesRegistryImpl>()
-                .with_datasets_dir(workspace_layout.datasets_dir.clone()),
-        )
-        .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
+        b.add::<RemoteAliasesRegistryImpl>()
+            .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
         b.add_value(EngineProvisionerNull)
             .bind::<dyn EngineProvisioner, EngineProvisionerNull>();

@@ -141,10 +141,7 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
-    b.add_builder(
-        builder_for::<RemoteAliasesRegistryImpl>()
-            .with_datasets_dir(workspace_layout.repos_dir.clone()),
-    );
+    b.add::<RemoteAliasesRegistryImpl>();
     b.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
     b.add::<ResourceLoaderImpl>();

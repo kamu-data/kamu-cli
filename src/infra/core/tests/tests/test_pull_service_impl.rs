@@ -370,6 +370,7 @@ async fn test_pull_batching_complex_with_remote() {
             &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
             RemoteAliasKind::Pull,
         )
+        .await
         .unwrap();
 
     // Pulling E results in a sync
@@ -715,10 +716,7 @@ impl PullTestHarness {
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
             workspace_layout.repos_dir.clone(),
         ));
-        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
-            local_repo.clone(),
-            workspace_layout.datasets_dir.clone(),
-        ));
+        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(local_repo.clone()));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), local_repo.clone()));

@@ -458,4 +458,8 @@ where
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository {
         &self.checkpoint_repo
     }
+
+    fn as_info_repo(&self) -> &dyn NamedObjectRepository {
+        &self.info_repo
+    }
 }

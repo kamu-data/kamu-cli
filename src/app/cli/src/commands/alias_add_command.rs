@@ -65,7 +65,7 @@ impl Command for AliasAddCommand {
             .map_err(CLIError::failure)?;
 
         if self.pull {
-            if aliases.add(&self.alias, RemoteAliasKind::Pull)? {
+            if aliases.add(&self.alias, RemoteAliasKind::Pull).await? {
                 eprintln!(
                     "{}: {} ({})",
                     console::style("Added").green(),
@@ -76,7 +76,7 @@ impl Command for AliasAddCommand {
         }
 
         if self.push {
-            if aliases.add(&self.alias, RemoteAliasKind::Push)? {
+            if aliases.add(&self.alias, RemoteAliasKind::Push).await? {
                 eprintln!(
                     "{}: {} ({})",
                     console::style("Added").green(),

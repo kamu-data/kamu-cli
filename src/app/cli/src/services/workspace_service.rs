@@ -115,6 +115,7 @@ impl WorkspaceService {
 
             match current_version {
                 WorkspaceVersion::V0_Initial => self.upgrade_0_to_1()?,
+                WorkspaceVersion::V1_WorkspaceCacheDir => self.upgrade_1_to_2()?,
                 _ => unreachable!(),
             }
 
@@ -142,6 +143,22 @@ impl WorkspaceService {
             }
         }
         let _ = std::fs::create_dir(&self.workspace_layout.cache_dir);
+        Ok(())
+    }
+
+    fn upgrade_1_to_2(&self) -> Result<(), InternalError> {
+        for entry in self.workspace_layout.datasets_dir.read_dir().int_err()? {
+            let dataset_dir = entry.int_err()?;
+            let dataset_config_path = dataset_dir.path().join("config");
+            if dataset_config_path.is_file() {
+                tracing::info!(
+                    ?dataset_config_path,
+                    "Moving DatasetConfig file from old location"
+                );
+                let new_dataset_config_path = dataset_dir.path().join("info/config");
+                std::fs::rename(dataset_config_path, new_dataset_config_path).int_err()?;
+            }
+        }
         Ok(())
     }
 }

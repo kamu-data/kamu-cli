@@ -15,6 +15,7 @@ use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
+use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
 use crate::utils::{CommandError, Kamu};
@@ -71,6 +72,17 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     std::fs::write(ingest_cache_dir.join("fetch.yaml"), b"<fetch.yaml>").unwrap();
     std::fs::write(ingest_cache_dir.join("commit.yaml"), b"<commit.yaml>").unwrap();
+
+    // Dataset config
+    let dataset_config = DatasetConfig::default();
+    let manifest = Manifest {
+        kind: "DatasetConfig".to_owned(),
+        version: 1,
+        content: dataset_config,
+    };
+    let v0_config_path = dataset_dir.join("config");
+    let file = std::fs::File::create(&v0_config_path).unwrap();
+    serde_yaml::to_writer(file, &manifest).unwrap();
 }
 
 #[test_log::test(tokio::test)]
@@ -85,6 +97,11 @@ async fn test_workspace_upgrade() {
 
     assert!(!temp_dir.path().join(".kamu/version").is_file());
     assert!(temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+    assert!(temp_dir.path().join(".kamu/datasets/foo/config").is_file());
+    assert!(!temp_dir
+        .path()
+        .join(".kamu/datasets/foo/info/config")
+        .is_file());
     assert_eq!(
         workspace_svc.workspace_version().unwrap(),
         Some(WorkspaceVersion::V0_Initial)
@@ -107,6 +124,11 @@ async fn test_workspace_upgrade() {
 
     assert!(temp_dir.path().join(".kamu/version").is_file());
     assert!(!temp_dir.path().join(".kamu/datasets/foo/cache").is_dir());
+    assert!(!temp_dir.path().join(".kamu/datasets/foo/config").is_file());
+    assert!(temp_dir
+        .path()
+        .join(".kamu/datasets/foo/info/config")
+        .is_file());
 
     kamu.execute(["list"]).await.unwrap();
 }

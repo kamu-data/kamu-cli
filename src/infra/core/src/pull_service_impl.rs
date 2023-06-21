@@ -400,7 +400,7 @@ impl PullServiceImpl {
                             .await
                             .int_err()?
                             .add(&remote_ref, RemoteAliasKind::Pull)
-                            .int_err()?;
+                            .await?;
                     }
                 }
             }
