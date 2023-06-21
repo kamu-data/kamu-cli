@@ -103,7 +103,6 @@ async fn test_get_next_operation() {
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        workspace_layout.clone(),
         workspace_layout.run_info_dir.clone(),
     );
 
@@ -153,7 +152,6 @@ async fn test_get_verification_plan_one_to_one() {
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        workspace_layout.clone(),
         workspace_layout.run_info_dir.clone(),
     );
 

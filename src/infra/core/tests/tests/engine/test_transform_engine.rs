@@ -223,7 +223,6 @@ async fn test_transform_common(transform: Transform) {
     ));
 
     let ingest_svc = IngestServiceImpl::new(
-        workspace_layout.clone(),
         local_repo.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
@@ -234,7 +233,6 @@ async fn test_transform_common(transform: Transform) {
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         engine_provisioner.clone(),
-        workspace_layout.clone(),
         workspace_layout.run_info_dir.clone(),
     );
 

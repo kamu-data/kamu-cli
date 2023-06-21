@@ -17,12 +17,9 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::*;
-
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    workspace_layout: Arc<WorkspaceLayout>,
     run_info_dir: PathBuf,
 }
 
@@ -31,13 +28,11 @@ impl TransformServiceImpl {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        workspace_layout: Arc<WorkspaceLayout>,
         run_info_dir: PathBuf,
     ) -> Self {
         Self {
             local_repo,
             engine_provisioner,
-            workspace_layout,
             run_info_dir,
         }
     }
@@ -697,7 +692,6 @@ impl TransformServiceImpl {
         let source = source.ok_or(
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
@@ -755,6 +749,9 @@ impl TransformServiceImpl {
                 None
             };
 
+            let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
+            let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
+
             let step = VerificationStep {
                 operation: TransformOperation {
                     dataset_handle: dataset_handle.clone(),
@@ -775,8 +772,8 @@ impl TransformServiceImpl {
                         vocab: vocab.clone().unwrap_or_default(),
                         inputs,
                         prev_checkpoint_path,
-                        new_checkpoint_path: dataset_layout.checkpoints_dir.join(".pending"),
-                        out_data_path: dataset_layout.data_dir.join(".pending"),
+                        new_checkpoint_path,
+                        out_data_path,
                     },
                 },
                 expected_block: block,

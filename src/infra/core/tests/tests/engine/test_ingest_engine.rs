@@ -195,7 +195,6 @@ impl IngestTestHarness {
         ));
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(
-            workspace_layout.clone(),
             local_repo.clone(),
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
