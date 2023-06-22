@@ -54,8 +54,18 @@ impl DatasetRepositoryLocalFs {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<impl Dataset, InternalError> {
-        let layout = DatasetLayout::new(self.root.join(&dataset_alias.dataset_name));
+        let layout = DatasetLayout::new(self.get_dataset_path(&dataset_alias));
         Ok(DatasetFactoryImpl::get_local_fs(layout))
+    }
+
+    fn get_dataset_path(&self, dataset_alias: &DatasetAlias) -> PathBuf {
+        if dataset_alias.is_multitenant() {
+            self.root
+                .join(dataset_alias.account_name.as_ref().unwrap())
+                .join(dataset_alias.dataset_name.as_str())
+        } else {
+            self.root.join(dataset_alias.dataset_name.as_str())
+        }
     }
 }
 
@@ -193,15 +203,9 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset_path = if dataset_alias.is_multitenant() {
-            self.root
-                .join(dataset_alias.account_name.as_ref().unwrap())
-                .join(dataset_alias.dataset_name.as_str())
-        } else {
-            self.root.join(dataset_alias.dataset_name.as_str())
-        };
-
+        let dataset_path = self.get_dataset_path(&dataset_alias);
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
+
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
         // There are three possiblities at this point:

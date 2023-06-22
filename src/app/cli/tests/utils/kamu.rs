@@ -12,7 +12,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use futures::stream::TryStreamExt;
 use kamu::domain::*;
 use kamu::testing::ParquetReaderHelper;
 use kamu::*;
@@ -61,11 +60,6 @@ impl Kamu {
         &self.workspace_path
     }
 
-    pub fn dataset_layout(&self, dataset_name: &DatasetName) -> DatasetLayout {
-        self.workspace_layout
-            .dataset_layout(&DatasetAlias::new(None, dataset_name.clone()))
-    }
-
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let local_repo = DatasetRepositoryLocalFs::new(self.workspace_layout.datasets_dir.clone());
 
@@ -73,16 +67,23 @@ impl Kamu {
             .get_dataset(&dataset_name.as_local_ref())
             .await
             .unwrap();
-        let part_file = dataset
+        let slice = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
             .filter_map_ok(|(_, b)| b.event.output_data)
-            .map_ok(|slice| self.dataset_layout(dataset_name).data_slice_path(&slice))
             .try_first()
             .await
             .unwrap()
-            .expect("Data file not found");
+            .expect("Data slice not found");
+
+        let part_file = kamu_data_utils::data::local_url::into_local_path(
+            dataset
+                .as_data_repo()
+                .get_internal_url(&slice.physical_hash)
+                .await,
+        )
+        .unwrap();
 
         ParquetReaderHelper::open(&part_file)
     }

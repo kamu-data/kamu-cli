@@ -9,10 +9,6 @@
 
 use std::path::PathBuf;
 
-use opendatafabric::DatasetAlias;
-
-use crate::DatasetLayout;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Consider extracting to kamu-cli layer
@@ -59,11 +55,6 @@ impl WorkspaceLayout {
         std::fs::create_dir(&ws.run_info_dir)?;
         std::fs::write(&ws.version_path, Self::VERSION.to_string())?;
         Ok(ws)
-    }
-
-    pub fn dataset_layout(&self, alias: &DatasetAlias) -> DatasetLayout {
-        assert!(!alias.is_multitenant(), "Multitenancy is not yet supported");
-        DatasetLayout::new(self.datasets_dir.join(&alias.dataset_name))
     }
 }
 
