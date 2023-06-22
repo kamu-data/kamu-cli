@@ -18,6 +18,7 @@ use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::parquet::basic::{Compression, GzipLevel};
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::parquet::record::RowAccessor;
+use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::*;
@@ -71,7 +72,7 @@ async fn test_ingest_csv_with_engine() {
         .ingest_snapshot(dataset_snapshot, &dataset_name)
         .await;
 
-    let parquet_reader = harness.read_datafile(&dataset_name);
+    let parquet_reader = harness.read_datafile(&dataset_name).await;
 
     assert_eq!(
         parquet_reader.get_column_names(),
@@ -150,7 +151,7 @@ async fn test_ingest_parquet_with_engine() {
         .ingest_snapshot(dataset_snapshot, &dataset_name)
         .await;
 
-    let parquet_reader = harness.read_datafile(&dataset_name);
+    let parquet_reader = harness.read_datafile(&dataset_name).await;
 
     assert_eq!(
         parquet_reader.get_column_names(),
@@ -175,7 +176,7 @@ async fn test_ingest_parquet_with_engine() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    workspace_layout: Arc<WorkspaceLayout>,
+    _workspace_layout: Arc<WorkspaceLayout>,
     local_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
 }
@@ -204,7 +205,7 @@ impl IngestTestHarness {
 
         Self {
             temp_dir,
-            workspace_layout,
+            _workspace_layout: workspace_layout,
             local_repo,
             ingest_svc,
         }
@@ -227,20 +228,26 @@ impl IngestTestHarness {
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
-    fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let dataset_layout = self
-            .workspace_layout
-            .dataset_layout(&DatasetAlias::new(None, dataset_name.clone()));
+    async fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
+        let dataset_ref = dataset_name.as_local_ref();
+        let dataset = self.local_repo.get_dataset(&dataset_ref).await.unwrap();
 
-        assert!(dataset_layout.data_dir.exists());
+        let (_, block) = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks()
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
 
-        let part_file = match dataset_layout.data_dir.read_dir().unwrap().next() {
-            Some(Ok(entry)) => entry.path(),
-            _ => panic!(
-                "Data file not found in {}",
-                dataset_layout.data_dir.display()
-            ),
-        };
+        let part_file = kamu_data_utils::data::local_url::into_local_path(
+            dataset
+                .as_data_repo()
+                .get_internal_url(&block.event.output_data.unwrap().physical_hash)
+                .await,
+        )
+        .unwrap();
 
         ParquetReaderHelper::open(&part_file)
     }

@@ -157,7 +157,7 @@ impl WorkspaceService {
                 );
 
                 let dataset_info_dir = dataset_dir.path().join("info");
-                if (!dataset_info_dir.exists()) {
+                if !dataset_info_dir.exists() {
                     std::fs::create_dir(dataset_info_dir).int_err()?;
                 }
 

@@ -26,7 +26,6 @@ async fn test_verify_data_consistency() {
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let dataset_layout = workspace_layout.dataset_layout(&dataset_alias);
 
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
@@ -146,13 +145,15 @@ async fn test_verify_data_consistency() {
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
 
-    ParquetWriterHelper::from_record_batch(
-        &dataset_layout
-            .data_dir
-            .join(data_physical_hash.to_multibase_string()),
-        &record_batch,
+    let local_data_path = kamu_data_utils::data::local_url::into_local_path(
+        dataset
+            .as_data_repo()
+            .get_internal_url(&data_physical_hash)
+            .await,
     )
     .unwrap();
+
+    ParquetWriterHelper::from_record_batch(&local_data_path, &record_batch).unwrap();
 
     // Check verification fails
     assert_matches!(
