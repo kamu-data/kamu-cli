@@ -10,8 +10,13 @@ content:
       # Where to fetch the data from.
       fetch:
         kind: url
-        # Source: https://www.alberta.ca/stats/covid-19-alberta-statistics.htm
-        url: https://www.alberta.ca/data/stats/covid-19-alberta-statistics-data.csv
+        # Note: On July 15, 2023 Government of Alberta have stopped providing
+        # disaggregated data on COVID-19 cases. Another testament to how short-lived are the 
+        # data pipelines that rely on constant human effort to keep running.
+        # To keep the demo operational we have switched the source to use a last seen version of this dataset.
+        #
+        # Original source URL: https://www.alberta.ca/data/stats/covid-19-alberta-statistics-data.csv
+        url: https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/demo/covid/covid-19-alberta-statistics-data.csv
       # How to interpret the data.
       read:
         kind: csv
