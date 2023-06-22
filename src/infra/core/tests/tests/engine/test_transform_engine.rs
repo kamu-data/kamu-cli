@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
@@ -23,19 +24,39 @@ use opendatafabric::*;
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
-    dataset_layout: DatasetLayout,
+    run_info_dir: PathBuf,
 }
 
 impl DatasetHelper {
-    fn new(dataset: Arc<dyn Dataset>, dataset_layout: DatasetLayout) -> Self {
+    fn new(dataset: Arc<dyn Dataset>, run_info_dir: PathBuf) -> Self {
         Self {
             dataset,
-            dataset_layout,
+            run_info_dir,
         }
     }
 
     async fn block_count(&self) -> usize {
         self.dataset.as_metadata_chain().iter_blocks().count().await
+    }
+
+    async fn data_slice_path(&self, data_slice: &DataSlice) -> PathBuf {
+        kamu_data_utils::data::local_url::into_local_path(
+            self.dataset
+                .as_data_repo()
+                .get_internal_url(&data_slice.physical_hash)
+                .await,
+        )
+        .unwrap()
+    }
+
+    async fn checkpoint_path(&self, checkpoint: &Checkpoint) -> PathBuf {
+        kamu_data_utils::data::local_url::into_local_path(
+            self.dataset
+                .as_checkpoint_repo()
+                .get_internal_url(&checkpoint.physical_hash)
+                .await,
+        )
+        .unwrap()
     }
 
     async fn get_data_of_block(&self, block_hash: &Multihash) -> ParquetReaderHelper {
@@ -46,14 +67,16 @@ impl DatasetHelper {
             .await
             .unwrap();
 
-        let data_path = self.dataset_layout.data_slice_path(
-            block
-                .as_data_stream_block()
-                .unwrap()
-                .event
-                .output_data
-                .unwrap(),
-        );
+        let data_path = self
+            .data_slice_path(
+                block
+                    .as_data_stream_block()
+                    .unwrap()
+                    .event
+                    .output_data
+                    .unwrap(),
+            )
+            .await;
 
         ParquetReaderHelper::open(&data_path)
     }
@@ -85,7 +108,7 @@ impl DatasetHelper {
             .unwrap();
 
         let orig_slice = orig_block.event.output_data.as_ref().unwrap();
-        let orig_data_path = self.dataset_layout.data_slice_path(orig_slice);
+        let orig_data_path = self.data_slice_path(&orig_slice).await;
 
         // Re-encode data
         let mut reader =
@@ -100,7 +123,7 @@ impl DatasetHelper {
             (false, record_batch)
         };
 
-        let tmp_path: std::path::PathBuf = self.dataset_layout.data_dir.join(".tmpdata");
+        let tmp_path: std::path::PathBuf = self.run_info_dir.join(".tmpdata");
         let mut arrow_writer = ArrowWriter::try_new(
             std::fs::File::create(&tmp_path).unwrap(),
             record_batch.schema(),
@@ -149,15 +172,11 @@ impl DatasetHelper {
 
         // Rename new file according to new physical hash and delete the original data
         // and checkpoint
-        let new_data_path = self.dataset_layout.data_slice_path(&new_slice);
+        let new_data_path = self.data_slice_path(&new_slice).await;
         std::fs::rename(&tmp_path, &new_data_path).unwrap();
         std::fs::remove_file(&orig_data_path).unwrap();
         if let Some(orig_checkpoint) = &orig_block.event.output_checkpoint {
-            std::fs::remove_file(
-                self.dataset_layout
-                    .checkpoint_path(&orig_checkpoint.physical_hash),
-            )
-            .unwrap();
+            std::fs::remove_file(self.checkpoint_path(&orig_checkpoint).await).unwrap();
         }
 
         // Rewrite last block
@@ -308,7 +327,7 @@ async fn test_transform_common(transform: Transform) {
         .unwrap()
         .dataset;
 
-    let deriv_helper = DatasetHelper::new(dataset, workspace_layout.dataset_layout(&deriv_alias));
+    let deriv_helper = DatasetHelper::new(dataset, workspace_layout.run_info_dir.clone());
 
     let block_hash = match transform_svc
         .transform(&deriv_alias.as_local_ref(), None)
