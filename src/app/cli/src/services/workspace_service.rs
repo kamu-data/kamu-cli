@@ -155,6 +155,12 @@ impl WorkspaceService {
                     ?dataset_config_path,
                     "Moving DatasetConfig file from old location"
                 );
+
+                let dataset_info_dir = dataset_dir.path().join("info");
+                if (!dataset_info_dir.exists()) {
+                    std::fs::create_dir(dataset_info_dir).int_err()?;
+                }
+
                 let new_dataset_config_path = dataset_dir.path().join("info/config");
                 std::fs::rename(dataset_config_path, new_dataset_config_path).int_err()?;
             }

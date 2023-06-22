@@ -109,9 +109,7 @@ impl IngestServiceImpl {
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
-        let some_random_hash: Multihash =
-            Multihash::from_multibase_str("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8")
-                .unwrap();
+        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
 
         let data_dir_path = PathBuf::from(
             kamu_data_utils::data::local_url::into_local_path(
