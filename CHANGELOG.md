@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.131] - 2023-06-23
 ### Changed
 - Internal: isolated infra layer from direct access to WorkspaceLayout / DatasetLayout to support different layouts or non-local stores in future
+- Workspace version #2: storing remote aliases configuration as a part of dataset info-repo
 
 ## [0.130.1] - 2023-06-19
 ### Added
