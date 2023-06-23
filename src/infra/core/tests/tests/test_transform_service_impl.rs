@@ -97,15 +97,17 @@ async fn append_data_block(
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        workspace_layout.clone(),
+        workspace_layout.run_info_dir.clone(),
     );
 
     let foo = new_root(local_repo.as_ref(), "foo").await;
-    let foo_layout = workspace_layout.dataset_layout(&foo.alias);
+    let foo_dataset = local_repo.get_dataset(&foo.as_local_ref()).await.unwrap();
 
     let (bar, bar_source) = new_deriv(local_repo.as_ref(), "bar", &[foo.alias.clone()]).await;
 
@@ -119,7 +121,14 @@ async fn test_get_next_operation() {
     );
 
     let (_, foo_block) = append_data_block(local_repo.as_ref(), &foo.alias, 10).await;
-    let data_path = foo_layout.data_slice_path(foo_block.event.output_data.as_ref().unwrap());
+    let foo_slice = foo_block.event.output_data.as_ref().unwrap();
+    let data_path = kamu_data_utils::data::local_url::into_local_path(
+        foo_dataset
+            .as_data_repo()
+            .get_internal_url(&foo_slice.physical_hash)
+            .await,
+    )
+    .unwrap();
 
     assert!(matches!(
         transform_svc.get_next_operation(&bar, Utc::now()).await.unwrap(),
@@ -144,17 +153,18 @@ async fn test_get_next_operation() {
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
     let transform_svc = TransformServiceImpl::new(
         local_repo.clone(),
         Arc::new(EngineProvisionerNull),
-        workspace_layout.clone(),
+        workspace_layout.run_info_dir.clone(),
     );
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let root_layout = workspace_layout.dataset_layout(&root_alias);
     let root_create_result = local_repo
         .create_dataset(
             &root_alias,
@@ -243,11 +253,16 @@ async fn test_get_verification_plan_one_to_one() {
         .build(),
     )
     .await;
-    std::fs::write(
-        root_layout.data_dir.join(root_head_t1.to_string()),
-        "<data>",
+
+    let root_head_t1_path = kamu_data_utils::data::local_url::into_local_path(
+        root_create_result
+            .dataset
+            .as_data_repo()
+            .get_internal_url(&root_head_t1)
+            .await,
     )
     .unwrap();
+    std::fs::write(root_head_t1_path, "<data>").unwrap();
 
     // T2: Transform [SRC; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
@@ -309,11 +324,15 @@ async fn test_get_verification_plan_one_to_one() {
         .build(),
     )
     .await;
-    std::fs::write(
-        root_layout.data_dir.join(root_head_t3.to_string()),
-        "<data>",
+    let root_head_t3_path = kamu_data_utils::data::local_url::into_local_path(
+        root_create_result
+            .dataset
+            .as_data_repo()
+            .get_internal_url(&root_head_t3)
+            .await,
     )
     .unwrap();
+    std::fs::write(root_head_t3_path, "<data>").unwrap();
 
     // T4: Transform [T3; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();

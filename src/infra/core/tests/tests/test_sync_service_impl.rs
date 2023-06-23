@@ -74,15 +74,8 @@ async fn append_random_data(
     .new_head
 }
 
-fn assert_in_sync(
-    workspace_layout: &WorkspaceLayout,
-    dataset_alias_1: &DatasetAlias,
-    dataset_alias_2: &DatasetAlias,
-) {
-    let dataset_1_layout = workspace_layout.dataset_layout(dataset_alias_1);
-    let dataset_2_layout = workspace_layout.dataset_layout(dataset_alias_2);
-
-    DatasetTestHelper::assert_datasets_in_sync(&dataset_1_layout, &dataset_2_layout);
+fn assert_in_sync(dataset_layout_1: DatasetLayout, dataset_layout_2: DatasetLayout) {
+    DatasetTestHelper::assert_datasets_in_sync(&dataset_layout_1, &dataset_layout_2);
 }
 
 async fn create_random_file(path: &Path) -> usize {
@@ -108,8 +101,12 @@ async fn do_test_sync(
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
-    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
+    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+    ));
+    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
+        workspace_layout.repos_dir.clone(),
+    ));
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
 
     let sync_svc = SyncServiceImpl::new(
@@ -187,7 +184,10 @@ async fn do_test_sync(
         }) if new_head == b1
     );
 
-    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
+    assert_in_sync(
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
+    );
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
@@ -218,8 +218,10 @@ async fn do_test_sync(
         }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
-
+    assert_in_sync(
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
+    );
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc
@@ -245,7 +247,10 @@ async fn do_test_sync(
         Ok(SyncResult::UpToDate)
     );
 
-    assert_in_sync(&workspace_layout, &dataset_alias, &dataset_alias_2);
+    assert_in_sync(
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
+        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
+    );
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 

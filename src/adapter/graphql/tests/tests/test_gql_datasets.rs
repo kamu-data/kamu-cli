@@ -22,7 +22,7 @@ use opendatafabric::*;
 async fn dataset_by_id_does_not_exist() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
@@ -58,7 +58,7 @@ async fn dataset_by_id_does_not_exist() {
 async fn dataset_by_id() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
@@ -111,7 +111,7 @@ async fn dataset_by_id() {
 async fn dataset_create_empty() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
@@ -155,7 +155,7 @@ async fn dataset_create_empty() {
 async fn dataset_create_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
@@ -214,7 +214,7 @@ async fn dataset_create_from_snapshot() {
 async fn dataset_create_from_snapshot_malformed() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)

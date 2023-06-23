@@ -9,10 +9,6 @@
 
 use std::path::PathBuf;
 
-use opendatafabric::DatasetAlias;
-
-use crate::DatasetLayout;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Consider extracting to kamu-cli layer
@@ -34,7 +30,7 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V1_WorkspaceCacheDir;
+    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V2_DatasetConfig;
 
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
@@ -60,11 +56,6 @@ impl WorkspaceLayout {
         std::fs::write(&ws.version_path, Self::VERSION.to_string())?;
         Ok(ws)
     }
-
-    pub fn dataset_layout(&self, alias: &DatasetAlias) -> DatasetLayout {
-        assert!(!alias.is_multitenant(), "Multitenancy is not yet supported");
-        DatasetLayout::new(self.datasets_dir.join(&alias.dataset_name))
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -76,6 +67,7 @@ impl WorkspaceLayout {
 pub enum WorkspaceVersion {
     V0_Initial,
     V1_WorkspaceCacheDir,
+    V2_DatasetConfig,
     Unknown(u32),
 }
 
@@ -91,6 +83,7 @@ impl From<u32> for WorkspaceVersion {
         match value {
             0 => WorkspaceVersion::V0_Initial,
             1 => WorkspaceVersion::V1_WorkspaceCacheDir,
+            2 => WorkspaceVersion::V2_DatasetConfig,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -101,6 +94,7 @@ impl Into<u32> for WorkspaceVersion {
         match self {
             Self::V0_Initial => 0,
             Self::V1_WorkspaceCacheDir => 1,
+            Self::V2_DatasetConfig => 2,
             Self::Unknown(value) => value,
         }
     }

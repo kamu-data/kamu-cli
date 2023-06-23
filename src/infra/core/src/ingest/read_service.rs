@@ -15,8 +15,6 @@ use kamu_core::engine::IngestRequest;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::*;
-
 pub struct ReadService {
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
@@ -30,11 +28,11 @@ impl ReadService {
     pub async fn read<'a, 'b>(
         &'a self,
         dataset_handle: &'b DatasetHandle,
-        dataset_layout: &'b DatasetLayout,
+        dataset_data_dir: &'b Path,
         source: &'b SetPollingSource,
         src_data_path: &'b Path,
         prev_watermark: Option<DateTime<Utc>>,
-        prev_checkpoint: Option<Multihash>,
+        prev_checkpoint_path: Option<&'b Path>,
         vocab: &'b DatasetVocabulary,
         system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
@@ -71,8 +69,8 @@ impl ReadService {
             source: source.clone(),
             dataset_vocab: vocab.clone(),
             prev_watermark,
-            prev_checkpoint_path: prev_checkpoint.map(|cp| dataset_layout.checkpoint_path(&cp)),
-            data_dir: dataset_layout.data_dir.clone(),
+            prev_checkpoint_path: prev_checkpoint_path.map(|cp_path| cp_path.to_owned()),
+            data_dir: dataset_data_dir.to_owned(),
             output_data_path: out_data_path.to_owned(),
             new_checkpoint_path: out_checkpoint_path.to_owned(),
         };

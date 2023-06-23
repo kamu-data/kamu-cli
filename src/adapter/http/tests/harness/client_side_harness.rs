@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use dill::builder_for;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
@@ -35,11 +36,17 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
-        b.add::<DatasetRepositoryLocalFs>()
-            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
+        b.add_builder(
+            builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(workspace_layout.datasets_dir.clone()),
+        )
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        b.add::<RemoteRepositoryRegistryImpl>()
-            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+        b.add_builder(
+            builder_for::<RemoteRepositoryRegistryImpl>()
+                .with_repos_dir(workspace_layout.repos_dir.clone()),
+        )
+        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>()
             .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
@@ -47,8 +54,12 @@ impl ClientSideHarness {
         b.add_value(EngineProvisionerNull)
             .bind::<dyn EngineProvisioner, EngineProvisionerNull>();
 
-        b.add::<IngestServiceImpl>()
-            .bind::<dyn IngestService, IngestServiceImpl>();
+        b.add_builder(
+            builder_for::<IngestServiceImpl>()
+                .with_run_info_dir(workspace_layout.run_info_dir.clone())
+                .with_cache_dir(workspace_layout.datasets_dir.clone()),
+        )
+        .bind::<dyn IngestService, IngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>()
             .bind::<dyn DatasetFactory, DatasetFactoryImpl>();
@@ -59,8 +70,11 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>()
             .bind::<dyn SyncService, SyncServiceImpl>();
 
-        b.add::<TransformServiceImpl>()
-            .bind::<dyn TransformService, TransformServiceImpl>();
+        b.add_builder(
+            builder_for::<TransformServiceImpl>()
+                .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        )
+        .bind::<dyn TransformService, TransformServiceImpl>();
 
         b.add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>();

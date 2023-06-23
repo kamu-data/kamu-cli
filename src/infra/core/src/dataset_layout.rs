@@ -9,8 +9,6 @@
 
 use std::path::PathBuf;
 
-use opendatafabric::{DataSlice, Multihash};
-
 /// Describes the layout of the dataset on disk
 #[derive(Debug, Clone)]
 pub struct DatasetLayout {
@@ -51,15 +49,5 @@ impl DatasetLayout {
         std::fs::create_dir_all(&dl.checkpoints_dir)?;
         std::fs::create_dir_all(&dl.info_dir)?;
         Ok(dl)
-    }
-
-    pub fn data_slice_path(&self, slice: &DataSlice) -> PathBuf {
-        self.data_dir
-            .join(slice.physical_hash.to_multibase_string())
-    }
-
-    pub fn checkpoint_path(&self, physical_hash: &Multihash) -> PathBuf {
-        self.checkpoints_dir
-            .join(physical_hash.to_multibase_string())
     }
 }

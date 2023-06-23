@@ -47,6 +47,7 @@ pub trait Dataset: Send + Sync {
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
     fn as_checkpoint_repo(&self) -> &dyn ObjectRepository;
+    fn as_info_repo(&self) -> &dyn NamedObjectRepository;
 
     /// Returns a brief summary of the dataset
     async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError>;

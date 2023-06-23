@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -16,7 +16,6 @@ use std::time::Duration;
 
 use container_runtime::*;
 use internal_error::*;
-use kamu::*;
 
 use crate::JupyterConfig;
 
@@ -56,7 +55,8 @@ impl NotebookServerImpl {
 
     pub async fn run<StartedClb, ShutdownClb>(
         &self,
-        workspace_layout: &WorkspaceLayout,
+        datasets_dir: &PathBuf,
+        run_info_dir: &PathBuf,
         address: Option<IpAddr>,
         port: Option<u16>,
         environment_vars: Vec<(String, String)>,
@@ -91,10 +91,10 @@ impl NotebookServerImpl {
 
         let cwd = Path::new(".").canonicalize().unwrap();
 
-        let livy_stdout_path = workspace_layout.run_info_dir.join("livy.out.txt");
-        let livy_stderr_path = workspace_layout.run_info_dir.join("livy.err.txt");
-        let jupyter_stdout_path = workspace_layout.run_info_dir.join("jupyter.out.txt");
-        let jupyter_stderr_path = workspace_layout.run_info_dir.join("jupyter.err.txt");
+        let livy_stdout_path = run_info_dir.join("livy.out.txt");
+        let livy_stderr_path = run_info_dir.join("livy.err.txt");
+        let jupyter_stdout_path = run_info_dir.join("jupyter.out.txt");
+        let jupyter_stderr_path = run_info_dir.join("jupyter.err.txt");
 
         let mut livy = self
             .container_runtime
@@ -104,10 +104,7 @@ impl NotebookServerImpl {
             .network(network_name)
             .user("root")
             .work_dir("/opt/bitnami/spark/work-dir")
-            .volume(
-                &workspace_layout.datasets_dir,
-                "/opt/bitnami/spark/work-dir",
-            )
+            .volume(&datasets_dir, "/opt/bitnami/spark/work-dir")
             .entry_point("/opt/livy/bin/livy-server")
             .stdout(if inherit_stdio {
                 Stdio::inherit()

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use async_trait::async_trait;
 use opendatafabric::DatasetRefRemote;
 
 use crate::InternalError;
@@ -17,7 +18,8 @@ pub enum RemoteAliasKind {
     Push,
 }
 
-pub trait RemoteAliases: Send {
+#[async_trait]
+pub trait RemoteAliases: Send + Sync {
     fn get_by_kind<'a>(
         &'a self,
         kind: RemoteAliasKind,
@@ -27,17 +29,17 @@ pub trait RemoteAliases: Send {
 
     fn is_empty(&self, kind: RemoteAliasKind) -> bool;
 
-    fn add(
+    async fn add(
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError>;
 
-    fn delete(
+    async fn delete(
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
     ) -> Result<bool, InternalError>;
 
-    fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError>;
+    async fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError>;
 }

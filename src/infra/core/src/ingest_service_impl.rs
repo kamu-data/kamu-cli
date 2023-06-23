@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
@@ -15,28 +16,30 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use super::ingest::*;
-use crate::*;
 
 pub struct IngestServiceImpl {
-    workspace_layout: Arc<WorkspaceLayout>,
     local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     container_runtime: Arc<ContainerRuntime>,
+    run_info_dir: PathBuf,
+    cache_dir: PathBuf,
 }
 
 #[component(pub)]
 impl IngestServiceImpl {
     pub fn new(
-        workspace_layout: Arc<WorkspaceLayout>,
         local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
+        run_info_dir: PathBuf,
+        cache_dir: PathBuf,
     ) -> Self {
         Self {
-            workspace_layout,
             local_repo,
             engine_provisioner,
             container_runtime,
+            run_info_dir,
+            cache_dir,
         }
     }
 
@@ -98,10 +101,6 @@ impl IngestServiceImpl {
     ) -> Result<IngestResult, IngestError> {
         let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
 
-        // TODO: This service should not know the dataset layout specifics
-        // Consider getting layout from DatasetRepository
-        let layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
-
         let dataset = self
             .local_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -110,17 +109,32 @@ impl IngestServiceImpl {
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
+        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
+
+        let data_dir_path = PathBuf::from(
+            kamu_data_utils::data::local_url::into_local_path(
+                dataset
+                    .as_data_repo()
+                    .get_internal_url(&some_random_hash)
+                    .await,
+            )
+            .int_err()?
+            .parent()
+            .unwrap(),
+        );
+
         // TODO: create via DI to avoid passing through all dependencies
         let ingest_task = IngestTask::new(
             dataset_handle.clone(),
             dataset,
+            &data_dir_path,
             options.clone(),
-            layout,
             fetch_override,
             listener,
             self.engine_provisioner.clone(),
             self.container_runtime.clone(),
-            self.workspace_layout.clone(),
+            &self.run_info_dir,
+            &self.cache_dir,
         )
         .await?;
 

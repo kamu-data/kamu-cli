@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::fs::File;
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -15,7 +16,6 @@ use std::time::Duration;
 
 use container_runtime::*;
 use internal_error::*;
-use kamu::*;
 
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -43,7 +43,8 @@ impl LivyServerImpl {
         &self,
         addr: &str,
         host_port: u16,
-        workspace_layout: &WorkspaceLayout,
+        datasets_dir: &PathBuf,
+        run_info_dir: &PathBuf,
         inherit_stdio: bool,
         on_started: StartedClb,
     ) -> Result<(), InternalError>
@@ -52,8 +53,8 @@ impl LivyServerImpl {
     {
         const LIVY_PORT: u16 = 8998;
 
-        let livy_stdout_path = workspace_layout.run_info_dir.join("livy.out.txt");
-        let livy_stderr_path = workspace_layout.run_info_dir.join("livy.err.txt");
+        let livy_stdout_path = run_info_dir.join("livy.out.txt");
+        let livy_stderr_path = run_info_dir.join("livy.err.txt");
 
         let mut livy = self
             .container_runtime
@@ -63,10 +64,7 @@ impl LivyServerImpl {
             .user("root")
             .map_port_with_address(addr, host_port, LIVY_PORT)
             .work_dir("/opt/bitnami/spark/work-dir")
-            .volume(
-                &workspace_layout.datasets_dir,
-                "/opt/bitnami/spark/work-dir",
-            )
+            .volume(&datasets_dir, "/opt/bitnami/spark/work-dir")
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {

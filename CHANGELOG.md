@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.130.1] - 2023-06-28
+## [0.131] - 2023-06-23
+### Changed
+- Internal: isolated infra layer from direct access to WorkspaceLayout / DatasetLayout to support different layouts or non-local stores in future
+- Workspace version #2: storing remote aliases configuration as a part of dataset info-repo
+
+## [0.130.1] - 2023-06-19
 ### Added
 - Improved tracing and error handling in the GQL API
 

@@ -17,13 +17,12 @@ use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
 use super::*;
-use crate::*;
 
 pub struct IngestTask {
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
+    dataset_data_dir: PathBuf,
     options: IngestOptions,
-    layout: DatasetLayout,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
 
@@ -44,13 +43,14 @@ impl IngestTask {
     pub async fn new<'a>(
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
+        dataset_data_dir: &PathBuf,
         options: IngestOptions,
-        layout: DatasetLayout,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        run_info_dir: &PathBuf,
+        cache_dir: &PathBuf,
     ) -> Result<Self, InternalError> {
         // TODO: PERF: This is expensive and could be cached
         let mut source = None;
@@ -136,8 +136,8 @@ impl IngestTask {
         Ok(Self {
             options,
             dataset_handle,
+            dataset_data_dir: dataset_data_dir.clone(),
             next_offset: next_offset.unwrap(),
-            layout,
             dataset,
             fetch_override,
             listener,
@@ -146,10 +146,10 @@ impl IngestTask {
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),
             prev_watermark: prev_watermark.unwrap_or_default(),
             vocab: vocab.unwrap_or_default(),
-            fetch_service: FetchService::new(container_runtime, &workspace_layout.run_info_dir),
+            fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_provisioner),
-            cache_dir: workspace_layout.cache_dir.clone(),
+            cache_dir: cache_dir.clone(),
         })
     }
 
@@ -463,15 +463,29 @@ impl IngestTask {
         let out_checkpoint_cache_key = self.get_random_cache_key("read-cpt-");
         let out_checkpoint_path = self.cache_dir.join(&out_checkpoint_cache_key);
 
+        let prev_checkpoint_path = if let Some(cp) = &self.prev_checkpoint {
+            Some(
+                kamu_data_utils::data::local_url::into_local_path(
+                    self.dataset
+                        .as_checkpoint_repo()
+                        .get_internal_url(&cp)
+                        .await,
+                )
+                .int_err()?,
+            )
+        } else {
+            None
+        };
+
         let engine_response = self
             .read_service
             .read(
                 &self.dataset_handle,
-                &self.layout,
+                &self.dataset_data_dir,
                 self.source.as_ref().unwrap(),
                 &src_data_path,
                 self.prev_watermark.clone(),
-                self.prev_checkpoint.clone(),
+                prev_checkpoint_path.as_ref().map(|cp| cp.as_path()),
                 &self.vocab,
                 system_time.clone(),
                 source_event_time,

@@ -87,7 +87,8 @@ impl Command for SqlServerLivyCommand {
             .run(
                 &self.address.to_string(),
                 self.port,
-                &self.workspace_layout,
+                &self.workspace_layout.datasets_dir,
+                &self.workspace_layout.run_info_dir,
                 self.output_config.verbosity_level > 0,
                 move || {
                     if let Some(s) = spinner {

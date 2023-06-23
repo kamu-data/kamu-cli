@@ -262,6 +262,7 @@ impl PushService for PushServiceImpl {
                             .await
                             .unwrap()
                             .add(remote_ref, RemoteAliasKind::Push)
+                            .await
                             .unwrap();
                     }
                     _ => {}

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use dill::*;
@@ -22,65 +21,46 @@ use super::*;
 #[derive(Clone)]
 pub struct RemoteAliasesRegistryImpl {
     local_repo: Arc<dyn DatasetRepository>,
-    workspace_layout: Arc<WorkspaceLayout>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl RemoteAliasesRegistryImpl {
-    pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
-        workspace_layout: Arc<WorkspaceLayout>,
-    ) -> Self {
-        Self {
-            local_repo,
-            workspace_layout,
+    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { local_repo }
+    }
+
+    async fn read_config(dataset: Arc<dyn Dataset>) -> Result<DatasetConfig, InternalError> {
+        match dataset.as_info_repo().get("config").await {
+            Ok(bytes) => {
+                let manifest: Manifest<DatasetConfig> =
+                    serde_yaml::from_slice(&bytes[..]).int_err()?;
+                assert_eq!(manifest.kind, "DatasetConfig");
+                Ok(manifest.content)
+            }
+            Err(GetNamedError::Internal(e)) => Err(e),
+            Err(GetNamedError::Access(e)) => Err(e.int_err()),
+            Err(GetNamedError::NotFound(_)) => Ok(DatasetConfig::default()),
         }
     }
 
-    fn get_dataset_metadata_dir(&self, alias: &DatasetAlias) -> PathBuf {
-        assert!(!alias.is_multitenant(), "Multitenancy is not supported");
-        self.workspace_layout.datasets_dir.join(&alias.dataset_name)
-    }
-
-    fn read_config(&self, path: &Path) -> Result<DatasetConfig, InternalError> {
-        let file = std::fs::File::open(&path).int_err()?;
-
-        let manifest: Manifest<DatasetConfig> = serde_yaml::from_reader(&file).int_err()?;
-
-        assert_eq!(manifest.kind, "DatasetConfig");
-        Ok(manifest.content)
-    }
-
-    fn write_config(&self, path: &Path, config: DatasetConfig) -> Result<(), InternalError> {
+    async fn write_config(
+        dataset: Arc<dyn Dataset>,
+        config: &DatasetConfig,
+    ) -> Result<(), InternalError> {
         let manifest = Manifest {
             kind: "DatasetConfig".to_owned(),
             version: 1,
-            content: config,
+            content: config.clone(),
         };
-        let file = std::fs::File::create(&path).int_err()?;
-        serde_yaml::to_writer(file, &manifest).int_err()?;
+        let manifest_yaml = serde_yaml::to_string(&manifest).int_err()?;
+        dataset
+            .as_info_repo()
+            .set("config", manifest_yaml.as_bytes())
+            .await
+            .int_err()?;
         Ok(())
-    }
-
-    fn get_config(&self, dataset_alias: &DatasetAlias) -> Result<DatasetConfig, InternalError> {
-        let path = self.get_dataset_metadata_dir(dataset_alias).join("config");
-
-        if path.exists() {
-            self.read_config(&path)
-        } else {
-            Ok(DatasetConfig::default())
-        }
-    }
-
-    fn set_config(
-        &self,
-        dataset_alias: &DatasetAlias,
-        config: DatasetConfig,
-    ) -> Result<(), InternalError> {
-        let path = self.get_dataset_metadata_dir(dataset_alias).join("config");
-        self.write_config(&path, config)
     }
 }
 
@@ -92,9 +72,9 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
-        let config = self.get_config(&hdl.alias)?;
-        Ok(Box::new(RemoteAliasesImpl::new(self.clone(), hdl, config)))
+        let dataset = self.local_repo.get_dataset(dataset_ref).await?;
+        let config = Self::read_config(dataset.clone()).await?;
+        Ok(Box::new(RemoteAliasesImpl::new(dataset, config)))
     }
 }
 
@@ -103,25 +83,17 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 struct RemoteAliasesImpl {
-    alias_registry: RemoteAliasesRegistryImpl,
-    dataset_handle: DatasetHandle,
+    dataset: Arc<dyn Dataset>,
     config: DatasetConfig,
 }
 
 impl RemoteAliasesImpl {
-    fn new(
-        alias_registry: RemoteAliasesRegistryImpl,
-        dataset_handle: DatasetHandle,
-        config: DatasetConfig,
-    ) -> Self {
-        Self {
-            alias_registry,
-            dataset_handle,
-            config,
-        }
+    fn new(dataset: Arc<dyn Dataset>, config: DatasetConfig) -> Self {
+        Self { dataset, config }
     }
 }
 
+#[async_trait::async_trait]
 impl RemoteAliases for RemoteAliasesImpl {
     fn get_by_kind<'a>(
         &'a self,
@@ -155,7 +127,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         aliases.is_empty()
     }
 
-    fn add(
+    async fn add(
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
@@ -168,15 +140,14 @@ impl RemoteAliases for RemoteAliasesImpl {
         let remote_ref = remote_ref.to_owned();
         if !aliases.contains(&remote_ref) {
             aliases.push(remote_ref);
-            self.alias_registry
-                .set_config(&self.dataset_handle.alias, self.config.clone())?;
+            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    fn delete(
+    async fn delete(
         &mut self,
         remote_ref: &DatasetRefRemote,
         kind: RemoteAliasKind,
@@ -188,15 +159,14 @@ impl RemoteAliases for RemoteAliasesImpl {
 
         if let Some(i) = aliases.iter().position(|r| *r == *remote_ref) {
             aliases.remove(i);
-            self.alias_registry
-                .set_config(&self.dataset_handle.alias, self.config.clone())?;
+            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError> {
+    async fn clear(&mut self, kind: RemoteAliasKind) -> Result<usize, InternalError> {
         let aliases = match kind {
             RemoteAliasKind::Pull => &mut self.config.pull_aliases,
             RemoteAliasKind::Push => &mut self.config.push_aliases,
@@ -204,8 +174,7 @@ impl RemoteAliases for RemoteAliasesImpl {
         let len = aliases.len();
         if !aliases.is_empty() {
             aliases.clear();
-            self.alias_registry
-                .set_config(&self.dataset_handle.alias, self.config.clone())?;
+            RemoteAliasesRegistryImpl::write_config(self.dataset.clone(), &self.config).await?;
         }
         Ok(len)
     }
@@ -229,3 +198,5 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryNull {
         .into())
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////

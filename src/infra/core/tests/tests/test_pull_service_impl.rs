@@ -202,7 +202,7 @@ async fn create_graph_remote(
 
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        Arc::new(DatasetRepositoryLocalFs::new(ws.clone())),
+        Arc::new(DatasetRepositoryLocalFs::new(ws.datasets_dir.clone())),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -370,6 +370,7 @@ async fn test_pull_batching_complex_with_remote() {
             &DatasetRefRemote::try_from("kamu.dev/anonymous/e").unwrap(),
             RemoteAliasKind::Pull,
         )
+        .await
         .unwrap();
 
     // Pulling E results in a sync
@@ -709,12 +710,13 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
-        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(workspace_layout.clone()));
-        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(workspace_layout.clone()));
-        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(
-            local_repo.clone(),
-            workspace_layout.clone(),
+        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+            workspace_layout.datasets_dir.clone(),
         ));
+        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
+            workspace_layout.repos_dir.clone(),
+        ));
+        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(local_repo.clone()));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), local_repo.clone()));

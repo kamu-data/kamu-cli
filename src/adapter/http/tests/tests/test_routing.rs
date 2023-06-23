@@ -14,6 +14,7 @@ use axum::extract::{FromRequestParts, Path};
 use axum::http::StatusCode;
 use axum::routing::IntoMakeService;
 use axum::Router;
+use dill::builder_for;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -33,10 +34,13 @@ struct RepoFixture {
 
 async fn setup_repo() -> RepoFixture {
     let tmp_dir = tempfile::tempdir().unwrap();
+    let workspace_layout = WorkspaceLayout::create(tmp_dir.path()).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
-        .add_value(WorkspaceLayout::create(tmp_dir.path()).unwrap())
-        .add::<DatasetRepositoryLocalFs>()
+        .add_builder(
+            builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(workspace_layout.datasets_dir.clone()),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 

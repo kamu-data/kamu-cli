@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use kamu::*;
 use tempfile::TempDir;
 
@@ -18,7 +16,7 @@ use super::test_dataset_repository_shared;
 
 fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
     let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    DatasetRepositoryLocalFs::new(Arc::new(workspace_layout))
+    DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -17,12 +17,10 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::*;
-
 pub struct TransformServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    workspace_layout: Arc<WorkspaceLayout>,
+    run_info_dir: PathBuf,
 }
 
 #[component(pub)]
@@ -30,12 +28,12 @@ impl TransformServiceImpl {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        workspace_layout: Arc<WorkspaceLayout>,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             local_repo,
             engine_provisioner,
-            workspace_layout,
+            run_info_dir,
         }
     }
 
@@ -342,21 +340,23 @@ impl TransformServiceImpl {
             .int_err()?;
 
         // TODO: This service shouldn't know specifics of dataset layouts
-        let prev_checkpoint_path = prev_checkpoint.as_ref().map(|cp| {
-            self.workspace_layout
-                .dataset_layout(&dataset_handle.alias)
-                .checkpoint_path(&cp.physical_hash)
-        });
+        let prev_checkpoint_path = if let Some(cp) = prev_checkpoint.as_ref() {
+            Some(
+                kamu_data_utils::data::local_url::into_local_path(
+                    dataset
+                        .as_checkpoint_repo()
+                        .get_internal_url(&cp.physical_hash)
+                        .await,
+                )
+                .int_err()?,
+            )
+        } else {
+            None
+        };
 
         // TODO: Reconsider where to store staged files
-        let out_data_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(super::repos::get_staging_name());
-        let new_checkpoint_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(super::repos::get_staging_name());
+        let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
+        let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
 
         assert!(
             !dataset_handle.alias.is_multitenant(),
@@ -505,7 +505,6 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
         let input_chain = input_dataset.as_metadata_chain();
-        let input_layout = self.workspace_layout.dataset_layout(&input_handle.alias);
 
         // List of part files and watermarks that will be used by the engine
         // Note: Engine will still filter the records by the offset interval
@@ -525,7 +524,14 @@ impl TransformServiceImpl {
 
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 if let Some(slice) = &block.event.output_data {
-                    data_paths.push(input_layout.data_slice_path(slice));
+                    let data_slice_url = input_dataset
+                        .as_data_repo()
+                        .get_internal_url(&slice.physical_hash)
+                        .await;
+                    data_paths.push(
+                        kamu_data_utils::data::local_url::into_local_path(data_slice_url)
+                            .int_err()?,
+                    );
                 }
 
                 if let Some(wm) = block.event.output_watermark {
@@ -543,6 +549,7 @@ impl TransformServiceImpl {
 
         // TODO: Migrate to providing schema directly
         // TODO: Will not work with schema evolution
+
         let schema_file = if let Some(p) = data_paths.last() {
             p.clone()
         } else {
@@ -554,7 +561,11 @@ impl TransformServiceImpl {
                 .await
                 .int_err()?
                 .unwrap();
-            input_layout.data_slice_path(&last_slice)
+            let last_slice_url = input_dataset
+                .as_data_repo()
+                .get_internal_url(&last_slice.physical_hash)
+                .await;
+            kamu_data_utils::data::local_url::into_local_path(last_slice_url).int_err()?
         };
 
         let vocab = match vocab_hint {
@@ -681,7 +692,6 @@ impl TransformServiceImpl {
         let source = source.ok_or(
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
-        let dataset_layout = self.workspace_layout.dataset_layout(&dataset_handle.alias);
 
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
@@ -728,6 +738,20 @@ impl TransformServiceImpl {
                 "Multitenancy is not supported yet"
             );
 
+            let prev_checkpoint_path = if let Some(cp) = block_t.event.input_checkpoint.as_ref() {
+                Some(
+                    kamu_data_utils::data::local_url::into_local_path(
+                        dataset.as_checkpoint_repo().get_internal_url(&cp).await,
+                    )
+                    .int_err()?,
+                )
+            } else {
+                None
+            };
+
+            let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
+            let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
+
             let step = VerificationStep {
                 operation: TransformOperation {
                     dataset_handle: dataset_handle.clone(),
@@ -747,13 +771,9 @@ impl TransformServiceImpl {
                         transform: source.transform.clone(),
                         vocab: vocab.clone().unwrap_or_default(),
                         inputs,
-                        prev_checkpoint_path: block_t
-                            .event
-                            .input_checkpoint
-                            .as_ref()
-                            .map(|cp| dataset_layout.checkpoint_path(cp)),
-                        new_checkpoint_path: dataset_layout.checkpoints_dir.join(".pending"),
-                        out_data_path: dataset_layout.data_dir.join(".pending"),
+                        prev_checkpoint_path,
+                        new_checkpoint_path,
+                        out_data_path,
                     },
                 },
                 expected_block: block,

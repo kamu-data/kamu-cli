@@ -35,7 +35,7 @@ struct RunInfo {
 }
 
 impl RunInfo {
-    fn new(workspace_layout: &WorkspaceLayout, operation: &str) -> Self {
+    fn new(run_info_dir: &PathBuf, operation: &str) -> Self {
         use rand::Rng;
         let run_id: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
@@ -43,20 +43,14 @@ impl RunInfo {
             .map(char::from)
             .collect();
 
-        let in_out_dir = workspace_layout
-            .run_info_dir
-            .join(format!("{}-{}", operation, &run_id));
+        let in_out_dir = run_info_dir.join(format!("{}-{}", operation, &run_id));
 
         std::fs::create_dir_all(&in_out_dir).expect("Failed to create in-out directory");
 
         Self {
             in_out_dir,
-            stdout_path: workspace_layout
-                .run_info_dir
-                .join(format!("spark-{}.out.txt", run_id)),
-            stderr_path: workspace_layout
-                .run_info_dir
-                .join(format!("spark-{}.err.txt", run_id)),
+            stdout_path: run_info_dir.join(format!("spark-{}.out.txt", run_id)),
+            stderr_path: run_info_dir.join(format!("spark-{}.err.txt", run_id)),
         }
     }
 
@@ -206,7 +200,7 @@ impl IngestEngine for SparkEngine {
         &self,
         request: IngestRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
-        let run_info = RunInfo::new(&self.workspace_layout, "ingest");
+        let run_info = RunInfo::new(&self.workspace_layout.run_info_dir, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);

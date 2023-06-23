@@ -50,7 +50,7 @@ pub async fn run(
 
     // Configure application
     let (guards, catalog, output_config) = {
-        let mut catalog_builder = configure_catalog();
+        let mut catalog_builder = configure_catalog(&workspace_layout);
         catalog_builder.add_value(workspace_layout.clone());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
@@ -119,7 +119,7 @@ pub async fn run(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
-pub fn configure_catalog() -> CatalogBuilder {
+pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
     b.add::<ConfigService>();
@@ -127,13 +127,18 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<GcService>();
     b.add::<WorkspaceService>();
 
-    b.add::<DatasetRepositoryLocalFs>();
+    b.add_builder(
+        builder_for::<DatasetRepositoryLocalFs>().with_root(workspace_layout.datasets_dir.clone()),
+    );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
-    b.add::<RemoteRepositoryRegistryImpl>();
+    b.add_builder(
+        builder_for::<RemoteRepositoryRegistryImpl>()
+            .with_repos_dir(workspace_layout.repos_dir.clone()),
+    );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
@@ -142,10 +147,17 @@ pub fn configure_catalog() -> CatalogBuilder {
     b.add::<ResourceLoaderImpl>();
     b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
-    b.add::<IngestServiceImpl>();
+    b.add_builder(
+        builder_for::<IngestServiceImpl>()
+            .with_run_info_dir(workspace_layout.run_info_dir.clone())
+            .with_cache_dir(workspace_layout.datasets_dir.clone()),
+    );
     b.bind::<dyn IngestService, IngestServiceImpl>();
 
-    b.add::<TransformServiceImpl>();
+    b.add_builder(
+        builder_for::<TransformServiceImpl>()
+            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+    );
     b.bind::<dyn TransformService, TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();

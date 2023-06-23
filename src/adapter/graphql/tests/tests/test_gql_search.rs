@@ -19,7 +19,7 @@ use opendatafabric::*;
 async fn query() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.clone());
+    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)
