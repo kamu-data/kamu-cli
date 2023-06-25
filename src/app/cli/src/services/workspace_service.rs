@@ -11,12 +11,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::{WorkspaceLayout, WorkspaceVersion};
+use kamu::{WorkspaceConfig, WorkspaceLayout, WorkspaceVersion};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WorkspaceService {
     workspace_layout: Arc<WorkspaceLayout>,
+    workspace_config: WorkspaceConfig,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,7 +25,20 @@ pub struct WorkspaceService {
 #[dill::component(pub)]
 impl WorkspaceService {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        Self { workspace_layout }
+        let workspace_config = WorkspaceService::init_workspace_config(workspace_layout.clone());
+
+        Self {
+            workspace_layout,
+            workspace_config,
+        }
+    }
+
+    fn init_workspace_config(workspace_layout: Arc<WorkspaceLayout>) -> WorkspaceConfig {
+        if workspace_layout.config_path.is_file() {
+            WorkspaceConfig::load_from(&workspace_layout.config_path).unwrap()
+        } else {
+            WorkspaceConfig::default()
+        }
     }
 
     pub fn find_workspace() -> WorkspaceLayout {
@@ -59,6 +73,11 @@ impl WorkspaceService {
     /// Whether there is an initialized workspace
     pub fn is_in_workspace(&self) -> bool {
         self.workspace_layout.root_dir.is_dir()
+    }
+
+    /// Whether the workspace is multitenant
+    pub fn is_multitenant_workspace(&self) -> bool {
+        self.workspace_config.multitenant
     }
 
     /// Whether workspace requires and upgrade
@@ -200,3 +219,5 @@ pub struct WorkspaceFutureVersionError {
     pub workspace_version: WorkspaceVersion,
     pub latest_supported_version: WorkspaceVersion,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -15,8 +15,8 @@ use super::test_dataset_repository_shared;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
-    DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone())
+    let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
+    DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone(), false)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

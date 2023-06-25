@@ -202,7 +202,10 @@ async fn create_graph_remote(
 
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        Arc::new(DatasetRepositoryLocalFs::new(ws.datasets_dir.clone())),
+        Arc::new(DatasetRepositoryLocalFs::new(
+            ws.datasets_dir.clone(),
+            false,
+        )),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -709,9 +712,10 @@ struct PullTestHarness {
 impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
-        let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path).unwrap());
+        let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, false).unwrap());
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            false,
         ));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
             workspace_layout.repos_dir.clone(),

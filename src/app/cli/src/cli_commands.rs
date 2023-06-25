@@ -102,7 +102,10 @@ pub fn get_command(
                     submatches.get_flag("list-only"),
                 ))
             } else {
-                Box::new(InitCommand::new(catalog.get_one()?))
+                Box::new(InitCommand::new(
+                    catalog.get_one()?,
+                    submatches.get_flag("multitenant"),
+                ))
             }
         }
         Some(("inspect", submatches)) => match submatches.subcommand() {

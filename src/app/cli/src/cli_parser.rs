@@ -332,6 +332,11 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .hide(true)
                             .help("List image names instead of pulling"),
+                        Arg::new("multitenant")
+                            .long("multitenant")
+                            .action(ArgAction::SetTrue)
+                            .hide(true)
+                            .help("Initialize a workspace for multiple tenants")
                     ])
                     .after_help(indoc::indoc!(
                         r#"

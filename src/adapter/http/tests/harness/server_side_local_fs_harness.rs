@@ -32,12 +32,13 @@ pub struct ServerSideLocalFsHarness {
 impl ServerSideLocalFsHarness {
     pub async fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+        let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
-                    .with_root(workspace_layout.datasets_dir.clone()),
+                    .with_root(workspace_layout.datasets_dir.clone())
+                    .with_multitenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();

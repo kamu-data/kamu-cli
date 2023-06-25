@@ -230,10 +230,11 @@ impl DatasetHelper {
 async fn test_transform_common(transform: Transform) {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
 
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        false,
     ));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),

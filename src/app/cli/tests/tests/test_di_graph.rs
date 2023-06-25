@@ -15,7 +15,7 @@ use kamu_cli;
 async fn test_di_graph_validates() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
-    let mut catalog_builder = kamu_cli::configure_catalog(&workspace_layout);
+    let mut catalog_builder = kamu_cli::configure_catalog(&workspace_layout, false);
     kamu_cli::register_config_in_catalog(&kamu_cli::CLIConfig::default(), &mut catalog_builder);
 
     // TODO: We should ensure this test covers parameters requested by commands and

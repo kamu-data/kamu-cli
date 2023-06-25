@@ -50,7 +50,8 @@ pub async fn run(
 
     // Configure application
     let (guards, catalog, output_config) = {
-        let mut catalog_builder = configure_catalog(&workspace_layout);
+        let mut catalog_builder =
+            configure_catalog(&workspace_layout, workspace_svc.is_multitenant_workspace());
         catalog_builder.add_value(workspace_layout.clone());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
@@ -119,7 +120,10 @@ pub async fn run(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
-pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
+pub fn configure_catalog(
+    workspace_layout: &WorkspaceLayout,
+    is_multitenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
     b.add::<ConfigService>();
@@ -128,7 +132,9 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     b.add::<WorkspaceService>();
 
     b.add_builder(
-        builder_for::<DatasetRepositoryLocalFs>().with_root(workspace_layout.datasets_dir.clone()),
+        builder_for::<DatasetRepositoryLocalFs>()
+            .with_root(workspace_layout.datasets_dir.clone())
+            .with_multitenant(is_multitenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

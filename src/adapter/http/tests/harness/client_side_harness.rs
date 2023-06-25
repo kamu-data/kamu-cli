@@ -32,13 +32,14 @@ pub struct ClientSideHarness {
 impl ClientSideHarness {
     pub fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+        let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
 
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
-                .with_root(workspace_layout.datasets_dir.clone()),
+                .with_root(workspace_layout.datasets_dir.clone())
+                .with_multitenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

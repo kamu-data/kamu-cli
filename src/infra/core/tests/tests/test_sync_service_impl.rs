@@ -100,9 +100,10 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        false,
     ));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
         workspace_layout.repos_dir.clone(),

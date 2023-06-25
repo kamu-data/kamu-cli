@@ -25,9 +25,10 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let repo_name = RepoName::new_unchecked("repo");
     let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir).unwrap());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        false,
     ));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
         workspace_layout.repos_dir.clone(),

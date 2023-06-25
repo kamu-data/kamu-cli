@@ -21,11 +21,12 @@ use opendatafabric::*;
 async fn main() {
     let tempdir = tempfile::tempdir().unwrap();
     let pull_svc = Arc::new(TestPullService {});
-    let workspace_layout = WorkspaceLayout::create(tempdir.path()).unwrap();
+    let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
     let mut cmd = PullCommand::new(
         pull_svc,
         Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            false,
         )),
         Arc::new(RemoteAliasesRegistryNull),
         Arc::new(OutputConfig {

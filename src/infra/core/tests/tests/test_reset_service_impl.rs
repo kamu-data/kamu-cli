@@ -109,9 +109,10 @@ struct ResetTestHarness {
 impl ResetTestHarness {
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
-        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path()).unwrap());
+        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            false,
         ));
 
         let reset_svc = ResetServiceImpl::new(local_repo.clone());

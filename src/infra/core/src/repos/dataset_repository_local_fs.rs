@@ -23,14 +23,14 @@ use crate::*;
 
 pub struct DatasetRepositoryLocalFs {
     root: PathBuf,
-    //info_repo: NamedObjectRepositoryLocalFS,
+    multitenant: bool,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
 // TODO: Find a better way to share state with dataset builder
 impl Clone for DatasetRepositoryLocalFs {
     fn clone(&self) -> Self {
-        Self::from(self.root.clone())
+        Self::from(self.root.clone(), self.multitenant)
     }
 }
 
@@ -38,13 +38,14 @@ impl Clone for DatasetRepositoryLocalFs {
 
 #[component(pub)]
 impl DatasetRepositoryLocalFs {
-    pub fn new(root: PathBuf) -> Self {
-        Self::from(root)
+    pub fn new(root: PathBuf, multitenant: bool) -> Self {
+        Self::from(root, multitenant)
     }
 
-    pub fn from(root: impl Into<PathBuf>) -> Self {
+    pub fn from(root: impl Into<PathBuf>, multitenant: bool) -> Self {
         Self {
             root: root.into(),
+            multitenant,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
@@ -59,6 +60,7 @@ impl DatasetRepositoryLocalFs {
     }
 
     fn get_dataset_path(&self, dataset_alias: &DatasetAlias) -> PathBuf {
+        // TODO: account for self.multitenant and return errors
         if dataset_alias.is_multitenant() {
             self.root
                 .join(dataset_alias.account_name.as_ref().unwrap())
