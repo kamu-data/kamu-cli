@@ -236,6 +236,10 @@ pub struct AlreadyInWorkspace;
 pub struct NotInWorkspace;
 
 #[derive(Debug, Error)]
+#[error("Directory is not a multitenant kamu workspace")]
+pub struct NotInMultitenantWorkspace;
+
+#[derive(Debug, Error)]
 #[error("Command interpretation failed")]
 pub struct CommandInterpretationFailed;
 

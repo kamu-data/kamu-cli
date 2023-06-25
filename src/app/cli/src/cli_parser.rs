@@ -439,11 +439,29 @@ pub fn cli() -> Command {
                     Command::new("list")
                         .visible_alias("ls")
                         .about("List all datasets in the workspace")
-                        .args([Arg::new("wide")
-                            .long("wide")
-                            .short('w')
-                            .action(ArgAction::Count)
-                            .help("Show more details (repeat for more)")])
+                        .args([
+                            Arg::new("wide")
+                                .long("wide")
+                                .short('w')
+                                .action(ArgAction::Count)
+                                .help("Show more details (repeat for more)"),
+
+                            Arg::new("user")
+                                .long("user")
+                                .short('u')
+                                .action(ArgAction::Set)
+                                .hide(true),
+
+                            Arg::new("target-user")
+                                .long("target-user")
+                                .action(ArgAction::Set)
+                                .hide(true),
+
+                            Arg::new("all-users")
+                                .long("all-users")
+                                .action(ArgAction::SetTrue)
+                                .hide(true)
+                        ])
                         .after_help(indoc::indoc!(
                             r#"
                             ### Examples ###

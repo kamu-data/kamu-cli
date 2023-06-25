@@ -102,6 +102,7 @@ tempfile = "3"
 thiserror = "1"
 url = "2"
 urlencoding = "2"
+whoami = "1.4"
 
 
 [target.'cfg(unix)'.dependencies]

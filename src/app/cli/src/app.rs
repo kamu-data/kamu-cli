@@ -83,6 +83,8 @@ pub async fn run(
         Err(CLIError::usage_error_from(NotInWorkspace))
     } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
         Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+    } else if command.needs_multitenant_workspace() && !workspace_svc.is_multitenant_workspace() {
+        Err(CLIError::usage_error_from(NotInMultitenantWorkspace))
     } else {
         command.run().await
     };
@@ -130,6 +132,7 @@ pub fn configure_catalog(
     b.add::<ContainerRuntime>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
+    b.add::<UserService>();
 
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()

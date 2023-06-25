@@ -85,6 +85,10 @@ impl DatasetRegistry for DatasetRepositoryLocalFs {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryLocalFs {
+    fn is_multitenant(&self) -> bool {
+        self.multitenant
+    }
+
     // TODO: PERF: Cache data and speed up lookups by ID
     //
     // TODO: CONCURRENCY: Since resolving ID to Name currently requires accessing

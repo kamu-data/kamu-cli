@@ -17,24 +17,28 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
+use crate::UserIndication;
 
 pub struct ListCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    user_indication: UserIndication,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
 
 impl ListCommand {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+        user_indication: UserIndication,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
+            user_indication,
             output_config,
             detail_level,
         }
@@ -78,94 +82,124 @@ impl ListCommand {
             format!("{:?}", summary.kind)
         })
     }
+
+    fn column_formats(&self, show_owners: bool) -> Vec<ColumnFormat> {
+        let mut cols: Vec<ColumnFormat> = Vec::new();
+        if self.detail_level > 0 {
+            cols.push(ColumnFormat::new().with_style_spec("l")); // id
+        }
+        cols.push(ColumnFormat::new().with_style_spec("l")); // name
+        if show_owners {
+            cols.push(ColumnFormat::new().with_style_spec("c")); // owner
+        }
+        cols.push(ColumnFormat::new().with_style_spec("c")); // kind
+        if self.detail_level > 0 {
+            cols.push(ColumnFormat::new().with_style_spec("l")); // head
+        }
+        cols.push(
+            // pulled
+            ColumnFormat::new()
+                .with_style_spec("c")
+                .with_value_fmt(Self::humanize_relative_date),
+        );
+        cols.push(
+            // records
+            ColumnFormat::new()
+                .with_style_spec("r")
+                .with_value_fmt(Self::humanize_quantity),
+        );
+        if self.detail_level > 0 {
+            cols.push(
+                // blocks
+                ColumnFormat::new()
+                    .with_style_spec("r")
+                    .with_value_fmt(Self::humanize_quantity),
+            );
+        }
+        cols.push(
+            // size
+            ColumnFormat::new()
+                .with_style_spec("r")
+                .with_value_fmt(Self::humanize_data_size),
+        );
+        if self.detail_level > 0 {
+            cols.push(
+                // watermark
+                ColumnFormat::new()
+                    .with_style_spec("c")
+                    .with_value_fmt(Self::humanize_relative_date),
+            );
+        }
+        cols
+    }
+
+    fn schema_fields(&self, show_owners: bool) -> Vec<datafusion::arrow::datatypes::Field> {
+        use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
+
+        let mut fields: Vec<Field> = Vec::new();
+        let tz = Some(Arc::from("+00:00"));
+
+        if self.detail_level > 0 {
+            fields.push(Field::new("ID", DataType::Utf8, false));
+        }
+        fields.push(Field::new("Name", DataType::Utf8, false));
+        if show_owners {
+            fields.push(Field::new("Owner", DataType::Utf8, false));
+        }
+        fields.push(Field::new("Kind", DataType::Utf8, false));
+        if self.detail_level > 0 {
+            fields.push(Field::new("Head", DataType::Utf8, false));
+        }
+        fields.push(Field::new(
+            "Pulled",
+            DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
+            true,
+        ));
+        fields.push(Field::new("Records", DataType::UInt64, false));
+        if self.detail_level > 0 {
+            fields.push(Field::new("Blocks", DataType::UInt64, false));
+        }
+        fields.push(Field::new("Size", DataType::UInt64, false));
+        if self.detail_level > 0 {
+            fields.push(Field::new(
+                "Watermark",
+                DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
+                true,
+            ));
+        }
+        fields
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
+    fn needs_multitenant_workspace(&self) -> bool {
+        self.user_indication.is_explicit()
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
-        use datafusion::arrow::array::{StringArray, TimestampMicrosecondArray, UInt64Array};
-        use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+        use datafusion::arrow::array::{
+            ArrayRef,
+            StringArray,
+            TimestampMicrosecondArray,
+            UInt64Array,
+        };
+        use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
+
+        let show_owners = self.dataset_repo.is_multitenant() && self.user_indication.is_explicit();
 
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))
-            .with_column_formats(if self.detail_level == 0 {
-                vec![
-                    ColumnFormat::new().with_style_spec("l"),
-                    ColumnFormat::new().with_style_spec("c"),
-                    ColumnFormat::new()
-                        .with_style_spec("c")
-                        .with_value_fmt(Self::humanize_relative_date),
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt(Self::humanize_quantity),
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt(Self::humanize_data_size),
-                ]
-            } else {
-                vec![
-                    ColumnFormat::new().with_style_spec("l"),
-                    ColumnFormat::new().with_style_spec("l"),
-                    ColumnFormat::new().with_style_spec("c"),
-                    ColumnFormat::new().with_style_spec("l"),
-                    ColumnFormat::new()
-                        .with_style_spec("c")
-                        .with_value_fmt(Self::humanize_relative_date),
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt(Self::humanize_quantity),
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt(Self::humanize_quantity),
-                    ColumnFormat::new()
-                        .with_style_spec("r")
-                        .with_value_fmt(Self::humanize_data_size),
-                    ColumnFormat::new()
-                        .with_style_spec("c")
-                        .with_value_fmt(Self::humanize_relative_date),
-                ]
-            });
+            .with_column_formats(self.column_formats(show_owners));
 
         let mut writer = self.output_config.get_records_writer(records_format);
 
-        let tz = Some(Arc::from("+00:00"));
-        let schema = Arc::new(Schema::new(if self.detail_level == 0 {
-            vec![
-                Field::new("Name", DataType::Utf8, false),
-                Field::new("Kind", DataType::Utf8, false),
-                Field::new(
-                    "Pulled",
-                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
-                    true,
-                ),
-                Field::new("Records", DataType::UInt64, false),
-                Field::new("Size", DataType::UInt64, false),
-            ]
-        } else {
-            vec![
-                Field::new("ID", DataType::Utf8, false),
-                Field::new("Name", DataType::Utf8, false),
-                Field::new("Kind", DataType::Utf8, false),
-                Field::new("Head", DataType::Utf8, false),
-                Field::new(
-                    "Pulled",
-                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
-                    true,
-                ),
-                Field::new("Records", DataType::UInt64, false),
-                Field::new("Blocks", DataType::UInt64, false),
-                Field::new("Size", DataType::UInt64, false),
-                Field::new(
-                    "Watermark",
-                    DataType::Timestamp(TimeUnit::Microsecond, tz.clone()),
-                    true,
-                ),
-            ]
-        }));
+        let schema = Arc::new(Schema::new(self.schema_fields(show_owners)));
 
         let mut id: Vec<String> = Vec::new();
         let mut name: Vec<String> = Vec::new();
+        let mut owner: Vec<String> = Vec::new();
         let mut kind: Vec<String> = Vec::new();
         let mut head: Vec<String> = Vec::new();
         let mut pulled: Vec<Option<i64>> = Vec::new();
@@ -174,15 +208,25 @@ impl Command for ListCommand {
         let mut size: Vec<u64> = Vec::new();
         let mut watermark: Vec<Option<i64>> = Vec::new();
 
-        let mut datasets: Vec<_> = self.local_repo.get_all_datasets().try_collect().await?;
+        let mut datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         for hdl in datasets.iter() {
-            let dataset = self.local_repo.get_dataset(&hdl.as_local_ref()).await?;
+            let dataset = self.dataset_repo.get_dataset(&hdl.as_local_ref()).await?;
             let current_head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
             let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
 
             name.push(hdl.alias.to_string());
+
+            if show_owners {
+                // TODO: dataset user is a dataset property
+                owner.push(format!(
+                    "{}/{:?}",
+                    self.user_indication.current_user.clone(),
+                    self.user_indication.target_user
+                ));
+            }
+
             kind.push(self.get_kind(hdl, &summary).await?);
             pulled.push(summary.last_pulled.map(|t| t.timestamp_micros()));
             records.push(summary.num_records);
@@ -210,31 +254,34 @@ impl Command for ListCommand {
             }
         }
 
-        let records = RecordBatch::try_new(
-            schema,
-            if self.detail_level == 0 {
-                vec![
-                    Arc::new(StringArray::from(name)),
-                    Arc::new(StringArray::from(kind)),
-                    Arc::new(TimestampMicrosecondArray::from(pulled).with_timezone_utc()),
-                    Arc::new(UInt64Array::from(records)),
-                    Arc::new(UInt64Array::from(size)),
-                ]
-            } else {
-                vec![
-                    Arc::new(StringArray::from(id)),
-                    Arc::new(StringArray::from(name)),
-                    Arc::new(StringArray::from(kind)),
-                    Arc::new(StringArray::from(head)),
-                    Arc::new(TimestampMicrosecondArray::from(pulled).with_timezone_utc()),
-                    Arc::new(UInt64Array::from(records)),
-                    Arc::new(UInt64Array::from(blocks)),
-                    Arc::new(UInt64Array::from(size)),
-                    Arc::new(TimestampMicrosecondArray::from(watermark).with_timezone_utc()),
-                ]
-            },
-        )
-        .unwrap();
+        let mut columns: Vec<ArrayRef> = Vec::new();
+
+        if self.detail_level > 0 {
+            columns.push(Arc::new(StringArray::from(id)));
+        }
+        columns.push(Arc::new(StringArray::from(name)));
+        if show_owners {
+            columns.push(Arc::new(StringArray::from(owner)));
+        }
+        columns.push(Arc::new(StringArray::from(kind)));
+        if self.detail_level > 0 {
+            columns.push(Arc::new(StringArray::from(head)));
+        }
+        columns.push(Arc::new(
+            TimestampMicrosecondArray::from(pulled).with_timezone_utc(),
+        ));
+        columns.push(Arc::new(UInt64Array::from(records)));
+        if self.detail_level > 0 {
+            columns.push(Arc::new(UInt64Array::from(blocks)));
+        }
+        columns.push(Arc::new(UInt64Array::from(size)));
+        if self.detail_level > 0 {
+            columns.push(Arc::new(
+                TimestampMicrosecondArray::from(watermark).with_timezone_utc(),
+            ));
+        }
+
+        let records = RecordBatch::try_new(schema, columns).unwrap();
 
         writer.write_batch(&records)?;
         writer.finish()?;

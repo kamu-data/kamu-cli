@@ -42,6 +42,8 @@ impl CreateDatasetResult {
 
 #[async_trait]
 pub trait DatasetRepository: DatasetRegistry + Sync + Send {
+    fn is_multitenant(&self) -> bool;
+
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRef,

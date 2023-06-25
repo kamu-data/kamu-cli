@@ -7,11 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use dill::InjectionError;
 use opendatafabric::*;
 
 use crate::commands::*;
 use crate::services::WorkspaceService;
-use crate::CommandInterpretationFailed;
+use crate::{CommandInterpretationFailed, UserIndication, UserService};
 
 pub fn get_command(
     catalog: &dill::Catalog,
@@ -142,6 +143,7 @@ pub fn get_command(
         Some(("list", submatches)) => Box::new(ListCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
+            user_indication(catalog, submatches)?,
             catalog.get_one()?,
             submatches.get_count("wide"),
         )),
@@ -399,4 +401,12 @@ pub fn get_command(
     };
 
     Ok(command)
+}
+
+fn user_indication(
+    catalog: &dill::Catalog,
+    submatches: &clap::ArgMatches,
+) -> Result<UserIndication, InjectionError> {
+    let user_service = catalog.get_one::<UserService>()?;
+    Ok(user_service.user_indication(submatches))
 }

@@ -125,6 +125,11 @@ impl DatasetRegistry for DatasetRepositoryS3 {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryS3 {
+    fn is_multitenant(&self) -> bool {
+        // TODO
+        false
+    }
+
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRef,
