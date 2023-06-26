@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use domain::DEFAULT_DATASET_OWNER_NAME;
 use kamu::*;
+use opendatafabric::AccountName;
 use tempfile::TempDir;
 
 use super::test_dataset_repository_shared;
@@ -16,7 +18,11 @@ use super::test_dataset_repository_shared;
 
 fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
     let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
-    DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone(), false)
+    DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        false,
+    )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -187,6 +187,7 @@ impl IngestTestHarness {
         let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
             false,
         ));
 

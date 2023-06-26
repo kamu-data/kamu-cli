@@ -234,6 +234,7 @@ async fn test_transform_common(transform: Transform) {
 
     let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
         false,
     ));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(

@@ -190,6 +190,12 @@ impl DatasetRepository for DatasetRepositoryS3 {
         })
     }
 
+    fn get_account_datasets<'s>(&'s self, _account_name: AccountName) -> DatasetHandleStream<'s> {
+        unimplemented!(
+            "Account-based dataset filtering is not yet supported by S3 dataset repository"
+        );
+    }
+
     async fn get_dataset(
         &self,
         dataset_ref: &DatasetRef,

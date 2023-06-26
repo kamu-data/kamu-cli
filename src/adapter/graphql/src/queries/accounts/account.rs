@@ -28,7 +28,7 @@ impl Account {
     pub(crate) fn mock() -> Self {
         Self::User(User::new(
             AccountID::from("1"),
-            odf::AccountName::try_from("kamu").unwrap().into(),
+            odf::AccountName::new_unchecked("kamu").into(),
         ))
     }
 }

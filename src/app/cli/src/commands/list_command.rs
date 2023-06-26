@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -17,7 +18,7 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::UserIndication;
+use crate::{TargetUser, UserIndication};
 
 pub struct ListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -169,6 +170,22 @@ impl ListCommand {
         }
         fields
     }
+
+    fn stream_datasets(&self) -> DatasetHandleStream {
+        if self.dataset_repo.is_multitenant() {
+            match &self.user_indication.target_user {
+                TargetUser::Current => self.dataset_repo.get_account_datasets(
+                    AccountName::from_str(self.user_indication.current_user.as_str()).unwrap(),
+                ),
+                TargetUser::Specific { user_name } => self
+                    .dataset_repo
+                    .get_account_datasets(AccountName::from_str(user_name.as_str()).unwrap()),
+                TargetUser::AllUsers => self.dataset_repo.get_all_datasets(),
+            }
+        } else {
+            self.dataset_repo.get_all_datasets()
+        }
+    }
 }
 
 #[async_trait::async_trait(?Send)]
@@ -208,7 +225,7 @@ impl Command for ListCommand {
         let mut size: Vec<u64> = Vec::new();
         let mut watermark: Vec<Option<i64>> = Vec::new();
 
-        let mut datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+        let mut datasets: Vec<_> = self.stream_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
         for hdl in datasets.iter() {
@@ -216,15 +233,13 @@ impl Command for ListCommand {
             let current_head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
             let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
 
-            name.push(hdl.alias.to_string());
+            name.push(hdl.alias.dataset_name.to_string());
 
             if show_owners {
-                // TODO: dataset user is a dataset property
-                owner.push(format!(
-                    "{}/{:?}",
-                    self.user_indication.current_user.clone(),
-                    self.user_indication.target_user
-                ));
+                owner.push(String::from(match &hdl.alias.account_name {
+                    Some(name) => name.as_str(),
+                    None => DEFAULT_DATASET_OWNER_NAME,
+                }));
             }
 
             kind.push(self.get_kind(hdl, &summary).await?);

@@ -13,7 +13,7 @@ use dill::component;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct UserService {
-    default_user_name: String,
+    pub default_user_name: String,
 }
 
 #[component(pub)]

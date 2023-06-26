@@ -12,6 +12,7 @@ use std::sync::Arc;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
+use opendatafabric::AccountName;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
@@ -56,7 +57,11 @@ async fn test_internal_error() {
 
     // Note: Not creating a workspace to cause an error
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone(), false);
+    let local_repo = DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        false,
+    );
 
     let cat = dill::CatalogBuilder::new()
         .add_value(local_repo)

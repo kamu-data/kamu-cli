@@ -204,6 +204,7 @@ async fn create_graph_remote(
         reg.clone(),
         Arc::new(DatasetRepositoryLocalFs::new(
             ws.datasets_dir.clone(),
+            AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
             false,
         )),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
@@ -715,6 +716,7 @@ impl PullTestHarness {
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, false).unwrap());
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
             false,
         ));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(

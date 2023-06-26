@@ -22,6 +22,10 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub const DEFAULT_DATASET_OWNER_NAME: &str = "kamu";
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct CreateDatasetResult {
     pub dataset_handle: DatasetHandle,
     pub dataset: Arc<dyn Dataset>,
@@ -50,6 +54,8 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     ) -> Result<DatasetHandle, GetDatasetError>;
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
+
+    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
 
     async fn get_dataset(
         &self,
