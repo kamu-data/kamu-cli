@@ -22,7 +22,6 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetRepositoryLocalFs {
-    root: PathBuf,
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
@@ -40,16 +39,14 @@ impl DatasetRepositoryLocalFs {
         default_account_name: AccountName,
         multitenant: bool,
     ) -> Self {
-        let root_path: PathBuf = root.into();
         Self {
-            root: root_path.clone(),
             storage_strategy: if multitenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
-                    root_path,
+                    root.into(),
                     default_account_name,
                 ))
             } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root_path))
+                Box::new(DatasetSingleTenantStorageStrategy::new(root.into()))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
         }
@@ -70,9 +67,9 @@ impl DatasetRepositoryLocalFs {
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryLocalFs {
     async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        // TODO: multitenancy
         let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        Ok(Url::from_directory_path(self.root.join(handle.alias.dataset_name)).unwrap())
+        let dataset_path = self.storage_strategy.get_dataset_path(&handle);
+        Ok(Url::from_directory_path(dataset_path).unwrap())
     }
 }
 
@@ -144,7 +141,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        // TODO: multitenancy
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
         let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
@@ -181,6 +177,10 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(err) => Err(err.int_err().into()),
         }?;
 
+        self.storage_strategy
+            .handle_dataset_created(&dataset, &dataset_handle.alias)
+            .await?;
+
         Ok(CreateDatasetResult {
             dataset_handle,
             dataset: Arc::new(dataset),
@@ -193,27 +193,25 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         dataset_ref: &DatasetRef,
         new_alias: &DatasetAlias,
     ) -> Result<(), RenameDatasetError> {
-        // TODO: multitenancy
-        let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
 
-        let old_dataset_path = self.root.join(&old_alias.dataset_name);
-        let new_dataset_path = self.root.join(&new_alias.dataset_name);
-
-        if new_dataset_path.exists() {
-            Err(NameCollisionError {
+        match self.storage_strategy.resolve_dataset_alias(new_alias).await {
+            Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
                 alias: new_alias.clone(),
-            }
-            .into())
-        } else {
-            // Atomic move
-            std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
-            Ok(())
-        }
+            })),
+            Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
+            Err(ResolveDatasetError::NotFound(_)) => Ok(()),
+        }?;
+
+        self.storage_strategy
+            .handle_dataset_renamed(&dataset_handle, new_alias)
+            .await?;
+
+        Ok(())
     }
 
     // TODO: PERF: Need fast inverse dependency lookup
     async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
-        // TODO: multitenancy
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
@@ -243,7 +241,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         // repo_info.datasets.remove(index);
         // self.write_repo_info(repo_info).await?;
 
-        let dataset_dir = self.root.join(&dataset_handle.alias.dataset_name);
+        let dataset_dir = self.storage_strategy.get_dataset_path(&dataset_handle);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
         Ok(())
     }
@@ -277,6 +275,18 @@ trait DatasetStorageStrategy: Sync + Send {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetHandle, ResolveDatasetError>;
+
+    async fn handle_dataset_created(
+        &self,
+        dataset: &dyn Dataset,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<(), InternalError>;
+
+    async fn handle_dataset_renamed(
+        &self,
+        dataset_handle: &DatasetHandle,
+        new_alias: &DatasetAlias,
+    ) -> Result<(), InternalError>;
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -428,6 +438,29 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
             dataset_ref: dataset_id.as_local_ref(),
         }))
     }
+
+    async fn handle_dataset_created(
+        &self,
+        _dataset: &dyn Dataset,
+        _dataset_alias: &DatasetAlias,
+    ) -> Result<(), InternalError> {
+        // No extra action required in singletenant mode
+        Ok(())
+    }
+
+    async fn handle_dataset_renamed(
+        &self,
+        dataset_handle: &DatasetHandle,
+        new_alias: &DatasetAlias,
+    ) -> Result<(), InternalError> {
+        let old_dataset_path = self.get_dataset_path(dataset_handle);
+        let new_dataset_path = old_dataset_path
+            .parent()
+            .unwrap()
+            .join(&new_alias.dataset_name);
+        std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -474,6 +507,20 @@ impl DatasetMultiTenantStorageStrategy {
                 }))
             }
         }
+    }
+
+    async fn save_dataset_alias(
+        &self,
+        dataset: &dyn Dataset,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<(), InternalError> {
+        dataset
+            .as_info_repo()
+            .set("alias", dataset_alias.dataset_name.as_bytes())
+            .await
+            .int_err()?;
+
+        Ok(())
     }
 
     fn stream_account_datasets<'s>(
@@ -641,6 +688,28 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
             dataset_ref: dataset_id.as_local_ref(),
         }))
+    }
+
+    async fn handle_dataset_created(
+        &self,
+        dataset: &dyn Dataset,
+        dataset_alias: &DatasetAlias,
+    ) -> Result<(), InternalError> {
+        self.save_dataset_alias(dataset, dataset_alias).await
+    }
+
+    async fn handle_dataset_renamed(
+        &self,
+        dataset_handle: &DatasetHandle,
+        new_alias: &DatasetAlias,
+    ) -> Result<(), InternalError> {
+        let dataset_path = self.get_dataset_path(dataset_handle);
+        let layout = DatasetLayout::new(dataset_path);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+
+        self.save_dataset_alias(&dataset, new_alias).await?;
+
+        Ok(())
     }
 }
 
