@@ -57,7 +57,7 @@ impl ClientSideHarness {
         b.add_builder(
             builder_for::<IngestServiceImpl>()
                 .with_run_info_dir(workspace_layout.run_info_dir.clone())
-                .with_cache_dir(workspace_layout.datasets_dir.clone()),
+                .with_cache_dir(workspace_layout.cache_dir.clone()),
         )
         .bind::<dyn IngestService, IngestServiceImpl>();
 

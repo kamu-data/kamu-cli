@@ -150,7 +150,7 @@ pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
     b.add_builder(
         builder_for::<IngestServiceImpl>()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
-            .with_cache_dir(workspace_layout.datasets_dir.clone()),
+            .with_cache_dir(workspace_layout.cache_dir.clone()),
     );
     b.bind::<dyn IngestService, IngestServiceImpl>();
 
