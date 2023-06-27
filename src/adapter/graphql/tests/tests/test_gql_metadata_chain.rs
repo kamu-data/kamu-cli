@@ -35,6 +35,7 @@ async fn metadata_chain_append_event() {
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
     let create_result = local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

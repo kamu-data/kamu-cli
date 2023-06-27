@@ -105,11 +105,13 @@ pub trait DatasetRepositoryExt: DatasetRepository {
 
     async fn create_dataset_from_snapshot(
         &self,
+        account_name: Option<AccountName>,
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
+        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
@@ -149,6 +151,7 @@ where
 
     async fn create_dataset_from_snapshot(
         &self,
+        account_name: Option<AccountName>,
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // Validate / resolve events
@@ -204,7 +207,7 @@ where
 
         let create_result = self
             .create_dataset(
-                &DatasetAlias::new(None, snapshot.name),
+                &DatasetAlias::new(account_name, snapshot.name),
                 MetadataBlockTyped {
                     system_time,
                     prev_block_hash: None,
@@ -261,6 +264,7 @@ where
 
     async fn create_datasets_from_snapshots(
         &self,
+        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
@@ -271,7 +275,9 @@ where
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
             let name = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot(snapshot).await;
+            let res = self
+                .create_dataset_from_snapshot(account_name.clone(), snapshot)
+                .await;
             ret.push((name, res));
         }
         ret

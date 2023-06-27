@@ -78,7 +78,7 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
         .build();
 
     let create_result = repo
-        .create_dataset_from_snapshot(snapshot.clone())
+        .create_dataset_from_snapshot(None, snapshot.clone())
         .await
         .unwrap();
 
@@ -96,7 +96,9 @@ pub async fn test_create_dataset_from_snapshot(repo: &dyn DatasetRepository) {
     assert_eq!(actual_head, create_result.head);
 
     assert_matches!(
-        repo.create_dataset_from_snapshot(snapshot).await.err(),
+        repo.create_dataset_from_snapshot(None, snapshot)
+            .await
+            .err(),
         Some(CreateDatasetFromSnapshotError::NameCollision(_))
     );
 }
@@ -121,7 +123,7 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
             .build(),
     ];
 
-    repo.create_datasets_from_snapshots(snapshots).await;
+    repo.create_datasets_from_snapshots(None, snapshots).await;
 
     assert_matches!(
         repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo)
@@ -165,7 +167,7 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository) {
     ];
 
     let handles: Vec<_> = repo
-        .create_datasets_from_snapshots(snapshots)
+        .create_datasets_from_snapshots(None, snapshots)
         .await
         .into_iter()
         .map(|(_, r)| r.unwrap().dataset_handle)

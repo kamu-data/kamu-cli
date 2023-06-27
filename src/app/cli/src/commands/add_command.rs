@@ -13,10 +13,12 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
+use crate::CurrentUserSelection;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     local_repo: Arc<dyn DatasetRepository>,
+    current_user: CurrentUserSelection,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -27,6 +29,7 @@ impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
         local_repo: Arc<dyn DatasetRepository>,
+        current_user: CurrentUserSelection,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -38,6 +41,7 @@ impl AddCommand {
         Self {
             resource_loader,
             local_repo,
+            current_user,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
@@ -124,6 +128,10 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
+    fn needs_multitenant_workspace(&self) -> bool {
+        self.current_user.is_explicit()
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(
@@ -188,6 +196,7 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
+                // TODO: delete permissions should be checked in multitenant scenario
                 for hdl in already_exist {
                     self.local_repo.delete_dataset(&hdl.as_local_ref()).await?;
                 }
@@ -196,7 +205,14 @@ impl Command for AddCommand {
 
         let mut add_results = self
             .local_repo
-            .create_datasets_from_snapshots(snapshots)
+            .create_datasets_from_snapshots(
+                if self.current_user.is_explicit() {
+                    Some(AccountName::try_from(&self.current_user.user_name).unwrap())
+                } else {
+                    None
+                },
+                snapshots,
+            )
             .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));

@@ -24,7 +24,7 @@ impl UserService {
         }
     }
 
-    pub fn user_indication(&self, arg_matches: &ArgMatches) -> UserIndication {
+    pub fn current_user_selection(&self, arg_matches: &ArgMatches) -> CurrentUserSelection {
         let (current_user, current_user_specified_explicitly) =
             if let Some(user) = arg_matches.get_one::<String>("user") {
                 (user, true)
@@ -32,53 +32,73 @@ impl UserService {
                 (&self.default_user_name, false)
             };
 
+        CurrentUserSelection::new(current_user, current_user_specified_explicitly)
+    }
+
+    pub fn user_indication(&self, arg_matches: &ArgMatches) -> UserRelationIndication {
+        let current_user = self.current_user_selection(arg_matches);
+
         let target_user = if let Some(target_user) = arg_matches.get_one::<String>("target-user") {
-            TargetUser::Specific {
+            TargetUserSeletion::Specific {
                 user_name: target_user.clone(),
             }
         } else if arg_matches.get_flag("all-users") {
-            TargetUser::AllUsers
+            TargetUserSeletion::AllUsers
         } else {
-            TargetUser::Current
+            TargetUserSeletion::Current
         };
 
-        UserIndication::new(
-            current_user.clone(),
-            current_user_specified_explicitly,
-            target_user,
-        )
+        UserRelationIndication::new(current_user, target_user)
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub struct UserIndication {
-    pub current_user: String,
-    pub current_user_specified_explicitly: bool,
-    pub target_user: TargetUser,
+pub struct CurrentUserSelection {
+    pub user_name: String,
+    pub specified_explicitly: bool,
 }
 
-impl UserIndication {
-    pub fn new(
-        current_user: String,
-        current_user_specified_explicitly: bool,
-        target_user: TargetUser,
-    ) -> Self {
+impl CurrentUserSelection {
+    pub fn new<S>(user_name: S, specified_explicitly: bool) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            user_name: user_name.into(),
+            specified_explicitly,
+        }
+    }
+
+    pub fn is_explicit(&self) -> bool {
+        self.specified_explicitly
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct UserRelationIndication {
+    pub current_user: CurrentUserSelection,
+    pub target_user: TargetUserSeletion,
+}
+
+impl UserRelationIndication {
+    pub fn new(current_user: CurrentUserSelection, target_user: TargetUserSeletion) -> Self {
         Self {
             current_user,
-            current_user_specified_explicitly,
             target_user,
         }
     }
 
     pub fn is_explicit(&self) -> bool {
-        self.current_user_specified_explicitly || self.target_user != TargetUser::Current
+        self.current_user.is_explicit() || self.target_user != TargetUserSeletion::Current
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum TargetUser {
+pub enum TargetUserSeletion {
     Current,
     Specific { user_name: String },
     AllUsers,

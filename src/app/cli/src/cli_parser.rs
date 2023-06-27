@@ -123,6 +123,11 @@ pub fn cli() -> Command {
                             .action(ArgAction::Append)
                             .index(1)
                             .help("Dataset manifest reference(s) (path, or URL)"),
+                        Arg::new("user")
+                            .long("user")
+                            .short('u')
+                            .action(ArgAction::Set)
+                            .hide(true),
                     ])
                     .after_help(indoc::indoc!(
                         r#"
@@ -445,18 +450,15 @@ pub fn cli() -> Command {
                                 .short('w')
                                 .action(ArgAction::Count)
                                 .help("Show more details (repeat for more)"),
-
                             Arg::new("user")
                                 .long("user")
                                 .short('u')
                                 .action(ArgAction::Set)
                                 .hide(true),
-
                             Arg::new("target-user")
                                 .long("target-user")
                                 .action(ArgAction::Set)
                                 .hide(true),
-
                             Arg::new("all-users")
                                 .long("all-users")
                                 .action(ArgAction::SetTrue)

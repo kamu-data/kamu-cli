@@ -589,6 +589,9 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                         continue;
                     }
                 }
+                if !account_dir_entry.path().is_dir() {
+                    continue;
+                }
 
                 let account_name = AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
                 let mut account_datasets = self.stream_account_datasets(&account_name, account_dir_entry.path());

@@ -52,6 +52,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     // Add and sync dataset
     local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_local_alias.dataset_name)
                 .kind(DatasetKind::Root)

@@ -32,6 +32,7 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
 
     client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -81,6 +82,7 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
 
     client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -129,6 +131,7 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
 
     let create_result = client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -203,6 +206,7 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
 
     client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -266,6 +270,7 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
 
     client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -326,6 +331,7 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
 
     let create_result = client_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

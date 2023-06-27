@@ -152,7 +152,7 @@ async fn do_test_sync(
         .build();
 
     let b1 = local_repo
-        .create_dataset_from_snapshot(snapshot)
+        .create_dataset_from_snapshot(None, snapshot)
         .await
         .unwrap()
         .head;

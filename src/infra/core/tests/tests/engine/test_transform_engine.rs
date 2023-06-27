@@ -298,7 +298,7 @@ async fn test_transform_common(transform: Transform) {
     let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
 
     local_repo
-        .create_dataset_from_snapshot(root_snapshot)
+        .create_dataset_from_snapshot(None, root_snapshot)
         .await
         .unwrap();
 
@@ -324,7 +324,7 @@ async fn test_transform_common(transform: Transform) {
     let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
 
     let dataset = local_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+        .create_dataset_from_snapshot(None, deriv_snapshot)
         .await
         .unwrap()
         .dataset;

@@ -33,6 +33,7 @@ async fn query() {
     let local_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
     local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

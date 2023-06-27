@@ -631,6 +631,7 @@ async fn test_set_watermark() {
     harness
         .local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_alias.dataset_name)
                 .build(),
@@ -1009,6 +1010,7 @@ impl SyncService for TestSyncService {
                 None => {
                     self.local_repo
                         .create_dataset_from_snapshot(
+                            None,
                             MetadataFactory::dataset_snapshot()
                                 .name(local_ref.dataset_name().unwrap())
                                 .build(),

@@ -40,6 +40,7 @@ async fn test_verify_data_consistency() {
 
     local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -51,6 +52,7 @@ async fn test_verify_data_consistency() {
 
     local_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_alias.dataset_name)
                 .kind(DatasetKind::Derivative)
