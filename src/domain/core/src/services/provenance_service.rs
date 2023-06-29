@@ -39,13 +39,13 @@ pub trait LineageVisitor: Send {
 pub enum NodeInfo<'a> {
     Local {
         id: DatasetID,
-        name: DatasetName,
+        alias: DatasetAlias,
         kind: DatasetKind,
         dependencies: &'a [ResolvedTransformInput],
     },
     Remote {
         id: DatasetID,
-        name: DatasetName,
+        alias: DatasetAlias,
     },
 }
 
@@ -57,10 +57,10 @@ impl<'a> NodeInfo<'a> {
         }
     }
 
-    pub fn name(&self) -> &DatasetName {
+    pub fn alias(&self) -> &DatasetAlias {
         match self {
-            NodeInfo::Local { name, .. } => name,
-            NodeInfo::Remote { name, .. } => name,
+            NodeInfo::Local { alias, .. } => alias,
+            NodeInfo::Remote { alias, .. } => alias,
         }
     }
 }

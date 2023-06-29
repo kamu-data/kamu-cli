@@ -135,22 +135,22 @@ impl LineageVisitor for ShellVisitor {
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
         let fmt = match &dataset {
-            &NodeInfo::Local { name, kind, .. } => match kind {
+            &NodeInfo::Local { alias, kind, .. } => match kind {
                 DatasetKind::Root => format!(
                     "{}{}",
-                    console::style(name).bold(),
+                    console::style(alias).bold(),
                     console::style(": Root").dim(),
                 ),
                 DatasetKind::Derivative => format!(
                     "{}{}",
-                    console::style(name).bold(),
+                    console::style(alias).bold(),
                     console::style(": Derivative").dim(),
                 ),
             },
-            &NodeInfo::Remote { name, .. } => {
+            &NodeInfo::Remote { alias, .. } => {
                 format!(
                     "{}{}",
-                    console::style(name).dim(),
+                    console::style(alias).dim(),
                     console::style(": N/A").dim(),
                 )
             }
@@ -212,7 +212,7 @@ impl LineageVisitor for ShellVisitor {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct CsvVisitor {
-    visited: HashSet<DatasetName>,
+    visited: HashSet<DatasetAlias>,
 }
 
 impl CsvVisitor {
@@ -229,18 +229,18 @@ impl LineageVisitor for CsvVisitor {
     }
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
-        if !self.visited.insert(dataset.name().clone()) {
+        if !self.visited.insert(dataset.alias().clone()) {
             return false;
         }
 
         match dataset {
             &NodeInfo::Local { dependencies, .. } => {
                 for dep in dependencies {
-                    println!("\"{}\",\"true\",\"{}\"", dataset.name(), dep.name);
+                    println!("\"{}\",\"true\",\"{}\"", dataset.alias(), dep.name);
                 }
             }
             &NodeInfo::Remote { .. } => {
-                println!("\"{}\",\"false\",\"\"", dataset.name());
+                println!("\"{}\",\"false\",\"\"", dataset.alias());
             }
         }
 

@@ -61,14 +61,9 @@ impl ProvenanceServiceImpl {
                 })
             }
 
-            assert!(
-                !dataset_handle.alias.is_multi_tenant(),
-                "Multitenancy is not supported yet"
-            );
-
             let dataset_info = NodeInfo::Local {
                 id: summary.id.clone(),
-                name: dataset_handle.alias.dataset_name.clone(),
+                alias: dataset_handle.alias.clone(),
                 kind: summary.kind,
                 dependencies: &resolved_inputs,
             };
@@ -85,7 +80,7 @@ impl ProvenanceServiceImpl {
             // Remote dataset
             let dataset_info = NodeInfo::Remote {
                 id: dataset_handle.id.clone(),
-                name: dataset_handle.alias.dataset_name.clone(),
+                alias: dataset_handle.alias.clone(),
             };
 
             visitor.enter(&dataset_info);
@@ -153,16 +148,16 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
         }
 
         match dataset {
-            NodeInfo::Local { name, kind, .. } => match kind {
+            NodeInfo::Local { alias, kind, .. } => match kind {
                 DatasetKind::Root => {
-                    writeln!(self.writer, "\"{}\" [{}];", name, S::root_style())
+                    writeln!(self.writer, "\"{}\" [{}];", alias, S::root_style())
                 }
                 DatasetKind::Derivative => {
-                    writeln!(self.writer, "\"{}\" [{}];", name, S::derivative_style())
+                    writeln!(self.writer, "\"{}\" [{}];", alias, S::derivative_style())
                 }
             },
-            NodeInfo::Remote { name, .. } => {
-                writeln!(self.writer, "\"{}\" [{}];", name, S::remote_style())
+            NodeInfo::Remote { alias, .. } => {
+                writeln!(self.writer, "\"{}\" [{}];", alias, S::remote_style())
             }
         }
         .unwrap();
@@ -173,7 +168,7 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
                     self.writer,
                     "\"{}\" -> \"{}\";",
                     dep.handle.alias,
-                    dataset.name()
+                    dataset.alias()
                 )
                 .unwrap();
             }
