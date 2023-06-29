@@ -12,12 +12,7 @@ use opendatafabric::*;
 
 use crate::commands::*;
 use crate::services::WorkspaceService;
-use crate::{
-    CommandInterpretationFailed,
-    CurrentUserSelection,
-    UserRelationIndication,
-    UserService,
-};
+use crate::{AccountService, CommandInterpretationFailed, RelatedAccountIndication};
 
 pub fn get_command(
     catalog: &dill::Catalog,
@@ -27,7 +22,7 @@ pub fn get_command(
         Some(("add", submatches)) => Box::new(AddCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            current_user_selection(catalog, submatches)?,
+            catalog.get_one()?,
             submatches
                 .get_many("manifest")
                 .unwrap_or_default()
@@ -149,7 +144,8 @@ pub fn get_command(
         Some(("list", submatches)) => Box::new(ListCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            user_relation_indication(catalog, submatches)?,
+            catalog.get_one()?,
+            related_account_indication(catalog, submatches)?,
             catalog.get_one()?,
             submatches.get_count("wide"),
         )),
@@ -409,18 +405,10 @@ pub fn get_command(
     Ok(command)
 }
 
-fn current_user_selection(
+fn related_account_indication(
     catalog: &dill::Catalog,
     submatches: &clap::ArgMatches,
-) -> Result<CurrentUserSelection, InjectionError> {
-    let user_service = catalog.get_one::<UserService>()?;
-    Ok(user_service.current_user_selection(submatches))
-}
-
-fn user_relation_indication(
-    catalog: &dill::Catalog,
-    submatches: &clap::ArgMatches,
-) -> Result<UserRelationIndication, InjectionError> {
-    let user_service = catalog.get_one::<UserService>()?;
-    Ok(user_service.user_indication(submatches))
+) -> Result<RelatedAccountIndication, InjectionError> {
+    let account_service = catalog.get_one::<AccountService>()?;
+    Ok(account_service.related_account_indication(submatches))
 }

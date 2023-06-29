@@ -13,12 +13,11 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
-use crate::CurrentUserSelection;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     local_repo: Arc<dyn DatasetRepository>,
-    current_user: CurrentUserSelection,
+    current_account: Arc<CurrentAccountConfig>,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -29,7 +28,7 @@ impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
         local_repo: Arc<dyn DatasetRepository>,
-        current_user: CurrentUserSelection,
+        current_account: Arc<CurrentAccountConfig>,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -41,7 +40,7 @@ impl AddCommand {
         Self {
             resource_loader,
             local_repo,
-            current_user,
+            current_account,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
@@ -129,7 +128,7 @@ impl AddCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
     fn needs_multitenant_workspace(&self) -> bool {
-        self.current_user.is_explicit()
+        self.current_account.is_explicit()
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
@@ -206,8 +205,8 @@ impl Command for AddCommand {
         let mut add_results = self
             .local_repo
             .create_datasets_from_snapshots(
-                if self.current_user.is_explicit() {
-                    Some(AccountName::try_from(&self.current_user.user_name).unwrap())
+                if self.current_account.is_explicit() {
+                    Some(self.current_account.account_name.clone())
                 } else {
                     None
                 },

@@ -18,12 +18,13 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::{TargetUserSeletion, UserRelationIndication};
+use crate::{RelatedAccountIndication, TargetAccountSelection};
 
 pub struct ListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    user_relation: UserRelationIndication,
+    current_account: Arc<CurrentAccountConfig>,
+    related_account_indication: RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
@@ -32,14 +33,16 @@ impl ListCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        user_relation: UserRelationIndication,
+        current_account: Arc<CurrentAccountConfig>,
+        related_account_indication: RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
         Self {
             dataset_repo,
             remote_alias_reg,
-            user_relation,
+            current_account,
+            related_account_indication,
             output_config,
             detail_level,
         }
@@ -173,15 +176,16 @@ impl ListCommand {
 
     fn stream_datasets(&self) -> DatasetHandleStream {
         if self.dataset_repo.is_multitenant() {
-            match &self.user_relation.target_user {
-                TargetUserSeletion::Current => self.dataset_repo.get_account_datasets(
-                    AccountName::from_str(self.user_relation.current_user.user_name.as_str())
-                        .unwrap(),
-                ),
-                TargetUserSeletion::Specific { user_name } => self
+            match &self.related_account_indication.target_account {
+                TargetAccountSelection::Current => self
+                    .dataset_repo
+                    .get_account_datasets(self.current_account.account_name.clone()),
+                TargetAccountSelection::Specific {
+                    account_name: user_name,
+                } => self
                     .dataset_repo
                     .get_account_datasets(AccountName::from_str(user_name.as_str()).unwrap()),
-                TargetUserSeletion::AllUsers => self.dataset_repo.get_all_datasets(),
+                TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
             }
         } else {
             self.dataset_repo.get_all_datasets()
@@ -192,7 +196,7 @@ impl ListCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
     fn needs_multitenant_workspace(&self) -> bool {
-        self.user_relation.is_explicit()
+        self.current_account.is_explicit() || self.related_account_indication.is_explicit()
     }
 
     async fn run(&mut self) -> Result<(), CLIError> {
@@ -205,7 +209,7 @@ impl Command for ListCommand {
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
 
-        let show_owners = self.dataset_repo.is_multitenant() && self.user_relation.is_explicit();
+        let show_owners = self.dataset_repo.is_multitenant() && self.needs_multitenant_workspace();
 
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))

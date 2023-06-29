@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod current_account_config;
 pub mod dataset;
 pub mod dataset_summary;
 pub mod engine;
 pub mod metadata_chain;
 pub mod metadata_stream;
 
+pub use current_account_config::*;
 pub use dataset::*;
 pub use dataset_summary::*;
 pub use engine::*;

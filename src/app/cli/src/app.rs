@@ -48,6 +48,8 @@ pub async fn run(
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
+    let account_svc = AccountService::new();
+
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
@@ -58,6 +60,9 @@ pub async fn run(
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
+
+        let current_account = account_svc.current_account_config(&matches);
+        catalog_builder.add_value(current_account);
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -134,14 +139,14 @@ pub fn configure_catalog(
     b.add::<ContainerRuntime>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
-    b.add::<UserService>();
+    b.add::<AccountService>();
 
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())
             .with_default_account_name_fn(|catalog| {
-                let user_service = catalog.get_one::<UserService>()?;
-                Ok(AccountName::from_str(user_service.default_user_name.as_str()).unwrap())
+                let account_service = catalog.get_one::<AccountService>()?;
+                Ok(AccountName::from_str(account_service.default_account_name.as_str()).unwrap())
             })
             .with_multitenant(is_multitenant_workspace),
     );
