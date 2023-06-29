@@ -23,7 +23,7 @@ async fn metadata_chain_append_event() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 

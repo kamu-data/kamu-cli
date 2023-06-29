@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
@@ -16,7 +15,6 @@ use dill::*;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
-use opendatafabric::AccountName;
 
 use crate::cli_commands;
 use crate::commands::Command;
@@ -49,6 +47,7 @@ pub async fn run(
     let workspace_version = workspace_svc.workspace_version()?;
 
     let account_svc = AccountService::new();
+    let current_account = account_svc.current_account_config(&matches);
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -61,7 +60,6 @@ pub async fn run(
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
 
-        let current_account = account_svc.current_account_config(&matches);
         catalog_builder.add_value(current_account);
 
         let guards = configure_logging(&output_config, &workspace_layout);
@@ -144,10 +142,6 @@ pub fn configure_catalog(
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())
-            .with_default_account_name_fn(|catalog| {
-                let account_service = catalog.get_one::<AccountService>()?;
-                Ok(AccountName::from_str(account_service.default_account_name.as_str()).unwrap())
-            })
             .with_multitenant(is_multitenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();

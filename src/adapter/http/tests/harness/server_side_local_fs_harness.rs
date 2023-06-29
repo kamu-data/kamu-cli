@@ -14,13 +14,13 @@ use std::sync::Arc;
 
 use dill::builder_for;
 use kamu::domain::{
+    CurrentAccountConfig,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
     DEFAULT_DATASET_OWNER_NAME,
 };
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
-use opendatafabric::AccountName;
 use tempfile::TempDir;
 use url::Url;
 
@@ -44,12 +44,10 @@ impl ServerSideLocalFsHarness {
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(workspace_layout.datasets_dir.clone())
-                    .with_default_account_name(AccountName::new_unchecked(
-                        DEFAULT_DATASET_OWNER_NAME,
-                    ))
                     .with_multitenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false))
             .build();
 
         let api_server = TestAPIServer::new(

@@ -246,12 +246,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
+        let new_alias = DatasetAlias::new(old_alias.account_name.clone(), new_name.clone());
 
         match self
-            .move_bucket_items_on_dataset_rename(&old_alias, new_alias)
+            .move_bucket_items_on_dataset_rename(&old_alias, &new_alias)
             .await
         {
             Ok(_) => Ok(()),

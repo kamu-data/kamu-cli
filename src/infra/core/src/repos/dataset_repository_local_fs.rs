@@ -30,20 +30,24 @@ pub struct DatasetRepositoryLocalFs {
 
 #[component(pub)]
 impl DatasetRepositoryLocalFs {
-    pub fn new(root: PathBuf, default_account_name: AccountName, multitenant: bool) -> Self {
-        Self::from(root, default_account_name, multitenant)
+    pub fn new(
+        root: PathBuf,
+        current_account_config: Arc<CurrentAccountConfig>,
+        multitenant: bool,
+    ) -> Self {
+        Self::from(root, current_account_config, multitenant)
     }
 
     pub fn from(
         root: impl Into<PathBuf>,
-        default_account_name: AccountName,
+        current_account_config: Arc<CurrentAccountConfig>,
         multitenant: bool,
     ) -> Self {
         Self {
             storage_strategy: if multitenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root.into(),
-                    default_account_name,
+                    current_account_config,
                 ))
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root.into()))
@@ -178,7 +182,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         }?;
 
         self.storage_strategy
-            .handle_dataset_created(&dataset, &dataset_handle.alias)
+            .handle_dataset_created(&dataset, &dataset_handle.alias.dataset_name)
             .await?;
 
         Ok(CreateDatasetResult {
@@ -191,20 +195,29 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
 
-        match self.storage_strategy.resolve_dataset_alias(new_alias).await {
+        let new_alias =
+            DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+        match self
+            .storage_strategy
+            .resolve_dataset_alias(&new_alias)
+            .await
+        {
             Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
-                alias: new_alias.clone(),
+                alias: DatasetAlias::new(
+                    dataset_handle.alias.account_name.clone(),
+                    new_name.clone(),
+                ),
             })),
             Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
 
         self.storage_strategy
-            .handle_dataset_renamed(&dataset_handle, new_alias)
+            .handle_dataset_renamed(&dataset_handle, new_name)
             .await?;
 
         Ok(())
@@ -279,13 +292,13 @@ trait DatasetStorageStrategy: Sync + Send {
     async fn handle_dataset_created(
         &self,
         dataset: &dyn Dataset,
-        dataset_alias: &DatasetAlias,
+        dataset_name: &DatasetName,
     ) -> Result<(), InternalError>;
 
     async fn handle_dataset_renamed(
         &self,
         dataset_handle: &DatasetHandle,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), InternalError>;
 }
 
@@ -442,7 +455,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     async fn handle_dataset_created(
         &self,
         _dataset: &dyn Dataset,
-        _dataset_alias: &DatasetAlias,
+        _dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
         // No extra action required in singletenant mode
         Ok(())
@@ -451,13 +464,10 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     async fn handle_dataset_renamed(
         &self,
         dataset_handle: &DatasetHandle,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), InternalError> {
         let old_dataset_path = self.get_dataset_path(dataset_handle);
-        let new_dataset_path = old_dataset_path
-            .parent()
-            .unwrap()
-            .join(&new_alias.dataset_name);
+        let new_dataset_path = old_dataset_path.parent().unwrap().join(&new_name);
         std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
         Ok(())
     }
@@ -467,14 +477,17 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
 struct DatasetMultiTenantStorageStrategy {
     root: PathBuf,
-    default_account_name: AccountName,
+    current_account_config: Arc<CurrentAccountConfig>,
 }
 
 impl DatasetMultiTenantStorageStrategy {
-    pub fn new(root: impl Into<PathBuf>, default_account_name: AccountName) -> Self {
+    pub fn new(
+        root: impl Into<PathBuf>,
+        current_account_config: Arc<CurrentAccountConfig>,
+    ) -> Self {
         Self {
             root: root.into(),
-            default_account_name,
+            current_account_config,
         }
     }
 
@@ -482,7 +495,7 @@ impl DatasetMultiTenantStorageStrategy {
         if dataset_alias.is_multitenant() {
             dataset_alias.account_name.as_ref().unwrap()
         } else {
-            &self.default_account_name
+            &self.current_account_config.account_name
         }
     }
 
@@ -509,14 +522,14 @@ impl DatasetMultiTenantStorageStrategy {
         }
     }
 
-    async fn save_dataset_alias(
+    async fn save_dataset_name(
         &self,
         dataset: &dyn Dataset,
-        dataset_alias: &DatasetAlias,
+        dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
         dataset
             .as_info_repo()
-            .set("alias", dataset_alias.dataset_name.as_bytes())
+            .set("alias", dataset_name.as_bytes())
             .await
             .int_err()?;
 
@@ -696,21 +709,21 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
     async fn handle_dataset_created(
         &self,
         dataset: &dyn Dataset,
-        dataset_alias: &DatasetAlias,
+        dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
-        self.save_dataset_alias(dataset, dataset_alias).await
+        self.save_dataset_name(dataset, dataset_name).await
     }
 
     async fn handle_dataset_renamed(
         &self,
         dataset_handle: &DatasetHandle,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), InternalError> {
         let dataset_path = self.get_dataset_path(dataset_handle);
         let layout = DatasetLayout::new(dataset_path);
         let dataset = DatasetFactoryImpl::get_local_fs(layout);
 
-        self.save_dataset_alias(&dataset, new_alias).await?;
+        self.save_dataset_name(&dataset, new_name).await?;
 
         Ok(())
     }

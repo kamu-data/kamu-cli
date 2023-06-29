@@ -11,7 +11,7 @@ use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CurrentAccountConfig {
     pub account_name: AccountName,
     pub specified_explicitly: bool,

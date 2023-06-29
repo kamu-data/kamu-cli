@@ -23,6 +23,7 @@ use thiserror::Error;
 // Test wrapper on top of CLI library
 pub struct Kamu {
     workspace_layout: WorkspaceLayout,
+    current_account_config: CurrentAccountConfig,
     workspace_path: PathBuf,
     _temp_dir: Option<tempfile::TempDir>,
 }
@@ -31,8 +32,10 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
+        let current_account_config = CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false);
         Self {
             workspace_layout,
+            current_account_config,
             workspace_path,
             _temp_dir: None,
         }
@@ -63,7 +66,7 @@ impl Kamu {
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let local_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+            Arc::new(self.current_account_config.clone()),
             false,
         );
 
@@ -121,7 +124,7 @@ impl Kamu {
         let cli = kamu_cli::cli();
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+            Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
             false,
         ));
         let config_service = Arc::new(ConfigService::new(&self.workspace_layout));
@@ -161,6 +164,7 @@ impl Kamu {
     pub fn catalog(&self) -> dill::Catalog {
         let mut builder = kamu_cli::configure_catalog(&self.workspace_layout, false);
         builder.add_value(self.workspace_layout.clone());
+        builder.add_value(self.current_account_config.clone());
         builder.build()
     }
 }

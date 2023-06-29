@@ -71,7 +71,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 
     async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;

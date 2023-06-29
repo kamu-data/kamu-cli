@@ -126,18 +126,18 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
     repo.create_datasets_from_snapshots(None, snapshots).await;
 
     assert_matches!(
-        repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo)
+        repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo.dataset_name)
             .await,
         Err(RenameDatasetError::NotFound(_))
     );
 
     assert_matches!(
-        repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar)
+        repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
             .await,
         Err(RenameDatasetError::NameCollision(_))
     );
 
-    repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz)
+    repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz.dataset_name)
         .await
         .unwrap();
 

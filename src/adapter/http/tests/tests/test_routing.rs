@@ -40,10 +40,10 @@ async fn setup_repo() -> RepoFixture {
         .add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(workspace_layout.datasets_dir.clone())
-                .with_default_account_name(AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME))
                 .with_multitenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false))
         .build();
 
     let local_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

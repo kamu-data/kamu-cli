@@ -16,7 +16,7 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use opendatafabric::{AccountName, DatasetRef, DatasetRefAny, DatasetRefRemote};
+use opendatafabric::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -36,10 +36,11 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
+        b.add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false));
+
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(workspace_layout.datasets_dir.clone())
-                .with_default_account_name(AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME))
                 .with_multitenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();

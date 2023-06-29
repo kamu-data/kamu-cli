@@ -24,7 +24,7 @@ async fn dataset_by_id_does_not_exist() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 
@@ -64,7 +64,7 @@ async fn dataset_by_id() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 
@@ -122,7 +122,7 @@ async fn dataset_create_empty() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 
@@ -170,7 +170,7 @@ async fn dataset_create_from_snapshot() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 
@@ -233,7 +233,7 @@ async fn dataset_create_from_snapshot_malformed() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 

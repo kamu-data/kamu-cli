@@ -12,7 +12,6 @@ use std::sync::Arc;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
-use opendatafabric::AccountName;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
@@ -59,7 +58,7 @@ async fn test_internal_error() {
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let local_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        AccountName::new_unchecked(DEFAULT_DATASET_OWNER_NAME),
+        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     );
 
