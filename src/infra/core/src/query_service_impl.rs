@@ -482,15 +482,14 @@ impl SchemaProvider for KamuSchema {
     }
 
     async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        // TODO: multitencancy
-        let dataset_name = match DatasetName::try_from(name) {
-            Ok(name) => name,
+        let dataset_alias = match DatasetAlias::try_from(name) {
+            Ok(alias) => alias,
             Err(_) => return None,
         };
 
         let dataset_handle = match self
             .dataset_repo
-            .resolve_dataset_ref(&dataset_name.as_local_ref())
+            .resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await
         {
             Ok(hdl) => hdl,
