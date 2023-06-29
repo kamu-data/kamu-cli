@@ -16,7 +16,6 @@ use super::{CLIError, Command};
 
 pub struct RenameCommand {
     local_repo: Arc<dyn DatasetRepository>,
-    current_account: Arc<CurrentAccountConfig>,
     dataset_ref: DatasetRef,
     new_name: DatasetName,
 }
@@ -24,7 +23,6 @@ pub struct RenameCommand {
 impl RenameCommand {
     pub fn new<N>(
         local_repo: Arc<dyn DatasetRepository>,
-        current_account: Arc<CurrentAccountConfig>,
         dataset_ref: DatasetRef,
         new_name: N,
     ) -> Self
@@ -34,7 +32,6 @@ impl RenameCommand {
     {
         Self {
             local_repo,
-            current_account,
             dataset_ref,
             new_name: new_name.try_into().unwrap(),
         }
@@ -43,10 +40,6 @@ impl RenameCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RenameCommand {
-    fn needs_multi_tenant_workspace(&self) -> bool {
-        self.current_account.is_explicit()
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         match self
             .local_repo

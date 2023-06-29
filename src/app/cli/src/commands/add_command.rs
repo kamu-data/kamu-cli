@@ -127,10 +127,6 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    fn needs_multi_tenant_workspace(&self) -> bool {
-        self.current_account.is_explicit()
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.stdin && !self.snapshot_refs.is_empty() {
             return Err(CLIError::usage_error(

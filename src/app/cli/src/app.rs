@@ -60,7 +60,7 @@ pub async fn run(
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
 
-        catalog_builder.add_value(current_account);
+        catalog_builder.add_value(current_account.clone());
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -88,7 +88,7 @@ pub async fn run(
         Err(CLIError::usage_error_from(NotInWorkspace))
     } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
         Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-    } else if command.needs_multi_tenant_workspace() && !workspace_svc.is_multi_tenant_workspace() {
+    } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
         Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
     } else {
         command.run().await

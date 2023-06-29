@@ -131,10 +131,6 @@ pub trait Command {
         true
     }
 
-    fn needs_multi_tenant_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError>;
 }
 

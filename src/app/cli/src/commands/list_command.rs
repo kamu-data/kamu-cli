@@ -18,7 +18,7 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::{RelatedAccountIndication, TargetAccountSelection};
+use crate::{NotInMultiTenantWorkspace, RelatedAccountIndication, TargetAccountSelection};
 
 pub struct ListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -195,10 +195,6 @@ impl ListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
-    fn needs_multi_tenant_workspace(&self) -> bool {
-        self.current_account.is_explicit() || self.related_account_indication.is_explicit()
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
         use datafusion::arrow::array::{
             ArrayRef,
@@ -209,8 +205,13 @@ impl Command for ListCommand {
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
 
-        let show_owners =
-            self.dataset_repo.is_multi_tenant() && self.needs_multi_tenant_workspace();
+        let show_owners = if self.dataset_repo.is_multi_tenant() {
+            self.current_account.is_explicit() || self.related_account_indication.is_explicit()
+        } else if self.related_account_indication.is_explicit() {
+            return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
+        } else {
+            false
+        };
 
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))

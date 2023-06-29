@@ -144,8 +144,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         Ok(Arc::new(dataset))
     }
 
-    // TODO: why accepting alias here? should be a name
-    // TODO: name collision check
+    // TODO: name collision check for multi-tenant case
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,

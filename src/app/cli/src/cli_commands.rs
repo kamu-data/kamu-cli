@@ -227,7 +227,6 @@ pub fn get_command(
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
             catalog.get_one()?,
-            catalog.get_one()?,
             rename_matches
                 .get_one::<DatasetRef>("dataset")
                 .unwrap()
