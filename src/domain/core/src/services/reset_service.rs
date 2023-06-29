@@ -35,6 +35,12 @@ pub enum ResetError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    MultiTenantRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
+    #[error(transparent)]
     CASFailed(
         #[from]
         #[backtrace]
@@ -64,6 +70,7 @@ impl From<GetDatasetError> for ResetError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

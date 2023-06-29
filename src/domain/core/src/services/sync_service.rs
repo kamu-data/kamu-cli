@@ -157,6 +157,12 @@ pub enum SyncError {
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
+    MultiTenantRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
+    #[error(transparent)]
     CreateDatasetFailed(#[from] CreateDatasetError),
     #[error(transparent)]
     UnsupportedProtocol(#[from] UnsupportedProtocolError),
@@ -252,6 +258,7 @@ impl From<GetDatasetError> for SyncError {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(DatasetNotFoundError {
                 dataset_ref: e.dataset_ref.into(),
             }),
+            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

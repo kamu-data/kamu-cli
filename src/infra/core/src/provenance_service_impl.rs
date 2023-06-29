@@ -62,7 +62,7 @@ impl ProvenanceServiceImpl {
             }
 
             assert!(
-                !dataset_handle.alias.is_multitenant(),
+                !dataset_handle.alias.is_multi_tenant(),
                 "Multitenancy is not supported yet"
             );
 

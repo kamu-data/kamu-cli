@@ -348,7 +348,7 @@ impl DatasetAlias {
         }
     }
 
-    pub fn is_multitenant(&self) -> bool {
+    pub fn is_multi_tenant(&self) -> bool {
         self.account_name.is_some()
     }
 
@@ -431,7 +431,7 @@ impl DatasetAliasRemote {
         }
     }
 
-    pub fn is_multitenant(&self) -> bool {
+    pub fn is_multi_tenant(&self) -> bool {
         self.account_name.is_some()
     }
 

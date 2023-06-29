@@ -33,18 +33,18 @@ impl DatasetRepositoryLocalFs {
     pub fn new(
         root: PathBuf,
         current_account_config: Arc<CurrentAccountConfig>,
-        multitenant: bool,
+        multi_tenant: bool,
     ) -> Self {
-        Self::from(root, current_account_config, multitenant)
+        Self::from(root, current_account_config, multi_tenant)
     }
 
     pub fn from(
         root: impl Into<PathBuf>,
         current_account_config: Arc<CurrentAccountConfig>,
-        multitenant: bool,
+        multi_tenant: bool,
     ) -> Self {
         Self {
-            storage_strategy: if multitenant {
+            storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root.into(),
                     current_account_config,
@@ -81,8 +81,8 @@ impl DatasetRegistry for DatasetRepositoryLocalFs {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryLocalFs {
-    fn is_multitenant(&self) -> bool {
-        self.storage_strategy.is_multitenant()
+    fn is_multi_tenant(&self) -> bool {
+        self.storage_strategy.is_multi_tenant()
     }
 
     // TODO: PERF: Cache data and speed up lookups by ID
@@ -110,6 +110,9 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                 .map_err(|e| match e {
                     ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
                     ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
+                    ResolveDatasetError::MultiTenantRefUnexpected(e) => {
+                        GetDatasetError::MultiTenantRefUnexpected(e)
+                    }
                 }),
             DatasetRef::ID(id) => self
                 .storage_strategy
@@ -118,6 +121,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                 .map_err(|e| match e {
                     ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
                     ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
+                    ResolveDatasetError::MultiTenantRefUnexpected(_) => unreachable!(),
                 }),
         }
     }
@@ -140,6 +144,8 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         Ok(Arc::new(dataset))
     }
 
+    // TODO: why accepting alias here? should be a name
+    // TODO: name collision check
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
@@ -212,6 +218,9 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                     new_name.clone(),
                 ),
             })),
+            Err(ResolveDatasetError::MultiTenantRefUnexpected(e)) => {
+                Err(RenameDatasetError::MultiTenantRefUnexpected(e))
+            }
             Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
@@ -228,6 +237,9 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
+            Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
+                Err(DeleteDatasetError::MultiTenantRefUnexpected(e))
+            }
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
@@ -271,7 +283,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
 #[async_trait]
 trait DatasetStorageStrategy: Sync + Send {
-    fn is_multitenant(&self) -> bool;
+    fn is_multi_tenant(&self) -> bool;
 
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
@@ -311,6 +323,8 @@ enum ResolveDatasetError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -330,11 +344,8 @@ impl DatasetSingleTenantStorageStrategy {
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
-        if dataset_alias.is_multitenant() {
-            panic!("Multitenant alias applied to singletenant repository")
-        } else {
-            &dataset_alias.dataset_name
-        }
+        assert!(!dataset_alias.is_multi_tenant());
+        &dataset_alias.dataset_name
     }
 
     fn dataset_path_impl(&self, dataset_alias: &DatasetAlias) -> PathBuf {
@@ -366,7 +377,7 @@ impl DatasetSingleTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
-    fn is_multitenant(&self) -> bool {
+    fn is_multi_tenant(&self) -> bool {
         false
     }
 
@@ -397,13 +408,21 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_account_datasets<'s>(&'s self, _account_name: AccountName) -> DatasetHandleStream<'s> {
-        unreachable!("Singletenant dataset repository queried by account");
+        panic!("Single-tenant dataset repository queried by account");
     }
 
     async fn resolve_dataset_alias(
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
+        if dataset_alias.is_multi_tenant() {
+            return Err(ResolveDatasetError::MultiTenantRefUnexpected(
+                MultiTenantRefUnexpectedError {
+                    dataset_ref: dataset_alias.as_local_ref(),
+                },
+            ));
+        }
+
         let dataset_path = self.dataset_path_impl(&dataset_alias);
         if !dataset_path.exists() {
             return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
@@ -457,7 +476,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         _dataset: &dyn Dataset,
         _dataset_name: &DatasetName,
     ) -> Result<(), InternalError> {
-        // No extra action required in singletenant mode
+        // No extra action required in single-tenant mode
         Ok(())
     }
 
@@ -492,7 +511,7 @@ impl DatasetMultiTenantStorageStrategy {
     }
 
     fn effective_account_name<'a>(&'a self, dataset_alias: &'a DatasetAlias) -> &'a AccountName {
-        if dataset_alias.is_multitenant() {
+        if dataset_alias.is_multi_tenant() {
             dataset_alias.account_name.as_ref().unwrap()
         } else {
             &self.current_account_config.account_name
@@ -579,7 +598,7 @@ impl DatasetMultiTenantStorageStrategy {
 
 #[async_trait]
 impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
-    fn is_multitenant(&self) -> bool {
+    fn is_multi_tenant(&self) -> bool {
         true
     }
 

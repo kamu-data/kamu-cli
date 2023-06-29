@@ -41,7 +41,7 @@ impl ClientSideHarness {
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(workspace_layout.datasets_dir.clone())
-                .with_multitenant(false),
+                .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

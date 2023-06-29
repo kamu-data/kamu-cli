@@ -147,6 +147,7 @@ impl From<GetDatasetError> for CLIError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             e @ GetDatasetError::NotFound(_) => Self::failure(e),
+            e @ GetDatasetError::MultiTenantRefUnexpected(_) => Self::failure(e),
             e @ GetDatasetError::Internal(_) => Self::critical(e),
         }
     }
@@ -156,6 +157,7 @@ impl From<GetAliasesError> for CLIError {
     fn from(v: GetAliasesError) -> Self {
         match v {
             e @ GetAliasesError::DatasetNotFound(_) => Self::failure(e),
+            e @ GetAliasesError::MultiTenantRefUnexpected(_) => Self::failure(e),
             e @ GetAliasesError::Internal(_) => Self::critical(e),
         }
     }
@@ -166,6 +168,7 @@ impl From<DeleteDatasetError> for CLIError {
         match v {
             e @ DeleteDatasetError::NotFound(_) => Self::failure(e),
             e @ DeleteDatasetError::DanglingReference(_) => Self::failure(e),
+            e @ DeleteDatasetError::MultiTenantRefUnexpected(_) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }
@@ -236,8 +239,8 @@ pub struct AlreadyInWorkspace;
 pub struct NotInWorkspace;
 
 #[derive(Debug, Error)]
-#[error("Directory is not a multitenant kamu workspace")]
-pub struct NotInMultitenantWorkspace;
+#[error("Directory is not a multi-tenant kamu workspace")]
+pub struct NotInMultiTenantWorkspace;
 
 #[derive(Debug, Error)]
 #[error("Command interpretation failed")]

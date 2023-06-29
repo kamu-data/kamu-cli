@@ -43,7 +43,7 @@ impl RenameCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for RenameCommand {
-    fn needs_multitenant_workspace(&self) -> bool {
+    fn needs_multi_tenant_workspace(&self) -> bool {
         self.current_account.is_explicit()
     }
 
@@ -56,6 +56,7 @@ impl Command for RenameCommand {
             Ok(_) => Ok(()),
             Err(RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
             Err(RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
+            Err(RenameDatasetError::MultiTenantRefUnexpected(e)) => Err(CLIError::failure(e)),
             Err(e) => Err(CLIError::critical(e)),
         }?;
 

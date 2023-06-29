@@ -75,9 +75,9 @@ impl WorkspaceService {
         self.workspace_layout.root_dir.is_dir()
     }
 
-    /// Whether the workspace is multitenant
-    pub fn is_multitenant_workspace(&self) -> bool {
-        self.workspace_config.multitenant
+    /// Whether the workspace is multi-tenant
+    pub fn is_multi_tenant_workspace(&self) -> bool {
+        self.workspace_config.multi_tenant
     }
 
     /// Whether workspace requires and upgrade

@@ -46,7 +46,7 @@ impl CreateDatasetResult {
 
 #[async_trait]
 pub trait DatasetRepository: DatasetRegistry + Sync + Send {
-    fn is_multitenant(&self) -> bool;
+    fn is_multi_tenant(&self) -> bool;
 
     async fn resolve_dataset_ref(
         &self,
@@ -134,6 +134,7 @@ where
         match self.resolve_dataset_ref(dataset_ref).await {
             Ok(hdl) => Ok(Some(hdl)),
             Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::MultiTenantRefUnexpected(e)) => Err(e.int_err()),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
     }
@@ -145,6 +146,7 @@ where
         match self.get_dataset(dataset_ref).await {
             Ok(ds) => Ok(Some(ds)),
             Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::MultiTenantRefUnexpected(e)) => Err(e.int_err()),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
     }
@@ -306,10 +308,13 @@ where
                         missing_inputs: vec![input_id.as_local_ref()],
                     }),
                 ),
+                Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
+                    Err(CreateDatasetFromSnapshotError::MultiTenantRefUnexpected(e))
+                }
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?;
         } else {
-            // TODO: Input should be a multitenant alias
+            // TODO: Input should be a multi-tenant alias
             let input_alias = DatasetAlias::new(None, input.name.clone());
 
             // When ID is not specified we try resolving it by name
@@ -321,6 +326,9 @@ where
                         missing_inputs: vec![input_alias.into_local_ref()],
                     }),
                 ),
+                Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
+                    Err(CreateDatasetFromSnapshotError::MultiTenantRefUnexpected(e))
+                }
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?;
 
@@ -375,6 +383,12 @@ fn sort_snapshots_in_dependency_order(
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
+    pub dataset_ref: DatasetRef,
+}
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref}")]
+pub struct MultiTenantRefUnexpectedError {
     pub dataset_ref: DatasetRef,
 }
 
@@ -447,6 +461,8 @@ pub enum GetDatasetError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
+    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -477,6 +493,8 @@ pub enum CreateDatasetFromSnapshotError {
     #[error(transparent)]
     MissingInputs(#[from] MissingInputsError),
     #[error(transparent)]
+    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
+    #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
     Internal(
@@ -495,6 +513,8 @@ pub enum RenameDatasetError {
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
+    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -506,6 +526,7 @@ impl From<GetDatasetError> for RenameDatasetError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::NotFound(e),
+            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }
@@ -519,6 +540,8 @@ pub enum DeleteDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
+    #[error(transparent)]
+    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
     #[error(transparent)]
     Internal(
         #[from]

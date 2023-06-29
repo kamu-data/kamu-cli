@@ -91,6 +91,12 @@ pub enum QueryError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    MultiTenantRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
+    #[error(transparent)]
     DatasetSchemaNotAvailable(
         #[from]
         #[backtrace]
@@ -124,6 +130,7 @@ impl From<GetDatasetError> for QueryError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

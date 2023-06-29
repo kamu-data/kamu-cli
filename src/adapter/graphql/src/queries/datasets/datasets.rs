@@ -42,7 +42,7 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let account = Account::mock();
 
-        // Not multitenant yet
+        // Not multi-tenant yet
         let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
 
         let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
@@ -173,8 +173,8 @@ impl Datasets {
             .await
     }
 
-    // TODO: Multitenancy
-    // TODO: Multitenant resolution for derivative dataset inputs (should it only
+    // TODO: Multi-tenancy
+    // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
     // work by ID?)
     #[allow(unused_variables)]
     #[graphql(skip)]
@@ -213,6 +213,9 @@ impl Datasets {
                         .map(|r| r.to_string())
                         .collect(),
                 })
+            }
+            Err(domain::CreateDatasetFromSnapshotError::MultiTenantRefUnexpected(e)) => {
+                return Err(e.int_err().into())
             }
             Err(domain::CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };

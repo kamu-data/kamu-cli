@@ -127,7 +127,7 @@ impl AddCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for AddCommand {
-    fn needs_multitenant_workspace(&self) -> bool {
+    fn needs_multi_tenant_workspace(&self) -> bool {
         self.current_account.is_explicit()
     }
 
@@ -195,7 +195,7 @@ impl Command for AddCommand {
                     return Err(CLIError::Aborted);
                 }
 
-                // TODO: delete permissions should be checked in multitenant scenario
+                // TODO: delete permissions should be checked in multi-tenant scenario
                 for hdl in already_exist {
                     self.local_repo.delete_dataset(&hdl.as_local_ref()).await?;
                 }

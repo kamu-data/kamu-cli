@@ -14,7 +14,7 @@ use opendatafabric::*;
 use thiserror::Error;
 
 use super::sync_service::*;
-use crate::{DatasetNotFoundError, GetDatasetError};
+use crate::{DatasetNotFoundError, GetDatasetError, MultiTenantRefUnexpectedError};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Service
@@ -101,6 +101,12 @@ pub enum PushError {
         #[backtrace]
         DatasetNotFoundError,
     ),
+    #[error(transparent)]
+    MultitenantSourceRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
     #[error("Destination is not specified and there is no associated push alias")]
     NoTarget,
     #[error("Cannot choose between multiple push aliases")]
@@ -123,6 +129,7 @@ impl From<GetDatasetError> for PushError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => e.into(),
+            GetDatasetError::MultiTenantRefUnexpected(e) => e.into(),
             GetDatasetError::Internal(e) => e.into(),
         }
     }

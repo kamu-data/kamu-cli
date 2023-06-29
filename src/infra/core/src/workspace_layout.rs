@@ -51,7 +51,7 @@ impl WorkspaceLayout {
         }
     }
 
-    pub fn create(root: impl Into<PathBuf>, multitenant: bool) -> Result<Self, InternalError> {
+    pub fn create(root: impl Into<PathBuf>, multi_tenant: bool) -> Result<Self, InternalError> {
         let ws = Self::new(root);
         if !ws.root_dir.exists() || ws.root_dir.read_dir().int_err()?.next().is_some() {
             std::fs::create_dir(&ws.root_dir).int_err()?;
@@ -62,7 +62,7 @@ impl WorkspaceLayout {
         std::fs::create_dir(&ws.run_info_dir).int_err()?;
         std::fs::write(&ws.version_path, Self::VERSION.to_string()).int_err()?;
 
-        let ws_config = WorkspaceConfig::new(multitenant);
+        let ws_config = WorkspaceConfig::new(multi_tenant);
         ws_config.save_to(&ws.config_path).int_err()?;
 
         Ok(ws)
@@ -124,12 +124,12 @@ const WORKSPACE_CONFIG_VERSION: i32 = 1;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
-    pub multitenant: bool,
+    pub multi_tenant: bool,
 }
 
 impl WorkspaceConfig {
-    pub fn new(multitenant: bool) -> Self {
-        Self { multitenant }
+    pub fn new(multi_tenant: bool) -> Self {
+        Self { multi_tenant }
     }
 
     pub fn load_from(config_path: &Path) -> serde_yaml::Result<Self> {
@@ -166,7 +166,9 @@ impl WorkspaceConfig {
 
 impl Default for WorkspaceConfig {
     fn default() -> Self {
-        Self { multitenant: false }
+        Self {
+            multi_tenant: false,
+        }
     }
 }
 

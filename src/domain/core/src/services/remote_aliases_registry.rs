@@ -30,6 +30,12 @@ pub enum GetAliasesError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    MultiTenantRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -41,6 +47,7 @@ impl From<GetDatasetError> for GetAliasesError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
+            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

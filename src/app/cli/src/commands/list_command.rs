@@ -175,7 +175,7 @@ impl ListCommand {
     }
 
     fn stream_datasets(&self) -> DatasetHandleStream {
-        if self.dataset_repo.is_multitenant() {
+        if self.dataset_repo.is_multi_tenant() {
             match &self.related_account_indication.target_account {
                 TargetAccountSelection::Current => self
                     .dataset_repo
@@ -195,7 +195,7 @@ impl ListCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
-    fn needs_multitenant_workspace(&self) -> bool {
+    fn needs_multi_tenant_workspace(&self) -> bool {
         self.current_account.is_explicit() || self.related_account_indication.is_explicit()
     }
 
@@ -209,7 +209,8 @@ impl Command for ListCommand {
         use datafusion::arrow::datatypes::Schema;
         use datafusion::arrow::record_batch::RecordBatch;
 
-        let show_owners = self.dataset_repo.is_multitenant() && self.needs_multitenant_workspace();
+        let show_owners =
+            self.dataset_repo.is_multi_tenant() && self.needs_multi_tenant_workspace();
 
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default().with_null_value("-"))

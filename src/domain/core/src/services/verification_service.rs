@@ -156,6 +156,12 @@ pub enum VerificationError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    MultiTenantRefUnexpected(
+        #[from]
+        #[backtrace]
+        MultiTenantRefUnexpectedError,
+    ),
+    #[error(transparent)]
     RefNotFound(
         #[from]
         #[backtrace]
@@ -221,6 +227,9 @@ impl From<GetDatasetError> for VerificationError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => VerificationError::DatasetNotFound(e),
+            GetDatasetError::MultiTenantRefUnexpected(e) => {
+                VerificationError::MultiTenantRefUnexpected(e)
+            }
             GetDatasetError::Internal(e) => VerificationError::Internal(e),
         }
     }

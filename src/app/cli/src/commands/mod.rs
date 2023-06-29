@@ -131,7 +131,7 @@ pub trait Command {
         true
     }
 
-    fn needs_multitenant_workspace(&self) -> bool {
+    fn needs_multi_tenant_workspace(&self) -> bool {
         false
     }
 

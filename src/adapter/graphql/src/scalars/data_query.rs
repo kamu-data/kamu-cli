@@ -77,6 +77,7 @@ impl From<QueryError> for DataQueryResult {
     fn from(e: QueryError) -> Self {
         match e {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
+            QueryError::MultiTenantRefUnexpected(e) => DataQueryResult::internal(e.to_string()),
             QueryError::DataFusionError(e) => e.into(),
             QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),

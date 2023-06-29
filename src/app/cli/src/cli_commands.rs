@@ -106,7 +106,7 @@ pub fn get_command(
             } else {
                 Box::new(InitCommand::new(
                     catalog.get_one()?,
-                    submatches.get_flag("multitenant"),
+                    submatches.get_flag("multi-tenant"),
                 ))
             }
         }

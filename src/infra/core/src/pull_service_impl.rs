@@ -613,6 +613,9 @@ impl PullService for PullServiceImpl {
     ) -> Result<PullResult, SetWatermarkError> {
         let aliases = match self.remote_alias_reg.get_remote_aliases(dataset_ref).await {
             Ok(v) => Ok(v),
+            Err(GetAliasesError::MultiTenantRefUnexpected(e)) => {
+                Err(SetWatermarkError::MultiTenantRefUnexpected(e))
+            }
             Err(GetAliasesError::DatasetNotFound(e)) => Err(SetWatermarkError::NotFound(e)),
             Err(GetAliasesError::Internal(e)) => Err(SetWatermarkError::Internal(e)),
         }?;

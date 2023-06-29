@@ -369,7 +369,7 @@ impl TransformServiceImpl {
         let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
 
         assert!(
-            !dataset_handle.alias.is_multitenant(),
+            !dataset_handle.alias.is_multi_tenant(),
             "Multitenancy is not supported yet"
         );
 
@@ -744,7 +744,7 @@ impl TransformServiceImpl {
                 .await?;
 
             assert!(
-                !dataset_handle.alias.is_multitenant(),
+                !dataset_handle.alias.is_multi_tenant(),
                 "Multitenancy is not supported yet"
             );
 

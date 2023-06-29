@@ -54,7 +54,7 @@ pub async fn run(
     // Configure application
     let (guards, catalog, output_config) = {
         let mut catalog_builder =
-            configure_catalog(&workspace_layout, workspace_svc.is_multitenant_workspace());
+            configure_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
         catalog_builder.add_value(workspace_layout.clone());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
@@ -88,8 +88,8 @@ pub async fn run(
         Err(CLIError::usage_error_from(NotInWorkspace))
     } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
         Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-    } else if command.needs_multitenant_workspace() && !workspace_svc.is_multitenant_workspace() {
-        Err(CLIError::usage_error_from(NotInMultitenantWorkspace))
+    } else if command.needs_multi_tenant_workspace() && !workspace_svc.is_multi_tenant_workspace() {
+        Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
     } else {
         command.run().await
     };
@@ -129,7 +129,7 @@ pub async fn run(
 // Public only for tests
 pub fn configure_catalog(
     workspace_layout: &WorkspaceLayout,
-    is_multitenant_workspace: bool,
+    is_multi_tenant_workspace: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -142,7 +142,7 @@ pub fn configure_catalog(
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())
-            .with_multitenant(is_multitenant_workspace),
+            .with_multi_tenant(is_multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
