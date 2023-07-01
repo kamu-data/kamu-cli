@@ -80,9 +80,9 @@ impl TransformServiceImpl {
         CommitFn: FnOnce(DateTime<Utc>, ExecuteQuery, PathBuf, PathBuf) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
-        let new_checkpoint_path = PathBuf::from(&operation.request.new_checkpoint_path);
+        let new_checkpoint_path = operation.request.new_checkpoint_path.clone();
         let system_time = operation.request.system_time.clone();
-        let out_data_path = PathBuf::from(&operation.request.out_data_path);
+        let out_data_path = Arc::new(operation.request.out_data_path.clone());
 
         let engine = engine_provisioner
             .provision_engine(
@@ -112,13 +112,23 @@ impl TransformServiceImpl {
             }
 
             // TODO: Move out into data commit procedure of sorts
-            let logical_hash =
-                kamu_data_utils::data::hash::get_parquet_logical_hash(&out_data_path).int_err()?;
+            let path = out_data_path.clone();
+            let logical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
 
-            let physical_hash =
-                kamu_data_utils::data::hash::get_file_physical_hash(&out_data_path).int_err()?;
+            let path = out_data_path.clone();
+            let physical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_file_physical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
 
-            let size = std::fs::metadata(&out_data_path).int_err()?.len() as i64;
+            let size = std::fs::metadata(out_data_path.as_path()).int_err()?.len() as i64;
 
             Some(DataSlice {
                 logical_hash,
@@ -170,7 +180,7 @@ impl TransformServiceImpl {
         let result = commit_fn(
             system_time,
             new_event,
-            out_data_path.clone(),
+            (*out_data_path).clone(),
             new_checkpoint_path.clone(),
         )
         .await?;

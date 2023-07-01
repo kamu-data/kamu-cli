@@ -100,7 +100,7 @@ impl VerificationServiceImpl {
                     CachedObject::from(&output_slice.physical_hash, dataset.as_data_repo()).await?;
 
                 // Do a fast pass using physical hash
-                let physical_hash_actual = data_hashing_helper.physical_hash().int_err()?;
+                let physical_hash_actual = data_hashing_helper.physical_hash().await.int_err()?;
                 if physical_hash_actual != output_slice.physical_hash {
                     // Root data files are non-reproducible by definition, so
                     // if physical hashes don't match - we can give up right away.
@@ -117,7 +117,8 @@ impl VerificationServiceImpl {
                     } else {
                         // Derivative data may be replayed and produce different binary file
                         // but data must have same logical hash to be valid.
-                        let logical_hash_actual = data_hashing_helper.logical_hash().int_err()?;
+                        let logical_hash_actual =
+                            data_hashing_helper.logical_hash().await.int_err()?;
 
                         if logical_hash_actual != output_slice.logical_hash {
                             return Err(VerificationError::DataDoesNotMatchMetadata(
@@ -159,7 +160,7 @@ impl VerificationServiceImpl {
                             .await?;
 
                     let physical_hash_actual =
-                        checkpoint_hashing_helper.physical_hash().int_err()?;
+                        checkpoint_hashing_helper.physical_hash().await.int_err()?;
 
                     if physical_hash_actual != checkpoint.physical_hash {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(

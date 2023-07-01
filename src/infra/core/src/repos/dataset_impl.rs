@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -356,19 +357,29 @@ where
         let output_data = match data_interval {
             None => None,
             Some(data_interval) => {
-                let from_data_path = movable_data_file.unwrap();
+                let from_data_path = Arc::new(movable_data_file.unwrap().to_path_buf());
+
+                let path = from_data_path.clone();
+                let logical_hash = tokio::task::spawn_blocking(move || {
+                    kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
+                })
+                .await
+                .int_err()?
+                .int_err()?;
+
+                let path = from_data_path.clone();
+                let physical_hash = tokio::task::spawn_blocking(move || {
+                    kamu_data_utils::data::hash::get_file_physical_hash(&path)
+                })
+                .await
+                .int_err()?
+                .int_err()?;
 
                 let output_data = DataSlice {
-                    logical_hash: kamu_data_utils::data::hash::get_parquet_logical_hash(
-                        from_data_path.as_ref(),
-                    )
-                    .int_err()?,
-                    physical_hash: kamu_data_utils::data::hash::get_file_physical_hash(
-                        from_data_path.as_ref(),
-                    )
-                    .int_err()?,
+                    logical_hash,
+                    physical_hash,
                     interval: data_interval,
-                    size: std::fs::metadata(&from_data_path).int_err()?.len() as i64,
+                    size: std::fs::metadata(from_data_path.as_path()).int_err()?.len() as i64,
                 };
 
                 // Move data to repo
