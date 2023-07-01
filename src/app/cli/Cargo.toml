@@ -75,8 +75,8 @@ serde_yaml = "0.9"
 # Tracing / logging / telemetry
 tracing = "0.1"
 tracing-appender = "0.2"
-tracing-chrome = "0.7"
-tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter"] }
+tracing-perfetto = { workspace = true }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt", "ansi", "env-filter"] }
 tracing-log = "0.1"
 tracing-bunyan-formatter = "0.3"
 

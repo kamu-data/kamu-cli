@@ -2990,8 +2990,8 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-bunyan-formatter",
- "tracing-chrome",
  "tracing-log",
+ "tracing-perfetto",
  "tracing-subscriber",
  "url",
  "urlencoding",
@@ -5423,17 +5423,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-chrome"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "496b3cd5447f7ff527bbbf19b071ad542a000adf297d4127078b4dfdb931f41a"
-dependencies = [
- "serde_json",
- "tracing-core",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-core"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5452,6 +5441,20 @@ dependencies = [
  "lazy_static",
  "log",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-perfetto"
+version = "0.131.1"
+dependencies = [
+ "env_logger",
+ "serde",
+ "serde_json",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

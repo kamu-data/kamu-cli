@@ -366,14 +366,8 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
     // Configure Perfetto tracing if enabled
     let (maybe_perfetto_layer, perfetto_guard) = if let Some(trace_file) = &output_config.trace_file
     {
-        let (perfetto_layer, perfetto_guard) = tracing_chrome::ChromeLayerBuilder::new()
-            .file(trace_file)
-            .trace_style(tracing_chrome::TraceStyle::Async)
-            .include_locations(true)
-            .include_args(true)
-            .build();
-
-        (Some(perfetto_layer), Some(perfetto_guard))
+        let (layer, guard) = tracing_perfetto::PerfettoLayer::new(trace_file);
+        (Some(layer), Some(guard))
     } else {
         (None, None)
     };
@@ -485,5 +479,5 @@ fn get_output_format_recursive<'a>(
 #[derive(Default)]
 struct Guards {
     appender: Option<tracing_appender::non_blocking::WorkerGuard>,
-    perfetto: Option<tracing_chrome::FlushGuard>,
+    perfetto: Option<tracing_perfetto::FlushGuard>,
 }

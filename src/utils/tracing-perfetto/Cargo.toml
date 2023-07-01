@@ -1,0 +1,32 @@
+[package]
+name = "tracing-perfetto"
+description = "A tracing layer for recording profiling information in Perfetto format"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+serde = { version = "1", default-features = false }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false }
+
+
+[dev-dependencies]
+env_logger = "0.10"
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "rt-multi-thread", "macros", "time"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -8,6 +8,7 @@ members = [
     "src/utils/event-sourcing-macros",
     "src/utils/internal-error",
     "src/utils/repo-tools",
+    "src/utils/tracing-perfetto",
     # Domain
     "src/domain/opendatafabric",
     "src/domain/core",
@@ -32,6 +33,7 @@ event-sourcing = { version = "0.131.1", path = "src/utils/event-sourcing", defau
 event-sourcing-macros = { version = "0.131.1", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.131.1", path = "src/utils/internal-error", default-features = false }
 kamu-data-utils = { version = "0.131.1", path = "src/utils/data-utils", default-features = false }
+tracing-perfetto = { version = "0.131.1", path = "src/utils/tracing-perfetto", default-features = false }
 # Domain
 opendatafabric = { version = "0.131.1", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.131.1", path = "src/domain/core", default-features = false }
