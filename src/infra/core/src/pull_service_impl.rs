@@ -19,7 +19,6 @@ use url::Url;
 
 pub struct PullServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
-    remote_repository_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
@@ -31,7 +30,6 @@ pub struct PullServiceImpl {
 impl PullServiceImpl {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
-        remote_repository_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
@@ -40,7 +38,6 @@ impl PullServiceImpl {
     ) -> Self {
         Self {
             local_repo,
-            remote_repository_reg,
             remote_alias_reg,
             ingest_svc,
             transform_svc,
@@ -442,11 +439,10 @@ impl PullServiceImpl {
         &self,
         r: &DatasetRefAny,
     ) -> Result<DatasetRef, DatasetRefRemote> {
-        if self.multi_tenant {
-            r.as_local_ref(|r| self.remote_repository_reg.is_repository(r))
-        } else {
-            r.as_local_single_tenant_ref()
-        }
+        // Single-tenant workspace => treat all repo-like references as repos.
+        // Multi-tenant workspace => treat all repo-like references as accounts, use
+        // repo:// for repos
+        r.as_local_ref(|_| !self.multi_tenant)
     }
 }
 
