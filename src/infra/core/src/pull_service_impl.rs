@@ -19,27 +19,33 @@ use url::Url;
 
 pub struct PullServiceImpl {
     local_repo: Arc<dyn DatasetRepository>,
+    remote_repository_reg: Arc<dyn RemoteRepositoryRegistry>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
+    multi_tenant: bool,
 }
 
 #[component(pub)]
 impl PullServiceImpl {
     pub fn new(
         local_repo: Arc<dyn DatasetRepository>,
+        remote_repository_reg: Arc<dyn RemoteRepositoryRegistry>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
+        multi_tenant: bool,
     ) -> Self {
         Self {
             local_repo,
+            remote_repository_reg,
             remote_alias_reg,
             ingest_svc,
             transform_svc,
             sync_svc,
+            multi_tenant,
         }
     }
 
@@ -431,6 +437,17 @@ impl PullServiceImpl {
             })
             .collect())
     }
+
+    fn classify_dataset_reference(
+        &self,
+        r: &DatasetRefAny,
+    ) -> Result<DatasetRef, DatasetRefRemote> {
+        if self.multi_tenant {
+            r.as_local_ref(|r| self.remote_repository_reg.is_repository(r))
+        } else {
+            r.as_local_single_tenant_ref()
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -441,8 +458,7 @@ impl PullService for PullServiceImpl {
         options: PullOptions,
         listener: Option<Arc<dyn PullListener>>,
     ) -> Result<PullResult, PullError> {
-        // TODO: Support local multi-tenancy
-        let request = match dataset_ref.as_local_single_tenant_ref() {
+        let request = match self.classify_dataset_reference(dataset_ref) {
             Ok(local_ref) => PullRequest {
                 local_ref: Some(local_ref),
                 remote_ref: None,
@@ -495,20 +511,17 @@ impl PullService for PullServiceImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         let requests = dataset_refs
             .into_iter()
-            .map(|r| {
-                // TODO: Support local multi-tenancy
-                match r.as_local_single_tenant_ref() {
-                    Ok(local_ref) => PullRequest {
-                        local_ref: Some(local_ref),
-                        remote_ref: None,
-                        ingest_from: None,
-                    },
-                    Err(remote_ref) => PullRequest {
-                        local_ref: None,
-                        remote_ref: Some(remote_ref),
-                        ingest_from: None,
-                    },
-                }
+            .map(|r| match self.classify_dataset_reference(&r) {
+                Ok(local_ref) => PullRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: None,
+                    ingest_from: None,
+                },
+                Err(remote_ref) => PullRequest {
+                    local_ref: None,
+                    remote_ref: Some(remote_ref),
+                    ingest_from: None,
+                },
             })
             .collect();
 

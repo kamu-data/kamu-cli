@@ -729,10 +729,12 @@ impl PullTestHarness {
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), local_repo.clone()));
         let pull_svc = PullServiceImpl::new(
             local_repo.clone(),
+            remote_repo_reg.clone(),
             remote_alias_reg.clone(),
             ingest_svc,
             transform_svc,
             sync_svc,
+            false,
         );
 
         Self {
