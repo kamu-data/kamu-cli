@@ -23,7 +23,7 @@ pub struct PullServiceImpl {
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
-    multi_tenant: bool,
+    current_account: Arc<CurrentAccountConfig>,
 }
 
 #[component(pub)]
@@ -34,7 +34,7 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
-        multi_tenant: bool,
+        current_account: Arc<CurrentAccountConfig>,
     ) -> Self {
         Self {
             local_repo,
@@ -42,7 +42,7 @@ impl PullServiceImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
-            multi_tenant,
+            current_account,
         }
     }
 
@@ -132,9 +132,14 @@ impl PullServiceImpl {
                     DatasetRefRemote::Alias(alias)
                     | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
-                Some(DatasetRefRemote::Url(url)) => {
-                    DatasetAlias::new(None, self.infer_local_name_from_url(url)?)
-                }
+                Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
+                    if self.local_repo.is_multi_tenant() {
+                        Some(self.current_account.account_name.clone())
+                    } else {
+                        None
+                    },
+                    self.infer_local_name_from_url(url)?,
+                ),
                 None => unreachable!(),
             }
         };
@@ -260,9 +265,14 @@ impl PullServiceImpl {
             }
         }
 
-        // No luck - now have to search through aliases
+        // No luck - now have to search through aliases (of current user)
         use tokio_stream::StreamExt;
-        let mut datasets = self.local_repo.get_all_datasets();
+        let mut datasets = if self.local_repo.is_multi_tenant() {
+            self.local_repo
+                .get_account_datasets(self.current_account.account_name.clone())
+        } else {
+            self.local_repo.get_all_datasets()
+        };
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 
@@ -442,7 +452,7 @@ impl PullServiceImpl {
         // Single-tenant workspace => treat all repo-like references as repos.
         // Multi-tenant workspace => treat all repo-like references as accounts, use
         // repo:// for repos
-        r.as_local_ref(|_| !self.multi_tenant)
+        r.as_local_ref(|_| !self.local_repo.is_multi_tenant())
     }
 }
 
@@ -694,7 +704,6 @@ impl PullItem {
     }
 
     fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
-        // TODO: Support local multi-tenancy
         PullResponse {
             original_request: self.original_request,
             local_ref: r.dst.as_local_ref(|_| true).ok(),

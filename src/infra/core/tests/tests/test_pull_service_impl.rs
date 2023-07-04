@@ -715,9 +715,11 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, false).unwrap());
+        let current_account_config =
+            Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false));
         let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+            current_account_config.clone(),
             false,
         ));
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
@@ -733,7 +735,7 @@ impl PullTestHarness {
             ingest_svc,
             transform_svc,
             sync_svc,
-            false,
+            current_account_config,
         );
 
         Self {
@@ -784,13 +786,19 @@ impl PullBatch {
             match v {
                 DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
                 DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
-                DatasetRefAny::Alias(r, a, n) => (
+                DatasetRefAny::LocalAlias(a, n) => {
+                    (None, None, None, a.as_ref().map(|v| v.as_ref()), Some(n))
+                }
+                DatasetRefAny::RemoteAlias(r, a, n) => (
                     None,
                     None,
-                    r.as_ref().map(|v| v.as_ref()),
+                    Some(r.as_ref()),
                     a.as_ref().map(|v| v.as_ref()),
                     Some(n),
                 ),
+                DatasetRefAny::AmbiguousAlias(ra, n) => {
+                    (None, None, Some(ra.as_ref()), None, Some(n))
+                }
                 DatasetRefAny::LocalHandle(h) => (
                     None,
                     None,

@@ -79,7 +79,7 @@ impl ClientSideHarness {
         )
         .bind::<dyn TransformService, TransformServiceImpl>();
 
-        b.add_builder(builder_for::<PullServiceImpl>().with_multi_tenant(false))
+        b.add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>();
 
         b.add::<PushServiceImpl>()

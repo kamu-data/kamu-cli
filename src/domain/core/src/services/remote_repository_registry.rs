@@ -31,8 +31,6 @@ pub struct RepositoryAccessInfo {
 pub trait RemoteRepositoryRegistry: Send + Sync {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's>;
 
-    fn is_repository(&self, repo_name: &RepoName) -> bool;
-
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError>;
 
     fn add_repository(&self, repo_name: &RepoName, url: Url) -> Result<(), AddRepoError>;

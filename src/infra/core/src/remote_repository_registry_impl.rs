@@ -47,11 +47,6 @@ impl RemoteRepositoryRegistry for RemoteRepositoryRegistryImpl {
         }))
     }
 
-    fn is_repository(&self, repo_name: &RepoName) -> bool {
-        let file_path = self.repos_dir.join(repo_name);
-        file_path.exists()
-    }
-
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {
         let file_path = self.repos_dir.join(repo_name);
 
@@ -118,10 +113,6 @@ pub struct RemoteRepositoryRegistryNull;
 impl RemoteRepositoryRegistry for RemoteRepositoryRegistryNull {
     fn get_all_repositories<'s>(&'s self) -> Box<dyn Iterator<Item = RepoName> + 's> {
         Box::new(std::iter::empty())
-    }
-
-    fn is_repository(&self, _repo_name: &RepoName) -> bool {
-        false
     }
 
     fn get_repository(&self, repo_name: &RepoName) -> Result<RepositoryAccessInfo, GetRepoError> {

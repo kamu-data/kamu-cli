@@ -183,7 +183,7 @@ pub fn configure_catalog(
     b.add::<SyncServiceImpl>();
     b.bind::<dyn SyncService, SyncServiceImpl>();
 
-    b.add_builder(builder_for::<PullServiceImpl>().with_multi_tenant(is_multi_tenant_workspace));
+    b.add::<PullServiceImpl>();
     b.bind::<dyn PullService, PullServiceImpl>();
 
     b.add::<PushServiceImpl>();

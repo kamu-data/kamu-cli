@@ -448,19 +448,15 @@ impl DatasetAliasRemote {
     }
 
     pub fn as_any_ref(&self) -> DatasetRefAny {
-        DatasetRefAny::Alias(
-            Some(self.repo_name.clone().into_inner()),
-            self.account_name.clone().map(|v| v.into_inner()),
+        DatasetRefAny::RemoteAlias(
+            self.repo_name.clone(),
+            self.account_name.clone(),
             self.dataset_name.clone(),
         )
     }
 
     pub fn into_any_ref(self) -> DatasetRefAny {
-        DatasetRefAny::Alias(
-            Some(self.repo_name.into_inner()),
-            self.account_name.map(|v| v.into_inner()),
-            self.dataset_name,
-        )
+        DatasetRefAny::RemoteAlias(self.repo_name, self.account_name, self.dataset_name)
     }
 }
 
