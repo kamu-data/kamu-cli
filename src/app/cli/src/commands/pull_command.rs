@@ -102,9 +102,13 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
-            CLIError::usage_error("When using --fetch reference should point to a local dataset")
-        })?;
+        let dataset_ref = self.refs[0]
+            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+            .map_err(|_| {
+                CLIError::usage_error(
+                    "When using --fetch reference should point to a local dataset",
+                )
+            })?;
 
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
