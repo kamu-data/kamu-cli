@@ -177,7 +177,7 @@ async fn test_ingest_parquet_with_engine() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     _workspace_layout: Arc<WorkspaceLayout>,
-    local_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
 }
 
@@ -185,7 +185,7 @@ impl IngestTestHarness {
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
-        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
             Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
             false,
@@ -198,7 +198,7 @@ impl IngestTestHarness {
         ));
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(
-            local_repo.clone(),
+            dataset_repo.clone(),
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
             workspace_layout.run_info_dir.clone(),
@@ -208,13 +208,13 @@ impl IngestTestHarness {
         Self {
             temp_dir,
             _workspace_layout: workspace_layout,
-            local_repo,
+            dataset_repo,
             ingest_svc,
         }
     }
 
     async fn ingest_snapshot(&self, dataset_snapshot: DatasetSnapshot, dataset_name: &DatasetName) {
-        self.local_repo
+        self.dataset_repo
             .create_dataset_from_snapshot(None, dataset_snapshot)
             .await
             .unwrap();
@@ -232,7 +232,7 @@ impl IngestTestHarness {
 
     async fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let dataset_ref = dataset_name.as_local_ref();
-        let dataset = self.local_repo.get_dataset(&dataset_ref).await.unwrap();
+        let dataset = self.dataset_repo.get_dataset(&dataset_ref).await.unwrap();
 
         let (_, block) = dataset
             .as_metadata_chain()

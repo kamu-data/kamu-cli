@@ -25,7 +25,7 @@ type GenericVerificationResult =
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct VerifyCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRef>,
@@ -35,7 +35,7 @@ pub struct VerifyCommand {
 
 impl VerifyCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -46,7 +46,7 @@ impl VerifyCommand {
         I: Iterator<Item = DatasetRef>,
     {
         Self {
-            local_repo,
+            dataset_repo,
             verification_svc,
             output_config,
             refs: refs.collect(),
@@ -80,7 +80,7 @@ impl VerifyCommand {
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(self.refs.first().unwrap())
             .await?;
 

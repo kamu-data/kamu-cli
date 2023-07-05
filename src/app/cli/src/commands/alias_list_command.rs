@@ -18,7 +18,7 @@ use crate::output::*;
 use crate::records_writers::TableWriter;
 
 pub struct AliasListCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     dataset_ref: Option<DatasetRef>,
@@ -26,13 +26,13 @@ pub struct AliasListCommand {
 
 impl AliasListCommand {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         dataset_ref: Option<DatasetRef>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
             output_config,
             dataset_ref,
@@ -121,10 +121,10 @@ impl AliasListCommand {
 impl Command for AliasListCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let mut datasets: Vec<_> = if let Some(dataset_ref) = &self.dataset_ref {
-            let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+            let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
             vec![hdl]
         } else {
-            self.local_repo.get_all_datasets().try_collect().await?
+            self.dataset_repo.get_all_datasets().try_collect().await?
         };
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));

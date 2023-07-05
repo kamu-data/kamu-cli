@@ -26,7 +26,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
@@ -36,7 +36,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     ));
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
-        local_repo.clone(),
+        dataset_repo.clone(),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -50,7 +50,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Add and sync dataset
-    local_repo
+    dataset_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()

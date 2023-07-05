@@ -18,18 +18,18 @@ use crate::utils::cached_object::CachedObject;
 use crate::*;
 
 pub struct VerificationServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     transform_service: Arc<dyn TransformService>,
 }
 
 #[component(pub)]
 impl VerificationServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         transform_service: Arc<dyn TransformService>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             transform_service,
         }
     }
@@ -43,7 +43,7 @@ impl VerificationServiceImpl {
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
@@ -197,7 +197,7 @@ impl VerificationServiceImpl {
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
@@ -258,9 +258,9 @@ impl VerificationService for VerificationServiceImpl {
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
-        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 

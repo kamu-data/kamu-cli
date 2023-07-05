@@ -46,9 +46,9 @@ async fn setup_repo() -> RepoFixture {
         .add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false))
         .build();
 
-    let local_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-    let created_dataset = local_repo
+    let created_dataset = dataset_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()

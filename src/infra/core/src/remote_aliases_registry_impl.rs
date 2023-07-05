@@ -20,15 +20,15 @@ use super::*;
 
 #[derive(Clone)]
 pub struct RemoteAliasesRegistryImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl RemoteAliasesRegistryImpl {
-    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { local_repo }
+    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { dataset_repo }
     }
 
     async fn read_config(dataset: Arc<dyn Dataset>) -> Result<DatasetConfig, InternalError> {
@@ -72,7 +72,7 @@ impl RemoteAliasesRegistry for RemoteAliasesRegistryImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Box<dyn RemoteAliases>, GetAliasesError> {
-        let dataset = self.local_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
         let config = Self::read_config(dataset.clone()).await?;
         Ok(Box::new(RemoteAliasesImpl::new(dataset, config)))
     }

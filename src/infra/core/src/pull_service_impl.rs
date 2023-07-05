@@ -18,7 +18,7 @@ use opendatafabric::*;
 use url::Url;
 
 pub struct PullServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
@@ -29,7 +29,7 @@ pub struct PullServiceImpl {
 #[component(pub)]
 impl PullServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
@@ -37,7 +37,7 @@ impl PullServiceImpl {
         current_account: Arc<CurrentAccountConfig>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
             ingest_svc,
             transform_svc,
@@ -91,7 +91,7 @@ impl PullServiceImpl {
 
         // Resolve local dataset if it exists
         let local_handle = if let Some(local_ref) = &request.local_ref {
-            let local_handle = self.local_repo.try_resolve_dataset_ref(local_ref).await?;
+            let local_handle = self.dataset_repo.try_resolve_dataset_ref(local_ref).await?;
             if local_handle.is_none() && request.remote_ref.is_none() {
                 // Dataset does not exist locally nor remote ref was provided
                 return Err(PullError::NotFound(DatasetNotFoundError {
@@ -133,7 +133,7 @@ impl PullServiceImpl {
                     | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
-                    if self.local_repo.is_multi_tenant() {
+                    if self.dataset_repo.is_multi_tenant() {
                         Some(self.current_account.account_name.clone())
                     } else {
                         None
@@ -183,7 +183,7 @@ impl PullServiceImpl {
             let local_handle = local_handle.unwrap();
 
             let summary = self
-                .local_repo
+                .dataset_repo
                 .get_dataset(&local_handle.as_local_ref())
                 .await
                 .int_err()?
@@ -247,7 +247,7 @@ impl PullServiceImpl {
         // Do a quick check when remote and local names match
         if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
-                .local_repo
+                .dataset_repo
                 .try_resolve_dataset_ref(
                     &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
                 )
@@ -267,11 +267,11 @@ impl PullServiceImpl {
 
         // No luck - now have to search through aliases (of current user)
         use tokio_stream::StreamExt;
-        let mut datasets = if self.local_repo.is_multi_tenant() {
-            self.local_repo
+        let mut datasets = if self.dataset_repo.is_multi_tenant() {
+            self.dataset_repo
                 .get_account_datasets(self.current_account.account_name.clone())
         } else {
-            self.local_repo.get_all_datasets()
+            self.dataset_repo.get_all_datasets()
         };
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
@@ -452,7 +452,7 @@ impl PullServiceImpl {
         // Single-tenant workspace => treat all repo-like references as repos.
         // Multi-tenant workspace => treat all repo-like references as accounts, use
         // repo:// for repos
-        r.as_local_ref(|_| !self.local_repo.is_multi_tenant())
+        r.as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
     }
 }
 
@@ -545,7 +545,7 @@ impl PullService for PullServiceImpl {
             requests
         } else {
             use futures::TryStreamExt;
-            self.local_repo
+            self.dataset_repo
                 .get_all_datasets()
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
@@ -643,7 +643,7 @@ impl PullService for PullServiceImpl {
             return Err(SetWatermarkError::IsRemote);
         }
 
-        let dataset = self.local_repo.get_dataset(dataset_ref).await?;
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
         let chain = dataset.as_metadata_chain();
 
         if let Some(last_watermark) = chain

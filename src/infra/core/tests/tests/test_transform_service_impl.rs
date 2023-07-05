@@ -16,7 +16,7 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
-async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHandle {
+async fn new_root(dataset_repo: &dyn DatasetRepository, name: &str) -> DatasetHandle {
     let name = DatasetName::try_from(name).unwrap();
     let snap = MetadataFactory::dataset_snapshot()
         .name(name)
@@ -24,7 +24,7 @@ async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHand
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let create_result = local_repo
+    let create_result = dataset_repo
         .create_dataset_from_snapshot(None, snap)
         .await
         .unwrap();
@@ -32,7 +32,7 @@ async fn new_root(local_repo: &dyn DatasetRepository, name: &str) -> DatasetHand
 }
 
 async fn new_deriv(
-    local_repo: &dyn DatasetRepository,
+    dataset_repo: &dyn DatasetRepository,
     name: &str,
     inputs: &[DatasetAlias],
 ) -> (DatasetHandle, SetTransform) {
@@ -45,7 +45,7 @@ async fn new_deriv(
         .push_event(transform.clone())
         .build();
 
-    let create_result = local_repo
+    let create_result = dataset_repo
         .create_dataset_from_snapshot(None, snap)
         .await
         .unwrap();
@@ -53,11 +53,11 @@ async fn new_deriv(
 }
 
 async fn append_block(
-    local_repo: &dyn DatasetRepository,
+    dataset_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRef>,
     block: MetadataBlock,
 ) -> Multihash {
-    let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+    let ds = dataset_repo.get_dataset(&dataset_ref.into()).await.unwrap();
     ds.as_metadata_chain()
         .append(block, AppendOpts::default())
         .await
@@ -65,11 +65,14 @@ async fn append_block(
 }
 
 async fn append_data_block(
-    local_repo: &dyn DatasetRepository,
+    dataset_repo: &dyn DatasetRepository,
     alias: &DatasetAlias,
     records: i64,
 ) -> (Multihash, MetadataBlockTyped<AddData>) {
-    let ds = local_repo.get_dataset(&alias.as_local_ref()).await.unwrap();
+    let ds = dataset_repo
+        .get_dataset(&alias.as_local_ref())
+        .await
+        .unwrap();
     let chain = ds.as_metadata_chain();
     let offset = chain
         .iter_blocks()
@@ -103,21 +106,21 @@ async fn append_data_block(
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     ));
     let transform_svc = TransformServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         Arc::new(EngineProvisionerNull),
         workspace_layout.run_info_dir.clone(),
     );
 
-    let foo = new_root(local_repo.as_ref(), "foo").await;
-    let foo_dataset = local_repo.get_dataset(&foo.as_local_ref()).await.unwrap();
+    let foo = new_root(dataset_repo.as_ref(), "foo").await;
+    let foo_dataset = dataset_repo.get_dataset(&foo.as_local_ref()).await.unwrap();
 
-    let (bar, bar_source) = new_deriv(local_repo.as_ref(), "bar", &[foo.alias.clone()]).await;
+    let (bar, bar_source) = new_deriv(dataset_repo.as_ref(), "bar", &[foo.alias.clone()]).await;
 
     // No data - no work
     assert_eq!(
@@ -128,7 +131,7 @@ async fn test_get_next_operation() {
         None
     );
 
-    let (_, foo_block) = append_data_block(local_repo.as_ref(), &foo.alias, 10).await;
+    let (_, foo_block) = append_data_block(dataset_repo.as_ref(), &foo.alias, 10).await;
     let foo_slice = foo_block.event.output_data.as_ref().unwrap();
     let data_path = kamu_data_utils::data::local_url::into_local_path(
         foo_dataset
@@ -161,13 +164,13 @@ async fn test_get_next_operation() {
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
     ));
     let transform_svc = TransformServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         Arc::new(EngineProvisionerNull),
         workspace_layout.run_info_dir.clone(),
     );
@@ -175,7 +178,7 @@ async fn test_get_verification_plan_one_to_one() {
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
     let root_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let root_create_result = local_repo
+    let root_create_result = dataset_repo
         .create_dataset(
             &root_alias,
             MetadataFactory::metadata_block(
@@ -207,7 +210,7 @@ async fn test_get_verification_plan_one_to_one() {
 
     // Create derivative
     let deriv_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let deriv_create_result = local_repo
+    let deriv_create_result = dataset_repo
         .create_dataset(
             &deriv_alias,
             MetadataFactory::metadata_block(
@@ -244,7 +247,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T1: Root data added
     let t1 = Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap();
     let root_head_t1 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &root_hdl,
         MetadataFactory::metadata_block(AddData {
             input_checkpoint: None,
@@ -282,7 +285,7 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .unwrap();
     let deriv_head_t2 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &deriv_hdl,
         MetadataFactory::metadata_block(ExecuteQuery {
             input_slices: vec![InputSlice {
@@ -312,7 +315,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T3: More root data
     let t3 = Utc.with_ymd_and_hms(2020, 1, 3, 12, 0, 0).unwrap();
     let root_head_t3 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &root_hdl,
         MetadataFactory::metadata_block(AddData {
             input_checkpoint: None,
@@ -352,7 +355,7 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .unwrap();
     let deriv_head_t4 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &deriv_hdl,
         MetadataFactory::metadata_block(ExecuteQuery {
             input_slices: vec![InputSlice {
@@ -388,7 +391,7 @@ async fn test_get_verification_plan_one_to_one() {
     // T5: Root watermark update only
     let t5 = Utc.with_ymd_and_hms(2020, 1, 5, 12, 0, 0).unwrap();
     let root_head_t5 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &root_hdl,
         MetadataFactory::metadata_block(SetWatermark {
             output_watermark: t4,
@@ -407,7 +410,7 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap()
         .unwrap();
     let deriv_head_t6 = append_block(
-        local_repo.as_ref(),
+        dataset_repo.as_ref(),
         &deriv_hdl,
         MetadataFactory::metadata_block(ExecuteQuery {
             input_slices: vec![InputSlice {
@@ -442,7 +445,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
-    let deriv_ds = local_repo
+    let deriv_ds = dataset_repo
         .get_dataset(&deriv_hdl.as_local_ref())
         .await
         .unwrap();

@@ -20,19 +20,19 @@ use super::{CLIError, Command};
 use crate::{OutputConfig, WritePager};
 
 pub struct InspectQueryCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRef,
     output_config: Arc<OutputConfig>,
 }
 
 impl InspectQueryCommand {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRef,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             dataset_ref,
             output_config,
         }
@@ -44,7 +44,7 @@ impl InspectQueryCommand {
         dataset_handle: &DatasetHandle,
     ) -> Result<(), CLIError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
@@ -174,7 +174,7 @@ impl InspectQueryCommand {
 impl Command for InspectQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await?;
 

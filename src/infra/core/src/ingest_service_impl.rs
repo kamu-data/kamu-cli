@@ -18,7 +18,7 @@ use opendatafabric::*;
 use super::ingest::*;
 
 pub struct IngestServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
@@ -28,14 +28,14 @@ pub struct IngestServiceImpl {
 #[component(pub)]
 impl IngestServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: PathBuf,
         cache_dir: PathBuf,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             engine_provisioner,
             container_runtime,
             run_info_dir,
@@ -99,10 +99,10 @@ impl IngestServiceImpl {
         fetch_override: Option<FetchStep>,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 

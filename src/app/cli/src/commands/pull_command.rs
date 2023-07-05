@@ -24,7 +24,7 @@ use crate::output::OutputConfig;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
@@ -40,7 +40,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, SS>(
         pull_svc: Arc<dyn PullService>,
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -58,7 +58,7 @@ impl PullCommand {
     {
         Self {
             pull_svc,
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.clone()).collect(),
@@ -106,10 +106,10 @@ impl PullCommand {
             CLIError::usage_error("When using --fetch reference should point to a local dataset")
         })?;
 
-        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         let summary = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?
             .get_summary(GetSummaryOpts::default())

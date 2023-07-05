@@ -19,13 +19,13 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { local_repo }
+    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { dataset_repo }
     }
 
     #[async_recursion::async_recursion]
@@ -35,7 +35,7 @@ impl ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         if let Some(dataset) = self
-            .local_repo
+            .dataset_repo
             .try_get_dataset(&dataset_handle.as_local_ref())
             .await?
         {
@@ -51,7 +51,7 @@ impl ProvenanceServiceImpl {
                 let input_id = input.id.as_ref().unwrap();
 
                 let handle = self
-                    .local_repo
+                    .dataset_repo
                     .resolve_dataset_ref(&input_id.as_local_ref())
                     .await?;
 
@@ -98,7 +98,7 @@ impl ProvenanceService for ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), GetLineageError> {
-        let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         self.visit_upstream_dependencies_rec(&hdl, visitor).await
     }
 }

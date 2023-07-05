@@ -64,13 +64,13 @@ impl Kamu {
     }
 
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let local_repo = DatasetRepositoryLocalFs::new(
+        let dataset_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
             Arc::new(self.current_account_config.clone()),
             false,
         );
 
-        let dataset = local_repo
+        let dataset = dataset_repo
             .get_dataset(&dataset_name.as_local_ref())
             .await
             .unwrap();

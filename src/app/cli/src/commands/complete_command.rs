@@ -20,7 +20,7 @@ use super::{CLIError, Command};
 use crate::services::ConfigService;
 
 pub struct CompleteCommand {
-    local_repo: Option<Arc<dyn DatasetRepository>>,
+    dataset_repo: Option<Arc<dyn DatasetRepository>>,
     remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
     remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
     config_service: Arc<ConfigService>,
@@ -33,7 +33,7 @@ pub struct CompleteCommand {
 // but we have to do this until clap supports custom completer functions
 impl CompleteCommand {
     pub fn new<S>(
-        local_repo: Option<Arc<dyn DatasetRepository>>,
+        dataset_repo: Option<Arc<dyn DatasetRepository>>,
         remote_repo_reg: Option<Arc<dyn RemoteRepositoryRegistry>>,
         remote_alias_reg: Option<Arc<dyn RemoteAliasesRegistry>>,
         config_service: Arc<ConfigService>,
@@ -45,7 +45,7 @@ impl CompleteCommand {
         S: Into<String>,
     {
         Self {
-            local_repo,
+            dataset_repo,
             remote_repo_reg,
             remote_alias_reg,
             config_service,
@@ -73,7 +73,7 @@ impl CompleteCommand {
     }
 
     async fn complete_dataset(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(repo) = self.local_repo.as_ref() {
+        if let Some(repo) = self.dataset_repo.as_ref() {
             let mut datasets = repo.get_all_datasets();
             while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                 if dataset_handle.alias.dataset_name.starts_with(prefix) {
@@ -94,7 +94,7 @@ impl CompleteCommand {
     }
 
     async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
-        if let Some(repo) = self.local_repo.as_ref() {
+        if let Some(repo) = self.dataset_repo.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
                 let mut datasets = repo.get_all_datasets();
                 while let Some(dataset_handle) = datasets.try_next().await.unwrap() {

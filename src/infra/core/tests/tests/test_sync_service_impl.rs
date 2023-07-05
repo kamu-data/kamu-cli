@@ -22,12 +22,12 @@ use url::Url;
 use crate::utils::{DummySmartTransferProtocolClient, HttpFileServer, IpfsDaemon};
 
 async fn append_random_data(
-    local_repo: &dyn DatasetRepository,
+    dataset_repo: &dyn DatasetRepository,
     dataset_ref: impl Into<DatasetRef>,
 ) -> Multihash {
     let tmp_dir = tempfile::tempdir().unwrap();
 
-    let ds = local_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+    let ds = dataset_repo.get_dataset(&dataset_ref.into()).await.unwrap();
 
     let prev_data = ds
         .as_metadata_chain()
@@ -101,7 +101,7 @@ async fn do_test_sync(
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
@@ -113,7 +113,7 @@ async fn do_test_sync(
 
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
-        local_repo.clone(),
+        dataset_repo.clone(),
         dataset_factory,
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(ipfs_client),
@@ -151,7 +151,7 @@ async fn do_test_sync(
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let b1 = local_repo
+    let b1 = dataset_repo
         .create_dataset_from_snapshot(None, snapshot)
         .await
         .unwrap()
@@ -192,9 +192,9 @@ async fn do_test_sync(
     );
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let _b2 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
+    let _b2 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b3 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
+    let b3 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
@@ -257,7 +257,7 @@ async fn do_test_sync(
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let exta_head = append_random_data(local_repo.as_ref(), &dataset_alias_2).await;
+    let exta_head = append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -325,11 +325,11 @@ async fn do_test_sync(
 
     // Datasets complex divergence //////////////////////////////////////////////
 
-    let _b4 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
+    let _b4 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b5 = append_random_data(local_repo.as_ref(), &dataset_alias).await;
+    let b5 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b4_alt = append_random_data(local_repo.as_ref(), &dataset_alias_2).await;
+    let b4_alt = append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,

@@ -234,7 +234,7 @@ async fn test_pull_batching_chain() {
 
     // A - B - C
     create_graph(
-        harness.local_repo.as_ref(),
+        harness.dataset_repo.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names!["a"]),
@@ -287,7 +287,7 @@ async fn test_pull_batching_complex() {
     //         /
     // B - - -/
     create_graph(
-        harness.local_repo.as_ref(),
+        harness.dataset_repo.as_ref(),
         vec![
             (n!("a"), names![]),
             (n!("b"), names![]),
@@ -354,7 +354,7 @@ async fn test_pull_batching_complex_with_remote() {
     )
     .await;
     create_graph(
-        harness.local_repo.as_ref(),
+        harness.dataset_repo.as_ref(),
         vec![
             (n!("c"), names![]),
             (n!("d"), names![]),
@@ -629,7 +629,7 @@ async fn test_set_watermark() {
     let dataset_alias = n!("foo");
 
     harness
-        .local_repo
+        .dataset_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -641,7 +641,7 @@ async fn test_set_watermark() {
 
     let num_blocks = || async {
         let ds = harness
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_alias.as_local_ref())
             .await
             .unwrap();
@@ -705,7 +705,7 @@ async fn test_set_watermark() {
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     workspace_layout: Arc<WorkspaceLayout>,
-    local_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
     pull_svc: PullServiceImpl,
@@ -717,7 +717,7 @@ impl PullTestHarness {
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, false).unwrap());
         let current_account_config =
             Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false));
-        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
             current_account_config.clone(),
             false,
@@ -725,12 +725,12 @@ impl PullTestHarness {
         let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
             workspace_layout.repos_dir.clone(),
         ));
-        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(local_repo.clone()));
+        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(dataset_repo.clone()));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
-        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), local_repo.clone()));
+        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), dataset_repo.clone()));
         let pull_svc = PullServiceImpl::new(
-            local_repo.clone(),
+            dataset_repo.clone(),
             remote_alias_reg.clone(),
             ingest_svc,
             transform_svc,
@@ -741,7 +741,7 @@ impl PullTestHarness {
         Self {
             calls,
             workspace_layout,
-            local_repo,
+            dataset_repo,
             remote_repo_reg,
             remote_alias_reg,
             pull_svc,
@@ -976,12 +976,15 @@ impl TransformService for TestTransformService {
 
 struct TestSyncService {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 impl TestSyncService {
-    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, local_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { calls, local_repo }
+    fn new(calls: Arc<Mutex<Vec<PullBatch>>>, dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self {
+            calls,
+            dataset_repo,
+        }
     }
 }
 
@@ -1011,13 +1014,13 @@ impl SyncService for TestSyncService {
             let local_ref = dst.as_local_single_tenant_ref().unwrap();
 
             match self
-                .local_repo
+                .dataset_repo
                 .try_resolve_dataset_ref(&local_ref)
                 .await
                 .unwrap()
             {
                 None => {
-                    self.local_repo
+                    self.dataset_repo
                         .create_dataset_from_snapshot(
                             None,
                             MetadataFactory::dataset_snapshot()

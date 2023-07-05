@@ -232,7 +232,7 @@ async fn test_transform_common(transform: Transform) {
 
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
 
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
         false,
@@ -244,7 +244,7 @@ async fn test_transform_common(transform: Transform) {
     ));
 
     let ingest_svc = IngestServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
         workspace_layout.run_info_dir.clone(),
@@ -252,7 +252,7 @@ async fn test_transform_common(transform: Transform) {
     );
 
     let transform_svc = TransformServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         engine_provisioner.clone(),
         workspace_layout.run_info_dir.clone(),
     );
@@ -297,7 +297,7 @@ async fn test_transform_common(transform: Transform) {
 
     let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
 
-    local_repo
+    dataset_repo
         .create_dataset_from_snapshot(None, root_snapshot)
         .await
         .unwrap();
@@ -323,7 +323,7 @@ async fn test_transform_common(transform: Transform) {
 
     let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
 
-    let dataset = local_repo
+    let dataset = dataset_repo
         .create_dataset_from_snapshot(None, deriv_snapshot)
         .await
         .unwrap()

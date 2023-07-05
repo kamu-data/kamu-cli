@@ -14,7 +14,7 @@ use kamu_core::*;
 use opendatafabric::*;
 
 pub struct PushServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     sync_svc: Arc<dyn SyncService>,
 }
@@ -22,12 +22,12 @@ pub struct PushServiceImpl {
 #[component(pub)]
 impl PushServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         sync_svc: Arc<dyn SyncService>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
             sync_svc,
         }
@@ -50,7 +50,7 @@ impl PushServiceImpl {
     async fn collect_plan_item(&self, request: PushRequest) -> Result<PushItem, PushResponse> {
         // Resolve local dataset if we have a local reference
         let local_handle = if let Some(local_ref) = &request.local_ref {
-            match self.local_repo.resolve_dataset_ref(local_ref).await {
+            match self.dataset_repo.resolve_dataset_ref(local_ref).await {
                 Ok(h) => Some(h),
                 Err(e) => {
                     return Err(PushResponse {
@@ -143,7 +143,7 @@ impl PushServiceImpl {
         // Do a quick check when remote and local names match
         if let Some(remote_name) = remote_ref.dataset_name() {
             if let Some(local_handle) = self
-                .local_repo
+                .dataset_repo
                 .try_resolve_dataset_ref(
                     &DatasetAlias::new(None, remote_name.clone()).as_local_ref(),
                 )
@@ -163,7 +163,7 @@ impl PushServiceImpl {
 
         // No luck - now have to search through aliases
         use tokio_stream::StreamExt;
-        let mut datasets = self.local_repo.get_all_datasets();
+        let mut datasets = self.dataset_repo.get_all_datasets();
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 

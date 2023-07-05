@@ -16,7 +16,7 @@ use super::{common, BatchError, CLIError, Command};
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     current_account: Arc<CurrentAccountConfig>,
     snapshot_refs: Vec<String>,
     recursive: bool,
@@ -27,7 +27,7 @@ pub struct AddCommand {
 impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         current_account: Arc<CurrentAccountConfig>,
         snapshot_refs_iter: I,
         recursive: bool,
@@ -39,7 +39,7 @@ impl AddCommand {
     {
         Self {
             resource_loader,
-            local_repo,
+            dataset_repo,
             current_account,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
@@ -167,7 +167,7 @@ impl Command for AddCommand {
             let mut already_exist = Vec::new();
             for s in &snapshots {
                 if let Some(hdl) = self
-                    .local_repo
+                    .dataset_repo
                     .try_resolve_dataset_ref(&s.name.as_local_ref())
                     .await?
                 {
@@ -193,13 +193,15 @@ impl Command for AddCommand {
 
                 // TODO: delete permissions should be checked in multi-tenant scenario
                 for hdl in already_exist {
-                    self.local_repo.delete_dataset(&hdl.as_local_ref()).await?;
+                    self.dataset_repo
+                        .delete_dataset(&hdl.as_local_ref())
+                        .await?;
                 }
             }
         };
 
         let mut add_results = self
-            .local_repo
+            .dataset_repo
             .create_datasets_from_snapshots(
                 if self.current_account.is_explicit() {
                     Some(self.current_account.account_name.clone())
