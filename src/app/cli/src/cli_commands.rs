@@ -212,6 +212,7 @@ pub fn get_command(
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
             catalog.get_one()?,
+            catalog.get_one()?,
             push_matches
                 .get_many("dataset")
                 .unwrap_or_default()
