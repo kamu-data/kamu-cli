@@ -185,6 +185,7 @@ pub fn get_command(
                 Box::new(SetWatermarkCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
+                    catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),

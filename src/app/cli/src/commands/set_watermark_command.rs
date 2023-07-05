@@ -16,6 +16,7 @@ use opendatafabric::*;
 use super::{CLIError, Command};
 
 pub struct SetWatermarkCommand {
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
     refs: Vec<DatasetRefAny>,
@@ -26,6 +27,7 @@ pub struct SetWatermarkCommand {
 
 impl SetWatermarkCommand {
     pub fn new<I, S>(
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         pull_svc: Arc<dyn PullService>,
         refs: I,
@@ -38,6 +40,7 @@ impl SetWatermarkCommand {
         I: Iterator<Item = DatasetRefAny>,
     {
         Self {
+            dataset_repo,
             remote_alias_reg,
             pull_svc,
             refs: refs.collect(),
@@ -69,7 +72,7 @@ impl Command for SetWatermarkCommand {
         })?;
 
         let dataset_ref = self.refs[0]
-            .as_local_ref(|_| true)
+            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
         let aliases = self

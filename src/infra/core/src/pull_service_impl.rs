@@ -706,7 +706,7 @@ impl PullItem {
     fn into_response_sync(self, r: SyncResultMulti) -> PullResponse {
         PullResponse {
             original_request: self.original_request,
-            local_ref: r.dst.as_local_ref(|_| true).ok(),
+            local_ref: r.dst.as_local_ref(|_| true).ok(), // TODO: multi-tenancy
             remote_ref: r.src.as_remote_ref(|_| true).ok(),
             result: match r.result {
                 Ok(r) => Ok(r.into()),

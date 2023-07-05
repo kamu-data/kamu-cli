@@ -114,7 +114,7 @@ impl PushCommand {
     }
 
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
-        let progress = PrettyPushProgress::new();
+        let progress = PrettyPushProgress::new(self.dataset_repo.is_multi_tenant());
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }
@@ -197,12 +197,14 @@ impl Command for PushCommand {
 #[derive(Clone)]
 struct PrettyPushProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
+    pub multi_tenant_workspace: bool,
 }
 
 impl PrettyPushProgress {
-    fn new() -> Self {
+    fn new(multi_tenant_workspace: bool) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
+            multi_tenant_workspace,
         }
     }
 }
@@ -214,7 +216,8 @@ impl SyncMultiListener for PrettyPushProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            src.as_local_ref(|_| true).expect("Expected local ref"),
+            src.as_local_ref(|_| !self.multi_tenant_workspace)
+                .expect("Expected local ref"),
             dst.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))

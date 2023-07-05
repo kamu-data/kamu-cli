@@ -210,7 +210,8 @@ impl PullCommand {
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
-        let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable);
+        let pull_progress =
+            PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }
@@ -338,13 +339,15 @@ impl Command for PullCommand {
 struct PrettyPullProgress {
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
+    multi_tenant_workspace: bool,
 }
 
 impl PrettyPullProgress {
-    fn new(fetch_uncacheable: bool) -> Self {
+    fn new(fetch_uncacheable: bool, multi_tenant_workspace: bool) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
+            multi_tenant_workspace,
         }
     }
 }
@@ -392,7 +395,8 @@ impl SyncMultiListener for PrettyPullProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            dst.as_local_ref(|_| true).expect("Expected local ref"),
+            dst.as_local_ref(|_| !self.multi_tenant_workspace)
+                .expect("Expected local ref"),
             src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))
