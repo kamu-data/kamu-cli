@@ -191,9 +191,8 @@ impl PushService for PushServiceImpl {
     ) -> Vec<PushResponse> {
         let requests = dataset_refs
             .into_iter()
-            .map(|r| {
-                // TODO: Support local multi-tenancy
-                match r.as_local_single_tenant_ref() {
+            .map(
+                |r| match r.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
                     Ok(local_ref) => PushRequest {
                         local_ref: Some(local_ref),
                         remote_ref: None,
@@ -202,8 +201,8 @@ impl PushService for PushServiceImpl {
                         local_ref: None,
                         remote_ref: Some(remote_ref),
                     },
-                }
-            })
+                },
+            )
             .collect();
 
         self.push_multi_ext(requests, options, sync_listener).await
