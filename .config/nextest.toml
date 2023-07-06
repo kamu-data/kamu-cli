@@ -16,5 +16,5 @@ filter = "test(::engine::)"
 test-group = "engine"
 
 [[profile.default.overrides]]
-filter = 'test(::flaky::)'
-retries = 3
+filter = "test(::flaky::)"
+retries = { count = 3, backoff = "exponential", delay = "3s" }
