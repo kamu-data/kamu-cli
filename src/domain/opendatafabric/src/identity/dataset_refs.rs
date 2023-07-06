@@ -400,23 +400,13 @@ impl DatasetRefAny {
         match self {
             Self::ID(None, id) => Ok(DatasetRef::ID(id)),
             Self::ID(Some(repo), id) => Err(DatasetRefRemote::ID(Some(repo), id)),
-            Self::LocalAlias(None, dataset_name) => {
-                Ok(DatasetRef::Alias(DatasetAlias::new(None, dataset_name)))
-            }
-            Self::LocalAlias(Some(account_name), dataset_name) => Ok(DatasetRef::Alias(
-                DatasetAlias::new(Some(account_name), dataset_name),
+            Self::LocalAlias(account_name, dataset_name) => Ok(DatasetRef::Alias(
+                DatasetAlias::new(account_name, dataset_name),
             )),
-            Self::RemoteAlias(repo_name, Some(account_name), dataset_name) => {
+            Self::RemoteAlias(repo_name, account_name, dataset_name) => {
                 Err(DatasetRefRemote::Alias(DatasetAliasRemote {
                     repo_name,
-                    account_name: Some(account_name),
-                    dataset_name,
-                }))
-            }
-            Self::RemoteAlias(repo_name, None, dataset_name) => {
-                Err(DatasetRefRemote::Alias(DatasetAliasRemote {
-                    repo_name,
-                    account_name: None,
+                    account_name,
                     dataset_name,
                 }))
             }
@@ -456,23 +446,13 @@ impl DatasetRefAny {
     ) -> Result<DatasetRefRemote, DatasetRef> {
         match self {
             Self::ID(repo, id) => Ok(DatasetRefRemote::ID(repo, id)),
-            Self::LocalAlias(None, dataset_name) => {
-                Err(DatasetRef::Alias(DatasetAlias::new(None, dataset_name)))
-            }
-            Self::LocalAlias(Some(account_name), dataset_name) => Err(DatasetRef::Alias(
-                DatasetAlias::new(Some(account_name), dataset_name),
+            Self::LocalAlias(account_name, dataset_name) => Err(DatasetRef::Alias(
+                DatasetAlias::new(account_name, dataset_name),
             )),
-            Self::RemoteAlias(repo_name, Some(account_name), dataset_name) => {
+            Self::RemoteAlias(repo_name, account_name, dataset_name) => {
                 Ok(DatasetRefRemote::Alias(DatasetAliasRemote {
                     repo_name,
-                    account_name: Some(account_name),
-                    dataset_name,
-                }))
-            }
-            Self::RemoteAlias(repo_name, None, dataset_name) => {
-                Ok(DatasetRefRemote::Alias(DatasetAliasRemote {
-                    repo_name,
-                    account_name: None,
+                    account_name,
                     dataset_name,
                 }))
             }
