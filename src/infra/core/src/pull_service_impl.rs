@@ -444,16 +444,6 @@ impl PullServiceImpl {
             })
             .collect())
     }
-
-    fn classify_dataset_reference(
-        &self,
-        r: &DatasetRefAny,
-    ) -> Result<DatasetRef, DatasetRefRemote> {
-        // Single-tenant workspace => treat all repo-like references as repos.
-        // Multi-tenant workspace => treat all repo-like references as accounts, use
-        // repo:// for repos
-        r.as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-    }
 }
 
 #[async_trait::async_trait]
@@ -464,18 +454,8 @@ impl PullService for PullServiceImpl {
         options: PullOptions,
         listener: Option<Arc<dyn PullListener>>,
     ) -> Result<PullResult, PullError> {
-        let request = match self.classify_dataset_reference(dataset_ref) {
-            Ok(local_ref) => PullRequest {
-                local_ref: Some(local_ref),
-                remote_ref: None,
-                ingest_from: None,
-            },
-            Err(remote_ref) => PullRequest {
-                local_ref: None,
-                remote_ref: Some(remote_ref),
-                ingest_from: None,
-            },
-        };
+        let request =
+            PullRequest::from_any_ref(dataset_ref, |_| !self.dataset_repo.is_multi_tenant());
 
         self.pull_ext(&request, options, listener).await
     }
@@ -517,18 +497,7 @@ impl PullService for PullServiceImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         let requests = dataset_refs
             .into_iter()
-            .map(|r| match self.classify_dataset_reference(&r) {
-                Ok(local_ref) => PullRequest {
-                    local_ref: Some(local_ref),
-                    remote_ref: None,
-                    ingest_from: None,
-                },
-                Err(remote_ref) => PullRequest {
-                    local_ref: None,
-                    remote_ref: Some(remote_ref),
-                    ingest_from: None,
-                },
-            })
+            .map(|r| PullRequest::from_any_ref(&r, |_| !self.dataset_repo.is_multi_tenant()))
             .collect();
 
         self.pull_multi_ext(requests, options, listener).await
