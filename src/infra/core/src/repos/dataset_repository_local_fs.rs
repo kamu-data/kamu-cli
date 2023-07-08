@@ -694,7 +694,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
-        let id_as_string = dataset_id.to_string();
+        let id_as_string = dataset_id.cid.to_string();
         let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
         for r_account_dir in read_account_dir {

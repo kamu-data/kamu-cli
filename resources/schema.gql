@@ -109,6 +109,7 @@ type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult
 }
 
 type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	accountName: AccountName
 	datasetName: DatasetName!
 	message: String!
 }

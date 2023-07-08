@@ -314,16 +314,28 @@ where
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?;
         } else {
-            // TODO: Input should be a multi-tenant alias
-            let input_alias = DatasetAlias::new(None, input.name.clone());
+            // When ID is not specified we try resolving it by name or a reference
 
-            // When ID is not specified we try resolving it by name
-            let hdl = match repo.resolve_dataset_ref(&input_alias.as_local_ref()).await {
+            // When reference is available, it dominates
+            let input_local_ref = if let Some(dataset_ref) = &input.dataset_ref {
+                match dataset_ref.as_local_ref(|_| !repo.is_multi_tenant()) {
+                    Ok(local_ref) => local_ref,
+                    Err(_) => {
+                        unimplemented!("Deriving from remote dataset is not supported yet");
+                    }
+                }
+            } else {
+                // Derive reference purely from a name assuming a default account
+                let input_alias = DatasetAlias::new(None, input.name.clone());
+                input_alias.as_local_ref()
+            };
+
+            let hdl = match repo.resolve_dataset_ref(&input_local_ref).await {
                 Ok(hdl) => Ok(hdl),
                 Err(GetDatasetError::NotFound(_)) => Err(
                     CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
                         dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_alias.into_local_ref()],
+                        missing_inputs: vec![input_local_ref],
                     }),
                 ),
                 Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {

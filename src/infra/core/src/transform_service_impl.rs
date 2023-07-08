@@ -368,11 +368,6 @@ impl TransformServiceImpl {
         let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
         let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
 
-        assert!(
-            !dataset_handle.alias.is_multi_tenant(),
-            "Multitenancy is not supported yet"
-        );
-
         Ok(Some(TransformOperation {
             dataset_handle: dataset_handle.clone(),
             input_slices,
@@ -742,11 +737,6 @@ impl TransformServiceImpl {
                 })
                 .try_collect()
                 .await?;
-
-            assert!(
-                !dataset_handle.alias.is_multi_tenant(),
-                "Multitenancy is not supported yet"
-            );
 
             let prev_checkpoint_path = if let Some(cp) = block_t.event.input_checkpoint.as_ref() {
                 Some(

@@ -31,7 +31,7 @@ impl Datasets {
         Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
-    // TODO: Multitenancy
+    // TODO: Multi-tenancy
     /// Returns dataset by its owner and name
     #[allow(unused_variables)]
     async fn by_owner_and_name(
@@ -52,7 +52,7 @@ impl Datasets {
         Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
-    // TODO: Multitenancy
+    // TODO: Multi-tenancy
     #[graphql(skip)]
     async fn by_account_impl(
         &self,
@@ -196,7 +196,7 @@ impl Datasets {
             }
             Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
-                    // TODO: Multitenancy
+                    account_name: e.alias.account_name.map(|a| a.into()),
                     dataset_name: e.alias.dataset_name.into(),
                 })
             }
@@ -268,6 +268,7 @@ impl CreateDatasetResultSuccess {
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct CreateDatasetResultNameCollision {
+    pub account_name: Option<AccountName>,
     pub dataset_name: DatasetName,
 }
 
