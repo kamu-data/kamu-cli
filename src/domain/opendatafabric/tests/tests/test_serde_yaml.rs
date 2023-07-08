@@ -144,10 +144,12 @@ fn serde_dataset_snapshot_derivative() {
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("com.naturalearthdata.10m.admin0").unwrap(),
+                    dataset_ref: None,
                 },
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("com.naturalearthdata.50m.admin0").unwrap(),
+                    dataset_ref: None,
                 },
             ],
             transform: Transform::Sql(TransformSql {

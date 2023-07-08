@@ -50,10 +50,12 @@ fn serde_dataset_summary() {
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("foo").unwrap(),
+                    dataset_ref: None,
                 },
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("bar").unwrap(),
+                    dataset_ref: None,
                 },
             ],
             last_pulled: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),

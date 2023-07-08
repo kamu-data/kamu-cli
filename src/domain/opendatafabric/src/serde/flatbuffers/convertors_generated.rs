@@ -2179,9 +2179,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformInput {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.to_bytes()));
         let name_offset = { fb.create_string(&self.name) };
+        let dataset_ref_offset = self
+            .dataset_ref
+            .as_ref()
+            .map(|v| fb.create_string(v.to_string().as_str()));
         let mut builder = fb::TransformInputBuilder::new(fb);
         id_offset.map(|off| builder.add_id(off));
         builder.add_name(name_offset);
+        dataset_ref_offset.map(|off| builder.add_dataset_ref(off));
         builder.finish()
     }
 }
@@ -2196,6 +2201,9 @@ impl<'fb> FlatbuffersDeserializable<fb::TransformInput<'fb>> for odf::TransformI
                 .name()
                 .map(|v| odf::DatasetName::try_from(v).unwrap())
                 .unwrap(),
+            dataset_ref: proxy
+                .dataset_ref()
+                .map(|v| odf::DatasetRefAny::try_from(v).unwrap()),
         }
     }
 }

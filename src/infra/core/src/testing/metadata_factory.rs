@@ -246,6 +246,7 @@ impl SetTransformBuilder {
                     .map(|s| TransformInput {
                         id: None,
                         name: s.try_into().unwrap(),
+                        dataset_ref: None,
                     })
                     .collect(),
                 transform: TransformSqlBuilder::new().build(),

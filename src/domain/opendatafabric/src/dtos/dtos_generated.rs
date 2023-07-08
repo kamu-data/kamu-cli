@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 
 use crate::formats::Multihash;
-use crate::identity::{DatasetID, DatasetName};
+use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -902,8 +902,10 @@ pub struct TransformInput {
     /// Unique dataset identifier. This field is required in metadata blocks and
     /// can be empty only in a DatasetSnapshot.
     pub id: Option<DatasetID>,
-    /// An alias of this input to be used in queries.
+    /// A name of this input's table to be used in queries.
     pub name: DatasetName,
+    /// A local or remote dataset reference to use in dataset resolutions.
+    pub dataset_ref: Option<DatasetRefAny>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

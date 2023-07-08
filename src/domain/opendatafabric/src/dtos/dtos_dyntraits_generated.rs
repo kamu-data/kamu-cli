@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 use crate::dtos;
 use crate::dtos::{CompressionFormat, DatasetKind, SourceOrdering};
 use crate::formats::*;
-use crate::identity::{DatasetID, DatasetName};
+use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -1903,6 +1903,7 @@ impl Into<dtos::TransformSql> for &dyn TransformSql {
 pub trait TransformInput {
     fn id(&self) -> Option<&DatasetID>;
     fn name(&self) -> &DatasetName;
+    fn dataset_ref(&self) -> Option<&DatasetRefAny>;
 }
 
 impl TransformInput for dtos::TransformInput {
@@ -1912,6 +1913,9 @@ impl TransformInput for dtos::TransformInput {
     fn name(&self) -> &DatasetName {
         &self.name
     }
+    fn dataset_ref(&self) -> Option<&DatasetRefAny> {
+        self.dataset_ref.as_ref().map(|v| -> &DatasetRefAny { v })
+    }
 }
 
 impl Into<dtos::TransformInput> for &dyn TransformInput {
@@ -1919,6 +1923,7 @@ impl Into<dtos::TransformInput> for &dyn TransformInput {
         dtos::TransformInput {
             id: self.id().map(|v| v.clone()),
             name: self.name().to_owned(),
+            dataset_ref: self.dataset_ref().map(|v| v.to_owned()),
         }
     }
 }

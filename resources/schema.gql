@@ -309,6 +309,8 @@ type DatasetMetadata {
 
 scalar DatasetName
 
+scalar DatasetRefAny
+
 type Datasets {
 	"""
 	Returns dataset by its ID
@@ -888,6 +890,7 @@ union Transform = TransformSql
 type TransformInput {
 	id: DatasetID
 	name: DatasetName!
+	datasetRef: DatasetRefAny
 	dataset: Dataset!
 }
 

@@ -1270,6 +1270,7 @@ impl From<odf::TransformSql> for TransformSql {
 pub struct TransformInput {
     pub id: Option<DatasetID>,
     pub name: DatasetName,
+    pub dataset_ref: Option<DatasetRefAny>,
 }
 
 #[ComplexObject]
@@ -1285,6 +1286,7 @@ impl From<odf::TransformInput> for TransformInput {
         Self {
             id: v.id.map(Into::into),
             name: v.name.into(),
+            dataset_ref: v.dataset_ref.map(Into::into),
         }
     }
 }

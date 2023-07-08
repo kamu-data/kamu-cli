@@ -37,7 +37,7 @@ impl DatasetRepositoryS3 {
     fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
         assert!(
             !dataset_alias.is_multi_tenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            "Multi-tenancy is not yet supported by S3 repo"
         );
 
         let context_url = self.s3_context.make_url();
@@ -52,7 +52,7 @@ impl DatasetRepositoryS3 {
     ) -> Result<impl Dataset, InternalError> {
         assert!(
             !dataset_alias.is_multi_tenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            "Multi-tenancy is not yet supported by S3 repo"
         );
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
         DatasetFactoryImpl::get_s3(dataset_url).await
@@ -64,7 +64,7 @@ impl DatasetRepositoryS3 {
     ) -> Result<(), InternalError> {
         assert!(
             !dataset_alias.is_multi_tenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            "Multi-tenancy is not yet supported by S3 repo"
         );
         let dataset_key_prefix = self.s3_context.get_key(&dataset_alias.dataset_name);
         self.s3_context.recursive_delete(dataset_key_prefix).await
@@ -77,7 +77,7 @@ impl DatasetRepositoryS3 {
     ) -> Result<(), MoveBucketItemsOnRenameError> {
         assert!(
             !new_alias.is_multi_tenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            "Multi-tenancy is not yet supported by S3 repo"
         );
 
         let new_key_prefix = self.s3_context.get_key(&new_alias.dataset_name);

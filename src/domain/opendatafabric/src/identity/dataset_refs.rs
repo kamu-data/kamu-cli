@@ -544,6 +544,8 @@ super::dataset_identity::impl_try_from_str!(DatasetRefAny);
 
 crate::formats::impl_invalid_value!(DatasetRefAny);
 
+impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
+
 impl From<DatasetID> for DatasetRefAny {
     fn from(v: DatasetID) -> Self {
         Self::ID(None, v)
